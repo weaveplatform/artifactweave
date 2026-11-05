@@ -13,6 +13,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 )
 
 func metadataFixture(t *testing.T) (Package, Metadata, string) {
@@ -268,7 +270,7 @@ func TestUnitDecodePrimaryRejectsMalformedCompressedXML(t *testing.T) {
 
 func TestUnitDecodeIndependentCreaterepoCMetadata(t *testing.T) {
 	t.Parallel()
-	const fixture = "../../../test/acceptance/testdata/rpm-upstream/repodata"
+	fixture := repopath.Path(t, "test/acceptance/testdata/rpm-upstream/repodata")
 	manifest, err := os.ReadFile(filepath.Join(fixture, "repomd.xml"))
 	if err != nil {
 		t.Fatal(err)
@@ -300,22 +302,12 @@ func TestUnitDecodePrimaryRejectsTruncatedCompressionFrames(t *testing.T) {
 		t.Fatal(err)
 	}
 	gzipBody := meta.Files[strings.TrimPrefix(primaryPath, root)]
-	manifest, err := os.ReadFile(
-		"../../../test/acceptance/testdata/rpm-upstream/repodata/repomd.xml",
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	manifest := repopath.Read(t, "test/acceptance/testdata/rpm-upstream/repodata/repomd.xml")
 	zstdPath, _, err := DecodeRepomd(manifest, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	zstdBody, err := os.ReadFile(
-		filepath.Join("../../../test/acceptance/testdata/rpm-upstream", zstdPath),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	zstdBody := repopath.Read(t, "test/acceptance/testdata/rpm-upstream/"+zstdPath)
 	for _, tc := range []struct {
 		name string
 		body []byte

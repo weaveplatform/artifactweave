@@ -14,7 +14,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"strings"
 	"testing"
 
@@ -30,6 +29,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/work"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/blob/blobtest"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
@@ -273,11 +273,7 @@ func (f *fixture) do(method, path, user string) *httptest.ResponseRecorder {
 
 func fixtureArchive(t *testing.T) []byte {
 	t.Helper()
-	data, err := os.ReadFile("../../../test/acceptance/fixtures/puppet/acme-widget-1.0.0.tar.gz")
-	if err != nil {
-		t.Fatal(err)
-	}
-	return data
+	return repopath.Read(t, "test/acceptance/fixtures/puppet/acme-widget-1.0.0.tar.gz")
 }
 
 func (f *fixture) deploy(c repo.Config, body []byte) types.Item {

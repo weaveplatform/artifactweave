@@ -9,12 +9,11 @@ import (
 	"fmt"
 	"net/http/httptest"
 	"net/url"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/format/huggingface/xet"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -33,11 +32,7 @@ type xetTestToken struct {
 
 func xetFixture(t *testing.T, name string) []byte {
 	t.Helper()
-	b, e := os.ReadFile(filepath.Join("..", "format", "huggingface", "xet", "testdata", name))
-	if e != nil {
-		t.Fatal(e)
-	}
-	return b
+	return repopath.Read(t, "internal/format/huggingface/xet/testdata/"+name)
 }
 
 func newXetWorld(t *testing.T) *itemWorld {

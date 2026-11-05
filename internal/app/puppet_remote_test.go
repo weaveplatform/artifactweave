@@ -6,25 +6,19 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
 func TestAccPuppetRemoteCacheRefreshOfflineAndIntegrity(t *testing.T) {
 	w := newRemoteWorld(t)
-	data, err := os.ReadFile("../../test/acceptance/fixtures/puppet/acme-widget-1.0.0.tar.gz")
-	if err != nil {
-		t.Fatal(err)
-	}
-	manifest, err := os.ReadFile("../../test/acceptance/fixtures/puppet/widget/metadata.json")
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := repopath.Read(t, "test/acceptance/fixtures/puppet/acme-widget-1.0.0.tar.gz")
+	manifest := repopath.Read(t, "test/acceptance/fixtures/puppet/widget/metadata.json")
 	digest := sha256.Sum256(data)
 	var fetches atomic.Int64
 	var status atomic.Int64
@@ -121,10 +115,7 @@ func TestAccPuppetRemoteCacheRefreshOfflineAndIntegrity(t *testing.T) {
 
 func TestAccPuppetRegisteredRoutesAndReindex(t *testing.T) {
 	w := newRemoteWorld(t)
-	data, err := os.ReadFile("../../test/acceptance/fixtures/puppet/acme-widget-1.0.0.tar.gz")
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := repopath.Read(t, "test/acceptance/fixtures/puppet/acme-widget-1.0.0.tar.gz")
 	c := *repo.Defaults(&repo.Config{Key: "puppet", Class: repo.Local, PackageType: repo.Puppet})
 	if err := w.rt.store.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)

@@ -13,6 +13,8 @@ import (
 	"testing"
 
 	"github.com/ulikunitz/xz"
+
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 )
 
 func archiveTar(t *testing.T, names ...string) []byte {
@@ -86,10 +88,7 @@ func completeArchive(t *testing.T, b []byte, name string, wantValid bool) {
 func TestUnitRemoteArchiveCompleteValidation(t *testing.T) {
 	tarBytes := archiveTar(t, "PKG-INFO", "demo/data.txt")
 	gz := archiveGzip(t, tarBytes)
-	bz, err := os.ReadFile("../../format/pypi/testdata/demo_pkg-1.0.tar.bz2")
-	if err != nil {
-		t.Fatal(err)
-	}
+	bz := repopath.Read(t, "internal/format/pypi/testdata/demo_pkg-1.0.tar.bz2")
 	zipBytes := archiveZip(t, "demo-1.0.dist-info/METADATA", "demo/data.txt")
 	for name, b := range map[string][]byte{"demo.tar": tarBytes, "demo.tar.gz": gz, "demo.tar.bz2": bz, "demo.zip": zipBytes} {
 		t.Run(name, func(t *testing.T) { completeArchive(t, b, name, true) })
@@ -306,11 +305,7 @@ func TestUnitRemoteModuleCompressionTrailers(t *testing.T) {
 		case "gz":
 			b = archiveGzip(t, []byte("module bytes"))
 		case "bz2":
-			var err error
-			b, err = os.ReadFile("../../format/pypi/testdata/demo_pkg-1.0.tar.bz2")
-			if err != nil {
-				t.Fatal(err)
-			}
+			b = repopath.Read(t, "internal/format/pypi/testdata/demo_pkg-1.0.tar.bz2")
 		}
 		completeArchive(t, b, "module."+kind, true)
 		broken := bytes.Clone(b)

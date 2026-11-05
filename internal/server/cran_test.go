@@ -10,13 +10,14 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitCRANSourceValidatesPublishedBytes(t *testing.T) {
-	base := filepath.Join("..", "format", "cran", "testdata")
+	base := repopath.Path(t, "internal/format/cran/testdata")
 	index, err := os.ReadFile(filepath.Join(base, "assertthat-PACKAGES"))
 	if err != nil {
 		t.Fatal(err)
@@ -104,12 +105,7 @@ func TestUnitCRANVirtualIndexFiltersUnreadablePackage(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	body, err := os.ReadFile(
-		filepath.Join("..", "format", "cran", "testdata", "assertthat_0.2.1.tar.gz"),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	body := repopath.Read(t, "internal/format/cran/testdata/assertthat_0.2.1.tar.gz")
 	wantStatus(t, w.do("POST", "/artifactory/api/cran/cran-member/sources", "admin", string(body)),
 		http.StatusCreated)
 	if err := w.db.Permissions().Create(t.Context(), types.Permission{
@@ -198,7 +194,7 @@ func TestUnitCRANNativePOSTAndReindex(t *testing.T) {
 	if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
 		t.Fatal(err)
 	}
-	base := filepath.Join("..", "format", "cran", "testdata")
+	base := repopath.Path(t, "internal/format/cran/testdata")
 	for _, tc := range []struct {
 		file, endpoint, path, index string
 	}{

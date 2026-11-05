@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"strings"
 	"testing"
 
@@ -22,6 +21,7 @@ import (
 	"github.com/go-git/go-git/v5/storage/memory"
 
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
@@ -402,10 +402,7 @@ func TestAccCocoaPodsGitDestinationAndTransport(t *testing.T) {
 }
 
 func TestUnitCocoaPodsGitNativePackFixture(t *testing.T) {
-	pack, err := os.ReadFile("../../test/fixtures/cocoapods-git/root.pack")
-	if err != nil {
-		t.Fatal(err)
-	}
+	pack := repopath.Read(t, "test/fixtures/cocoapods-git/root.pack")
 	s, err := decodeCocoaPodsPack(t.Context(), pack, cocoaPodsGitBytes, cocoaPodsGitObjects)
 	if err != nil {
 		t.Fatal(err)

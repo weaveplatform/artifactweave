@@ -23,6 +23,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
@@ -77,21 +78,7 @@ func newWorldWith(t *testing.T, configure func(*server.Config)) *world {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := os.ReadFile(
-		filepath.Join(
-			"..",
-			"..",
-			"..",
-			"internal",
-			"format",
-			"gems",
-			"testdata",
-			"rake-12.3.1.gem",
-		),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	b := repopath.Read(t, "internal/format/gems/testdata/rake-12.3.1.gem")
 	cfg := server.Config{Store: db, Blobs: blobs, Auth: a, BaseURL: "https://reg.example"}
 	if configure != nil {
 		configure(&cfg)

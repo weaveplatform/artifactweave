@@ -40,7 +40,7 @@ func (w *world) createOpkgPackage(name, version, variant, folder string) error {
 		version != "1.0" && version != "2.0" {
 		return fmt.Errorf("unavailable controlled Opkg package %s %s", name, version)
 	}
-	source := filepath.Join("..", "..", "internal", "format", "opkg", "testdata",
+	source := filepath.Join(repoRoot, "internal/format/opkg/testdata",
 		fmt.Sprintf("%s_%s_%s.ipk", name, version, variant))
 	body, err := os.ReadFile(source)
 	if err != nil {
@@ -222,7 +222,7 @@ func (w *world) opkgUpstreamRedirectsAlpha(version string) error {
 // Serve metadata copied from OpenWrt's published feed. The upstream bytes
 // must not be built by the adapter under test.
 func (w *world) opkgOpenWrtUpstream() error {
-	base := filepath.Join("..", "..", "internal", "format", "opkg", "testdata")
+	base := filepath.Join(repoRoot, "internal/format/opkg/testdata")
 	raw, err := os.ReadFile(filepath.Join(base, "openwrt-Packages"))
 	if err != nil {
 		return err
@@ -269,7 +269,7 @@ func (w *world) setOpenWrtResources(raw, ipk []byte) error {
 }
 
 func (w *world) opkgOpenWrtSHA256Mismatch() error {
-	base := filepath.Join("..", "..", "internal", "format", "opkg", "testdata")
+	base := filepath.Join(repoRoot, "internal/format/opkg/testdata")
 	raw, err := os.ReadFile(filepath.Join(base, "openwrt-Packages"))
 	if err != nil {
 		return err

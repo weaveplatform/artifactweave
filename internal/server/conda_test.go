@@ -10,9 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"path"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -20,6 +18,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/work"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -99,12 +98,10 @@ func TestUnitCondaIndexReadFailureNeverServesMetadata(t *testing.T) {
 
 func condaFixture(t *testing.T) []byte {
 	t.Helper()
-	body, err := os.ReadFile(filepath.Join("..", "format", "conda", "testdata",
-		"artifactweave-conda-fixture-1.0.0-0.tar.bz2"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return body
+	return repopath.Read(
+		t,
+		"internal/format/conda/testdata/artifactweave-conda-fixture-1.0.0-0.tar.bz2",
+	)
 }
 
 func TestUnitCondaChannelRejectsUnsafeRequestsAndVirtualCycles(t *testing.T) {
@@ -181,10 +178,7 @@ func TestUnitCondaChannelRejectsUnsafeRequestsAndVirtualCycles(t *testing.T) {
 
 func TestUnitCondaRemoteModernPackageIsFilteredByCurrentSourceAuthority(t *testing.T) {
 	const name = "ca-certificates-2026.7.22-hbd8a1cb_0.conda"
-	body, err := os.ReadFile(filepath.Join("..", "format", "conda", "testdata", name))
-	if err != nil {
-		t.Fatal(err)
-	}
+	body := repopath.Read(t, "internal/format/conda/testdata/"+name)
 	id, _ := condafmt.ParsePackagePath("noarch/" + name)
 	rec, err := condafmt.ReadPackage(t.Context(), bytes.NewReader(body), int64(len(body)), id)
 	if err != nil {
@@ -673,10 +667,7 @@ func TestUnitCondaLocalAndVirtualNativeChannel(t *testing.T) {
 		"/artifactory/api/conda/conda-virtual/noarch/"+filename, "user", ""),
 		http.StatusForbidden)
 	const modernName = "ca-certificates-2026.7.22-hbd8a1cb_0.conda"
-	modern, err := os.ReadFile(filepath.Join("..", "format", "conda", "testdata", modernName))
-	if err != nil {
-		t.Fatal(err)
-	}
+	modern := repopath.Read(t, "internal/format/conda/testdata/"+modernName)
 	wantStatus(t, w.do(http.MethodPut, "/artifactory/conda-fed/noarch/"+modernName,
 		"admin", string(modern)), http.StatusCreated)
 	if err := q.EnsureFresh(t.Context(), condafmt.KindIndex, "conda-fed"); err != nil {

@@ -20,6 +20,8 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-chi/chi/v5"
+
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 )
 
 // This ledger joins the served specs, the implementation/status inventory and
@@ -49,7 +51,7 @@ type apiReviewHandler struct {
 }
 
 func TestAccAPIReliabilityLedger(t *testing.T) {
-	root := moduleRoot(t)
+	root := repopath.Root(t)
 	handlers := apiReviewHandlers(t)
 	entries := map[string]apiReviewOperation{}
 	for _, spec := range specFiles {

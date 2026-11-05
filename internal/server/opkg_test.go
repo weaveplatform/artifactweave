@@ -10,7 +10,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -21,6 +20,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/opkg"
 	"github.com/weaveplatform/artifactweave/internal/format/terraform/terraformtest"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -31,17 +31,8 @@ import (
 // index encoder and archive fixture builder. See docs/testing/opkg.md.
 func opkgUpstreamFixture(t *testing.T) (index, ipk []byte) {
 	t.Helper()
-	var err error
-	index, err = os.ReadFile(filepath.Join("..", "format", "opkg", "testdata", "openwrt-Packages"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	ipk, err = os.ReadFile(
-		filepath.Join("..", "format", "opkg", "testdata", "464xlat_13_x86_64.ipk"),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	index = repopath.Read(t, "internal/format/opkg/testdata/openwrt-Packages")
+	ipk = repopath.Read(t, "internal/format/opkg/testdata/464xlat_13_x86_64.ipk")
 	return index, ipk
 }
 

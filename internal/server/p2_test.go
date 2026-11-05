@@ -7,14 +7,13 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format/p2"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -142,11 +141,7 @@ func TestAccP2ArchiveSuffixIsBoundedAndPermissionChecked(t *testing.T) {
 
 func p2Fixture(t *testing.T, name string) []byte {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join("..", "format", "p2", "testdata", name))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return data
+	return repopath.Read(t, "internal/format/p2/testdata/"+name)
 }
 
 func TestUnitP2SourceAdmission(t *testing.T) {

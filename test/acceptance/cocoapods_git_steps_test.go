@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
 
 	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
 	podfmt "github.com/weaveplatform/artifactweave/internal/format/cocoapods"
@@ -21,8 +20,7 @@ func (w *world) cocoaPodsGitUpstream() error {
 	if err := w.cocoaPodsHTTPUpstream("HelloPod-1.0.0.tar.gz"); err != nil {
 		return err
 	}
-	_, file, _, _ := runtime.Caller(0)
-	dir := filepath.Join(filepath.Dir(file), "../fixtures/cocoapods-git")
+	dir := filepath.Join(repoRoot, "test/fixtures/cocoapods-git")
 	data, err := os.ReadFile(filepath.Join(dir, "refs.json"))
 	if err != nil {
 		return err

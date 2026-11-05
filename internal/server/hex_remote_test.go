@@ -5,12 +5,12 @@ import (
 	"context"
 	"io"
 	"net/http"
-	"os"
 	"testing"
 
 	hexfmt "github.com/weaveplatform/artifactweave/internal/format/hex"
 	"github.com/weaveplatform/artifactweave/internal/keymaterial"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -49,10 +49,7 @@ func TestUnitHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 		Repository: "hexpm",
 		Releases:   []hexfmt.Package{pkg, denied},
 	}
-	ectoArchive, err := os.ReadFile("../format/hex/testdata/ecto-3.12.5.tar")
-	if err != nil {
-		t.Fatal(err)
-	}
+	ectoArchive := repopath.Read(t, "internal/format/hex/testdata/ecto-3.12.5.tar")
 	ecto, err := hexfmt.InspectTarball(bytes.NewReader(ectoArchive))
 	if err != nil {
 		t.Fatal(err)
@@ -449,9 +446,5 @@ func TestUnitHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 
 func mustReadHexFixture(t *testing.T) []byte {
 	t.Helper()
-	b, err := os.ReadFile("../format/hex/testdata/decimal-2.0.0.tar")
-	if err != nil {
-		t.Fatal(err)
-	}
-	return b
+	return repopath.Read(t, "internal/format/hex/testdata/decimal-2.0.0.tar")
 }

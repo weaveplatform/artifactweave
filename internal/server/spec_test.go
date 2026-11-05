@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -22,6 +21,7 @@ import (
 	gridgen "github.com/weaveplatform/artifactweave/internal/server/gen/grid"
 	pfedgen "github.com/weaveplatform/artifactweave/internal/server/gen/pfed"
 	workergen "github.com/weaveplatform/artifactweave/internal/server/gen/worker"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
@@ -31,7 +31,7 @@ var specFiles = api.SpecFiles
 
 func loadSpec(t *testing.T, name string) *openapi3.T {
 	t.Helper()
-	root := moduleRoot(t)
+	root := repopath.Root(t)
 	loader := openapi3.NewLoader()
 	doc, err := loader.LoadFromFile(filepath.Join(root, "api", name))
 	if err != nil {
@@ -41,24 +41,6 @@ func loadSpec(t *testing.T, name string) *openapi3.T {
 		t.Fatalf("validate %s: %v", name, err)
 	}
 	return doc
-}
-
-func moduleRoot(t *testing.T) string {
-	t.Helper()
-	dir, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			return dir
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			t.Fatal("go.mod not found")
-		}
-		dir = parent
-	}
 }
 
 // TestAccOpenAPIFieldDescriptions enforces docs/implementation/api-description-conventions.md:

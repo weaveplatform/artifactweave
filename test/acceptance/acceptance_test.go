@@ -12,6 +12,8 @@ import (
 	"testing"
 
 	"github.com/cucumber/godog"
+
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 )
 
 const module = "github.com/weaveplatform/artifactweave"
@@ -22,12 +24,23 @@ var binary string
 // coverDir receives coverage from the binary when set.
 var coverDir = os.Getenv("ARTIFACTWEAVE_GOCOVERDIR")
 
+// repoRoot is the repository root, resolved once by TestMain. Steps name
+// fixtures from it rather than through repopath.Path because godog steps
+// report a failure by returning an error and hold no testing.TB to fail.
+var repoRoot string
+
 func TestMain(m *testing.M) {
 	flag.Parse()
 	if skip, why := skipReason(); skip {
 		fmt.Fprintln(os.Stderr, "skipping acceptance: "+why)
 		os.Exit(0)
 	}
+	root, err := repopath.FindRoot(".")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	repoRoot = root
 	dir, err := os.MkdirTemp("", "artifactweave-accept-")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -48,7 +61,8 @@ func TestMain(m *testing.M) {
 			}
 			args = append(args, "-cover", "-covermode=atomic", "-coverpkg="+coverpkg)
 		}
-		cmd := exec.Command("go", append(args, "../../cmd/artifactweave")...)
+		cmd := exec.Command("go", append(args, "./cmd/artifactweave")...)
+		cmd.Dir = repoRoot
 		cmd.Env = append(os.Environ(), "GOWORK=off")
 		if b, err := cmd.CombinedOutput(); err != nil {
 			fmt.Fprintf(

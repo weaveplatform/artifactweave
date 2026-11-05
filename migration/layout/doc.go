@@ -26,6 +26,8 @@
 //     ARTIFACTWEAVE_UPDATE_LEDGER=1, TestUnitLedgerComplete first rewrites
 //     migration/ledger.json in canonical form.
 //   - With -v, the number of ledger entries in each derived status.
+//   - With -v, each import of a split legacy package that
+//     TestUnitImportTiers allowed, and how many there were.
 //
 // # References
 //

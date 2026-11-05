@@ -9,8 +9,9 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
-	"os"
 	"testing"
+
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 )
 
 func archiveTar(t *testing.T, names ...string) []byte {
@@ -84,10 +85,7 @@ func completeArchive(t *testing.T, b []byte, name string, wantValid bool) {
 func TestUnitRemoteArchiveCompleteValidation(t *testing.T) {
 	tarBytes := archiveTar(t, "PKG-INFO", "demo/data.txt")
 	gz := archiveGzip(t, tarBytes)
-	bz, err := os.ReadFile("../../format/pypi/testdata/demo_pkg-1.0.tar.bz2")
-	if err != nil {
-		t.Fatal(err)
-	}
+	bz := repopath.Read(t, "internal/format/pypi/testdata/demo_pkg-1.0.tar.bz2")
 	zipBytes := archiveZip(t, "demo-1.0.dist-info/METADATA", "demo/data.txt")
 	for name, b := range map[string][]byte{"demo.tar": tarBytes, "demo.tar.gz": gz, "demo.tgz": gz, "demo.tar.bz2": bz, "demo.zip": zipBytes, "demo.whl": zipBytes, "demo.egg": zipBytes} {
 		t.Run(name, func(t *testing.T) { completeArchive(t, b, name, true) })
@@ -117,10 +115,10 @@ func TestUnitRemoteArchiveCompleteValidation(t *testing.T) {
 	completeArchive(t, archiveZip(t, "duplicate", "duplicate"), "demo.zip", false)
 	// Both advertised hash and package identity match; the trailer is still invalid.
 	f := remoteFile{name: "demo-1.0.tar.gz", path: "demo/1.0/demo-1.0.tar.gz", version: "1.0"}
-	if err = f.validateArtifact(t.Context(), bytes.NewReader(gz), int64(len(gz))); err != nil {
+	if err := f.validateArtifact(t.Context(), bytes.NewReader(gz), int64(len(gz))); err != nil {
 		t.Fatal(err)
 	}
-	if err = f.validateArtifact(
+	if err := f.validateArtifact(
 		t.Context(),
 		bytes.NewReader(corruptGzip),
 		int64(len(corruptGzip)),

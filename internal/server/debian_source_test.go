@@ -5,12 +5,11 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
@@ -30,10 +29,7 @@ func TestAccDebianRemoteSourceRejectsInvalidPackages(t *testing.T) {
 		if err != nil || q.Resource.Validate == nil || q.Resource.Variant == "" {
 			t.Fatalf("%s: missing remote validator: %v", tc.path, err)
 		}
-		body, err := os.ReadFile(filepath.Join("..", "format", "debian", "testdata", tc.fixture))
-		if err != nil {
-			t.Fatal(err)
-		}
+		body := repopath.Read(t, "internal/format/debian/testdata/"+tc.fixture)
 		if err := q.Resource.Validate(
 			t.Context(),
 			bytes.NewReader(body),

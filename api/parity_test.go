@@ -7,6 +7,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/api"
 	"github.com/weaveplatform/artifactweave/internal/specoracle"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 )
 
 // specFiles must match tools/specoracle so the test and the report agree.
@@ -19,7 +20,7 @@ var specFiles = api.SpecFiles
 // oracle cache is gitignored, so without it the test skips; CI fetches it in
 // the parity job (docs/testing/ci.md).
 func TestAccSpecParity(t *testing.T) {
-	root := moduleRoot(t)
+	root := repopath.Root(t)
 	cache := filepath.Join(root, ".specoracle")
 	if _, err := os.Stat(filepath.Join(cache, specoracle.ManifestFile)); err != nil {
 		t.Skip("no oracle cache: run make oracle-fetch")
@@ -52,22 +53,4 @@ func TestAccSpecParity(t *testing.T) {
 		t.Errorf("parity regression: %s", reg)
 	}
 	t.Logf("\n%s", report.String())
-}
-
-func moduleRoot(t *testing.T) string {
-	t.Helper()
-	dir, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			return dir
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			t.Fatal("go.mod not found")
-		}
-		dir = parent
-	}
 }
