@@ -20,8 +20,11 @@
 // # Inputs
 //
 // None: the package holds values, pure functions and interfaces. The access
-// module implements the interfaces, and its module root binds them into an
-// API (https://github.com/weaveplatform/artifactweave/issues/966).
+// module implements the interfaces: the evaluator's *Decider in
+// internal/authz satisfies Decider, and its AsAPI and FromAPI convert
+// between the two, AsAPI never returning a typed nil; the module root binds
+// the other contracts into an API
+// (https://github.com/weaveplatform/artifactweave/issues/966).
 //
 // # Outputs
 //

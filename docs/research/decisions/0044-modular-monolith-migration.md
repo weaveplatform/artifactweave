@@ -204,6 +204,7 @@ change that adds a name appends its row; the change column gives the ticket of t
 | `Projects` | `access/api` | Reads project environments, membership and existence; the target document plans a fuller `Projects` for P11 | ACC-01 |
 | `Grants` | `access/api` | Scans permissions about content: who holds what on an item, and whether a move changes who may reach it; not in the target document | ACC-01 |
 | `AnonymousAccess` | `access/api` | Reads and switches the anonymous access setting; not in the target document | ACC-01 |
+| `AsAPI`, `FromAPI` | `access/core/authz` | Convert between the evaluator's `*Decider` and `access/api`'s `Decider`; `AsAPI(nil)` is a nil interface, never a typed nil | ACC-01 |
 
 ### Placeholders
 
