@@ -570,8 +570,8 @@ func TestUnitOwed(t *testing.T) {
 func TestUnitMetadataLayouts(t *testing.T) {
 	w := newMetaWorld(t, func(c *repo.Config) {
 		c.PackageType, c.RepoLayoutRef = repo.Gradle, repo.LayoutGradle
-		// Gradle's default (migration/artifacts/api/repo/defaults.go): its paths are no Maven
-		// paths, which the POM checks would refuse.
+		// Gradle's default (migration/artifacts/api/repo/defaults.go): its
+		// paths are no Maven paths, which the POM checks would refuse.
 		suppress := true
 		c.SuppressPomConsistencyChecks = &suppress
 	})

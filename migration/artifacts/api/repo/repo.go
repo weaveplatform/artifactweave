@@ -1,9 +1,3 @@
-// Package repo is the repository configuration model: the JSON document that
-// PUT, POST and GET /artifactory/api/repositories/{key} exchange, with JFrog's
-// field names. It is a wire model, so its JSON tags follow Artifactory's
-// camelCase rather than the repository's snake_case rule; .golangci.yml excludes
-// this package from tagliatelle for that reason. Field semantics, defaults and
-// per-class rules are documented in docs/research/03-repository-configuration-model.md.
 package repo
 
 import (

@@ -6,7 +6,8 @@
 // pkg/types/wire and nowhere else.
 //
 // The repository configuration is the one entity whose wire and internal
-// shapes coincide, so it stays migration/artifacts/api/repo.Config and is not duplicated here.
+// shapes coincide, so it stays migration/artifacts/api/repo.Config and is not
+// duplicated here.
 //
 // JSON tags appear only on types the stores persist as JSON documents
 // (research 15 section 4 lists which columns are documents): role flags,

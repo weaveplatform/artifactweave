@@ -115,8 +115,8 @@ when its first implementation is in an earlier phase.
 ### Repository type and class checklist
 
 This table accounts for the original 44 types accepted by
-[`AllowedPackageTypes`](../../migration/artifacts/api/repo/packagetypes.go). **L/R/V/F mean configuration
-acceptance** for local/remote/virtual/federated repositories; they do not claim native
+[`AllowedPackageTypes`](../../migration/artifacts/api/repo/packagetypes.go). **L/R/V/F mean
+configuration acceptance** for local/remote/virtual/federated repositories; they do not claim native
 protocol support, upstream resolution or peer convergence. P20 and each format phase
 revalidate this source-union matrix against the target contract. A class the target
 itself rejects is a compatibility rule, not a missing product feature.

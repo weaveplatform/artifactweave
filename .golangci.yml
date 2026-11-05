@@ -92,9 +92,11 @@ linters:
         # Wire-model packages mirror JFrog's JSON names (camelCase with
         # kebab-case and snake_case mixed into the same structs), which no
         # single case rule can express; decision record 0002 limits the
-        # exception to these packages.
+        # exception to these packages. golangci-lint matches pkg against the
+        # package path relative to the module root: a full import path
+        # matches nothing, and tagliatelle then reports every JFrog name.
         overrides:
-          - pkg: github.com/weaveplatform/artifactweave/migration/artifacts/api/repo
+          - pkg: migration/artifacts/api/repo
             ignore: true
           - pkg: github.com/weaveplatform/artifactweave/pkg/types/wire
             ignore: true

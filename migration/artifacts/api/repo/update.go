@@ -53,6 +53,9 @@ type CreationOnlyError struct {
 	Once        bool
 }
 
+// Error names the field and the repository's package type, as listings spell
+// it, and says whether the field is set only on create or only once. The text
+// is the message of the 400 response a refused update gets.
 func (e CreationOnlyError) Error() string {
 	name := PackageTypeName(string(e.PackageType))
 	if e.Once {

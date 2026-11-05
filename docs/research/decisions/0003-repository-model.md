@@ -18,8 +18,8 @@ port per repository), each needing reverse-proxy or DNS support.
 
 ## Decision
 
-**One configuration struct.** `migration/artifacts/api/repo.Config` mirrors the Artifactory repository JSON
-in [03-repository-configuration-model](../03-repository-configuration-model.md): the
+**One configuration struct.** `migration/artifacts/api/repo.Config` mirrors the Artifactory
+repository JSON in [03-repository-configuration-model](../03-repository-configuration-model.md): the
 common fields, the local, remote, virtual and federated fields, the per-package-type
 fields, the enumerations, the defaults, the booleans JFrog documents as strings (accepted
 in either spelling, written as booleans) and the provider-only keys. Validation
@@ -269,8 +269,8 @@ These assignments describe planned work, not current runtime support.
 
 ## Verification
 
-- `migration/artifacts/api/repo` round-trip tests for every field in the research tables, including string
-  and boolean forms per class.
+- `migration/artifacts/api/repo` round-trip tests for every field in the research tables, including
+  string and boolean forms per class.
 - Validation tests for the package-type sets per class.
 - Routing tests for both prefixes, the subdomain option, keys in any case, names that
   contain reserved words and each repository class.

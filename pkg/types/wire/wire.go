@@ -1,10 +1,10 @@
 // Package wire mirrors the JFrog JSON forms that pkg/types converts: the
 // legacy v1 and v2 permission targets, the Access v2 permission, and the
 // legacy and Access user and group documents. Field names match JFrog
-// exactly, which is why this package (with migration/artifacts/api/repo) is exempt from the
-// project's snake_case tag rule (decision 0002). It holds no logic; the
-// conversions live in pkg/types so this package never depends on the domain
-// model.
+// exactly, which is why this package (with migration/artifacts/api/repo) is
+// exempt from the project's snake_case tag rule (decision 0002). It holds no
+// logic; the conversions live in pkg/types so this package never depends on the
+// domain model.
 //
 // Booleans whose default is not false are pointers so a converter can tell
 // "absent" from "false" when a client omits them.

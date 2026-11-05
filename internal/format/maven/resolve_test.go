@@ -252,8 +252,9 @@ func TestUnitResolveSnapshotBehaviours(t *testing.T) {
 func TestUnitResolveGradle(t *testing.T) {
 	w := newWorld(t, func(c *repo.Config) {
 		c.PackageType, c.RepoLayoutRef = repo.Gradle, "gradle-default"
-		// Gradle's default (migration/artifacts/api/repo/defaults.go): the fixture's POM sits
-		// in a Gradle path, which the POM checks would refuse.
+		// Gradle's default (migration/artifacts/api/repo/defaults.go): the
+		// fixture's POM sits in a Gradle path, which the POM checks would
+		// refuse.
 		c.SuppressPomConsistencyChecks = on()
 	})
 	dir := "org.acme/lib/"
