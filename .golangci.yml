@@ -141,18 +141,22 @@ linters:
           - lll
         source: "^//go:generate "
 
-    # exclude entire files from reporting (still analyzed)
+    # Files whose issues are never reported (they are still analysed).
+    # golangci-lint v2 drops these before it reads paths-except, and the
+    # patterns match anywhere in the path, so each is anchored: an unanchored
+    # "tools/.*" would also hide migration/devtools/.
     paths:
-      - ".*\\.gen\\.go$"          # Generated Go files
-      - ".*_test\\.go$"           # Test files (already handled with more specific rules)
-      - "examples/.*"             # Example code for documentation
-      - "tools/.*"                # Build/helper tools
-      - "scripts/.*"              # Scripts for development
-      - "docs/.*\\.go$"           # Documentation generators
+      - ".*\\.gen\\.go$"          # oapi-codegen output: findings are fixed in the generator
+      - ".*_test\\.go$"           # test code is not held to the production rules
+      - "^examples/"              # documentation examples, not part of the binary
+      - "^tools/"                 # repository tooling, not part of the binary
+      - "^scripts/"               # development scripts, not part of the binary
+      - "^docs/.*\\.go$"          # documentation generators, not part of the binary
 
-    # Never exclude these critical paths, even if they match patterns above
+    # An allowlist, not an override: only issues in these files are reported.
     paths-except:
-      - "internal/.*\\.go$"       # Core provider logic
+      - "^internal/.*\\.go$"      # the application code
+      - "^migration/.*\\.go$"     # staged code that becomes internal/ (decision 0044)
 
 formatters:
   # Only run the formatters you actually want to auto‐fix in CI

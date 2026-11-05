@@ -269,3 +269,43 @@ func TestUnitFormatAppDependenciesSelectOnlyOwnedFiles(t *testing.T) {
 		})
 	}
 }
+
+func TestUnitScanKindsIncludesMigrationAndToleratesMissingRoots(t *testing.T) {
+	root := t.TempDir()
+	write := func(path, source string) {
+		t.Helper()
+		file := filepath.Join(root, path)
+		if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(file, []byte(source), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("internal/legacy/legacy_test.go", `package legacy
+func TestUnitLegacy() {}
+func TestAccLegacy() {}
+`)
+	// Only internal/ exists, so every other root, migration/ included, is missing.
+	before, err := scanKinds(root, plan{profile: "full"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(before.Unit, []string{"./internal/legacy"}) {
+		t.Fatalf("tree without migration/: %+v", before)
+	}
+	write("migration/staged/staged_test.go", `package staged
+func TestUnitStaged() {}
+func TestAccStaged() {}
+func FuzzStaged() {}
+`)
+	after, err := scanKinds(root, plan{profile: "full"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(after.Unit, []string{"./internal/legacy", "./migration/staged"}) ||
+		!slices.Equal(after.Acc, []string{"./internal/legacy", "./migration/staged"}) ||
+		!slices.Equal(after.Fuzz, []string{"./migration/staged"}) {
+		t.Fatalf("staged package not selected: %+v", after)
+	}
+}

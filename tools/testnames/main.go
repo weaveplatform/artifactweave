@@ -20,7 +20,9 @@ import (
 	"unicode/utf8"
 )
 
-var roots = []string{"api", "internal", "pkg", "test", "tools"}
+// migration/ holds the staged future internal/ (decision 0044), so its tests are
+// classified like internal/ ones; scan skips a root that does not exist yet.
+var roots = []string{"api", "internal", "migration", "pkg", "test", "tools"}
 
 // Go reserves TestMain and Fuzz names. They are reviewed exceptions with
 // explicit CI owners; new hooks or fuzz targets require a policy update.
