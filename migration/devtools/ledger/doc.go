@@ -7,8 +7,9 @@
 //
 // # Role
 //
-// devtools layer: a library behind repository tooling and the layout tests,
-// not part of the server binary. It imports only the standard library.
+// devtools layer: a library behind repository tooling (tools/pkgmove) and
+// the layout tests, not part of the server binary. It imports only the
+// standard library.
 //
 // # Inputs
 //
@@ -24,7 +25,8 @@
 //     parallel pull requests that add entries conflict only on their own
 //     lines.
 //   - A Report with each entry's status derived from the tree.
-//   - The target import path and action of a legacy import path.
+//   - The target import path and action of a legacy import path, and the
+//     root-relative directory of a target (Dir) or file move (FileTarget).
 //
 // # Invariants
 //
@@ -54,7 +56,9 @@
 //   - TestUnitStatusDerivesFromTree: one temporary tree per status.
 //     TestUnitStatusReportsEntriesInLedgerOrder,
 //     TestUnitStatusFailsOnAnUnreadableDirectory.
-//   - TestUnitTranslate, TestUnitLegacyRootsAgreeWithPatterns.
+//   - TestUnitTranslate, TestUnitDirResolvesScopes,
+//     TestUnitFileTargetKeepsNamesAndAssetDirectories,
+//     TestUnitLegacyRootsAgreeWithPatterns.
 //   - TestUnitSchemaAgreesWithValidator: the schema's constants, enums,
 //     patterns and field names equal the Go ones.
 package ledger

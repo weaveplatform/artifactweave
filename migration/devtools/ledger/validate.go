@@ -232,7 +232,7 @@ func (v *validator) unique(l *Ledger) {
 	}
 	placeholders := map[string]int{}
 	for _, p := range l.Placeholders {
-		placeholders[l.dir(p.Scope, p.To)]++
+		placeholders[l.Dir(p.Scope, p.To)]++
 	}
 	for _, f := range slices.Sorted(maps.Keys(from)) {
 		if from[f] > 1 {
@@ -254,7 +254,7 @@ func (v *validator) targets(l *Ledger) {
 	for _, p := range l.Packages {
 		legacyDirs[p.From] = true
 		if p.Action == ActionMove || p.Action == ActionMerge {
-			t := l.dir(p.Scope, p.To)
+			t := l.Dir(p.Scope, p.To)
 			byTarget[t] = append(byTarget[t], p)
 		}
 	}
@@ -284,12 +284,12 @@ func (v *validator) targets(l *Ledger) {
 		}
 		for _, t := range append([]string{f.To}, f.Targets...) {
 			if t != "" {
-				targeted[l.dir(f.Scope, t)] = true
+				targeted[l.Dir(f.Scope, t)] = true
 			}
 		}
 	}
 	for _, p := range l.Placeholders {
-		if targeted[l.dir(p.Scope, p.To)] {
+		if targeted[l.Dir(p.Scope, p.To)] {
 			v.addf(
 				"placeholder %q: it is the target of an entry, but a placeholder holds doc.go only",
 				p.To,

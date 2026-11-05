@@ -10,6 +10,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/weaveplatform/artifactweave/tools/citestselection/ownership"
 )
 
 type change struct {
@@ -332,7 +334,7 @@ func classify(changes []change) plan {
 }
 
 func isServerTest(file string) bool {
-	return strings.HasSuffix(file, "_test.go") && ownedTestDir(path.Dir(file))
+	return strings.HasSuffix(file, "_test.go") && ownership.OwnedTestDir(path.Dir(file))
 }
 
 func documentationPath(path string) bool {

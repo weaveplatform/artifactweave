@@ -1,0 +1,151 @@
+# status derives every entry's status from the tree and says where a legacy
+# path lives now, from anywhere in the repository.
+ok status
+cmpout want/status
+ok status -ticket PLT-11
+cmpout want/status-plt-11
+ok status -json -ticket PLT-10
+cmpout want/status-plt-10.json
+ok status -json -ticket NONE-99
+cmpout want/empty.json
+ok status -ticket NONE-99
+stdout \A0 entries\n\z
+ok status -ticket PLT-13
+stdout \Ainternal/a7 \(pending, PLT-13; moves to migration/platform/a7\)\n1 entry: 1 pending\n\z
+
+cd migration
+ok status internal/a3
+cmpout want/a3
+ok status internal/a3/old.go
+stdout ^internal/a3/old\.go -> migration/platform/a3/new\.go \(done, PLT-11\)$
+ok status ./internal/a3/testdata/x/y.txt
+stdout ^internal/a3/testdata/x/y\.txt -> migration/platform/a3/testdata/x/y\.txt \(done, PLT-11\)$
+ok status internal\a3\other.go
+stdout ^internal/a3/other\.go -> migration/platform/a3/other\.go \(done, PLT-11\)$
+ok status internal/a1/a1.go
+stdout ^internal/a1/a1\.go \(pending, PLT-10; moves to migration/platform/a1/a1\.go\)$
+ok status internal/a5/a5.go
+stdout ^internal/a5/a5\.go \(pending, split by PLT-12\)$
+ok status internal/a6
+stdout ^internal/a6 \(done, deleted by PLT-12\)$
+ok status internal/a5/data.txt
+stdout ^internal/a5/data\.txt \(pending, PLT-12; moves to migration/platform/a5data/data\.txt\)$
+ok status internal/a5/assets/logo.png
+stdout ^internal/a5/assets/logo\.png -> migration/platform/assets/assets/logo\.png \(done, PLT-12\)$
+ok status internal/a5/assets
+stdout ^internal/a5/assets -> migration/platform/assets/assets \(done, PLT-12\)$
+ok status internal/a5/gone.txt
+stdout ^internal/a5/gone\.txt \(done, deleted by PLT-12\)$
+ok status internal/srv
+cmpout want/srv
+ok status -json internal/a3/old.go
+cmpout want/old.json
+fail status internal/zzz
+stderr ^pkgmove: refused: no ledger entry covers internal/zzz$
+usage status ../outside
+stderr ^pkgmove: usage: "\.\./outside" is not a path relative to the repository root$
+usage status internal/a1 internal/a2
+usage status -bogus
+
+-- go.mod --
+module github.com/weaveplatform/artifactweave
+
+go $GOVERSION
+-- migration/ledger.json --
+{
+    "schema": 1,
+    "module": "github.com/weaveplatform/artifactweave",
+    "staging_root": "migration",
+    "final_root": "internal",
+    "packages": [
+        {"from":"internal/a1","action":"move","to":"platform/a1","ticket":"PLT-10"},
+        {"from":"internal/a2","action":"move","to":"platform/a2","ticket":"PLT-10"},
+        {"from":"internal/a3","action":"move","to":"platform/a3","rename":{"old.go":"new.go"},"ticket":"PLT-11"},
+        {"from":"internal/a4","action":"move","to":"platform/a4","ticket":"PLT-11"},
+        {"from":"internal/a5","action":"split","ticket":"PLT-12"},
+        {"from":"internal/a6","action":"delete","ticket":"PLT-12"},
+        {"from":"internal/a7","action":"move","to":"platform/a7","ticket":"PLT-13"},
+        {"from":"internal/srv/gen/x","action":"move","to":"platform/gen/x","ticket":"WEB-01"},
+        {"from":"internal/srv/gen/y","action":"move","to":"platform/gen/y","ticket":"WEB-01"}
+    ],
+    "files": [
+        {"from":"internal/a5/assets/","action":"move","to":"platform/assets","ticket":"PLT-12"},
+        {"from":"internal/a5/data.txt","action":"move","to":"platform/a5data","ticket":"PLT-12"},
+        {"from":"internal/a5/gone.txt","action":"delete","ticket":"PLT-12"}
+    ],
+    "placeholders": []
+}
+-- internal/a1/a1.go --
+package a1
+-- internal/a2/bridge.go --
+package a2
+-- migration/platform/a2/a2.go --
+package a2
+-- migration/platform/a3/new.go --
+package a3
+-- migration/platform/a3/other.go --
+package a3
+-- internal/a5/a5.go --
+package a5
+-- internal/a5/data.txt --
+data
+-- migration/platform/assets/assets/logo.png --
+logo
+-- internal/a7/a7.go --
+package a7
+-- internal/srv/gen/x/x.go --
+package x
+-- internal/srv/gen/y/y.go --
+package y
+-- want/status --
+internal/a1 (pending, PLT-10; moves to migration/platform/a1)
+internal/a2 -> migration/platform/a2 (bridged, PLT-10)
+internal/a3 -> migration/platform/a3 (done, PLT-11)
+internal/a4 -> migration/platform/a4 (broken, PLT-11)
+internal/a5 (pending, split by PLT-12)
+internal/a6 (done, deleted by PLT-12)
+internal/a7 (pending, PLT-13; moves to migration/platform/a7)
+internal/srv/gen/x (pending, WEB-01; moves to migration/platform/gen/x)
+internal/srv/gen/y (pending, WEB-01; moves to migration/platform/gen/y)
+internal/a5/assets/ -> migration/platform/assets/assets/ (done, PLT-12)
+internal/a5/data.txt (pending, PLT-12; moves to migration/platform/a5data/data.txt)
+internal/a5/gone.txt (done, deleted by PLT-12)
+12 entries: 1 bridged, 1 broken, 4 done, 6 pending
+-- want/status-plt-11 --
+internal/a3 -> migration/platform/a3 (done, PLT-11)
+internal/a4 -> migration/platform/a4 (broken, PLT-11)
+2 entries: 1 broken, 1 done
+-- want/status-plt-10.json --
+[
+  {
+    "ticket": "PLT-10",
+    "from": "internal/a1",
+    "to": "migration/platform/a1",
+    "action": "move",
+    "status": "pending"
+  },
+  {
+    "ticket": "PLT-10",
+    "from": "internal/a2",
+    "to": "migration/platform/a2",
+    "action": "move",
+    "status": "bridged"
+  }
+]
+-- want/empty.json --
+[]
+-- want/a3 --
+internal/a3 -> migration/platform/a3 (done, PLT-11)
+-- want/srv --
+internal/srv/gen/x (pending, WEB-01; moves to migration/platform/gen/x)
+internal/srv/gen/y (pending, WEB-01; moves to migration/platform/gen/y)
+-- want/old.json --
+[
+  {
+    "ticket": "PLT-11",
+    "from": "internal/a3/old.go",
+    "to": "migration/platform/a3/new.go",
+    "action": "move",
+    "status": "done"
+  }
+]

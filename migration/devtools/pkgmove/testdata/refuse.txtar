@@ -1,0 +1,150 @@
+# move refuses a tree it cannot move safely, and names the reason.
+
+# An uncommitted change to a tracked file blocks a move; untracked files, such
+# as the repository copies under .worktrees/, do not, and are never read.
+cp want/changed.go internal/rho/rho.go
+fail move -ticket PLT-13
+stderr ^pkgmove: refused: the working tree has uncommitted changes; commit or stash them first:$
+stderr internal/rho/rho\.go
+git checkout -- internal/rho/rho.go
+cp want/changed.go .worktrees/copy/internal/rho/rho.go
+ok move -ticket PLT-13 -dry-run
+
+# git mv would leave an untracked file in the source directory behind.
+cp want/note.txt internal/rho/scratch.txt
+fail move -ticket PLT-13
+stderr ^pkgmove: refused: untracked files would stay behind: internal/rho/scratch\.txt; commit or remove them$
+rm internal/rho/scratch.txt
+
+# A target may hold placeholder subpackages, but no Go file of its own.
+ok move -ticket PLT-13
+exists migration/platform/rho/rho.go migration/platform/rho/cold/doc.go
+cmp .worktrees/copy/internal/rho/rho.go want/changed.go
+commit
+fail move -ticket PLT-14
+stderr ^pkgmove: refused: the target migration/platform/sigma already holds sigma\.go$
+
+# Only pending move and merge entries move; split and delete entries are
+# named and left alone.
+fail move -ticket PLT-13
+stderr ^pkgmove: refused: internal/rho is done, not pending$
+fail move -ticket PLT-99
+stderr ^pkgmove: refused: PLT-99 has no move or merge entry in the ledger$
+ok move -ticket PLT-16 -dry-run
+stdout ^note: internal/upsilon is a split entry; move carries only move and merge entries$
+stdout ^move internal/phi -> migration/platform/phi \[PLT-16\]$
+
+# A rename that the wrapcheck exceptions would stop matching is refused.
+fail move -ticket PLT-18
+stderr would rename package apierror to apierr, but the wrapcheck exception "apierror\.New\(" in \.golangci\.yml matches it by name
+
+# A rename is typed against a tree that builds.
+fail move -ticket PLT-19
+stderr ^pkgmove: refused: GOOS=linux: github\.com/weaveplatform/artifactweave/internal/broken does not build: (?s:.*)cannot use psi\.Psi(?s:.*); a move starts from a tree that builds$
+
+# A lint configuration that cannot be read stops a move.
+cp want/bad.yml .golangci.yml
+commit
+fail move -ticket PLT-16
+stderr ^pkgmove: unexpected content: \.golangci\.yml: yaml: \S
+git rm -q .golangci.yml
+cp want/note.txt .golangci.yml/x
+commit
+fail move -ticket PLT-16
+stderr ^pkgmove: read \.golangci\.yml: \S
+git rm -q .golangci.yml/x
+commit
+
+# move and promote run from the module root, with a valid ledger.
+cd internal
+fail move -ticket PLT-16
+stderr ^pkgmove: refused: run from the module root, \S
+cd .
+cp want/invalid.json migration/ledger.json
+commit
+fail move -ticket PLT-16
+stderr ^pkgmove: refused: the ledger does not validate: invalid ledger: package "internal/phi": ticket "PLT-1" does not match
+fail promote
+stderr ^pkgmove: refused: the ledger does not validate:
+
+-- go.mod --
+module github.com/weaveplatform/artifactweave
+
+go $GOVERSION
+-- .golangci.yml --
+linters:
+  settings:
+    wrapcheck:
+      extra-ignore-sigs:
+        - apierror.New(
+        - format.Rejectf(
+-- migration/ledger.json --
+{
+    "schema": 1,
+    "module": "github.com/weaveplatform/artifactweave",
+    "staging_root": "migration",
+    "final_root": "internal",
+    "packages": [
+        {"from":"internal/apierror","action":"move","to":"platform/apierr","ticket":"PLT-18"},
+        {"from":"internal/phi","action":"move","to":"platform/phi","ticket":"PLT-16"},
+        {"from":"internal/psi","action":"move","to":"platform/omega","ticket":"PLT-19"},
+        {"from":"internal/rho","action":"move","to":"platform/rho","ticket":"PLT-13"},
+        {"from":"internal/sigma","action":"move","to":"platform/sigma","ticket":"PLT-14"},
+        {"from":"internal/upsilon","action":"split","ticket":"PLT-16"}
+    ],
+    "files": [],
+    "placeholders": []
+}
+-- internal/apierror/apierror.go --
+// Package apierror builds API errors.
+package apierror
+-- internal/phi/phi.go --
+// Package phi is pending.
+package phi
+-- internal/psi/psi.go --
+// Package psi is pending.
+package psi
+
+// Psi is psi.
+const Psi = "psi"
+-- internal/broken/broken.go --
+// Package broken does not build.
+package broken
+
+import "github.com/weaveplatform/artifactweave/internal/psi"
+
+var _ int = psi.Psi
+-- internal/rho/rho.go --
+// Package rho is pending.
+package rho
+-- migration/platform/rho/cold/doc.go --
+// Package cold is a placeholder.
+package cold
+-- internal/sigma/sigma.go --
+// Package sigma is pending.
+package sigma
+-- migration/platform/sigma/sigma.go --
+// Package sigma is already here.
+package sigma
+-- internal/upsilon/upsilon.go --
+// Package upsilon is split.
+package upsilon
+-- want/changed.go --
+// Package rho is changed.
+package rho
+-- want/bad.yml --
+linters: [unclosed
+-- want/note.txt --
+an untracked note
+-- want/invalid.json --
+{
+    "schema": 1,
+    "module": "github.com/weaveplatform/artifactweave",
+    "staging_root": "migration",
+    "final_root": "internal",
+    "packages": [
+        {"from":"internal/phi","action":"move","to":"platform/phi","ticket":"PLT-1"}
+    ],
+    "files": [],
+    "placeholders": []
+}

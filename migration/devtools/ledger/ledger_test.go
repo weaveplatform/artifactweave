@@ -145,6 +145,36 @@ func TestUnitTranslate(t *testing.T) {
 	}
 }
 
+func TestUnitDirResolvesScopes(t *testing.T) {
+	l := sample()
+	for _, tc := range []struct{ scope, to, want string }{
+		{"", "platform/x", "migration/platform/x"},
+		{ScopeRoot, "platform/x", "migration/platform/x"},
+		{ScopeRepo, "test/server/x", "test/server/x"},
+	} {
+		if got := l.Dir(tc.scope, tc.to); got != tc.want {
+			t.Errorf("Dir(%q, %q) = %q, want %q", tc.scope, tc.to, got, tc.want)
+		}
+	}
+}
+
+func TestUnitFileTargetKeepsNamesAndAssetDirectories(t *testing.T) {
+	l := sample()
+	for _, tc := range []struct {
+		f    File
+		want string
+	}{
+		{File{From: "internal/x/a.go", To: "platform/y"}, "migration/platform/y/a.go"},
+		{File{From: "internal/x/a.go", To: "platform/y", File: "b.go"}, "migration/platform/y/b.go"},
+		{File{From: "internal/x/testdata/npm/", To: "platform/y/testdata"}, "migration/platform/y/testdata/npm/"},
+		{File{From: "internal/x/x_test.go", Scope: ScopeRepo, To: "test/server/x"}, "test/server/x/x_test.go"},
+	} {
+		if got := l.FileTarget(tc.f); got != tc.want {
+			t.Errorf("FileTarget(%+v) = %q, want %q", tc.f, got, tc.want)
+		}
+	}
+}
+
 func TestUnitLegacyRootsAgreeWithPatterns(t *testing.T) {
 	// legacyRoots groups the pkg/ roots, as LegacyRegexp's documented form
 	// does; rebuilding it from LegacyRoots proves the two list the same

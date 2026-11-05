@@ -47,13 +47,14 @@ finding its fixtures.
 
 Every ticket that creates, moves or splits a package:
 
-0. Paths and line numbers in a ticket are as of `02affc88`. Once the move tool has
-   merged, `go run ./tools/pkgmove status <legacy path>` prints where a package or file
-   lives now.
-1. Moves with `tools/pkgmove`: a `git mv` driven by the ledger, the package clause, the
-   importer rewrite, the configuration path rewrite and the stale-reference check. A
-   split package is split in place first and moved in a later commit, never both in one
-   commit; `go run ./tools/pkgmove fix` requalifies importers.
+0. Paths and line numbers in a ticket are as of `02affc88`;
+   `go run ./tools/pkgmove status <legacy path>` prints where a package or file lives now.
+1. Moves with `tools/pkgmove` (see [Moving packages with pkgmove](#moving-packages-with-pkgmove)):
+   a `git mv` driven by the ledger, the package clause, the importer rewrite, the
+   configuration path rewrite and the stale-reference check. A split package is split in
+   place first and moved in a later commit, never both in one commit;
+   `go run ./tools/pkgmove fix` ([FND-08](https://github.com/weaveplatform/artifactweave/issues/956))
+   requalifies importers.
 2. Writes each package's `doc.go` to the
    [documentation standard](../docs/research/decisions/0044-modular-monolith-migration.md#documentation-standard),
    comments every exported identifier and removes comments that restate the code.
@@ -243,6 +244,124 @@ the other decision records. The move tool rewrites legacy paths in living docume
 packages move, and its stale check fails on any legacy path that remains once its entry is
 done. A living document therefore names a legacy package by its role, such as "the old
 server package", where the reference must outlast the move.
+
+## Moving packages with pkgmove
+
+`tools/pkgmove` carries out the ledger. It reads the ledger and the tracked files only, so
+the untracked copies in `.worktrees/` never count.
+
+```sh
+go run ./tools/pkgmove status  [-ticket ID] [-json] [legacy-path]
+go run ./tools/pkgmove move    -ticket ID [-dry-run] [-no-regenerate] [-skip GLOB]...
+go run ./tools/pkgmove move    -from DIR -to DIR [-name NAME] [-dry-run] [-no-regenerate] [-skip GLOB]...
+go run ./tools/pkgmove check   [-ticket ID | -from DIR]
+go run ./tools/pkgmove fmt     [-check]
+go run ./tools/pkgmove promote [-dry-run] [-no-regenerate]
+```
+
+The exit status is 0 on success, 1 when the command found problems (printed to stdout as
+`file:line: message`) or refused (the reason is on stderr), and 2 for a command line it
+cannot run.
+
+| Command | What it does |
+|---|---|
+| `status` | One line per entry with its derived status and a count per status. Given a legacy path (a package directory, a file in one, or a file entry) it prints where that path lives now, renames applied, such as `internal/server/npm/npm.go (pending, ECO-06; moves to migration/artifacts/ecosystem/npm/http/npm.go)`. `-ticket` keeps one ticket's entries; `-json` prints objects `{ticket, from, to, action, status}` |
+| `move -ticket` | Moves every pending `move` and `merge` entry of the ticket in one change. The ticket's `split` and `delete` entries are named in a notice and left alone |
+| `move -from -to` | Re-homes a directory below `migration/` or `test/` that has no ledger entry, such as a staged package a later ticket puts elsewhere; `-name` sets the package name when it is not the last element of `-to` |
+| `check` | The stale-path step of CI: reports every remaining mention of an old path. `-ticket` checks one ticket's done entries; `-from` checks a re-homed directory |
+| `fmt` | Rewrites the ledger in [canonical form](#canonical-form); `-check` only reports a difference |
+| `promote` | The close-out ([PRO-03](https://github.com/weaveplatform/artifactweave/issues/1102)): renames each `migration/<top>` to `internal/<top>`, rewrites the staged paths, removes this README and the ledger files and writes `docs/implementation/p9d-path-map.json` |
+
+`-dry-run` prints the plan, every file move, write and regeneration step, and changes
+nothing. Run `move -dry-run` first and read the plan.
+
+### What a move does
+
+`move` and `promote` run from the module root and refuse, changing nothing, unless the
+ledger validates and the working tree has no uncommitted change to a tracked file. `move`
+also refuses an entry that is not `pending`, untracked files in a source directory (`git
+mv` would leave them behind), a target directory that already holds Go files (a target
+with placeholder subpackages below it is fine), two files that would land on one path, a
+package rename that a wrapcheck exception in `.golangci.yml` matches by name, and
+importers of a renamed package that do not type-check for linux, darwin and windows. Then
+it:
+
+1. moves with `git mv` the files directly in each directory, with the entry's `rename`
+   applied, and its asset subdirectories, such as `testdata/` and `migrations/`, that hold
+   no package at any depth; a subdirectory holding a package stays for its own entry;
+2. rewrites the package clause to the ledger `name`, or the last element of `to`;
+3. rewrites each importer's import path. Where the package name changes, it renames the
+   qualifiers from type information, or keeps the old name as an import name where the
+   new one would clash in that file; an import that a merge repeats is removed;
+4. rewrites the old paths in Go string literals and comments, in the living Markdown and
+   in the fixed configuration list: `.golangci.yml`, `.testcoverage.yml`,
+   `.gitattributes`, the Makefiles, `Dockerfile`, `.goreleaser.yaml`, the workflows, the
+   OpenAPI sources and generator configuration under `api/`, `tools/depsync`, the
+   acceptance scripts and features, the format inventory, the client recipe sources and
+   the SQL migrations. Generated `*.gen.go` files and the history set are never edited;
+   `-skip GLOB` (slash-separated, `**` for any depth, repeatable) exempts more files from
+   the text rewrite, but not from the import rewrite or the stale check;
+5. rewrites `tools/citestselection/test_ownership.json` as JSON in its own encoding: a
+   moved test directory keeps its owner under the new key, and a key whose new path is no
+   test directory is dropped with a note;
+6. runs the regeneration steps the change needs, in order, unless `-no-regenerate` is
+   given: `make generate` when an API source, a generator or a generated file changed or
+   generated code names a moved path, `go run ./tools/formatinventory` when the format
+   inventory changed, `make client-recipes` when a recipe source changed or the evidence
+   lock names a moved path, `make api-ledger` when the API reliability ledger names one,
+   and `make fmt` always;
+7. runs `check -ticket` for the moved entries.
+
+Moved files are staged; edited files are not. Review the change with `git status` and
+`git diff`, run the verification of the [per-ticket checklist](#per-ticket-checklist) and
+commit.
+
+### What counts as a reference
+
+One matcher decides every reference for `move`, `check`, `promote` and `status`, so a
+move rewrites exactly the paths `check` would report. For an old path `P`:
+
+- `<module>/P`, `$(MODULE)/P` and `${MODULE}/P` match anywhere. A bare `P` matches only
+  where a path can start (the start of the text, after `^`, after a `./` or `../`
+  chain, or after a byte that cannot be part of a path, such as a space, a quote or `=`)
+  and only when the path ends there or continues with `/`. So `internal/format` never
+  matches `internal/formats`, `pkg/x/internal/format` or a tracked file such as
+  `internal/format.go`;
+- `P/<file>` is rewritten with the entry's renames applied; a subpackage with its own
+  entry is judged by that entry, never through its parent;
+- a directory prefix such as `"P/"` and a `P/...` pattern are rewritten only once every
+  package below `P` lands at the same place below the target. Until then they have no
+  single replacement and are neither rewritten nor reported, so the ticket that empties
+  such a directory checks them by hand.
+
+Tests name fixtures so that a move finds them: one slash-separated, root-relative
+literal, as `repopath.Path(t, "internal/x/testdata/a.json")`, `repopath.Read`, or a
+literal prefix joined to a name (`"internal/x/testdata/" + name`). godog steps report a
+failure by returning an error and hold no `testing.TB`, so they join a root-relative
+literal to `repoRoot`, which `TestMain` in `test/acceptance` resolves once with
+`repopath.FindRoot`: `filepath.Join(repoRoot, "internal/x/testdata", name)`. A path
+built from separate elements, or relative to the test's own directory, is not found.
+
+`check` reads every tracked text file outside the history set, not only the files that
+`move` rewrites, so a mention in another kind of file is reported for a hand edit.
+
+### Known limits
+
+- `split` and `delete` entries and file entries are not moved yet;
+  [FND-08](https://github.com/weaveplatform/artifactweave/issues/956) adds them and `fix`.
+- Relative Markdown links inside moved files and GitHub URLs to repository files are not
+  rewritten.
+- Merging two packages where one imports the other leaves a self-import to remove by hand.
+- A test that uses legacy paths as data, such as the keys of a map literal, can end up
+  with two equal keys after the rewrite; the build reports it.
+- With `-no-regenerate`, generated files still name the old paths, and `check` reports
+  them until `make generate` runs.
+- `promote` rewrites `<module>/migration/` in all three forms and bare `migration/<top>`
+  paths; patterns that name `migration` otherwise, such as `^(internal|migration)/` in
+  `.golangci.yml` or `^migration/[a-z]+/` in `.testcoverage.yml`, and `./migration/...`,
+  are edited by hand. Promotion removes the ledger, so the same change removes the CI
+  stale-path step, `tools/pkgmove`, the package behind it and that package's `TestMain`
+  owner in `tools/testnames`.
 
 ## Pre-migration base
 

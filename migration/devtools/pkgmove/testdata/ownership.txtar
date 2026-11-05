@@ -1,0 +1,113 @@
+# The server test ownership inventory is rewritten as JSON, encoded as
+# tools/citestselection writes it. A package key follows its directory, with
+# the entry's file renames applied to its shared files and format
+# dependencies; a directory that is no longer one whose tests need an owner
+# loses its keys and its dependencies, with a notice, and a list that empties
+# loses its key.
+ok move -ticket ECO-01
+stdout ^note: tools/citestselection/test_ownership\.json: dropped internal/server/eta, since migration/platform/eta is not a directory whose tests need an owner$
+stdout ^check: no stale paths \(2 old paths checked\)$
+cmp tools/citestselection/test_ownership.json want/test_ownership.json
+exists migration/artifacts/ecosystem/zeta/http/protocol_test.go
+
+-- go.mod --
+module github.com/weaveplatform/artifactweave
+
+go $GOVERSION
+-- migration/ledger.json --
+{
+    "schema": 1,
+    "module": "github.com/weaveplatform/artifactweave",
+    "staging_root": "migration",
+    "final_root": "internal",
+    "packages": [
+        {"from":"internal/server/eta","action":"move","to":"platform/eta","ticket":"ECO-01"},
+        {"from":"internal/server/zeta","action":"move","to":"artifacts/ecosystem/zeta/http","name":"zetahttp","rename":{"zeta_test.go":"protocol_test.go"},"ticket":"ECO-01"}
+    ],
+    "files": [],
+    "placeholders": []
+}
+-- internal/server/eta/eta.go --
+// Package eta is shared.
+package eta
+
+// Eta is shared.
+const Eta = "eta"
+-- internal/server/eta/eta_test.go --
+package eta
+
+import "testing"
+
+func TestEta(t *testing.T) {
+	if Eta == "" {
+		t.Fatal("empty")
+	}
+}
+-- internal/server/zeta/zeta.go --
+// Package zeta serves zeta.
+package zeta
+
+// Zeta is served.
+const Zeta = "zeta"
+-- internal/server/zeta/zeta_test.go --
+package zeta
+
+import "testing"
+
+func TestZeta(t *testing.T) {
+	if Zeta == "" {
+		t.Fatal("empty")
+	}
+}
+-- tools/citestselection/test_ownership.json --
+{
+  "version": 2,
+  "packages": {
+    "internal/server/eta": "shared",
+    "internal/server/zeta": "shared",
+    "test/server": "shared"
+  },
+  "shared_files": {
+    "internal/server/eta": [
+      "eta_test.go"
+    ],
+    "internal/server/zeta": [
+      "zeta_test.go"
+    ],
+    "test/server": [
+      "server_test.go"
+    ]
+  },
+  "format_dependencies": {
+    "npm": [
+      "internal/server/eta/eta_test.go",
+      "internal/server/zeta/zeta_test.go",
+      "test/server/server_test.go"
+    ],
+    "pypi": [
+      "internal/server/eta/eta_test.go"
+    ]
+  }
+}
+-- want/test_ownership.json --
+{
+  "version": 2,
+  "packages": {
+    "migration/artifacts/ecosystem/zeta/http": "shared",
+    "test/server": "shared"
+  },
+  "shared_files": {
+    "migration/artifacts/ecosystem/zeta/http": [
+      "protocol_test.go"
+    ],
+    "test/server": [
+      "server_test.go"
+    ]
+  },
+  "format_dependencies": {
+    "npm": [
+      "migration/artifacts/ecosystem/zeta/http/protocol_test.go",
+      "test/server/server_test.go"
+    ]
+  }
+}

@@ -1,0 +1,187 @@
+# promote renames each top-level staged directory to the final root, removes
+# the ledger and the staging README, rewrites the module and bare staged
+# paths, writes the path map and checks: a legacy path that the promoted tree
+# holds again, as internal/app, is correct, and "migrations/" and the word
+# "migration" never match.
+ok promote -dry-run
+cmpout want/plan
+git status --porcelain
+! stdout .
+ok promote
+runs make fmt
+stdout ^check: no stale paths \(4 old paths checked\)$
+! exists migration
+exists internal/app/app.go internal/platform/zeta2/zeta2.go internal/platform/zassets/assets/logo.txt
+cmp internal/app/app.go want/app.go
+cmp cmd/server/main.go want/main.go
+cmp Makefile want/Makefile
+cmp docs/arch.md want/arch.md
+cmp docs/legacy.md want/legacy.md
+cmp CHANGELOG.md want/CHANGELOG.md
+cmp docs/implementation/p9d-path-map.json want/p9d-path-map.json
+git status --porcelain docs/implementation
+stdout ^A  docs/implementation/p9d-path-map\.json$
+go vet ./...
+
+-- go.mod --
+module github.com/weaveplatform/artifactweave
+
+go $GOVERSION
+-- migration/ledger.json --
+{
+    "schema": 1,
+    "module": "github.com/weaveplatform/artifactweave",
+    "staging_root": "migration",
+    "final_root": "internal",
+    "packages": [
+        {"from":"internal/app","action":"move","to":"app","ticket":"WEB-18"},
+        {"from":"internal/zeta2","action":"move","to":"platform/zeta2","rename":{"z.go":"zeta2.go"},"ticket":"PLT-40"},
+        {"from":"pkg/blob","action":"move","to":"platform/blob","ticket":"PLT-41"}
+    ],
+    "files": [
+        {"from":"internal/zeta2/assets/","action":"move","to":"platform/zassets","ticket":"PLT-40"},
+        {"from":"internal/zeta2/split.go","action":"split","targets":["platform/blob","platform/zeta2"],"ticket":"PLT-40"}
+    ],
+    "placeholders": []
+}
+-- migration/ledger.schema.json --
+{}
+-- migration/README.md --
+The staging root of migration/app and migration/platform.
+-- migration/app/app.go --
+// Package app composes the server from migration/platform/zeta2.
+package app
+
+import (
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/zeta2"
+)
+
+// Name names the parts.
+const Name = blob.Name + zeta2.Name
+-- migration/platform/zeta2/zeta2.go --
+// Package zeta2 is a part.
+package zeta2
+
+// Name is its name.
+const Name = "zeta2"
+-- migration/platform/zassets/assets/logo.txt --
+logo
+-- migration/platform/blob/blob.go --
+// Package blob is a part.
+package blob
+
+// Name is its name.
+const Name = "blob"
+-- cmd/server/main.go --
+// Command server serves.
+package main
+
+import (
+	"fmt"
+
+	"github.com/weaveplatform/artifactweave/migration/app"
+)
+
+func main() { fmt.Println(app.Name) }
+-- Makefile --
+LDFLAGS := -X $(MODULE)/migration/platform/zeta2.Name=x
+COVERPKG := ${MODULE}/migration/...
+-- docs/arch.md --
+The app lives in migration/app, zeta2 in migration/platform/zeta2/zeta2.go
+and blob in github.com/weaveplatform/artifactweave/migration/platform/blob.
+Schema migrations live in migrations/, and the migration is over.
+-- docs/legacy.md --
+internal/app is where the app was, and is again.
+-- CHANGELOG.md --
+- migration/app was staged.
+-- want/plan --
+  git mv migration/app internal/app
+  git mv migration/platform internal/platform
+  git rm migration/README.md
+  git rm migration/ledger.json
+  git rm migration/ledger.schema.json
+  rewrite Makefile: 2 paths
+  rewrite cmd/server/main.go: 1 import
+  rewrite docs/arch.md: 3 paths
+  rewrite migration/app/app.go (at internal/app/app.go): 2 imports, 1 path
+  write docs/implementation/p9d-path-map.json
+regenerate: make fmt (format the changed files)
+dry run: nothing changed
+-- want/app.go --
+// Package app composes the server from internal/platform/zeta2.
+package app
+
+import (
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
+	"github.com/weaveplatform/artifactweave/internal/platform/zeta2"
+)
+
+// Name names the parts.
+const Name = blob.Name + zeta2.Name
+-- want/main.go --
+// Command server serves.
+package main
+
+import (
+	"fmt"
+
+	"github.com/weaveplatform/artifactweave/internal/app"
+)
+
+func main() { fmt.Println(app.Name) }
+-- want/Makefile --
+LDFLAGS := -X $(MODULE)/internal/platform/zeta2.Name=x
+COVERPKG := ${MODULE}/internal/...
+-- want/arch.md --
+The app lives in internal/app, zeta2 in internal/platform/zeta2/zeta2.go
+and blob in github.com/weaveplatform/artifactweave/internal/platform/blob.
+Schema migrations live in migrations/, and the migration is over.
+-- want/legacy.md --
+internal/app is where the app was, and is again.
+-- want/CHANGELOG.md --
+- migration/app was staged.
+-- want/p9d-path-map.json --
+{
+  "module": "github.com/weaveplatform/artifactweave",
+  "packages": [
+    {
+      "from": "internal/app",
+      "action": "move",
+      "to": "internal/app",
+      "ticket": "WEB-18"
+    },
+    {
+      "from": "internal/zeta2",
+      "action": "move",
+      "to": "internal/platform/zeta2",
+      "rename": {
+        "z.go": "zeta2.go"
+      },
+      "ticket": "PLT-40"
+    },
+    {
+      "from": "pkg/blob",
+      "action": "move",
+      "to": "internal/platform/blob",
+      "ticket": "PLT-41"
+    }
+  ],
+  "files": [
+    {
+      "from": "internal/zeta2/assets/",
+      "action": "move",
+      "to": "internal/platform/zassets",
+      "ticket": "PLT-40"
+    },
+    {
+      "from": "internal/zeta2/split.go",
+      "action": "split",
+      "targets": [
+        "internal/platform/blob",
+        "internal/platform/zeta2"
+      ],
+      "ticket": "PLT-40"
+    }
+  ]
+}
