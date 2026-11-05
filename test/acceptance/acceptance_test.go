@@ -1,11 +1,3 @@
-// Package acceptance runs the Gherkin features in features/ against the real
-// artifactweave binary (decision record 0015). The binary is built once with
-// -cover; when ARTIFACTWEAVE_GOCOVERDIR is set (make accept) every process
-// writes coverage there so acceptance runs count toward the merged gate.
-//
-// The suite runs on Linux in CI. Windows runners cannot run the container
-// backed scenarios and macOS runners have no Docker, so both skip unless a
-// developer opts in locally.
 package acceptance
 
 import (

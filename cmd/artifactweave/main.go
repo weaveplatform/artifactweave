@@ -1,6 +1,3 @@
-// Command artifactweave is the registry server and its operator commands.
-// It stays a thin cobra shim: flags are parsed here and everything else lives
-// in internal/ so it can be tested without a process.
 package main
 
 import (

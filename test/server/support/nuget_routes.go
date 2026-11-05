@@ -1,4 +1,3 @@
-// Package support owns the route inventory used by standalone server tests.
 package support
 
 // NuGetRoutes lists the implemented NuGet route patterns. The root package

@@ -23,6 +23,7 @@ qualification at its exit gate. Tooling details are in
 |---|---|
 | Build | `make build` cross-compiles `cmd/artifactweave` for linux, darwin and windows (amd64 and arm64) with CGO disabled |
 | Lint | `golangci-lint` with the repository `.golangci.yml` reports zero issues, and `make fmt-check` passes all configured formatters. Wire-model packages are the only `tagliatelle` exceptions ([0002](../research/decisions/0002-spec-first-flat-crud-handwritten-item-paths.md)) |
+| Documentation | Every package outside the legacy roots has a doc.go to the decision 0044 standard (TestUnitPackageDocs); revive exported and package-comments report zero issues |
 | Go unit | `make test` selects `^TestUnit` with `-race -shuffle=on` on Linux, macOS and Windows; the four owned fuzz seed corpora run separately in the same lane |
 | Go acceptance | `make accept-go` selects `^TestAcc` across all selected non-native packages, including mixed packages; Linux native-client partitions run `TestAccFeatures` with scoped godog tags |
 | Terraform provider conformance | The pinned JFrog provider fixtures apply against artifactweave, produce an empty follow-up plan, then destroy |

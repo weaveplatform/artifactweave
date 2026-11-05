@@ -1,15 +1,3 @@
-// Command specoracle maintains the gitignored cache of JFrog's embedded
-// OpenAPI blocks and reports parity against api/*.openapi.yaml. See
-// internal/specoracle and docs/research/01-jfrog-api-landscape.md.
-//
-//	specoracle fetch    [-cache .specoracle]            download the documented blocks
-//	specoracle report   [-cache .specoracle] [-api api] print the comparison
-//	specoracle baseline [-cache .specoracle] [-api api] -update
-//	                                                    rewrite api/parity-baseline.json
-//	specoracle inventory [-cache .specoracle] [-api api] [-out docs/...md]
-//	                                                    write the fact inventory (JSON + markdown)
-//	specoracle scaffold -family <slug> -service <svc> -out <fragment.yaml>
-//	                                                    draft a spec fragment from one family
 package main
 
 import (

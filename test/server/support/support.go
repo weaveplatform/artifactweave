@@ -1,6 +1,3 @@
-// Package support holds server-route test data and request helpers shared by
-// independently runnable protocol test packages. Production code must not
-// import this package.
 package support
 
 import (
@@ -35,6 +32,11 @@ var CheapHash = func() []byte {
 	return h
 }()
 
+// Seed creates the built-in principals in db as a new server does (the admin
+// user, anonymous, the readers group, the Anything and Any Remote permissions
+// and the artifactory-build-info repository), with "pw" as the admin
+// password, and fails t if the store refuses them. A store that is already
+// seeded is left as it is.
 func Seed(t *testing.T, db store.Store) {
 	t.Helper()
 	if _, err := auth.SeedHashed(context.Background(), db, CheapHash, time.Now()); err != nil {
@@ -42,6 +44,9 @@ func Seed(t *testing.T, db store.Store) {
 	}
 }
 
+// Do serves one request to h in process and returns the recorded response.
+// It sets each of headers on the request and sends body, or no body at all
+// when body is empty.
 func Do(
 	t *testing.T, h http.Handler, method, path string, headers map[string]string, body string,
 ) *httptest.ResponseRecorder {
@@ -59,16 +64,24 @@ func Do(
 	return rec
 }
 
+// Basic returns the Authorization header that authenticates as user with
+// password over HTTP Basic, in the form Do takes.
 func Basic(user, password string) map[string]string {
 	return map[string]string{
 		"Authorization": "Basic " + base64.StdEncoding.EncodeToString([]byte(user+":"+password)),
 	}
 }
 
+// Bearer returns the Authorization header that presents token as a Bearer
+// credential, in the form Do takes.
 func Bearer(token string) map[string]string {
 	return map[string]string{"Authorization": "Bearer " + token}
 }
 
+// NuGetForm returns pkg as the multipart form that nuget push sends, written
+// in the route tables' body notation: "multipart:", the boundary, a newline,
+// then the form. The suites turn that prefix into the request's
+// multipart/form-data Content-Type with the same boundary.
 func NuGetForm(pkg []byte) string {
 	var buf bytes.Buffer
 	mw := multipart.NewWriter(&buf)
@@ -82,6 +95,10 @@ func NuGetForm(pkg []byte) string {
 	return "multipart:" + mw.Boundary() + "\n" + buf.String()
 }
 
+// NuGetPackage returns a .nupkg for id at version, as an uncompressed zip: an
+// empty _rels/.rels, the nuspec and a stand-in lib/net8.0 assembly. more is
+// written inside the nuspec's metadata element, so a test can add elements
+// such as packageTypes.
 func NuGetPackage(id, version, more string) []byte {
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
@@ -101,11 +118,16 @@ func NuGetPackage(id, version, more string) []byte {
 	return buf.Bytes()
 }
 
+// NuGetSymbolsPackage returns a NuGetPackage whose nuspec declares the
+// SymbolsPackage package type, which marks a .snupkg symbol package.
 func NuGetSymbolsPackage(id, version string) []byte {
 	return NuGetPackage(id, version,
 		`<packageTypes><packageType name="SymbolsPackage" /></packageTypes>`)
 }
 
+// NuGetPortablePDB returns a minimal Portable PDB that the symbol server can
+// index. Its symbol key is 030201000504070608090A0B0C0D0E0F followed by
+// FFFFFFFF, which stands in for the age in a Portable PDB's key.
 func NuGetPortablePDB() []byte {
 	b := make([]byte, 120)
 	copy(b, "BSJB")
@@ -126,6 +148,9 @@ func NuGetPortablePDB() []byte {
 	return b
 }
 
+// NuGetWindowsPDB returns a minimal Windows (MSF 7.00) PDB that the symbol
+// server can index. Its symbol key is the GUID of NuGetPortablePDB's key
+// followed by the age, 2A.
 func NuGetWindowsPDB() []byte {
 	b := make([]byte, 6*512)
 	copy(b, "Microsoft C/C++ MSF 7.00\r\n\x1aDS\x00\x00\x00")
@@ -138,6 +163,8 @@ func NuGetWindowsPDB() []byte {
 	return b
 }
 
+// NuGetPDBPackage returns a symbol package for id at version 1.0.0 that holds
+// pdb as lib/net10.0/App.pdb, for the symbol server's indexing tests.
 func NuGetPDBPackage(id string, pdb []byte) []byte {
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
@@ -152,6 +179,9 @@ func NuGetPDBPackage(id string, pdb []byte) []byte {
 	return buf.Bytes()
 }
 
+// ArtifactoryError returns the status and message of the error in rec's
+// Artifactory error envelope, {"errors":[{"status":...,"message":...}]}. It
+// fails t unless rec is application/json and holds exactly one error.
 func ArtifactoryError(t *testing.T, rec *httptest.ResponseRecorder) (int, string) {
 	t.Helper()
 	var body struct {

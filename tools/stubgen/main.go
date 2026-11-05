@@ -1,6 +1,3 @@
-// Command stubgen writes internal/server/gen/<service>/unimplemented.gen.go
-// from the generated strict server interface (make generate). See
-// internal/stubgen.
 package main
 
 import (

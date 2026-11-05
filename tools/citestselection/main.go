@@ -1,5 +1,3 @@
-// citestselection selects the safe CI test profile for a pull request. Uncertain input
-// always receives the full profile.
 package main
 
 import (

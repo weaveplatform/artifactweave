@@ -1,0 +1,40 @@
+// Package support holds server-route test data and request helpers shared by
+// independently runnable protocol test packages. Production code must not
+// import this package.
+//
+// # Role
+//
+// Test support, outside the modules, for the server-assembly suites under
+// test/server and for the route tests that remain in internal/server.
+//
+// # Inputs
+//
+//   - The stores, authentication and format packages the fixtures are built
+//     from.
+//
+// # Outputs
+//
+//   - The route inventory of each format (DockerRoutes, GoRoutes, HelmRoutes,
+//     MavenRoutes, NPMRoutes, NuGetRoutes, PyPIRoutes, TerraformRoutes,
+//     TerraformBackendRoutes). Each format's suite holds its status and
+//     principal tables to its inventory, and the guards in internal/server
+//     count those routes as covered; DockerHandwrittenRoutes and
+//     NPMGeneratedRoutes give those guards the parts they treat apart.
+//   - Request helpers (Do, Basic, Bearer, ArtifactoryError) and seeding
+//     (Seed, with the fast TestHash and CheapHash, the hash of the shared
+//     password).
+//   - Format fixtures: npm publish bodies and tarballs, NuGet packages and
+//     PDBs, Helm charts, OCI images and manifests, Terraform repositories and
+//     the backend keyring.
+//
+// # References
+//
+//   - Decision 0015: docs/research/decisions/0015-testing-and-acceptance.md.
+//   - docs/testing/server-test-ownership.md: how CI selection gives the
+//     package an owner.
+//   - https://github.com/weaveplatform/artifactweave/issues/673
+//
+// # Status
+//
+// Implemented P9b (issue 673).
+package support

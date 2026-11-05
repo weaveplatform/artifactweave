@@ -1,9 +1,3 @@
-// Package containertest gates the tests that start containers (decision
-// 0015). They need a Docker daemon that runs Linux containers: GitHub's
-// Windows runners have a healthy Docker that runs only Windows containers,
-// so testcontainers' own health check passes and every Linux image then
-// fails to start. Those tests skip there and run on Linux and on macOS with
-// Docker Desktop.
 package containertest
 
 import (
