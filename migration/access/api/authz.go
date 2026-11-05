@@ -1,6 +1,6 @@
-package authz
+package api
 
-import "github.com/weaveplatform/artifactweave/pkg/types"
+import "github.com/weaveplatform/artifactweave/migration/kernel"
 
 // Subject is who a request acts as. Groups are the groups the subject
 // belongs to; the token service (#74) may instead put a token's scoped
@@ -12,7 +12,7 @@ type Subject struct {
 	Anonymous bool
 	// Scope is the scope of the token the request carries; nil for password
 	// authentication, which acts with everything the subject holds.
-	Scope *types.Scope
+	Scope *kernel.Scope
 }
 
 // Repo identifies a permission target: a repository's key and class (local,

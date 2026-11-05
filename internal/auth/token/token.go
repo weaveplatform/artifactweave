@@ -33,9 +33,6 @@ var (
 		"%w: only an administrator may issue a token that never expires",
 		ErrInvalidRequest,
 	)
-	// ErrNotRevocable refuses to revoke a token shorter than the revocable
-	// threshold that was neither forced revocable nor refreshable.
-	ErrNotRevocable = errors.New("token: token is not revocable")
 	// ErrRefreshOtherUser refuses a refresh token of another user than the
 	// one refreshing: "The authenticated user must match the user of the
 	// access token being refreshed" (createtoken.json, which answers 403).

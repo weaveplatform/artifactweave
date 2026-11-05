@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strings"
 
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -27,14 +26,6 @@ type TokenVerifier interface {
 // whose only fault is its expiry. internal/auth/token implements it.
 type ExpiredVerifier interface {
 	VerifyExpired(ctx context.Context, raw string) (types.Token, error)
-}
-
-// LooksLikeToken reports whether a Basic password is an access or reference
-// token rather than a password: the JFrog CLI sends tokens as the password
-// of a Basic credential.
-func LooksLikeToken(s string) bool {
-	return types.IsReferenceToken(s) ||
-		(strings.HasPrefix(s, "eyJ") && strings.Count(s, ".") == 2)
 }
 
 // Token verifies a token presented as Bearer, as X-JFrog-Art-Api, or as the
