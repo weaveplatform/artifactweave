@@ -56,6 +56,7 @@
   },
   "shared_files": {
     "internal/app": [
+      "access_test.go",
       "app_test.go",
       "blob_test.go",
       "conan_client_test.go",
@@ -81,6 +82,7 @@
       "store_test.go"
     ],
     "internal/server": [
+      "access_api_test.go",
       "access_identity_status_test.go",
       "access_identity_test.go",
       "access_test.go",

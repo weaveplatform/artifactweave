@@ -70,6 +70,8 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/service/usage"
 	"github.com/weaveplatform/artifactweave/internal/service/work"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/mirror"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
@@ -130,6 +132,13 @@ type Config struct {
 	// Tokens issues, refreshes and revokes access tokens for the token API;
 	// nil answers that API 501.
 	Tokens *token.Service
+	// Access is the access module's API, which app builds over Store, Auth
+	// and Tokens. When every contract in it is nil and Store is set, New and
+	// RegisterDebianSnapshotWork bind one over those fields, with
+	// AllowBasicAuthTokens and GlobalEnvironmentLimit as its settings, so a
+	// Config built by hand, as tests build it, answers as the application's
+	// does. Without a store it stays zero.
+	Access accessapi.API
 	// AllowBasicAuthTokens lets a password sent with Basic create tokens
 	// through POST /access/api/v1/tokens (token.allow_basic_auth); the zero
 	// value refuses it, as Artifactory 7.x does by default.
@@ -346,6 +355,40 @@ type MirrorStatus struct {
 	mirror.Status
 }
 
+// withAccess returns cfg with Access bound over its store and services by
+// the access module when cfg sets a store and no contract of Access (see
+// Config.Access).
+func withAccess(cfg Config) Config {
+	if cfg.Store == nil || !accessUnset(cfg.Access) {
+		return cfg
+	}
+	// New refuses only a nil store, which the check above excludes, so
+	// there is no error for New's callers to see.
+	if m, err := accessmodule.New(accessmodule.Deps{
+		Store: cfg.Store, Authenticator: cfg.Auth, Tokens: cfg.Tokens,
+		Settings: accessapi.Settings{
+			AllowBasicAuthTokens:   cfg.AllowBasicAuthTokens,
+			GlobalEnvironmentLimit: cfg.GlobalEnvironmentLimit,
+		},
+		Log: cfg.Logger,
+	}); err == nil {
+		cfg.Access = m.API()
+	}
+	return cfg
+}
+
+// accessUnset reports whether every contract of a is nil. It tests them one
+// by one because comparing the API with == panics when a contract holds a
+// value that cannot be compared, such as a struct with a map or function
+// field. Settings does not count: its zero value is a valid choice. A
+// contract added to the API must be added here too; TestUnitWithAccess fails
+// until it is.
+func accessUnset(a accessapi.API) bool {
+	return a.Authenticator == nil && a.Authorizer == nil && a.Tokens == nil &&
+		a.Keys == nil && a.Identity == nil && a.Restrictions == nil &&
+		a.Projects == nil && a.Grants == nil && a.AnonymousAccess == nil
+}
+
 // managementBodyLimit bounds JSON management requests. 64 MiB covers the
 // largest documented payloads (batch repository creation, build-info) with
 // room to spare; artifact uploads never pass through it.
@@ -353,6 +396,7 @@ const managementBodyLimit = 64 << 20
 
 // New returns the fully wired handler.
 func New(cfg Config) http.Handler {
+	cfg = withAccess(cfg)
 	logger := cfg.Logger
 	if logger == nil {
 		logger = slog.Default()

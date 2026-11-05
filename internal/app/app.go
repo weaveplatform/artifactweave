@@ -102,6 +102,7 @@ func serve(
 			Mirrors:       rt.mirrorsAdmin(),
 			Multipart:     rt.multipart,
 			Tokens:        rt.tokens,
+			Access:        rt.access.API(),
 			Redirect: server.Redirect{
 				MinSize: int64(cfg.Download.Redirect.MinSize), TTL: cfg.Download.Redirect.TTL,
 				CDNMaxSize: cdnMaxSize(cfg.Blob),
