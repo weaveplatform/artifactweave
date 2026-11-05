@@ -36,7 +36,11 @@ func TestUnitImportTiers(t *testing.T) {
 			return err
 		}
 		if d.IsDir() {
-			if d.Name() == ".git" || d.Name() == "cover" || d.Name() == "bin" {
+			// Dot-directories hold .git and the untracked repository copies
+			// under .worktrees/. The root itself is never skipped, or the
+			// walk would see nothing.
+			name := d.Name()
+			if name == "cover" || name == "bin" || (path != root && strings.HasPrefix(name, ".")) {
 				return filepath.SkipDir
 			}
 			return nil
