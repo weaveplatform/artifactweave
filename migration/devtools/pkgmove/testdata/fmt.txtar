@@ -1,0 +1,67 @@
+# fmt keeps the ledger canonical; fmt -check only compares.
+ok fmt -check
+! stdout .
+cp want/unsorted.json migration/ledger.json
+fail fmt -check
+cmpout want/check
+ok fmt
+stdout ^rewrote migration/ledger\.json in canonical form$
+cmp migration/ledger.json want/canonical.json
+ok fmt -check
+usage fmt extra
+usage fmt -bogus
+
+# A ledger that does not load, or is for another module, stops every command.
+cp want/unknown-key.json migration/ledger.json
+fail fmt -check
+stderr ^pkgmove: open the repository: load the ledger .*unknown field "colour"
+fail check
+stderr ^pkgmove: open the repository: load the ledger
+commit
+fail move -ticket PLT-01
+stderr ^pkgmove: open the repository: load the ledger
+cp want/other-module.json migration/ledger.json
+fail status
+stderr ^pkgmove: refused: .* is module "github\.com/weaveplatform/artifactweave", but the ledger is for "example\.com/other"$
+
+-- go.mod --
+module github.com/weaveplatform/artifactweave
+
+go $GOVERSION
+-- migration/ledger.json --
+{
+    "schema": 1,
+    "module": "github.com/weaveplatform/artifactweave",
+    "staging_root": "migration",
+    "final_root": "internal",
+    "packages": [
+        {"from":"internal/a","action":"move","to":"platform/a","ticket":"PLT-01"},
+        {"from":"internal/b","action":"move","to":"platform/b","ticket":"PLT-01"}
+    ],
+    "files": [],
+    "placeholders": []
+}
+-- want/unsorted.json --
+{"schema": 1, "module": "github.com/weaveplatform/artifactweave", "staging_root": "migration", "final_root": "internal",
+ "packages": [{"from": "internal/b", "action": "move", "to": "platform/b", "ticket": "PLT-01"},
+              {"from": "internal/a", "action": "move", "to": "platform/a", "ticket": "PLT-01"}],
+ "files": [], "placeholders": []}
+-- want/check --
+migration/ledger.json:1: not in canonical form; run go run ./tools/pkgmove fmt
+-- want/canonical.json --
+{
+    "schema": 1,
+    "module": "github.com/weaveplatform/artifactweave",
+    "staging_root": "migration",
+    "final_root": "internal",
+    "packages": [
+        {"from":"internal/a","action":"move","to":"platform/a","ticket":"PLT-01"},
+        {"from":"internal/b","action":"move","to":"platform/b","ticket":"PLT-01"}
+    ],
+    "files": [],
+    "placeholders": []
+}
+-- want/unknown-key.json --
+{"schema": 1, "colour": "blue"}
+-- want/other-module.json --
+{"schema": 1, "module": "example.com/other", "staging_root": "migration", "final_root": "internal", "packages": [], "files": [], "placeholders": []}

@@ -1,0 +1,89 @@
+# move -from -to re-homes a staged or test/ directory that the ledger does
+# not cover, with the same rewrite as a ticket's move; check -from proves it.
+usage move -from internal/pi -to migration/platform/pi
+stderr ^pkgmove: usage: "internal/pi" is not a directory below migration/ or test/; legacy packages move by -ticket$
+usage move -from migration/platform/pi -to migration/platform/pi/inner
+stderr ^pkgmove: usage: -to migration/platform/pi/inner is -from or lies below it$
+usage move -from migration/platform/pi -to migration/platform/x -name 9lives
+stderr ^pkgmove: usage: -name "9lives" is not a Go identifier$
+fail move -from migration/platform/empty -to migration/platform/full
+stderr ^pkgmove: refused: migration/platform/empty holds no tracked Go files$
+fail move -from migration/platform/pi -to migration/platform/file.txt -name filed
+stderr ^pkgmove: read the target: \S
+
+ok move -from migration/platform/pi -to migration/artifacts/core/pi2 -dry-run
+cmpout want/plan
+ok move -from migration/platform/pi -to migration/artifacts/core/pi2
+runs make fmt
+stdout ^check: no stale paths \(1 old paths checked\)$
+cmp migration/platform/user/user.go want/user.go
+cmp docs/pi.md want/pi.md
+exists migration/artifacts/core/pi2/testdata/x.txt migration/platform/pi/sub/sub.go
+go vet ./...
+commit
+ok check -from migration/platform/pi
+cp want/stale.md docs/stale.md
+commit
+fail check -from migration/platform/pi
+stdout ^docs/stale\.md:1: stale path "migration/platform/pi/pi\.go": migration/platform/pi moved$
+
+-- go.mod --
+module github.com/weaveplatform/artifactweave
+
+go $GOVERSION
+-- migration/ledger.json --
+{
+    "schema": 1,
+    "module": "github.com/weaveplatform/artifactweave",
+    "staging_root": "migration",
+    "final_root": "internal",
+    "packages": [],
+    "files": [],
+    "placeholders": []
+}
+-- migration/platform/pi/pi.go --
+// Package pi is re-homed.
+package pi
+
+// Pi is pi.
+const Pi = "pi"
+-- migration/platform/pi/testdata/x.txt --
+x
+-- migration/platform/pi/sub/sub.go --
+// Package sub stays.
+package sub
+-- migration/platform/empty/README.md --
+no Go here
+-- migration/platform/file.txt --
+a file
+-- migration/platform/user/user.go --
+// Package user uses pi.
+package user
+
+import "github.com/weaveplatform/artifactweave/migration/platform/pi"
+
+// P is pi.
+const P = pi.Pi
+-- docs/pi.md --
+pi lives in migration/platform/pi/pi.go; its subpackage in migration/platform/pi/sub.
+-- want/plan --
+move migration/platform/pi -> migration/artifacts/core/pi2 (package pi becomes pi2)
+  git mv migration/platform/pi/pi.go migration/artifacts/core/pi2/pi.go
+  git mv migration/platform/pi/testdata/x.txt migration/artifacts/core/pi2/testdata/x.txt
+  rewrite docs/pi.md: 1 path
+  rewrite migration/platform/pi/pi.go (at migration/artifacts/core/pi2/pi.go): 1 package clause
+  rewrite migration/platform/user/user.go: 1 import, 1 qualifier
+regenerate: make fmt (format the changed files)
+dry run: nothing changed
+-- want/user.go --
+// Package user uses pi.
+package user
+
+import "github.com/weaveplatform/artifactweave/migration/artifacts/core/pi2"
+
+// P is pi.
+const P = pi2.Pi
+-- want/pi.md --
+pi lives in migration/artifacts/core/pi2/pi.go; its subpackage in migration/platform/pi/sub.
+-- want/stale.md --
+See migration/platform/pi/pi.go.

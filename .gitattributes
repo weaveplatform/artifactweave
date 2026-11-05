@@ -14,3 +14,6 @@ internal/format/opkg/testdata/openwrt-Packages text eol=lf whitespace=-blank-at-
 # Nix cache text is native protocol data; CRLF is not a valid field delimiter.
 *.narinfo text eol=lf
 internal/format/nix/testdata/cache/nix-cache-info text eol=lf
+# txtar fixture archives: a file marker line that ends in CRLF is not a
+# marker, so a CRLF checkout on Windows would parse as an archive with no files.
+*.txtar text eol=lf

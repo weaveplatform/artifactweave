@@ -11,6 +11,8 @@ import (
 	"slices"
 	"strings"
 	"sync"
+
+	"github.com/weaveplatform/artifactweave/tools/citestselection/ownership"
 )
 
 // test_ownership.json is a package boundary, not a selector of test names.
@@ -66,7 +68,7 @@ func (o testOwnership) validate() error {
 	}
 	owners := map[string]bool{}
 	for dir, owner := range o.Packages {
-		if !ownedTestDir(dir) || owner == "" {
+		if !ownership.OwnedTestDir(dir) || owner == "" {
 			return fmt.Errorf("invalid test package owner %q: %q", dir, owner)
 		}
 		if owner != "shared" {
@@ -108,36 +110,6 @@ func (o testOwnership) validate() error {
 		}
 	}
 	return nil
-}
-
-// ownedTestDir reports whether the tests in dir need a reviewed owner: server
-// assembly tests, the application tests and the HTTP adapter tests. P9d builds
-// the target tree under migration/ and then renames it to internal/ (decision
-// 0044), so each staged pattern accepts both roots; internal/app is the
-// internal form of <root>/app.
-func ownedTestDir(dir string) bool {
-	// An unclean inventory key such as "test/server/npm/" could never equal
-	// a test file's directory, so its tests would stay unmapped.
-	if dir != path.Clean(dir) {
-		return false
-	}
-	if dir == "internal/server" || strings.HasPrefix(dir, "internal/server/") ||
-		dir == "test/server" || strings.HasPrefix(dir, "test/server/") {
-		return true
-	}
-	parts := strings.Split(dir, "/")
-	if parts[0] != "migration" && parts[0] != "internal" {
-		return false
-	}
-	switch {
-	case len(parts) == 2:
-		return parts[1] == "app"
-	case len(parts) >= 5 && parts[1] == "artifacts" && parts[2] == "ecosystem":
-		return parts[4] == "http"
-	case len(parts) >= 4:
-		return parts[2] == "adapters" && parts[3] == "http"
-	}
-	return false
 }
 
 func serverTestOwner(file string) (string, bool) {

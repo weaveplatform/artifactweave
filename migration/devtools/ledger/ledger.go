@@ -223,14 +223,16 @@ func (l *Ledger) Translate(importPath string) (target, action string, ok bool) {
 	}
 	p := l.Packages[i]
 	if p.Action == ActionMove || p.Action == ActionMerge {
-		target = l.Module + "/" + l.dir(p.Scope, p.To)
+		target = l.Module + "/" + l.Dir(p.Scope, p.To)
 	}
 	return target, p.Action, true
 }
 
-// dir resolves a target to a slash-separated path relative to the repository
-// root.
-func (l *Ledger) dir(scope, to string) string {
+// Dir resolves to, the target of an entry with the given scope, to a
+// slash-separated path relative to the repository root: to itself under
+// ScopeRepo, and to below the staging root otherwise. It does not check to;
+// Validate does.
+func (l *Ledger) Dir(scope, to string) string {
 	if scope == ScopeRepo {
 		return to
 	}

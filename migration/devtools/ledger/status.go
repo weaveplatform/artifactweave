@@ -99,7 +99,7 @@ func (l *Ledger) Status(root string) (Report, error) {
 		r.Files[i] = FileStatus{File: f, Status: l.fileStatus(t, f)}
 	}
 	for i, p := range l.Placeholders {
-		status := placeholderStatus(t.goFiles(l.dir(p.Scope, p.To)))
+		status := placeholderStatus(t.goFiles(l.Dir(p.Scope, p.To)))
 		r.Placeholders[i] = PlaceholderStatus{Placeholder: p, Status: status}
 	}
 	if t.err != nil {
@@ -119,7 +119,7 @@ func (l *Ledger) packageStatus(t *tree, p Package) string {
 		}
 		return StatusPending
 	}
-	target := len(t.goFiles(l.dir(p.Scope, p.To))) > 0
+	target := len(t.goFiles(l.Dir(p.Scope, p.To))) > 0
 	switch {
 	case len(legacy) == 0 && target:
 		return StatusDone
@@ -138,21 +138,22 @@ func (l *Ledger) fileStatus(t *tree, f File) string {
 		return StatusPending
 	case f.Action != ActionMove:
 		return StatusDone
-	case t.exists(l.fileTarget(f)):
+	case t.exists(l.FileTarget(f)):
 		return StatusDone
 	}
 	return StatusBroken
 }
 
-// fileTarget is where a file move puts f: the name in File, or else the last
-// element of From, inside the target directory, with the trailing "/" of an
-// asset directory kept.
-func (l *Ledger) fileTarget(f File) string {
+// FileTarget returns where a file move puts f, as a slash-separated path
+// relative to the repository root: the name in File, or else the last element
+// of From, inside the target directory, with the trailing "/" of an asset
+// directory kept. It is meaningful only for ActionMove.
+func (l *Ledger) FileTarget(f File) string {
 	name := f.File
 	if name == "" {
 		name = path.Base(strings.TrimSuffix(f.From, "/"))
 	}
-	target := l.dir(f.Scope, f.To) + "/" + name
+	target := l.Dir(f.Scope, f.To) + "/" + name
 	if strings.HasSuffix(f.From, "/") {
 		target += "/"
 	}
