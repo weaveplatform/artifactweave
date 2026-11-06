@@ -14,7 +14,7 @@ type Status struct {
 	// Zone is this instance's zone.
 	Zone string
 	// UnderReplicated counts blobs with fewer present copies than
-	// Redundancy (store.ReplicaIndex.UnderReplicated).
+	// Redundancy (ReplicaIndex.UnderReplicated).
 	UnderReplicated int64
 	Members         []MemberStatus
 	// Removed are members with replica records that are no longer

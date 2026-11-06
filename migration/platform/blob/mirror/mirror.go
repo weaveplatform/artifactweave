@@ -1,22 +1,3 @@
-// Package mirror is a blob store that keeps each blob on several member
-// stores at once (decision 0028): different clouds, regions or accounts, any
-// mix of the fs, s3, gcs and azure backends.
-//
-// Writes go to Redundancy members in parallel and succeed once WriteQuorum of
-// them hold the blob; members still committing get MemberTimeout to finish
-// in the background, and every member's outcome is recorded in the replica
-// index (store.ReplicaIndex) as present or pending, so the repair worker can
-// fill missing copies later. Reads use the index to go straight to a member
-// holding the blob, in read order: this instance's zone first, then by
-// observed latency, members whose breaker is open last. A read that fails
-// part-way reopens on the next holder at the same offset, which is safe
-// because blobs are immutable.
-//
-// This is Artifactory's sharding provider (redundancy, lenientLimit,
-// zone-aware reads) with three differences: members may be any backend in
-// any cloud, an index records which members hold which blob instead of every
-// read probing every shard, and surplus copies are never deleted
-// automatically.
 package mirror
 
 import (
