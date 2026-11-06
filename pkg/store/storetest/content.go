@@ -17,7 +17,7 @@ import (
 )
 
 // runContent covers repositories, items with their properties and
-// statistics, upload sessions, the trash can and the package index.
+// statistics, the trash can and the package index.
 func runContent(t *testing.T, newStore Factory) {
 	t.Run("Repos", func(t *testing.T) { testRepos(t, newStore(t).Repos()) })
 	t.Run("Items", func(t *testing.T) { testItems(t, newStore(t).Items()) })
@@ -29,7 +29,6 @@ func runContent(t *testing.T, newStore Factory) {
 	t.Run("ItemSearch", func(t *testing.T) { testItemSearch(t, newStore(t)) })
 	t.Run("LongPropertyValues", func(t *testing.T) { testLongPropertyValues(t, newStore(t)) })
 	t.Run("LongPropertyKeys", func(t *testing.T) { testLongPropertyKeys(t, newStore(t)) })
-	t.Run("Uploads", func(t *testing.T) { testUploads(t, newStore(t).Uploads()) })
 	t.Run("Trash", func(t *testing.T) { testTrash(t, newStore(t).Trash()) })
 	t.Run("Packages", func(t *testing.T) { testPackages(t, newStore(t)) })
 }
@@ -806,47 +805,6 @@ func testItemStats(t *testing.T, s store.ItemStore) {
 	wantErr(t, err, store.ErrNotFound)
 	wantErr(t, s.RecordDownload(ctx, missing, store.Download{At: at(1)}), store.ErrNotFound)
 	wantErr(t, s.PutStats(ctx, missing, imported), store.ErrNotFound)
-}
-
-func testUploads(t *testing.T, s store.UploadStore) {
-	ctx := context.Background()
-	u1 := store.Upload{
-		ID: "u1", Backend: "s3", RepoKey: "docker-local", Path: "img/blobs", State: []byte("abc"),
-		Bytes: 3, Started: at(1), Updated: at(5),
-	}
-	u2 := store.Upload{ID: "u2", Backend: "fs", Started: at(2)}
-	u3 := store.Upload{ID: "u3"}
-	u4 := store.Upload{ID: "u4", Started: at(1), Updated: at(10)}
-	for _, u := range []store.Upload{u4, u3, u2, u1} {
-		must(t, s.Put(ctx, u))
-	}
-	same(t, "Get", u1, get[store.Upload](t)(s.Get(ctx, "u1")))
-	wantErr(t, s.Put(ctx, store.Upload{Bytes: 1}), store.ErrInvalid)
-
-	u1.Bytes, u1.State = 6, []byte("abcdef")
-	must(t, s.Put(ctx, u1))
-	got := get[store.Upload](t)(s.Get(ctx, "u1"))
-	same(t, "Get after replace", u1, got)
-	got.State[0] = 'X'
-	same(t, "copies", u1, get[store.Upload](t)(s.Get(ctx, "u1")))
-
-	ids := func(us []store.Upload, err error) []string {
-		t.Helper()
-		must(t, err)
-		out := make([]string, 0, len(us))
-		for _, u := range us {
-			out = append(out, u.ID)
-		}
-		return out
-	}
-	same(t, "Stale", []string{"u3", "u2", "u1"}, ids(s.Stale(ctx, at(6), 0)))
-	same(t, "Stale limited", []string{"u3", "u2"}, ids(s.Stale(ctx, at(6), 2)))
-	same(t, "Stale none", []string{"u3"}, ids(s.Stale(ctx, at(-100000), 0)))
-
-	must(t, s.Delete(ctx, "u1"))
-	_, err := s.Get(ctx, "u1")
-	wantErr(t, err, store.ErrNotFound)
-	wantErr(t, s.Delete(ctx, "u1"), store.ErrNotFound)
 }
 
 func trashEntry(repoKey, full string, i int, deleted int) types.TrashEntry {

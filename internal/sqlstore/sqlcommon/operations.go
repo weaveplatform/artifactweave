@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"slices"
-	"strings"
 
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -19,9 +18,6 @@ func (s *Store) Projects() store.ProjectStore { return projectStore{s} }
 // share one table keyed by (project_key, name) with ” for global roles,
 // which is research 15's roles and project_roles in one.
 type projectStore struct{ s *Store }
-
-// opsCols splits a column list written as "a, b, c".
-func opsCols(list string) []string { return strings.Split(list, ", ") }
 
 const projectCols = "key, display_name, description, storage_quota_bytes, soft_limit, quota_email, admin_privileges"
 
