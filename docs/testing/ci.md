@@ -1113,7 +1113,11 @@ the signature check offline. Its signature cases use the real 12.11.14 `SHA256SU
 signature committed in `deploy/ci/testdata/jfrog-providers`.
 
 `make terraform TERRAFORM_MODE=apply` adds the full run, which the `terraform` CI job runs:
-1. Build and start one `-cover` binary, writing its coverage to `cover/terraform`.
+1. Build and start one `-cover` binary, writing its coverage to `cover/terraform`, with
+   `ARTIFACTWEAVE_API_BUDGET_TIMEOUT=5s`, the maximum. Terraform deletes up to ten resources
+   at once, and on SQLite the default 500ms admission deadline can refuse one of those
+   requests with a 503 that the provider does not retry (#1147). If a later step fails,
+   `run.sh` prints the last 300 lines of the server log.
 2. Mint an admin access token with the bootstrap admin's password
    (`POST /access/api/v1/tokens`), which the server takes because step 1 starts it with
    `ARTIFACTWEAVE_TOKEN_ALLOW_BASIC_AUTH=true`. The providers authenticate only with a Bearer

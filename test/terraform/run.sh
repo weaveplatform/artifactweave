@@ -7,7 +7,8 @@
 #   run.sh apply [scenario...]     also start one -cover artifactweave, mint
 #                                  an admin access token through its token
 #                                  API, then apply each scenario, require an
-#                                  empty plan, and destroy it
+#                                  empty plan, and destroy it; a failed
+#                                  run prints the end of the server log
 #
 # A scenario is a directory relative to the repository root; the default is
 # the repositories reference in deploy/artifactweave/terraform. The providers
@@ -47,9 +48,16 @@ fi
 mkdir -p "$work"
 server=
 cleanup() {
+	rc=$?
 	if [ -n "$server" ]; then
 		kill -TERM "$server" 2>/dev/null || true
 		wait "$server" 2>/dev/null || true
+	fi
+	# Terraform reports only the status of a failed call. The error behind a
+	# 5xx is in the server log, which goes when the work directory does.
+	if [ "$rc" -ne 0 ] && [ -s "$work/server.log" ]; then
+		echo "run.sh: exit $rc; the last 300 lines of the server log:" >&2
+		tail -n 300 "$work/server.log" >&2
 	fi
 	if [ -n "${owned:-}" ]; then rm -rf "$work"; fi
 }
@@ -112,7 +120,14 @@ port=${TERRAFORM_PORT:-18081}
 url="http://127.0.0.1:$port"
 password=terraform-admin
 mkdir -p "${GOCOVERDIR:-$work/cover}"
+# Terraform deletes up to ten resources at once (its default parallelism).
+# On SQLite each request-budget check is a write that waits behind those
+# deletes for the one writer, and past api.budget_timeout (500ms by
+# default) admission fails closed with a 503 that the provider does not
+# retry (#1147). This job tests the providers against the API, not that
+# default, so the server allows the maximum.
 GOCOVERDIR=${GOCOVERDIR:-$work/cover} \
+	ARTIFACTWEAVE_API_BUDGET_TIMEOUT=5s \
 	ARTIFACTWEAVE_MASTER_KEY=terraform-master-key-0123456789abcdef0123456789abcdef \
 	ARTIFACTWEAVE_BOOTSTRAP_ADMIN_PASSWORD=$password \
 	ARTIFACTWEAVE_TOKEN_ALLOW_BASIC_AUTH=true \
