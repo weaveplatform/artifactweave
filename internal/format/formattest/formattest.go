@@ -102,7 +102,7 @@ type Format struct {
 	// type's repositories, as Terraform's terraformType chooses modules or
 	// providers (decision 0040).
 	Local func(*repo.Config)
-	// Handler is the format; nil means the one formats.For picks for Type.
+	// Handler is the format; nil means the one ecosystem.For picks for Type.
 	Handler format.Handler
 	// Version returns version v of package p as deployed for the nth time.
 	// The suite names packages "alpha" and "beta" and versions "1.0" and
