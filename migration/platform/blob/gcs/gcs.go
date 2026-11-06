@@ -1,29 +1,3 @@
-// Package gcs is the Google Cloud Storage blob store (decision 0027). Blobs
-// live at <prefix>sha256/<ab>/<hex>.
-//
-// GCS objects cannot be appended to, and the Go SDK cannot resume a
-// resumable-upload session from persisted state, so an upload session is
-// built from compose instead:
-//
-//   - Bytes accumulate in a pending buffer of at most PartSize. A blob that
-//     never fills one part is written in a single request at commit.
-//   - Each full part becomes its own object under <prefix>_uploads/<id>/,
-//     written with a must-not-exist precondition. Part names are never
-//     reused across parts, so a retry of the same part either lands or finds
-//     its own earlier copy.
-//   - GCS composes at most 32 sources per request, so before a 33rd source
-//     the session composes what it has into a fold object and continues from
-//     that. There is no limit on how many components a composite object has.
-//   - At commit the content key is known; the session composes everything
-//     straight onto it with a must-not-exist precondition and
-//     DeleteSourceObjects, so the bytes are never copied. A 412 there means
-//     the blob is already stored, which the contract treats as success.
-//   - Composite objects carry a CRC32C but no MD5, so the session tracks the
-//     CRC32C of everything appended and checks the result against it; the
-//     blob.Hasher state still provides SHA-256, SHA-1 and MD5.
-//
-// The session (part objects, their generations, sizes and checksums) is
-// persisted through migration/platform/blob/session after every append.
 package gcs
 
 import (

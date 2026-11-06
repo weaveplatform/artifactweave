@@ -1,29 +1,3 @@
-// Package s3 is the S3-compatible blob store (AWS S3, MinIO, Ceph RGW and
-// similar). Blobs live at <prefix>sha256/<ab>/<hex>.
-//
-// Object stores cannot append or rename, so an upload session is shaped
-// around those limits:
-//
-//   - Bytes accumulate in a pending buffer of at most PartSize. A blob that
-//     never fills one part is written with a single PutObject at commit; most
-//     package files are that small, and they never pay for a multipart upload.
-//   - When the buffer fills, the session starts an S3 multipart upload (on the
-//     first full part) and uploads the part. S3 requires every part except the
-//     last to be at least 5 MiB, which is why appends are buffered rather than
-//     uploaded as they arrive: Docker clients PATCH in chunks of any size.
-//   - The multipart upload ID, the part list, the pending tail and the hash
-//     state are saved through a session.Store after every append, so a
-//     session resumes in a later request (decision 0027; session.InUploads
-//     keeps it in the metadata database).
-//   - At commit the content key is known. If the client declared the digest
-//     up front the multipart upload already targets the content key; otherwise
-//     it targets a temporary key and is copied into place, with a multipart
-//     copy above S3's 5 GiB single-copy limit.
-//   - Every write of a content key is a must-not-exist write (If-None-Match:
-//     *, decision 0027), as the GCS and Azure backends write, so a blob that
-//     is already stored is never written again and two uploads of one blob
-//     cannot race. S3 answers 412 for a taken key, and the existing object is
-//     adopted. There is no HeadObject before the write.
 package s3
 
 import (

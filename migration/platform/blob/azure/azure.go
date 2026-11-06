@@ -1,27 +1,3 @@
-// Package azure is the Azure Blob Storage blob store (decision 0027). Blobs
-// live at <prefix>sha256/<ab>/<hex> in one container.
-//
-// Azure block blobs are written as staged blocks that a later Put Block List
-// commits, and staged blocks are server-side state any process can commit, so
-// an upload session maps onto them directly:
-//
-//   - Appended bytes accumulate in a pending buffer of at most PartSize; each
-//     full part is staged as one block. A blob that never fills a part is
-//     written with a single Put Blob at commit.
-//   - Block IDs are derived from the upload ID and the block number, so the
-//     session only records how many blocks it staged, and re-staging a block
-//     after a failure is idempotent.
-//   - Staged blocks belong to one blob name and the namespace has no rename.
-//     When the client declared the digest up front the blocks are staged on
-//     the content key and commit needs no copy. Otherwise they are staged on
-//     a temporary blob, which commit finalises and then copies into the
-//     content key with parallel Put Block From URL ranges and one atomic
-//     Put Block List. Asynchronous Copy Blob is never used: it shows a
-//     zero-length blob at the destination while it runs, which would answer
-//     Exists for content that is not there.
-//   - Every commit to a content key carries If-None-Match: *, so a committed
-//     blob is never overwritten; losing that race to an identical upload is
-//     success.
 package azure
 
 import (
