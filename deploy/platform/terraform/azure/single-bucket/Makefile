@@ -14,7 +14,7 @@ CONFORMANCE_ENV = \
   ARTIFACTWEAVE_TEST_AZURE_CONTAINER=$$($(TERRAFORM) -chdir=$(CURDIR) output -raw container) \
   ARTIFACTWEAVE_TEST_AZURE_LARGE_RANGES=$(LARGE_RANGES)
 CONFORMANCE_RUN := TestAccContractOnRealAzure|TestAccRealAzureProbes
-CONFORMANCE_PKG := ./pkg/blob/azure/
+CONFORMANCE_PKG := ./migration/platform/blob/azure/
 # The identity, tenant and subscription variables, and the environment,
 # come from deploy/ci/terraform/azure.
 GITHUB_VARS := \

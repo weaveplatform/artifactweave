@@ -83,7 +83,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          go test -count=1 -timeout 25m -v -run 'TestAccContractOnRealGCS|TestAccRealGCSProbes' ./pkg/blob/gcs/ \
+          go test -count=1 -timeout 25m -v -run 'TestAccContractOnRealGCS|TestAccRealGCSProbes' ./migration/platform/blob/gcs/ \
             | tee "$RUNNER_TEMP/gcs.log"
 
       - name: Summary
@@ -167,7 +167,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          go test -count=1 -timeout 25m -v -run 'TestAccContractOnRealAzure|TestAccRealAzureProbes' ./pkg/blob/azure/ \
+          go test -count=1 -timeout 25m -v -run 'TestAccContractOnRealAzure|TestAccRealAzureProbes' ./migration/platform/blob/azure/ \
             | tee "$RUNNER_TEMP/azure.log"
 
       - name: Summary
@@ -243,7 +243,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          go test -count=1 -timeout 25m -v -run 'TestAccContractOnRealS3|TestAccRealS3Probes' ./pkg/blob/s3/ \
+          go test -count=1 -timeout 25m -v -run 'TestAccContractOnRealS3|TestAccRealS3Probes' ./migration/platform/blob/s3/ \
             | tee "$RUNNER_TEMP/s3.log"
 
       - name: Summary

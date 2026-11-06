@@ -848,17 +848,17 @@ make gcp-conformance     # or, by hand, after make gcp-credentials (writes .loca
 ARTIFACTWEAVE_TEST_GCS_BUCKET=$(terraform -chdir=deploy/platform/terraform/gcp/single-bucket output -raw bucket) \
 ARTIFACTWEAVE_TEST_GCS_ACCESS_ID=$(terraform -chdir=deploy/platform/terraform/gcp/single-bucket output -raw service_account) \
 GOOGLE_APPLICATION_CREDENTIALS=deploy/platform/terraform/gcp/single-bucket/.local/gcp-credentials.json \
-  go test -count=1 -v -run 'TestAccContractOnRealGCS|TestAccRealGCSProbes' ./pkg/blob/gcs/
+  go test -count=1 -v -run 'TestAccContractOnRealGCS|TestAccRealGCSProbes' ./migration/platform/blob/gcs/
 
 make aws-conformance     # or, by hand, after aws login:
 ARTIFACTWEAVE_TEST_S3_BUCKET=$(terraform -chdir=deploy/platform/terraform/aws/single-bucket output -raw bucket) \
 ARTIFACTWEAVE_TEST_S3_REGION=eu-west-2 \
-  go test -count=1 -v -run 'TestAccContractOnRealS3|TestAccRealS3Probes' ./pkg/blob/s3/
+  go test -count=1 -v -run 'TestAccContractOnRealS3|TestAccRealS3Probes' ./migration/platform/blob/s3/
 
 make azure-conformance   # or, by hand, after az login:
 ARTIFACTWEAVE_TEST_AZURE_ACCOUNT=$(terraform -chdir=deploy/platform/terraform/azure/single-bucket output -raw account) \
 ARTIFACTWEAVE_TEST_AZURE_CONTAINER=artifactweave \
-  go test -count=1 -v -run 'TestAccContractOnRealAzure|TestAccRealAzureProbes' ./pkg/blob/azure/
+  go test -count=1 -v -run 'TestAccContractOnRealAzure|TestAccRealAzureProbes' ./migration/platform/blob/azure/
 ```
 
 The GCS run acts as the conformance service account through the impersonated credentials

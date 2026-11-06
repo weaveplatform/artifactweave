@@ -422,8 +422,8 @@ across clouds and regions in parallel. The work is tracked as GitHub issues, one
 - Epic #21, cloud backends:
   - research and decision (#7);
   - a shared upload-session layer with per-instance upload rows (#8);
-  - `pkg/blob/gcs` (#9);
-  - `pkg/blob/azure` (#10);
+  - `migration/platform/blob/gcs` (#9);
+  - `migration/platform/blob/azure` (#10);
   - configuration (#11);
   - an opt-in real-cloud conformance workflow (#12).
 - Epic #22, mirroring:
