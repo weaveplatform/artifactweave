@@ -18,7 +18,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // ErrUnusable is content that is not a usable archive: an unknown or
@@ -225,7 +225,7 @@ func Clean(name string) (string, error) {
 	if n == "" || n == "." {
 		return "", nil
 	}
-	if _, _, _, err := types.SplitItemPath(n); err != nil {
+	if _, _, _, err := kernel.SplitItemPath(n); err != nil {
 		return "", fmt.Errorf("%w: the entry %q is not a valid path", ErrUnusable, name)
 	}
 	return n, nil
