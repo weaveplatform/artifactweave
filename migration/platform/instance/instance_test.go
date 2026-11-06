@@ -1,4 +1,4 @@
-package types_test
+package instance_test
 
 import (
 	"errors"

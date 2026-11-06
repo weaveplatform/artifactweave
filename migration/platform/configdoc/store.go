@@ -1,4 +1,4 @@
-package store
+package configdoc
 
 import (
 	"context"

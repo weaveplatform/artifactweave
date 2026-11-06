@@ -1,4 +1,4 @@
-package types
+package settings
 
 // Setting keys of the singleton settings table.
 const (
