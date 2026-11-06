@@ -7790,7 +7790,7 @@
     "handler": "internal/server/searches.go: artifactoryService.SearchPattern",
     "direct_calls": [
       "ant.Match",
-      "authz.CompilePattern",
+      "antpath.CompilePattern",
       "baseurl.From",
       "h.Item.FullPath",
       "r.capped",

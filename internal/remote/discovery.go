@@ -141,7 +141,7 @@ func (s DiscoveryScope) Allows(q source.Request) bool {
 	if s.Root {
 		allows = q.Access.Allows
 	}
-	return authz.PatternsOf(q.Repo).Accepts(s.Path, true) && allows(types.ResourceArtifact,
+	return repo.PatternsOf(q.Repo).Accepts(s.Path, true) && allows(types.ResourceArtifact,
 		authz.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)}, s.Path, types.ActionRead)
 }
 

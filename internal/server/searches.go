@@ -12,10 +12,10 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	"github.com/weaveplatform/artifactweave/migration/kernel/antpath"
 	"github.com/weaveplatform/artifactweave/pkg/aql"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -800,7 +800,7 @@ func (s artifactoryService) SearchPattern(
 		}
 		// $match's * crosses "/", so the query narrows by depth and globs,
 		// and the Ant pattern decides.
-		ant := authz.CompilePattern(pattern)
+		ant := antpath.CompilePattern(pattern)
 		hits, err := r.collect(ctx, all(
 			files(), scope,
 			&aql.FieldCriterion{Field: aql.FieldDepth, Op: aql.OpEq, Number: int64(len(segs))},

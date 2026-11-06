@@ -17,7 +17,6 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/format/alpine"
 	"github.com/weaveplatform/artifactweave/internal/format/debian"
@@ -1051,9 +1050,9 @@ func (s artifactoryService) listFolder(
 	var b strings.Builder
 	fmt.Fprintf(&b, "<!DOCTYPE html>\n<html><head><title>Index of %s</title></head><body>\n", title)
 	fmt.Fprintf(&b, "<h1>Index of %s</h1>\n<pre>", title)
-	patterns := []authz.RepoPatterns{authz.PatternsOf(f.repo)}
+	patterns := []repo.RepoPatterns{repo.PatternsOf(f.repo)}
 	if named.Key != f.repo.Key {
-		patterns = append(patterns, authz.PatternsOf(named))
+		patterns = append(patterns, repo.PatternsOf(named))
 	}
 	for _, c := range children {
 		// Children the caller may not see are left out; a folder shows when
@@ -1087,7 +1086,7 @@ func (s artifactoryService) listFolder(
 }
 
 // acceptedByAll reports whether every set of patterns accepts p.
-func acceptedByAll(patterns []authz.RepoPatterns, p string, folder bool) bool {
+func acceptedByAll(patterns []repo.RepoPatterns, p string, folder bool) bool {
 	for _, pat := range patterns {
 		if !pat.Accepts(p, folder) {
 			return false

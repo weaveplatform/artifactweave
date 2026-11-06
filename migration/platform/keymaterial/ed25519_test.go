@@ -6,7 +6,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/keymaterial"
+	"github.com/weaveplatform/artifactweave/migration/platform/keymaterial"
 )
 
 func TestUnitEd25519KeyMaterial(t *testing.T) {

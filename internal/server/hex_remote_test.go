@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	hexfmt "github.com/weaveplatform/artifactweave/internal/format/hex"
-	"github.com/weaveplatform/artifactweave/internal/keymaterial"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/platform/keymaterial"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"

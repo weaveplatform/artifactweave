@@ -1,6 +1,3 @@
-// Package keymaterial checks the key material the security API stores: that
-// the private and public halves of an RSA or GPG key pair belong together,
-// and that a client certificate bundle carries its own private key.
 package keymaterial
 
 import (
@@ -214,10 +211,13 @@ type Bundle struct {
 	// first; PrivateKey the PEM of its key.
 	Certificates string
 	PrivateKey   string
-	IssuedTo     string
-	IssuedBy     string
-	IssuedOn     time.Time
-	ValidUntil   time.Time
+	// IssuedTo and IssuedBy are the leaf's subject and issuer common names,
+	// each falling back to the full distinguished name when it has none.
+	IssuedTo string
+	IssuedBy string
+	// IssuedOn and ValidUntil bound the leaf's validity, in UTC.
+	IssuedOn   time.Time
+	ValidUntil time.Time
 	// Fingerprint is the leaf's SHA-256 in colon-separated upper-case hex,
 	// as Java's keytool prints it.
 	Fingerprint string

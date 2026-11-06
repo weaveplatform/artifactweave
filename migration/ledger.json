@@ -158,6 +158,10 @@
     ],
     "files": [
         {"from":"internal/authz/api_types.go","action":"move","to":"access/api","file":"authz.go","ticket":"ACC-01"},
+        {"from":"internal/authz/pattern.go","action":"move","to":"kernel/antpath","ticket":"ACC-04"},
+        {"from":"internal/authz/pattern_test.go","action":"move","to":"kernel/antpath","ticket":"ACC-04"},
+        {"from":"internal/authz/repopatterns.go","action":"delete","ticket":"ACC-04","note":"becomes pkg/repo/patterns.go, which the pkg/repo entry (ART-01) carries to artifacts/api/repo; a file entry cannot target pkg/repo, and a move to artifacts/api/repo would derive broken until ART-01"},
+        {"from":"internal/authz/repopatterns_test.go","action":"delete","ticket":"ACC-04","note":"becomes pkg/repo/patterns_test.go, which the pkg/repo entry (ART-01) carries to artifacts/api/repo"},
         {"from":"pkg/store/normalise.go","action":"move","to":"kernel","file":"normalise.go","ticket":"PLT-03"},
         {"from":"pkg/store/store_kernel.go","action":"move","to":"kernel","file":"page.go","ticket":"PLT-03"},
         {"from":"pkg/store/store_test.go","action":"move","to":"kernel","file":"page_test.go","ticket":"PLT-03"},

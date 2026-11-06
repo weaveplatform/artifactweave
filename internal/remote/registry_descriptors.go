@@ -8,9 +8,9 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/kernel/antpath"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -152,7 +152,7 @@ func registryExternal(ctx context.Context, c repo.Config, opts Options, raw stri
 	}
 	allowed := false
 	for _, pattern := range c.ExternalDependenciesPatterns {
-		if pattern != "" && authz.CompilePattern(pattern).Match(raw) {
+		if pattern != "" && antpath.CompilePattern(pattern).Match(raw) {
 			allowed = true
 			break
 		}

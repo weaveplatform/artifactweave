@@ -17,11 +17,11 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	bowerfmt "github.com/weaveplatform/artifactweave/internal/format/bower"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/kernel/antpath"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -53,7 +53,7 @@ func dependencyURL(c repo.Config, raw string) (*url.URL, error) {
 		}
 	}
 	for _, pattern := range c.ExternalDependenciesPatterns {
-		if pattern != "" && authz.CompilePattern(pattern).Match(u.String()) {
+		if pattern != "" && antpath.CompilePattern(pattern).Match(u.String()) {
 			return u, nil
 		}
 	}

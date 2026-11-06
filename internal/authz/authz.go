@@ -14,6 +14,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/kernel/antpath"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -29,8 +30,8 @@ type Sources struct {
 
 type rule struct {
 	target  string
-	include []Pattern
-	exclude []Pattern
+	include []antpath.Pattern
+	exclude []antpath.Pattern
 	actions types.Actions
 }
 
@@ -347,17 +348,17 @@ func TargetAllows(t types.Target, path string, folder bool) bool {
 		allows(path, folder)
 }
 
-func compileAll(patterns []string, fallback string) []Pattern {
-	var out []Pattern
+func compileAll(patterns []string, fallback string) []antpath.Pattern {
+	var out []antpath.Pattern
 	for _, p := range patterns {
 		if p = strings.TrimSpace(p); p != "" {
-			out = append(out, CompilePattern(p))
+			out = append(out, antpath.CompilePattern(p))
 		}
 	}
 	// An empty include list means everything, Artifactory's default; an
 	// empty exclude list excludes nothing.
 	if out == nil && fallback != "" {
-		out = []Pattern{CompilePattern(fallback)}
+		out = []antpath.Pattern{antpath.CompilePattern(fallback)}
 	}
 	return out
 }
@@ -510,7 +511,7 @@ func scopeActions(entries []types.ScopeEntry, repo Repo, path string, folder boo
 			continue
 		}
 		if e.Path != "" {
-			p := CompilePattern(e.Path)
+			p := antpath.CompilePattern(e.Path)
 			if !p.Match(path) && (!folder || !p.MatchBelow(path)) {
 				continue
 			}

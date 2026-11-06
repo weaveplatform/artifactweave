@@ -9,6 +9,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -130,7 +131,7 @@ func ListMappedFolder(ctx context.Context, service *source.Service, q source.Req
 }
 
 func mappedFileAllowed(q source.Request, canonical string) bool {
-	return authz.PatternsOf(q.Repo).Accepts(canonical, false) &&
+	return repo.PatternsOf(q.Repo).Accepts(canonical, false) &&
 		q.Access.Allows(types.ResourceArtifact,
 			authz.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)}, canonical, types.ActionRead)
 }

@@ -50,7 +50,7 @@ func (h handler) migrationPolicy(
 	if ref != "" {
 		pairs = append(pairs, migrationPathPair{status.Source, ref, false})
 	}
-	patterns := authz.PatternsOf(c)
+	patterns := repo.PatternsOf(c)
 	for _, pair := range pairs {
 		if patterns.Accepts(
 			pair.source,
