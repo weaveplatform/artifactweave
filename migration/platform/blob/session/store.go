@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // Store keeps encoded sessions between requests. Get returns an error
@@ -63,12 +63,12 @@ func (m *Memory) Delete(_ context.Context, id string) error {
 // "s3:hot" or "gcs:archive". A session stored under another backend name is
 // unknown here, so the stale-upload reaper always knows which store aborts a
 // session.
-func InUploads(us store.UploadStore, backend string) Store {
+func InUploads(us UploadStore, backend string) Store {
 	return uploads{us: us, backend: backend, now: time.Now}
 }
 
 type uploads struct {
-	us      store.UploadStore
+	us      UploadStore
 	backend string
 	now     func() time.Time
 }
@@ -81,10 +81,10 @@ func (u uploads) Put(ctx context.Context, id string, state []byte, size int64) e
 	switch {
 	case err == nil:
 		started = cur.Started
-	case !errors.Is(err, store.ErrNotFound):
+	case !errors.Is(err, kernel.ErrNotFound):
 		return fmt.Errorf("blob/session: load upload %s: %w", id, err)
 	}
-	if err := u.us.Put(ctx, store.Upload{
+	if err := u.us.Put(ctx, Upload{
 		ID: id, Backend: u.backend, State: state, Bytes: size, Started: started, Updated: now,
 	}); err != nil {
 		return fmt.Errorf("blob/session: store upload %s: %w", id, err)
@@ -96,7 +96,7 @@ func (u uploads) Put(ctx context.Context, id string, state []byte, size int64) e
 // the table has none under id for this backend.
 func (u uploads) Get(ctx context.Context, id string) ([]byte, error) {
 	rec, err := u.us.Get(ctx, id)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return nil, fmt.Errorf("%w: %s", blob.ErrUploadUnknown, id)
 	}
 	if err != nil {
@@ -111,7 +111,7 @@ func (u uploads) Get(ctx context.Context, id string) ([]byte, error) {
 
 // Delete forgets a session; forgetting one that is already gone succeeds.
 func (u uploads) Delete(ctx context.Context, id string) error {
-	if err := u.us.Delete(ctx, id); err != nil && !errors.Is(err, store.ErrNotFound) {
+	if err := u.us.Delete(ctx, id); err != nil && !errors.Is(err, kernel.ErrNotFound) {
 		return fmt.Errorf("blob/session: forget upload %s: %w", id, err)
 	}
 	return nil
