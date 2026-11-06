@@ -14,10 +14,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/buildinfo"
 	"github.com/weaveplatform/artifactweave/internal/config"
 	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/apilimit"
+	"github.com/weaveplatform/artifactweave/migration/platform/buildinfo"
 )
 
 const (

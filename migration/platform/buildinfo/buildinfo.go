@@ -1,6 +1,3 @@
-// Package buildinfo carries version metadata injected with -ldflags -X
-// (see LDFLAGS in the Makefile). Release builds set all three; a plain
-// `go build` reports "devel" and empty values.
 package buildinfo
 
 var (
@@ -15,5 +12,7 @@ func Version() string { return version }
 // Commit returns the source commit, if known.
 func Commit() string { return commit }
 
-// BuildDate returns the RFC 3339 build time, if known.
+// BuildDate returns the RFC 3339 date stamped at link time, or empty: the
+// build time for make build, the commit date for a release build, and
+// nothing for the image build.
 func BuildDate() string { return buildDate }

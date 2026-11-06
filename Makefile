@@ -13,7 +13,7 @@ GOEXE := $(shell $(GO) env GOEXE)
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo devel)
 COMMIT ?= $(shell git rev-parse HEAD 2>/dev/null)
 BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
-LDFLAGS := -s -w -X $(MODULE)/internal/buildinfo.version=$(VERSION) -X $(MODULE)/internal/buildinfo.commit=$(COMMIT) -X $(MODULE)/internal/buildinfo.buildDate=$(BUILD_DATE)
+LDFLAGS := -s -w -X $(MODULE)/migration/platform/buildinfo.version=$(VERSION) -X $(MODULE)/migration/platform/buildinfo.commit=$(COMMIT) -X $(MODULE)/migration/platform/buildinfo.buildDate=$(BUILD_DATE)
 PLATFORMS ?= linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64
 # test/acceptance runs in its own job; test/platform runs only in
 # platform-scenarios.yml, against a deployment, and is evidence rather than coverage.
