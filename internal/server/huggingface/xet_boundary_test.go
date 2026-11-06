@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/crypt"
+	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 )
 
 func TestUnitXetAuthenticationBypassIsLimitedToCASRoutes(t *testing.T) {

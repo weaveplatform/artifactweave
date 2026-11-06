@@ -10,12 +10,12 @@ import (
 	"path/filepath"
 
 	"github.com/weaveplatform/artifactweave/internal/config"
-	"github.com/weaveplatform/artifactweave/internal/crypt"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/terraformstate"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/postgres"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
+	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 )
 
 // ErrUnknownMigration reports a migrate action other than up, down or

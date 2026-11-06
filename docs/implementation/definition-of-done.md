@@ -33,7 +33,7 @@ qualification at its exit gate. Tooling details are in
 | Status codes | A handler's response codes come from [research 02](../research/02-artifactory-core-api-inventory.md), [05](../research/05-platform-identity-and-security-apis.md), or the protocol's research and decision record. The table-driven status tests (`internal/server/status*_test.go`) cover every new route; `TestAccStatusTableCoversImplemented` fails while an implemented route has no row |
 | Spec drift | `make verify-generate` produces no diff in bundled `api/*.openapi.yaml`, `internal/server/gen/` or `pkg/client/` |
 | Acceptance | Every required Linux native-client partition passes within its configured job and test deadlines. A feature that changes client-visible behaviour adds or updates a `.feature` file |
-| Security | `gosec` (through golangci) and `govulncheck` are clean. Stored secrets use `internal/crypt` sealed columns; encrypted Terraform state uses sealed blobs. Nothing logs a credential |
+| Security | `gosec` (through golangci) and `govulncheck` are clean. Stored secrets use `migration/platform/crypt` sealed columns; encrypted Terraform state uses sealed blobs. Nothing logs a credential |
 | Docs | Behaviour changes update the matching decision record in place and the relevant research or operations page. A new decision gets a new numbered record |
 | Capability ownership | Every new or deferred capability is mapped in the [capability roadmap](capability-roadmap.md), with an owning phase and acceptance criterion. Only evidenced supersession permits exclusion; P20 adds automated inventory enforcement |
 | PR title | Conventional-commit title, checked by `pr-title-validation.yml`, so release-please can generate the changelog |
