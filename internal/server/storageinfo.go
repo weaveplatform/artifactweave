@@ -10,8 +10,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
-	"github.com/weaveplatform/artifactweave/internal/service/usage"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/pkg/types/wire"

@@ -16,7 +16,6 @@ import (
 
 var at = time.Date(2026, 10, 17, 9, 0, 0, 0, time.UTC)
 
-// indexWorld is a repository with files to link.
 type indexWorld struct {
 	t   *testing.T
 	db  *inmem.Store

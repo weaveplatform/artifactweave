@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/service/usage"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )

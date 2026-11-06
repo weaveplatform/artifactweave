@@ -1,7 +1,3 @@
-// Package usage computes the storage summary (GET /api/storageinfo): blob
-// totals, item totals per repository and for the trash can, and the capacity
-// of the volume a local blob store lives on. It is computed on every request
-// rather than cached, so it never lags writes.
 package usage
 
 import (
@@ -11,8 +7,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/service/trash"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
