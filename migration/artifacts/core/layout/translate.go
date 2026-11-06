@@ -22,6 +22,10 @@ type LossError struct {
 	Rival    string
 }
 
+// Error describes the loss in the first form that applies: the values the
+// target layout has no place for (Lost), the other source path that takes
+// the same target (Rival), or that the target layout does not read Target
+// back. Copy and move report this text to clients.
 func (e *LossError) Error() string {
 	switch {
 	case len(e.Lost) > 0:
@@ -35,6 +39,7 @@ func (e *LossError) Error() string {
 		e.To, e.Target, e.From)
 }
 
+// Unwrap returns ErrLossy, so errors.Is matches every LossError to it.
 func (e *LossError) Unwrap() error { return ErrLossy }
 
 // Translate converts path from layout from to layout to, as a copy or move

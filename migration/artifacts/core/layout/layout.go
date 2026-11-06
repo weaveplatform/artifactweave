@@ -1,10 +1,3 @@
-// Package layout implements Artifactory repository layouts: the path patterns
-// that tell the server which part of an artifact path is the organisation,
-// module, base revision, integration revision, classifier and extension. A
-// layout drives version search, snapshot cleanup and cross-layout copy, so it
-// has to parse and build paths exactly as Artifactory does. The pattern syntax
-// is documented at https://docs.jfrog.com/artifactory/docs/repository-layouts.md
-// and summarised in docs/research/03-repository-configuration-model.md.
 package layout
 
 import (
@@ -36,7 +29,7 @@ const (
 	TokenOrgPath       = "orgPath"
 	TokenModule        = "module"
 	TokenBaseRev       = "baseRev"
-	TokenFolderItegRev = "folderItegRev"
+	TokenFolderItegRev = "folderItegRev" //nolint:gosec // G101: layout token name, not a credential
 	TokenFileItegRev   = "fileItegRev"
 	TokenClassifier    = "classifier"
 	TokenExt           = "ext"
@@ -272,7 +265,7 @@ type pattern struct {
 // "7z" is the one documented exception to the leading-digit rule. Module alone
 // is greedy: where it appears only in a file name, as in maven-1-default and
 // build-default, commons-lang-2.1.jar is module commons-lang, not commons.
-var tokenRegexps = map[string]string{
+var tokenRegexps = map[string]string{ //nolint:gosec // G101: layout token name, not a credential
 	TokenOrg:        `[^/]+?`,
 	TokenOrgPath:    `.+?`,
 	TokenModule:     `[^/]+`,

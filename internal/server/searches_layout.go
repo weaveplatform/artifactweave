@@ -20,9 +20,9 @@ import (
 
 // The layout searches, GAVC, versions and latest version (decision 0012,
 // research 22 §2), read Maven coordinates from a file's path through its
-// repository's layout (migration/artifacts/core/layout). The query only narrows, to the files
-// under the start each layout gives the group and module asked for; Match,
-// with the file's own repository's layout, decides.
+// repository's layout (migration/artifacts/core/layout). The query only
+// narrows, to the files under the start each layout gives the group and module
+// asked for; Match, with the file's own repository's layout, decides.
 
 const (
 	mediaGavcSearch     = "application/vnd.org.jfrog.artifactory.search.GavcSearchResult+json"
