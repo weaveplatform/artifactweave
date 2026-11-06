@@ -29,7 +29,7 @@ SDK offer.
 
 **Shared session layer.**
 - The object-store backends (s3, gcs, azure) persist their sessions through one shared
-  layer, `pkg/blob/session`. It holds:
+  layer, `migration/platform/blob/session`. It holds:
   - the pending part buffer;
   - the saved `blob.Hasher` state;
   - the size and the declared digest;

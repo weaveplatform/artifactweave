@@ -22,11 +22,11 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/blobtest"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
 	"github.com/weaveplatform/artifactweave/pkg/blob/azure"
 	"github.com/weaveplatform/artifactweave/pkg/blob/gcs"
 	"github.com/weaveplatform/artifactweave/pkg/blob/mirror"
 	"github.com/weaveplatform/artifactweave/pkg/blob/s3"
-	"github.com/weaveplatform/artifactweave/pkg/blob/session"
 	"github.com/weaveplatform/artifactweave/pkg/containertest"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"

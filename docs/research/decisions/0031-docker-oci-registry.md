@@ -108,7 +108,7 @@ operations under `/artifactory/api/docker/<repo>/v2/` that are not registry oper
   the download redirect policy of decision [0029](0029-cdn-delivery-and-download-redirect.md),
   which Artifactory applies to Docker too (research 19). `HEAD` never redirects. Both send
   `Docker-Content-Digest`, `Content-Length` and `Accept-Ranges: bytes`.
-- **Uploads.** `POST .../blobs/uploads/` opens a session in `pkg/blob/session` recorded in
+- **Uploads.** `POST .../blobs/uploads/` opens a session in `migration/platform/blob/session` recorded in
   the `uploads` store, and answers 202 with an absolute `Location` from the base-URL
   resolver, `Range: 0-0` and `Docker-Upload-UUID`. `OCI-Chunk-Min-Length` is sent only when
   the blob backend needs a minimum part size. With `?digest=` and a body the upload is
