@@ -17,9 +17,9 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/internal/service/identity"
+	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
-	"github.com/weaveplatform/artifactweave/pkg/types/wire"
 )
 
 // The legacy security API (/api/security/users, groups, locks, policies and

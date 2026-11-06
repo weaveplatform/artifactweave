@@ -7,10 +7,10 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
-	"github.com/weaveplatform/artifactweave/pkg/types/wire"
 )
 
 const (

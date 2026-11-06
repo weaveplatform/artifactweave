@@ -98,7 +98,7 @@ linters:
         overrides:
           - pkg: migration/artifacts/api/repo
             ignore: true
-          - pkg: github.com/weaveplatform/artifactweave/pkg/types/wire
+          - pkg: github.com/weaveplatform/artifactweave/migration/kernel/wire
             ignore: true
     wrapcheck:
       # Constructors of new errors with an HTTP status, this project's

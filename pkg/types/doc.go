@@ -3,7 +3,7 @@
 // shape the services and stores work with. JFrog's several wire forms of the
 // same entity (legacy camelCase, Access snake_case, the YAML descriptor) are
 // converted to and from these types; the wire structs themselves live in
-// pkg/types/wire and nowhere else.
+// migration/kernel/wire and nowhere else.
 //
 // The repository configuration is the one entity whose wire and internal
 // shapes coincide, so it stays migration/artifacts/api/repo.Config and is not

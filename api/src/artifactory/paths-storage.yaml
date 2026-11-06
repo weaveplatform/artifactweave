@@ -969,7 +969,7 @@ components:
           x-go-json-ignore: true
           x-go-type: '[]wire.BlobMirror'
           x-go-type-import:
-            path: github.com/weaveplatform/artifactweave/pkg/types/wire
+            path: github.com/weaveplatform/artifactweave/migration/kernel/wire
         fileStoreSummary:
           allOf:
           - $ref: '#/components/schemas/FileStoreSummary'
