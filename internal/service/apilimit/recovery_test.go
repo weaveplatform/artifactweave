@@ -1,4 +1,4 @@
-package apilimit
+package apilimit_test
 
 import (
 	"context"
@@ -6,12 +6,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/service/apilimit"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
 func TestUnitRecoveryReservedAllowance(t *testing.T) {
 	now := time.Date(2026, 10, 28, 12, 0, 15, 0, time.UTC)
-	s, err := New(inmem.New(), Default(), func() time.Time { return now })
+	s, err := apilimit.New(inmem.New(), apilimit.Default(), func() time.Time { return now })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -24,7 +25,7 @@ func TestUnitRecoveryReservedAllowance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := s.EnterRecovery(ctx); !errors.Is(err, ErrBusy) {
+	if _, _, err := s.EnterRecovery(ctx); !errors.Is(err, apilimit.ErrBusy) {
 		t.Fatalf("unbounded recovery: %v", err)
 	}
 	first()
