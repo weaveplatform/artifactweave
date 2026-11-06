@@ -32,7 +32,7 @@ original tested versions.
 | [`maven-3.9/Dockerfile`](../../test/acceptance/clients/maven-3.9/Dockerfile) | `maven:3.9-eclipse-temurin-26@sha256:b2c1ad85954592f9928e84327c65201f308ad9b5d8ed7d5b823717c97bf23fbb` | Maven 3.9 image, Temurin 26 | [Maven downloads](https://maven.apache.org/download.cgi) |
 | [`maven.Dockerfile`](../../test/acceptance/clients/maven.Dockerfile) | `maven:3-eclipse-temurin-27@sha256:bd2c0a2c430f787b7b6887826b6b1a43fe48f1e3ca4196b9ab886567bf54de58` | Maven 3 image, Temurin 27, Ivy 2.6.0, Gradle 9.8.2 | [Maven downloads](https://maven.apache.org/download.cgi), [Ivy release](https://repo.maven.apache.org/maven2/org/apache/ivy/ivy/2.6.0/), [Gradle distribution](https://services.gradle.org/distributions/gradle-9.8.2-bin.zip.sha256) |
 | [`nix.Dockerfile`](../../test/acceptance/clients/nix.Dockerfile) | `nixos/nix:2.35.4@sha256:f159a58f390677f41e8e900a74b6e2f9c7f27b364122ae6acf7a652ce6c551c0` | Nix 2.35.4 | [Nix 2.35 manual](https://nix.dev/manual/nix/2.35/), [official image](https://hub.docker.com/r/nixos/nix/tags) |
-| [`node-npm12.Dockerfile`](../../test/acceptance/clients/node-npm12.Dockerfile) | `node:26.13.0-bookworm-slim@sha256:bc0a2afd3b74ce12222fc8bab99271e66257f021078f5f4a5d687a77d280c1d9` | Node 26.13.0, npm 12.2.1 | [Node](https://nodejs.org/download/release/), [npm](https://www.npmjs.com/package/npm) |
+| [`node-npm12/Dockerfile`](../../test/acceptance/clients/node-npm12/Dockerfile) | `node:24.22.2-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9` | Node 24.22.2, npm 12.2.1 | [Node](https://nodejs.org/download/release/), [npm](https://www.npmjs.com/package/npm) |
 | [`node.Dockerfile`](../../test/acceptance/clients/node.Dockerfile) | `node:26.13.0-bookworm-slim@sha256:bc0a2afd3b74ce12222fc8bab99271e66257f021078f5f4a5d687a77d280c1d9` | Node 26.13.0, bundled npm | [Node releases](https://nodejs.org/download/release/latest/) |
 | [`opkg.Dockerfile`](../../test/acceptance/clients/opkg.Dockerfile) | `ubuntu:26.10@sha256:262df65c0ec6bf8d9dcc87454f4330a05fae4b97825f45854af3b136666584c2` | opkg 0.10.0 | [Yocto opkg releases](https://downloads.yoctoproject.org/releases/opkg/) |
 | [`p2.Dockerfile`](../../test/acceptance/clients/p2.Dockerfile) | `ubuntu:26.10@sha256:262df65c0ec6bf8d9dcc87454f4330a05fae4b97825f45854af3b136666584c2` | Eclipse Platform / Equinox P2 4.41, Java 21 | [Eclipse Platform downloads](https://download.eclipse.org/eclipse/downloads/) |
@@ -47,7 +47,9 @@ original tested versions.
 
 The Puppet image stays on Ruby 3.3 through a Dependabot entry of its own,
 because the pinned Puppet cannot extract a module archive on Ruby 3.4
-([#1126](https://github.com/weaveplatform/artifactweave/issues/1126)).
+([#1126](https://github.com/weaveplatform/artifactweave/issues/1126)). The
+npm 12 image stays on Node 24 LTS the same way: it keeps the prior Node line
+beside the newest Node ([decision 0034](../research/decisions/0034-npm.md)).
 
 Purposeful compatibility lanes retain their declared runtimes. Updating a pin
 regenerates this inventory, recipe labels and secondary version assertions; it

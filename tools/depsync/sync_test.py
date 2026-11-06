@@ -48,11 +48,11 @@ class ReferenceTests(unittest.TestCase):
         self.assertEqual([], sync.sync(self.root, check=True))
 
     def test_node_lanes_are_independent_and_digest_only_updates_render(self):
-        legacy = self.read("test/acceptance/clients/node-npm12.Dockerfile")
+        legacy = self.read("test/acceptance/clients/node-npm12/Dockerfile")
         self.set_pin("node.version", "99.14.0")
         self.set_pin("node.image", self.values["node.image"].split("@sha256:")[0].replace(self.values["node.version"], "99.14.0") + "@sha256:" + "a" * 64)
         sync.sync(self.root)
-        self.assertEqual(legacy, self.read("test/acceptance/clients/node-npm12.Dockerfile"))
+        self.assertEqual(legacy, self.read("test/acceptance/clients/node-npm12/Dockerfile"))
         self.assertIn("Node 99.14.0; npm " + self.values["npm12"] + " on Node " + self.values["node-npm12.version"], self.read("docs/client-recipes/src/npm.json"))
         self.assertIn("@sha256:" + "a" * 64, self.read("docs/testing/ci-client-images.md"))
 

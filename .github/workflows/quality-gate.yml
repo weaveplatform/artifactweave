@@ -451,8 +451,7 @@ jobs:
               -f test/acceptance/clients/maven.Dockerfile test/acceptance/clients
             fi
             if [[ ",$CLIENTS," == *,npm12,* ]]; then
-            docker build -t artifactweave-accept-npm12 \
-              -f test/acceptance/clients/node-npm12.Dockerfile test/acceptance/clients
+            docker build -t artifactweave-accept-npm12 test/acceptance/clients/node-npm12
             fi
             if [[ ",$CLIENTS," == *,maven39,* ]]; then
             docker build -t artifactweave-accept-maven39 test/acceptance/clients/maven-3.9

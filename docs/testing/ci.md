@@ -537,7 +537,7 @@ Dockerfile, pinned digest, binary version, release source and compatibility lane
   | Image | Client | Scenarios |
   |---|---|---|
   | `node.Dockerfile` | Primary Node image with its bundled npm | every npm scenario |
-  | `node-npm12.Dockerfile` | Explicit npm compatibility lane; Node and npm are pinned separately from the primary lane | every npm client scenario again: each is a Scenario Outline over `npm` and `npm 12` |
+  | `node-npm12/Dockerfile` | npm 12 on Node 24 LTS, the prior Node line (decision 0034, #294), with npm pinned in the file; in a directory of its own so that its Dependabot entry can hold it below Node 25 | every npm client scenario again: each is a Scenario Outline over `npm` and `npm 12` |
   | `maven.Dockerfile` | Primary Maven 3 image on Eclipse Temurin | every Maven scenario |
   | `maven-3.9/Dockerfile` | Maven 3.9 on Eclipse Temurin, in a directory of its own so that its Dependabot entry can hold the 3.9 line | the release and snapshot round trip again, as a Scenario Outline over `Maven` and `Maven 3.9` |
   | `python.Dockerfile` | The newest Python 3 (`slim`) with `pip`, `twine`, `uv` and `poetry` installed at versions pinned in the file and moved by hand; poetry has a virtual environment of its own | every `@pypi` scenario (`Python`) |
