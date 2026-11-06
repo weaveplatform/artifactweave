@@ -28,6 +28,14 @@ type Decision struct {
 	RetryAfter time.Duration
 }
 
+// Store is what admission needs from persistence: the request budgets that
+// Authentication and Admit charge. New reads RequestBudgets once and charges
+// through what it returns, so services over one store share its rates, as
+// replicas over one metadata database do; the metadata store satisfies it.
+type Store interface {
+	RequestBudgets() store.RequestBudgetStore
+}
+
 // Service owns one process's permits and shares rates through metadata. It
 // starts no goroutines. Release must run after the handler actually returns,
 // including when its context is canceled; never release early while work runs.
@@ -43,7 +51,7 @@ type Service struct {
 	recoveryReset     time.Time
 }
 
-func New(st store.Store, options Options, now func() time.Time) (*Service, error) {
+func New(st Store, options Options, now func() time.Time) (*Service, error) {
 	if err := options.Validate(); err != nil {
 		return nil, err
 	}
