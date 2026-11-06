@@ -2,7 +2,7 @@
   "schema": 1,
   "type": "puppet",
   "name": "Puppet Forge modules",
-  "client": "Puppet 8.10.0 on Ruby 3.3.13",
+  "client": "Puppet 8.10.0 on Ruby 3.4.11",
   "version_sources": [
     "test/acceptance/clients/puppet/Dockerfile"
   ],

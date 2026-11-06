@@ -44,7 +44,7 @@ Start with the [common setup](README.md). Each recipe names the tested client, e
 | [Opkg feeds](opkg.md) | opkg 0.10.0 | local, federated | local, remote, virtual, federated |
 | [Eclipse P2 update sites](p2.md) | Eclipse Platform / Equinox P2 4.41, Java 21 | none | remote, virtual |
 | [Dart pub hosted registry](pub.md) | Dart/pub 3.13.7 | local, federated | local, remote, virtual, federated |
-| [Puppet Forge modules](puppet.md) | Puppet 8.10.0 on Ruby 3.3.13 | local, federated | local, remote, virtual, federated |
+| [Puppet Forge modules](puppet.md) | Puppet 8.10.0 on Ruby 3.4.11 | local, federated | local, remote, virtual, federated |
 | [Python simple index](pypi.md) | Python 3.15.2; pip 26.3; Twine 7.0.0; uv 0.13.7; Poetry 2.5.1 | local | local, remote |
 | [RPM / DNF](rpm.md) | DNF and RPM bundled with Fedora 45 (immutable image) | local, federated | local, remote, virtual, federated |
 | [sbt artifacts](sbt.md) | sbt 2.0.12; Eclipse Temurin 26 | local, federated | local, remote, virtual, federated |
