@@ -34,7 +34,7 @@
         {"from":"internal/format/cran","action":"move","to":"artifacts/ecosystem/cran","ticket":"ECO-19"},
         {"from":"internal/format/debian","action":"move","to":"artifacts/ecosystem/debian","ticket":"ECO-18"},
         {"from":"internal/format/docker","action":"move","to":"artifacts/ecosystem/docker","ticket":"ECO-05"},
-        {"from":"internal/format/formats","action":"move","to":"artifacts/ecosystem","rename":{"formats.go":"registry.go"},"ticket":"ART-05"},
+        {"from":"internal/format/formats","action":"move","to":"artifacts/ecosystem","rename":{"formats.go":"registry.go","formats_test.go":"registry_test.go"},"ticket":"ART-05"},
         {"from":"internal/format/formattest","action":"move","to":"artifacts/core/formattest","ticket":"ART-06"},
         {"from":"internal/format/gems","action":"move","to":"artifacts/ecosystem/gems","ticket":"ECO-25"},
         {"from":"internal/format/generic","action":"move","to":"artifacts/ecosystem/generic","ticket":"ECO-01"},
