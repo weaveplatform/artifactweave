@@ -88,9 +88,17 @@ type Options struct {
 	Meters metric.MeterProvider
 }
 
+// Store is what the queue needs from persistence: the queue table, and a
+// hook that runs fn once the caller's transaction commits (Enqueue wakes the
+// workers through it).
+type Store interface {
+	WorkQueue() store.WorkQueue
+	AfterCommit(ctx context.Context, fn func())
+}
+
 // Queue runs the persistent work queue for one node.
 type Queue struct {
-	st       store.Store
+	st       Store
 	q        store.WorkQueue
 	o        Options
 	mu       sync.Mutex
@@ -103,7 +111,7 @@ type Queue struct {
 }
 
 // New returns a queue over st; register handlers with Handle before Run.
-func New(st store.Store, o Options) (*Queue, error) {
+func New(st Store, o Options) (*Queue, error) {
 	if o.Workers == 0 {
 		o.Workers = DefaultWorkers
 	}
