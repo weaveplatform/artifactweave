@@ -1,8 +1,3 @@
-// Package trash restores, cleans and purges the trash can (decision 0010).
-// Deleting an item moves its record here (internal/service/item), as does
-// deleting a repository (Keep, internal/repos), and a trashed file keeps its
-// blob reference, so it can be restored until its retention period passes. Purging an entry releases that reference, and the
-// next garbage collection removes the content once nothing else holds it.
 package trash
 
 import (
@@ -289,7 +284,6 @@ func (s *Service) withSidecars(
 	return out, nil
 }
 
-// destination maps an original path below from onto the destination path.
 func destination(original, from, to string) string {
 	to = strings.Trim(to, "/")
 	if to == "" {

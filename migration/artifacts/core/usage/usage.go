@@ -1,7 +1,3 @@
-// Package usage computes the storage summary (GET /api/storageinfo): blob
-// totals, item totals per repository and for the trash can, and the capacity
-// of the volume a local blob store lives on. It is computed on every request
-// rather than cached, so it never lags writes.
 package usage
 
 import (

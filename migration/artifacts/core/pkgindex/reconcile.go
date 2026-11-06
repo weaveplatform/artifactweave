@@ -14,7 +14,6 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// pageSize is how many packages each read of a repository's index asks for.
 const pageSize = 200
 
 // Indexed is a package as its format reads it from the item tree: what the

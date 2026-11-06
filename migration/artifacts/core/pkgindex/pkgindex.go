@@ -1,6 +1,3 @@
-// Package pkgindex maintains the package index of decision 0018 for the
-// format handlers: which package and version each file belongs to. The item
-// tree stays the source of truth; the index is derived from it.
 package pkgindex
 
 import (
