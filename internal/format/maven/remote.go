@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/layout"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
 )
 
 // ErrRemoteContent identifies invalid source bytes without echoing upstream XML.

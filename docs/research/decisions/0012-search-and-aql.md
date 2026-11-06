@@ -331,8 +331,8 @@ store's search, and render their documented response shapes (research 22 §2), i
   since these responses have no `range` to report it.
 
 **Layout searches.** GAVC, versions and latest version read Maven coordinates from each
-file's path through its repository's layout (`pkg/layout`), so Maven, Gradle, Ivy, sbt and
-custom layouts follow one rule.
+file's path through its repository's layout (`migration/artifacts/core/layout`), so Maven, Gradle,
+Ivy, sbt and custom layouts follow one rule.
 - **Which files.** Files only, descriptors such as POMs included, in repositories whose layout
   defines the organisation, module and base revision tokens. A layout that does not compile
   reads nothing.
