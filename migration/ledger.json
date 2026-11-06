@@ -173,6 +173,7 @@
         {"from":"pkg/store/content_uploads.go","action":"move","to":"platform/blob/session","file":"uploads.go","ticket":"PLT-11"},
         {"from":"pkg/store/normalise.go","action":"move","to":"kernel","file":"normalise.go","ticket":"PLT-03"},
         {"from":"pkg/store/operations_work.go","action":"move","to":"platform/work","file":"lease_store.go","ticket":"PLT-14"},
+        {"from":"pkg/store/request_budget.go","action":"move","to":"platform/apilimit","file":"store.go","ticket":"PLT-16"},
         {"from":"pkg/store/store_kernel.go","action":"move","to":"kernel","file":"page.go","ticket":"PLT-03"},
         {"from":"pkg/store/store_test.go","action":"move","to":"kernel","file":"page_test.go","ticket":"PLT-03"},
         {"from":"pkg/store/work.go","action":"move","to":"platform/work","file":"queue_store.go","ticket":"PLT-14"},

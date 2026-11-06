@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"sync"
 	"time"
-
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // Scope carries authenticated and resolved identities, never arbitrary client
@@ -33,14 +31,14 @@ type Decision struct {
 // through what it returns, so services over one store share its rates, as
 // replicas over one metadata database do; the metadata store satisfies it.
 type Store interface {
-	RequestBudgets() store.RequestBudgetStore
+	RequestBudgets() RequestBudgetStore
 }
 
 // Service owns one process's permits and shares rates through metadata. It
 // starts no goroutines. Release must run after the handler actually returns,
 // including when its context is canceled; never release early while work runs.
 type Service struct {
-	store             store.RequestBudgetStore
+	store             RequestBudgetStore
 	options           Options
 	now               func() time.Time
 	mu                sync.Mutex
@@ -121,12 +119,12 @@ func budgetKey(policy, scope string) string {
 // Authentication charges a shared coarse budget before credential verification.
 func (s *Service) Authentication(ctx context.Context) (Decision, error) {
 	now := s.now().UTC()
-	b := store.RequestBudget{
+	b := RequestBudget{
 		Key:   budgetKey("authentication", ""),
 		Limit: s.options.AuthenticationPerMinute,
 		Reset: now.Truncate(time.Minute).Add(time.Minute),
 	}
-	return s.take(ctx, now, []store.RequestBudget{b}, 0, "authentication")
+	return s.take(ctx, now, []RequestBudget{b}, 0, "authentication")
 }
 
 // Admit charges the accepted request's global, principal, cost and resolved
@@ -134,11 +132,11 @@ func (s *Service) Authentication(ctx context.Context) (Decision, error) {
 func (s *Service) Admit(ctx context.Context, scope Scope) (Decision, error) {
 	now := s.now().UTC()
 	reset := now.Truncate(time.Minute).Add(time.Minute)
-	budgets := make([]store.RequestBudget, 0, 6)
+	budgets := make([]RequestBudget, 0, 6)
 	add := func(policy, scope string, limit int64) {
 		budgets = append(
 			budgets,
-			store.RequestBudget{Key: budgetKey(policy, scope), Limit: limit, Reset: reset},
+			RequestBudget{Key: budgetKey(policy, scope), Limit: limit, Reset: reset},
 		)
 	}
 	add("global", "", s.options.GlobalPerMinute)
@@ -161,7 +159,7 @@ func (s *Service) Admit(ctx context.Context, scope Scope) (Decision, error) {
 func (s *Service) take(
 	ctx context.Context,
 	now time.Time,
-	budgets []store.RequestBudget,
+	budgets []RequestBudget,
 	visible int,
 	policy string,
 ) (Decision, error) {
@@ -169,7 +167,7 @@ func (s *Service) take(
 	defer cancel()
 	result, err := s.store.Take(
 		ctx,
-		store.BudgetRequest{Budgets: budgets, Now: now, MaxKeys: s.options.MaxKeys},
+		BudgetRequest{Budgets: budgets, Now: now, MaxKeys: s.options.MaxKeys},
 	)
 	if err != nil {
 		return Decision{}, fmt.Errorf("request budget: %w", err)

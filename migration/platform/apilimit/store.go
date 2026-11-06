@@ -1,4 +1,4 @@
-package store
+package apilimit
 
 import (
 	"context"
@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // ErrBudgetCapacity means the bounded budget table cannot admit another key.
@@ -34,14 +36,14 @@ type BudgetRequest struct {
 func (r BudgetRequest) Validate() error {
 	if len(r.Budgets) < 1 || len(r.Budgets) > 8 || r.Now.IsZero() || r.MaxKeys < 1 ||
 		r.MaxKeys > 65536 {
-		return fmt.Errorf("request budget bounds: %w", ErrInvalid)
+		return fmt.Errorf("request budget bounds: %w", kernel.ErrInvalid)
 	}
 	seen := make(map[string]bool, len(r.Budgets))
 	for _, b := range r.Budgets {
 		raw, err := hex.DecodeString(b.Key)
 		if err != nil || len(raw) != 32 || hex.EncodeToString(raw) != b.Key || seen[b.Key] ||
 			b.Limit < 1 || b.Limit > 1_000_000_000 || b.Reset.UnixMicro() <= r.Now.UnixMicro() || b.Reset.Sub(r.Now) > time.Hour {
-			return fmt.Errorf("invalid request budget: %w", ErrInvalid)
+			return fmt.Errorf("invalid request budget: %w", kernel.ErrInvalid)
 		}
 		seen[b.Key] = true
 	}
