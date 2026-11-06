@@ -1277,7 +1277,7 @@ mode on the existing release (#507):
 
 - `artifactweave` for linux, darwin and windows on amd64 and arm64, built as `make build`
   builds it: `CGO_ENABLED=0`, `GOWORK=off`, `-trimpath`, the `disable_grpc_modules` tag, and
-  `internal/buildinfo`'s version, commit and date stamped with `-X`;
+  `migration/platform/buildinfo`'s version, commit and date stamped with `-X`;
 - a `tar.gz` archive per platform (`zip` for Windows), a SHA-256 checksum file, and an SPDX
   SBOM per archive (syft);
 - a keyless cosign signature over the checksum file, in a Sigstore bundle. The

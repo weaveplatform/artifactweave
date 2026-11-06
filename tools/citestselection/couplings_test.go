@@ -286,7 +286,7 @@ func packageRefs(text string) []packageRef {
 	for _, argument := range []*regexp.Regexp{packageArgument, modulePackageArgument} {
 		for _, m := range argument.FindAllStringSubmatchIndex(text, -1) {
 			// More path after the match, as in ./test/oci/run.sh or
-			// $(MODULE)/internal/buildinfo.version, names a file or a symbol,
+			// $(MODULE)/migration/platform/buildinfo.version, names a file or a symbol,
 			// not a package.
 			if m[1] < len(text) && !strings.ContainsRune(" \t'\",;)|&\\", rune(text[m[1]])) {
 				continue

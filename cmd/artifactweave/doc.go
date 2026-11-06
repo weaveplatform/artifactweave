@@ -15,7 +15,7 @@
 //     history.
 //   - The subcommand and its arguments: serve; migrate up, down and version;
 //     config validate and apply; keys rotate; version.
-//   - The version, commit and build date stamped into internal/buildinfo at
+//   - The version, commit and build date stamped into migration/platform/buildinfo at
 //     link time (the -X flags in the Makefile and the release build).
 //
 // # Outputs

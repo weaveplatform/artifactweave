@@ -10,8 +10,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/weaveplatform/artifactweave/internal/app"
-	"github.com/weaveplatform/artifactweave/internal/buildinfo"
 	"github.com/weaveplatform/artifactweave/internal/config"
+	"github.com/weaveplatform/artifactweave/migration/platform/buildinfo"
 )
 
 // flagKeys maps flags to the dotted config keys they override.

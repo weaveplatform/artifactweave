@@ -37,9 +37,9 @@ builds:
       # The same three symbols the Makefile's LDFLAGS set, so `artifactweave
       # version` names the tag and the commit it was cut from.
       - -s -w
-      - -X github.com/weaveplatform/artifactweave/internal/buildinfo.version={{ .Version }}
-      - -X github.com/weaveplatform/artifactweave/internal/buildinfo.commit={{ .FullCommit }}
-      - -X github.com/weaveplatform/artifactweave/internal/buildinfo.buildDate={{ .CommitDate }}
+      - -X github.com/weaveplatform/artifactweave/migration/platform/buildinfo.version={{ .Version }}
+      - -X github.com/weaveplatform/artifactweave/migration/platform/buildinfo.commit={{ .FullCommit }}
+      - -X github.com/weaveplatform/artifactweave/migration/platform/buildinfo.buildDate={{ .CommitDate }}
     # Reproducible: the file times come from the commit rather than the runner.
     mod_timestamp: "{{ .CommitTimestamp }}"
 
