@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/blobtest"
-	"github.com/weaveplatform/artifactweave/pkg/blob/mirror"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/mirror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
