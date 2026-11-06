@@ -292,7 +292,6 @@ func propertiesScenario(w *world) error {
 	return errors.Join(w.expect(w.a, v), w.expect(w.c, v), w.verify(w.a, w.b, w.c))
 }
 
-// annotate changes the properties of every file of v in c.
 func (w *world) annotate(c repo.Config, v Version, set types.Properties, remove []string) error {
 	for _, f := range v.Files {
 		it, err := w.file(c, f.Path)

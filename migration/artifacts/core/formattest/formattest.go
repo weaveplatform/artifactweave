@@ -1,38 +1,3 @@
-// Package formattest is the contract suite for package formats (decision
-// 0032). Every format runs Run with a fixture that builds packages of its
-// type, and one set of scenarios proves, on the in-memory, SQLite and
-// PostgreSQL stores, that its package index (decision 0018) stays right on
-// every write path the item service offers: deploy, overwrite, delete, copy,
-// move, restore from the trash can, property changes and a remote
-// repository's cache.
-//
-// "Right" has two halves. The fixture says which versions a scenario leaves
-// and which files each links. And the item tree is the source of truth, so
-// the index the hooks kept must be the one the format's reindex reads from
-// the tree: a reindex over it changes nothing, and a reindex from an empty
-// index rebuilds it, every version's metadata included. A format that
-// indexes nothing must leave the index empty.
-//
-// Two options of the fixture cover what P8's formats add (decision 0032,
-// "Verification"):
-//   - Format.RepoWork lists the kinds of derived work a format keys by
-//     repository, such as Helm's index.yaml (decision 0039). Every write
-//     that changes a repository's versions must leave exactly one item of
-//     each, keyed by the repository's key, however many packages it
-//     touched: after a deploy, an overwrite, a copy (its target), a move
-//     (both repositories), a delete and a restore. Format.Work keeps the
-//     kinds keyed by package, as npm's, Go's and Maven's are.
-//   - File.SidecarOf marks a file as a sidecar its format keeps with its
-//     owner (format.SidecarKeeper), such as a Helm chart's .prov. A sidecar
-//     is never a version file. It follows its owner through a delete, a
-//     copy, a move and a trash restore. On its own it is an ordinary file
-//     that may arrive before its owner. A format that records its sidecars
-//     in a version's metadata has that compared after a reindex from empty
-//     too.
-//
-// The suite drives the item service, whose entry points every API calls:
-// the properties API and AQL properties.update call Service.Annotate, which
-// internal/server's TestAccPropertyWritesReachTheFormat holds them to.
 package formattest
 
 import (
@@ -251,7 +216,6 @@ func principal(v Version) []File {
 	return out
 }
 
-// sidecarFiles lists v's sidecars.
 func sidecarFiles(v Version) []File {
 	var out []File
 	for _, f := range v.Files {
@@ -274,7 +238,6 @@ func with(v Version, p string) []string {
 	return out
 }
 
-// pathsOf lists the paths of files.
 func pathsOf(files []File) []string {
 	out := make([]string, 0, len(files))
 	for _, f := range files {
@@ -283,7 +246,6 @@ func pathsOf(files []File) []string {
 	return out
 }
 
-// everything lists the paths of every file of vs.
 func everything(vs ...Version) []string {
 	out := make([]string, 0, len(vs))
 	for _, v := range vs {
@@ -389,11 +351,8 @@ func (w *world) remote(key string) repo.Config {
 
 func (w *world) tick() { w.now = w.now.Add(time.Minute) }
 
-// version is the fixture's version v of package p, deployed for the nth
-// time.
 func (w *world) version(p, v string, n int) Version { return w.f.Version(p, v, n) }
 
-// deploy deploys v's files to c in order, setting props on each.
 func (w *world) deploy(c repo.Config, v Version, props types.Properties) error {
 	for _, f := range v.Files {
 		w.tick()
@@ -422,7 +381,6 @@ func (w *world) cache(c repo.Config, v Version) error {
 	return nil
 }
 
-// file returns the item at p in c.
 func (w *world) file(c repo.Config, p string) (types.Item, error) {
 	it, err := w.st.Items().Get(w.ctx, c.Key, false, p)
 	if err != nil {
@@ -715,7 +673,6 @@ func refused(err error, status int) error {
 	return nil
 }
 
-// paths lists v's file paths.
 func paths(v Version) string {
 	out := make([]string, 0, len(v.Files))
 	for _, f := range v.Files {

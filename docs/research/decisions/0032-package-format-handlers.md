@@ -331,8 +331,8 @@ These assignments describe planned work, not current runtime support.
 
 ## Verification
 
-- `migration/artifacts/core/formattest` runs every format against the same contract on the in-memory,
-  SQLite and PostgreSQL stores: the index is right after deploy, overwrite, delete, copy,
+- `migration/artifacts/core/formattest` runs every format against the same contract on the
+  in-memory, SQLite and PostgreSQL stores: the index is right after deploy, overwrite, delete, copy,
   move and restore, and a reindex reproduces it (#268). Two options of the fixture cover P8
   (#533):
   - `Format.RepoWork` lists the kinds a format keys by repository. Every write that changes a
