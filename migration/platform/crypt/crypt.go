@@ -1,23 +1,3 @@
-// Package crypt seals secret columns at rest (decision record 0017): remote
-// repository and proxy passwords, LDAP and mail credentials, webhook secrets,
-// key pair private keys, OIDC secrets and the token signing key.
-//
-// A sealed value is
-//
-//	magic(4) | version(4, big endian) | key id(4) | nonce(12) | AES-256-GCM ciphertext and tag
-//
-// Keys are derived from the operator's master key with HKDF-SHA256, one per
-// version, so rotation adds a version instead of replacing the key: values
-// sealed under an older version still open until the store re-seals them
-// (Reseal), and the old master key can then be retired. The key id is a
-// fingerprint of the master key for that version; it turns "the server was
-// started with a different master key" into ErrWrongKey rather than an
-// authentication failure that looks like tampering.
-//
-// The purpose (which column) and row id (which record) are authenticated but
-// not stored, so a sealed value copied into another row or column fails to
-// open. This is the same design as hostweave's keyring, with a version number
-// in place of a key name because artifactweave has one master key at a time.
 package crypt
 
 import (
