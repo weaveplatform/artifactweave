@@ -124,7 +124,7 @@ func (s artifactoryService) nestBuilds(
 	if err != nil {
 		return aql.Related{}, err
 	}
-	related, err := q.NestBuilds(ctx, store.AQLSource(st), n, hits)
+	related, err := q.NestBuilds(ctx, store.AQLSource(st.Builds(), st.Items()), n, hits)
 	if err != nil {
 		return related, fmt.Errorf("nest related rows: %w", err)
 	}

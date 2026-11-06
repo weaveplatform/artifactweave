@@ -99,7 +99,12 @@ func testRelatedSearch(t *testing.T, st store.Store) {
 			if q.Domain == aql.DomainItems {
 				hits, err := st.Items().Search(ctx, q.ForNesting(), c.Options)
 				must(t, err)
-				rel, err := q.Nest(ctx, store.AQLSource(st), aql.Nesting{Now: aqltest.Now}, hits)
+				rel, err := q.Nest(
+					ctx,
+					store.AQLSource(st.Builds(), st.Items()),
+					aql.Nesting{Now: aqltest.Now},
+					hits,
+				)
 				must(t, err)
 				got = render(q.Response(hits).WithRelated(rel))
 				ref := aql.SelectItems(q.ForNesting(), c.Options, corpus)
@@ -109,7 +114,12 @@ func testRelatedSearch(t *testing.T, st store.Store) {
 			} else {
 				hits, err := st.Builds().Search(ctx, q, c.Options)
 				must(t, err)
-				rel, err := q.NestBuilds(ctx, store.AQLSource(st), aql.Nesting{}, hits)
+				rel, err := q.NestBuilds(
+					ctx,
+					store.AQLSource(st.Builds(), st.Items()),
+					aql.Nesting{},
+					hits,
+				)
 				must(t, err)
 				got = render(q.BuildResponse(hits).WithRelated(rel))
 				ref := aql.SelectBuilds(q, c.Options, corpus)
@@ -125,7 +135,7 @@ func testRelatedSearch(t *testing.T, st store.Store) {
 	// A source that cannot read reports the store's error.
 	cancelled, cancel := context.WithCancel(ctx)
 	cancel()
-	src := store.AQLSource(st)
+	src := store.AQLSource(st.Builds(), st.Items())
 	for name, call := range map[string]func() error{
 		"runs":       func() error { _, err := src.RunsWithFile(cancelled, false, "a"); return err },
 		"items":      func() error { _, err := src.ItemsWithSHA1(cancelled, "a"); return err },
