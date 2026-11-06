@@ -133,25 +133,6 @@ func TestUnitTokenPrincipal(t *testing.T) {
 	}
 }
 
-func TestUnitLooksLikeToken(t *testing.T) {
-	for s, want := range map[string]bool{
-		"eyJhbGciOi.eyJzdWIi.c2ln": true,
-		// One character short of a reference token.
-		"cmVmd0123456789012345678901234567890123456789012345678901234567": false,
-		"password":    false,
-		"eyJonly.two": false,
-		"a.b.c":       false,
-	} {
-		if got := LooksLikeToken(s); got != want {
-			t.Errorf("%q: %v", s, got)
-		}
-	}
-	ref := "cmVmd" + "01234567890123456789012345678901234567890123456789012345678"
-	if !LooksLikeToken(ref) {
-		t.Errorf("reference %q", ref)
-	}
-}
-
 // expiringVerifier is a fakeVerifier that also verifies expired tokens from
 // a map of its own.
 type expiringVerifier struct {

@@ -185,6 +185,27 @@ the work.
 - **`idtoken` keeps its name** because it and `oidc` both declare `Provider`
   (`internal/auth/idtoken/idtoken.go:114`, `internal/service/oidc/oidc.go:104`).
 
+### Names the migration introduces
+
+Exported names that a migration change adds, or that it declares in a module's `api`
+package for other modules to share, where the target document does not name them. The
+change that adds a name appends its row; the change column gives the ticket of the
+[P9d backlog](https://github.com/weaveplatform/artifactweave/issues/935).
+
+| Name | Package | What it is | Change |
+| --- | --- | --- | --- |
+| `TokenRequest` | `access/api` | What `Tokens.Issue` takes: every field of the token service's request, with kernel types | ACC-01 |
+| `RegistryTokenRequest` | `access/api` | What `Tokens.IssueRegistry` takes: every field of the token service's registry request | ACC-01 |
+| `IssuedToken` | `access/api` | A new token's secrets, lifetime, id and issue time, which callers read from the token service's result | ACC-01 |
+| `UserInfo` | `access/api` | What other modules read about a user account, with `Enabled` | ACC-01 |
+| `PathPair` | `access/api` | A path and the path its content takes after a move, which `Grants.AccessChange` compares | ACC-01 |
+| `ErrScanLimit` | `access/api` | A permission scan that found more permissions than its limit | ACC-01 |
+| `Restrictions` | `access/api` | Checks a user's temporary API restriction; not in the target document | ACC-01 |
+| `Projects` | `access/api` | Reads project environments, membership and existence; the target document plans a fuller `Projects` for P11 | ACC-01 |
+| `Grants` | `access/api` | Scans permissions about content: who holds what on an item, and whether a move changes who may reach it; not in the target document | ACC-01 |
+| `AnonymousAccess` | `access/api` | Reads and switches the anonymous access setting; not in the target document | ACC-01 |
+| `AsAPI`, `FromAPI` | `access/core/authz` | Convert between the evaluator's `*Decider` and `access/api`'s `Decider`; `AsAPI(nil)` is a nil interface, never a typed nil | ACC-01 |
+
 ### Placeholders
 
 Every package the target document marks for a later phase exists from the start as a

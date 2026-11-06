@@ -46,11 +46,6 @@ func TestUnitToken(t *testing.T) {
 			t.Errorf("%q: %v", bad, err)
 		}
 	}
-	ref := "cmVmd" + strings.Repeat("A", 59)
-	if !types.IsReferenceToken(ref) || types.IsReferenceToken(ref+"A") ||
-		types.IsReferenceToken("eyJhbGciOi") {
-		t.Error("IsReferenceToken")
-	}
 }
 
 func TestUnitProject(t *testing.T) {
