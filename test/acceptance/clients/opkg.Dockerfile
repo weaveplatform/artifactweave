@@ -1,5 +1,7 @@
 # Client pins: opkg 0.10.0.
-# source digest and base image digest make real-client results repeatable.
+# The client is the latest opkg release from Yocto, built from source. The
+# upstream source digest and base image digest make real-client results
+# repeatable.
 FROM ubuntu:26.10@sha256:262df65c0ec6bf8d9dcc87454f4330a05fae4b97825f45854af3b136666584c2
 
 RUN apt-get update && apt-get install -y --no-install-recommends \

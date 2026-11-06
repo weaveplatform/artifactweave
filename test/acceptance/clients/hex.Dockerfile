@@ -1,5 +1,6 @@
 # Client pins: Hex 2.6.0; Elixir 1.20.5; OTP 29.1.2.
-# the runtime and mix; Hex is pinned separately because it ships as an archive.
+# The image digest pins the Elixir, Erlang/OTP and Alpine runtime and mix;
+# Hex is pinned separately because it ships as an archive.
 FROM hexpm/elixir:1.20.5-erlang-29.1.2-alpine-3.24.3@sha256:d4a56ccb80b8aeedcb7d9d4a56b4b5b229ec684aaea537dfac39cd146fb3aea5
 ENV MIX_ARCHIVES=/usr/local/share/mix/archives
 RUN mix local.hex 2.6.0 --force

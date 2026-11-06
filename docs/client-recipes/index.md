@@ -38,13 +38,13 @@ Start with the [common setup](README.md). Each recipe names the tested client, e
 | [Apache Maven](maven.md) | Maven 3 image / Temurin 27; compatibility Maven 3.9 image / Temurin 26 (exact bundled versions in CI logs) | local, federated | local, remote, virtual, federated |
 | [NIM metadata and paired container](nimmodel.md) | curl for metadata; crane 0.22.1 for the paired image | none | remote |
 | [Nix binary caches](nix.md) | Nix 2.35.4 | local, federated | local, remote, virtual, federated |
-| [npm](npm.md) | Bundled npm on Node 26.13.0; npm 12.2.1 on Node 26.13.0 | local | local, remote |
+| [npm](npm.md) | Bundled npm on Node 26.13.0; npm 12.2.1 on Node 24.22.2 | local | local, remote |
 | [NuGet v3 with dotnet](nuget.md) | NuGet bundled with .NET SDK 10.0 image; .NET 11.0 image also exercised (exact SDK versions in CI logs) | local | local, remote |
 | [OCI artifacts](oci.md) | ORAS 1.3.6; crane 0.22.1; Cosign 3.1.4 | local, federated | local, remote, virtual, federated |
 | [Opkg feeds](opkg.md) | opkg 0.10.0 | local, federated | local, remote, virtual, federated |
 | [Eclipse P2 update sites](p2.md) | Eclipse Platform / Equinox P2 4.41, Java 21 | none | remote, virtual |
 | [Dart pub hosted registry](pub.md) | Dart/pub 3.13.7 | local, federated | local, remote, virtual, federated |
-| [Puppet Forge modules](puppet.md) | Puppet 8.10.0 on Ruby 3.4.11 | local, federated | local, remote, virtual, federated |
+| [Puppet Forge modules](puppet.md) | Puppet 8.10.0 on Ruby 3.3.13 | local, federated | local, remote, virtual, federated |
 | [Python simple index](pypi.md) | Python 3.15.2; pip 26.3; Twine 7.0.0; uv 0.13.7; Poetry 2.5.1 | local | local, remote |
 | [RPM / DNF](rpm.md) | DNF and RPM bundled with Fedora 45 (immutable image) | local, federated | local, remote, virtual, federated |
 | [sbt artifacts](sbt.md) | sbt 2.0.12; Eclipse Temurin 26 | local, federated | local, remote, virtual, federated |

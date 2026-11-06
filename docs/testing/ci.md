@@ -537,14 +537,14 @@ Dockerfile, pinned digest, binary version, release source and compatibility lane
   | Image | Client | Scenarios |
   |---|---|---|
   | `node.Dockerfile` | Primary Node image with its bundled npm | every npm scenario |
-  | `node-npm12.Dockerfile` | Explicit npm compatibility lane; Node and npm are pinned separately from the primary lane | every npm client scenario again: each is a Scenario Outline over `npm` and `npm 12` |
+  | `node-npm12/Dockerfile` | npm 12 on Node 24 LTS, the prior Node line (decision 0034, #294), with npm pinned in the file; in a directory of its own so that its Dependabot entry can hold it below Node 25 | every npm client scenario again: each is a Scenario Outline over `npm` and `npm 12` |
   | `maven.Dockerfile` | Primary Maven 3 image on Eclipse Temurin | every Maven scenario |
   | `maven-3.9/Dockerfile` | Maven 3.9 on Eclipse Temurin, in a directory of its own so that its Dependabot entry can hold the 3.9 line | the release and snapshot round trip again, as a Scenario Outline over `Maven` and `Maven 3.9` |
   | `python.Dockerfile` | The newest Python 3 (`slim`) with `pip`, `twine`, `uv` and `poetry` installed at versions pinned in the file and moved by hand; poetry has a virtual environment of its own | every `@pypi` scenario (`Python`) |
   | `dotnet.Dockerfile` | The .NET SDK's LTS lane, whose `dotnet` carries NuGet's client | every `@nuget` scenario (`.NET`) |
   | `dotnet-11.Dockerfile` | The SDK's newer compatibility lane, with its exact tag and digest in the generated image inventory | every `dotnet` scenario again: each is a Scenario Outline over `.NET` and `.NET 11` |
   | `r.Dockerfile` | Digest-pinned R with `Rscript` and `install.packages()` | `@cran` source install, cache and virtual scenarios |
-  | `puppet/Dockerfile` | Puppet 8.10.0 on Ruby 3, in a directory of its own so that its Dependabot entry can hold it below Ruby 4, which every Facter 4 release excludes | every `@puppet` scenario |
+  | `puppet/Dockerfile` | Puppet 8.10.0 on Ruby 3.3, in a directory of its own so that its Dependabot entry can hold it below Ruby 3.4, where Puppet cannot extract a module archive (#1126); every Facter 4 release excludes Ruby 4 as well | every `@puppet` scenario |
   | `frogml/Dockerfile` | FrogML 3.0.0 on Python 3.13, in a directory of its own so that its Dependabot entry can hold it below Python 3.14, which the SDK excludes | every `@machinelearning` scenario |
 
 The `@cran` selector builds this R image when CRAN code changes and runs its

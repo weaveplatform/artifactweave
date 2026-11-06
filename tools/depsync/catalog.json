@@ -169,11 +169,11 @@
       "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
     },
     "node-npm12.image": {
-      "path": "test/acceptance/clients/node-npm12.Dockerfile",
+      "path": "test/acceptance/clients/node-npm12/Dockerfile",
       "pattern": "^FROM (\\S+)$"
     },
     "node-npm12.version": {
-      "path": "test/acceptance/clients/node-npm12.Dockerfile",
+      "path": "test/acceptance/clients/node-npm12/Dockerfile",
       "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
     },
     "node.image": {
@@ -349,7 +349,7 @@
       "pattern": "^FROM maven:\\S+-eclipse-temurin-([0-9.]+)@"
     },
     "npm12": {
-      "path": "test/acceptance/clients/node-npm12.Dockerfile",
+      "path": "test/acceptance/clients/node-npm12/Dockerfile",
       "pattern": "npm@([0-9.]+)"
     },
     "opkg": {
@@ -665,7 +665,7 @@
       "replacement": "# Client pins: Nix {{nix.version}}."
     },
     {
-      "path": "test/acceptance/clients/node-npm12.Dockerfile",
+      "path": "test/acceptance/clients/node-npm12/Dockerfile",
       "pattern": "\\A#[^\\n]*",
       "replacement": "# Client pins: Node {{node-npm12.version}}, npm {{npm12}}."
     },
@@ -897,7 +897,7 @@
     "test/acceptance/clients/maven-3.9/Dockerfile",
     "test/acceptance/clients/maven.Dockerfile",
     "test/acceptance/clients/nix.Dockerfile",
-    "test/acceptance/clients/node-npm12.Dockerfile",
+    "test/acceptance/clients/node-npm12/Dockerfile",
     "test/acceptance/clients/node.Dockerfile",
     "test/acceptance/clients/opkg.Dockerfile",
     "test/acceptance/clients/p2.Dockerfile",

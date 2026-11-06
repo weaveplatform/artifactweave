@@ -87,25 +87,54 @@ updates:
       prefix: "chore"
       include: "scope"
 
-  # The Puppet client stays below Ruby 4: Puppet 8.10.0 needs Facter 4, and
-  # every Facter 4 release declares Ruby below 4.0, so each Ruby 4 update
-  # broke the image (#895, #906, #934). The image has a directory of its own
-  # because an ignore applies to a whole entry: on /test/acceptance/clients
-  # it would also stop chef, cocoapods and ruby moving within Ruby 4. Ruby 3
-  # minor, patch and digest updates still arrive. Lift the hold once the
-  # qualified Puppet client installs on Ruby 4: delete the ignore, or move
-  # the Dockerfile back beside the others and delete this entry.
+  # The second npm client holds Node 24 LTS, the prior Node line beside the
+  # newest Node in node.Dockerfile (decision 0034, #294). While it shared the
+  # /test/acceptance/clients entry, a grouped update (#934) moved it to Node
+  # 26 and left no lane running npm on Node 24 (#1119). The image has a
+  # directory of its own because an ignore applies to a whole entry: on
+  # /test/acceptance/clients it would also stop node.Dockerfile and
+  # bower.Dockerfile taking new Node majors. Node 24 minor, patch and digest
+  # updates still arrive.
+  - package-ecosystem: "docker"
+    directory: "/test/acceptance/clients/node-npm12"
+    schedule:
+      interval: "daily"
+    ignore:
+      - dependency-name: "node"
+        versions: [">= 25"]
+    groups:
+      acceptance-clients-node-npm12:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+
+  # The Puppet client stays on Ruby 3.3. Puppet 8.10.0, the newest Puppet
+  # gem, cannot extract a module archive on Ruby 3.4: safe_posix_fork closes
+  # the descriptor of its own /proc/self/fd walk, which Ruby 3.4 reports as
+  # Errno::EBADF, so every Puppet scenario failed once #1121 moved the image
+  # to Ruby 3.4 (#1126). On Ruby 4 the gem does not install, since every
+  # Facter 4 release declares Ruby below 4.0 (#895, #906, #934). The image
+  # has a directory of its own because an ignore applies to a whole entry: on
+  # /test/acceptance/clients it would also stop chef, cocoapods and ruby
+  # taking newer Ruby releases. Ruby 3.3 patch and digest updates still
+  # arrive. Ruby 3.3 is supported until March 2027, so revisit the hold
+  # before then: once a Puppet gem, or a successor such as OpenVox that the
+  # client recipes accept, installs modules on Ruby 3.4, raise the bound to
+  # ">= 4"; once it installs on Ruby 4 too, delete the ignore, or move the
+  # Dockerfile back beside the others and delete this entry.
   - package-ecosystem: "docker"
     directory: "/test/acceptance/clients/puppet"
     schedule:
       interval: "daily"
     ignore:
       - dependency-name: "ruby"
-        versions: [">= 4"]
+        versions: [">= 3.4"]
     groups:
       acceptance-clients-puppet:
         patterns: ["*"]
-        update-types: ["minor", "patch"]
+        update-types: ["patch"]
     commit-message:
       prefix: "chore"
       include: "scope"

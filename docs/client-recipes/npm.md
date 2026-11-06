@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **Bundled npm on Node 26.13.0; npm 12.2.1 on Node 26.13.0**. Registered classes: **local, remote, virtual, federated**.
+Client: **Bundled npm on Node 26.13.0; npm 12.2.1 on Node 24.22.2**. Registered classes: **local, remote, virtual, federated**.
 
 Endpoint: `${AW_URL}/artifactory/api/npm/${AW_REPO}/`
 
@@ -72,7 +72,7 @@ Classes outside **local, remote, virtual, federated** are not registered for thi
 These are the pinned client definitions and executable evidence from which this recipe was reviewed. Their [fingerprints](evidence-lock.json) detect subsequent source changes; a fingerprint alone is not a native-client test result. See [verification](README.md#verification) for the required run evidence.
 
 - Client pin: [test/acceptance/clients/node.Dockerfile](../../test/acceptance/clients/node.Dockerfile).
-- Client pin: [test/acceptance/clients/node-npm12.Dockerfile](../../test/acceptance/clients/node-npm12.Dockerfile).
+- Client pin: [test/acceptance/clients/node-npm12/Dockerfile](../../test/acceptance/clients/node-npm12/Dockerfile).
 - Evidence: [test/acceptance/features/npm.feature](../../test/acceptance/features/npm.feature).
 - Evidence: [test/acceptance/features/npm_search_auth.feature](../../test/acceptance/features/npm_search_auth.feature).
 - Evidence: [internal/auth/token.go](../../internal/auth/token.go).

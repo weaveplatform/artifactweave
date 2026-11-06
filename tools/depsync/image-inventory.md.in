@@ -32,7 +32,7 @@ original tested versions.
 | [`maven-3.9/Dockerfile`](../../test/acceptance/clients/maven-3.9/Dockerfile) | `{{maven-3_9.image}}` | Maven {{maven-3_9.version}} image, Temurin {{jdk-legacy}} | [Maven downloads](https://maven.apache.org/download.cgi) |
 | [`maven.Dockerfile`](../../test/acceptance/clients/maven.Dockerfile) | `{{maven.image}}` | Maven {{maven.version}} image, Temurin {{jdk}}, Ivy {{ivy}}, Gradle {{gradle}} | [Maven downloads](https://maven.apache.org/download.cgi), [Ivy release](https://repo.maven.apache.org/maven2/org/apache/ivy/ivy/{{ivy}}/), [Gradle distribution](https://services.gradle.org/distributions/gradle-{{gradle}}-bin.zip.sha256) |
 | [`nix.Dockerfile`](../../test/acceptance/clients/nix.Dockerfile) | `{{nix.image}}` | Nix {{nix.version}} | [Nix 2.35 manual](https://nix.dev/manual/nix/2.35/), [official image](https://hub.docker.com/r/nixos/nix/tags) |
-| [`node-npm12.Dockerfile`](../../test/acceptance/clients/node-npm12.Dockerfile) | `{{node-npm12.image}}` | Node {{node-npm12.version}}, npm {{npm12}} | [Node](https://nodejs.org/download/release/), [npm](https://www.npmjs.com/package/npm) |
+| [`node-npm12/Dockerfile`](../../test/acceptance/clients/node-npm12/Dockerfile) | `{{node-npm12.image}}` | Node {{node-npm12.version}}, npm {{npm12}} | [Node](https://nodejs.org/download/release/), [npm](https://www.npmjs.com/package/npm) |
 | [`node.Dockerfile`](../../test/acceptance/clients/node.Dockerfile) | `{{node.image}}` | Node {{node.version}}, bundled npm | [Node releases](https://nodejs.org/download/release/latest/) |
 | [`opkg.Dockerfile`](../../test/acceptance/clients/opkg.Dockerfile) | `{{opkg.image}}` | opkg {{opkg}} | [Yocto opkg releases](https://downloads.yoctoproject.org/releases/opkg/) |
 | [`p2.Dockerfile`](../../test/acceptance/clients/p2.Dockerfile) | `{{p2.image}}` | Eclipse Platform / Equinox P2 {{p2}}, Java {{p2-java}} | [Eclipse Platform downloads](https://download.eclipse.org/eclipse/downloads/) |
@@ -44,6 +44,12 @@ original tested versions.
 | [`swift.Dockerfile`](../../test/acceptance/clients/swift.Dockerfile) | `{{swift.image}}` | Swift/SwiftPM {{swift.version}} pinned Linux client | [Swift {{swift.version}}](https://github.com/swiftlang/swift/releases/tag/swift-{{swift.version}}-RELEASE) |
 | [`vagrant.Dockerfile`](../../test/acceptance/clients/vagrant.Dockerfile) | `{{vagrant.image}}` | Vagrant {{vagrant}} (Linux amd64) | [HashiCorp stable installer](https://developer.hashicorp.com/vagrant/install), [release checksums](https://releases.hashicorp.com/vagrant/{{vagrant}}/vagrant_{{vagrant}}_SHA256SUMS) |
 | [`vscode.Dockerfile`](../../test/acceptance/clients/vscode.Dockerfile) | `{{vscode.image}}` | VS Code official archive commit `{{vscode-commit}}`; Ubuntu {{vscode.version}} | [VS Code stable update API](https://update.code.visualstudio.com/api/update/linux-x64/stable/latest) |
+
+The Puppet image stays on Ruby 3.3 through a Dependabot entry of its own,
+because the pinned Puppet cannot extract a module archive on Ruby 3.4
+([#1126](https://github.com/weaveplatform/artifactweave/issues/1126)). The
+npm 12 image stays on Node 24 LTS the same way: it keeps the prior Node line
+beside the newest Node ([decision 0034](../research/decisions/0034-npm.md)).
 
 Purposeful compatibility lanes retain their declared runtimes. Updating a pin
 regenerates this inventory, recipe labels and secondary version assertions; it
