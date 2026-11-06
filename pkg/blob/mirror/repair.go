@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -28,8 +29,8 @@ const (
 
 // repairState is the Store's repair worker configuration.
 type repairState struct {
-	blobs       store.BlobIndex
-	leases      store.LeaseStore
+	blobs       BlobIndex
+	leases      work.LeaseStore
 	batch       int
 	maxAttempts int
 	backoff     time.Duration

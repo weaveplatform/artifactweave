@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -59,17 +59,17 @@ func (h *health) Failure(now time.Time, threshold int, cooldown time.Duration) {
 }
 
 // SetReplicas replaces the replica index, so a test can make it fail.
-func (s *Store) SetReplicas(r store.ReplicaIndex) { s.replicas = r }
+func (s *Store) SetReplicas(r ReplicaIndex) { s.replicas = r }
 
 // RepairRunning is the lock that keeps two repair passes in this process
 // apart.
 func (s *Store) RepairRunning() *sync.Mutex { return &s.repair.running }
 
 // SetRepairLeases replaces the repair worker's lease store.
-func (s *Store) SetRepairLeases(l store.LeaseStore) { s.repair.leases = l }
+func (s *Store) SetRepairLeases(l work.LeaseStore) { s.repair.leases = l }
 
 // SetRepairBlobs replaces the repair worker's blob index.
-func (s *Store) SetRepairBlobs(b store.BlobIndex) { s.repair.blobs = b }
+func (s *Store) SetRepairBlobs(b BlobIndex) { s.repair.blobs = b }
 
 // Children is the member upload of every active target of u, a mirror
 // upload.

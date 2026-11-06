@@ -57,7 +57,8 @@ func newMirror(
 	if err != nil {
 		t.Fatal(err)
 	}
-	return s, o.Replicas
+	// The mirror's port leaves out Get, which the tests read records with.
+	return s, o.Replicas.(store.ReplicaIndex)
 }
 
 var contractOptions = blobtest.Options{LargeSize: 3*testChunk + 1234}

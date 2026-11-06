@@ -33,7 +33,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 // Sentinel errors. Test with errors.Is.
@@ -124,7 +124,7 @@ type Options struct {
 	// IDs). Members keep their own sessions.
 	Sessions session.Store
 	// Replicas records which members hold which blobs.
-	Replicas store.ReplicaIndex
+	Replicas ReplicaIndex
 	// BreakerThreshold and BreakerCooldown tune each member's breaker; zero
 	// means the defaults.
 	BreakerThreshold int
@@ -138,9 +138,9 @@ type Options struct {
 	//
 	// Blobs is the blob index whose reference counts tell a deferred delete
 	// whether the blob was uploaded again since.
-	Blobs store.BlobIndex
+	Blobs BlobIndex
 	// Leases holds the lease that keeps two repair passes from overlapping.
-	Leases store.LeaseStore
+	Leases work.LeaseStore
 	// RepairLease names the lease a pass holds; empty means
 	// "blob-mirror-repair". Two mirrors sharing a lease store (the hot and
 	// cold tiers) need different names, or each pass of one skips the other.
@@ -165,7 +165,7 @@ type Store struct {
 	memberTimeout time.Duration
 	chunk         int64
 	sessions      session.Store
-	replicas      store.ReplicaIndex
+	replicas      ReplicaIndex
 	threshold     int
 	cooldown      time.Duration
 	now           func() time.Time
