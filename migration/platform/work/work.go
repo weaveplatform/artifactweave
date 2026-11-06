@@ -1,8 +1,3 @@
-// Package work runs the persistent work queue (decision 0033): a pool of
-// workers that lease due items, run the handler registered for each item's
-// kind, and complete, retry or park it. Work is asked for with Enqueue
-// inside the transaction of the change that needs it; readers that must see
-// the work done call EnsureFresh first.
 package work
 
 import (

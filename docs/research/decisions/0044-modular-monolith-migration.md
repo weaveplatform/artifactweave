@@ -61,12 +61,6 @@ the work.
 - **The work queue's meter scope moves once.** Its OpenTelemetry meter scope is set
   straight to its final path, `github.com/weaveplatform/artifactweave/internal/platform/work`,
   rather than to a staged path and again at promotion.
-- **User-visible effects are announced.** The history reset and the meter scope change are
-  visible to users. The squash commit that introduces each carries a `BREAKING CHANGE:`
-  footer that states the effect in one paragraph, so that release-please lists it in the
-  release notes; release-please hides `refactor` commits otherwise, and titles never carry
-  `!`. The pull request description ends with the exact footer text, which the squash
-  merge copies into the commit body.
 
 ### Public types and published `api` surface
 
@@ -222,6 +216,7 @@ change that adds a name appends its row; the change column gives the ticket of t
 | `Options.Formats` | `artifacts/ecosystem/docker/http` | The `format.Registry` that the Docker registry's uploads, manifest pushes and mounts write through; nil means the generic handler, which indexes no image or tag | ART-04 |
 | `BuildRuns` | `artifacts/core/aql` | The build-run lookups `AQLSource` reads related runs through: the runs that hold a file as an artifact or as a dependency, a run by ID and a run's promotions, with the build store's signatures. `AQLSource` takes it and `ItemSearch` in place of the store aggregate, whose package imports `core/aql`; the target document puts the source in `core/port`'s `store.go` | ART-15 |
 | `ItemSearch` | `artifacts/core/aql` | The item store's AQL search, which `AQLSource` reads nested files through, so that they carry their properties and statistics as a query's own rows do | ART-15 |
+| `Store` | `platform/work` | What `work.New` takes: the queue table (`WorkQueue()`) and `AfterCommit`, through which `Enqueue` wakes the node's workers once the caller's transaction commits. The metadata store satisfies it, so the queue imports no store; the target document names the package's files, not this port | PLT-14 |
 
 ### Placeholders
 

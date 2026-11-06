@@ -65,8 +65,7 @@ Every ticket that creates, moves or splits a package:
    name), and the pull request shows `go run ./tools/pkgmove check` clean.
 4. Changes no behaviour: the same routes, statuses, response envelopes, YAML
    configuration shape, CLI behaviour and database behaviour, with error, log and metric
-   text byte-identical. A user-visible effect is announced with a `BREAKING CHANGE:`
-   footer, as decision 0044 describes.
+   text byte-identical, except where decision 0044 says otherwise.
 5. Verifies with `GOWORK=off go build ./...`, `make vet`, `make lint`, `make fmt-check`,
    `make verify-generate`, `make test` (or the moved and dependent packages) and the
    layout and doc tests. A full CI run (`ci:full`) must cover the change, with merged
