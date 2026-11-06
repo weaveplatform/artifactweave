@@ -443,10 +443,11 @@ artifacts and join the required quality gate.
 
 ## Controlled upstream tests
 
-P9's [`migration/artifacts/adapters/upstream/fakeupstream`](../../migration/artifacts/adapters/upstream/fakeupstream/README.md) supplies chi
-HTTP/HTTPS fixtures for transport, cache and adapter tests. Its self-checks run in
-the existing unit jobs with race detection and shuffle; the package remains in the
-normal merged coverage gate, with no new exclusion. They cover mutable artifacts
+P9's [`migration/artifacts/adapters/upstream/fakeupstream`](../../migration/artifacts/adapters/upstream/fakeupstream/README.md)
+supplies chi HTTP/HTTPS fixtures for transport, cache and adapter tests. Its self-checks are
+`TestAcc` tests, so they run in the Go acceptance job (`make accept-go`, without the
+race detector or shuffle); the package remains in the normal merged coverage gate,
+with no new exclusion. They cover mutable artifacts
 and metadata, validators/ranges, auth, cookies, TLS/mTLS, restricted forward/CONNECT
 proxies, cancellation and network/content faults using barriers and an injected
 clock. They make no requests to public registries.

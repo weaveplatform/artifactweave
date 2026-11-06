@@ -13,14 +13,20 @@ type Clock struct {
 	now time.Time
 }
 
+// NewClock returns a Clock set to now, in UTC.
 func NewClock(now time.Time) *Clock { return &Clock{now: now.UTC()} }
 
+// Now returns the clock's time. Pass the method value as Options.Now and to the
+// cache under test. It is safe to call while Advance runs.
 func (c *Clock) Now() time.Time {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.now
 }
 
+// Advance moves the clock on by d. It is safe to call while handlers read Now:
+// a request already in flight may see either time, so advance before sending
+// the request that must see the new one.
 func (c *Clock) Advance(d time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -44,11 +50,19 @@ func (b *Barrier) initialize() {
 	})
 }
 
+// Reached returns a channel that closes when the first request arrives at the
+// barrier. Wait on it before inspecting counts, replacing a resource or
+// cancelling a request, so the test acts while that request is held.
 func (b *Barrier) Reached() <-chan struct{} {
 	b.initialize()
 	return b.reached
 }
 
+// Wait holds the caller until Release or until ctx is done, and the first call
+// closes Reached. It returns nil once released, or ctx.Err() if ctx ends
+// first. Any number of goroutines may wait at once. The server waits on a
+// Fault's barriers with the request's context, so cancelling the request or
+// closing the server frees the handler.
 func (b *Barrier) Wait(ctx context.Context) error {
 	b.initialize()
 	b.arrived.Do(func() { close(b.reached) })
@@ -60,6 +74,8 @@ func (b *Barrier) Wait(ctx context.Context) error {
 	}
 }
 
+// Release opens the barrier for good: every waiter returns, and later calls to
+// Wait return at once.
 func (b *Barrier) Release() {
 	b.initialize()
 	b.released.Do(func() { close(b.ready) })

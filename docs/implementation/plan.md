@@ -931,8 +931,8 @@ JFrog search/download are covered; precise current-vendor wire mapping remains
    and persistent unused-cache cleanup; generation checks prevent stale in-flight
    publication. Native adapters must reuse these operations and prove their format rules.
 3. Per-format upstream adapters with metadata rewriting through the base-URL resolver.
-4. `migration/artifacts/adapters/upstream/fakeupstream` with fault modes; the scheduled/manual `-tags e2e`
-   public upstream matrix is implemented by #638. Its first full dispatch passed
+4. `migration/artifacts/adapters/upstream/fakeupstream` with fault modes; the scheduled/manual
+   `-tags e2e` public upstream matrix is implemented by #638. Its first full dispatch passed
    14/15 families; a successful complete rerun on merged main is required before
    completion. See [CI scope and evidence](../testing/ci.md#public-upstream-conformance-p9).
 5. Implemented by #213: `remote=1` on the versions and latest version searches uses
