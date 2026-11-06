@@ -7,10 +7,10 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/format/pypi"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 )
 
 // The messages 7.x answers (pypi-repositories), without the stray `” +`

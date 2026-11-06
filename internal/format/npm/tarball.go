@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/archive"
-	"github.com/weaveplatform/artifactweave/internal/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 )
 
 // ErrNotTarball is content the format cannot index: no tar or tar.gz, no

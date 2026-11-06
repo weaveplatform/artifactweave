@@ -2,7 +2,7 @@
 // (content into the blob store, then the item and its blob reference in one
 // transaction), checksum deploy, folders, client checksums and deletion into
 // the trash can (decision 0010). Every write calls the repository format's
-// hooks (internal/format, decision 0032): Inspect once the content is
+// hooks (migration/artifacts/core/format, decision 0032): Inspect once the content is
 // stored, then Admit and the hooks inside the write's transaction. A format
 // indexes what it deploys, and a delete prunes the package index for every
 // format.
@@ -18,10 +18,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/service/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"

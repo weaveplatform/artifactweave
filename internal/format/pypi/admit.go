@@ -6,8 +6,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 )
 
 // Admit applies the deploy policy of every package type, then refuses a

@@ -10,7 +10,7 @@ import (
 	"golang.org/x/mod/sumdb/dirhash"
 
 	"github.com/weaveplatform/artifactweave/internal/archive"
-	"github.com/weaveplatform/artifactweave/internal/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 )
 
 // maxInflated bounds the content H1 decompresses. The largest Terraform
