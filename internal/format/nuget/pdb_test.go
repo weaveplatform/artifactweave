@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/archive"
 	"github.com/weaveplatform/artifactweave/internal/format/nuget"
+	"github.com/weaveplatform/artifactweave/migration/platform/archive"
 )
 
 const symbolGUID = "030201000504070608090A0B0C0D0E0F"

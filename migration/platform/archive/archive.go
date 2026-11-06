@@ -1,9 +1,3 @@
-// Package archive reads zip, tar and tar.gz archives: the walker the item
-// service explodes and serves archive entries with, and a bounded walker
-// and reader the format handlers (decision 0032) read packages with, such
-// as an npm tarball's package.json and file count, a Go module zip's go.mod
-// or a jar's POM. Every count an archive's headers give is the uploader's
-// claim, so the bounded walker counts what it actually decompresses.
 package archive
 
 import (
@@ -18,7 +12,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // ErrUnusable is content that is not a usable archive: an unknown or
@@ -225,7 +219,7 @@ func Clean(name string) (string, error) {
 	if n == "" || n == "." {
 		return "", nil
 	}
-	if _, _, _, err := types.SplitItemPath(n); err != nil {
+	if _, _, _, err := kernel.SplitItemPath(n); err != nil {
 		return "", fmt.Errorf("%w: the entry %q is not a valid path", ErrUnusable, name)
 	}
 	return n, nil

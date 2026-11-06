@@ -9,8 +9,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/archive"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/platform/archive"
 )
 
 const maxRockspec = 1 << 20

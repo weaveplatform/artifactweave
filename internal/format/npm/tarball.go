@@ -11,8 +11,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/archive"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/platform/archive"
 )
 
 // ErrNotTarball is content the format cannot index: no tar or tar.gz, no

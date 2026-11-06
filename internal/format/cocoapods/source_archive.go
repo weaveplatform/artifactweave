@@ -10,7 +10,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/archivecheck"
+	"github.com/weaveplatform/artifactweave/migration/platform/archivecheck"
 )
 
 // ValidateSourceArchive checks an HTTP-sourced pod's complete archive before
