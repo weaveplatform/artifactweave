@@ -576,7 +576,7 @@ func (q *Queue) WaitIdle(ctx context.Context) error {
 // age of the oldest pending item, and runs by outcome. Kinds are code
 // constants, so the labels stay bounded (decision 0016).
 func (q *Queue) instrument() error {
-	m := q.o.Meters.Meter("github.com/weaveplatform/artifactweave/internal/service/work")
+	m := q.o.Meters.Meter("github.com/weaveplatform/artifactweave/migration/platform/work")
 	var err error
 	if q.runs, err = m.Int64Counter("artifactweave.work.runs",
 		metric.WithDescription("Work queue runs, by kind and outcome"),

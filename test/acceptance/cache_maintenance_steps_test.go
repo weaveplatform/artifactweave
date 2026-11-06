@@ -12,11 +12,11 @@ import (
 	"github.com/cucumber/godog"
 
 	"github.com/weaveplatform/artifactweave/internal/service/item"
-	"github.com/weaveplatform/artifactweave/internal/service/work"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 

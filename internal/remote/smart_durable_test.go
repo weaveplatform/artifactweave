@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/service/work"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )

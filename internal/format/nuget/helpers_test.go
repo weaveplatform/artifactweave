@@ -11,11 +11,11 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/format/nuget"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
-	"github.com/weaveplatform/artifactweave/internal/service/work"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"

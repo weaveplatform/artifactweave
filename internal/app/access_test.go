@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/server"
-	"github.com/weaveplatform/artifactweave/internal/service/work"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 

@@ -220,7 +220,7 @@ These assignments describe planned work, not current runtime support.
 - `pkg/store/storetest/work.go`: the contract on the in-memory, SQLite and PostgreSQL stores,
   including concurrent leasing, coalescing, fencing, crash recovery and transactions.
 - `internal/sqlstore/sqlcommon/work_test.go`: driver-failure paths.
-- `internal/service/work/work_test.go`: the worker pool, retries, parking, panics,
+- `migration/platform/work/work_test.go`: the worker pool, retries, parking, panics,
   heartbeats, lost leases, shutdown, `EnsureFresh`, `WaitIdle` and the metrics;
   `periodic_test.go`: periodic kinds, their timer and `RunDue`.
 - `internal/format/npm/work_test.go` and `internal/server/npm_operations_test.go`: npm's

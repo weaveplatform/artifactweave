@@ -26,7 +26,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/multipart"
 	"github.com/weaveplatform/artifactweave/internal/service/registry"
-	"github.com/weaveplatform/artifactweave/internal/service/work"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/migration/access"
@@ -35,6 +34,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/blob/mirror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
