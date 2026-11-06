@@ -10,8 +10,9 @@
 -- more.
 --
 -- Lookups by value use the first 255 characters (at most 1020 bytes), as
--- Artifactory's own PostgreSQL index did from its 3.1.1 conversion; pkg/aql
--- narrows on that prefix (valuePrefixLen), then compares the whole value.
+-- Artifactory's own PostgreSQL index did from its 3.1.1 conversion;
+-- migration/artifacts/core/aql narrows on that prefix (valuePrefixLen), then
+-- compares the whole value.
 --
 -- SQLite has no entry limit, so its schema keeps the whole value in its keys.
 -- +up

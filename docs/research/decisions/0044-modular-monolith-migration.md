@@ -220,6 +220,8 @@ change that adds a name appends its row; the change column gives the ticket of t
 | `accessapitest` | `access/api/accessapitest` | Hand-written fakes of every `access/api` contract for other modules' tests; a test-support package below `api`, which imports only `api`, `kernel` and the standard library | ACC-05 |
 | `Registry` | `artifacts/core/format` | A package type's format `Handler`, which the item, build and registry services and the Docker registry take as a value so that core never imports the ecosystem slices; app builds it from the registry's `Settings.For`, and nil means the generic handler. The target document names only `ecosystem/registry.go`'s `Formats()` | ART-04 |
 | `Options.Formats` | `artifacts/ecosystem/docker/http` | The `format.Registry` that the Docker registry's uploads, manifest pushes and mounts write through; nil means the generic handler, which indexes no image or tag | ART-04 |
+| `BuildRuns` | `artifacts/core/aql` | The build-run lookups `AQLSource` reads related runs through: the runs that hold a file as an artifact or as a dependency, a run by ID and a run's promotions, with the build store's signatures. `AQLSource` takes it and `ItemSearch` in place of the store aggregate, whose package imports `core/aql`; the target document puts the source in `core/port`'s `store.go` | ART-15 |
+| `ItemSearch` | `artifacts/core/aql` | The item store's AQL search, which `AQLSource` reads nested files through, so that they carry their properties and statistics as a query's own rows do | ART-15 |
 
 ### Placeholders
 

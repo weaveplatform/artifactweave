@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Refreshes pkg/aql/aqltest/testdata with the AQL the pinned JFrog CLI sends.
+# Refreshes migration/artifacts/core/aql/aqltest/testdata with the AQL the
+# pinned JFrog CLI sends.
 # The acceptance scenario "the query shapes the fixtures capture" runs one jf
 # command per fixture, in the order below, and the server logs each query at
 # debug level; this copies them over the fixtures. Run it whenever the pinned
-# jf changes, then check the expected rows in pkg/aql/aqltest still hold.
+# jf changes, then check the expected rows in
+# migration/artifacts/core/aql/aqltest still hold.
 set -euo pipefail
 : "${ARTIFACTWEAVE_JF_BIN:?set ARTIFACTWEAVE_JF_BIN to the pinned jf binary}"
 cd "$(dirname "$0")/../.."
@@ -23,6 +25,6 @@ if [ "${#captured[@]}" -ne "${#names[@]}" ]; then
 	exit 1
 fi
 for i in "${!names[@]}"; do
-	cp "${captured[$i]}" "pkg/aql/aqltest/testdata/${names[$i]}.aql"
+	cp "${captured[$i]}" "migration/artifacts/core/aql/aqltest/testdata/${names[$i]}.aql"
 done
-echo "refreshed ${#names[@]} fixtures in pkg/aql/aqltest/testdata"
+echo "refreshed ${#names[@]} fixtures in migration/artifacts/core/aql/aqltest/testdata"

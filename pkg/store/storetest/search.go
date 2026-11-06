@@ -7,17 +7,18 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/pkg/aql"
-	"github.com/weaveplatform/artifactweave/pkg/aql/aqltest"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql/aqltest"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// testItemSearch runs the shared AQL cases (pkg/aql/aqltest): every backend
-// must return the reference evaluator's rows in the reference order, with the
-// properties and statistics the query includes, which is what keeps the SQL
-// dialects' globbing, collation and NULL handling honest. The build runs
-// the relation-path cases join to are stored too, and the builds and
+// testItemSearch runs the shared AQL cases
+// (migration/artifacts/core/aql/aqltest): every backend must return the
+// reference evaluator's rows in the reference order, with the properties and
+// statistics the query includes, which is what keeps the SQL dialects'
+// globbing, collation and NULL handling honest. The build runs the
+// relation-path cases join to are stored too, and the builds and
 // build.promotions cases run through the build store.
 func testItemSearch(t *testing.T, st store.Store) {
 	ctx := context.Background()
@@ -81,7 +82,7 @@ func testItemSearch(t *testing.T, st store.Store) {
 }
 
 // testRelatedSearch runs the shared includes of related domains: the
-// store's rows, nested from the store (store.AQLSource), must render as
+// store's rows, nested from the store (aql.AQLSource), must render as
 // the reference evaluator's nested from aqltest.Corpus.
 func testRelatedSearch(t *testing.T, st store.Store) {
 	ctx := context.Background()
@@ -99,7 +100,12 @@ func testRelatedSearch(t *testing.T, st store.Store) {
 			if q.Domain == aql.DomainItems {
 				hits, err := st.Items().Search(ctx, q.ForNesting(), c.Options)
 				must(t, err)
-				rel, err := q.Nest(ctx, store.AQLSource(st), aql.Nesting{Now: aqltest.Now}, hits)
+				rel, err := q.Nest(
+					ctx,
+					aql.AQLSource(st.Builds(), st.Items()),
+					aql.Nesting{Now: aqltest.Now},
+					hits,
+				)
 				must(t, err)
 				got = render(q.Response(hits).WithRelated(rel))
 				ref := aql.SelectItems(q.ForNesting(), c.Options, corpus)
@@ -109,7 +115,12 @@ func testRelatedSearch(t *testing.T, st store.Store) {
 			} else {
 				hits, err := st.Builds().Search(ctx, q, c.Options)
 				must(t, err)
-				rel, err := q.NestBuilds(ctx, store.AQLSource(st), aql.Nesting{}, hits)
+				rel, err := q.NestBuilds(
+					ctx,
+					aql.AQLSource(st.Builds(), st.Items()),
+					aql.Nesting{},
+					hits,
+				)
 				must(t, err)
 				got = render(q.BuildResponse(hits).WithRelated(rel))
 				ref := aql.SelectBuilds(q, c.Options, corpus)
@@ -125,7 +136,7 @@ func testRelatedSearch(t *testing.T, st store.Store) {
 	// A source that cannot read reports the store's error.
 	cancelled, cancel := context.WithCancel(ctx)
 	cancel()
-	src := store.AQLSource(st)
+	src := aql.AQLSource(st.Builds(), st.Items())
 	for name, call := range map[string]func() error{
 		"runs":       func() error { _, err := src.RunsWithFile(cancelled, false, "a"); return err },
 		"items":      func() error { _, err := src.ItemsWithSHA1(cancelled, "a"); return err },

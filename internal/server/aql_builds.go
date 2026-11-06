@@ -12,7 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/aql"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -124,7 +124,7 @@ func (s artifactoryService) nestBuilds(
 	if err != nil {
 		return aql.Related{}, err
 	}
-	related, err := q.NestBuilds(ctx, store.AQLSource(st), n, hits)
+	related, err := q.NestBuilds(ctx, aql.AQLSource(st.Builds(), st.Items()), n, hits)
 	if err != nil {
 		return related, fmt.Errorf("nest related rows: %w", err)
 	}

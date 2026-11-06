@@ -157,7 +157,7 @@ jfrog-providers:
 deploy-docs:
 	./deploy/check.sh docs
 
-## capture-aql: refresh pkg/aql/aqltest/testdata with the AQL the pinned jf sends (needs ARTIFACTWEAVE_JF_BIN)
+## capture-aql: refresh migration/artifacts/core/aql/aqltest/testdata with the AQL the pinned jf sends (needs ARTIFACTWEAVE_JF_BIN)
 capture-aql:
 	./test/acceptance/capture-aql.sh
 

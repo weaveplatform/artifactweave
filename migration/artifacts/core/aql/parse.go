@@ -301,6 +301,8 @@ func (a Action) String() string {
 // Parse parses an items, builds or build.promotions query, items.delete or
 // properties.update. Errors wrap ErrEmpty, ErrSyntax, ErrUnsupported,
 // ErrInvalid or ErrTooLong.
+//
+//nolint:gocyclo // One pass in grammar order, so each error is raised where the text breaks the grammar.
 func Parse(src string) (*Query, error) {
 	if strings.TrimSpace(src) == "" {
 		return nil, ErrEmpty
@@ -562,6 +564,8 @@ var modifiers = map[Action][]string{
 }
 
 // modifier parses the arguments of one suffix.
+//
+//nolint:gocyclo // One case per suffix, each with the argument rules Artifactory documents for it.
 func (p *parser) modifier(q *Query, name string, pos int) error {
 	var args []value
 	for !p.punct(")") {

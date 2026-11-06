@@ -1253,15 +1253,16 @@ scenario starts from a copy of one that passes, and its README from
 
 ## AQL fixtures from the JFrog CLI
 
-`pkg/aql/aqltest/testdata` holds the AQL the pinned `jf` sends, one file per command shape.
-With `ARTIFACTWEAVE_JF_BIN` pointing at the pinned binary, `make capture-aql`:
+`migration/artifacts/core/aql/aqltest/testdata` holds the AQL the pinned `jf` sends, one
+file per command shape. With `ARTIFACTWEAVE_JF_BIN` pointing at the pinned binary,
+`make capture-aql`:
 1. runs the acceptance scenario "the query shapes the fixtures capture", with the server
    logging every query it is sent at debug level (`ARTIFACTWEAVE_AQL_CAPTURE` names the
    directory the harness writes them to);
 2. copies each query over its fixture.
 
 Run it whenever the pinned `jf` changes, then check that the expected rows in
-`pkg/aql/aqltest` still hold.
+`migration/artifacts/core/aql/aqltest` still hold.
 
 ## Releases
 
