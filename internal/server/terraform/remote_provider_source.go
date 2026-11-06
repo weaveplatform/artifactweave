@@ -14,7 +14,7 @@ import (
 
 	tf "github.com/weaveplatform/artifactweave/internal/format/terraform"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
 type remotePlatform struct {

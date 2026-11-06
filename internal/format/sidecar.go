@@ -1,6 +1,6 @@
 package format
 
-import "github.com/weaveplatform/artifactweave/pkg/repo"
+import "github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 
 // SidecarKeeper is a format some of whose files own sidecars: files at
 // paths named after theirs that are of use only beside them, such as a Helm

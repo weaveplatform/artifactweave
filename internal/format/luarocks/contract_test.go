@@ -8,7 +8,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/format/formattest"
 	"github.com/weaveplatform/artifactweave/internal/format/luarocks"
-	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
 func contractRock(t *testing.T, name, version string, n int) []byte {

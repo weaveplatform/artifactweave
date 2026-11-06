@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
 // RefEndpoint binds a provider's discovery URL to its metadata parser.

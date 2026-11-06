@@ -91,7 +91,7 @@ func (i Item) ReportedRepoKey() string {
 
 // ResolveRepoKey maps a key as a client sent it to the stored key and the
 // cached flag: "maven-remote-cache" is the cache of "maven-remote". Repository
-// keys cannot end in the suffix (pkg/repo.Validate), so the mapping is
+// keys cannot end in the suffix (migration/artifacts/api/repo.Validate), so the mapping is
 // unambiguous.
 func ResolveRepoKey(key string) (stored string, cached bool) {
 	if base, ok := strings.CutSuffix(key, CacheSuffix); ok && base != "" {

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/service/item"
-	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
 // Only a remote repository's cache is indexed (pkgindex.Stored): a file in

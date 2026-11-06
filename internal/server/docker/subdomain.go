@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
 // subdomain returns the repository a request's host names under the

@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
 func TestUnitP2ExternalChildNeverReceivesRepositoryCredentials(t *testing.T) {

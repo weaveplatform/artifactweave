@@ -3,7 +3,7 @@
 Reviewed 2026-10-24 against the current published Artifactory 7.x guides. The
 exact live target build is still an [oracle question](https://github.com/weaveplatform/artifactweave/issues/216).
 The [machine-readable inventory](package-format-inventory.json) records the
-classes currently accepted by `pkg/repo`, the client and required operations,
+classes currently accepted by `migration/artifacts/api/repo`, the client and required operations,
 the route owner, metadata, lifecycle, native evidence or gap owner. The
 [generated matrix](package-format-matrix.md) is the review surface.
 
@@ -48,7 +48,7 @@ The source table and individual guides conflict for Bazel and Opkg, so the
 matrix shows the current registered class union. Opkg's native client result
 is recorded in its acceptance feature. The target Artifactory version remains
 an oracle question under #216. A target build that rejects an extra class
-should narrow `pkg/repo` and update this inventory in the same PR.
+should narrow `migration/artifacts/api/repo` and update this inventory in the same PR.
 
 Hex is explicitly L/R/V in both its current guide and the class table. The
 native client recipe and the boundary test are in

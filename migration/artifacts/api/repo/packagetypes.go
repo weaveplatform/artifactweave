@@ -126,7 +126,7 @@ func createLayout(packageType PackageType) string {
 // to a package type when the caller sets none (its default_repo_layout_map).
 // The REST API gives a create without one createLayout's layout instead,
 // which differs for most types. Nothing in artifactweave calls this outside
-// the tests; it is exported for importers of pkg/repo that want the
+// the tests; it is exported for importers of migration/artifacts/api/repo that want the
 // ecosystem-appropriate layout.
 func DefaultLayout(packageType PackageType, terraformType TerraformType) string {
 	switch packageType {

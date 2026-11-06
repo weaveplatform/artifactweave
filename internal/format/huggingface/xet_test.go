@@ -6,7 +6,7 @@ import (
 
 	api "github.com/weaveplatform/artifactweave/internal/format"
 	format "github.com/weaveplatform/artifactweave/internal/format/huggingface"
-	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 

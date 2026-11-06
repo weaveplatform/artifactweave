@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/format/formattest"
-	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
 // An image's tag is a version linking every file of its tag folder: the

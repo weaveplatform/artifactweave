@@ -8,7 +8,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
-	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -252,7 +252,7 @@ func TestUnitResolveSnapshotBehaviours(t *testing.T) {
 func TestUnitResolveGradle(t *testing.T) {
 	w := newWorld(t, func(c *repo.Config) {
 		c.PackageType, c.RepoLayoutRef = repo.Gradle, "gradle-default"
-		// Gradle's default (pkg/repo/defaults.go): the fixture's POM sits
+		// Gradle's default (migration/artifacts/api/repo/defaults.go): the fixture's POM sits
 		// in a Gradle path, which the POM checks would refuse.
 		c.SuppressPomConsistencyChecks = on()
 	})

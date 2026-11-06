@@ -41,8 +41,8 @@ version is not the introduction date of these fields.
 
 The source inspection for this design is against the P8 baseline:
 
-- **[S]** [repo.Config](../../pkg/repo/repo.go) has none of the three new fields;
-  [validation](../../pkg/repo/validate.go) requires `url` for every remote. JSON decoding
+- **[S]** [repo.Config](../../migration/artifacts/api/repo/repo.go) has none of the three new fields;
+  [validation](../../migration/artifacts/api/repo/validate.go) requires `url` for every remote. JSON decoding
   ignores unknown fields, including through [partial updates](../../internal/repos/repos.go),
   so a successful ordinary URL-based create/update does not prove these fields took
   effect. The [descriptor parser](../../internal/descriptor/parse.go) rejects unknown

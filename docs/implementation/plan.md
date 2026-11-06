@@ -213,7 +213,7 @@ Decisions: [0001](../research/decisions/0001-mirror-the-jfrog-api-surface.md),
 
 **Tasks**
 1. `make init NAME=artifactweave`; this documentation set; `CODEOWNERS`.
-2. `pkg/repo`: the `Config` model with every field in [research 03](../research/03-repository-configuration-model.md), JSON round-trip that accepts the string-typed booleans JFrog documents per rclass and writes booleans, validation (key syntax, rclass and packageType sets, virtual members exist, `defaultDeploymentRepo` is a member, `projectKey` implies `environments`).
+2. `migration/artifacts/api/repo`: the `Config` model with every field in [research 03](../research/03-repository-configuration-model.md), JSON round-trip that accepts the string-typed booleans JFrog documents per rclass and writes booleans, validation (key syntax, rclass and packageType sets, virtual members exist, `defaultDeploymentRepo` is a member, `projectKey` implies `environments`).
 3. `pkg/layout`: pattern engine for `repoLayoutRef` tokens with the bundled layouts and the Maven-2 integration-revision regexes.
 4. `internal/config`: strict app YAML, flag > env > file precedence, unknown keys rejected, `config validate`.
 5. `internal/server`: chi router, request id, slog access log, recovery, body limits, the per-surface errors table, the base-URL resolver middleware, content-type normalisation for `+json` vendor types and `application/yaml`.
@@ -248,8 +248,8 @@ features before any store is written.
 2. [Research 15, data model](../research/15-data-model.md) and
    [decision 0020](../research/decisions/0020-domain-model.md): wire entities per
    family, identity and mutability, server-owned fields, relationships, and the derived
-   storage model that P2 implements. Contradictions with `pkg/repo` are fixed in
-   `pkg/repo`.
+   storage model that P2 implements. Contradictions with `migration/artifacts/api/repo` are fixed in
+   `migration/artifacts/api/repo`.
 3. Spec tooling: `specoracle scaffold` (draft fragments from the cache with
    `TODO(author)` descriptions and `x-oracle-source` links), `openapi-bundle`
    (per-family fragments under `api/src/<service>/` merged into the three bundled
@@ -306,7 +306,7 @@ features before any store is written.
   report nondeterministic; the spec models those as one route each, with the
   `/checksum` documentation alias marked `x-not-routed`; item routes exclude the
   reserved repository key `api`; union-typed query parameters are typed as strings
-  because the generator cannot bind them; `pkg/repo` gained `UnmarshalJSON`, the
+  because the generator cannot bind them; `migration/artifacts/api/repo` gained `UnmarshalJSON`, the
   federated `priorityResolution` boolean, and class checks for `terraformType` and
   proxy fields; research 15 gained the `leases` and `vault_configs` tables; task 5
   moved to P2 (above).

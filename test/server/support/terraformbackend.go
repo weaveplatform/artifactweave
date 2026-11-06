@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/crypt"
-	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
 // TerraformBackendRepos is the local backend fixture shared with the root

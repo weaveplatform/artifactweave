@@ -10,8 +10,8 @@ import (
 	"path"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel/antpath"
-	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
 // sourceDocument is the archive variant of Bazel's source.json. Source URLs

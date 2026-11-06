@@ -3,7 +3,7 @@ package types
 import (
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
 // Replication is one replication target of a repository. Key is the

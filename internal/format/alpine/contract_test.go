@@ -17,7 +17,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/format/alpine"
 	"github.com/weaveplatform/artifactweave/internal/format/formattest"
-	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
 var contractSigningKey = sync.OnceValue(func() *rsa.PrivateKey {

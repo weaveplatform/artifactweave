@@ -21,7 +21,7 @@ var LegacyRoots = []string{
 	"pkg/blob",
 	"pkg/cdn",
 	"pkg/layout",
-	"pkg/repo",
+	"migration/artifacts/api/repo",
 	"pkg/store",
 	"pkg/types",
 }

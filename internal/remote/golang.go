@@ -16,7 +16,7 @@ import (
 
 	goformat "github.com/weaveplatform/artifactweave/internal/format/golang"
 	"github.com/weaveplatform/artifactweave/internal/source"
-	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
 // GoSource is the GOPROXY reader for the P10 virtual resolver. It deliberately

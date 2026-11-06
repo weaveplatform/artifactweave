@@ -14,7 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
-	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -696,7 +696,7 @@ func TestAccUpdateKeepsTheKey(t *testing.T) {
 }
 
 // The package type enumerations the OpenAPI document gives each class are
-// the types pkg/repo accepts for it, in its order.
+// the types migration/artifacts/api/repo accepts for it, in its order.
 func TestAccPackageTypeEnumsMatchTheAcceptedTypes(t *testing.T) {
 	doc := loadSpec(t, "artifactory.openapi.yaml")
 	for class, name := range map[repo.Class]string{

@@ -8,8 +8,8 @@ import (
 	"net/http"
 
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/aql"
-	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
 // query deliberately has no persistent response/cache entry: search may disclose

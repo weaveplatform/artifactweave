@@ -10,7 +10,7 @@ import (
 	"time"
 
 	nugetfmt "github.com/weaveplatform/artifactweave/internal/format/nuget"
-	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
