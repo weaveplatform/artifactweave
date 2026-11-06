@@ -16,7 +16,7 @@ import (
 
 	"github.com/oapi-codegen/runtime"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/types/wire"
+	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
 )
 
 // Defines values for ArchiveCriterionOperator.

@@ -9,8 +9,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
 	"github.com/weaveplatform/artifactweave/pkg/types"
-	"github.com/weaveplatform/artifactweave/pkg/types/wire"
 )
 
 // The historical receiver has no idempotency key. Claim before sending and
