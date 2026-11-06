@@ -20,9 +20,9 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
-	"github.com/weaveplatform/artifactweave/internal/testfault"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/fault"
 )
 
 // formFormat answers POST /upload/{file} with what ReadForm read for that
@@ -336,7 +336,7 @@ func TestAccReadFormDisconnect(t *testing.T) {
 		"before the last part": strings.LastIndex(body, "--") - 4,
 	} {
 		t.Run(name, func(t *testing.T) {
-			rec := f.post("content", testfault.Disconnect(strings.NewReader(body), int64(at)), ct)
+			rec := f.post("content", fault.Disconnect(strings.NewReader(body), int64(at)), ct)
 			if rec.Code != http.StatusBadRequest ||
 				!strings.Contains(npmError(t, rec), "malformed multipart/form-data body") {
 				t.Fatalf("%d %s", rec.Code, rec.Body)
@@ -362,7 +362,7 @@ func TestAccReadFormStoreFailure(t *testing.T) {
 	f := newFormFixture(t)
 	errDisk := errors.New("disk full")
 	f.items = &item.Service{
-		Store: f.db, Blobs: testfault.Blobs{Store: f.items.Blobs, Append: errDisk},
+		Store: f.db, Blobs: fault.Blobs{Store: f.items.Blobs, Append: errDisk},
 		Formats: ecosystem.For,
 	}
 	o := f.o

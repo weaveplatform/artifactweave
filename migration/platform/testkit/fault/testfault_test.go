@@ -1,4 +1,4 @@
-package testfault_test
+package fault_test
 
 import (
 	"context"
@@ -7,24 +7,24 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/testfault"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/fault"
 )
 
 func TestUnitDisconnect(t *testing.T) {
-	got, err := io.ReadAll(testfault.Disconnect(strings.NewReader("hello world"), 5))
-	if string(got) != "hello" || !errors.Is(err, testfault.ErrDisconnected) ||
+	got, err := io.ReadAll(fault.Disconnect(strings.NewReader("hello world"), 5))
+	if string(got) != "hello" || !errors.Is(err, fault.ErrDisconnected) ||
 		!errors.Is(err, io.ErrUnexpectedEOF) {
 		t.Fatalf("read %q, %v", got, err)
 	}
 	// A body that ends first ends as it would.
-	got, err = io.ReadAll(testfault.Disconnect(strings.NewReader("hi"), 5))
+	got, err = io.ReadAll(fault.Disconnect(strings.NewReader("hi"), 5))
 	if string(got) != "hi" || err != nil {
 		t.Fatalf("short body: %q, %v", got, err)
 	}
-	if n, err := testfault.Disconnect(strings.NewReader("x"), 0).
-		Read(make([]byte, 1)); n != 0 || !errors.Is(err, testfault.ErrDisconnected) {
+	if n, err := fault.Disconnect(strings.NewReader("x"), 0).
+		Read(make([]byte, 1)); n != 0 || !errors.Is(err, fault.ErrDisconnected) {
 		t.Fatalf("cut at once: %d, %v", n, err)
 	}
 }
@@ -40,18 +40,18 @@ func TestUnitBlobs(t *testing.T) {
 		errAppend = errors.New("append")
 		errCommit = errors.New("commit")
 	)
-	if _, err := (testfault.Blobs{Store: store, Begin: errBegin}).
+	if _, err := (fault.Blobs{Store: store, Begin: errBegin}).
 		BeginUpload(ctx); !errors.Is(err, errBegin) {
 		t.Fatalf("begin: %v", err)
 	}
-	u, err := testfault.Blobs{Store: store, Append: errAppend}.BeginUpload(ctx)
+	u, err := fault.Blobs{Store: store, Append: errAppend}.BeginUpload(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if n, err := u.Append(ctx, strings.NewReader("abc")); n != 3 || !errors.Is(err, errAppend) {
 		t.Fatalf("append: %d, %v", n, err)
 	}
-	u, err = testfault.Blobs{Store: store, Commit: errCommit}.BeginUpload(ctx)
+	u, err = fault.Blobs{Store: store, Commit: errCommit}.BeginUpload(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +62,7 @@ func TestUnitBlobs(t *testing.T) {
 		t.Fatalf("commit: %v", err)
 	}
 	// Nothing failed is the store itself.
-	u, err = testfault.Blobs{Store: store}.BeginUpload(ctx)
+	u, err = fault.Blobs{Store: store}.BeginUpload(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +74,7 @@ func TestUnitBlobs(t *testing.T) {
 		t.Fatalf("commit: %+v, %v", info, err)
 	}
 	// The store's own failure passes through.
-	if _, err := (testfault.Blobs{Store: failingBegin{store}}).BeginUpload(ctx); err == nil {
+	if _, err := (fault.Blobs{Store: failingBegin{store}}).BeginUpload(ctx); err == nil {
 		t.Fatal("the store's failure was lost")
 	}
 }

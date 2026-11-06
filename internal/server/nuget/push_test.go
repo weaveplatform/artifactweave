@@ -16,8 +16,8 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/postgres"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
-	"github.com/weaveplatform/artifactweave/internal/testfault"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/fault"
 )
 
 const v2 = "/artifactory/api/nuget/nuget-local"
@@ -146,7 +146,7 @@ func TestAccPushRefusals(t *testing.T) {
 	// The body is not read: a body that fails if read would answer 400.
 	unread := func(user, url string) *httptest.ResponseRecorder {
 		body, contentType := pushForm(pkg)
-		return f.doBody(http.MethodPut, url, user, testfault.Disconnect(body, 0),
+		return f.doBody(http.MethodPut, url, user, fault.Disconnect(body, 0),
 			"Content-Type", contentType)
 	}
 	for _, c := range []struct {
@@ -182,7 +182,7 @@ func TestAccPushRefusals(t *testing.T) {
 			strings.NewReader("--b\r\nContent-Disposition: form-data; name=x\r\n\r\nv\r\n--b--\r\n"),
 			"multipart/form-data; boundary=b", http.StatusBadRequest,
 		},
-		"broken off": {testfault.Disconnect(mustForm(pkg), 100), formType(pkg), http.StatusBadRequest},
+		"broken off": {fault.Disconnect(mustForm(pkg), 100), formType(pkg), http.StatusBadRequest},
 	} {
 		rec := f.doBody(http.MethodPut, v2+"/", "admin", c.body, "Content-Type", c.contentType)
 		if rec.Code != c.expected {
@@ -232,7 +232,7 @@ func formType(pkg []byte) string { _, ct := pushForm(pkg); return ct }
 // A store that fails while the package is stored, or read, is a fault.
 func TestAccPushFaults(t *testing.T) {
 	f := newFixture(t)
-	f.items.Blobs = testfault.Blobs{Store: f.blobs, Commit: errBroken}
+	f.items.Blobs = fault.Blobs{Store: f.blobs, Commit: errBroken}
 	wantStatus(t, f.pushTo(v2+"/", "admin", nupkg("Acme.Lib", "1.0.0", "")),
 		http.StatusInternalServerError)
 
