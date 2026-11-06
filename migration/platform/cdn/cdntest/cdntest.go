@@ -1,12 +1,3 @@
-// Package cdntest is a fake CDN edge for tests (decision 0029). It checks a
-// provider's URL signature the way the real edge does, then serves the blob
-// the URL names from a blob store, honouring Range and the response
-// overrides, so a download redirect is tested end to end without a cloud.
-//
-// The edge listens on "localhost" by default. A registry under test listens
-// on 127.0.0.1, so Go clients, the JFrog CLI among them, treat the edge as
-// another host and drop their Authorization header on the redirect, as they
-// do for a real CDN; the edge records whether one arrived.
 package cdntest
 
 import (

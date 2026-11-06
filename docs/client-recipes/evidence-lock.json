@@ -144,7 +144,7 @@
   "test/acceptance/puppet_steps_test.go": "6d51418741115b10965e2d25d5761f413294b66bb04334ff44df72c01ba61ef0",
   "test/acceptance/rpm_steps_test.go": "8d4c1d071c991a2aeec27494e6361ea4fe9deab117925af5ce55de46200d51e4",
   "test/acceptance/sbt_steps_test.go": "63b23e378514265abfa6157da4e96ddcfdf905aea2d1cefe8fcbb82efe6d4a45",
-  "test/acceptance/steps_test.go": "c3dfd1c6dde20f5b30e1dced5b17a69592ab7035f1e3c9e97ca3aca250f48ca6",
+  "test/acceptance/steps_test.go": "dc7dd21df185c46705b553bdccaf7d7cb2cfd2758d4af3b17d22b6033164d9eb",
   "test/acceptance/system_recipe_steps_test.go": "45eca1b58da7c9f832a3e8e580c938538d2ed3bdf3dd53fcdbcef6ba7c12ad22",
   "test/acceptance/terraform_backend_steps_test.go": "9d6113a4d83e532533635012674bee8186f0d83ddb107faff2ef728899833d3c",
   "test/acceptance/terraform_provider_steps_test.go": "d99dfab63f175788935658ae9b873aa6fce2ee2c1064ef8b997b67898f8daecc",

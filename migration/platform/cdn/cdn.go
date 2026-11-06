@@ -1,12 +1,3 @@
-// Package cdn signs download URLs on a CDN in front of an object store
-// (decision 0029). A blob store that has a CDN takes one of these signers in
-// its Options and answers blob.ViaCDN with the signer's URL for the blob's
-// object key, so the store is never wrapped and keeps its other interfaces.
-//
-// Every signer issues URLs on time windows: a URL minted in a window expires
-// when the window ends plus the TTL, so a URL lives at least the TTL and at
-// most twice it, and every client in one window is handed the same URL for
-// a blob when the signature is deterministic.
 package cdn
 
 import (
