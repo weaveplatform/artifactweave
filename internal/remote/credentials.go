@@ -21,9 +21,9 @@ import (
 	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/publicsuffix"
 
-	"github.com/weaveplatform/artifactweave/internal/crypt"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
+	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )

@@ -7,12 +7,12 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/config"
-	"github.com/weaveplatform/artifactweave/internal/crypt"
 	tfbe "github.com/weaveplatform/artifactweave/internal/format/terraformbackend"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/terraformstate"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 

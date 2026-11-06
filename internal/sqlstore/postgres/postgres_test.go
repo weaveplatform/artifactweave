@@ -9,10 +9,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/weaveplatform/artifactweave/internal/crypt"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/postgres"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
+	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/storetest"
 	"github.com/weaveplatform/artifactweave/pkg/types"

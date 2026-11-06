@@ -376,7 +376,7 @@ Decisions: [0004](../research/decisions/0004-storage-sql-metadata-and-blobs.md),
 1. `pkg/store` contracts (`Repos`, `Items`, `Properties`, `Stats`, `Principals`, `Groups`, `Permissions`, `Tokens`, `Projects`, `Webhooks`, `Policies`, `Runs`, `Packages`) with `Tx`, sentinel errors and keyset cursors; `pkg/store/inmem`.
 2. `internal/sqlstore/sqlcommon` dialect layer; `sqlite` (modernc, WAL, single writer) and `postgres` (pgx stdlib); embedded migrations; `artifactweave migrate up|down|version`.
 3. `pkg/blob` contract: `BeginUpload / Append / Commit(digest) / Abort`, `Open` returning `io.ReadSeekCloser`, `PresignGet`, `Delete`, `Stat`; `fs` backend (temp dir per upload id, rename on commit) and `s3` backend (multipart upload id persisted through the store, path-style option for MinIO); checksum index by sha256, sha1 and md5.
-4. `internal/crypt`: keyring, sealed columns with purpose and row AAD, `artifactweave keys rotate`.
+4. `migration/platform/crypt`: keyring, sealed columns with purpose and row AAD, `artifactweave keys rotate`.
 5. `storetest` and `blobtest` contract suites.
 
 **Exit criteria**

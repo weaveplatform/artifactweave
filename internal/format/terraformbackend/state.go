@@ -11,8 +11,8 @@ import (
 	"io"
 	"strconv"
 
-	"github.com/weaveplatform/artifactweave/internal/crypt"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 )
 
 // Errors of reading a state.

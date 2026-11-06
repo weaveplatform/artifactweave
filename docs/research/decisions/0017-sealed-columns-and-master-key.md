@@ -20,7 +20,7 @@ and row additional authenticated data.
 
 ## Decision
 
-`internal/crypt` ports hostweave's keyring: a master key from the application
+`migration/platform/crypt` ports hostweave's keyring: a master key from the application
 configuration (file or environment variable), AES-GCM sealing with
 a purpose string and the row identity as additional authenticated data, and key versions
 so `artifactweave keys rotate` re-wraps every sealed column. Every secret listed above is

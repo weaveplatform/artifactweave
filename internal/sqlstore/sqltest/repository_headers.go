@@ -10,11 +10,11 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/weaveplatform/artifactweave/internal/crypt"
 	"github.com/weaveplatform/artifactweave/internal/repos"
 	"github.com/weaveplatform/artifactweave/internal/service/roles"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
