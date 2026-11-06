@@ -55,7 +55,7 @@ A phase is complete when:
 ## Coverage rules
 
 - 95% is a floor. Test through the public surface of each package and use fakes at external boundaries: the blob store, the upstream fetcher, the clock, the SQL store.
-- Streaming handlers reach the floor through `internal/testfault`: client disconnect mid-stream, blob write failure after headers were sent, upstream 5xx, slow and wrong content type. These paths are tested, not excluded.
+- Streaming handlers reach the floor through `migration/platform/testkit/fault`: client disconnect mid-stream, blob write failure after headers were sent, upstream 5xx, slow and wrong content type. These paths are tested, not excluded.
 - Code reachable only with Docker (PostgreSQL, MinIO, the container-backed clients) is covered by the Linux jobs. The macOS and Windows unit runs cover the same packages through fakes.
 - Unreachable defensive branches are removed instead of being marked as excluded.
 
