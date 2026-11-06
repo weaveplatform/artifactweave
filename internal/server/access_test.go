@@ -9,6 +9,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
@@ -53,7 +54,7 @@ func accessWorld(t *testing.T) (http.Handler, *token.Service) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	items := &item.Service{Store: db, Blobs: blobs}
+	items := &item.Service{Store: db, Blobs: blobs, Formats: formats.For}
 	for key, files := range map[string][]string{
 		"libs-local": {"com/x.txt", "org/y.txt"},
 		"ext-local":  {"z.txt"},

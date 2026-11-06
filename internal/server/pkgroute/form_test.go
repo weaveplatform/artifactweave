@@ -17,6 +17,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
@@ -362,6 +363,7 @@ func TestAccReadFormStoreFailure(t *testing.T) {
 	errDisk := errors.New("disk full")
 	f.items = &item.Service{
 		Store: f.db, Blobs: testfault.Blobs{Store: f.items.Blobs, Append: errDisk},
+		Formats: formats.For,
 	}
 	o := f.o
 	var mapped []error

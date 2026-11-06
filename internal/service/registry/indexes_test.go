@@ -12,6 +12,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/registry"
 	"github.com/weaveplatform/artifactweave/pkg/aql"
@@ -58,7 +59,11 @@ func referrerOf(artifactType, subject, note string) (string, string) {
 }
 
 // items is the item service over w's store.
-func (w *world) items() *item.Service { return &item.Service{Store: w.db, Blobs: w.blobs} }
+func (w *world) items() *item.Service {
+	return &item.Service{
+		Store: w.db, Blobs: w.blobs, Formats: formats.For,
+	}
+}
 
 // target is folder of the image app in docker-local.
 func (w *world) target(folder string) item.Target {

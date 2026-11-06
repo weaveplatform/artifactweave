@@ -19,6 +19,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	"github.com/weaveplatform/artifactweave/internal/server/gitlfs"
@@ -195,7 +196,7 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 	if err := db.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
-	items := &item.Service{Store: db, Blobs: blobs}
+	items := &item.Service{Store: db, Blobs: blobs, Formats: formats.For}
 	roots := pem.EncodeToMemory(
 		&pem.Block{Type: "CERTIFICATE", Bytes: crossTarget.Certificate().Raw},
 	)

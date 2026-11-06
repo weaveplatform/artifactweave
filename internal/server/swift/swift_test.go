@@ -24,6 +24,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/server/swift"
@@ -66,7 +67,7 @@ func newFixture(
 	if err != nil {
 		t.Fatal(err)
 	}
-	items := &item.Service{Store: db, Blobs: blobs, Work: queue}
+	items := &item.Service{Store: db, Blobs: blobs, Work: queue, Formats: formats.For}
 	if err := items.RegisterWork(queue); err != nil {
 		t.Fatal(err)
 	}

@@ -15,6 +15,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -93,7 +94,9 @@ func (w *blobWorld) deploy(key, path, body string) types.Item {
 	if err != nil {
 		w.t.Fatal(err)
 	}
-	it, err := (&item.Service{Store: w.db, Blobs: w.blobs}).Deploy(ctx, item.Deploy{
+	it, err := (&item.Service{
+		Store: w.db, Blobs: w.blobs, Formats: formats.For,
+	}).Deploy(ctx, item.Deploy{
 		Target: item.Target{Repo: c, Path: path}, Body: strings.NewReader(body),
 	})
 	if err != nil {

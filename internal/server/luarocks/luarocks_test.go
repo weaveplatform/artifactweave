@@ -18,6 +18,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/luarocks"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
@@ -66,7 +67,7 @@ func newFixtureWithProtocol(
 	if err != nil {
 		t.Fatal(err)
 	}
-	items := &item.Service{Store: db, Blobs: blobs, Work: q}
+	items := &item.Service{Store: db, Blobs: blobs, Work: q, Formats: formats.For}
 	if err := items.RegisterWork(q); err != nil {
 		t.Fatal(err)
 	}

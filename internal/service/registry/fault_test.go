@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/registry"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/aql"
@@ -171,7 +172,9 @@ func newFaulty(t *testing.T) *faulty {
 		repos:   &faultyRepos{RepoStore: db.Repos()},
 	}
 	f.bl = &faultyBlobs{Store: w.blobs}
-	f.svc = &registry.Service{Store: f.st, Blobs: f.bl, Now: func() time.Time { return start }}
+	f.svc = &registry.Service{
+		Store: f.st, Blobs: f.bl, Now: func() time.Time { return start }, Formats: formats.For,
+	}
 	return f
 }
 

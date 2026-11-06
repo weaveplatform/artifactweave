@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/work"
@@ -73,7 +74,7 @@ func newMetaWorldOn(t *testing.T, db store.Store, tune func(*repo.Config)) *meta
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.items = &item.Service{Store: db, Blobs: blobs, Now: clock, Work: w.q}
+	w.items = &item.Service{Store: db, Blobs: blobs, Now: clock, Work: w.q, Formats: formats.For}
 	if err := w.items.RegisterWork(w.q); err != nil {
 		t.Fatal(err)
 	}

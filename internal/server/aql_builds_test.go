@@ -11,6 +11,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
@@ -54,7 +55,9 @@ func buildsAQLWorld(t *testing.T, tune ...func(*Config)) (http.Handler, *token.S
 	if err := db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := (&item.Service{Store: db, Blobs: blobs}).Deploy(ctx, item.Deploy{
+	if _, err := (&item.Service{
+		Store: db, Blobs: blobs, Formats: formats.For,
+	}).Deploy(ctx, item.Deploy{
 		Target: item.Target{Repo: c, Path: "app.jar"}, Body: strings.NewReader("jar"),
 	}); err != nil {
 		t.Fatal(err)

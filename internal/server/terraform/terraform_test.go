@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/crypt"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
@@ -48,7 +49,7 @@ func newFixture(t *testing.T) *fixture {
 	f := &fixture{
 		t:     t,
 		db:    db,
-		items: &item.Service{Store: db, Blobs: blobs},
+		items: &item.Service{Store: db, Blobs: blobs, Formats: formats.For},
 		keys:  keys,
 		now:   time.Now(),
 	}

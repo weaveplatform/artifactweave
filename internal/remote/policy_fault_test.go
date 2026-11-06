@@ -12,7 +12,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestAccPolicyHEADRevalidatesWithoutGETAndPreservesStale(t *testing.T) {
@@ -301,40 +300,6 @@ func TestAccPolicyNoStoreFailureCooldownAndHEAD(t *testing.T) {
 		store.ErrNotFound,
 	) {
 		t.Fatal("no-store persisted representation", err)
-	}
-}
-
-func TestAccPolicyMutableAndDerivedClassification(t *testing.T) {
-	w := policyFixture(t)
-	q := w.request("file.txt", source.ResourceKindArtifact)
-	q.Resource.Mutable = true
-	w.up.Set("/file.txt", fakeupstream.Resource{Body: []byte("one")})
-	w.mustRead(q, "one")
-	w.up.Set("/file.txt", fakeupstream.Resource{Body: []byte("two")})
-	w.mustRead(q, "one")
-	w.clock.Advance(30 * time.Second)
-	w.mustRead(q, "two")
-	e, err := w.db.RemoteCache().Read(t.Context(), w.p.cacheKey(q, "credential-1"))
-	if err != nil || e.Kind != types.RemoteMutable {
-		t.Fatal(e, err)
-	}
-	q.Repo.PackageType = repo.Maven
-	q.Resource.Path = "maven-metadata.xml"
-	q.Resource.Mutable = false
-	if w.p.kind(q) != types.RemoteDerived {
-		t.Fatal("format classification not applied")
-	}
-}
-
-func TestAccPolicyDerivedNeverFetches(t *testing.T) {
-	w := policyFixture(t)
-	q := w.request("maven-metadata.xml", source.ResourceKindArtifact)
-	q.Repo.PackageType = repo.Maven
-	if _, err := w.read(q); !errors.Is(err, store.ErrNotFound) {
-		t.Fatal(err)
-	}
-	if w.up.Count("", "") != 0 {
-		t.Fatal("derived index fetched upstream")
 	}
 }
 

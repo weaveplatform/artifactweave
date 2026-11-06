@@ -18,6 +18,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	nixfmt "github.com/weaveplatform/artifactweave/internal/format/nix"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
@@ -89,7 +90,7 @@ func newFixture(t *testing.T) *fixture {
 		t:       t,
 		db:      db,
 		st:      db,
-		items:   &item.Service{Store: db, Blobs: blobs},
+		items:   &item.Service{Store: db, Blobs: blobs, Formats: formats.For},
 		c:       c,
 		info:    info,
 		data:    data,

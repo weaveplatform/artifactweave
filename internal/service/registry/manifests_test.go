@@ -14,6 +14,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/registry"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
@@ -76,7 +77,9 @@ func (w *world) push(body, digest string, folders ...string) error {
 // SHA-256s.
 func (w *world) tree(dir string) map[string]string {
 	w.t.Helper()
-	items, err := (&item.Service{Store: w.db, Blobs: w.blobs}).Tree(context.Background(),
+	items, err := (&item.Service{
+		Store: w.db, Blobs: w.blobs, Formats: formats.For,
+	}).Tree(context.Background(),
 		item.Target{Repo: w.docker, Path: dir})
 	if err != nil {
 		w.t.Fatal(err)

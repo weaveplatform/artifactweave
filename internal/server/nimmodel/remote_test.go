@@ -15,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/docker"
 	"github.com/weaveplatform/artifactweave/internal/server/nimmodel"
@@ -79,7 +80,7 @@ func newFixture(t *testing.T) *fixture {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	items := &item.Service{Store: db, Blobs: blobs, Now: clock.Now}
+	items := &item.Service{Store: db, Blobs: blobs, Now: clock.Now, Formats: formats.For}
 	resolver, err := remote.NewResolver(db, nil, remote.ResolverOptions{
 		RevisionKey: []byte(strings.Repeat("k", 32)),
 	})

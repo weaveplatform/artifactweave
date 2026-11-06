@@ -107,7 +107,7 @@ func newWorld(t *testing.T, tune func(*repo.Config)) *world {
 	w.items = &item.Service{Store: w.db, Blobs: blobs, Work: noQueue{}, Now: func() time.Time {
 		w.now = w.now.Add(time.Minute)
 		return w.now
-	}}
+	}, Formats: formats.For}
 	return w
 }
 

@@ -11,6 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/idtoken/idtokentest"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
@@ -41,7 +42,7 @@ func newOIDCWorld(t *testing.T) oidcWorld {
 	must(db.Groups().Create(ctx, types.Group{Name: "everyone", AutoJoin: true}))
 	blobs, err := fs.New(t.TempDir())
 	must(err)
-	items := &item.Service{Store: db, Blobs: blobs}
+	items := &item.Service{Store: db, Blobs: blobs, Formats: formats.For}
 	for key, group := range map[string]string{"team-local": "ci-team", "open-local": "everyone"} {
 		c := repo.Defaults(&repo.Config{Key: key, Class: repo.Local})
 		must(db.Repos().Create(ctx, *c))

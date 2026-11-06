@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/registry"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/postgres"
@@ -122,7 +123,9 @@ func (w *world) repo(key string) repo.Config {
 }
 
 func (w *world) service(db store.Store) *registry.Service {
-	return &registry.Service{Store: db, Blobs: w.blobs, Now: func() time.Time { return start }}
+	return &registry.Service{
+		Store: db, Blobs: w.blobs, Now: func() time.Time { return start }, Formats: formats.For,
+	}
 }
 
 func (w *world) owner(name string) registry.Owner {
@@ -132,7 +135,9 @@ func (w *world) owner(name string) registry.Owner {
 // deploy stores a file in c at path, last written at.
 func (w *world) deploy(c repo.Config, path, body string, at time.Time) types.Item {
 	w.t.Helper()
-	items := &item.Service{Store: w.db, Blobs: w.blobs, Now: func() time.Time { return at }}
+	items := &item.Service{
+		Store: w.db, Blobs: w.blobs, Now: func() time.Time { return at }, Formats: formats.For,
+	}
 	it, err := items.Deploy(context.Background(), item.Deploy{
 		Target: item.Target{Repo: c, Path: path}, Body: strings.NewReader(body),
 	})
@@ -499,7 +504,7 @@ func TestAccExpireUploads(t *testing.T) {
 }
 
 func TestAccExpireWithoutImageRepositories(t *testing.T) {
-	svc := &registry.Service{Store: inmem.New()}
+	svc := &registry.Service{Store: inmem.New(), Formats: formats.For}
 	if n, err := svc.ExpireUploads(context.Background(), start); err != nil || n != 0 {
 		t.Fatalf("%d %v", n, err)
 	}

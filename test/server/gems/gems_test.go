@@ -18,6 +18,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	gemfmt "github.com/weaveplatform/artifactweave/internal/format/gems"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server"
@@ -739,7 +740,7 @@ func newRemoteWorld(t *testing.T, up *fakeupstream.Server) *world {
 		policy := &remote.Policy{
 			Store:   cfg.Store,
 			Blobs:   cfg.Blobs,
-			Items:   &item.Service{Store: cfg.Store, Blobs: cfg.Blobs},
+			Items:   &item.Service{Store: cfg.Store, Blobs: cfg.Blobs, Formats: formats.For},
 			Pool:    new(remote.Pool),
 			Options: resolver.Options,
 			Key:     []byte(strings.Repeat("k", 32)),

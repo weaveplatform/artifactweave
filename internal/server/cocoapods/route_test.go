@@ -20,6 +20,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
 	podfmt "github.com/weaveplatform/artifactweave/internal/format/cocoapods"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
@@ -56,7 +57,7 @@ func newRouteFixture(t *testing.T) *routeFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	items := &item.Service{Store: db, Blobs: blobs, Work: queue}
+	items := &item.Service{Store: db, Blobs: blobs, Work: queue, Formats: formats.For}
 	if err := items.RegisterWork(queue); err != nil {
 		t.Fatal(err)
 	}

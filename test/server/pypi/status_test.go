@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -76,7 +77,9 @@ func newPypiStatusWorld(t *testing.T, anonymous bool) pypiStatusWorld {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := (&item.Service{Store: cfg.Store, Blobs: cfg.Blobs}).Deploy(
+		if _, err := (&item.Service{
+			Store: cfg.Store, Blobs: cfg.Blobs, Formats: formats.For,
+		}).Deploy(
 			t.Context(),
 			item.Deploy{
 				Target: item.Target{

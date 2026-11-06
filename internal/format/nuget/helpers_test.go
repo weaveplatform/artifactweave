@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/format/nuget"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/trash"
@@ -98,7 +99,7 @@ func newWorldOn(t *testing.T, st store.Store, tune func(*repo.Config)) *world {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.items = &item.Service{Store: st, Blobs: blobs, Now: clock, Work: w.q}
+	w.items = &item.Service{Store: st, Blobs: blobs, Now: clock, Work: w.q, Formats: formats.For}
 	if err := w.items.RegisterWork(w.q); err != nil {
 		t.Fatal(err)
 	}

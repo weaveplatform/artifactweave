@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/crypt"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -34,7 +35,7 @@ func seedRegistryModule(t *testing.T, db store.Store, blobs blob.Store) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := &item.Service{Store: db, Blobs: blobs}
+	svc := &item.Service{Store: db, Blobs: blobs, Formats: formats.For}
 	if _, err := svc.Deploy(
 		context.Background(),
 		item.Deploy{

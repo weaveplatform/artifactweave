@@ -18,6 +18,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -54,7 +55,9 @@ func newWorldOn(t *testing.T, st store.Store) *world {
 		t: t, ctx: context.Background(), st: st,
 		now: time.Date(2026, 10, 17, 9, 0, 0, 0, time.UTC),
 	}
-	w.items = &item.Service{Store: st, Blobs: blobs, Now: func() time.Time { return w.now }}
+	w.items = &item.Service{
+		Store: st, Blobs: blobs, Now: func() time.Time { return w.now }, Formats: formats.For,
+	}
 	w.c = repo.Config{Key: "npm-local", Class: repo.Local, PackageType: repo.NPM}
 	repo.Defaults(&w.c)
 	if err := st.Repos().Create(w.ctx, w.c); err != nil {

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
@@ -24,7 +25,7 @@ func TestAccCacheMaintenancePermissionsAndAliases(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := &item.Service{Store: w.db, Blobs: w.blobs}
+	svc := &item.Service{Store: w.db, Blobs: w.blobs, Formats: formats.For}
 	entries := map[string]types.RemoteCacheEntry{}
 	for p, kind := range map[string]types.RemoteKind{"allowed/index": types.RemoteMetadata, "allowed/a.jar": types.RemoteUnique, "outside/index": types.RemoteMetadata} {
 		key := types.RemoteCacheKey{RepoKey: c.Key, Path: p}
@@ -122,7 +123,7 @@ func TestAccCacheMaintenanceHTTPNegativeRediscovery(t *testing.T) {
 		policy := &remote.Policy{
 			Store: c.Store,
 			Blobs: c.Blobs,
-			Items: &item.Service{Store: c.Store, Blobs: c.Blobs},
+			Items: &item.Service{Store: c.Store, Blobs: c.Blobs, Formats: formats.For},
 			Pool:  pool,
 			Key:   []byte("maintenance-test-cache-key"),
 			Options: func(context.Context, repo.Config) (remote.Options, error) {

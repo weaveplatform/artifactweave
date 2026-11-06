@@ -11,6 +11,7 @@ import (
 
 	"github.com/cucumber/godog"
 
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/work"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
@@ -46,7 +47,7 @@ func (w *world) maintenanceStore() (*sqlcommon.Store, *item.Service, error) {
 		_ = st.Close()
 		return nil, nil, err
 	}
-	return st, &item.Service{Store: st, Blobs: blobs}, nil
+	return st, &item.Service{Store: st, Blobs: blobs, Formats: formats.For}, nil
 }
 
 func (w *world) agedCacheContent(remote, kind, path, body string) error {

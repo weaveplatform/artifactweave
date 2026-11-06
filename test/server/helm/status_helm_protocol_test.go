@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	helmfmt "github.com/weaveplatform/artifactweave/internal/format/helm"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
@@ -27,7 +28,7 @@ var helmProtocolStatusPart = statusPart{
 	},
 	seed: func(t *testing.T, db store.Store, blobs blob.Store) {
 		t.Helper()
-		items := &item.Service{Store: db, Blobs: blobs}
+		items := &item.Service{Store: db, Blobs: blobs, Formats: formats.For}
 		seedHelm(t, items, db, "helm-local", true, "protocol/web-1.0.0.tgz")
 		seedHelmIndex(t, items)
 	},

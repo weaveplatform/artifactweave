@@ -13,6 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
@@ -44,7 +45,9 @@ func searchUpstreamWorld(t *testing.T) *upstreamSearchWorld {
 	)
 	u.itemWorld = newItemWorld(t, false, func(c *Config) {
 		policy := &remote.Policy{
-			Store: c.Store, Blobs: c.Blobs, Items: &item.Service{Store: c.Store, Blobs: c.Blobs},
+			Store: c.Store, Blobs: c.Blobs, Items: &item.Service{
+				Store: c.Store, Blobs: c.Blobs, Formats: formats.For,
+			},
 			Pool: new(remote.Pool), Key: []byte("search-test-key"), Now: u.clock.Now,
 			Options: func(context.Context, repo.Config) (remote.Options, error) {
 				return remote.Options{

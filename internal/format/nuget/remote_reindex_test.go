@@ -17,6 +17,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/format/formattest"
 	"github.com/weaveplatform/artifactweave/internal/format/nuget"
 	"github.com/weaveplatform/artifactweave/internal/reindexauth"
@@ -103,9 +104,10 @@ func TestUnitRemoteReindexStores(t *testing.T) {
 			// roll all of them back and keep a retryable item in the durable queue.
 			faultyStore := &faulty{Store: w.st, f: &faults{pass: map[string]int{"PutVersion": 0}}}
 			svc := &item.Service{
-				Store: faultyStore,
-				Blobs: w.items.Blobs,
-				Now:   func() time.Time { return w.now },
+				Store:   faultyStore,
+				Blobs:   w.items.Blobs,
+				Now:     func() time.Time { return w.now },
+				Formats: formats.For,
 			}
 			q := restartedReindexWorker(t, w, svc)
 			if err = q.EnsureFresh(w.ctx, format.KindReindex, w.c.Key); !errors.Is(err, errFault) {
@@ -124,9 +126,10 @@ func TestUnitRemoteReindexStores(t *testing.T) {
 				t,
 				w,
 				&item.Service{
-					Store: w.st,
-					Blobs: w.items.Blobs,
-					Now:   func() time.Time { return w.now },
+					Store:   w.st,
+					Blobs:   w.items.Blobs,
+					Now:     func() time.Time { return w.now },
+					Formats: formats.For,
 				},
 			)
 			if err = q.EnsureFresh(w.ctx, format.KindReindex, w.c.Key); err != nil {
