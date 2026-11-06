@@ -78,7 +78,7 @@ permissions. Virtual metadata is filtered before disclosure and each download
 reselects its current ordered member.
 
 The [`@puppet` features](../../test/acceptance/features/puppet.feature) run the
-[pinned Puppet client image](../../test/acceptance/clients/puppet.Dockerfile).
+[pinned Puppet client image](../../test/acceptance/clients/puppet/Dockerfile).
 Controlled root and helper modules are committed with their source metadata and
 archives. A fresh client installs both modules through L and one-node F, through
 R with an archive redirect followed by an offline install, and through V with
@@ -89,8 +89,7 @@ archive corruption, stale authority, source failure, cache refresh/offline,
 version pagination and virtual member ordering and changes.
 
 ```sh
-docker build -t artifactweave-accept-puppet \
-  -f test/acceptance/clients/puppet.Dockerfile test/acceptance/clients
+docker build -t artifactweave-accept-puppet test/acceptance/clients/puppet
 ARTIFACTWEAVE_PUPPET_IMAGE=artifactweave-accept-puppet \
 ARTIFACTWEAVE_REQUIRE_DOCKER=1 ARTIFACTWEAVE_ACCEPT_TAGS=@puppet \
   go test ./test/acceptance -run '^TestAccFeatures$' -count=1

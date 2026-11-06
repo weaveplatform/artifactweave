@@ -195,18 +195,24 @@ func TestUnitStatusReportsEntriesInLedgerOrder(t *testing.T) {
 }
 
 func TestUnitStatusFailsOnAnUnreadableDirectory(t *testing.T) {
-	// A regular file where a directory belongs makes reading the directory
-	// fail on every operating system, unlike a path that does not exist.
+	// A regular file where a directory belongs fails the status, unlike a
+	// path that does not exist. The message is the same on every operating
+	// system, though Windows reports reading through the file as not found.
 	root := makeTree(t, "internal/x", "migration/platform/z")
-	for _, l := range []*Ledger{
-		{Packages: []Package{{From: "internal/x", Action: ActionMove, To: "platform/x"}}},
-		{Files: []File{{From: "internal/x/a.go", Action: ActionDelete}}},
-		{Placeholders: []Placeholder{{To: "platform/z"}}},
+	for _, tc := range []struct {
+		l    *Ledger
+		file string
+	}{
+		{&Ledger{Packages: []Package{{From: "internal/x", Action: ActionMove, To: "platform/x"}}}, "internal/x"},
+		{&Ledger{Files: []File{{From: "internal/x/a.go", Action: ActionDelete}}}, "internal/x"},
+		{&Ledger{Placeholders: []Placeholder{{To: "platform/z"}}}, "migration/platform/z"},
 	} {
-		l.StagingRoot = stagingRoot
-		r, err := l.Status(root)
-		if err == nil || r.Packages != nil || r.Files != nil || r.Placeholders != nil {
-			t.Errorf("Status over an unreadable directory = %+v, %v; want only an error", r, err)
+		tc.l.StagingRoot = stagingRoot
+		r, err := tc.l.Status(root)
+		want := "derive the ledger status: " + tc.file + " is not a directory"
+		empty := r.Packages == nil && r.Files == nil && r.Placeholders == nil
+		if err == nil || err.Error() != want || !empty {
+			t.Errorf("Status = %+v, %v; want only the error %q", r, err, want)
 		}
 	}
 }

@@ -83,8 +83,10 @@ func (r Report) Counts() map[string]int {
 //     than doc.go, ok when it holds doc.go alone, and missing otherwise.
 //
 // Subdirectories never count: each package directory has its own entry.
-// Status expects a ledger that validates. The error reports a directory it
-// could not read; a directory that does not exist holds nothing.
+// Status expects a ledger that validates. It reads each directory with
+// ReadDir, so a directory that does not exist holds nothing, and the error
+// reports a directory it could not read or a regular file in a directory's
+// place.
 func (l *Ledger) Status(root string) (Report, error) {
 	t := &tree{root: root}
 	r := Report{
@@ -198,16 +200,57 @@ type tree struct {
 }
 
 // list returns the entries directly in rel, a slash-separated path relative
-// to the root; a directory that does not exist has none.
+// to the root, as ReadDir reads them.
 func (t *tree) list(rel string) []fs.DirEntry {
 	if t.err != nil {
 		return nil
 	}
-	entries, err := os.ReadDir(filepath.Join(t.root, filepath.FromSlash(rel)))
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+	entries, err := ReadDir(t.root, rel)
+	if err != nil {
 		t.err = fmt.Errorf("derive the ledger status: %w", err)
 	}
 	return entries
+}
+
+// errNotDirectory follows the regular file that ReadDir found on a path.
+var errNotDirectory = errors.New("is not a directory")
+
+// ReadDir returns the entries directly in rel, a slash-separated path
+// relative to root. A directory that does not exist has none. A path that
+// runs through a regular file is an error naming that file.
+//
+// The check for the file is explicit because the read error differs by
+// operating system: Unix reports "not a directory", but Windows reports
+// "path not found", which matches fs.ErrNotExist and would otherwise read
+// as an empty directory there.
+func ReadDir(root, rel string) ([]fs.DirEntry, error) {
+	entries, err := os.ReadDir(filepath.Join(root, filepath.FromSlash(rel)))
+	if err != nil {
+		if file := fileOnPath(root, rel); file != "" {
+			err = fmt.Errorf("%s %w", file, errNotDirectory)
+		} else if errors.Is(err, fs.ErrNotExist) {
+			err = nil
+		}
+	}
+	return entries, err
+}
+
+// fileOnPath returns the first element of rel, from root down, that exists
+// and is not a directory, or "" when an element is missing before one is
+// found or there is none.
+func fileOnPath(root, rel string) string {
+	p := ""
+	for elem := range strings.SplitSeq(strings.TrimSuffix(rel, "/"), "/") {
+		p = path.Join(p, elem)
+		info, err := os.Stat(filepath.Join(root, filepath.FromSlash(p)))
+		if err != nil {
+			break
+		}
+		if !info.IsDir() {
+			return p
+		}
+	}
+	return ""
 }
 
 // goFiles returns the names of the .go files directly in rel.

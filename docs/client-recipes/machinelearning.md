@@ -4,14 +4,14 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **FrogML 3.0.0; Python 3.15.0**. Registered classes: **local, federated**.
+Client: **FrogML 3.0.0; Python 3.13.18**. Registered classes: **local, federated**.
 
 Endpoint: `${AW_URL}/artifactory/api/machinelearning/${AW_REPO}/model`
 
 ## Before connecting
 
 - Existing machinelearning repository.
-- Python >=3.9,<3.14 for this pinned SDK; install the checked wheel from clients/frogml.Dockerfile.
+- Python >=3.9,<3.14 for this pinned SDK; install the checked wheel from clients/frogml/Dockerfile.
 - A model.pkl file to publish; the example model name is controlled-model.
 
 Authentication: READ permission is required to resolve metadata and bytes; DEPLOY is additionally required to publish. Supply an unexpired Access token in AW_TOKEN; Basic authentication uses AW_USER matching the token subject. Token scope must retain the repository permissions; a token cannot grant access that its principal lacks.
@@ -64,6 +64,6 @@ Classes outside **local, federated** are not registered for this format. Command
 
 These are the pinned client definitions and executable evidence from which this recipe was reviewed. Their [fingerprints](evidence-lock.json) detect subsequent source changes; a fingerprint alone is not a native-client test result. See [verification](README.md#verification) for the required run evidence.
 
-- Client pin: [test/acceptance/clients/frogml.Dockerfile](../../test/acceptance/clients/frogml.Dockerfile).
+- Client pin: [test/acceptance/clients/frogml/Dockerfile](../../test/acceptance/clients/frogml/Dockerfile).
 - Evidence: [test/acceptance/machinelearning_steps_test.go](../../test/acceptance/machinelearning_steps_test.go).
 - Evidence: [test/acceptance/features/machinelearning.feature](../../test/acceptance/features/machinelearning.feature).

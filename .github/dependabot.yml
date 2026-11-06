@@ -86,3 +86,48 @@ updates:
     commit-message:
       prefix: "chore"
       include: "scope"
+
+  # The Puppet client stays below Ruby 4: Puppet 8.10.0 needs Facter 4, and
+  # every Facter 4 release declares Ruby below 4.0, so each Ruby 4 update
+  # broke the image (#895, #906, #934). The image has a directory of its own
+  # because an ignore applies to a whole entry: on /test/acceptance/clients
+  # it would also stop chef, cocoapods and ruby moving within Ruby 4. Ruby 3
+  # minor, patch and digest updates still arrive. Lift the hold once the
+  # qualified Puppet client installs on Ruby 4: delete the ignore, or move
+  # the Dockerfile back beside the others and delete this entry.
+  - package-ecosystem: "docker"
+    directory: "/test/acceptance/clients/puppet"
+    schedule:
+      interval: "daily"
+    ignore:
+      - dependency-name: "ruby"
+        versions: [">= 4"]
+    groups:
+      acceptance-clients-puppet:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+
+  # The FrogML client stays below Python 3.14: FrogML 3.0.0, like its newest
+  # release, declares Python >=3.9,<3.14, so pip refused it on the Python
+  # 3.15 image that #934 moved it to. Its own directory keeps the hold off
+  # python.Dockerfile and ansible.Dockerfile, which track the newest Python.
+  # Python 3.13 patch and digest updates still arrive. Lift the hold once a
+  # pinned FrogML release accepts the newer Python: delete the ignore, or
+  # move the Dockerfile back beside the others and delete this entry.
+  - package-ecosystem: "docker"
+    directory: "/test/acceptance/clients/frogml"
+    schedule:
+      interval: "daily"
+    ignore:
+      - dependency-name: "python"
+        versions: [">= 3.14"]
+    groups:
+      acceptance-clients-frogml:
+        patterns: ["*"]
+        update-types: ["patch"]
+    commit-message:
+      prefix: "chore"
+      include: "scope"

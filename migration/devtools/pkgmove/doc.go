@@ -86,7 +86,8 @@
 //   - move and promote refuse a working tree with uncommitted changes to
 //     tracked files, a ledger that does not validate, an entry that is not
 //     pending, untracked files in a source directory, a target directory
-//     that already holds Go files, a package rename that a wrapcheck
+//     that already holds Go files or whose path runs through a regular file
+//     (on every operating system alike), a package rename that a wrapcheck
 //     exception matches by name and importers that do not type-check. move
 //     also refuses a file entry whose old path the tree does not hold in the
 //     entry's shape, two moves to one path, a move onto a tracked file and a

@@ -518,8 +518,7 @@ jobs:
               -f test/acceptance/clients/nix.Dockerfile test/acceptance/clients
             fi
             if [[ ",$CLIENTS," == *,puppet,* ]]; then
-            docker build -t artifactweave-accept-puppet \
-              -f test/acceptance/clients/puppet.Dockerfile test/acceptance/clients
+            docker build -t artifactweave-accept-puppet test/acceptance/clients/puppet
             fi
             if [[ ",$CLIENTS," == *,dart,* ]]; then
             docker build -t artifactweave-accept-dart \
@@ -550,8 +549,7 @@ jobs:
               -f test/acceptance/clients/vscode.Dockerfile test/acceptance/clients
             fi
             if [[ ",$CLIENTS," == *,frogml,* ]]; then
-            docker build -t artifactweave-accept-frogml \
-              -f test/acceptance/clients/frogml.Dockerfile test/acceptance/clients
+            docker build -t artifactweave-accept-frogml test/acceptance/clients/frogml
             fi
             if [[ ",$CLIENTS," == *,ansible,* ]]; then
             docker build -t artifactweave-accept-ansible \
