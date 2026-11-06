@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/cdn"
+	"github.com/weaveplatform/artifactweave/migration/platform/cdn"
 )
 
 func TestUnitFrontDoorURL(t *testing.T) {

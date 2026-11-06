@@ -159,9 +159,9 @@ type Signer interface {
 - A repository whose flags ask for a redirect its store cannot sign is logged once at
   start. A signing failure at request time is logged at WARN at most once a minute and the
   download streams.
-- The CDN signers live in `pkg/cdn`, one per provider, and are injected through each
+- The CDN signers live in `migration/platform/cdn`, one per provider, and are injected through each
   backend's `Options`, so `Signs` is known at construction. Front Door is the exception
-  in kind: it checks no signature, so `pkg/cdn.FrontDoor` only places a SAS on the
+  in kind: it checks no signature, so `migration/platform/cdn.FrontDoor` only places a SAS on the
   endpoint, and the azure store signs the SAS with its own credentials. A store is never wrapped in a
   CDN decorator, because a wrapper hides the store's other interfaces, `blob.PartSizer` in
   particular, which silently changes mirror chunk sizing (#39).
@@ -332,9 +332,9 @@ still redirects a HEAD is on #216.
   - download counts.
 - `blobtest` covers `Signs` and `SignURL` with overrides on fs, s3 (fake and MinIO), gcs
   (fake and emulator), azure (fake and Azurite) and the mirror.
-- `pkg/cdn` tests sign with generated keys and verify with the public key (CloudFront),
+- `migration/platform/cdn` tests sign with generated keys and verify with the public key (CloudFront),
   Google's documented algorithm (Cloud CDN) and the SAS string-to-sign (Front Door).
-- `pkg/cdn/cdntest`, a chi fake edge, validates each provider's signature and proxies to a
+- `migration/platform/cdn/cdntest`, a chi fake edge, validates each provider's signature and proxies to a
   blob store. Acceptance serves artifactweave on `127.0.0.1` and the edge on `localhost`,
   so Go strips `Authorization`, and runs `jf rt dl` of a file above 5 MiB through it, and
   `crane pull` of an image whose manifest and layers redirect to it.

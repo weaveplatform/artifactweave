@@ -14,8 +14,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/blobtest"
+	"github.com/weaveplatform/artifactweave/migration/platform/cdn"
 	"github.com/weaveplatform/artifactweave/pkg/blob/session"
-	"github.com/weaveplatform/artifactweave/pkg/cdn"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 

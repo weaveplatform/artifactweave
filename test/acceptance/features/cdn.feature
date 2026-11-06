@@ -3,7 +3,7 @@ Feature: CDN delivery
   Decision 0029: a repository with cdnRedirect, or downloadRedirect, on a
   store with a CDN answers a download with a 302 to the CDN's signed URL:
   CloudFront in front of an s3 store, Cloud CDN in front of a gcs store.
-  The edge is pkg/cdn/cdntest's fake: it checks the signature as the real
+  The edge is migration/platform/cdn/cdntest's fake: it checks the signature as the real
   CDN does and serves the blob from the registry's own bucket, in MinIO or
   fake-gcs-server. The registry listens on 127.0.0.1 and the edge on
   localhost, so clients treat them as different hosts and drop their

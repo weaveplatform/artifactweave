@@ -14,7 +14,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/pkg/cdn/cdntest"
+	"github.com/weaveplatform/artifactweave/migration/platform/cdn/cdntest"
 )
 
 // sasOrigin models storage behind Front Door: it serves one blob at

@@ -30,7 +30,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth/idtoken/idtokentest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
-	"github.com/weaveplatform/artifactweave/pkg/cdn/cdntest"
+	"github.com/weaveplatform/artifactweave/migration/platform/cdn/cdntest"
 )
 
 // testMasterKey is a fixed key so scenarios are reproducible; it protects
