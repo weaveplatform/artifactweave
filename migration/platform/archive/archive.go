@@ -1,9 +1,3 @@
-// Package archive reads zip, tar and tar.gz archives: the walker the item
-// service explodes and serves archive entries with, and a bounded walker
-// and reader the format handlers (decision 0032) read packages with, such
-// as an npm tarball's package.json and file count, a Go module zip's go.mod
-// or a jar's POM. Every count an archive's headers give is the uploader's
-// claim, so the bounded walker counts what it actually decompresses.
 package archive
 
 import (

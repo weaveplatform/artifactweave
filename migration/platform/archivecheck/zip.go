@@ -1,4 +1,3 @@
-// Package archivecheck validates bounded archive structure before native-client extraction.
 package archivecheck
 
 import (
