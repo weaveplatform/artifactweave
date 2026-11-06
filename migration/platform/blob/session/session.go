@@ -1,17 +1,3 @@
-// Package session is the upload session shared by the object-store blob
-// backends (s3, gcs, azure; decision 0027). Object stores cannot append, so
-// each backend buffers appended bytes into parts and uploads a part whenever
-// one is full; between HTTP requests the session must survive in the
-// metadata store so a Docker chunked upload or a CLI multipart upload
-// resumes in a later request or another process.
-//
-// A Session holds what every backend needs: the size, the declared digest,
-// the saved blob.Hasher state and the pending tail shorter than one part,
-// plus a backend-specific document D (S3's multipart upload ID and part
-// list, GCS's part objects, Azure's block count). It is persisted through a
-// Store after every append. InUploads keeps sessions in the uploads table
-// under a per-store backend name such as "s3:hot", so two stores of one kind
-// never share or misattribute sessions.
 package session
 
 import (

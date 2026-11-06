@@ -28,7 +28,7 @@ type UploadStore interface {
 	// Delete removes the session.
 	Delete(ctx context.Context, id string) error
 	// Stale lists sessions last updated (or started, when never updated)
-	// before t, oldest first, at most limit (DefaultLimit when zero), for
-	// the reaper.
+	// before t, oldest first, at most limit (kernel.DefaultLimit when
+	// zero), for the reaper.
 	Stale(ctx context.Context, before time.Time, limit int) ([]Upload, error)
 }

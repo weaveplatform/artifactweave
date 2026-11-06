@@ -108,14 +108,14 @@ operations under `/artifactory/api/docker/<repo>/v2/` that are not registry oper
   the download redirect policy of decision [0029](0029-cdn-delivery-and-download-redirect.md),
   which Artifactory applies to Docker too (research 19). `HEAD` never redirects. Both send
   `Docker-Content-Digest`, `Content-Length` and `Accept-Ranges: bytes`.
-- **Uploads.** `POST .../blobs/uploads/` opens a session in `migration/platform/blob/session` recorded in
-  the `uploads` store, and answers 202 with an absolute `Location` from the base-URL
-  resolver, `Range: 0-0` and `Docker-Upload-UUID`. `OCI-Chunk-Min-Length` is sent only when
-  the blob backend needs a minimum part size. With `?digest=` and a body the upload is
-  monolithic and answers 201. `PATCH` appends: with `Content-Range` the chunk must start at
-  the current offset or the answer is 416 `BLOB_UPLOAD_INVALID`; without it the body is
-  streamed. `PUT ?digest=` (with an optional final chunk) verifies the digest, answering
-  400 `DIGEST_INVALID` and discarding the session on a mismatch, and otherwise 201 with the
+- **Uploads.** `POST .../blobs/uploads/` opens a session in `migration/platform/blob/session`
+  recorded in the `uploads` store, and answers 202 with an absolute `Location` from the
+  base-URL resolver, `Range: 0-0` and `Docker-Upload-UUID`. `OCI-Chunk-Min-Length` is sent
+  only when the blob backend needs a minimum part size. With `?digest=` and a body the upload
+  is monolithic and answers 201. `PATCH` appends: with `Content-Range` the chunk must start
+  at the current offset or the answer is 416 `BLOB_UPLOAD_INVALID`; without it the body is
+  streamed. `PUT ?digest=` (with an optional final chunk) verifies the digest, answering 400
+  `DIGEST_INVALID` and discarding the session on a mismatch, and otherwise 201 with the
   blob's `Location` and `Docker-Content-Digest`. `GET` on a session answers 204 with `Range`;
   `DELETE` cancels it with 204. A whole layer is never held in memory.
 - **Where a finished blob lives.** A finished upload becomes the item
