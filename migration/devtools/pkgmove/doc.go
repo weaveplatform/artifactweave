@@ -79,8 +79,10 @@
 //     packages all move alike, because the Makefile and the coverage
 //     configuration name it; a legacy root never maps.
 //   - The history set (CHANGELOG.md, research, evidence, decision 0044, the
-//     repository layout document, the path map, migration/README.md and the
-//     ledger files) is never rewritten and never checked.
+//     repository layout document, the path map, migration/README.md, the
+//     ledger files and the ledger package's ledger.go, whose LegacyRoots
+//     keeps naming each pkg/ root after its own package moves) is never
+//     rewritten and never checked.
 //   - Generated Go files are moved but never edited; make generate rewrites
 //     them (decision 0002). fix edits no generated file and no bridge file.
 //   - move and promote refuse a working tree with uncommitted changes to

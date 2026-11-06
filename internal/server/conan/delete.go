@@ -5,7 +5,7 @@ import (
 
 	conanfmt "github.com/weaveplatform/artifactweave/internal/format/conan"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
-	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
 func (h handler) deleteRecipe(w http.ResponseWriter, r *http.Request, ref conanfmt.Reference) {

@@ -18,8 +18,8 @@ port per repository), each needing reverse-proxy or DNS support.
 
 ## Decision
 
-**One configuration struct.** `pkg/repo.Config` mirrors the Artifactory repository JSON
-in [03-repository-configuration-model](../03-repository-configuration-model.md): the
+**One configuration struct.** `migration/artifacts/api/repo.Config` mirrors the Artifactory
+repository JSON in [03-repository-configuration-model](../03-repository-configuration-model.md): the
 common fields, the local, remote, virtual and federated fields, the per-package-type
 fields, the enumerations, the defaults, the booleans JFrog documents as strings (accepted
 in either spelling, written as booleans) and the provider-only keys. Validation
@@ -238,7 +238,7 @@ The audit in [#378](https://github.com/weaveplatform/artifactweave/issues/378) f
 the Repositories API differs from 7.x. The issue named changes the code, and
 [research 03](../03-repository-configuration-model.md#artifactory-7x-check) lists the
 differences in the configuration model:
-- `GET /api/repositories` gives `packageType` as the type's `RepoType` name, such as `"Generic"`, `"Maven"`, `"Npm"` and `"YUM"` for rpm, and its `packageType` filter matches either spelling without regard to case ([D] [getrepositoriesbytypeandproject](https://docs.jfrog.com/artifactory/reference/getrepositoriesbytypeandproject.md); [S] provider 12.11.14 [`datasource_artifactory_repositories_test.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/datasource/repository/datasource_artifactory_repositories_test.go) expects `"Alpine"`). `pkg/repo.PackageTypeName` holds the names, and [research 03](../03-repository-configuration-model.md#package-type-names-in-listings) gives the source of each.
+- `GET /api/repositories` gives `packageType` as the type's `RepoType` name, such as `"Generic"`, `"Maven"`, `"Npm"` and `"YUM"` for rpm, and its `packageType` filter matches either spelling without regard to case ([D] [getrepositoriesbytypeandproject](https://docs.jfrog.com/artifactory/reference/getrepositoriesbytypeandproject.md); [S] provider 12.11.14 [`datasource_artifactory_repositories_test.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/datasource/repository/datasource_artifactory_repositories_test.go) expects `"Alpine"`). `migration/artifacts/api/repo.PackageTypeName` holds the names, and [research 03](../03-repository-configuration-model.md#package-type-names-in-listings) gives the source of each.
 - Every read sends an empty `description` and `notes` as `""`, and an administrator's read of a local, remote or federated repository sends empty `propertySets` as `[]` ([D] [getrepositoryconfiguration](https://docs.jfrog.com/artifactory/reference/getrepositoryconfiguration.md), [getbatchofrepositoriesbyname](https://docs.jfrog.com/artifactory/reference/getbatchofrepositoriesbyname.md) and the v2 samples). A read by anyone but an administrator shows `notes` as `""`.
 - The v2 read and the configurations list keep `checksumPolicyType` for the Maven family and local and federated npm repositories, and `forceMetadataNameVersion` for Helm only, so a generic local repository has neither ([D] [getrepositoryconfigurationv2](https://docs.jfrog.com/artifactory/reference/getrepositoryconfigurationv2.md), sample `genericLocalV2`). That sample also lacks `priorityResolution` and `environments`, which the v2 read still sends for every type: the sample may predate both, and the configurations sample of a generic local repository sends them [I], on [#216](https://github.com/weaveplatform/artifactweave/issues/216).
 - 7.x differs: a YAML PATCH can change a repository's package type ([D] [patchsystemconfiguration](https://docs.jfrog.com/administration/reference/patchsystemconfiguration.md): "it is easy to overwrite configurations, such as a repository's package type"). artifactweave refuses the change on every write path, a deviation registered by #378.
@@ -269,8 +269,8 @@ These assignments describe planned work, not current runtime support.
 
 ## Verification
 
-- `pkg/repo` round-trip tests for every field in the research tables, including string
-  and boolean forms per class.
+- `migration/artifacts/api/repo` round-trip tests for every field in the research tables, including
+  string and boolean forms per class.
 - Validation tests for the package-type sets per class.
 - Routing tests for both prefixes, the subdomain option, keys in any case, names that
   contain reserved words and each repository class.

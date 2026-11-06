@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
 // GET and HEAD of a version token or a -SNAPSHOT name serve the file the

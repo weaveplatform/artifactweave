@@ -19,10 +19,10 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/work"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/aql"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -570,8 +570,8 @@ func TestUnitOwed(t *testing.T) {
 func TestUnitMetadataLayouts(t *testing.T) {
 	w := newMetaWorld(t, func(c *repo.Config) {
 		c.PackageType, c.RepoLayoutRef = repo.Gradle, repo.LayoutGradle
-		// Gradle's default (pkg/repo/defaults.go): its paths are no Maven
-		// paths, which the POM checks would refuse.
+		// Gradle's default (migration/artifacts/api/repo/defaults.go): its
+		// paths are no Maven paths, which the POM checks would refuse.
 		suppress := true
 		c.SuppressPomConsistencyChecks = &suppress
 	})

@@ -12,8 +12,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/archive"
 	"github.com/weaveplatform/artifactweave/internal/format/helm"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
-	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
 func read(t *testing.T, b []byte) (*helm.Chart, error) {

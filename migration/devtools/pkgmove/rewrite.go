@@ -58,6 +58,11 @@ var historyFiles = []string{
 	"docs/implementation/p9d-path-map.json",
 	"migration/README.md",
 	"migration/ledger*.json",
+	// LegacyRoots. Each pkg/ root is also a package with its own entry, and
+	// it stays a legacy root after that package moves, until promotion.
+	// Rewritten, the list would name the staged package as legacy, and the
+	// ledger tests and promote's empty-roots check would fail.
+	"migration/devtools/ledger/ledger.go",
 }
 
 // ownershipPath is the server test ownership inventory, which is rewritten

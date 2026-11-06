@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
 type pooled struct {

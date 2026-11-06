@@ -20,6 +20,8 @@ type FieldError struct {
 	Message string
 }
 
+// Error is the field's JSON name, a colon and the message: one entry of a
+// ValidationError's text.
 func (e FieldError) Error() string {
 	return e.Field + ": " + e.Message
 }
@@ -27,6 +29,9 @@ func (e FieldError) Error() string {
 // ValidationError is the list of field errors Validate found. It unwraps to ErrInvalid.
 type ValidationError []FieldError
 
+// Error is ErrInvalid's text, a colon, then every field error in the order
+// they were found, joined by "; ". The text is the message of the 400
+// response a refused create or update gets.
 func (es ValidationError) Error() string {
 	parts := make([]string, len(es))
 	for i, e := range es {
@@ -62,10 +67,12 @@ func ValidateStored(c *Config) error {
 }
 
 // buildInfoKey is the key of the build-info repository the server seeds.
-// It must match types.BuildInfoRepository, which pkg/repo cannot import
-// because pkg/types imports pkg/repo; internal/repos tests the two agree.
+// It must match types.BuildInfoRepository, which migration/artifacts/api/repo
+// cannot import because pkg/types imports migration/artifacts/api/repo;
+// internal/repos tests the two agree.
 const buildInfoKey = "artifactory-build-info"
 
+//nolint:gocyclo // One pass applies every independent field rule, so a client sees all its errors at once.
 func validate(c *Config, keyRules bool) error {
 	var errs ValidationError
 	add := func(field, msg string) { errs = append(errs, FieldError{Field: field, Message: msg}) }
@@ -129,6 +136,7 @@ func validate(c *Config, keyRules bool) error {
 		add("proxy", "is only valid on remote and federated repositories")
 	}
 	if len(c.P2ChildOrigins) > 0 {
+		//nolint:gocritic // In a switch, the origin loop's break would read as leaving the switch.
 		if class != Remote || c.PackageType != P2 {
 			add("p2ChildOrigins", "is only valid on a remote P2 repository")
 		} else if len(c.P2ChildOrigins) > 16 {

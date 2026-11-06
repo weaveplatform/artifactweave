@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/format/formattest"
-	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
 // A module is a package and each version a version linking its .zip, .mod

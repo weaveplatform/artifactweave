@@ -3,7 +3,7 @@ package format
 import (
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
 // No limit, or a limit of 0 or less, keeps every build; any other keeps at

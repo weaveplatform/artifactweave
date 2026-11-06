@@ -237,7 +237,9 @@ them:
   `docs/testing/phase*.md`;
 - `docs/implementation/repo-layout.md`, until the close-out rewrites it, and
   `docs/implementation/p9d-path-map.json`;
-- this README and the ledger files.
+- this README and the ledger files;
+- `devtools/ledger/ledger.go`, whose `LegacyRoots` keeps naming each `pkg/` root after
+  that root's own package moves, until promotion.
 
 Every other tracked Markdown file is living, including `docs/implementation/plan.md` and
 the other decision records. The move tool rewrites legacy paths in living documents as

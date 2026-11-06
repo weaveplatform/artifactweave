@@ -1,5 +1,6 @@
 // Package store defines artifactweave's metadata persistence contracts
-// (decision 0004) over the domain types of pkg/types and pkg/repo.
+// (decision 0004) over the domain types of pkg/types and
+// migration/artifacts/api/repo.
 //
 // # Design
 //

@@ -71,7 +71,7 @@ does without `p2` (research 27 section 1.3). Snapshot renaming, sidecar mapping 
   with `maven-plugin` packaging gets `artifactory.maven.mavenPlugin=true`.
 - **Defaults.** `suppressPomConsistencyChecks` defaults to `false` for `maven` and `true` for
   `gradle`, `ivy` and `sbt`, as the Terraform provider and Artifactory's UI do.
-  `pkg/repo/defaults.go` sets them so, locally and remotely (#278).
+  `migration/artifacts/api/repo/defaults.go` sets them so, locally and remotely (#278).
 
 **Uploaded metadata and checksums:**
 - **Snapshot level.** Under `unique` and `non-unique`, in a repository with the Maven

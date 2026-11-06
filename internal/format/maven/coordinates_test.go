@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/layout"
-	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
 func mustLayout(t *testing.T, name string) *layout.Layout {

@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/format/formattest"
-	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
 // Generic files belong to no package, so every write leaves the index

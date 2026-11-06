@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	cheffmt "github.com/weaveplatform/artifactweave/internal/format/chef"
-	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
 func TestUnitUpstreamVersionIdentityAndURLBoundaries(t *testing.T) {

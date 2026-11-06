@@ -326,7 +326,7 @@ components:
       type: object
       x-go-type: repo.Config
       x-go-type-import:
-        path: github.com/weaveplatform/artifactweave/pkg/repo
+        path: github.com/weaveplatform/artifactweave/migration/artifacts/api/repo
     LocalRepositoryConfiguration:
       description: 'Configuration of a local repository: the server stores uploads and generates the format''s metadata
         itself. Fields outside the common set apply to specific package types and are ignored for others.'
@@ -620,7 +620,7 @@ components:
       type: object
       x-go-type: repo.Config
       x-go-type-import:
-        path: github.com/weaveplatform/artifactweave/pkg/repo
+        path: github.com/weaveplatform/artifactweave/migration/artifacts/api/repo
     PackageTypeFederated:
       description: Package types a federated repository may serve. Every type is allowed except terraformbackend,
         vcs, p2, hex, aieditorextensions and jetbrainsplugins.
@@ -1281,7 +1281,7 @@ components:
       type: object
       x-go-type: repo.Config
       x-go-type-import:
-        path: github.com/weaveplatform/artifactweave/pkg/repo
+        path: github.com/weaveplatform/artifactweave/migration/artifacts/api/repo
     RemoveRepositoryFailureReport:
       description: Report returned when deleting a repository did not fully succeed. The configuration is kept whenever
         this shape is returned.
@@ -1389,7 +1389,7 @@ components:
       - $ref: '#/components/schemas/FederatedRepositoryConfiguration'
       x-go-type: repo.Config
       x-go-type-import:
-        path: github.com/weaveplatform/artifactweave/pkg/repo
+        path: github.com/weaveplatform/artifactweave/migration/artifacts/api/repo
     SharedRemoteRepositoryConfiguration:
       additionalProperties: true
       description: 'Sanitised view of a remote repository returned by the deprecated shared configuration endpoint:
@@ -1572,7 +1572,7 @@ components:
       type: object
       x-go-type: repo.Config
       x-go-type-import:
-        path: github.com/weaveplatform/artifactweave/pkg/repo
+        path: github.com/weaveplatform/artifactweave/migration/artifacts/api/repo
 paths:
   /api/repositories:
     get:

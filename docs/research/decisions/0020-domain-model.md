@@ -34,8 +34,8 @@ and external integration contracts. Existing tables alone do not prove a service
   (domain) that carries every field any wire form needs, in the type the server reasons
   with (booleans as `bool`, sizes as `int64`, times as `time.Time`). Wire forms live only
   in `internal/wire/{artifactory,access,legacy}` and are produced and consumed by
-  converters; no handler or store touches a wire struct directly. `pkg/repo` is the
-  existing instance of this rule for repositories and stays the model for that entity.
+  converters; no handler or store touches a wire struct directly. `migration/artifacts/api/repo` is
+  the existing instance of this rule for repositories and stays the model for that entity.
 - **Wire quirks are preserved by the converters, never by the domain.** Booleans
   accepted as strings, `size` as a decimal string, `lastDownloaded` as epoch
   milliseconds in one projection and ISO time in another, kebab-case keys in the legacy

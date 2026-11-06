@@ -7,7 +7,7 @@ import (
 
 	npmfmt "github.com/weaveplatform/artifactweave/internal/format/npm"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
-	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )

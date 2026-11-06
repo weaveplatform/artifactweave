@@ -1,6 +1,6 @@
 package format
 
-import "github.com/weaveplatform/artifactweave/pkg/repo"
+import "github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 
 // MinUniqueSnapshots is the fewest unique builds a maxUniqueSnapshots
 // cleanup keeps, whatever the limit: "Artifactory requires that you store

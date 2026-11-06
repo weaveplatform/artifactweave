@@ -536,7 +536,9 @@ func TestUnitImportRulesDetectViolations(t *testing.T) {
 				Scope: ledger.ScopeRepo,
 			},
 			{From: "internal/layout", Action: ledger.ActionDelete},
-			{From: "pkg/repo", Action: ledger.ActionMove, To: "artifacts/api/repo"},
+			// Made up: pkgmove rewrites a real legacy path in this data once its
+			// package moves. pkg/client may import its target.
+			{From: "internal/repomodel", Action: ledger.ActionMove, To: "artifacts/api/repo"},
 			{From: "pkg/types", Action: ledger.ActionSplit},
 		},
 	}
@@ -561,7 +563,7 @@ func TestUnitImportRulesDetectViolations(t *testing.T) {
 			"migration/kernel/nested/go.mod":     "module example.com/nested\n",
 			"migration/kernel/nested/x.go":       src(m + "migration/app"),
 			"internal/server/server.go":          src(m + "test/server/support"),
-			"pkg/client/artifactory/client.go":   src(m+"pkg/repo", m+"pkg/types"),
+			"pkg/client/artifactory/client.go":   src(m+"internal/repomodel", m+"pkg/types"),
 			"pkg/containertest/containertest.go": src(m + "migration/platform/blob"),
 		})
 		violation := func(file, shown string, row int) string {

@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
-	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
 func dependencyFixture(t *testing.T) (*remoteFixture, string) {

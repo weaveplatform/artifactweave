@@ -13,7 +13,7 @@ import (
 	puppetfmt "github.com/weaveplatform/artifactweave/internal/format/puppet"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
-	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
 func TestUnitRemoteDocumentValidation(t *testing.T) {

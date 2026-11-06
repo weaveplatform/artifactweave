@@ -6,7 +6,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
 var ErrInvalidPath = errors.New("vcs: invalid vcs path")

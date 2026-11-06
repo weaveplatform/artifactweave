@@ -13,7 +13,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/format"
 	apmfmt "github.com/weaveplatform/artifactweave/internal/format/agentpackages"
-	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/agentcommon"
 )

@@ -10,8 +10,8 @@ import (
 	"testing"
 	"testing/iotest"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/layout"
-	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
 func TestUnitSourceMetadataValidation(t *testing.T) {

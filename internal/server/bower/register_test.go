@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
-	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
 func (f *fixture) registerPackage(key, name, raw, user string) *httptest.ResponseRecorder {

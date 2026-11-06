@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
 // A pull from a blacked-out repository answers NAME_UNKNOWN, as a push to

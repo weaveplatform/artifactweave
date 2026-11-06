@@ -100,8 +100,8 @@ used as written rather than with the request's scheme (DV-038).
 
 **Wire models and the linter.** JFrog's JSON mixes camelCase, snake_case and kebab-case,
 sometimes inside one struct, so per-package case rules cannot express it. The wire models
-live only in `pkg/repo` and `internal/wire/{artifactory,access,legacy}` and those packages
-are excluded from `tagliatelle`; everything else keeps the template rule.
+live only in `migration/artifacts/api/repo` and `internal/wire/{artifactory,access,legacy}` and
+those packages are excluded from `tagliatelle`; everything else keeps the template rule.
 
 ```yaml
 linters:
@@ -112,7 +112,7 @@ linters:
           json: snake
           yaml: snake
         overrides:
-          - pkg: pkg/repo
+          - pkg: migration/artifacts/api/repo
             ignore: true
           - pkg: internal/wire/artifactory
             ignore: true

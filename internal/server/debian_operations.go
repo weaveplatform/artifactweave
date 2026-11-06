@@ -6,7 +6,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/format/debian"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
-	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
 // CalculateDebianRepositoryMetadata rebuilds a local apt view. The REST

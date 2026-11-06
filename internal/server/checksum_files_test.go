@@ -7,7 +7,7 @@ import (
 
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
 	npmfmt "github.com/weaveplatform/artifactweave/internal/format/npm"
-	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
 // TestAccServerWrittenChecksumFiles (#399): under client-checksums, the
