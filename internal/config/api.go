@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/weaveplatform/artifactweave/internal/service/apilimit"
+	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
 )
 
 func setAPI(o *apilimit.Options, sub, key, value string) error {
