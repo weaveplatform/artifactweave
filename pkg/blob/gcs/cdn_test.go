@@ -8,8 +8,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/blobtest"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
 	"github.com/weaveplatform/artifactweave/migration/platform/cdn"
-	"github.com/weaveplatform/artifactweave/pkg/blob/session"
 )
 
 // fakeCDN is a cdn.Signer that records what it signs.

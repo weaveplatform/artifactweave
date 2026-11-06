@@ -18,7 +18,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/blobtest"
-	"github.com/weaveplatform/artifactweave/pkg/blob/session"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
 )
 
 // The real-cloud conformance run (issue #12) is opt-in: it needs a bucket

@@ -38,8 +38,8 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
 	"github.com/weaveplatform/artifactweave/migration/platform/cdn"
-	"github.com/weaveplatform/artifactweave/pkg/blob/session"
 )
 
 // Props are a committed blob's properties.

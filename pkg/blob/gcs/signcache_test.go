@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/blob/session"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
 )
 
 // signCalls counts the signatures the fake has made, each standing for one

@@ -44,8 +44,8 @@ import (
 	"github.com/aws/smithy-go"
 
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
 	"github.com/weaveplatform/artifactweave/migration/platform/cdn"
-	"github.com/weaveplatform/artifactweave/pkg/blob/session"
 )
 
 // API is the subset of *s3.Client the store uses, so tests can substitute a

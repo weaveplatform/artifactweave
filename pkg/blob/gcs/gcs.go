@@ -23,7 +23,7 @@
 //     blob.Hasher state still provides SHA-256, SHA-1 and MD5.
 //
 // The session (part objects, their generations, sizes and checksums) is
-// persisted through pkg/blob/session after every append.
+// persisted through migration/platform/blob/session after every append.
 package gcs
 
 import (
@@ -36,8 +36,8 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
 	"github.com/weaveplatform/artifactweave/migration/platform/cdn"
-	"github.com/weaveplatform/artifactweave/pkg/blob/session"
 )
 
 // Attrs are the object attributes the store uses.
