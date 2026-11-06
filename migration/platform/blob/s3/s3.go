@@ -312,7 +312,7 @@ func (u *upload) Commit(ctx context.Context, want blob.Digests) (blob.Info, erro
 		return blob.Info{}, fmt.Errorf("blob/s3: commit: %w", err)
 	}
 	if err := blob.ValidateDigests(want); err != nil {
-		return blob.Info{}, err
+		return blob.Info{}, err //nolint:wrapcheck // already a blob sentinel
 	}
 	if err := u.ss.Live(ctx); err != nil {
 		return blob.Info{}, fmt.Errorf("blob/s3: %w", err)
@@ -320,7 +320,7 @@ func (u *upload) Commit(ctx context.Context, want blob.Digests) (blob.Info, erro
 	got, err := u.ss.Verify(want)
 	if err != nil {
 		_ = u.Abort(ctx)
-		return blob.Info{}, err
+		return blob.Info{}, err //nolint:wrapcheck // already a blob sentinel
 	}
 	mp := &u.ss.Data
 	info := blob.Info{Size: u.ss.Size, Digests: got}
@@ -340,7 +340,7 @@ func (u *upload) Commit(ctx context.Context, want blob.Digests) (blob.Info, erro
 	}
 	if len(u.ss.Pending) > 0 {
 		if err := u.ss.Flush(ctx, u.flushPart); err != nil {
-			return blob.Info{}, err
+			return blob.Info{}, err //nolint:wrapcheck // flushPart names its errors
 		}
 		if err := u.ss.Save(ctx); err != nil {
 			return blob.Info{}, fmt.Errorf("blob/s3: %w", err)
@@ -539,7 +539,7 @@ func (s *Store) Stat(ctx context.Context, sha string) (blob.Info, error) {
 		return blob.Info{}, fmt.Errorf("blob/s3: stat: %w", err)
 	}
 	if err := blob.ValidateSHA256(sha); err != nil {
-		return blob.Info{}, err
+		return blob.Info{}, err //nolint:wrapcheck // already a blob sentinel
 	}
 	key := s.blobKey(sha)
 	out, err := s.api.HeadObject(ctx, &s3.HeadObjectInput{Bucket: &s.bucket, Key: &key})
@@ -573,7 +573,7 @@ func (s *Store) Delete(ctx context.Context, sha string) error {
 		return fmt.Errorf("blob/s3: delete: %w", err)
 	}
 	if err := blob.ValidateSHA256(sha); err != nil {
-		return err
+		return err //nolint:wrapcheck // already a blob sentinel
 	}
 	key := s.blobKey(sha)
 	if _, err := s.api.DeleteObject(

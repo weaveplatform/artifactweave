@@ -431,6 +431,7 @@ func (u *upload) Commit(ctx context.Context, want blob.Digests) (blob.Info, erro
 		// Never leave a blob under a content address it does not match. The
 		// generation pins the delete to the object this compose created.
 		_ = u.s.api.Delete(ctx, target, attrs.Generation)
+		//nolint:err113 // reports both sizes and CRC32Cs; no caller matches it with errors.Is
 		return blob.Info{}, fmt.Errorf(
 			"blob/gcs: composed %s has %d bytes, crc32c %08x; want %d, %08x",
 			got.SHA256,

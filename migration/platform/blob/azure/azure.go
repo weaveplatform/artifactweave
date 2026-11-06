@@ -286,7 +286,7 @@ func blockIDs(uploadID string, sep byte, n int) []string {
 
 // Session phases.
 const (
-	phaseStaging = ""
+	phaseStaging = "" //nolint:unused // names the stored zero phase, which Phase's comment cites
 	// phaseCopying means the temporary blob is committed and the content is
 	// being copied into the content key; a retried Commit resumes the copy.
 	phaseCopying = "copying"
@@ -371,7 +371,7 @@ func (u *upload) Commit(ctx context.Context, want blob.Digests) (blob.Info, erro
 		return blob.Info{}, fmt.Errorf("blob/azure: commit: %w", err)
 	}
 	if err := blob.ValidateDigests(want); err != nil {
-		return blob.Info{}, err
+		return blob.Info{}, err //nolint:wrapcheck // already a blob sentinel
 	}
 	if err := u.ss.Live(ctx); err != nil {
 		return blob.Info{}, fmt.Errorf("blob/azure: %w", err)
@@ -379,7 +379,7 @@ func (u *upload) Commit(ctx context.Context, want blob.Digests) (blob.Info, erro
 	got, err := u.ss.Verify(want)
 	if err != nil {
 		_ = u.Abort(ctx)
-		return blob.Info{}, err
+		return blob.Info{}, err //nolint:wrapcheck // already a blob sentinel
 	}
 	info := blob.Info{Size: u.ss.Size, Digests: got}
 	target := u.s.blobKey(got.SHA256)
@@ -403,7 +403,7 @@ func (u *upload) Commit(ctx context.Context, want blob.Digests) (blob.Info, erro
 		return info, u.forget(ctx)
 	}
 	if err := u.ss.Flush(ctx, u.stage); err != nil {
-		return blob.Info{}, err
+		return blob.Info{}, err //nolint:wrapcheck // stage names its errors
 	}
 	if err := u.ss.Save(ctx); err != nil {
 		return blob.Info{}, fmt.Errorf("blob/azure: %w", err)
