@@ -1,4 +1,4 @@
-package mirror
+package mirror_test
 
 import (
 	"bytes"
@@ -15,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/blobtest"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
+	"github.com/weaveplatform/artifactweave/pkg/blob/mirror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -24,31 +25,35 @@ const testChunk = 16 << 10
 
 // fakes returns n fake members named m0, m1, ... ; every one signs storage
 // URLs when presign is set.
-func fakes(n int, presign bool) ([]*fake, []Member) {
+func fakes(n int, presign bool) ([]*fake, []mirror.Member) {
 	fs := make([]*fake, n)
-	ms := make([]Member, n)
+	ms := make([]mirror.Member, n)
 	for i := range n {
 		fs[i] = newFake()
 		var st blob.Store = fs[i]
 		if presign {
 			st = presigner{fs[i]}
 		}
-		ms[i] = Member{Name: fmt.Sprintf("m%d", i), Store: st, WriteEnabled: true}
+		ms[i] = mirror.Member{Name: fmt.Sprintf("m%d", i), Store: st, WriteEnabled: true}
 	}
 	return fs, ms
 }
 
 // newMirror builds a mirror with in-memory sessions and replicas.
-func newMirror(t *testing.T, ms []Member, tune func(*Options)) (*Store, store.ReplicaIndex) {
+func newMirror(
+	t *testing.T,
+	ms []mirror.Member,
+	tune func(*mirror.Options),
+) (*mirror.Store, store.ReplicaIndex) {
 	t.Helper()
-	o := Options{
+	o := mirror.Options{
 		Members: ms, ChunkSize: testChunk,
 		Sessions: session.NewMemory(), Replicas: inmem.New().Replicas(),
 	}
 	if tune != nil {
 		tune(&o)
 	}
-	s, err := New(o)
+	s, err := mirror.New(o)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,20 +72,26 @@ func TestUnitContractOnThreeFakes(t *testing.T) {
 
 func TestUnitContractOnFilesystemsAndFake(t *testing.T) {
 	blobtest.Run(t, func(t *testing.T) blob.Store {
-		var ms []Member
+		var ms []mirror.Member
 		for i := range 2 {
 			st, err := fs.New(t.TempDir())
 			if err != nil {
 				t.Fatal(err)
 			}
-			ms = append(ms, Member{Name: fmt.Sprintf("disk%d", i), Store: st, WriteEnabled: true})
+			ms = append(
+				ms,
+				mirror.Member{Name: fmt.Sprintf("disk%d", i), Store: st, WriteEnabled: true},
+			)
 		}
-		ms = append(ms, Member{Name: "cloud", Store: presigner{newFake()}, WriteEnabled: true})
+		ms = append(
+			ms,
+			mirror.Member{Name: "cloud", Store: presigner{newFake()}, WriteEnabled: true},
+		)
 		// Every member is in the write quorum. The cloud fake is the only one
 		// that signs, and the contract signs straight after Put: with a
 		// quorum of two disks the cloud could still be committing, holding
 		// no copy to sign (#212, TestUnitSignBeforeTheSigningMemberCommits).
-		s, _ := newMirror(t, ms, func(o *Options) { o.WriteQuorum = len(ms) })
+		s, _ := newMirror(t, ms, func(o *mirror.Options) { o.WriteQuorum = len(ms) })
 		// Anything the mirror still runs in the background must finish
 		// before the temp dirs are removed (cleanups run last registered
 		// first): Windows cannot remove a directory that a straggler is
@@ -93,7 +104,7 @@ func TestUnitContractOnFilesystemsAndFake(t *testing.T) {
 func TestUnitContractTwoOfThree(t *testing.T) {
 	blobtest.Run(t, func(t *testing.T) blob.Store {
 		_, ms := fakes(3, true)
-		s, _ := newMirror(t, ms, func(o *Options) { o.Redundancy = 2 })
+		s, _ := newMirror(t, ms, func(o *mirror.Options) { o.Redundancy = 2 })
 		return s
 	}, contractOptions)
 }
@@ -101,7 +112,7 @@ func TestUnitContractTwoOfThree(t *testing.T) {
 func TestUnitContractWithDurableSessions(t *testing.T) {
 	blobtest.Run(t, func(t *testing.T) blob.Store {
 		_, ms := fakes(3, true)
-		s, _ := newMirror(t, ms, func(o *Options) {
+		s, _ := newMirror(t, ms, func(o *mirror.Options) {
 			o.Sessions = session.InUploads(inmem.New().Uploads(), "mirror:test")
 		})
 		return s
@@ -109,7 +120,7 @@ func TestUnitContractWithDurableSessions(t *testing.T) {
 }
 
 // put stores body through the mirror and returns its digests.
-func put(t *testing.T, s *Store, body []byte) blob.Info {
+func put(t *testing.T, s *mirror.Store, body []byte) blob.Info {
 	t.Helper()
 	return blobtest.Put(context.Background(), t, s, body)
 }
@@ -183,7 +194,7 @@ func TestUnitQuorumNotMet(t *testing.T) {
 		f[1].failOn("begin", 0, errInjected)
 		if _, err := s.BeginUpload(
 			ctx,
-		); !errors.Is(err, ErrQuorum) ||
+		); !errors.Is(err, mirror.ErrQuorum) ||
 			!errors.Is(err, errInjected) {
 			t.Fatal(err)
 		}
@@ -200,7 +211,13 @@ func TestUnitQuorumNotMet(t *testing.T) {
 		}
 		f[0].failOn("append", 0, errInjected)
 		f[1].failOn("append", 0, errInjected)
-		if _, err := u.Append(ctx, bytes.NewReader([]byte("x"))); !errors.Is(err, ErrQuorum) {
+		if _, err := u.Append(
+			ctx,
+			bytes.NewReader([]byte("x")),
+		); !errors.Is(
+			err,
+			mirror.ErrQuorum,
+		) {
 			t.Fatal(err)
 		}
 	})
@@ -230,7 +247,7 @@ func retryAfterPartialCommit(t *testing.T, resume bool) {
 		}
 		f[1].failOn("commit", 0, errInjected)
 		f[2].failOn("commit", 0, errInjected)
-		if _, err := u.Commit(ctx, blob.Digests{}); !errors.Is(err, ErrQuorum) {
+		if _, err := u.Commit(ctx, blob.Digests{}); !errors.Is(err, mirror.ErrQuorum) {
 			t.Fatal(err)
 		}
 		sha := blobtest.Digest(body).SHA256
@@ -283,7 +300,7 @@ func synctestWaitStragglers(t *testing.T, r store.ReplicaIndex, sha string, n in
 func TestUnitStragglers(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		f, ms := fakes(3, false)
-		s, r := newMirror(t, ms, func(o *Options) { o.MemberTimeout = 30 * time.Second })
+		s, r := newMirror(t, ms, func(o *mirror.Options) { o.MemberTimeout = 30 * time.Second })
 		f[2].slow("commit", 10*time.Second)
 		info := put(t, s, blobtest.Content(4, 64))
 		sha := info.Digests.SHA256
@@ -383,7 +400,7 @@ func TestUnitReadFailover(t *testing.T) {
 	ctx := context.Background()
 	f, ms := fakes(3, false)
 	// A full quorum, so every member holds the blob when the read starts.
-	s, _ := newMirror(t, ms, func(o *Options) { o.WriteQuorum = 3 })
+	s, _ := newMirror(t, ms, func(o *mirror.Options) { o.WriteQuorum = 3 })
 	body := blobtest.Content(6, 5000)
 	info := put(t, s, body)
 	f[0].failOn("read", 1, errInjected)
@@ -402,7 +419,7 @@ func TestUnitReadFailover(t *testing.T) {
 	if _, err := io.ReadFull(rc, b); err != nil || !bytes.Equal(b, body[100:110]) {
 		t.Fatalf("read after seek: %v", err)
 	}
-	if _, err := rc.Seek(0, 9); !errors.Is(err, ErrSeek) {
+	if _, err := rc.Seek(0, 9); !errors.Is(err, mirror.ErrSeek) {
 		t.Fatal(err)
 	}
 	_ = rc.Close()
@@ -436,7 +453,7 @@ func (s shortStore) Open(ctx context.Context, sha string) (io.ReadSeekCloser, bl
 func TestUnitReadEarlyEOFFailsOver(t *testing.T) {
 	f, ms := fakes(2, false)
 	ms[0].Store = shortStore{f[0]}
-	s, _ := newMirror(t, ms, func(o *Options) { o.WriteQuorum = 2 })
+	s, _ := newMirror(t, ms, func(o *mirror.Options) { o.WriteQuorum = 2 })
 	body := blobtest.Content(7, 1000)
 	info := put(t, s, body)
 	rc, _, err := s.Open(context.Background(), info.Digests.SHA256)
@@ -452,7 +469,7 @@ func TestUnitBreaker(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx := context.Background()
 		f, ms := fakes(3, false)
-		s, r := newMirror(t, ms, func(o *Options) {
+		s, r := newMirror(t, ms, func(o *mirror.Options) {
 			o.BreakerThreshold, o.BreakerCooldown = 2, 15*time.Second
 		})
 		info := put(t, s, blobtest.Content(8, 100))
@@ -464,7 +481,7 @@ func TestUnitBreaker(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		if !s.byName["m0"].health.open(s.now()) {
+		if !s.Breaker("m0").Open(s.Now()) {
 			t.Fatal("two failures must open the breaker")
 		}
 		calls := f[0].calls["stat"]
@@ -480,12 +497,12 @@ func TestUnitBreaker(t *testing.T) {
 		if _, err := s.Stat(ctx, sha); err != nil || f[0].calls["stat"] != calls+1 {
 			t.Fatalf("after the cooldown one call goes through: %v", err)
 		}
-		if !s.byName["m0"].health.open(s.now()) {
+		if !s.Breaker("m0").Open(s.Now()) {
 			t.Fatal("a failure after the cooldown reopens at once")
 		}
 		f[0].heal()
 		time.Sleep(16 * time.Second)
-		if _, err := s.Stat(ctx, sha); err != nil || s.byName["m0"].health.open(s.now()) {
+		if _, err := s.Stat(ctx, sha); err != nil || s.Breaker("m0").Open(s.Now()) {
 			t.Fatalf("a success closes the breaker: %v", err)
 		}
 	})
@@ -528,12 +545,12 @@ func TestUnitSignBeforeTheSigningMemberCommits(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx := context.Background()
 		f := newFake()
-		ms := []Member{
+		ms := []mirror.Member{
 			{Name: "plain", Store: newFake(), WriteEnabled: true},
 			{Name: "signer", Store: presigner{f}, WriteEnabled: true},
 		}
 		storage := blob.SignOptions{TTL: time.Minute}
-		s, _ := newMirror(t, ms, func(o *Options) { o.WriteQuorum = 1 })
+		s, _ := newMirror(t, ms, func(o *mirror.Options) { o.WriteQuorum = 1 })
 		f.slow("commit", 10*time.Second)
 		info := put(t, s, blobtest.Content(15, 10))
 		sha := info.Digests.SHA256
@@ -546,7 +563,7 @@ func TestUnitSignBeforeTheSigningMemberCommits(t *testing.T) {
 			t.Fatalf("sign once the signer holds the blob: %q %v", url, err)
 		}
 
-		s, _ = newMirror(t, ms, func(o *Options) { o.WriteQuorum = 2 })
+		s, _ = newMirror(t, ms, func(o *mirror.Options) { o.WriteQuorum = 2 })
 		info = put(t, s, blobtest.Content(16, 10))
 		if _, err := s.SignURL(ctx, info.Digests.SHA256, storage); err != nil {
 			t.Fatalf("sign after a put whose quorum included the signer: %v", err)
@@ -557,11 +574,11 @@ func TestUnitSignBeforeTheSigningMemberCommits(t *testing.T) {
 func TestUnitSign(t *testing.T) {
 	ctx := context.Background()
 	f := newFake()
-	ms := []Member{
+	ms := []mirror.Member{
 		{Name: "plain", Store: newFake(), WriteEnabled: true},
 		{Name: "signer", Store: presigner{f}, WriteEnabled: true},
 	}
-	s, r := newMirror(t, ms, func(o *Options) { o.WriteQuorum = 2 })
+	s, r := newMirror(t, ms, func(o *mirror.Options) { o.WriteQuorum = 2 })
 	if !s.Signs(blob.ViaStorage) || s.Signs(blob.ViaCDN) {
 		t.Fatal("the mirror signs the routes its members sign")
 	}
@@ -616,11 +633,11 @@ func TestUnitSignPicksAMemberForTheRoute(t *testing.T) {
 	// read order is configuration order.
 	synctest.Test(t, func(t *testing.T) {
 		ctx := context.Background()
-		ms := []Member{
+		ms := []mirror.Member{
 			{Name: "storage", Store: presigner{newFake()}, WriteEnabled: true},
 			{Name: "edge", Store: cdnSigner{newFake()}, WriteEnabled: true},
 		}
-		s, _ := newMirror(t, ms, func(o *Options) { o.WriteQuorum = 2 })
+		s, _ := newMirror(t, ms, func(o *mirror.Options) { o.WriteQuorum = 2 })
 		if !s.Signs(blob.ViaCDN) {
 			t.Fatal("a member with a CDN gives the mirror one")
 		}
@@ -646,13 +663,17 @@ func TestUnitSignFailureKeepsHealth(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx := context.Background()
 		unsigned := newFake()
-		ms := []Member{
+		ms := []mirror.Member{
 			{Name: "unsigned", Store: presigner{unsigned}, WriteEnabled: true},
 			{Name: "signer", Store: presigner{newFake()}, WriteEnabled: true},
 		}
-		s, _ := newMirror(t, ms, func(o *Options) { o.WriteQuorum, o.BreakerThreshold = 2, 2 })
+		s, _ := newMirror(
+			t,
+			ms,
+			func(o *mirror.Options) { o.WriteQuorum, o.BreakerThreshold = 2, 2 },
+		)
 		sha := put(t, s, blobtest.Content(13, 10)).Digests.SHA256
-		unsigned.failOn("sign", 0, fmt.Errorf("%w: cannot sign", ErrConfig))
+		unsigned.failOn("sign", 0, fmt.Errorf("%w: cannot sign", mirror.ErrConfig))
 		for range 10 {
 			if url, err := s.SignURL(
 				ctx,
@@ -663,7 +684,7 @@ func TestUnitSignFailureKeepsHealth(t *testing.T) {
 				t.Fatalf("sign %q %v", url, err)
 			}
 		}
-		if s.byName["unsigned"].health.open(s.now()) {
+		if s.Breaker("unsigned").Open(s.Now()) {
 			t.Fatal("signing failures opened the breaker")
 		}
 		// Still first in read order, so it was asked every time.
@@ -675,77 +696,99 @@ func TestUnitSignFailureKeepsHealth(t *testing.T) {
 
 func TestUnitNewValidates(t *testing.T) {
 	st := newFake()
-	m := func(name string) Member { return Member{Name: name, Store: st, WriteEnabled: true} }
-	base := Options{Sessions: session.NewMemory(), Replicas: inmem.New().Replicas()}
-	cases := map[string]Options{
-		"no members":        {},
-		"bad name":          {Members: []Member{m("Bad-Name")}},
-		"duplicate":         {Members: []Member{m("a"), m("a")}},
-		"no store":          {Members: []Member{{Name: "a", WriteEnabled: true}}},
-		"redundancy high":   {Members: []Member{m("a")}, Redundancy: 2},
-		"quorum high":       {Members: []Member{m("a"), m("b")}, Redundancy: 1, WriteQuorum: 2},
-		"none writable":     {Members: []Member{{Name: "a", Store: st}}},
-		"negative chunk":    {Members: []Member{m("a")}, ChunkSize: -1},
-		"negative timeout":  {Members: []Member{m("a")}, MemberTimeout: -1},
-		"negative quorum":   {Members: []Member{m("a")}, WriteQuorum: -1},
-		"negative breakers": {Members: []Member{m("a")}, BreakerThreshold: -1},
+	m := func(name string) mirror.Member { return mirror.Member{Name: name, Store: st, WriteEnabled: true} }
+	base := mirror.Options{Sessions: session.NewMemory(), Replicas: inmem.New().Replicas()}
+	cases := map[string]mirror.Options{
+		"no members":      {},
+		"bad name":        {Members: []mirror.Member{m("Bad-Name")}},
+		"duplicate":       {Members: []mirror.Member{m("a"), m("a")}},
+		"no store":        {Members: []mirror.Member{{Name: "a", WriteEnabled: true}}},
+		"redundancy high": {Members: []mirror.Member{m("a")}, Redundancy: 2},
+		"quorum high": {
+			Members:     []mirror.Member{m("a"), m("b")},
+			Redundancy:  1,
+			WriteQuorum: 2,
+		},
+		"none writable":     {Members: []mirror.Member{{Name: "a", Store: st}}},
+		"negative chunk":    {Members: []mirror.Member{m("a")}, ChunkSize: -1},
+		"negative timeout":  {Members: []mirror.Member{m("a")}, MemberTimeout: -1},
+		"negative quorum":   {Members: []mirror.Member{m("a")}, WriteQuorum: -1},
+		"negative breakers": {Members: []mirror.Member{m("a")}, BreakerThreshold: -1},
 	}
 	for name, o := range cases {
 		if o.Members != nil || name == "no members" {
 			o.Sessions, o.Replicas = base.Sessions, base.Replicas
 		}
-		if _, err := New(o); !errors.Is(err, ErrConfig) {
+		if _, err := mirror.New(o); !errors.Is(err, mirror.ErrConfig) {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
-	if _, err := New(Options{Members: []Member{m("a")}}); !errors.Is(err, ErrConfig) {
+	if _, err := mirror.New(
+		mirror.Options{Members: []mirror.Member{m("a")}},
+	); !errors.Is(
+		err,
+		mirror.ErrConfig,
+	) {
 		t.Errorf("missing session store and replicas: %v", err)
 	}
-	s, err := New(Options{
-		Members: []Member{m("a"), m("b"), m("c")}, Sessions: base.Sessions, Replicas: base.Replicas,
+	s, err := mirror.New(mirror.Options{
+		Members: []mirror.Member{
+			m("a"),
+			m("b"),
+			m("c"),
+		},
+		Sessions: base.Sessions,
+		Replicas: base.Replicas,
 	})
-	if err != nil || s.redundancy != 3 || s.quorum != 2 || s.chunk != DefaultChunkSize {
+	if err != nil || s.Redundancy() != 3 || s.Quorum() != 2 ||
+		s.Chunk() != mirror.DefaultChunkSize {
 		t.Fatalf("defaults: %+v %v", s, err)
 	}
 }
 
 func TestUnitChunkSize(t *testing.T) {
 	const mib = 1 << 20
-	sized := func(parts ...int64) []Member {
-		ms := []Member{{Name: "unsized", Store: newFake()}}
+	sized := func(parts ...int64) []mirror.Member {
+		ms := []mirror.Member{{Name: "unsized", Store: newFake()}}
 		for i, p := range parts {
-			ms = append(ms, Member{Name: fmt.Sprintf("m%d", i), Store: parted{newFake(), p}})
+			ms = append(ms, mirror.Member{Name: fmt.Sprintf("m%d", i), Store: parted{newFake(), p}})
 		}
 		return ms
 	}
 	for name, tc := range map[string]struct {
 		explicit int64
-		members  []Member
+		members  []mirror.Member
 		want     int64
 	}{
-		"unsized members":    {members: sized(), want: DefaultChunkSize},
+		"unsized members":    {members: sized(), want: mirror.DefaultChunkSize},
 		"backend defaults":   {members: sized(8*mib, 8*mib, 16*mib), want: 16 * mib},
-		"small parts":        {members: sized(256<<10, mib), want: DefaultChunkSize},
+		"small parts":        {members: sized(256<<10, mib), want: mirror.DefaultChunkSize},
 		"rounded up":         {members: sized(3 * mib), want: 9 * mib},
 		"no common divisor":  {members: sized(5*mib, 16*mib), want: 80 * mib},
-		"zero part ignored":  {members: sized(0), want: DefaultChunkSize},
+		"zero part ignored":  {members: sized(0), want: mirror.DefaultChunkSize},
 		"explicit multiple":  {explicit: 32 * mib, members: sized(8*mib, 16*mib), want: 32 * mib},
 		"explicit unchecked": {explicit: 1000, members: sized(), want: 1000},
 	} {
-		if got, err := chunkSize(tc.explicit, tc.members); err != nil || got != tc.want {
+		if got, err := mirror.ChunkSize(tc.explicit, tc.members); err != nil || got != tc.want {
 			t.Errorf("%s: chunk %d, %v; want %d", name, got, err, tc.want)
 		}
 	}
 	for name, tc := range map[string]struct {
 		explicit int64
-		members  []Member
+		members  []mirror.Member
 	}{
 		"negative":                {explicit: -1, members: sized()},
 		"explicit not a multiple": {explicit: 24 * mib, members: sized(8*mib, 16*mib)},
 		"common multiple too big": {members: sized(5*mib, 7*mib, 11*mib)},
-		"one part too big":        {members: sized(MaxDerivedChunkSize + 1)},
+		"one part too big":        {members: sized(mirror.MaxDerivedChunkSize + 1)},
 	} {
-		if got, err := chunkSize(tc.explicit, tc.members); !errors.Is(err, ErrConfig) {
+		if got, err := mirror.ChunkSize(
+			tc.explicit,
+			tc.members,
+		); !errors.Is(
+			err,
+			mirror.ErrConfig,
+		) {
 			t.Errorf("%s: chunk %d, %v; want ErrConfig", name, got, err)
 		}
 	}
@@ -757,21 +800,21 @@ func TestUnitChunkSize(t *testing.T) {
 func TestUnitAppendsAlignWithPartSizes(t *testing.T) {
 	const mib = 1 << 20
 	parts := []int64{3 * mib, mib}
-	var ms []Member
+	var ms []mirror.Member
 	var stores []*fake
 	for i, p := range parts {
 		f := newFake()
 		stores = append(stores, f)
 		ms = append(
 			ms,
-			Member{Name: fmt.Sprintf("m%d", i), Store: parted{f, p}, WriteEnabled: true},
+			mirror.Member{Name: fmt.Sprintf("m%d", i), Store: parted{f, p}, WriteEnabled: true},
 		)
 	}
-	s, _ := newMirror(t, ms, func(o *Options) { o.ChunkSize = 0 })
-	if s.chunk != 9*mib {
-		t.Fatalf("chunk %d, want 9 MiB: the default 8 MiB is not a multiple of 3 MiB", s.chunk)
+	s, _ := newMirror(t, ms, func(o *mirror.Options) { o.ChunkSize = 0 })
+	if s.Chunk() != 9*mib {
+		t.Fatalf("chunk %d, want 9 MiB: the default 8 MiB is not a multiple of 3 MiB", s.Chunk())
 	}
-	put(t, s, blobtest.Content(39, 2*int(s.chunk)+123))
+	put(t, s, blobtest.Content(39, 2*int(s.Chunk())+123))
 	for i, f := range stores {
 		f.mu.Lock()
 		got := slices.Clone(f.appends)
@@ -799,7 +842,7 @@ func TestUnitPlacementPrefersZoneAndRotates(t *testing.T) {
 	s, _ := newMirror(
 		t,
 		ms,
-		func(o *Options) { o.Redundancy, o.WriteQuorum, o.Zone = 1, 1, "home" },
+		func(o *mirror.Options) { o.Redundancy, o.WriteQuorum, o.Zone = 1, 1, "home" },
 	)
 	info := put(t, s, blobtest.Content(13, 10))
 	if !f[2].has(info.Digests.SHA256) {
@@ -807,7 +850,7 @@ func TestUnitPlacementPrefersZoneAndRotates(t *testing.T) {
 	}
 	// Without a zone, single copies rotate.
 	f, ms = fakes(3, false)
-	s, _ = newMirror(t, ms, func(o *Options) { o.Redundancy, o.WriteQuorum = 1, 1 })
+	s, _ = newMirror(t, ms, func(o *mirror.Options) { o.Redundancy, o.WriteQuorum = 1, 1 })
 	for i := range 3 {
 		info := put(t, s, blobtest.Content(byte(20+i), 10))
 		if !f[i].has(info.Digests.SHA256) {
@@ -817,7 +860,7 @@ func TestUnitPlacementPrefersZoneAndRotates(t *testing.T) {
 	// A drained member gets no new copies but still serves reads.
 	f, ms = fakes(2, false)
 	ms[1].WriteEnabled = false
-	s, _ = newMirror(t, ms, func(o *Options) { o.WriteQuorum = 1 })
+	s, _ = newMirror(t, ms, func(o *mirror.Options) { o.WriteQuorum = 1 })
 	info = put(t, s, blobtest.Content(30, 10))
 	if f[1].has(info.Digests.SHA256) {
 		t.Fatal("a drained member received a copy")
@@ -832,7 +875,7 @@ func TestUnitResumeDropsLostMembers(t *testing.T) {
 	ctx := context.Background()
 	f, ms := fakes(3, false)
 	sessions := session.NewMemory()
-	s, _ := newMirror(t, ms, func(o *Options) { o.Sessions = sessions })
+	s, _ := newMirror(t, ms, func(o *mirror.Options) { o.Sessions = sessions })
 	u, err := s.BeginUpload(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -842,11 +885,15 @@ func TestUnitResumeDropsLostMembers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := len(resumed.(*upload).children); got != 2 {
+	if got := len(mirror.Children(resumed)); got != 2 {
 		t.Fatalf("%d members after resume", got)
 	}
 	// A member removed from the configuration drops out too.
-	other, _ := newMirror(t, ms[1:], func(o *Options) { o.Sessions = sessions; o.WriteQuorum = 1 })
+	other, _ := newMirror(
+		t,
+		ms[1:],
+		func(o *mirror.Options) { o.Sessions = sessions; o.WriteQuorum = 1 },
+	)
 	if _, err := other.ResumeUpload(ctx, u.ID()); err != nil {
 		t.Fatal(err)
 	}
@@ -881,7 +928,7 @@ func TestUnitAbortReportsMemberErrors(t *testing.T) {
 func TestUnitWalkFailures(t *testing.T) {
 	ctx := context.Background()
 	f, ms := fakes(2, false)
-	s, _ := newMirror(t, ms, func(o *Options) { o.WriteQuorum = 1 })
+	s, _ := newMirror(t, ms, func(o *mirror.Options) { o.WriteQuorum = 1 })
 	put(t, s, blobtest.Content(31, 10))
 	f[1].failOn("walk", 0, errInjected)
 	if err := s.Walk(ctx, func(blob.Info) error { return nil }); !errors.Is(err, errInjected) {
@@ -892,7 +939,7 @@ func TestUnitWalkFailures(t *testing.T) {
 func TestUnitReadErrors(t *testing.T) {
 	ctx := context.Background()
 	f, ms := fakes(2, false)
-	s, _ := newMirror(t, ms, func(o *Options) { o.WriteQuorum = 1 })
+	s, _ := newMirror(t, ms, func(o *mirror.Options) { o.WriteQuorum = 1 })
 	info := put(t, s, blobtest.Content(32, 10))
 	sha := info.Digests.SHA256
 	for _, x := range f {
@@ -954,7 +1001,7 @@ func TestUnitReplicaIndexFailures(t *testing.T) {
 	s, _ := newMirror(
 		t,
 		ms,
-		func(o *Options) { o.Replicas = failingReplicas{ReplicaIndex: base, put: errInjected} },
+		func(o *mirror.Options) { o.Replicas = failingReplicas{ReplicaIndex: base, put: errInjected} },
 	)
 	u, err := s.BeginUpload(ctx)
 	if err != nil {
@@ -971,7 +1018,7 @@ func TestUnitReplicaIndexFailures(t *testing.T) {
 	s, _ = newMirror(
 		t,
 		ms,
-		func(o *Options) { o.Replicas = failingReplicas{ReplicaIndex: base, forBlob: errInjected} },
+		func(o *mirror.Options) { o.Replicas = failingReplicas{ReplicaIndex: base, forBlob: errInjected} },
 	)
 	if _, err := s.Stat(ctx, sha); !errors.Is(err, errInjected) {
 		t.Fatal(err)
@@ -986,13 +1033,13 @@ func TestUnitReplicaIndexFailures(t *testing.T) {
 	s, _ = newMirror(
 		t,
 		ms,
-		func(o *Options) { o.Replicas = failingReplicas{ReplicaIndex: base, deleteBlob: errInjected} },
+		func(o *mirror.Options) { o.Replicas = failingReplicas{ReplicaIndex: base, deleteBlob: errInjected} },
 	)
 	if err := s.Delete(ctx, sha); !errors.Is(err, errInjected) {
 		t.Fatal(err)
 	}
 	f, ms2 := fakes(2, false)
-	s, _ = newMirror(t, ms2, func(o *Options) {
+	s, _ = newMirror(t, ms2, func(o *mirror.Options) {
 		o.WriteQuorum = 1
 		o.Replicas = failingReplicas{ReplicaIndex: base, put: errInjected}
 	})
@@ -1021,7 +1068,7 @@ func TestUnitSessionSaveFailures(t *testing.T) {
 	ctx := context.Background()
 	f, ms := fakes(3, false)
 	puts := 0
-	s, _ := newMirror(t, ms, func(o *Options) {
+	s, _ := newMirror(t, ms, func(o *mirror.Options) {
 		o.Sessions = failingSessions{Memory: session.NewMemory(), puts: &puts, n: 1}
 	})
 	if _, err := s.BeginUpload(ctx); !errors.Is(err, errInjected) {

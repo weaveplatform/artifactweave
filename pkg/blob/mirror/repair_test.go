@@ -1,4 +1,4 @@
-package mirror
+package mirror_test
 
 import (
 	"bytes"
@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/blobtest"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
+	"github.com/weaveplatform/artifactweave/pkg/blob/mirror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -39,17 +40,17 @@ func (c *clock) advance(d time.Duration) {
 	c.t = c.t.Add(d)
 }
 
-// rig is a mirror over fakes with an in-memory metadata store providing the
-// replica index, the blob index and the leases.
-type rig struct {
-	s   *Store
+// repairRig is a mirror over fakes with an in-memory metadata store
+// providing the replica index, the blob index and the leases.
+type repairRig struct {
+	s   *mirror.Store
 	f   []*fake
 	db  *inmem.Store
 	clk *clock
 }
 
-func (r *rig) options(ms []Member, tune func(*Options)) Options {
-	o := Options{
+func (r *repairRig) options(ms []mirror.Member, tune func(*mirror.Options)) mirror.Options {
+	o := mirror.Options{
 		Members: ms, ChunkSize: testChunk, Sessions: session.NewMemory(),
 		Replicas: r.db.Replicas(), Blobs: r.db.Blobs(), Leases: r.db.Leases(), Now: r.clk.now,
 	}
@@ -59,26 +60,30 @@ func (r *rig) options(ms []Member, tune func(*Options)) Options {
 	return o
 }
 
-func newRig(t *testing.T, n int, tune func(*Options)) *rig {
+func newRig(t *testing.T, n int, tune func(*mirror.Options)) *repairRig {
 	t.Helper()
 	f, ms := fakes(n, false)
-	r := &rig{f: f, db: inmem.New(), clk: newClock()}
+	r := &repairRig{f: f, db: inmem.New(), clk: newClock()}
 	r.s = r.mirror(t, ms, tune)
 	return r
 }
 
 // mirror builds another mirror over ms sharing the rig's metadata store,
 // which is how a configuration change (a member added or drained) looks.
-func (r *rig) mirror(t *testing.T, ms []Member, tune func(*Options)) *Store {
+func (r *repairRig) mirror(
+	t *testing.T,
+	ms []mirror.Member,
+	tune func(*mirror.Options),
+) *mirror.Store {
 	t.Helper()
-	s, err := New(r.options(ms, tune))
+	s, err := mirror.New(r.options(ms, tune))
 	if err != nil {
 		t.Fatal(err)
 	}
 	return s
 }
 
-func (r *rig) repair(t *testing.T) RepairReport {
+func (r *repairRig) repair(t *testing.T) mirror.RepairReport {
 	t.Helper()
 	rep, err := r.s.Repair(context.Background())
 	if err != nil {
@@ -87,7 +92,7 @@ func (r *rig) repair(t *testing.T) RepairReport {
 	return rep
 }
 
-func (r *rig) record(t *testing.T, sha, member string) types.BlobReplica {
+func (r *repairRig) record(t *testing.T, sha, member string) types.BlobReplica {
 	t.Helper()
 	rec, err := r.db.Replicas().Get(context.Background(), sha, member)
 	if err != nil {
@@ -96,7 +101,7 @@ func (r *rig) record(t *testing.T, sha, member string) types.BlobReplica {
 	return rec
 }
 
-func (r *rig) setPending(t *testing.T, sha, member string) {
+func (r *repairRig) setPending(t *testing.T, sha, member string) {
 	t.Helper()
 	rec := types.BlobReplica{
 		SHA256: sha, Member: member, State: types.ReplicaPending, Updated: r.clk.now(),
@@ -108,10 +113,10 @@ func (r *rig) setPending(t *testing.T, sha, member string) {
 
 // putSettled stores body and waits for the members still committing in the
 // background, so their late records and copies cannot race the test.
-func putSettled(t *testing.T, s *Store, body []byte) blob.Info {
+func putSettled(t *testing.T, s *mirror.Store, body []byte) blob.Info {
 	t.Helper()
 	info := put(t, s, body)
-	if err := s.settle(context.Background(), info.Digests.SHA256); err != nil {
+	if err := s.Settle(context.Background(), info.Digests.SHA256); err != nil {
 		t.Fatal(err)
 	}
 	return info
@@ -185,7 +190,7 @@ func TestUnitRepairFindsStraggler(t *testing.T) {
 }
 
 func TestUnitRepairWithoutSourceBacksOffThenFails(t *testing.T) {
-	r := newRig(t, 2, func(o *Options) { o.WriteQuorum = 1; o.RepairMaxAttempts = 2 })
+	r := newRig(t, 2, func(o *mirror.Options) { o.WriteQuorum = 1; o.RepairMaxAttempts = 2 })
 	sha := blobtest.Digest([]byte("nowhere")).SHA256
 	r.setPending(t, sha, "m0")
 
@@ -193,22 +198,22 @@ func TestUnitRepairWithoutSourceBacksOffThenFails(t *testing.T) {
 		t.Fatalf("report %+v", rep)
 	}
 	rec := r.record(t, sha, "m0")
-	if rec.State != types.ReplicaPending || rec.Attempts != 1 || rec.LastError != noSource {
+	if rec.State != types.ReplicaPending || rec.Attempts != 1 || rec.LastError != mirror.NoSource {
 		t.Fatalf("after one attempt: %+v", rec)
 	}
 	// Inside the backoff nothing is tried.
-	r.clk.advance(DefaultRepairBackoff / 2)
+	r.clk.advance(mirror.DefaultRepairBackoff / 2)
 	if rep := r.repair(t); rep.Failed != 0 {
 		t.Fatalf("retried inside the backoff: %+v", rep)
 	}
-	r.clk.advance(DefaultRepairBackoff)
+	r.clk.advance(mirror.DefaultRepairBackoff)
 	if rep := r.repair(t); rep.Failed != 1 {
 		t.Fatalf("not retried after the backoff: %+v", rep)
 	}
 	if rec := r.record(t, sha, "m0"); rec.State != types.ReplicaFailed || rec.Attempts != 2 {
 		t.Fatalf("after the last attempt: %+v", rec)
 	}
-	r.clk.advance(maxRepairBackoff)
+	r.clk.advance(mirror.MaxRepairBackoff)
 	if rep := r.repair(t); rep.Failed != 0 {
 		t.Fatalf("a failed replica is left for an operator: %+v", rep)
 	}
@@ -218,16 +223,18 @@ func TestUnitRepairBackoffDoublesAndCaps(t *testing.T) {
 	r := newRig(t, 1, nil)
 	base := r.clk.now()
 	rec := types.BlobReplica{Attempts: 3, Updated: base}
-	r.clk.advance(4*DefaultRepairBackoff - time.Second)
-	if r.s.due(rec) {
+	r.clk.advance(4*mirror.DefaultRepairBackoff - time.Second)
+	if r.s.Due(rec) {
 		t.Fatal("the third retry waits four backoffs")
 	}
 	r.clk.advance(time.Second)
-	if !r.s.due(rec) {
+	if !r.s.Due(rec) {
 		t.Fatal("due after four backoffs")
 	}
 	rec.Attempts = 40
-	if !r.s.due(types.BlobReplica{Attempts: 40, Updated: r.clk.now().Add(-maxRepairBackoff)}) {
+	if !r.s.Due(
+		types.BlobReplica{Attempts: 40, Updated: r.clk.now().Add(-mirror.MaxRepairBackoff)},
+	) {
 		t.Fatal("the backoff is capped")
 	}
 }
@@ -280,7 +287,7 @@ func TestUnitRepairDeferredDelete(t *testing.T) {
 		t.Fatalf("a failing delete keeps its tombstone: %+v", rec)
 	}
 	r.f[1].heal()
-	r.clk.advance(DefaultRepairBackoff)
+	r.clk.advance(mirror.DefaultRepairBackoff)
 	if rep := r.repair(t); rep.Deleted != 1 {
 		t.Fatalf("report %+v", rep)
 	}
@@ -338,9 +345,12 @@ func TestUnitRepairBackfillsAddedMember(t *testing.T) {
 	added := newFake()
 	_, ms := fakes(0, false)
 	for i, f := range r.f {
-		ms = append(ms, Member{Name: []string{"m0", "m1", "m2"}[i], Store: f, WriteEnabled: true})
+		ms = append(
+			ms,
+			mirror.Member{Name: []string{"m0", "m1", "m2"}[i], Store: f, WriteEnabled: true},
+		)
 	}
-	ms = append(ms, Member{Name: "m3", Store: added, WriteEnabled: true})
+	ms = append(ms, mirror.Member{Name: "m3", Store: added, WriteEnabled: true})
 	r.s = r.mirror(t, ms, nil)
 
 	if rep := r.repair(t); rep.Backfilled != 3 {
@@ -361,7 +371,7 @@ func TestUnitRepairBackfillsAddedMember(t *testing.T) {
 }
 
 func TestUnitRepairDrainsWriteDisabledMember(t *testing.T) {
-	r := newRig(t, 2, func(o *Options) { o.Redundancy = 1; o.WriteQuorum = 1 })
+	r := newRig(t, 2, func(o *mirror.Options) { o.Redundancy = 1; o.WriteQuorum = 1 })
 	sha := putSettled(t, r.s, []byte("only one copy")).Digests.SHA256
 	recs := states(t, r.db.Replicas(), sha)
 	if len(recs) != 1 {
@@ -372,11 +382,11 @@ func TestUnitRepairDrainsWriteDisabledMember(t *testing.T) {
 		holder = map[string]int{"m0": 0, "m1": 1}[name]
 	}
 	other = 1 - holder
-	ms := []Member{
+	ms := []mirror.Member{
 		{Name: "m0", Store: r.f[0], WriteEnabled: holder != 0},
 		{Name: "m1", Store: r.f[1], WriteEnabled: holder != 1},
 	}
-	r.s = r.mirror(t, ms, func(o *Options) { o.Redundancy = 1; o.WriteQuorum = 1 })
+	r.s = r.mirror(t, ms, func(o *mirror.Options) { o.Redundancy = 1; o.WriteQuorum = 1 })
 	if rep := r.repair(t); rep.Drained != 1 || rep.Backfilled != 0 {
 		t.Fatalf("first pass: %+v", rep)
 	}
@@ -415,7 +425,10 @@ func TestUnitRepairLease(t *testing.T) {
 	r.setPending(t, sha, "m2")
 	now := r.clk.now()
 	if ok, err := r.db.Leases().Acquire(ctx, types.Lease{
-		Name: defaultRepairLease, Holder: "elsewhere", Acquired: now, Expires: now.Add(time.Hour),
+		Name:     mirror.DefaultRepairLease,
+		Holder:   "elsewhere",
+		Acquired: now,
+		Expires:  now.Add(time.Hour),
 	}, now); err != nil || !ok {
 		t.Fatal(ok, err)
 	}
@@ -427,13 +440,13 @@ func TestUnitRepairLease(t *testing.T) {
 		t.Fatal("touched a replica without the lease")
 	}
 	// Two passes in one process share a holder; the second is skipped.
-	r.s.repair.running.Lock()
+	r.s.RepairRunning().Lock()
 	rep, err = r.s.Repair(ctx)
-	r.s.repair.running.Unlock()
+	r.s.RepairRunning().Unlock()
 	if err != nil || !rep.Skipped {
 		t.Fatalf("concurrent pass = %+v, %v", rep, err)
 	}
-	if err := r.db.Leases().Release(ctx, defaultRepairLease, "elsewhere"); err != nil {
+	if err := r.db.Leases().Release(ctx, mirror.DefaultRepairLease, "elsewhere"); err != nil {
 		t.Fatal(err)
 	}
 	if rep := r.repair(t); rep.Copied != 1 {
@@ -449,13 +462,16 @@ func TestUnitRepairLease(t *testing.T) {
 // while the default lease is held, as the cold tier must beside the hot one.
 func TestUnitRepairLeaseName(t *testing.T) {
 	ctx := context.Background()
-	r := newRig(t, 3, func(o *Options) { o.RepairLease = "cold-blob-mirror-repair" })
+	r := newRig(t, 3, func(o *mirror.Options) { o.RepairLease = "cold-blob-mirror-repair" })
 	sha := putSettled(t, r.s, []byte("own lease")).Digests.SHA256
 	_ = r.f[2].Delete(ctx, sha)
 	r.setPending(t, sha, "m2")
 	now := r.clk.now()
 	if ok, err := r.db.Leases().Acquire(ctx, types.Lease{
-		Name: defaultRepairLease, Holder: "hot tier", Acquired: now, Expires: now.Add(time.Hour),
+		Name:     mirror.DefaultRepairLease,
+		Holder:   "hot tier",
+		Acquired: now,
+		Expires:  now.Add(time.Hour),
 	}, now); err != nil || !ok {
 		t.Fatal(ok, err)
 	}
@@ -472,10 +488,10 @@ func TestUnitRunRepair(t *testing.T) {
 		)
 		db := inmem.New()
 		_, ms := fakes(2, false)
-		s, err := New(Options{
+		s, err := mirror.New(mirror.Options{
 			Members: ms, WriteQuorum: 1, Sessions: session.NewMemory(), Replicas: db.Replicas(),
 			Blobs: db.Blobs(), Leases: db.Leases(),
-			OnRepair: func(rep RepairReport, err error) {
+			OnRepair: func(rep mirror.RepairReport, err error) {
 				mu.Lock()
 				defer mu.Unlock()
 				if err == nil && !rep.Skipped {
@@ -503,7 +519,7 @@ func TestUnitRunRepair(t *testing.T) {
 		if n := count(); n != 1 {
 			t.Fatalf("trigger: %d passes", n)
 		}
-		time.Sleep(DefaultRepairInterval)
+		time.Sleep(mirror.DefaultRepairInterval)
 		if n := count(); n != 2 {
 			t.Fatalf("interval: %d passes", n)
 		}
@@ -563,38 +579,38 @@ func TestUnitRepairErrors(t *testing.T) {
 	t.Run("not configured", func(t *testing.T) {
 		_, ms := fakes(2, false)
 		s, _ := newMirror(t, ms, nil)
-		if _, err := s.Repair(ctx); !errors.Is(err, ErrConfig) {
+		if _, err := s.Repair(ctx); !errors.Is(err, mirror.ErrConfig) {
 			t.Fatal(err)
 		}
 	})
 	t.Run("bad settings", func(t *testing.T) {
 		_, ms := fakes(2, false)
-		for _, tune := range []func(*Options){
-			func(o *Options) { o.RepairBatch = -1 },
-			func(o *Options) { o.RepairMaxAttempts = -1 },
-			func(o *Options) { o.RepairBackoff = -time.Second },
+		for _, tune := range []func(*mirror.Options){
+			func(o *mirror.Options) { o.RepairBatch = -1 },
+			func(o *mirror.Options) { o.RepairMaxAttempts = -1 },
+			func(o *mirror.Options) { o.RepairBackoff = -time.Second },
 		} {
-			o := Options{
+			o := mirror.Options{
 				Members:  ms,
 				Sessions: session.NewMemory(),
 				Replicas: inmem.New().Replicas(),
 			}
 			tune(&o)
-			if _, err := New(o); !errors.Is(err, ErrConfig) {
+			if _, err := mirror.New(o); !errors.Is(err, mirror.ErrConfig) {
 				t.Fatalf("New = %v", err)
 			}
 		}
 	})
 	t.Run("lease fails", func(t *testing.T) {
-		r := newRig(t, 2, func(o *Options) { o.WriteQuorum = 1 })
-		r.s.repair.leases = failingLeases{r.db.Leases()}
+		r := newRig(t, 2, func(o *mirror.Options) { o.WriteQuorum = 1 })
+		r.s.SetRepairLeases(failingLeases{r.db.Leases()})
 		if _, err := r.s.Repair(ctx); !errors.Is(err, errInjected) {
 			t.Fatal(err)
 		}
 	})
 	t.Run("list fails", func(t *testing.T) {
-		r := newRig(t, 2, func(o *Options) { o.WriteQuorum = 1 })
-		r.s.replicas = repairReplicas{ReplicaIndex: r.db.Replicas(), list: errInjected}
+		r := newRig(t, 2, func(o *mirror.Options) { o.WriteQuorum = 1 })
+		r.s.SetReplicas(repairReplicas{ReplicaIndex: r.db.Replicas(), list: errInjected})
 		if _, err := r.s.Repair(ctx); !errors.Is(err, errInjected) {
 			t.Fatal(err)
 		}
@@ -606,7 +622,7 @@ func TestUnitRepairErrors(t *testing.T) {
 		if err := r.s.Delete(ctx, sha); err != nil {
 			t.Fatal(err)
 		}
-		r.s.repair.blobs = failingBlobs{r.db.Blobs()}
+		r.s.SetRepairBlobs(failingBlobs{r.db.Blobs()})
 		if _, err := r.s.Repair(ctx); !errors.Is(err, errInjected) {
 			t.Fatal(err)
 		}
@@ -616,7 +632,7 @@ func TestUnitRepairErrors(t *testing.T) {
 		sha := putSettled(t, r.s, []byte("unrecordable")).Digests.SHA256
 		_ = r.f[2].Delete(ctx, sha)
 		r.setPending(t, sha, "m2")
-		r.s.replicas = repairReplicas{ReplicaIndex: r.db.Replicas(), put: errInjected}
+		r.s.SetReplicas(repairReplicas{ReplicaIndex: r.db.Replicas(), put: errInjected})
 		if _, err := r.s.Repair(ctx); !errors.Is(err, errInjected) {
 			t.Fatal(err)
 		}
@@ -629,31 +645,31 @@ func TestUnitRepairErrors(t *testing.T) {
 			t.Fatal(err)
 		}
 		r.f[1].heal()
-		r.s.replicas = repairReplicas{ReplicaIndex: r.db.Replicas(), del: errInjected}
+		r.s.SetReplicas(repairReplicas{ReplicaIndex: r.db.Replicas(), del: errInjected})
 		if _, err := r.s.Repair(ctx); !errors.Is(err, errInjected) {
 			t.Fatal(err)
 		}
 	})
 	t.Run("source breaker open", func(t *testing.T) {
-		r := newRig(t, 2, func(o *Options) { o.WriteQuorum = 1; o.BreakerThreshold = 1 })
+		r := newRig(t, 2, func(o *mirror.Options) { o.WriteQuorum = 1; o.BreakerThreshold = 1 })
 		sha := putSettled(t, r.s, []byte("source unhealthy")).Digests.SHA256
 		_ = r.f[1].Delete(ctx, sha)
 		r.setPending(t, sha, "m1")
-		r.s.byName["m0"].health.failure(r.clk.now(), 1, time.Hour)
+		r.s.Breaker("m0").Failure(r.clk.now(), 1, time.Hour)
 		if rep := r.repair(t); rep.Failed != 1 {
 			t.Fatalf("report %+v", rep)
 		}
-		if rec := r.record(t, sha, "m1"); rec.LastError != noSource {
+		if rec := r.record(t, sha, "m1"); rec.LastError != mirror.NoSource {
 			t.Fatalf("record %+v", rec)
 		}
 	})
 	t.Run("removed member and open target", func(t *testing.T) {
-		r := newRig(t, 2, func(o *Options) { o.WriteQuorum = 1; o.BreakerThreshold = 1 })
+		r := newRig(t, 2, func(o *mirror.Options) { o.WriteQuorum = 1; o.BreakerThreshold = 1 })
 		sha := putSettled(t, r.s, []byte("skipped")).Digests.SHA256
 		r.setPending(t, sha, "gone")
 		_ = r.f[1].Delete(ctx, sha)
 		r.setPending(t, sha, "m1")
-		r.s.byName["m1"].health.failure(r.clk.now(), 1, time.Hour)
+		r.s.Breaker("m1").Failure(r.clk.now(), 1, time.Hour)
 		if rep := r.repair(t); rep.Copied+rep.Failed+rep.Found != 0 {
 			t.Fatalf("worked on a removed or unhealthy member: %+v", rep)
 		}
@@ -661,7 +677,7 @@ func TestUnitRepairErrors(t *testing.T) {
 }
 
 func TestUnitRepairBatches(t *testing.T) {
-	r := newRig(t, 2, func(o *Options) { o.WriteQuorum = 1; o.RepairBatch = 2 })
+	r := newRig(t, 2, func(o *mirror.Options) { o.WriteQuorum = 1; o.RepairBatch = 2 })
 	var shas []string
 	for i := range 5 {
 		sha := putSettled(t, r.s, blobtest.Content(byte(i), 50)).Digests.SHA256
@@ -703,9 +719,9 @@ func (o onceLeases) Acquire(ctx context.Context, l types.Lease, now time.Time) (
 }
 
 func TestUnitRepairStopsWhenLeaseIsTakenOver(t *testing.T) {
-	r := newRig(t, 2, func(o *Options) { o.WriteQuorum = 1 })
+	r := newRig(t, 2, func(o *mirror.Options) { o.WriteQuorum = 1 })
 	calls := 0
-	r.s.repair.leases = onceLeases{LeaseStore: r.db.Leases(), calls: &calls}
+	r.s.SetRepairLeases(onceLeases{LeaseStore: r.db.Leases(), calls: &calls})
 	if _, err := r.s.Repair(context.Background()); err == nil ||
 		!strings.Contains(err.Error(), "taken over") {
 		t.Fatalf("Repair = %v", err)
