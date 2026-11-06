@@ -218,6 +218,8 @@ change that adds a name appends its row; the change column gives the ticket of t
 | `Module` | `access` | The access module as app holds it; `API()` returns one binding of each `access/api` contract over the legacy services, and the target document's `Routes()` and `Start()` come later | ACC-05 |
 | `KeysOf`, `ProjectsOf`, `AnonymousAccessOf` | `access` | Store-only bindings of `Keys`, `Projects` and `AnonymousAccess`, for code such as bootstrap and reseal that holds a store before any module exists | ACC-05 |
 | `accessapitest` | `access/api/accessapitest` | Hand-written fakes of every `access/api` contract for other modules' tests; a test-support package below `api`, which imports only `api`, `kernel` and the standard library | ACC-05 |
+| `Registry` | `artifacts/core/format` | A package type's format `Handler`, which the item, build and registry services and the Docker registry take as a value so that core never imports the ecosystem slices; app builds it from the registry's `Settings.For`, and nil means the generic handler. The target document names only `ecosystem/registry.go`'s `Formats()` | ART-04 |
+| `Options.Formats` | `artifacts/ecosystem/docker/http` | The `format.Registry` that the Docker registry's uploads, manifest pushes and mounts write through; nil means the generic handler, which indexes no image or tag | ART-04 |
 
 ### Placeholders
 
