@@ -119,6 +119,7 @@ func (s *Store) lostLease(held bool) error {
 	if held {
 		return nil
 	}
+	//nolint:err113 // names the lease; no caller matches it with errors.Is
 	return fmt.Errorf("blob/mirror: repair lease %s was taken over", s.repair.lease)
 }
 

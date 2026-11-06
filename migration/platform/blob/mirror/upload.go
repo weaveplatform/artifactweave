@@ -229,6 +229,7 @@ func (u *upload) fanOut(ctx context.Context, chunk []byte) error {
 			// write different content, so it leaves the session.
 			err := errs[j]
 			if err == nil {
+				//nolint:err113 // reports both sizes; no caller matches it with errors.Is
 				err = fmt.Errorf("stored %d bytes, the mirror %d", got, want)
 			}
 			u.eject(i, err)
