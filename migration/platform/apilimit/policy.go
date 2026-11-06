@@ -1,4 +1,3 @@
-// Package apilimit combines shared request budgets with bounded local work.
 package apilimit
 
 import (
