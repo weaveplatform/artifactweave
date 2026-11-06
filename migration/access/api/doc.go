@@ -1,9 +1,11 @@
 // Package api is the access module's published surface: the permission
 // vocabulary, signing key pairs and certificates, the subject and repository
 // that a permission question names, the helpers that recognise a token by its
-// shape, and the contracts through which other modules ask access to decide
-// permissions, issue and revoke tokens, and read keys, users, API
-// restrictions, projects, permission grants and the anonymous access setting.
+// shape, the contracts through which other modules ask access to verify
+// credentials, evaluate and decide permissions, issue and revoke tokens, and
+// read keys, users, API restrictions, projects, permission grants and the
+// anonymous access setting, and the context accessors that carry a request's
+// principal together with its permission decider.
 //
 // # Role
 //
@@ -15,16 +17,23 @@
 // rather than in the core packages that evaluate them. The contracts are
 // today's calls from other modules into access, which is wider than the
 // target layout's api: Restrictions, Projects, Grants and AnonymousAccess are
-// added to it.
+// added to it, Authenticator rechecks credentials as well as verifying them,
+// and Authorizer evaluates a principal once for a request and a subject that
+// no request authenticated, besides the target layout's For. The decider
+// travels in the request's context, bound to the principal's entry, rather
+// than in the principal (decision 0044, "Composition and HTTP"), so
+// kernel.Principal stays a plain value.
 //
 // # Inputs
 //
-// None: the package holds values, pure functions and interfaces. The access
-// module implements the interfaces: the evaluator's *Decider in
+// None: the package holds values, pure functions, interfaces and the context
+// accessors, which read and write only the context they are given. The
+// access module implements the interfaces: the evaluator's *Decider in
 // internal/authz satisfies Decider, and its AsAPI and FromAPI convert
-// between the two, AsAPI never returning a typed nil; the module root binds
-// the other contracts into an API
-// (https://github.com/weaveplatform/artifactweave/issues/966).
+// between the two, AsAPI never returning a typed nil; the module root,
+// package access, binds every contract into the API that its New returns,
+// and accessapitest below this package fakes each contract for other
+// modules' tests.
 //
 // # Outputs
 //
@@ -41,7 +50,17 @@
 //     target names.
 //   - Token shapes: IsReferenceToken and LooksLikeToken tell a token from a
 //     password; ErrNotRevocable refuses to revoke a short-lived token.
+//   - Authenticator: verifying a password or a token, the anonymous access
+//     switch, and rechecking a verified credential against current state
+//     (Current, CurrentRegistry and RestoreDownload).
 //   - Decider: the permission questions about one request's subject.
+//   - Authorizer: evaluating a principal's permissions once for a request
+//     (Authorize), for a principal the request did not authorise (For), and
+//     for a subject no request authenticated (Decide). SubjectOf is the
+//     subject an evaluation starts from for a principal.
+//   - The request's caller: WithCaller stores a principal and its decider in
+//     a context, WithDecider binds a decider to the principal a context
+//     already carries, and DeciderFrom reads it back.
 //   - Tokens, with TokenRequest, RegistryTokenRequest and IssuedToken:
 //     issuing, revoking and clearing access tokens, and a user's encrypted
 //     password.
@@ -55,7 +74,7 @@
 //   - AnonymousAccess: reading and switching the anonymous access setting.
 //   - Settings: the access options other modules read.
 //   - API: one implementation of each contract, as the module publishes
-//     them.
+//     them, with the Settings.
 //
 // # Invariants
 //
@@ -72,6 +91,17 @@
 //     (json:"-"); the stores seal them at rest (decision 0017).
 //   - A Decider answers exactly as the access module's evaluator does, and a
 //     token scope only removes actions (decision 0006).
+//   - A decider answers only for the WithPrincipal call it was bound to
+//     (kernel.PrincipalBinding), never for a principal that another call
+//     stored, even one of equal value: a context derived with a later
+//     kernel.WithPrincipal sees no decider, and one derived in any other
+//     way sees the same one. Comparing bindings is safe because
+//     PrincipalBinding returns the pointer that WithPrincipal stored.
+//   - WithDecider never stores a typed nil: a nil decider, or one holding a
+//     nil pointer, is stored as none, so DeciderFrom never returns a decider
+//     that is nil inside. Until the bridges go, internal/auth's
+//     WithAuthorized and DeciderFrom use these same accessors, so a decider
+//     stored through either package is visible through both.
 //   - TokenRequest and RegistryTokenRequest carry every field of the token
 //     service's requests, in the same order and of the same types, so the
 //     module converts them and issuance keeps the rules of decision 0005.
@@ -83,17 +113,23 @@
 // # References
 //
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md,
-//     "Public types and published api surface", "Type-alias bridges" and
-//     "Names the migration introduces".
+//     "Public types and published api surface", "Composition and HTTP" (the
+//     per-request decider bound through kernel.PrincipalBinding),
+//     "Type-alias bridges" and "Names the migration introduces".
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     "Full package tree", lines 258 to 272, and "Access and identity",
-//     lines 529 to 574.
+//     lines 529 to 574 ("Authorizer.For ... once per operation" at line
+//     568).
 //   - Decision 0005: docs/research/decisions/0005-authentication-and-tokens.md
 //     (reference tokens, tokens sent as a Basic password, revocable tokens,
-//     registry tokens).
+//     registry tokens, and the 401 and 403 split).
 //   - Decision 0006:
 //     docs/research/decisions/0006-authorization-native-permission-model.md
-//     (the permission model, its three wire forms and token scopes).
+//     (the permission model, its three wire forms and token scopes; "Once
+//     per request", line 169: the middleware's single evaluation).
+//   - Decision 0043: docs/research/decisions/0043-api-reliability.md
+//     (Current refreshes the credential a replay rechecks, and a restricted
+//     user's rechecks answer 403).
 //   - Decision 0013: docs/research/decisions/0013-projects-and-environments.md.
 //   - Decision 0017: docs/research/decisions/0017-sealed-columns-and-master-key.md.
 //   - Research 05: docs/research/05-platform-identity-and-security-apis.md,
@@ -106,14 +142,12 @@
 // # Status
 //
 // Implemented P4 to P9c and staged in P9d: the vocabulary, Keypair,
-// Certificate, Subject, Repo and the token shapes. Added in P9d: the
-// contracts Decider, Tokens, Keys, Identity, Restrictions, Projects, Grants
-// and AnonymousAccess, the Settings value and the API aggregate. Still to
-// come in P9d: Authenticator, Authorizer and the context accessors
-// WithCaller, WithDecider and DeciderFrom
-// (https://github.com/weaveplatform/artifactweave/issues/966). The target
-// layout's hooks.go, with the token gate (P17), and events.go, with the
-// access events (P11), are not created yet.
+// Certificate, Subject, Repo, the token shapes and SubjectOf. Added in P9d:
+// the contracts Authenticator, Authorizer, Decider, Tokens, Keys, Identity,
+// Restrictions, Projects, Grants and AnonymousAccess, the Settings value,
+// the API aggregate, and the context accessors WithCaller, WithDecider and
+// DeciderFrom. The target layout's hooks.go, with the token gate (P17), and
+// events.go, with the access events (P11), are not created yet.
 //
 // # Testing
 //
@@ -123,4 +157,12 @@
 //   - TestUnitIsReferenceToken, TestUnitLooksLikeToken: the reference-token
 //     form and how a Basic password is told apart from a token.
 //   - TestUnitUserInfoEnabled: which account statuses may act.
+//   - TestUnitSubjectOf: the subject of a password, a token, a token with
+//     an empty scope, a groups-scoped token and the anonymous principal, as
+//     the evaluator has always started from it.
+//   - TestUnitDeciderContext: a decider answers for the WithPrincipal call
+//     it was bound to, through derived contexts and never after a later
+//     WithPrincipal; a nil or typed-nil decider hides an outer one.
+//     internal/auth's TestUnitDeciderSharedWithAccessAPI checks that the
+//     legacy accessors share the context key.
 package api

@@ -32,6 +32,8 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/service/work"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
+	"github.com/weaveplatform/artifactweave/migration/access"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/mirror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -41,14 +43,21 @@ import (
 // so tests need not wait a minute for one.
 var repairEvery = mirror.DefaultRepairInterval
 
+// registerDebianSnapshotWork registers the Debian snapshot handler with the
+// work queue. It is a variable so tests can see the Config it is given.
+var registerDebianSnapshotWork = server.RegisterDebianSnapshotWork
+
 // runtime is what serve holds open: the metadata store, the blob tiers, the
 // garbage collector, the work queue, and the background loops (mirror
 // repair, GC and the work queue's workers).
 type runtime struct {
-	keys             *crypt.Keyring
-	store            store.Store
-	auth             *auth.Authenticator
-	tokens           *token.Service // issues and verifies access tokens
+	keys   *crypt.Keyring
+	store  store.Store
+	auth   *auth.Authenticator
+	tokens *token.Service // issues and verifies access tokens
+	// access is the access module over store, auth and tokens; the server
+	// is given its API beside them.
+	access           *access.Module
 	closeStore       func() error
 	blobs, coldBlobs blob.Store
 	location         usage.Location
@@ -94,10 +103,7 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	if err != nil {
 		return nil, errors.Join(err, st.Close())
 	}
-	authn, err := auth.NewAuthenticator(st.Users(), st.Settings(), auth.Options{
-		Hash: authHash, Tokens: tokens, Groups: st.Groups(),
-		APIRestrictions: st.APIRestrictions(),
-	})
+	authn, accessModule, err := openAccess(cfg, st, tokens, log)
 	if err != nil {
 		return nil, errors.Join(err, st.Close())
 	}
@@ -172,6 +178,7 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 		store:      st,
 		auth:       authn,
 		tokens:     tokens,
+		access:     accessModule,
 		closeStore: st.Close,
 		blobs:      hot.store,
 		coldBlobs:  cold.store,
@@ -192,8 +199,8 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 		stop()
 		return nil, errors.Join(err, st.Close())
 	}
-	if err := server.RegisterDebianSnapshotWork(queue, server.Config{
-		Store: st, Blobs: hot.store, Auth: authn, Work: queue,
+	if err := registerDebianSnapshotWork(queue, server.Config{
+		Store: st, Blobs: hot.store, Auth: authn, Access: accessModule.API(), Work: queue,
 		RemoteSources: rt.remoteSources, FormatSettings: fs,
 	}); err != nil {
 		stop()
@@ -242,6 +249,37 @@ func formatSettings(cfg config.Config, keys *crypt.Keyring) formats.Settings {
 		},
 		TerraformBackend: terraformbackend.Settings{Keys: keys},
 	}
+}
+
+// openAccess builds the authenticator over st, then the access module over
+// st, the authenticator and tokens, with cfg's access settings: the server
+// reaches the same credentials and permissions directly and through the
+// module's API. Errors keep their texts, for openRuntime to join with
+// closing the store.
+//
+// New runs even when NewAuthenticator fails, with no early return between
+// them: New does no I/O and takes a nil authenticator, openRuntime discards
+// both results on any error, and NewAuthenticator fails only when
+// crypto/rand does, so an early return would be a branch no test can reach.
+func openAccess(
+	cfg config.Config,
+	st store.Store,
+	tokens *token.Service,
+	log *slog.Logger,
+) (*auth.Authenticator, *access.Module, error) {
+	authn, authErr := auth.NewAuthenticator(st.Users(), st.Settings(), auth.Options{
+		Hash: authHash, Tokens: tokens, Groups: st.Groups(),
+		APIRestrictions: st.APIRestrictions(),
+	})
+	m, err := access.New(access.Deps{
+		Store: st, Authenticator: authn, Tokens: tokens,
+		Settings: accessapi.Settings{
+			AllowBasicAuthTokens:   cfg.Token.AllowBasicAuth,
+			GlobalEnvironmentLimit: cfg.Environments.GlobalLimit,
+		},
+		Log: log,
+	})
+	return authn, m, errors.Join(authErr, err)
 }
 
 // close stops the background loops, waits until ctx ends for mirror commits still

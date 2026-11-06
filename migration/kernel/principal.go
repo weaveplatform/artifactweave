@@ -6,8 +6,8 @@ import "time"
 const AnonymousUser = "anonymous"
 
 // Principal is who a request acts as. It holds no permissions: access's
-// Authorize returns the decider that answers for it, and its WithAuthorized
-// carries the two together in a request's context.
+// Authorizer returns the decider that answers for it, and access/api's
+// WithCaller carries the two together in a request's context.
 //
 // PasswordRevision, IsTokenAuthenticated and TokenSubject are exported only
 // because access, which sets them when it verifies a credential, is another

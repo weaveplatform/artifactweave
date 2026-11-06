@@ -1,10 +1,11 @@
 // Package layout holds the repository-wide tests of the modular-monolith
 // migration: the ledger is complete, every package documents itself to the
 // standard, staged packages keep the dependency rules, tests read fixtures by
-// root-relative paths, and only access and the kernel touch the credential
-// fields of the request principal. It has no production code. The tests are
-// the enforcement, so a violation fails the gate instead of waiting for
-// review.
+// root-relative paths, only access and the kernel touch the credential
+// fields of the request principal, and production code stores a principal
+// without its permission decider only where that is the point. It has no
+// production code. The tests are the enforcement, so a violation fails the
+// gate instead of waiting for review.
 //
 // # Role
 //
@@ -19,8 +20,9 @@
 //     platform/testkit/repopath and walked with its SkipDir rule.
 //   - migration/ledger.json, read and checked through devtools/ledger.
 //   - The Go source files of every package (package clauses, doc comments,
-//     imports, fixture reads, and the selectors and composite literal keys
-//     that name a field of the principal) and .golangci.yml.
+//     imports, fixture reads, the selectors and composite literal keys that
+//     name a field of the principal, and the identifiers that name
+//     WithPrincipal) and .golangci.yml.
 //
 // # Outputs
 //
@@ -68,4 +70,10 @@
 //     literal (PasswordRevision only in a Principal literal, since the
 //     credential references declare it too); its cases prove each rule can
 //     fail.
+//   - TestUnitWithPrincipalCallers: no production file names WithPrincipal,
+//     which stores a principal without its decider, except the bridge that
+//     aliases it, access/api's WithCaller, which binds the decider next, and
+//     the remote reindex, which stores the caller it has just rechecked so
+//     that its permissions are evaluated afresh; its cases prove each way of
+//     naming it is caught.
 package layout

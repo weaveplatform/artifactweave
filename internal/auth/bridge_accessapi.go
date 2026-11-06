@@ -4,4 +4,7 @@ package auth
 
 import accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 
-var LooksLikeToken = accessapi.LooksLikeToken
+var (
+	LooksLikeToken = accessapi.LooksLikeToken
+	SubjectOf      = accessapi.SubjectOf
+)
