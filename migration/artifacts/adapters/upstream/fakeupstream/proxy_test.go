@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 )
 
 func proxyClient(t *testing.T, target, proxy *fakeupstream.Server, auth string) *http.Client {

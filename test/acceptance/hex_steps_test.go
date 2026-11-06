@@ -11,8 +11,8 @@ import (
 
 	"github.com/cucumber/godog"
 
-	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
 	hexfmt "github.com/weaveplatform/artifactweave/internal/format/hex"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 )
 
 func (w *world) registerHex(sc *godog.ScenarioContext) {

@@ -16,8 +16,8 @@ import (
 
 	"github.com/cucumber/godog"
 
-	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
 	nixfmt "github.com/weaveplatform/artifactweave/internal/format/nix"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 )
 
 func (w *world) registerNix(sc *godog.ScenarioContext) {

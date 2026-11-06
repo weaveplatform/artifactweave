@@ -14,7 +14,7 @@
 //   - The production router from internal/server, built over an in-memory
 //     store and a file-system blob store, with the request and seed helpers
 //     of test/server/support.
-//   - internal/fakeupstream, which stands in for a v3 remote's upstream.
+//   - migration/artifacts/adapters/upstream/fakeupstream, which stands in for a v3 remote's upstream.
 //   - support.NuGetRoutes, the route inventory, and the NuGet package and PDB
 //     fixtures.
 //
