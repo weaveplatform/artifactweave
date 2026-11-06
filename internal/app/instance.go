@@ -17,7 +17,7 @@ var tokenKeyBits int
 // service over it, which creates the first signing key.
 func openTokens(ctx context.Context, st store.Store) (*token.Service, error) {
 	if err := instance.EnsureInstance(ctx, st); err != nil {
-		return nil, err
+		return nil, err //nolint:wrapcheck // EnsureInstance's errors start "instance identity:"
 	}
 	tokens, err := token.New(ctx, st, token.Options{KeyBits: tokenKeyBits})
 	if err != nil {
