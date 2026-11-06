@@ -87,10 +87,12 @@ type Edge struct {
 	reqs      []Request
 }
 
+var errNoValidatorOrOrigin = errors.New("cdntest: a validator and an origin are required")
+
 // Start listens and serves until Close.
 func Start(o Options) (*Edge, error) {
 	if o.Validator == nil || o.Origin == nil {
-		return nil, errors.New("cdntest: a validator and an origin are required")
+		return nil, errNoValidatorOrOrigin
 	}
 	if o.Host == "" {
 		o.Host = "localhost"
