@@ -7,7 +7,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // These names open the mirror's internals to its tests, which are the
@@ -32,7 +31,7 @@ const (
 func (s *Store) Settle(ctx context.Context, sha string) error { return s.settle(ctx, sha) }
 
 // Due reports whether r's repair backoff has passed.
-func (s *Store) Due(r types.BlobReplica) bool { return s.due(r) }
+func (s *Store) Due(r BlobReplica) bool { return s.due(r) }
 
 // Now is the mirror's clock.
 func (s *Store) Now() time.Time { return s.now() }

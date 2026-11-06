@@ -8,10 +8,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const (
@@ -126,7 +125,7 @@ func (s *Store) lostLease(held bool) error {
 // renew takes or extends the repair lease and reports whether it is held.
 func (s *Store) renew(ctx context.Context) (bool, error) {
 	now := s.now()
-	held, err := s.repair.leases.Acquire(ctx, types.Lease{
+	held, err := s.repair.leases.Acquire(ctx, work.Lease{
 		Name: s.repair.lease, Holder: s.repair.holder, Task: "blob mirror repair",
 		Acquired: now, Expires: now.Add(repairLeaseTTL),
 	}, now)
@@ -138,7 +137,7 @@ func (s *Store) renew(ctx context.Context) (bool, error) {
 
 // due reports whether r's backoff has passed: a record that never failed is
 // due at once, and the wait doubles with every failed attempt.
-func (s *Store) due(r types.BlobReplica) bool {
+func (s *Store) due(r BlobReplica) bool {
 	if r.Attempts == 0 {
 		return true
 	}
@@ -154,14 +153,14 @@ func (s *Store) due(r types.BlobReplica) bool {
 // the lease between pages.
 func (s *Store) queue(
 	ctx context.Context,
-	state types.ReplicaState,
-	fn func(types.BlobReplica) error,
+	state ReplicaState,
+	fn func(BlobReplica) error,
 ) error {
 	handled := 0
-	p := store.Page{Limit: s.repair.batch}
+	p := kernel.Page{Limit: s.repair.batch}
 	for {
 		recs, next, err := s.replicas.List(ctx,
-			store.ReplicaFilter{States: []types.ReplicaState{state}}, p)
+			ReplicaFilter{States: []ReplicaState{state}}, p)
 		if err != nil {
 			return fmt.Errorf("blob/mirror: list %s replicas: %w", state, err)
 		}
@@ -191,7 +190,7 @@ func (s *Store) queue(
 
 // repairPending fills pending replicas.
 func (s *Store) repairPending(ctx context.Context, rep *RepairReport) error {
-	return s.queue(ctx, types.ReplicaPending, func(r types.BlobReplica) error {
+	return s.queue(ctx, ReplicaPending, func(r BlobReplica) error {
 		m := s.byName[r.Member]
 		if info, err := s.stat(ctx, m, r.SHA256); err == nil {
 			rep.Found++
@@ -200,7 +199,7 @@ func (s *Store) repairPending(ctx context.Context, rep *RepairReport) error {
 		size, err := s.copyTo(ctx, m, r.SHA256)
 		if err != nil {
 			rep.Failed++
-			return s.attemptFailed(ctx, r, err, types.ReplicaFailed)
+			return s.attemptFailed(ctx, r, err, ReplicaFailed)
 		}
 		rep.Copied++
 		return s.markPresent(ctx, r, size)
@@ -216,8 +215,8 @@ func (s *Store) stat(ctx context.Context, m *member, sha string) (blob.Info, err
 }
 
 // markPresent records that r's member holds the blob.
-func (s *Store) markPresent(ctx context.Context, r types.BlobReplica, size int64) error {
-	r.State, r.Size, r.LastError, r.Updated = types.ReplicaPresent, size, "", s.now()
+func (s *Store) markPresent(ctx context.Context, r BlobReplica, size int64) error {
+	r.State, r.Size, r.LastError, r.Updated = ReplicaPresent, size, "", s.now()
 	if err := s.replicas.Put(ctx, r); err != nil {
 		return fmt.Errorf("blob/mirror: record %s on %s: %w", r.SHA256, r.Member, err)
 	}
@@ -230,9 +229,9 @@ func (s *Store) markPresent(ctx context.Context, r types.BlobReplica, size int64
 // probe the members and serve the deleted blob again.
 func (s *Store) attemptFailed(
 	ctx context.Context,
-	r types.BlobReplica,
+	r BlobReplica,
 	cause error,
-	giveUp types.ReplicaState,
+	giveUp ReplicaState,
 ) error {
 	r.Attempts++
 	r.LastError, r.Updated = cause.Error(), s.now()
@@ -259,7 +258,7 @@ func (s *Store) copyTo(ctx context.Context, m *member, sha string) (int64, error
 	now := s.now()
 	for _, r := range recs {
 		src := s.byName[r.Member]
-		if r.State == types.ReplicaPresent && src != nil && src != m && !src.health.open(now) {
+		if r.State == ReplicaPresent && src != nil && src != m && !src.health.open(now) {
 			sources = append(sources, src)
 		}
 	}
@@ -329,7 +328,7 @@ func (s *Store) copyFrom(ctx context.Context, src, dst *member, want blob.Digest
 // present record when the member still holds the blob, or a pending one when
 // it does not, so the mirror converges on the re-upload instead of losing it.
 func (s *Store) repairDeletes(ctx context.Context, rep *RepairReport) error {
-	return s.queue(ctx, types.ReplicaDeleting, func(r types.BlobReplica) error {
+	return s.queue(ctx, ReplicaDeleting, func(r BlobReplica) error {
 		m := s.byName[r.Member]
 		reuploaded, err := s.referenced(ctx, r.SHA256)
 		if err != nil {
@@ -341,7 +340,7 @@ func (s *Store) repairDeletes(ctx context.Context, rep *RepairReport) error {
 				return s.markPresent(ctx, r, info.Size)
 			}
 			r.State, r.Attempts, r.LastError, r.Updated =
-				types.ReplicaPending, 0, "uploaded again after a delete", s.now()
+				ReplicaPending, 0, "uploaded again after a delete", s.now()
 			if err := s.replicas.Put(ctx, r); err != nil {
 				return fmt.Errorf("blob/mirror: record %s on %s: %w", r.SHA256, r.Member, err)
 			}
@@ -352,7 +351,7 @@ func (s *Store) repairDeletes(ctx context.Context, rep *RepairReport) error {
 		s.observe(m, start, err)
 		if err != nil && !errors.Is(err, blob.ErrNotFound) {
 			rep.Failed++
-			return s.attemptFailed(ctx, r, err, types.ReplicaDeleting)
+			return s.attemptFailed(ctx, r, err, ReplicaDeleting)
 		}
 		rep.Deleted++
 		if err := s.replicas.Delete(ctx, r.SHA256, r.Member); err != nil && !isNotFound(err) {
@@ -390,9 +389,9 @@ func (s *Store) backfill(ctx context.Context, rep *RepairReport) error {
 	}
 	want := min(s.redundancy, writable)
 	seen := map[string]bool{}
-	p := store.Page{After: s.repair.backfillAfter, Limit: s.repair.batch}
+	p := kernel.Page{After: s.repair.backfillAfter, Limit: s.repair.batch}
 	for len(seen) < s.repair.batch {
-		recs, next, err := s.replicas.List(ctx, store.ReplicaFilter{}, p)
+		recs, next, err := s.replicas.List(ctx, ReplicaFilter{}, p)
 		if err != nil {
 			return fmt.Errorf("blob/mirror: list replicas: %w", err)
 		}
@@ -427,20 +426,20 @@ func (s *Store) place1(ctx context.Context, sha string, want int, rep *RepairRep
 	for _, r := range recs {
 		m := s.byName[r.Member]
 		switch {
-		case r.State == types.ReplicaDeleting:
+		case r.State == ReplicaDeleting:
 			// Deleted; never re-create copies of it.
 			return nil
 		case m == nil:
 			continue
-		case r.State == types.ReplicaPresent && m.WriteEnabled:
+		case r.State == ReplicaPresent && m.WriteEnabled:
 			onWritable++
 			size = r.Size
-		case r.State == types.ReplicaPresent:
+		case r.State == ReplicaPresent:
 			onDraining++
 			size = r.Size
 		}
 		has[r.Member] = true
-		if m.WriteEnabled && (r.State == types.ReplicaPresent || r.State == types.ReplicaPending) {
+		if m.WriteEnabled && (r.State == ReplicaPresent || r.State == ReplicaPending) {
 			placed++
 		}
 	}
@@ -461,8 +460,8 @@ func (s *Store) place1(ctx context.Context, sha string, want int, rep *RepairRep
 		if drained {
 			reason, count = "copies on draining members", &rep.Drained
 		}
-		r := types.BlobReplica{
-			SHA256: sha, Member: m.Name, State: types.ReplicaPending, Size: size,
+		r := BlobReplica{
+			SHA256: sha, Member: m.Name, State: ReplicaPending, Size: size,
 			Updated: s.now(), LastError: reason,
 		}
 		if err := s.replicas.Put(ctx, r); err != nil {
