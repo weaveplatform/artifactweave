@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"time"
-
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // Status is a mirror's configuration, member health and replica counts, for
@@ -16,7 +14,7 @@ type Status struct {
 	// Zone is this instance's zone.
 	Zone string
 	// UnderReplicated counts blobs with fewer present copies than
-	// Redundancy (store.ReplicaIndex.UnderReplicated).
+	// Redundancy (ReplicaIndex.UnderReplicated).
 	UnderReplicated int64
 	Members         []MemberStatus
 	// Removed are members with replica records that are no longer
@@ -30,7 +28,7 @@ type Status struct {
 type RemovedMember struct {
 	Name string
 	// Replicas are its replica records per state, ordered by state.
-	Replicas []store.ReplicaCount
+	Replicas []ReplicaCount
 	// SoleCopies counts the blobs whose only present copy is on it.
 	SoleCopies int64
 }
@@ -46,7 +44,7 @@ type MemberStatus struct {
 	// before the first one.
 	Latency time.Duration
 	// Replicas are the member's replica records per state, ordered by state.
-	Replicas []store.ReplicaCount
+	Replicas []ReplicaCount
 	// SoleCopies counts the blobs whose only present copy is on this
 	// member. A drained member (WriteEnabled false) is safe to remove from
 	// the configuration once it is zero.

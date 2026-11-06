@@ -1,6 +1,10 @@
-package types
+package blob
 
-import "time"
+import (
+	"time"
+
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+)
 
 // Blob is the index record of one stored content blob. Items reference blobs
 // by SHA256; Refs counts those references (and those of trash entries and
@@ -8,7 +12,7 @@ import "time"
 // can serve it again. SHA512, SHA1 and MD5 are recorded so checksum deploy,
 // the checksum searches and checksum files resolve without reading content.
 type Blob struct {
-	Checksums Checksums
+	Checksums kernel.Checksums
 	Size      int64
 	Created   time.Time
 	Refs      int64

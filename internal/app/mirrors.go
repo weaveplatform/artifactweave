@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/weaveplatform/artifactweave/internal/server"
-	"github.com/weaveplatform/artifactweave/pkg/blob/mirror"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/mirror"
 )
 
 // mirrorAdmin gives the storage endpoints the runtime's mirrors (#18): the

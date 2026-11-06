@@ -10,7 +10,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Target states in a session.
@@ -230,6 +229,7 @@ func (u *upload) fanOut(ctx context.Context, chunk []byte) error {
 			// write different content, so it leaves the session.
 			err := errs[j]
 			if err == nil {
+				//nolint:err113 // reports both sizes; no caller matches it with errors.Is
 				err = fmt.Errorf("stored %d bytes, the mirror %d", got, want)
 			}
 			u.eject(i, err)
@@ -471,8 +471,8 @@ func (u *upload) record(
 ) error {
 	sha := info.Digests.SHA256
 	var errs []error
-	put := func(name string, state types.ReplicaState, reason string) {
-		r := types.BlobReplica{
+	put := func(name string, state ReplicaState, reason string) {
+		r := BlobReplica{
 			SHA256:    sha,
 			Member:    name,
 			State:     state,
@@ -487,18 +487,18 @@ func (u *upload) record(
 	for i, t := range u.ss.Data.Targets {
 		switch {
 		case t.State == targetCommitted:
-			put(t.Member, types.ReplicaPresent, "")
+			put(t.Member, ReplicaPresent, "")
 		case t.State == targetFailed:
-			put(t.Member, types.ReplicaPending, t.Error)
+			put(t.Member, ReplicaPending, t.Error)
 		case outcomes[i] != nil:
-			put(t.Member, types.ReplicaPending, outcomes[i].Error())
+			put(t.Member, ReplicaPending, outcomes[i].Error())
 		}
 	}
 	for _, mr := range running {
-		put(mr.name, types.ReplicaPending, "still committing")
+		put(mr.name, ReplicaPending, "still committing")
 	}
 	for _, name := range u.ss.Data.Deferred {
-		put(name, types.ReplicaPending, "member unavailable at upload")
+		put(name, ReplicaPending, "member unavailable at upload")
 	}
 	return errors.Join(errs...)
 }
@@ -521,12 +521,12 @@ func (s *Store) finishStragglers(
 		select {
 		case r := <-results:
 			left--
-			rec := types.BlobReplica{
-				SHA256: info.Digests.SHA256, Member: names[r.i], State: types.ReplicaPresent,
+			rec := BlobReplica{
+				SHA256: info.Digests.SHA256, Member: names[r.i], State: ReplicaPresent,
 				Size: info.Size, Updated: s.now(),
 			}
 			if r.err != nil {
-				rec.State, rec.LastError = types.ReplicaPending, r.err.Error()
+				rec.State, rec.LastError = ReplicaPending, r.err.Error()
 			}
 			// Best effort: the record already says pending, which is what a
 			// failed write here leaves behind.

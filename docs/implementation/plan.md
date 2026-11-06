@@ -430,7 +430,7 @@ across clouds and regions in parallel. The work is tracked as GitHub issues, one
   - decision (#13);
   - named stores and mirror configuration (#14);
   - the `blob_replicas` index (#15);
-  - `pkg/blob/mirror` with quorum writes and failover reads (#16);
+  - `migration/platform/blob/mirror` with quorum writes and failover reads (#16);
   - the repair worker (#17);
   - per-member administration once P3 serves the storage endpoints (#18);
   - a cross-cloud scenario on Linux CI (#19).

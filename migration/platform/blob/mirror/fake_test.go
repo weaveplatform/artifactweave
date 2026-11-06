@@ -1,4 +1,4 @@
-package mirror
+package mirror_test
 
 import (
 	"bytes"

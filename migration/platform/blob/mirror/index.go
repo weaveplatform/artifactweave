@@ -1,0 +1,49 @@
+package mirror
+
+import (
+	"context"
+
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+)
+
+// BlobIndex is the blob index the repair worker reads a blob's reference
+// count and recorded digests from.
+type BlobIndex interface {
+	// Get returns the row for sha256, in whatever state, or an error matching
+	// kernel.ErrNotFound when there is none: a deferred delete takes that as
+	// no reference and goes ahead, where any other error fails its step.
+	Get(ctx context.Context, sha256 string) (blob.Blob, error)
+}
+
+// ReplicaIndex records which members hold which blobs. The mirror never
+// calls Get.
+type ReplicaIndex interface {
+	// Put creates or replaces the record (r.SHA256, r.Member);
+	// kernel.ErrInvalid without both.
+	Put(ctx context.Context, r BlobReplica) error
+	// ForBlob returns a blob's records ordered by member.
+	ForBlob(ctx context.Context, sha256 string) ([]BlobReplica, error)
+	// List returns matching records oldest update first, by (Updated, SHA256,
+	// Member), which is the order the repair worker drains them in.
+	List(ctx context.Context, f ReplicaFilter, p kernel.Page) ([]BlobReplica, string, error)
+	// Delete removes one record, or returns an error matching
+	// kernel.ErrNotFound when there is none, which the mirror ignores.
+	Delete(ctx context.Context, sha256, member string) error
+	// DeleteBlob removes every record of a blob and returns how many.
+	DeleteBlob(ctx context.Context, sha256 string) (int64, error)
+	// Counts returns the number and size of records per member and state,
+	// ordered by (member, state).
+	Counts(ctx context.Context) ([]ReplicaCount, error)
+	// UnderReplicated counts the blobs with fewer than redundancy present
+	// records. A blob with a deleting record is being deleted and is not
+	// counted; neither is a blob with no records at all, which the repair
+	// worker's backfill brings into the index.
+	UnderReplicated(ctx context.Context, redundancy int) (int64, error)
+	// SoleCopies counts, per member, the blobs whose only present record is
+	// on that member. Blobs being deleted are left out, as UnderReplicated
+	// leaves them out. A member holding sole copies cannot be removed from
+	// a mirror without losing them: repair never reads from a member that
+	// is no longer configured.
+	SoleCopies(ctx context.Context) (map[string]int64, error)
+}

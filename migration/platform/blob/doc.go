@@ -24,8 +24,10 @@
 // module the item, registry, multipart and build services, the format
 // handlers and the HTTP servers write and serve content through Store, and
 // garbage collection walks and deletes through it; the composition root
-// opens a store for each configured tier. It imports only the standard
-// library.
+// opens a store for each configured tier. Blob, the row of the metadata
+// store's blob index, is declared here as well, so that the mirror's repair
+// worker, which reads it through its own port, imports no store. It imports
+// the kernel and the standard library.
 //
 // # Inputs
 //
@@ -59,6 +61,11 @@
 //   - The sentinels ErrNotFound, ErrDigestMismatch, ErrUploadUnknown,
 //     ErrInvalidDigest, ErrCannotSign and ErrHasherState. Backends wrap
 //     them, and callers test them with errors.Is.
+//   - Blob, the blob index row: a blob's checksums, size, creation time,
+//     reference count, and its State in garbage collection with the time
+//     it was marked or removed; BlobState with BlobLive, BlobDeleting and
+//     BlobDeleted. The metadata store keeps the rows, and the mirror's
+//     BlobIndex returns them.
 //
 // # Invariants
 //
@@ -94,6 +101,8 @@
 //   - Decision 0004: docs/research/decisions/0004-storage-sql-metadata-and-blobs.md
 //     ("Blobs": content addressing, the checksums of one pass and the
 //     upload sessions).
+//   - Decision 0010: docs/research/decisions/0010-retention-trash-and-gc.md
+//     (the blob row's states while garbage collection deletes a blob).
 //   - Decision 0027: docs/research/decisions/0027-cloud-blob-backends.md
 //     (the Google Cloud Storage and Azure backends behind this contract).
 //   - Decision 0028: docs/research/decisions/0028-blob-mirroring.md (one
@@ -105,7 +114,9 @@
 //   - Research 18 and 19: docs/research/18-cloud-blob-storage.md and
 //     docs/research/19-cdn-and-download-redirect.md.
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md,
-//     "Dependency rules": the platform imports no module.
+//     "Dependency rules": the platform imports no module; "Type-alias
+//     bridges": the shared types keep aliases of the blob row while its
+//     users move.
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     lines 146 to 151 (platform/blob and its subpackages) and line 1049
 //     (the mapping row).
@@ -115,15 +126,17 @@
 //     (prework 1) and #p9d-modular-monolith-migration, epic PLT
 //     (https://github.com/weaveplatform/artifactweave/issues/938).
 //   - https://github.com/weaveplatform/artifactweave/issues/980
+//   - https://github.com/weaveplatform/artifactweave/issues/986
 //
 // # Status
 //
 // Implemented P2: the store contract, upload sessions with the saved hasher
-// state, the validators and the sentinels. P2b added PartSizer, by which the
-// mirror sizes its chunks (issue 39). P4b replaced the presigner with the
-// signing capability of download and CDN redirects: Signer, Via,
-// SignOptions, Disposition and ErrCannotSign (issue 119). P7 made SHA-512 a
-// digest of every upload (issue 296). Staged in P9d.
+// state, the validators and the sentinels, and Blob, the blob index row. P2b
+// added PartSizer, by which the mirror sizes its chunks (issue 39). P3 gave
+// the blob row its garbage-collection states (issue 64). P4b replaced the
+// presigner with the signing capability of download and CDN redirects:
+// Signer, Via, SignOptions, Disposition and ErrCannotSign (issue 119). P7
+// made SHA-512 a digest of every upload (issue 296). Staged in P9d.
 //
 // # Testing
 //
@@ -144,4 +157,7 @@
 //     failing random source is an error.
 //
 // Every backend runs the blobtest contract: fs, s3, gcs, azure and mirror.
+// The metadata store's blob index contract runs on its in-memory, SQLite and
+// PostgreSQL stores, and the test beside the shared types' bridge fails if
+// an alias of the blob row becomes a declared copy.
 package blob

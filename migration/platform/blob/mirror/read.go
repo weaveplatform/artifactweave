@@ -7,9 +7,8 @@ import (
 	"io"
 	"slices"
 
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // ErrSeek reports an invalid Seek.
@@ -31,11 +30,11 @@ func (s *Store) candidates(ctx context.Context, sha string) ([]*member, bool, er
 	deleting := false
 	for _, r := range recs {
 		switch r.State {
-		case types.ReplicaPresent:
+		case ReplicaPresent:
 			if m := s.byName[r.Member]; m != nil {
 				present = append(present, m)
 			}
-		case types.ReplicaDeleting:
+		case ReplicaDeleting:
 			deleting = true
 		}
 	}
@@ -302,8 +301,8 @@ func (s *Store) Delete(ctx context.Context, sha string) error {
 	}
 	var out []error
 	for _, i := range failed {
-		r := types.BlobReplica{
-			SHA256: sha, Member: s.members[i].Name, State: types.ReplicaDeleting,
+		r := BlobReplica{
+			SHA256: sha, Member: s.members[i].Name, State: ReplicaDeleting,
 			Updated: s.now(), LastError: errs[i].Error(),
 		}
 		if err := s.replicas.Put(ctx, r); err != nil {
@@ -400,4 +399,4 @@ func (s *Store) SignURL(ctx context.Context, sha string, o blob.SignOptions) (st
 	return url, err
 }
 
-func isNotFound(err error) bool { return errors.Is(err, store.ErrNotFound) }
+func isNotFound(err error) bool { return errors.Is(err, kernel.ErrNotFound) }

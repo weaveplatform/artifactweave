@@ -501,10 +501,10 @@ continues to exercise an image index. An `ubuntu-latest` runner update from Ubun
 24.04 to 26.04 exposed the implicit build's different manifest layout in both
 scenarios; the explicit flags keep the client proof stable on either runner.
 
-The cross-cloud blob mirror scenario (`TestAccCrossCloud` in `pkg/blob/mirror`) is one of
-those unit suites. It runs MinIO, fake-gcs-server and Azurite side by side in the Linux
-unit job and skips on macOS and Windows; the emulator images are pinned in
-`pkg/containertest`.
+The cross-cloud blob mirror scenario (`TestAccCrossCloud` in
+`migration/platform/blob/mirror`) is one of those unit suites. It runs MinIO,
+fake-gcs-server and Azurite side by side in the Linux unit job and skips on macOS and
+Windows; the emulator images are pinned in `pkg/containertest`.
 
 ## Package clients in acceptance
 

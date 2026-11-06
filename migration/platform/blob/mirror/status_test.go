@@ -1,4 +1,4 @@
-package mirror
+package mirror_test
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/blobtest"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/mirror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -16,7 +17,7 @@ func TestUnitStatus(t *testing.T) {
 	f, ms := fakes(3, false)
 	ms[0].Zone, ms[0].Kind = "home", "fs"
 	ms[2].WriteEnabled = false
-	s, r := newMirror(t, ms, func(o *Options) {
+	s, r := newMirror(t, ms, func(o *mirror.Options) {
 		o.Redundancy, o.WriteQuorum, o.Zone, o.BreakerThreshold = 2, 1, "home", 1
 	})
 	// m1's commit fails: its copy is left pending and its breaker opens.
@@ -104,7 +105,7 @@ func TestUnitStatusErrors(t *testing.T) {
 		_, ms := fakes(2, false)
 		s, r := newMirror(t, ms, nil)
 		fr.ReplicaIndex = r
-		s.replicas = fr
+		s.SetReplicas(fr)
 		if _, err := s.Status(context.Background()); !errors.Is(err, errInjected) {
 			t.Errorf("%s: %v", name, err)
 		}

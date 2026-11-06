@@ -1,22 +1,3 @@
-// Package mirror is a blob store that keeps each blob on several member
-// stores at once (decision 0028): different clouds, regions or accounts, any
-// mix of the fs, s3, gcs and azure backends.
-//
-// Writes go to Redundancy members in parallel and succeed once WriteQuorum of
-// them hold the blob; members still committing get MemberTimeout to finish
-// in the background, and every member's outcome is recorded in the replica
-// index (store.ReplicaIndex) as present or pending, so the repair worker can
-// fill missing copies later. Reads use the index to go straight to a member
-// holding the blob, in read order: this instance's zone first, then by
-// observed latency, members whose breaker is open last. A read that fails
-// part-way reopens on the next holder at the same offset, which is safe
-// because blobs are immutable.
-//
-// This is Artifactory's sharding provider (redundancy, lenientLimit,
-// zone-aware reads) with three differences: members may be any backend in
-// any cloud, an index records which members hold which blob instead of every
-// read probing every shard, and surplus copies are never deleted
-// automatically.
 package mirror
 
 import (
@@ -33,7 +14,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 // Sentinel errors. Test with errors.Is.
@@ -124,7 +105,7 @@ type Options struct {
 	// IDs). Members keep their own sessions.
 	Sessions session.Store
 	// Replicas records which members hold which blobs.
-	Replicas store.ReplicaIndex
+	Replicas ReplicaIndex
 	// BreakerThreshold and BreakerCooldown tune each member's breaker; zero
 	// means the defaults.
 	BreakerThreshold int
@@ -138,9 +119,9 @@ type Options struct {
 	//
 	// Blobs is the blob index whose reference counts tell a deferred delete
 	// whether the blob was uploaded again since.
-	Blobs store.BlobIndex
+	Blobs BlobIndex
 	// Leases holds the lease that keeps two repair passes from overlapping.
-	Leases store.LeaseStore
+	Leases work.LeaseStore
 	// RepairLease names the lease a pass holds; empty means
 	// "blob-mirror-repair". Two mirrors sharing a lease store (the hot and
 	// cold tiers) need different names, or each pass of one skips the other.
@@ -165,7 +146,7 @@ type Store struct {
 	memberTimeout time.Duration
 	chunk         int64
 	sessions      session.Store
-	replicas      store.ReplicaIndex
+	replicas      ReplicaIndex
 	threshold     int
 	cooldown      time.Duration
 	now           func() time.Time
