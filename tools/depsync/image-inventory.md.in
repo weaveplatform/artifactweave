@@ -45,6 +45,10 @@ original tested versions.
 | [`vagrant.Dockerfile`](../../test/acceptance/clients/vagrant.Dockerfile) | `{{vagrant.image}}` | Vagrant {{vagrant}} (Linux amd64) | [HashiCorp stable installer](https://developer.hashicorp.com/vagrant/install), [release checksums](https://releases.hashicorp.com/vagrant/{{vagrant}}/vagrant_{{vagrant}}_SHA256SUMS) |
 | [`vscode.Dockerfile`](../../test/acceptance/clients/vscode.Dockerfile) | `{{vscode.image}}` | VS Code official archive commit `{{vscode-commit}}`; Ubuntu {{vscode.version}} | [VS Code stable update API](https://update.code.visualstudio.com/api/update/linux-x64/stable/latest) |
 
+The Puppet image stays on Ruby 3.3 through a Dependabot entry of its own,
+because the pinned Puppet cannot extract a module archive on Ruby 3.4
+([#1126](https://github.com/weaveplatform/artifactweave/issues/1126)).
+
 Purposeful compatibility lanes retain their declared runtimes. Updating a pin
 regenerates this inventory, recipe labels and secondary version assertions; it
 does not bypass native tests or the review required for acceptance client changes.

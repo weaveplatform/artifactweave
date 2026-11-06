@@ -54,7 +54,7 @@
   "test/acceptance/clients/node.Dockerfile": "01905c5ad92add9618ea0f653224b597898499d47ec60771cb4b3064d395a2b1",
   "test/acceptance/clients/opkg.Dockerfile": "823e9e1f92794bc235ee47fe9b440dd3c26e8a8f756a161531bb31f009c50e24",
   "test/acceptance/clients/p2.Dockerfile": "bc887ec4a95227f7e062341022fde86f45e6be8fdce3fadc32dac0df82bf8c4b",
-  "test/acceptance/clients/puppet/Dockerfile": "6672fd0610e7a5c0eb321f6a2d65678731c6480059b207e7e04b29120f6bfc15",
+  "test/acceptance/clients/puppet/Dockerfile": "ca9a806b8b9da3dc5b14c78afa5b7d2071a150ae702b488e1f35f87fd92c36c4",
   "test/acceptance/clients/python.Dockerfile": "e02820ad4203759c9fc5171f5bdaae524d6becd21b4267b737129c241f6cab8c",
   "test/acceptance/clients/r.Dockerfile": "8862de89e4f2eb1e5c85a5c6ed1a6597c41421023e055a804e7d2c3ad56da94b",
   "test/acceptance/clients/ruby.Dockerfile": "ae2ce96966f118aef6a7923f0ebaed2a850d76c2f9ee4a3d4450ab58bffb9ac8",

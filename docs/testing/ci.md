@@ -544,7 +544,7 @@ Dockerfile, pinned digest, binary version, release source and compatibility lane
   | `dotnet.Dockerfile` | The .NET SDK's LTS lane, whose `dotnet` carries NuGet's client | every `@nuget` scenario (`.NET`) |
   | `dotnet-11.Dockerfile` | The SDK's newer compatibility lane, with its exact tag and digest in the generated image inventory | every `dotnet` scenario again: each is a Scenario Outline over `.NET` and `.NET 11` |
   | `r.Dockerfile` | Digest-pinned R with `Rscript` and `install.packages()` | `@cran` source install, cache and virtual scenarios |
-  | `puppet/Dockerfile` | Puppet 8.10.0 on Ruby 3, in a directory of its own so that its Dependabot entry can hold it below Ruby 4, which every Facter 4 release excludes | every `@puppet` scenario |
+  | `puppet/Dockerfile` | Puppet 8.10.0 on Ruby 3.3, in a directory of its own so that its Dependabot entry can hold it below Ruby 3.4, where Puppet cannot extract a module archive (#1126); every Facter 4 release excludes Ruby 4 as well | every `@puppet` scenario |
   | `frogml/Dockerfile` | FrogML 3.0.0 on Python 3.13, in a directory of its own so that its Dependabot entry can hold it below Python 3.14, which the SDK excludes | every `@machinelearning` scenario |
 
 The `@cran` selector builds this R image when CRAN code changes and runs its

@@ -36,7 +36,7 @@ original tested versions.
 | [`node.Dockerfile`](../../test/acceptance/clients/node.Dockerfile) | `node:26.13.0-bookworm-slim@sha256:bc0a2afd3b74ce12222fc8bab99271e66257f021078f5f4a5d687a77d280c1d9` | Node 26.13.0, bundled npm | [Node releases](https://nodejs.org/download/release/latest/) |
 | [`opkg.Dockerfile`](../../test/acceptance/clients/opkg.Dockerfile) | `ubuntu:26.10@sha256:262df65c0ec6bf8d9dcc87454f4330a05fae4b97825f45854af3b136666584c2` | opkg 0.10.0 | [Yocto opkg releases](https://downloads.yoctoproject.org/releases/opkg/) |
 | [`p2.Dockerfile`](../../test/acceptance/clients/p2.Dockerfile) | `ubuntu:26.10@sha256:262df65c0ec6bf8d9dcc87454f4330a05fae4b97825f45854af3b136666584c2` | Eclipse Platform / Equinox P2 4.41, Java 21 | [Eclipse Platform downloads](https://download.eclipse.org/eclipse/downloads/) |
-| [`puppet/Dockerfile`](../../test/acceptance/clients/puppet/Dockerfile) | `ruby:3.4.11-slim@sha256:71363b823df5bdec8330f98578a2d16b6a43f6ca2aafe4321e478ba2362521c8` | Puppet 8.10.0 on Ruby 3.4.11 | [Puppet release](https://rubygems.org/gems/puppet/versions/8.10.0) |
+| [`puppet/Dockerfile`](../../test/acceptance/clients/puppet/Dockerfile) | `ruby:3.3.13-slim@sha256:8743a2d8ce3a33aed0de5c009dca0542e5fa85a4bd5b43170ce7b4af8c23809a` | Puppet 8.10.0 on Ruby 3.3.13 | [Puppet release](https://rubygems.org/gems/puppet/versions/8.10.0) |
 | [`python.Dockerfile`](../../test/acceptance/clients/python.Dockerfile) | `python:3.15.2-slim@sha256:8c13a3f37a6a5b71498228e902c4b9f51c1f7900d49fabf71f9a650c6120e0d0` | Python 3.15.2; pip 26.3; Twine 7.0.0; uv 0.13.7; Poetry 2.5.1 | [Python](https://www.python.org/downloads/), [PyPI](https://pypi.org/) |
 | [`r.Dockerfile`](../../test/acceptance/clients/r.Dockerfile) | `r-base:4.6.2@sha256:857b44eeca5a8c4f39b210d3912a879fa4cf4b47d9e57a5940b6a29d44c8f938` | R 4.6.2 | [R releases](https://www.r-project.org/) |
 | [`ruby.Dockerfile`](../../test/acceptance/clients/ruby.Dockerfile) | `ruby:4.0.9-slim@sha256:88f0d8f1f2f7829c8c85c5cfee774f7ac936a7ba460e904e8c873b6a7f96c311` | RubyGems 4.0.23 and Bundler 4.0.23 on Ruby 4.0.9 | [Ruby releases](https://www.ruby-lang.org/en/downloads/releases/), [RubyGems/Bundler releases](https://rubygems.org/gems/rubygems-update/versions/4.0.23) |
@@ -44,6 +44,10 @@ original tested versions.
 | [`swift.Dockerfile`](../../test/acceptance/clients/swift.Dockerfile) | `swift:6.4.2-jammy@sha256:e86bcb3d1aa6e2bcd54251bad4b82b1f9d825757081c058840f7483c0d164744` | Swift/SwiftPM 6.4.2 pinned Linux client | [Swift 6.4.2](https://github.com/swiftlang/swift/releases/tag/swift-6.4.2-RELEASE) |
 | [`vagrant.Dockerfile`](../../test/acceptance/clients/vagrant.Dockerfile) | `ubuntu:26.10@sha256:262df65c0ec6bf8d9dcc87454f4330a05fae4b97825f45854af3b136666584c2` | Vagrant 2.4.9 (Linux amd64) | [HashiCorp stable installer](https://developer.hashicorp.com/vagrant/install), [release checksums](https://releases.hashicorp.com/vagrant/2.4.9/vagrant_2.4.9_SHA256SUMS) |
 | [`vscode.Dockerfile`](../../test/acceptance/clients/vscode.Dockerfile) | `ubuntu:26.10@sha256:262df65c0ec6bf8d9dcc87454f4330a05fae4b97825f45854af3b136666584c2` | VS Code official archive commit `261c84cb1eddf11235f9e2c921425e9663fbe556`; Ubuntu 26.10 | [VS Code stable update API](https://update.code.visualstudio.com/api/update/linux-x64/stable/latest) |
+
+The Puppet image stays on Ruby 3.3 through a Dependabot entry of its own,
+because the pinned Puppet cannot extract a module archive on Ruby 3.4
+([#1126](https://github.com/weaveplatform/artifactweave/issues/1126)).
 
 Purposeful compatibility lanes retain their declared runtimes. Updating a pin
 regenerates this inventory, recipe labels and secondary version assertions; it

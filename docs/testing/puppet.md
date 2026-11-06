@@ -88,6 +88,16 @@ and full application acceptance cover denied reads/writes, invalid metadata,
 archive corruption, stale authority, source failure, cache refresh/offline,
 version pagination and virtual member ordering and changes.
 
+The image runs Puppet on Ruby 3.3, and its Dependabot entry holds it there. On
+Ruby 3.4 the pinned Puppet cannot extract any module archive:
+`Puppet::Util.safe_posix_fork` closes every descriptor it lists in
+`/proc/self/fd`, including the one its own walk is reading, and Ruby 3.4 raises
+`Errno::EBADF` on that walk where Ruby 3.3 ignored it
+([#1126](https://github.com/weaveplatform/artifactweave/issues/1126),
+[Red Hat bug 2349352](https://bugzilla.redhat.com/show_bug.cgi?id=2349352)). On
+Ruby 4 the gem does not install, because every Facter 4 release declares Ruby
+below 4.0.
+
 ```sh
 docker build -t artifactweave-accept-puppet test/acceptance/clients/puppet
 ARTIFACTWEAVE_PUPPET_IMAGE=artifactweave-accept-puppet \
