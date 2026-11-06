@@ -17,8 +17,12 @@ type BuildSeed struct {
 }
 
 // sha1Of and md5Of are the checksums Seeds gives item n (1 is the first).
+//
+//nolint:gosec // n numbers a seed, far inside rune's range.
 func sha1Of(n int) string { return strings.Repeat(string(rune('a'+n)), 40) }
-func md5Of(n int) string  { return strings.Repeat(string(rune('a'+n)), 32) }
+
+//nolint:gosec // n numbers a seed, far inside rune's range.
+func md5Of(n int) string { return strings.Repeat(string(rune('a'+n)), 32) }
 
 func file(name, typ string, item int) types.BuildFile {
 	return types.BuildFile{
@@ -238,8 +242,8 @@ func pathCases() []Case {
 
 // RelatedCases are queries whose include names fields of related domains
 // (#410), in both directions. The rows they nest come from an aql.Source,
-// so every store's (aql.AQLSource) must nest what Corpus does; the migration/artifacts/core/aql
-// tests pin what that is.
+// so every store's (aql.AQLSource) must nest what Corpus does; the
+// migration/artifacts/core/aql tests pin what that is.
 func RelatedCases() []Case {
 	var out []Case
 	q := func(name, query string) {

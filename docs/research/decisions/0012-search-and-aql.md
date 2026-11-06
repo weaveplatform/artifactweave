@@ -666,10 +666,10 @@ live Artifactory ([#216](https://github.com/weaveplatform/artifactweave/issues/2
 - CLI-generated queries captured as fixtures and replayed, including `download_remote` for
   a remote's cache, and shared cases for remote, cache, nested and cyclic virtual keys
   under every operator.
-- Shared build fixtures (`migration/artifacts/core/aql/aqltest`) for every relation path in both directions,
-  the CLI's `--build` query shapes, and the `builds` and `build.promotions` domains, with
-  identical ordered rows from the reference evaluator, the in-memory store, SQLite and
-  PostgreSQL.
+- Shared build fixtures (`migration/artifacts/core/aql/aqltest`) for every relation path
+  in both directions, the CLI's `--build` query shapes, and the `builds` and
+  `build.promotions` domains, with identical ordered rows from the reference evaluator,
+  the in-memory store, SQLite and PostgreSQL.
 - Shared root cases (`aqltest` `rootCases`: `{"path":"."}`, a recorded root, a remote's
   cache, a virtual key, sorts, the window and the cap) with identical ordered rows on the
   reference evaluator and every store, and an acceptance scenario (`aql_roots.feature`) in
@@ -677,13 +677,15 @@ live Artifactory ([#216](https://github.com/weaveplatform/artifactweave/issues/2
   and `jf rt del` pass it over.
 - Shared cases for `@` and `@*`, of an item (`aqltest.Cases`) and of related rows and runs
   (`aqltest.RelatedCases`), on the reference evaluator and every store, beside a sort and
-  beside an `@<key>` include, and `migration/artifacts/core/aql` and server tests that an item's statistics
-  record without the included values renders no `stats` ([#506](https://github.com/weaveplatform/artifactweave/issues/506)).
+  beside an `@<key>` include, and `migration/artifacts/core/aql` and server tests that an
+  item's statistics record without the included values renders no `stats`
+  ([#506](https://github.com/weaveplatform/artifactweave/issues/506)).
 - Shared related-include cases (`aqltest.RelatedCases`) whose nested rows, loaded from each
   store through `aql.AQLSource`, render as the reference corpus's, the properties and
-  statistics of related rows and a run's own properties included; `migration/artifacts/core/aql` tests pin the
-  nesting, the criteria it shares, the folding, the key filter, visibility and the budget,
-  and server tests the properties and statistics a non-admin and a build-scoped token see.
+  statistics of related rows and a run's own properties included;
+  `migration/artifacts/core/aql` tests pin the nesting, the criteria it shares, the
+  folding, the key filter, visibility and the budget, and server tests the properties
+  and statistics a non-admin and a build-scoped token see.
 - Parser tests for the criteria list, the relative-time units and `item.infos`; server
   tests for the 408 on either timeout, the length message and the nested rows a
   non-admin sees.

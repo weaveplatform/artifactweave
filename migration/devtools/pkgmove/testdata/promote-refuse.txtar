@@ -20,7 +20,7 @@ git clean -fdq
 # stops promote with an error that names it.
 failgit ^ls-files -z -- internal
 fail promote
-stderr ^pkgmove: git ls-files -z -- internal pkg/aql .*: exit status 128: fake git failure$
+stderr ^pkgmove: git ls-files -z -- internal( pkg/[a-z]+)+: exit status 128: fake git failure$
 failgit grep .* -l -e
 fail promote
 stderr ^pkgmove: git .* grep .* -l -e .*: exit status 128: fake git failure$

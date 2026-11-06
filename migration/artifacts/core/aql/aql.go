@@ -1,25 +1,3 @@
-// Package aql parses Artifactory Query Language and runs it (decision 0012).
-// It covers the items domain: the shape the JFrog CLI generates for every
-// file specification (research 09) and what users write by hand. That is
-// $and and $or, field comparisons, $match and $nmatch globs, @property and
-// property.key/property.value criteria, $msp, the stat domain, and the
-// include, sort, offset, limit, transitive and distinct suffixes with
-// Artifactory's output rules (research 22 §1). The builds and
-// build.promotions domains are served too, and every domain reaches the
-// others through relation paths such as artifact.module.build.name (see
-// Joined), which is how the JFrog CLI finds a build's files; an include
-// may name those domains' fields too, which Nest fills in (nest.go). It
-// also parses the two actions, items.delete and properties.update
-// (research 22 §1.5), whose criteria select items the same way; the server
-// carries them out. Every repository's root is an items row (Roots).
-//
-// A parsed Query is run two ways that must agree row for row: Match and
-// Compare are the reference semantics (the in-memory store uses them), and
-// Compile turns the query into SQL for SQLite or PostgreSQL. The store
-// contract suite runs the same queries on every backend and expects the
-// same ordered rows. Before either, Resolve rewrites repo criteria against
-// the configured repositories, so remote and virtual keys match what they
-// stand for.
 package aql
 
 import (

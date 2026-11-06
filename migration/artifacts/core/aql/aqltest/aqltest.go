@@ -1,18 +1,3 @@
-// Package aqltest holds the AQL fixtures every search backend must agree
-// on (decision 0012): seed items chosen to trip the dialect traps (a GLOB
-// character class, LIKE wildcards in names, a multi-byte character, a
-// missing time, a remote cache, an item without statistics beside one whose
-// statistics are zero), the repositories they live in, the query shapes the
-// JFrog CLI generates, and the rows each query returns, in order.
-//
-// BuildSeeds add build runs and promotions that relate to the items by
-// checksum, for the relation-path cases and the builds and
-// build.promotions cases (BuildCases).
-//
-// The migration/artifacts/core/aql tests run the cases through aql.SelectItems and
-// aql.SelectBuilds over Corpus; the store contract suite runs them through
-// every ItemStore.Search and BuildStore.Search. Both resolve each query
-// against Repositories first, as the server does.
 package aqltest
 
 import (
@@ -72,6 +57,7 @@ func Seeds() []Seed {
 			Updated:  Base.Add(time.Duration(n) * time.Minute),
 		}
 		if !folder {
+			//nolint:gosec // n numbers a seed, far inside rune's range.
 			it.Actual = types.Checksums{
 				SHA1: strings.Repeat(string(rune('a'+n)), 40),
 				MD5:  strings.Repeat(string(rune('a'+n)), 32),
@@ -216,7 +202,7 @@ func (c Case) Parse() (*aql.Query, error) {
 	if q == nil {
 		var err error
 		if q, err = aql.Parse(c.Query); err != nil {
-			return nil, err
+			return nil, err //nolint:wrapcheck // a case that does not parse fails with the parser's own error
 		}
 	}
 	q.Resolve(Repositories())

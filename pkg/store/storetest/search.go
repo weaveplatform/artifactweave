@@ -13,11 +13,12 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// testItemSearch runs the shared AQL cases (migration/artifacts/core/aql/aqltest): every backend
-// must return the reference evaluator's rows in the reference order, with the
-// properties and statistics the query includes, which is what keeps the SQL
-// dialects' globbing, collation and NULL handling honest. The build runs
-// the relation-path cases join to are stored too, and the builds and
+// testItemSearch runs the shared AQL cases
+// (migration/artifacts/core/aql/aqltest): every backend must return the
+// reference evaluator's rows in the reference order, with the properties and
+// statistics the query includes, which is what keeps the SQL dialects'
+// globbing, collation and NULL handling honest. The build runs the
+// relation-path cases join to are stored too, and the builds and
 // build.promotions cases run through the build store.
 func testItemSearch(t *testing.T, st store.Store) {
 	ctx := context.Background()

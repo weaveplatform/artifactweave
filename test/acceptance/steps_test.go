@@ -42,7 +42,8 @@ const testAdminPassword = "acceptance-admin"
 
 // aqlCapture, when set, is a directory that receives every AQL query the
 // server is sent, one file per query named after its scenario, so the JFrog
-// CLI's real queries can refresh migration/artifacts/core/aql/aqltest/testdata (make capture-aql).
+// CLI's real queries can refresh
+// migration/artifacts/core/aql/aqltest/testdata (make capture-aql).
 var aqlCapture = os.Getenv("ARTIFACTWEAVE_AQL_CAPTURE")
 
 // world is one scenario's state.

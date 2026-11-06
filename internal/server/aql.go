@@ -77,7 +77,8 @@ func (s artifactoryService) searchAQL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// At debug level the queries clients send are kept: the acceptance
-	// suite captures the JFrog CLI's from here as migration/artifacts/core/aql fixtures.
+	// suite captures the JFrog CLI's from here as
+	// migration/artifacts/core/aql fixtures.
 	s.log().DebugContext(ctx, "aql query", "request_id", requestIDFrom(ctx), "query", string(body))
 	q, err := aql.Parse(string(body))
 	if err != nil {

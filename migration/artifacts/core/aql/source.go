@@ -28,7 +28,9 @@ type ItemSearch interface {
 // AQLSource is the source of the rows an AQL include of related domains
 // reaches (Query.Nest): runs by the checksum of their files, files by
 // checksum, runs by ID and their promotions. It reads through the store's
-// own lookups, builds and items, so every backend nests the same rows.
+// own lookups, builds and items, so every backend nests the same rows. It
+// takes those two rather than the store aggregate because the store imports
+// this package: a store parameter would be an import cycle.
 func AQLSource(builds BuildRuns, items ItemSearch) Source {
 	return aqlSource{builds: builds, items: items}
 }

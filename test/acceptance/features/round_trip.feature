@@ -2,8 +2,9 @@
 Feature: JFrog CLI round trip
   P3's exit criterion: the JFrog CLI uploads, searches, downloads, copies,
   moves, sets and deletes properties on, and deletes a tree, unchanged. The
-  tree mirrors the seeds in migration/artifacts/core/aql/aqltest, so the AQL the CLI sends here
-  is what make capture-aql saves as that package's fixtures.
+  tree mirrors the seeds in migration/artifacts/core/aql/aqltest, so the AQL
+  the CLI sends here is what make capture-aql saves as that package's
+  fixtures.
 
   Background:
     Given the registry is running
@@ -93,8 +94,9 @@ Feature: JFrog CLI round trip
     And the output does not contain "util-2.0.jar"
     And the output contains "libs-local/org/acme/app-1.0.jar"
 
-  # The file-spec shapes of migration/artifacts/core/aql/aqltest/testdata, one command each, so
-  # make capture-aql refreshes every fixture from the CLI's own queries.
+  # The file-spec shapes of migration/artifacts/core/aql/aqltest/testdata,
+  # one command each, so make capture-aql refreshes every fixture from the
+  # CLI's own queries.
   Scenario: the query shapes the fixtures capture
     Given I PUT "/artifactory/api/repositories/remote" as admin with body:
       """

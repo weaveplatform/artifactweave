@@ -16,6 +16,9 @@ const (
 	DomainPromotions
 )
 
+// String is the domain as a query spells it: "items", "builds" or
+// "build.promotions". A value that names no domain reads as items, the
+// zero value.
 func (d Domain) String() string {
 	switch d {
 	case DomainBuilds:

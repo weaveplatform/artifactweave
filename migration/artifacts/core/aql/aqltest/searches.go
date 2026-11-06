@@ -18,7 +18,7 @@ import (
 func searchCases() []Case {
 	file := &aql.FieldCriterion{Field: aql.FieldType, Op: aql.OpEq, Text: "file"}
 	repos := func(keys ...string) aql.Or {
-		out := aql.Or{}
+		out := make(aql.Or, 0, len(keys))
 		for _, k := range keys {
 			out = append(out, &aql.FieldCriterion{Field: aql.FieldRepo, Op: aql.OpEq, Text: k})
 		}
