@@ -1,15 +1,3 @@
-// Package format is the contract between the item service and the package
-// formats (decision 0032): the hooks every format implements, the optional
-// interfaces a format adds for what it needs, the environment they run in,
-// and the RejectionError a format refuses a request with. The item service calls
-// the hooks on every write, whichever API carried it, so a format's package
-// index (decision 0018) and derived items stay consistent with the item
-// tree, which remains the source of truth.
-//
-// Each ecosystem has a subpackage named after it (repo-layout.md), and
-// internal/format/formats picks one for a package type. A format package
-// never imports internal/server, so formats speak to clients only through
-// RejectionError.
 package format
 
 import (
@@ -255,8 +243,7 @@ type Resolver interface {
 // Annotation is a change to an item's properties.
 type Annotation struct {
 	// Set holds the keys set or replaced, with their new values.
-	Set types.Properties
-	// Removed lists the keys removed.
+	Set     types.Properties
 	Removed []string
 	// At is when the change was made. A hook that writes properties in
 	// turn writes them at At, so they read as part of the same change
@@ -351,7 +338,6 @@ type Worker interface {
 // replication (P11) and federation (P13).
 type Class int
 
-// Classes of item.
 const (
 	// ClassUnique is content only its deployer can supply again, such as a
 	// jar or an image layer.
@@ -397,6 +383,8 @@ type AcceptedError struct {
 	Status int
 }
 
+// Error names Status, for logs and wrapped errors. No client reads it: the
+// HTTP layer answers Status with an empty body.
 func (a *AcceptedError) Error() string {
 	return fmt.Sprintf("format: accepted with status %d and not stored", a.Status)
 }
@@ -414,4 +402,7 @@ func Rejectf(status int, format string, args ...any) *RejectionError {
 	return &RejectionError{Status: status, Message: fmt.Sprintf(format, args...)}
 }
 
+// Error returns Message alone, without Status, so a refusal that is wrapped
+// or logged reads as the text the client is answered with. The HTTP layer
+// takes Status from the struct.
 func (r *RejectionError) Error() string { return r.Message }

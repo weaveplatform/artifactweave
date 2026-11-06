@@ -1,6 +1,6 @@
 // Package formats picks the format of a package type. It is apart from
-// migration/artifacts/core/format so a format package can implement that contract without
-// an import cycle.
+// migration/artifacts/core/format so a format package can implement that
+// contract without an import cycle.
 package formats
 
 import (
