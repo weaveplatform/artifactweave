@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formattest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/formattest"
 )
 
 // zipOf is a zip of files, in name order, the same bytes every time.

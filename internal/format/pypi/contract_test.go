@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formattest"
 	"github.com/weaveplatform/artifactweave/internal/format/pypi"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/formattest"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 

@@ -288,7 +288,7 @@ func TestUnitSidecarsKeepTheContract(t *testing.T) {
 	Run(t, keepingFormat(keeping{tagged{unlinked: prov}}))
 }
 
-// Both options together, as the Helm format will run them.
+// Both options together, as the Helm format runs them.
 func TestUnitRepositoryWorkAndSidecarsKeepTheContract(t *testing.T) {
 	f := keepingFormat(keepingIndex{indexing{tagged{unlinked: prov}}})
 	f.RepoWork = []string{indexKind}
@@ -443,7 +443,6 @@ func byPackage(_ repo.Config, full string) string {
 	return p
 }
 
-// byRepository keys the index by repository.
 func byRepository(c repo.Config, _ string) string { return c.Key }
 
 // forgetful notes sidecars in its hooks but links them on a reindex.

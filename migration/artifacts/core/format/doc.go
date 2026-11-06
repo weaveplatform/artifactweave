@@ -141,7 +141,7 @@
 //   - TestUnitRejectf and TestUnitAcceptedError: the error texts.
 //   - TestUnitUniqueSnapshots: no limit, or one of 0 or less, keeps every
 //     build, and any other limit keeps at least MinUniqueSnapshots.
-//   - formattest.Run (internal/format/formattest) is the contract suite: the
+//   - formattest.Run (artifacts/core/formattest) is the contract suite: the
 //     format packages' tests run it through the item service on each store
 //     backend.
 package format
