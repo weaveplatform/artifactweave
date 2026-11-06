@@ -12,7 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 )
 
 func (w *world) registerCache(sc *godog.ScenarioContext) {

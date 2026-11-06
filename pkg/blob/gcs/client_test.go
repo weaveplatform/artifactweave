@@ -21,7 +21,7 @@ import (
 	"cloud.google.com/go/storage"
 	"google.golang.org/api/googleapi"
 
-	"github.com/weaveplatform/artifactweave/pkg/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 )
 
 func TestUnitNormaliseEndpoint(t *testing.T) {

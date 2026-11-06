@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	tfbe "github.com/weaveplatform/artifactweave/internal/format/terraformbackend"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
-	"github.com/weaveplatform/artifactweave/pkg/blob"
-	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 )
 
 func keys(t *testing.T, fill byte) *crypt.Keyring {

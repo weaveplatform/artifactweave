@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 )
 
 var errInjected = errors.New("injected")

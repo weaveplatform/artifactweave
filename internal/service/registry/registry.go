@@ -24,7 +24,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/pkg/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -59,7 +59,7 @@ type Service struct {
 	// locks serialise one session's requests in this process, striped by
 	// session id so the set stays bounded however many uploads run. Two
 	// instances serving one session at once is the client's doing, as with
-	// any blob store upload (pkg/blob).
+	// any blob store upload (migration/platform/blob).
 	locks [64]sync.Mutex
 }
 

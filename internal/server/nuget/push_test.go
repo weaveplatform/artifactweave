@@ -17,7 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/postgres"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
 	"github.com/weaveplatform/artifactweave/internal/testfault"
-	"github.com/weaveplatform/artifactweave/pkg/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 )
 
 const v2 = "/artifactory/api/nuget/nuget-local"

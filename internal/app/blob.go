@@ -11,9 +11,9 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 
 	"github.com/weaveplatform/artifactweave/internal/config"
-	"github.com/weaveplatform/artifactweave/pkg/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/blob/azure"
-	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/blob/gcs"
 	"github.com/weaveplatform/artifactweave/pkg/blob/mirror"
 	"github.com/weaveplatform/artifactweave/pkg/blob/s3"

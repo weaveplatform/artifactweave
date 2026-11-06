@@ -20,9 +20,9 @@ import (
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	"google.golang.org/api/option"
 
-	"github.com/weaveplatform/artifactweave/pkg/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/blobtest"
 	"github.com/weaveplatform/artifactweave/pkg/blob/azure"
-	"github.com/weaveplatform/artifactweave/pkg/blob/blobtest"
 	"github.com/weaveplatform/artifactweave/pkg/blob/gcs"
 	"github.com/weaveplatform/artifactweave/pkg/blob/mirror"
 	"github.com/weaveplatform/artifactweave/pkg/blob/s3"

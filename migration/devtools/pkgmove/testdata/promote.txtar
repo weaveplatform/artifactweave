@@ -36,7 +36,7 @@ go $GOVERSION
     "packages": [
         {"from":"internal/app","action":"move","to":"app","ticket":"WEB-18"},
         {"from":"internal/zeta2","action":"move","to":"platform/zeta2","rename":{"z.go":"zeta2.go"},"ticket":"PLT-40"},
-        {"from":"pkg/blob","action":"move","to":"platform/blob","ticket":"PLT-41"}
+        {"from":"internal/zstore","action":"move","to":"platform/blob","ticket":"PLT-41"}
     ],
     "files": [
         {"from":"internal/app/extra.go","action":"move","to":"app","ticket":"WEB-18"},
@@ -167,7 +167,7 @@ internal/app is where the app was, and is again.
       "ticket": "PLT-40"
     },
     {
-      "from": "pkg/blob",
+      "from": "internal/zstore",
       "action": "move",
       "to": "internal/platform/blob",
       "ticket": "PLT-41"

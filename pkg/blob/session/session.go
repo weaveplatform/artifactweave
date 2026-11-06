@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/weaveplatform/artifactweave/pkg/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 )
 
 // Session is one upload session. D is the backend's own state; it is stored

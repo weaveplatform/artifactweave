@@ -1,8 +1,3 @@
-// Package fs is the local-disk blob store. Blobs live at
-// <root>/sha256/<ab>/<cd>/<hex>; the two shard levels keep directories small
-// enough for tools and filesystems that slow down on huge listings. Upload
-// sessions live at <root>/_uploads/<id>/ on the same filesystem, so committing
-// is an fsync and a rename rather than a copy.
 package fs
 
 import (
@@ -16,7 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/weaveplatform/artifactweave/pkg/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 )
 
 const (
@@ -92,11 +87,11 @@ func (s *Store) BeginUpload(ctx context.Context, opts ...blob.UploadOption) (blo
 	}
 	o, err := blob.ResolveOptions(opts...)
 	if err != nil {
-		return nil, err
+		return nil, err //nolint:wrapcheck // blob's error names itself; a prefix changes it
 	}
 	id, err := blob.NewUploadID()
 	if err != nil {
-		return nil, err
+		return nil, err //nolint:wrapcheck // blob's error names itself; a prefix changes it
 	}
 	u := &upload{
 		s:        s,
@@ -177,7 +172,7 @@ func (u *upload) rehash() error {
 func (u *upload) saveState() error {
 	hs, err := u.h.MarshalBinary()
 	if err != nil {
-		return err
+		return err //nolint:wrapcheck // blob's error names itself; a prefix changes it
 	}
 	// Marshalling a struct of an int, a byte slice and a string cannot fail.
 	raw, _ := json.Marshal(state{Size: u.size, Hasher: hs, Expected: u.expected})
@@ -232,7 +227,7 @@ func (u *upload) Commit(ctx context.Context, want blob.Digests) (blob.Info, erro
 		return blob.Info{}, fmt.Errorf("blob/fs: commit: %w", err)
 	}
 	if err := blob.ValidateDigests(want); err != nil {
-		return blob.Info{}, err
+		return blob.Info{}, err //nolint:wrapcheck // blob's error names itself; a prefix changes it
 	}
 	if err := u.live(); err != nil {
 		return blob.Info{}, err
@@ -243,7 +238,7 @@ func (u *upload) Commit(ctx context.Context, want blob.Digests) (blob.Info, erro
 	got := u.h.Sum()
 	if err := blob.Verify(want, got); err != nil {
 		_ = u.Abort(ctx)
-		return blob.Info{}, err
+		return blob.Info{}, err //nolint:wrapcheck // blob's error names itself; a prefix changes it
 	}
 	info := blob.Info{Size: u.size, Digests: got}
 	target := u.s.blobPath(got.SHA256)
@@ -331,7 +326,7 @@ func (s *Store) Stat(ctx context.Context, sha string) (blob.Info, error) {
 		return blob.Info{}, fmt.Errorf("blob/fs: stat: %w", err)
 	}
 	if err := blob.ValidateSHA256(sha); err != nil {
-		return blob.Info{}, err
+		return blob.Info{}, err //nolint:wrapcheck // blob's error names itself; a prefix changes it
 	}
 	fi, err := os.Stat(s.blobPath(sha))
 	if err != nil {
@@ -355,7 +350,7 @@ func (s *Store) Delete(ctx context.Context, sha string) error {
 		return fmt.Errorf("blob/fs: delete: %w", err)
 	}
 	if err := blob.ValidateSHA256(sha); err != nil {
-		return err
+		return err //nolint:wrapcheck // blob's error names itself; a prefix changes it
 	}
 	if err := osRemove(s.blobPath(sha)); err != nil && !errors.Is(err, iofs.ErrNotExist) {
 		return fmt.Errorf("blob/fs: delete %s: %w", sha, err)
@@ -372,7 +367,7 @@ func (s *Store) Walk(ctx context.Context, fn func(blob.Info) error) error {
 				return err
 			}
 			if cerr := ctx.Err(); cerr != nil {
-				return cerr
+				return cerr //nolint:wrapcheck // Walk wraps it below as blob/fs: walk
 			}
 			if d.IsDir() || blob.ValidateSHA256(d.Name()) != nil {
 				return nil

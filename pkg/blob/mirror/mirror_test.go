@@ -11,9 +11,9 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/blob"
-	"github.com/weaveplatform/artifactweave/pkg/blob/blobtest"
-	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/blobtest"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/blob/session"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"

@@ -17,7 +17,7 @@ exclude:
     - ^tools/
     # Contract-suite harnesses (decision 0015): their remaining branches are
     # the t.Fatal paths taken only when a backend violates the contract.
-    - ^pkg/blob/blobtest/
+    - ^migration/platform/blob/blobtest/
     - ^pkg/store/storetest/
     - ^migration/artifacts/core/formattest/
     # Per-module store contract suites (decision 0015); their remaining

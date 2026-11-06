@@ -13,7 +13,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/weaveplatform/artifactweave/pkg/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 )
 
 // fakeGCS is an in-memory bucket with the semantics of real Cloud Storage

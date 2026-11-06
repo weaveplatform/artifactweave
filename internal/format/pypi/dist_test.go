@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/format/pypi"
-	"github.com/weaveplatform/artifactweave/pkg/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 )
 
 func read(t *testing.T, name string, body []byte) (*pypi.Dist, error) {

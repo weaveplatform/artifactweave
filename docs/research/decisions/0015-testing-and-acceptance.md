@@ -59,10 +59,10 @@ impact plan selects by prefix within reviewed packages and retains exact test
 names as a run artifact. The `TestMain` hooks remain Go hooks and the `Fuzz`
 targets retain their distinct reviewed owner.
 
-**Contract suites** (`pkg/store/storetest`, `pkg/blob/blobtest`) run against the
-in-memory store, SQLite, PostgreSQL and MinIO. Container-backed cases skip with a clear
-message when Docker is unreachable, so the macOS and Windows jobs stay green while only
-Linux exercises PostgreSQL and MinIO.
+**Contract suites** (`pkg/store/storetest`, `migration/platform/blob/blobtest`) run
+against the in-memory store, SQLite, PostgreSQL and MinIO. Container-backed cases skip
+with a clear message when Docker is unreachable, so the macOS and Windows jobs stay green
+while only Linux exercises PostgreSQL and MinIO.
 
 **API tests** start `httptest.NewServer`, drive it through the generated clients and
 include the route × principal matrix.

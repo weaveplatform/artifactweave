@@ -33,7 +33,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/cloudfront/sign"
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/pkg/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 )
 
 // ErrSignature reports a request the edge refuses: no signature, a bad one,

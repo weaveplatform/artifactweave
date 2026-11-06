@@ -1,20 +1,3 @@
-// Package blob is the content-addressed binary store behind every repository
-// (decision record 0004). Blobs are keyed by their lowercase hex SHA-256; the
-// SHA-512, SHA-1 and MD5 that package clients also use are computed in the
-// same pass during the upload and returned by Commit so the caller can record
-// them in the item index, which is where checksum deploy, checksum search and
-// checksum files read them.
-//
-// Uploads are sessions rather than single calls because two clients need to
-// append across HTTP requests: Docker chunked uploads (PATCH then PUT) and the
-// JFrog CLI's multipart upload. A session is identified by an opaque ID that
-// ResumeUpload accepts in a later request. One writer per session is assumed;
-// the HTTP layer serialises requests for the same upload.
-//
-// Backends: blob/fs (local disk), blob/s3 (S3-compatible object storage),
-// blob/gcs (Google Cloud Storage) and blob/azure (Azure Blob Storage), plus
-// blob/mirror, one store over several of them. All are held to the same
-// behaviour by blob/blobtest.
 package blob
 
 import (
@@ -296,6 +279,7 @@ func (h *Hasher) MarshalBinary() ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("blob: save hasher: %w", err)
 		}
+		//nolint:gosec // G115: a digest state is far shorter than 64 KiB, so two bytes hold its length
 		out = append(out, byte(len(b)>>8), byte(len(b)))
 		out = append(out, b...)
 	}

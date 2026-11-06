@@ -22,7 +22,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/testfault"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	"github.com/weaveplatform/artifactweave/pkg/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 )
 
 // formFormat answers POST /upload/{file} with what ReadForm read for that

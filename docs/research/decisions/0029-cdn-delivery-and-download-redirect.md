@@ -130,7 +130,7 @@ check, `BEFORE_DOWNLOAD` workers ([0026](0026-workers-runtime.md)) and archived 
 - A redirected download is counted under the same rule as a streamed one: a whole file, or
   a range starting at byte 0, unless `skipUpdateStats=true`.
 
-**Signing contract.** `pkg/blob` replaces `Presigner` with:
+**Signing contract.** `migration/platform/blob` replaces `Presigner` with:
 
 ```go
 type Via int // ViaStorage or ViaCDN

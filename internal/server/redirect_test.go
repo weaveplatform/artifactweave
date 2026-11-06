@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 )
 
 var errCannotSign = errors.New("cannot sign")

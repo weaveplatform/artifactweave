@@ -1,6 +1,3 @@
-// Package blobtest is the contract every blob.Store backend must satisfy.
-// Backends call Run from their own tests; the s3 backend runs it twice, against
-// an in-memory fake everywhere and against MinIO where Docker is available.
 package blobtest
 
 import (
@@ -19,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 )
 
 // Options tunes the suite for a backend.
@@ -492,6 +489,8 @@ func concurrent(ctx context.Context, t *testing.T, s blob.Store) {
 	}
 }
 
+var errStop = errors.New("stop")
+
 func walk(ctx context.Context, t *testing.T, s blob.Store) {
 	want := map[string]int64{}
 	for i := range 3 {
@@ -521,10 +520,9 @@ func walk(ctx context.Context, t *testing.T, s blob.Store) {
 			t.Fatalf("walk size for %s: %d, want %d", k, got[k], v)
 		}
 	}
-	stop := errors.New("stop")
 	calls := 0
-	err = s.Walk(ctx, func(blob.Info) error { calls++; return stop })
-	if !errors.Is(err, stop) || calls != 1 {
+	err = s.Walk(ctx, func(blob.Info) error { calls++; return errStop })
+	if !errors.Is(err, errStop) || calls != 1 {
 		t.Fatalf("walk must stop at the first error: %v after %d calls", err, calls)
 	}
 }

@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/testfault"
-	"github.com/weaveplatform/artifactweave/pkg/blob"
-	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 )
 
 func TestUnitDisconnect(t *testing.T) {

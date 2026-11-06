@@ -7,9 +7,9 @@ Status: Proposed
 ## Context
 
 Decision [0004](0004-storage-sql-metadata-and-blobs.md) defines the content-addressed blob
-contract (`pkg/blob`) with `fs` and `s3` backends. Artifactory also stores binaries on
-Google Cloud Storage and Azure Blob Storage, and teams leaving it often run on those
-clouds.
+contract (`migration/platform/blob`) with `fs` and `s3` backends. Artifactory also stores
+binaries on Google Cloud Storage and Azure Blob Storage, and teams leaving it often run on
+those clouds.
 
 The contract asks four things of a backend:
 - An upload is a session that resumes in a later HTTP request or another process, from

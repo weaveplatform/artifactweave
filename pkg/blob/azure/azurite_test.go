@@ -14,8 +14,8 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
 
-	"github.com/weaveplatform/artifactweave/pkg/blob"
-	"github.com/weaveplatform/artifactweave/pkg/blob/blobtest"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/blobtest"
 	"github.com/weaveplatform/artifactweave/pkg/blob/session"
 	"github.com/weaveplatform/artifactweave/pkg/cdn"
 	"github.com/weaveplatform/artifactweave/pkg/cdn/cdntest"

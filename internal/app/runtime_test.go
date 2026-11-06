@@ -16,7 +16,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/config"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
-	"github.com/weaveplatform/artifactweave/pkg/blob/blobtest"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/blobtest"
 	"github.com/weaveplatform/artifactweave/pkg/blob/s3"
 	"github.com/weaveplatform/artifactweave/pkg/containertest"
 )
