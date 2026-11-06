@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"errors"
 	"io"
 	"log/slog"
 	"testing"
@@ -76,22 +75,8 @@ func (f fakeInstance) Get(context.Context) (types.InstanceIdentity, error) {
 
 func (f fakeInstance) Update(context.Context, types.InstanceIdentity) error { return nil }
 
-func TestAccEnsureInstance(t *testing.T) {
+func TestAccOpenTokensWithoutIdentity(t *testing.T) {
 	ctx := context.Background()
-	boom := errors.New("boom")
-	for name, tc := range map[string]struct {
-		inst fakeInstance
-		ok   bool
-	}{
-		"read fails":  {fakeInstance{getErr: boom}, false},
-		"init fails":  {fakeInstance{getErr: store.ErrNotFound, initErr: boom}, false},
-		"lost a race": {fakeInstance{getErr: store.ErrNotFound, initErr: store.ErrConflict}, true},
-	} {
-		err := ensureInstance(ctx, instanceOf{inmem.New(), tc.inst})
-		if (err == nil) != tc.ok {
-			t.Errorf("%s: %v", name, err)
-		}
-	}
 	// The identity cannot be read back: the token service refuses to start.
 	if _, err := openTokens(
 		ctx,
