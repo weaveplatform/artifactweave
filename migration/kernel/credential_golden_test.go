@@ -1,4 +1,4 @@
-package auth
+package kernel_test
 
 import (
 	"crypto/sha256"
@@ -11,7 +11,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 var update = flag.Bool("update", false, "rewrite the golden credential reference file")
@@ -25,65 +25,65 @@ var update = flag.Bool("update", false, "rewrite the golden credential reference
 // for a deliberate format change.
 func TestUnitCredentialReferenceGolden(t *testing.T) {
 	revision := sha256.Sum256([]byte("stored password hash"))
-	registry := Principal{
+	registry := kernel.Principal{
 		Name: "ann",
-		Scope: types.Scope{
-			Entries: []types.ScopeEntry{
-				{Kind: types.ScopeGroups, Names: []string{"readers", "release managers"}},
+		Scope: kernel.Scope{
+			Entries: []kernel.ScopeEntry{
+				{Kind: kernel.ScopeGroups, Names: []string{"readers", "release managers"}},
 			},
 		},
 		TokenID: "registry-token",
 		// A named zone and nanoseconds pin the offset and precision that
 		// encoding/json writes for a token's expiry.
 		TokenExpires: time.Date(2026, 11, 5, 14, 30, 15, 123456789, time.FixedZone("BST", 3600)),
-		Registry: &types.RegistryAccess{
+		Registry: &kernel.RegistryAccess{
 			Realm: "docker-local",
-			Grants: []types.RegistryGrant{
+			Grants: []kernel.RegistryGrant{
 				{Type: "repository", Name: "library/alpine", Actions: []string{"pull", "push"}},
 			},
 		},
-		Identity:             types.IdentityTransient,
+		Identity:             kernel.IdentityTransient,
 		TokenParent:          "parent-token",
-		isTokenAuthenticated: true,
-		tokenSubject:         "jfac@test/users/ann",
+		IsTokenAuthenticated: true,
+		TokenSubject:         "jfac@test/users/ann",
 	}
-	noRealm := Principal{
+	noRealm := kernel.Principal{
 		Name:         "bob",
-		Scope:        types.UserScope(),
+		Scope:        kernel.UserScope(),
 		TokenID:      "path-registry-token",
 		TokenExpires: time.Date(2026, 11, 5, 13, 0, 0, 0, time.UTC),
-		Registry: &types.RegistryAccess{Grants: []types.RegistryGrant{
+		Registry: &kernel.RegistryAccess{Grants: []kernel.RegistryGrant{
 			{Type: "repository", Name: "docker-local/library/alpine", Actions: []string{"pull"}},
 			{Type: "registry", Name: "catalog", Actions: []string{"*"}},
 		}},
-		isTokenAuthenticated: true,
-		tokenSubject:         "jfac@test/users/bob",
+		IsTokenAuthenticated: true,
+		TokenSubject:         "jfac@test/users/bob",
 	}
-	password := Principal{
+	password := kernel.Principal{
 		Name:             "carol",
 		Groups:           []string{"readers"},
 		Password:         true,
-		passwordRevision: revision,
+		PasswordRevision: revision,
 	}
-	token := Principal{
+	token := kernel.Principal{
 		Name:                 "ci-bot",
-		Scope:                types.UserScope(),
+		Scope:                kernel.UserScope(),
 		TokenID:              "access-token",
 		TokenExpires:         time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC),
-		isTokenAuthenticated: true,
-		tokenSubject:         "jfac@test/users/ci-bot",
+		IsTokenAuthenticated: true,
+		TokenSubject:         "jfac@test/users/ci-bot",
 	}
 	cases := map[string]any{
 		"registry":          registry.CredentialReference(),
 		"registry-no-realm": noRealm.CredentialReference(),
 		"password":          password.CredentialReference(),
 		"token":             token.CredentialReference(),
-		"anonymous":         Anonymous.CredentialReference(),
+		"anonymous":         kernel.Anonymous.CredentialReference(),
 	}
-	for name, p := range map[string]Principal{
+	for name, p := range map[string]kernel.Principal{
 		"download-token":     token,
 		"download-password":  password,
-		"download-anonymous": Anonymous,
+		"download-anonymous": kernel.Anonymous,
 	} {
 		ref, err := p.DownloadReference()
 		if err != nil {
@@ -110,7 +110,7 @@ func TestUnitCredentialReferenceGolden(t *testing.T) {
 		t.Errorf("%s (-want +got):\n%s", path, diff)
 	}
 	for name, c := range cases {
-		ref, ok := c.(CredentialReference)
+		ref, ok := c.(kernel.CredentialReference)
 		if !ok {
 			continue
 		}

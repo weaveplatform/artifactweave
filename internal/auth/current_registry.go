@@ -17,7 +17,7 @@ func (a *Authenticator) CurrentRegistry(
 	p Principal,
 	tokens store.TokenStore,
 ) (Principal, error) {
-	if !p.isTokenAuthenticated || p.Registry == nil || p.TokenID == "" || p.TokenExpires.IsZero() ||
+	if !p.IsTokenAuthenticated || p.Registry == nil || p.TokenID == "" || p.TokenExpires.IsZero() ||
 		!a.now().Before(p.TokenExpires) {
 		return Principal{}, ErrBadCredentials
 	}
@@ -28,12 +28,12 @@ func (a *Authenticator) CurrentRegistry(
 		}
 		// Stored parent scopes are immutable. Refuse replacement of that record,
 		// rather than allowing an old grant to inherit a changed scope/identity.
-		if parent.Expired(a.now()) || parent.Subject != p.tokenSubject ||
+		if parent.Expired(a.now()) || parent.Subject != p.TokenSubject ||
 			parent.Identity != p.Identity || parent.Scope.String() != p.Scope.String() {
 			return Principal{}, ErrBadCredentials
 		}
 	}
-	u, err := a.tokenUser(ctx, types.Token{Subject: p.tokenSubject, Identity: p.Identity}, p.Name)
+	u, err := a.tokenUser(ctx, types.Token{Subject: p.TokenSubject, Identity: p.Identity}, p.Name)
 	if err != nil {
 		return Principal{}, err
 	}
@@ -45,12 +45,12 @@ func (a *Authenticator) CurrentRegistry(
 		if !on {
 			return Principal{}, ErrBadCredentials
 		}
-	} else if p.Identity == "" && sha256.Sum256(u.PasswordHash) != p.passwordRevision {
+	} else if p.Identity == "" && sha256.Sum256(u.PasswordHash) != p.PasswordRevision {
 		return Principal{}, ErrBadCredentials
 	}
 	fresh := tokenPrincipal(u, p.Scope)
 	fresh.TokenID, fresh.TokenExpires, fresh.Identity = p.TokenID, p.TokenExpires, p.Identity
 	fresh.Registry, fresh.TokenParent, fresh.Anonymous = p.Registry, p.TokenParent, p.Anonymous
-	fresh.tokenSubject, fresh.passwordRevision = p.tokenSubject, p.passwordRevision
+	fresh.TokenSubject, fresh.PasswordRevision = p.TokenSubject, p.PasswordRevision
 	return fresh, nil
 }

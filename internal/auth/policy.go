@@ -25,21 +25,6 @@ const (
 // effect here within this long.
 const policyTTL = 10 * time.Second
 
-// ErrPasswordExpired answers a correct password the expiration policy, or
-// an administrator, has expired. It is reported only after the password
-// verifies, so it tells nothing to someone without it. 403 rather than 401,
-// with Artifactory's message: its entry point answers a
-// CredentialsExpiredException as it does a locked account (decision 0005).
-var ErrPasswordExpired = apierror.New(http.StatusForbidden, "Password has expired")
-
-// ErrAccountLocked answers any password for a locked account. 403, as
-// Artifactory's entry point answers a locked user, with the message of its
-// UserLockedException, newline included (OSS 6.20; decision 0005). It
-// differs from the temporary suspension's 403 (suspension.go), which ends
-// by itself, where this lasts until an administrator unlocks the account.
-var ErrAccountLocked = apierror.New(http.StatusForbidden,
-	"User is Locked.\nContact System Administrator to Unlock The Account.")
-
 // ErrBasicAuthDisabled answers a user name and password while the platform
 // accepts only tokens (basic_authentication_enabled is false).
 var ErrBasicAuthDisabled = apierror.New(http.StatusUnauthorized,

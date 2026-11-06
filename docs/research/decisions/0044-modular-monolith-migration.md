@@ -208,6 +208,8 @@ change that adds a name appends its row; the change column gives the ticket of t
 | `Pattern`, `CompilePattern` | `kernel/antpath` | Ant-style path matching that access permission targets and artifacts repository patterns share: a kernel package with matching behaviour, where the target document keeps it in `access/core/authz` | ACC-04 |
 | `RepoPatterns`, `PatternsOf` | `artifacts/api/repo` | A repository's compiled include and exclude patterns, which AQL, listings, searches and the generic and Maven formats check paths with; in `pkg/repo` until ART-01 moves that package, where the target document keeps them in `access/core/authz` | ACC-04 |
 | `CheckPair`, `RSAPrivateKey`, `Ed25519PrivateKey`, `Ed25519PublicKey`, `ParseBundle`, `Bundle`, `ErrInvalid` | `platform/keymaterial` | Key pair and certificate checks that access's key pair API and the Alpine, Hex and Nix formats share, where the target document places the package in `access/core/keymaterial` | ACC-04 |
+| `PrincipalBinding` | `kernel` | Identifies the `WithPrincipal` call that set a context's principal, so access binds the request's permission decider to that call and `Principal` stays a plain value | PLT-05 |
+| `Principal.PasswordRevision`, `Principal.IsTokenAuthenticated`, `Principal.TokenSubject` | `kernel` | Fields that access sets when it verifies a credential and trusts when it rechecks one; exported only because the kernel declares `Principal`, and `TestUnitPrincipalInternals` keeps every package but access and the kernel off them | PLT-05 |
 
 ### Placeholders
 

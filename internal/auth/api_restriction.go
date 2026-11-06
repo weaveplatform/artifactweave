@@ -4,15 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
-
-// ErrAPIRestricted is returned only after the credential has been verified.
-var ErrAPIRestricted = apierror.New(http.StatusForbidden, "API access is temporarily restricted")
 
 type apiRecoveryKey struct{}
 

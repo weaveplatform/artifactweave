@@ -59,7 +59,7 @@ func (a *Authenticator) Current(
 		return Principal{}, fmt.Errorf("auth: current user: %w", err)
 	}
 	if u.Status != "" && u.Status != types.UserEnabled ||
-		sha256.Sum256(u.PasswordHash) != p.passwordRevision {
+		sha256.Sum256(u.PasswordHash) != p.PasswordRevision {
 		return Principal{}, ErrBadCredentials
 	}
 	on, err := BasicAuthEnabled(ctx, a.settings)

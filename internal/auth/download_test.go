@@ -31,7 +31,7 @@ func TestUnitDownloadCredentialRestoration(t *testing.T) {
 		t.Fatal(err)
 	}
 	fresh, err := a.RestoreDownload(ctx, "user", restored, db.Tokens())
-	if err != nil || !fresh.Password || fresh.passwordRevision != p.passwordRevision {
+	if err != nil || !fresh.Password || fresh.PasswordRevision != p.PasswordRevision {
 		t.Fatal(fresh, err)
 	}
 	user, _ := db.Users().Get(ctx, "user")
