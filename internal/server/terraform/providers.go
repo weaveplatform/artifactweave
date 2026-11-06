@@ -13,11 +13,11 @@ import (
 
 	"golang.org/x/net/idna"
 
-	"github.com/weaveplatform/artifactweave/internal/archive"
 	tf "github.com/weaveplatform/artifactweave/internal/format/terraform"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/platform/archive"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )

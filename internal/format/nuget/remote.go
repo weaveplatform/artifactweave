@@ -7,7 +7,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/archive"
+	"github.com/weaveplatform/artifactweave/migration/platform/archive"
 )
 
 // ValidateRemote preserves the original archive (including its signature) while

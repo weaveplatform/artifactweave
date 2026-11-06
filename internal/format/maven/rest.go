@@ -10,11 +10,11 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/archive"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
+	"github.com/weaveplatform/artifactweave/migration/platform/archive"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 

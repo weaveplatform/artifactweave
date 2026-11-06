@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/archive"
+	"github.com/weaveplatform/artifactweave/migration/platform/archive"
 )
 
 // entry is a test archive entry; dir entries end in "/", and link entries

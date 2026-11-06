@@ -1,6 +1,6 @@
 package npm
 
-import "github.com/weaveplatform/artifactweave/internal/archive"
+import "github.com/weaveplatform/artifactweave/migration/platform/archive"
 
 // Inspected reads what Inspect returned: the tarball it read, nil for
 // content that is none. ok is false when Inspect returned no inspection.

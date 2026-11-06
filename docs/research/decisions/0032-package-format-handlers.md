@@ -179,7 +179,7 @@ option. CDN metadata remains the authoritative package index. The
 and cold/offline native-client evidence.
 
 Native archive admission validates the physical ZIP entry layout as well as its
-central directory through `internal/archivecheck`, so the server and client
+central directory through `migration/platform/archivecheck`, so the server and client
 extractors cannot see different filenames or hidden entries. Tar limits count
 the full decompressed stream, including PAX/GNU metadata that `tar.Reader` consumes
 internally. These checks apply to both uploaded and remotely cached pod content.

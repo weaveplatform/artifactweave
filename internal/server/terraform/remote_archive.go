@@ -16,7 +16,7 @@ import (
 
 	"github.com/ulikunitz/xz"
 
-	"github.com/weaveplatform/artifactweave/internal/archive"
+	"github.com/weaveplatform/artifactweave/migration/platform/archive"
 )
 
 const (

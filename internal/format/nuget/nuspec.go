@@ -11,8 +11,8 @@ import (
 	"strings"
 	"unicode/utf16"
 
-	"github.com/weaveplatform/artifactweave/internal/archive"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/platform/archive"
 )
 
 // ErrNotPackage is content the format cannot index: no zip, no single

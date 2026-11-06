@@ -12,8 +12,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/weaveplatform/artifactweave/internal/archive"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/platform/archive"
 )
 
 // ErrNotDist is content the format cannot index as a distribution: a

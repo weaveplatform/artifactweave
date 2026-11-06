@@ -15,7 +15,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/archivecheck"
+	"github.com/weaveplatform/artifactweave/migration/platform/archivecheck"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 

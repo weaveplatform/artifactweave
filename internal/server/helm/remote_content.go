@@ -15,9 +15,9 @@ import (
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
 	"gopkg.in/yaml.v3"
 
-	"github.com/weaveplatform/artifactweave/internal/archive"
 	helmfmt "github.com/weaveplatform/artifactweave/internal/format/helm"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/migration/platform/archive"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 

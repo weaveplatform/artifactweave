@@ -12,8 +12,8 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/weaveplatform/artifactweave/internal/archive"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/platform/archive"
 )
 
 // ErrNotChart is content the format cannot index: no tar or tar.gz, no

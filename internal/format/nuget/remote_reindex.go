@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/weaveplatform/artifactweave/internal/archive"
 	"github.com/weaveplatform/artifactweave/internal/service/work"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/platform/archive"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
