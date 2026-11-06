@@ -17,6 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -563,7 +564,8 @@ func TestAccManifestStoreFailures(t *testing.T) {
 			var noted error
 			o := Options{
 				Store: w.db, Blobs: w.blobs,
-				Fault: func(_ *http.Request, err error) { noted = err },
+				Fault:   func(_ *http.Request, err error) { noted = err },
+				Formats: formats.For,
 			}
 			c.tune(w, &o)
 			rec := send(router(New(o)), c.method, c.target, body, ociManifest)

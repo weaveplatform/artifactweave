@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 )
 
@@ -35,7 +36,9 @@ func newTokenFixture(t *testing.T, tune ...func(*Config)) (http.Handler, statusS
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err = (&item.Service{Store: c.Store, Blobs: c.Blobs}).Deploy(t.Context(), item.Deploy{
+		if _, err = (&item.Service{
+			Store: c.Store, Blobs: c.Blobs, Formats: formats.For,
+		}).Deploy(t.Context(), item.Deploy{
 			Target: item.Target{
 				Repo: libs,
 				Path: "fixture/get.txt",

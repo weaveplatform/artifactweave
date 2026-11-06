@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -62,7 +63,7 @@ func sidecarWorld(t *testing.T) (*itemWorld, *string) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	items := &item.Service{Store: w.db, Blobs: w.blobs}
+	items := &item.Service{Store: w.db, Blobs: w.blobs, Formats: formats.For}
 	for p, body := range map[string][]byte{
 		"a/web-1.0.0.tgz": helmChart("web", "1.0.0"), "a/web-1.0.0.tgz.prov": []byte("signed"),
 	} {

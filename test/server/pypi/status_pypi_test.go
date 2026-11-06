@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -87,7 +88,9 @@ var pypiStatusPart = statusPart{
 	generated: map[string]bool{pypiJSONLatest: true, pypiJSONVersion: true},
 	seed: func(t *testing.T, db store.Store, blobs blob.Store) {
 		t.Helper()
-		seedPypi(t, &item.Service{Store: db, Blobs: blobs}, db, pypiWheelPath, "status-pkg")
+		seedPypi(t, &item.Service{
+			Store: db, Blobs: blobs, Formats: formats.For,
+		}, db, pypiWheelPath, "status-pkg")
 	},
 	// The JSON form and PEP 658 are on, so their rows answer too.
 	tune: func(c *server.Config) {

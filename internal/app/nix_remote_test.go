@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	nixfmt "github.com/weaveplatform/artifactweave/internal/format/nix"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -88,7 +89,7 @@ func TestAccNixRawRoutesCannotBypassNativeValidation(t *testing.T) {
 				)
 			}
 			before := w.up.Count("", "")
-			service := item.Service{Store: w.rt.store, Blobs: w.rt.blobs}
+			service := item.Service{Store: w.rt.store, Blobs: w.rt.blobs, Formats: formats.For}
 			_, err = service.Zap(t.Context(), item.Target{Repo: w.c, Cached: true, Path: path})
 			if cache && err != nil {
 				t.Fatal(err)

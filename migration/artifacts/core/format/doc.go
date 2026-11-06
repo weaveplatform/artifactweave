@@ -23,9 +23,9 @@
 //     the optional interfaces on every deploy, checksum upload, folder
 //     create, copy, move, delete, restore, property change and download,
 //     with the Env it builds for the operation. The build and registry
-//     services take a Handler for each package type, remote retrieval
-//     classifies items with ClassOf, and the reindex API and configuration
-//     apply queue the reindex kinds with a WorkRequest.
+//     services pass their Registry on to it, remote retrieval classifies
+//     items with ClassOf, and the reindex API and configuration apply queue
+//     the reindex kinds with a WorkRequest.
 //   - Driven: the format packages implement Handler and the optional
 //     interfaces they need: Inspector, Admitter, TransferSourceGuard,
 //     WriteGuard, FolderAdmitter, AnnotationAdmitter, Resolver, Annotator,
@@ -39,6 +39,14 @@
 //
 // # Outputs
 //
+//   - Registry, the function from a package type to its Handler. The
+//     application builds one from the format registry's Settings.For
+//     (internal/format/formats) and gives it to the item, build and registry
+//     services and the Docker registry; remote retrieval classifies with the
+//     item service's. A nil Registry means the generic handler, which indexes
+//     nothing. Core services take it as a value because importing the
+//     registry would import every ecosystem slice, and the slices import
+//     core.
 //   - Hook errors. An error from a hook inside a write's transaction rolls
 //     the write back.
 //   - *RejectionError, made by Rejectf: a format's refusal. The HTTP layer
@@ -103,7 +111,8 @@
 //     row of #build-status (https://github.com/weaveplatform/artifactweave/issues/753)
 //     and #p9d-modular-monolith-migration, epic ART
 //     (https://github.com/weaveplatform/artifactweave/issues/941).
-//   - https://github.com/weaveplatform/artifactweave/issues/969
+//   - https://github.com/weaveplatform/artifactweave/issues/969 and
+//     https://github.com/weaveplatform/artifactweave/issues/970
 //
 // # Status
 //
@@ -117,9 +126,9 @@
 // and caller checks for cached remote packages; P9c TransferSourceGuard,
 // Opkg's reindex that leaves item properties alone (writeProps=0) and
 // Write.By.
-// Staged in P9d. Roadmap: the injected Registry type
-// (https://github.com/weaveplatform/artifactweave/issues/970), Env's lease
-// and work-queue stores
+// Staged in P9d, which added the injected Registry
+// (https://github.com/weaveplatform/artifactweave/issues/970). Roadmap:
+// Env's lease and work-queue stores
 // (https://github.com/weaveplatform/artifactweave/issues/1029) and a narrow
 // format.Store in place of the whole store
 // (https://github.com/weaveplatform/artifactweave/issues/1087).

@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"golang.org/x/crypto/blake2b"
 
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
@@ -39,7 +40,7 @@ func TestUnitCachedPyPIArtifactChecksEveryAdvertisedHash(t *testing.T) {
 		t.Fatal(err)
 	}
 	counted := &hashReadBlobs{Store: storage}
-	service := &item.Service{Blobs: counted}
+	service := &item.Service{Blobs: counted, Formats: formats.For}
 	h := handler{
 		k: pkgroute.Mount(
 			chi.NewRouter(),

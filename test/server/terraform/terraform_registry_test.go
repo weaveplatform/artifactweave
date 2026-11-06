@@ -17,6 +17,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -56,7 +57,7 @@ func TestAccTerraformModuleInit(t *testing.T) {
 		t,
 		map[string]string{"main.tf": `output "message" { value = "downloaded through registry" }`},
 	)
-	items := &item.Service{Store: db, Blobs: blobs}
+	items := &item.Service{Store: db, Blobs: blobs, Formats: formats.For}
 	if _, err = items.Deploy(
 		t.Context(),
 		item.Deploy{

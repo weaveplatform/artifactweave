@@ -10,6 +10,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/registry"
 	"github.com/weaveplatform/artifactweave/internal/service/trash"
@@ -126,7 +127,7 @@ func (w *world) pushTo(c repo.Config, name, body, digest string, folders ...stri
 }
 
 func (w *world) itemsAt(c *clock) *item.Service {
-	return &item.Service{Store: w.db, Blobs: w.blobs, Now: c.now}
+	return &item.Service{Store: w.db, Blobs: w.blobs, Now: c.now, Formats: formats.For}
 }
 
 func (w *world) remove(c *clock, r repo.Config, path string) {

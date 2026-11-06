@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/format/nuget"
 	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
@@ -55,7 +56,7 @@ func nugetStatusFixture(t *testing.T, anonymous bool) http.Handler {
 			}
 		}
 	})
-	items := &item.Service{Store: db, Blobs: blobs}
+	items := &item.Service{Store: db, Blobs: blobs, Formats: formats.For}
 	for _, entry := range []struct {
 		key, path string
 		body      []byte

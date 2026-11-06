@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -94,7 +95,9 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 			}
 		}
 	})
-	f := &matrixFixture{h: h, db: db, items: &item.Service{Store: db, Blobs: blobs}}
+	f := &matrixFixture{h: h, db: db, items: &item.Service{
+		Store: db, Blobs: blobs, Formats: formats.For,
+	}}
 	f.secrets = seedHelmMatrixTokens(t, db, tokens)
 	helmMatrixPart.seed(t, f)
 	helmProtocolMatrixPart.seed(t, f)

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
@@ -54,7 +55,7 @@ func TestAccStatusNuGetV3Remote(t *testing.T) {
 		policy := &remote.Policy{
 			Store:   cfg.Store,
 			Blobs:   cfg.Blobs,
-			Items:   &item.Service{Store: cfg.Store, Blobs: cfg.Blobs},
+			Items:   &item.Service{Store: cfg.Store, Blobs: cfg.Blobs, Formats: formats.For},
 			Pool:    new(remote.Pool),
 			Options: resolver.Options,
 			Key:     []byte(strings.Repeat("k", 32)),

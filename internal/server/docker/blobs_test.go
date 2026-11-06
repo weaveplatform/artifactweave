@@ -15,6 +15,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -48,6 +49,7 @@ func newBlobWorld(t *testing.T, tune ...func(*Options)) *blobWorld {
 	w := &blobWorld{t: t, db: fixture(t), blobs: blobs}
 	o := Options{
 		Store: w.db, Blobs: blobs, SubdomainMatch: true, BaseURL: "https://reg.example.com",
+		Formats: formats.For,
 	}
 	for _, f := range tune {
 		f(&o)
@@ -93,7 +95,9 @@ func (w *blobWorld) deploy(key, path, body string) types.Item {
 	if err != nil {
 		w.t.Fatal(err)
 	}
-	it, err := (&item.Service{Store: w.db, Blobs: w.blobs}).Deploy(ctx, item.Deploy{
+	it, err := (&item.Service{
+		Store: w.db, Blobs: w.blobs, Formats: formats.For,
+	}).Deploy(ctx, item.Deploy{
 		Target: item.Target{Repo: c, Path: path}, Body: strings.NewReader(body),
 	})
 	if err != nil {
@@ -730,7 +734,8 @@ func TestAccBlobStoreAndIndexFailures(t *testing.T) {
 			var noted error
 			o := Options{
 				Store: w.db, Blobs: w.blobs,
-				Fault: func(_ *http.Request, err error) { noted = err },
+				Fault:   func(_ *http.Request, err error) { noted = err },
+				Formats: formats.For,
 			}
 			c.tune(w, &o)
 			h := router(New(o))

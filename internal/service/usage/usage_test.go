@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/usage"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -24,7 +25,7 @@ func TestUnitSummarize(t *testing.T) {
 		t.Fatal(err)
 	}
 	db := inmem.New()
-	svc := &item.Service{Store: db, Blobs: blobs}
+	svc := &item.Service{Store: db, Blobs: blobs, Formats: formats.For}
 	configs := map[string]repo.Config{}
 	for _, c := range []repo.Config{
 		{Key: "libs", Class: repo.Local, PackageType: repo.Generic},

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/format/formattest"
 	nixfmt "github.com/weaveplatform/artifactweave/internal/format/nix"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
@@ -40,7 +41,7 @@ func TestAccNixFormatLifecycle(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			items := &item.Service{Store: db, Blobs: blobs}
+			items := &item.Service{Store: db, Blobs: blobs, Formats: formats.For}
 			trashSvc := &trash.Service{Store: db, Items: items}
 			c := *repo.Defaults(&repo.Config{Key: "nix", Class: repo.Local, PackageType: repo.Nix})
 			other := c
@@ -215,7 +216,7 @@ func TestAccNixConcurrentFirstPublicationKeepsOneIdentity(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			items := &item.Service{Store: db, Blobs: blobs}
+			items := &item.Service{Store: db, Blobs: blobs, Formats: formats.For}
 			c := *repo.Defaults(&repo.Config{Key: "race", Class: repo.Local, PackageType: repo.Nix})
 			if err = db.Repos().Create(t.Context(), c); err != nil {
 				t.Fatal(err)

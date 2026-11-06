@@ -72,6 +72,10 @@ type Options struct {
 	// Blobs is the blob store behind Store. Nil leaves blobs and uploads
 	// unimplemented, for tests of the router alone.
 	Blobs blob.Store
+	// Formats returns a package type's format for the items that uploads,
+	// manifest pushes and mounts write through the item service; nil means
+	// the generic handler, which indexes no image or tag.
+	Formats format.Registry
 	// ServeBlob answers a GET of a blob's item in a repository with the
 	// server's download, which applies the download redirect policy
 	// (decision 0029) and counts the download. Nil streams it from Blobs.
@@ -134,7 +138,12 @@ func New(o Options) *Registry {
 	}
 	if o.Store != nil && o.Blobs != nil {
 		g.blobs = o.Blobs
-		g.uploads = &registry.Service{Store: o.Store, Blobs: o.Blobs, Now: o.Now}
+		g.uploads = &registry.Service{
+			Store:   o.Store,
+			Blobs:   o.Blobs,
+			Now:     o.Now,
+			Formats: o.Formats,
+		}
 		g.serveBlob = o.ServeBlob
 		if g.serveBlob == nil {
 			g.serveBlob = g.streamBlob

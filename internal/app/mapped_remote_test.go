@@ -12,6 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
@@ -85,7 +86,9 @@ func mappedRuntimeRequest(
 	if err != nil {
 		t.Fatal(err)
 	}
-	d, err := remote.NewDiscovery(t.Context(), &item.Service{Store: w.rt.store}, w.c)
+	d, err := remote.NewDiscovery(t.Context(), &item.Service{
+		Store: w.rt.store, Formats: formats.For,
+	}, w.c)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/format/composer"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
@@ -39,7 +40,7 @@ func TestAccHostedAdmissionAndReindex(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	service := &item.Service{Store: db, Blobs: blobs}
+	service := &item.Service{Store: db, Blobs: blobs, Formats: formats.For}
 	c := *repo.Defaults(&repo.Config{Key: "php", Class: repo.Local, PackageType: repo.Composer})
 	if err := db.Repos().Create(ctx, c); err != nil {
 		t.Fatal(err)

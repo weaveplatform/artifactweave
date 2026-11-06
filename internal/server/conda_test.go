@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	condafmt "github.com/weaveplatform/artifactweave/internal/format/conda"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/work"
 	"github.com/weaveplatform/artifactweave/internal/source"
@@ -592,7 +593,7 @@ func TestUnitCondaLocalAndVirtualNativeChannel(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		svc := &item.Service{Store: cfg.Store, Blobs: cfg.Blobs, Work: q}
+		svc := &item.Service{Store: cfg.Store, Blobs: cfg.Blobs, Work: q, Formats: formats.For}
 		if err := svc.RegisterWork(q); err != nil {
 			t.Fatal(err)
 		}

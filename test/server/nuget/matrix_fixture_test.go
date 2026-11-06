@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	nugetfmt "github.com/weaveplatform/artifactweave/internal/format/nuget"
 	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
@@ -98,7 +99,9 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 			}
 		}
 	})
-	f := &matrixFixture{h: h, db: db, items: &item.Service{Store: db, Blobs: blobs}}
+	f := &matrixFixture{h: h, db: db, items: &item.Service{
+		Store: db, Blobs: blobs, Formats: formats.For,
+	}}
 	f.secrets = seedNuGetMatrixTokens(t, db, tokens)
 	nugetMatrixPart.seed(t, f)
 	return f

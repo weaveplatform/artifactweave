@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -272,7 +273,7 @@ func TestAccCopyAndMoveRefused(t *testing.T) {
 	w := newItemWorld(t, true)
 	w.put("/artifactory/libs-local/d/a.txt", "a")
 	w.put("/artifactory/other-local/taken.txt", "taken")
-	cached := &item.Service{Store: w.db, Blobs: w.blobs}
+	cached := &item.Service{Store: w.db, Blobs: w.blobs, Formats: formats.For}
 	up, err := w.db.Repos().Get(context.Background(), "up")
 	if err != nil {
 		t.Fatal(err)

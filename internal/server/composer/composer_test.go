@@ -16,6 +16,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
@@ -46,7 +47,7 @@ func newFixtureWithSource(t *testing.T, remote *source.Service) *fixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	items := &item.Service{Store: db, Blobs: blobs}
+	items := &item.Service{Store: db, Blobs: blobs, Formats: formats.For}
 	r := chi.NewRouter()
 	r.Use(baseurl.Middleware("http://example.com"))
 	r.Use(func(next http.Handler) http.Handler {

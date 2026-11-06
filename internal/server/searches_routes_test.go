@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -24,7 +25,9 @@ func seedStatusSearches(t *testing.T, db store.Store, blobs blob.Store) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := (&item.Service{Store: db, Blobs: blobs}).Deploy(ctx, item.Deploy{
+	if _, err := (&item.Service{
+		Store: db, Blobs: blobs, Formats: formats.For,
+	}).Deploy(ctx, item.Deploy{
 		Target: item.Target{Repo: libs, Path: "maven/lib/1.0/lib-1.0.jar"},
 		Body:   strings.NewReader("lib"), Properties: types.Properties{"version": {"1.0"}},
 	}); err != nil {

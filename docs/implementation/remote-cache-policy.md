@@ -112,9 +112,9 @@ zap, path deletion, restore and persistent unused-cache cleanup to durable fence
 
 ## Evidence
 
-`policy_test.go`, `policy_fault_test.go`, `flight_test.go` and `rules_test.go` cover
-the R1–R14 contract, including exact fixture counts, fake-time expiry, shared
-cancellation, source/config/delete/zap races, variants, HTTP cache controls,
+`policy_test.go`, `policy_fault_test.go`, `policy_format_test.go`, `flight_test.go` and
+`rules_test.go` cover the R1–R14 contract, including exact fixture counts, fake-time
+expiry, shared cancellation, source/config/delete/zap races, variants, HTTP cache controls,
 HEAD/304, integrity failures, outage recovery and no-store body ownership. The
 storage contracts separately exercise restart and transactional behavior on
 in-memory, SQLite and PostgreSQL stores. These fixtures prove ArtifactWeave's

@@ -14,7 +14,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
+	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -279,7 +279,7 @@ func (p *Policy) kind(q source.Request) types.RemoteKind {
 	if q.Resource.Mutable {
 		return types.RemoteMutable
 	}
-	h := formats.For(q.Repo.PackageType)
+	var h format.Handler = generic.Handler{}
 	if p.Items != nil && p.Items.Formats != nil {
 		h = p.Items.Formats(q.Repo.PackageType)
 	}

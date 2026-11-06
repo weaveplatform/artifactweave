@@ -10,6 +10,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -52,7 +53,7 @@ func listings(t *testing.T, db store.Store) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	items := &item.Service{Store: db, Blobs: blobs}
+	items := &item.Service{Store: db, Blobs: blobs, Formats: formats.For}
 	configs := map[string]repo.Config{}
 	for _, key := range []string{"docker-local", "other", "empty"} {
 		c := *repo.Defaults(&repo.Config{Key: key, Class: repo.Local, PackageType: repo.Docker})

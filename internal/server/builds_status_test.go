@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/build"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -32,7 +33,7 @@ func buildDoc(name, number, started string) string {
 // seedBuild publishes run number 1 of name, started at testStarted.
 func seedBuild(t *testing.T, db store.Store, blobs blob.Store, name string) {
 	t.Helper()
-	svc := build.Service{Store: db, Blobs: blobs}
+	svc := build.Service{Store: db, Blobs: blobs, Formats: formats.For}
 	if _, err := svc.Publish(
 		context.Background(), "", []byte(buildDoc(name, "1", testStarted)), "admin", allowBuilds{},
 	); err != nil {
@@ -50,7 +51,9 @@ func seedBuildArtifact(t *testing.T, db store.Store, blobs blob.Store, name, pat
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := (&item.Service{Store: db, Blobs: blobs}).Deploy(ctx, item.Deploy{
+	if _, err := (&item.Service{
+		Store: db, Blobs: blobs, Formats: formats.For,
+	}).Deploy(ctx, item.Deploy{
 		Target: item.Target{Repo: libs, Path: path}, Body: strings.NewReader(name),
 		Properties: types.Properties{"build.name": {name}, "build.number": {"1"}},
 	}); err != nil {
@@ -58,7 +61,7 @@ func seedBuildArtifact(t *testing.T, db store.Store, blobs blob.Store, name, pat
 	}
 	doc := fmt.Sprintf(`{"name":%q,"number":"1","started":%q,"modules":[{"id":"m",`+
 		`"artifacts":[{"name":%q,"sha1":%q}]}]}`, name, testStarted, pathpkg.Base(path), sha1Hex(name))
-	if _, err := (&build.Service{Store: db, Blobs: blobs}).Publish(
+	if _, err := (&build.Service{Store: db, Blobs: blobs, Formats: formats.For}).Publish(
 		ctx, "", []byte(doc), "admin", allowBuilds{},
 	); err != nil {
 		t.Fatal(err)

@@ -5,6 +5,7 @@ import (
 	"context" //nolint:gosec // npm's dist.shasum is SHA-1 by definition
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	npmfmt "github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -177,7 +178,7 @@ var npmStatusPart = statusPart{
 	},
 	seed: func(t *testing.T, db store.Store, blobs blob.Store) {
 		t.Helper()
-		items := &item.Service{Store: db, Blobs: blobs}
+		items := &item.Service{Store: db, Blobs: blobs, Formats: formats.For}
 		next := types.Properties{npmfmt.PropDistTag: {"next"}}
 		deployNPM(t, items, "npm-local", "status-pkg", "1.0.0", nil)
 		deployNPM(t, items, "npm-local", "status-pkg", "1.1.0", nil)

@@ -13,6 +13,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -254,7 +255,8 @@ func TestAccReferrersStoreFailures(t *testing.T) {
 			var noted error
 			o := Options{
 				Store: w.db, Blobs: w.blobs,
-				Fault: func(_ *http.Request, err error) { noted = err },
+				Fault:   func(_ *http.Request, err error) { noted = err },
+				Formats: formats.For,
 			}
 			tune(w, &o)
 			rec := send(router(New(o)), http.MethodGet,
@@ -282,7 +284,7 @@ func TestAccReferrersAndIndexesChallengeRegistryTokens(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	g := New(Options{Store: w.db, Tokens: w.tokens, Blobs: blobs})
+	g := New(Options{Store: w.db, Tokens: w.tokens, Blobs: blobs, Formats: formats.For})
 	h := baseurl.Middleware("")(g.Challenge(router(g)))
 	pull := func(name string) *types.RegistryAccess {
 		return &types.RegistryAccess{Grants: []types.RegistryGrant{

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/work"
@@ -37,7 +38,9 @@ func TestAccNuGetSymbolServerLifecycle(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				items := &item.Service{Store: cfg.Store, Blobs: cfg.Blobs, Work: q}
+				items := &item.Service{
+					Store: cfg.Store, Blobs: cfg.Blobs, Work: q, Formats: formats.For,
+				}
 				if err := items.RegisterWork(q); err != nil {
 					t.Fatal(err)
 				}
