@@ -402,7 +402,7 @@ func apiReviewPersistence(path string) (string, string, []string) {
 			"internal/service/identity/identity.go",
 			"internal/auth/token/token.go",
 			"internal/sqlstore/sqlcommon/identity.go",
-			"internal/sqlstore/sqlcommon/enterprise.go",
+			"internal/sqlstore/sqlcommon/operations.go",
 		}
 	}
 	if strings.HasPrefix(path, "/artifactory/api/build") {

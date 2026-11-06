@@ -362,7 +362,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -424,7 +424,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -452,7 +452,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -616,7 +616,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -715,7 +715,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -745,7 +745,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -790,7 +790,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -820,7 +820,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -849,7 +849,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -877,7 +877,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -1552,7 +1552,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -1581,7 +1581,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -1612,7 +1612,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -1646,7 +1646,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -1693,7 +1693,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -1724,7 +1724,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -2587,7 +2587,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -2616,7 +2616,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -2647,7 +2647,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -2695,7 +2695,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -2834,7 +2834,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -2862,7 +2862,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -2893,7 +2893,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -2921,7 +2921,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -3151,7 +3151,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -3184,7 +3184,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -3456,7 +3456,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -3479,7 +3479,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -3502,7 +3502,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -3525,7 +3525,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -3555,7 +3555,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -3583,7 +3583,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -3670,7 +3670,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -3709,7 +3709,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -3740,7 +3740,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -3772,7 +3772,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -3865,7 +3865,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -7941,7 +7941,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -7971,7 +7971,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -8002,7 +8002,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -8036,7 +8036,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -8071,7 +8071,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -8103,7 +8103,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -8138,7 +8138,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -8169,7 +8169,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -8222,7 +8222,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -8255,7 +8255,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -8289,7 +8289,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -8320,7 +8320,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -8349,7 +8349,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -8383,7 +8383,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -8418,7 +8418,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -13476,7 +13476,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -13568,7 +13568,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -13602,7 +13602,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -13632,7 +13632,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -13666,7 +13666,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -13697,7 +13697,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -14131,7 +14131,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -14159,7 +14159,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -14309,7 +14309,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -14338,7 +14338,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -14366,7 +14366,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -14468,7 +14468,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -14642,7 +14642,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -14723,7 +14723,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -14783,7 +14783,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -14812,7 +14812,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -14841,7 +14841,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -14870,7 +14870,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -17453,7 +17453,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -17482,7 +17482,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -17510,7 +17510,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -17536,7 +17536,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -17576,7 +17576,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -17599,7 +17599,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -17629,7 +17629,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -17659,7 +17659,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -17691,7 +17691,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -17722,7 +17722,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -17752,7 +17752,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -17784,7 +17784,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -17814,7 +17814,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -17845,7 +17845,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -17874,7 +17874,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -19788,7 +19788,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -19817,7 +19817,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -19847,7 +19847,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -19877,7 +19877,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -19973,7 +19973,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -20001,7 +20001,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -20159,7 +20159,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -20297,7 +20297,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -20326,7 +20326,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -21412,7 +21412,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -21443,7 +21443,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -21473,7 +21473,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -21504,7 +21504,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -21535,7 +21535,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -21566,7 +21566,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -21596,7 +21596,7 @@
       "internal/service/identity/identity.go",
       "internal/auth/token/token.go",
       "internal/sqlstore/sqlcommon/identity.go",
-      "internal/sqlstore/sqlcommon/enterprise.go",
+      "internal/sqlstore/sqlcommon/operations.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
