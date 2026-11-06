@@ -1,7 +1,3 @@
-// Package fault holds the failing fakes that handler tests share
-// (decision 0015), so the error paths of streaming handlers are covered
-// without real failures: a client that goes away mid-stream, and a blob
-// store whose writes fail.
 package fault
 
 import (

@@ -68,9 +68,9 @@ while only Linux exercises PostgreSQL and MinIO.
 include the route × principal matrix.
 
 **Fault injection.** Every handler package depends on narrow interfaces and the shared
-`migration/platform/testkit/fault` fakes (client disconnect mid-stream, blob write failure after headers,
-upstream 5xx, slow upstream, wrong content type), so error paths in streaming handlers are
-covered without real failures. The remote-repository design adds
+`migration/platform/testkit/fault` fakes (client disconnect mid-stream, blob write failure
+after headers, upstream 5xx, slow upstream, wrong content type), so error paths in
+streaming handlers are covered without real failures. The remote-repository design adds
 `migration/artifacts/adapters/upstream/fakeupstream` chi fakes of each upstream registry with the
 same fault modes; that package is not part of the current local-protocol implementation.
 
