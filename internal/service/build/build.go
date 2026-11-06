@@ -56,8 +56,8 @@ type Service struct {
 	// store.MaxLimit.
 	Page int
 	// Formats and Work reach the item service's format hooks (decision
-	// 0032); nil means formats.For and the store's queue.
-	Formats func(repo.PackageType) format.Handler
+	// 0032); nil means the generic handler and the store's queue.
+	Formats format.Registry
 	Work    item.Enqueuer
 	// AllowDuplicateEntries accepts a document whose module lists one file
 	// twice, which the zero value refuses as Artifactory 7.x does by default

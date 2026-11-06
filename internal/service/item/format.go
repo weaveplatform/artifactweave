@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
+	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/service/work"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
@@ -30,7 +30,7 @@ func (s *Service) format(t repo.PackageType) format.Handler {
 	if s.Formats != nil {
 		return s.Formats(t)
 	}
-	return formats.For(t)
+	return generic.Handler{}
 }
 
 // Env is the environment of one operation a format offers beside its hooks,

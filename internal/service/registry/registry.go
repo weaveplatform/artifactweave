@@ -52,8 +52,8 @@ type Service struct {
 	// Now supplies the time; nil means time.Now.
 	Now func() time.Time
 	// Formats and Work reach the item service's format hooks (decision
-	// 0032); nil means formats.For and the store's queue.
-	Formats func(repo.PackageType) format.Handler
+	// 0032); nil means the generic handler and the store's queue.
+	Formats format.Registry
 	Work    item.Enqueuer
 
 	// locks serialise one session's requests in this process, striped by

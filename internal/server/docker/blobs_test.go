@@ -49,6 +49,7 @@ func newBlobWorld(t *testing.T, tune ...func(*Options)) *blobWorld {
 	w := &blobWorld{t: t, db: fixture(t), blobs: blobs}
 	o := Options{
 		Store: w.db, Blobs: blobs, SubdomainMatch: true, BaseURL: "https://reg.example.com",
+		Formats: formats.For,
 	}
 	for _, f := range tune {
 		f(&o)
@@ -733,7 +734,8 @@ func TestAccBlobStoreAndIndexFailures(t *testing.T) {
 			var noted error
 			o := Options{
 				Store: w.db, Blobs: w.blobs,
-				Fault: func(_ *http.Request, err error) { noted = err },
+				Fault:   func(_ *http.Request, err error) { noted = err },
+				Formats: formats.For,
 			}
 			c.tune(w, &o)
 			h := router(New(o))

@@ -18,7 +18,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/service/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
@@ -58,9 +57,11 @@ type Service struct {
 	Blobs blob.Store
 	// Now supplies the time; nil means time.Now.
 	Now func() time.Time
-	// Formats returns a package type's format; nil means formats.For.
-	// Tests substitute formats that record or fail their hooks.
-	Formats func(repo.PackageType) format.Handler
+	// Formats returns a package type's format; nil means the generic
+	// handler for every type, which indexes nothing, so a service that
+	// writes to other formats' repositories must set it. Tests substitute
+	// formats that record or fail their hooks.
+	Formats format.Registry
 	// Work takes the derived work formats ask for. Nil writes it to the
 	// store's queue directly, where every node's workers find it on their
 	// next poll; a queue also wakes its own idle workers on commit.
@@ -524,7 +525,7 @@ func (s *Service) writeFile(
 			return types.Item{}, fmt.Errorf("item: release overwritten blob: %w", err)
 		}
 	}
-	fresh := old.ID != 0 && old.Actual.SHA256 != actual.SHA256 && !maven.IsNonUniqueSnapshot(full)
+	fresh := old.ID != 0 && old.Actual.SHA256 != actual.SHA256 && !nonUniqueSnapshot(full)
 	if err := s.settle(ctx, stored, d.Properties, fresh, fw.shouldReplace, now); err != nil {
 		return types.Item{}, err
 	}
@@ -574,6 +575,18 @@ func (s *Service) settle(
 		return fmt.Errorf("item: statistics of %s: %w", it.FullPath(), err)
 	}
 	return nil
+}
+
+// nonUniqueSnapshot is maven.IsNonUniqueSnapshot (Artifactory's
+// MavenNaming), copied because the Maven slice imports core/remote, which
+// imports this package. It applies to every package type, as before.
+// TestUnitNonUniqueSnapshotMatchesMaven keeps them equal.
+func nonUniqueSnapshot(p string) bool {
+	if !strings.HasSuffix(path.Dir(p), "-SNAPSHOT") {
+		return false
+	}
+	name := path.Base(p)
+	return strings.Contains(name, "-SNAPSHOT.") || strings.Contains(name, "-SNAPSHOT-")
 }
 
 // mayReplace reports whether d may replace old, the file at full, with

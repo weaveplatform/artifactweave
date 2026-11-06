@@ -128,7 +128,9 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	}
 	// Registry upload sessions append to hot-tier blob uploads, and their
 	// finished uploads wait in the item tree until a manifest links them.
-	uploads := &registry.Service{Store: st, Blobs: hot.store}
+	// Expiry purges them through the item service, only ever from docker,
+	// oci and helmoci repositories, whose format takes no settings.
+	uploads := &registry.Service{Store: st, Blobs: hot.store, Formats: formats.For}
 	// The cold tier is not collected: nothing writes it until archiving (P16),
 	// which brings the references its collection would have to trust.
 	collector, err := gc.New(st, hot.store, gc.Options{

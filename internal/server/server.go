@@ -189,7 +189,7 @@ type Config struct {
 	// Formats returns a package type's format; nil means
 	// FormatSettings.For. Only tests set it, to substitute formats that
 	// record their hooks.
-	Formats func(repo.PackageType) format.Handler
+	Formats format.Registry
 	// FormatSettings are the formats' server-wide options, such as
 	// npm.tag_latest_by_publish; the zero value is each format's default.
 	FormatSettings formats.Settings
@@ -320,6 +320,9 @@ func newRegistry(cfg Config, artSvc artifactoryService) *docker.Registry {
 		// authenticator is configured (authenticate).
 		Authenticated: cfg.Auth != nil,
 		Fault:         func(r *http.Request, err error) { noteCause(r.Context(), err) },
+		// The registry serves only docker, oci and helmoci repositories,
+		// whose format takes no settings.
+		Formats: formats.For,
 		// A layer downloads as any file does: redirected to a signed URL
 		// when the repository says so (decision 0029), and counted.
 		ServeBlob: func(w http.ResponseWriter, r *http.Request, c repo.Config, it types.Item) {

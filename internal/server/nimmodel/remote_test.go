@@ -383,6 +383,7 @@ func TestAccNIMMetadataAndPairedDockerRegistryKeepSeparateAuthority(t *testing.T
 	}
 	docker.New(docker.Options{
 		Store: f.store, Blobs: f.blobs, Sources: registrySvc,
+		Formats: formats.For,
 	}).Register(f.router)
 	imagePath := "/artifactory/api/docker/nvcr-remote/v2/nim/meta/llama/manifests/1.3"
 	pull := func(user string) *httptest.ResponseRecorder {

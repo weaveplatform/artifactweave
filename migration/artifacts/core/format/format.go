@@ -30,6 +30,12 @@ type Handler interface {
 	Deleted(ctx context.Context, env Env, c repo.Config, removed []types.Item) error
 }
 
+// Registry returns the format handler of a package type. The application
+// builds it from the format registry's Settings.For; core services take it as
+// a value because importing the registry would import every ecosystem slice,
+// and the slices import core.
+type Registry func(t repo.PackageType) Handler
+
 // Env is what a hook runs with. The item service builds one per operation;
 // inside a hook, ctx carries the operation's transaction, which Store,
 // Derive and Enqueue join.
