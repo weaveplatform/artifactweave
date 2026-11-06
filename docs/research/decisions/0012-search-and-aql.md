@@ -680,7 +680,7 @@ live Artifactory ([#216](https://github.com/weaveplatform/artifactweave/issues/2
   beside an `@<key>` include, and `migration/artifacts/core/aql` and server tests that an item's statistics
   record without the included values renders no `stats` ([#506](https://github.com/weaveplatform/artifactweave/issues/506)).
 - Shared related-include cases (`aqltest.RelatedCases`) whose nested rows, loaded from each
-  store through `store.AQLSource`, render as the reference corpus's, the properties and
+  store through `aql.AQLSource`, render as the reference corpus's, the properties and
   statistics of related rows and a run's own properties included; `migration/artifacts/core/aql` tests pin the
   nesting, the criteria it shares, the folding, the key filter, visibility and the budget,
   and server tests the properties and statistics a non-admin and a build-scoped token see.

@@ -81,7 +81,7 @@ func testItemSearch(t *testing.T, st store.Store) {
 }
 
 // testRelatedSearch runs the shared includes of related domains: the
-// store's rows, nested from the store (store.AQLSource), must render as
+// store's rows, nested from the store (aql.AQLSource), must render as
 // the reference evaluator's nested from aqltest.Corpus.
 func testRelatedSearch(t *testing.T, st store.Store) {
 	ctx := context.Background()
@@ -101,7 +101,7 @@ func testRelatedSearch(t *testing.T, st store.Store) {
 				must(t, err)
 				rel, err := q.Nest(
 					ctx,
-					store.AQLSource(st.Builds(), st.Items()),
+					aql.AQLSource(st.Builds(), st.Items()),
 					aql.Nesting{Now: aqltest.Now},
 					hits,
 				)
@@ -116,7 +116,7 @@ func testRelatedSearch(t *testing.T, st store.Store) {
 				must(t, err)
 				rel, err := q.NestBuilds(
 					ctx,
-					store.AQLSource(st.Builds(), st.Items()),
+					aql.AQLSource(st.Builds(), st.Items()),
 					aql.Nesting{},
 					hits,
 				)
@@ -135,7 +135,7 @@ func testRelatedSearch(t *testing.T, st store.Store) {
 	// A source that cannot read reports the store's error.
 	cancelled, cancel := context.WithCancel(ctx)
 	cancel()
-	src := store.AQLSource(st.Builds(), st.Items())
+	src := aql.AQLSource(st.Builds(), st.Items())
 	for name, call := range map[string]func() error{
 		"runs":       func() error { _, err := src.RunsWithFile(cancelled, false, "a"); return err },
 		"items":      func() error { _, err := src.ItemsWithSHA1(cancelled, "a"); return err },

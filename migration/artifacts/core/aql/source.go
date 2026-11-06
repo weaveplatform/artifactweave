@@ -1,11 +1,10 @@
-package store
+package aql
 
 import (
 	"context"
 	"fmt"
 	"slices"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -23,14 +22,14 @@ type BuildRuns interface {
 // item store's AQL search, which loads a hit's properties and statistics as
 // it does for a query's own rows.
 type ItemSearch interface {
-	Search(ctx context.Context, q *aql.Query, o aql.Options) ([]aql.Hit, error)
+	Search(ctx context.Context, q *Query, o Options) ([]Hit, error)
 }
 
 // AQLSource is the source of the rows an AQL include of related domains
-// reaches (aql.Query.Nest): runs by the checksum of their files, files by
+// reaches (Query.Nest): runs by the checksum of their files, files by
 // checksum, runs by ID and their promotions. It reads through the store's
 // own lookups, builds and items, so every backend nests the same rows.
-func AQLSource(builds BuildRuns, items ItemSearch) aql.Source {
+func AQLSource(builds BuildRuns, items ItemSearch) Source {
 	return aqlSource{builds: builds, items: items}
 }
 
@@ -75,14 +74,14 @@ func (a aqlSource) RunsWithFile(
 // the item store's Stats answers zero for an item without a record, which a
 // nested item would then render as a record of zeros where its own row
 // renders none.
-func (a aqlSource) ItemsWithSHA1(ctx context.Context, sha1 string) ([]aql.Hit, error) {
-	hits, err := a.items.Search(ctx, &aql.Query{
-		Criteria: aql.And{
-			&aql.FieldCriterion{Field: aql.FieldType, Op: aql.OpEq, Text: "file"},
-			&aql.FieldCriterion{Field: aql.FieldActualSHA1, Op: aql.OpEq, Text: sha1},
+func (a aqlSource) ItemsWithSHA1(ctx context.Context, sha1 string) ([]Hit, error) {
+	hits, err := a.items.Search(ctx, &Query{
+		Criteria: And{
+			&FieldCriterion{Field: FieldType, Op: OpEq, Text: "file"},
+			&FieldCriterion{Field: FieldActualSHA1, Op: OpEq, Text: sha1},
 		},
 		Include: []string{"property", "stat"},
-	}, aql.Options{})
+	}, Options{})
 	if err != nil {
 		return nil, fmt.Errorf("find files by checksum: %w", err)
 	}

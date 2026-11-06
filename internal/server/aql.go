@@ -153,7 +153,7 @@ func (s artifactoryService) searchAQL(w http.ResponseWriter, r *http.Request) {
 	if q.Relates() {
 		n, err := nesting(ctx, st, p, configs, o.Now)
 		if err == nil {
-			related, err = q.Nest(dbctx, store.AQLSource(st.Builds(), st.Items()), n, hits)
+			related, err = q.Nest(dbctx, aql.AQLSource(st.Builds(), st.Items()), n, hits)
 		}
 		if err != nil {
 			writeErr(w, r, s.aqlFailure(ctx, dbctx.Err(), timeout, "aql related rows", err))
