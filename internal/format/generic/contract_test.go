@@ -3,8 +3,8 @@ package generic_test
 import (
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formattest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/formattest"
 )
 
 // Generic files belong to no package, so every write leaves the index

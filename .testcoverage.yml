@@ -19,7 +19,7 @@ exclude:
     # the t.Fatal paths taken only when a backend violates the contract.
     - ^pkg/blob/blobtest/
     - ^pkg/store/storetest/
-    - ^internal/format/formattest/
+    - ^migration/artifacts/core/formattest/
     # Per-module store contract suites (decision 0015); their remaining
     # branches are t.Fatal paths taken only when a backend breaks the contract.
     - ^migration/[a-z]+/adapters/storetest/
