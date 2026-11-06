@@ -49,6 +49,13 @@ type Service struct {
 	recoveryReset     time.Time
 }
 
+// New validates options and returns a Service that charges the request
+// budgets of st, reading time from now (time.Now when nil). Options that
+// Validate refuses give an error wrapping ErrInvalid, even when admission is
+// disabled. With admission disabled New returns a nil Service and a nil
+// error, so the caller mounts no limits. Enabled limits without st give an
+// error wrapping ErrInvalid: rates are shared only through metadata, and
+// there is no per-process fallback.
 func New(st Store, options Options, now func() time.Time) (*Service, error) {
 	if err := options.Validate(); err != nil {
 		return nil, err

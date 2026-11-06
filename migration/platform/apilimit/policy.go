@@ -8,8 +8,15 @@ import (
 )
 
 var (
+	// ErrInvalid reports options outside their bounds, from Validate and New,
+	// or limits enabled without a store to share rates through, from New.
 	ErrInvalid = errors.New("api limit: invalid policy")
-	ErrBusy    = errors.New("api limit: concurrent work capacity exhausted")
+	// ErrBusy reports that the permits a request needs are all held: this
+	// process's ordinary or expensive permits, a principal's share of the
+	// expensive ones, or the two of the recovery reserve. Nothing waits for a
+	// permit, so the request is refused at once; the HTTP boundary tells it
+	// apart from a failed budget store and answers 429, not 503.
+	ErrBusy = errors.New("api limit: concurrent work capacity exhausted")
 )
 
 // Options is immutable after constructing a Service. Rates are shared across
