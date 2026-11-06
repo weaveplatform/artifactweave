@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -100,7 +100,7 @@ func TestUnitAppendOnceFailures(t *testing.T) {
 		t.Run(fail, func(t *testing.T) {
 			w := newWorld(t)
 			w.publish(doc("app", "1", started0))
-			s := &Service{Store: faulty{w.db, fail}, Blobs: w.blobs, Formats: formats.For}
+			s := &Service{Store: faulty{w.db, fail}, Blobs: w.blobs, Formats: ecosystem.For}
 			_, err := s.AppendOnce(
 				t.Context(),
 				Append{Name: "app", Number: "1", Modules: []byte(`[]`)},

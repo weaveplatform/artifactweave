@@ -12,12 +12,12 @@ import (
 
 	"golang.org/x/mod/sumdb/dirhash"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/format/terraform"
 	"github.com/weaveplatform/artifactweave/internal/service/trash"
 	"github.com/weaveplatform/artifactweave/internal/service/work"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -44,8 +44,8 @@ func terraformH1(t testing.TB, body []byte) string {
 // terraform repositories have the Terraform format; the backend's type has
 // a format of its own to come, not this one.
 func TestUnitRegistered(t *testing.T) {
-	if _, ok := formats.For(repo.Terraform).(terraform.Handler); !ok {
-		t.Fatalf("%T", formats.For(repo.Terraform))
+	if _, ok := ecosystem.For(repo.Terraform).(terraform.Handler); !ok {
+		t.Fatalf("%T", ecosystem.For(repo.Terraform))
 	}
 	if terraform.Serves(repo.TerraformBackend) {
 		t.Fatal("serves terraformbackend")

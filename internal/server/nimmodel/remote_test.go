@@ -15,7 +15,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/docker"
 	"github.com/weaveplatform/artifactweave/internal/server/nimmodel"
@@ -23,6 +22,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -80,7 +80,7 @@ func newFixture(t *testing.T) *fixture {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	items := &item.Service{Store: db, Blobs: blobs, Now: clock.Now, Formats: formats.For}
+	items := &item.Service{Store: db, Blobs: blobs, Now: clock.Now, Formats: ecosystem.For}
 	resolver, err := remote.NewResolver(db, nil, remote.ResolverOptions{
 		RevisionKey: []byte(strings.Repeat("k", 32)),
 	})
@@ -383,7 +383,7 @@ func TestAccNIMMetadataAndPairedDockerRegistryKeepSeparateAuthority(t *testing.T
 	}
 	docker.New(docker.Options{
 		Store: f.store, Blobs: f.blobs, Sources: registrySvc,
-		Formats: formats.For,
+		Formats: ecosystem.For,
 	}).Register(f.router)
 	imagePath := "/artifactory/api/docker/nvcr-remote/v2/nim/meta/llama/manifests/1.3"
 	pull := func(user string) *httptest.ResponseRecorder {

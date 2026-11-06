@@ -3,9 +3,9 @@ package npm_test
 import (
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	npmfmt "github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
@@ -126,7 +126,7 @@ var npmLifecycleStatusPart = statusPart{
 	},
 	seed: func(t *testing.T, db store.Store, blobs blob.Store) {
 		t.Helper()
-		items := &item.Service{Store: db, Blobs: blobs, Formats: formats.For}
+		items := &item.Service{Store: db, Blobs: blobs, Formats: ecosystem.For}
 		deployNPM(t, items, "npm-local", "status-tags", "1.0.0", nil)
 		deployNPM(t, items, "npm-local", "status-tags", "2.0.0", nil)
 		for _, v := range []string{"1.0.0", "1.1.0", "2.0.0"} {

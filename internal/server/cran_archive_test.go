@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -246,7 +246,7 @@ func TestAccCRANArchiveDeletedAfterEnumeration(t *testing.T) {
 	wantStatus(t, w.do("PUT", "/artifactory/cran-migrate/"+cranLegacyPath, "admin", body), 201)
 	listed := w.item(c.Key, false, cranLegacyPath)
 	wantStatus(t, w.do("DELETE", "/artifactory/cran-migrate/"+cranLegacyPath, "admin", ""), 204)
-	svc := &item.Service{Store: w.db, Blobs: w.blobs, Formats: formats.For}
+	svc := &item.Service{Store: w.db, Blobs: w.blobs, Formats: ecosystem.For}
 	// A READ COMMITTED listing can precede another request's deletion. The
 	// migration must not resurrect that stale listed item after taking its lock.
 	moved, err := moveCranArchive(t.Context(), svc, c, listed, cranArchivePath, "admin")

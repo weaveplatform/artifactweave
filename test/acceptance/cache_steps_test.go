@@ -8,10 +8,10 @@ import (
 
 	"github.com/cucumber/godog"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 )
 
@@ -46,8 +46,11 @@ func (w *world) cacheFile(remote, file, target string) error {
 		return err
 	}
 	defer func() { _ = f.Close() }()
-	_, err = (&item.Service{Store: st, Blobs: blobs, Formats: formats.For}).Deploy(ctx, item.Deploy{
-		Target: item.Target{Repo: c, Cached: true, Path: target}, Body: f, By: "admin",
-	})
+	_, err = (&item.Service{Store: st, Blobs: blobs, Formats: ecosystem.For}).Deploy(
+		ctx,
+		item.Deploy{
+			Target: item.Target{Repo: c, Cached: true, Path: target}, Body: f, By: "admin",
+		},
+	)
 	return err
 }

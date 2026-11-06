@@ -14,12 +14,12 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/golang"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -98,7 +98,7 @@ func newFixtureOn(t *testing.T, seed *inmem.Store, serve store.Store) *fixture {
 		t.Fatal(err)
 	}
 	items := &item.Service{
-		Store: seed, Blobs: blobs, Now: func() time.Time { return created }, Formats: formats.For,
+		Store: seed, Blobs: blobs, Now: func() time.Time { return created }, Formats: ecosystem.For,
 	}
 	deploy := func(key, module, version string, exts ...string) {
 		t.Helper()

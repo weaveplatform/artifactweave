@@ -14,9 +14,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
 	condafmt "github.com/weaveplatform/artifactweave/internal/format/conda"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
@@ -36,7 +36,7 @@ func newCondaRemoteWorld(t *testing.T) (*remoteWorld, map[string][]byte, string)
 			RemoteSources:  w.rt.remoteSources,
 			RemoteHTTP:     &w.rt.remoteHTTP,
 			Logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
-			FormatSettings: formats.Settings{Conda: condafmt.Settings{ShardsEnabled: true}},
+			FormatSettings: ecosystem.Settings{Conda: condafmt.Settings{ShardsEnabled: true}},
 		},
 	)
 	const name = "artifactweave-conda-fixture-1.0.0-0.tar.bz2"

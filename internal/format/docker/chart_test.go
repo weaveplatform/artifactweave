@@ -11,10 +11,10 @@ import (
 	"time"
 
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -65,7 +65,7 @@ func newCharts(t *testing.T) *charts {
 	return &charts{t: t, db: db, blobs: blobs, c: c, items: &item.Service{
 		Store: db, Blobs: blobs,
 		Now:     func() time.Time { return time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC) },
-		Formats: formats.For,
+		Formats: ecosystem.For,
 	}}
 }
 

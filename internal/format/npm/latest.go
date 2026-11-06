@@ -29,7 +29,7 @@ import (
 const TagLatest = "latest"
 
 // Settings are the npm format's server-wide options (decision 0034), which
-// reach it through formats.Settings. The zero value is 7.x's default.
+// reach it through ecosystem.Settings. The zero value is 7.x's default.
 type Settings struct {
 	// TagLatestByPublish is npm.tag_latest_by_publish, 7.x's
 	// artifactory.npm.tag.tagLatestByPublish: in rules 2 and 4 the version

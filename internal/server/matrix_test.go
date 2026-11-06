@@ -11,13 +11,13 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/server/docker"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/multipart"
 	"github.com/weaveplatform/artifactweave/internal/service/oidc"
 	"github.com/weaveplatform/artifactweave/internal/service/roles"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -1591,7 +1591,7 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 	blobs, err := fs.New(t.TempDir())
 	must(err)
 	f := &matrixFixture{
-		db: db, items: &item.Service{Store: db, Blobs: blobs, Formats: formats.For},
+		db: db, items: &item.Service{Store: db, Blobs: blobs, Formats: ecosystem.For},
 	}
 	f.deploy(t, "libs-local", "work/get.txt", []byte("matrix"))
 	f.deploy(t, "libs-local", "fixture/get.txt", []byte("matrix"))

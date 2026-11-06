@@ -15,8 +15,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -992,7 +992,7 @@ func TestAccAuthenticatedRegistryRefusesWithoutDecider(t *testing.T) {
 	g := New(Options{
 		Store: w.db, Blobs: w.blobs, SubdomainMatch: true, BaseURL: "https://reg.example.com",
 		Authenticated: true,
-		Formats:       formats.For,
+		Formats:       ecosystem.For,
 	})
 	authenticated := g.Challenge(router(g))
 	const manifest = "/v2/docker-local/team/app/manifests/v1"

@@ -8,10 +8,10 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	npmfmt "github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/server/npm"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -21,7 +21,7 @@ import (
 func (f *fixture) byPublish(t *testing.T) {
 	t.Helper()
 	s := npmfmt.Settings{TagLatestByPublish: true}
-	f.items.Formats = formats.Settings{NPM: s}.For
+	f.items.Formats = ecosystem.Settings{NPM: s}.For
 	f.remount(t, npm.Options{Format: s})
 }
 
@@ -31,7 +31,7 @@ func (f *fixture) byPublish(t *testing.T) {
 func TestAccPublishUnderEnforcePath(t *testing.T) {
 	f := newFixture(t)
 	s := npmfmt.Settings{EnforcePath: true}
-	f.items.Formats = formats.Settings{NPM: s}.For
+	f.items.Formats = ecosystem.Settings{NPM: s}.For
 	f.remount(t, npm.Options{Format: s})
 	for _, name := range []string{"plain", "@acme/scoped"} {
 		wantStatus(t, f.publish(t, name, "1.0.0", "writer", nil), http.StatusCreated)

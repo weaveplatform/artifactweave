@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/trash"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -37,7 +37,7 @@ func newWorld(t *testing.T) *world {
 	}
 	w := &world{db: inmem.New(), clock: time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)}
 	now := func() time.Time { return w.clock }
-	w.items = &item.Service{Store: w.db, Blobs: blobs, Now: now, Formats: formats.For}
+	w.items = &item.Service{Store: w.db, Blobs: blobs, Now: now, Formats: ecosystem.For}
 	w.trash = &trash.Service{Store: w.db, Items: w.items, Now: now, Batch: 2}
 	for _, key := range []string{"libs", "other"} {
 		if err := w.db.Repos().
@@ -710,7 +710,7 @@ func TestUnitStoreFailures(t *testing.T) {
 	svc := func(fail map[string]error) *trash.Service {
 		st := failing{w.db, fail}
 		return &trash.Service{Store: st, Items: &item.Service{
-			Store: st, Blobs: w.items.Blobs, Formats: formats.For,
+			Store: st, Blobs: w.items.Blobs, Formats: ecosystem.For,
 		}}
 	}
 	dst := trash.Destination{Repo: w.libs}

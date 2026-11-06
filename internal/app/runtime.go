@@ -14,7 +14,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/config"
 	"github.com/weaveplatform/artifactweave/internal/crypt"
 	"github.com/weaveplatform/artifactweave/internal/format/conda"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/format/helm"
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/format/npm"
@@ -34,6 +33,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/migration/access"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/mirror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -74,7 +74,7 @@ type runtime struct {
 	registrySources *source.Service
 	// formats are the formats' options, which the server and the work
 	// queue's item service share.
-	formats   formats.Settings
+	formats   ecosystem.Settings
 	mirrors   []*mirror.Store
 	admin     *mirrorAdmin
 	stopLoops context.CancelFunc
@@ -130,7 +130,7 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	// finished uploads wait in the item tree until a manifest links them.
 	// Expiry purges them through the item service, only ever from docker,
 	// oci and helmoci repositories, whose format takes no settings.
-	uploads := &registry.Service{Store: st, Blobs: hot.store, Formats: formats.For}
+	uploads := &registry.Service{Store: st, Blobs: hot.store, Formats: ecosystem.For}
 	// The cold tier is not collected: nothing writes it until archiving (P16),
 	// which brings the references its collection would have to trust.
 	collector, err := gc.New(st, hot.store, gc.Options{
@@ -235,8 +235,8 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 // key's keyring. The server and the work queue's item service take the
 // same ones, so a write applies them whether a client or derived work
 // makes it.
-func formatSettings(cfg config.Config, keys *crypt.Keyring) formats.Settings {
-	return formats.Settings{
+func formatSettings(cfg config.Config, keys *crypt.Keyring) ecosystem.Settings {
+	return ecosystem.Settings{
 		Conda: conda.Settings{ShardsEnabled: cfg.Conda.ShardsEnabled},
 		Helm:  helm.Settings{RelativeURLs: &cfg.Helm.RelativeURLs},
 		NPM: npm.Settings{

@@ -9,10 +9,10 @@ import (
 	"testing"
 
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/registry"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
@@ -101,7 +101,7 @@ func PushImage(
 	t.Helper()
 	ctx := context.Background()
 	if _, err := (&item.Service{
-		Store: db, Blobs: blobs, Formats: formats.For,
+		Store: db, Blobs: blobs, Formats: ecosystem.For,
 	}).Deploy(ctx, item.Deploy{
 		Target: item.Target{
 			Repo: c,
@@ -120,7 +120,7 @@ func PushImage(
 		t.Fatal(err)
 	}
 	if err := (&registry.Service{
-		Store: db, Blobs: blobs, Formats: formats.For,
+		Store: db, Blobs: blobs, Formats: ecosystem.For,
 	}).PutManifest(ctx, registry.Push{
 		Owner:    registry.Owner{Repo: c, Name: name, By: "admin"},
 		Manifest: m, Body: []byte(body), Folders: []string{tag},

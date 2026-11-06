@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
@@ -89,7 +89,7 @@ var pypiStatusPart = statusPart{
 	seed: func(t *testing.T, db store.Store, blobs blob.Store) {
 		t.Helper()
 		seedPypi(t, &item.Service{
-			Store: db, Blobs: blobs, Formats: formats.For,
+			Store: db, Blobs: blobs, Formats: ecosystem.For,
 		}, db, pypiWheelPath, "status-pkg")
 	},
 	// The JSON form and PEP 658 are on, so their rows answer too.

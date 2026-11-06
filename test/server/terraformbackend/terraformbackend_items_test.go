@@ -10,11 +10,11 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/crypt"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	tfbe "github.com/weaveplatform/artifactweave/internal/format/terraformbackend"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/terraformstate"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/test/server/support"
@@ -55,7 +55,7 @@ func seedTfbe(
 	svc := &terraformstate.Service{
 		Items: &item.Service{
 			Store: db, Blobs: blobs,
-			Formats: formats.Settings{TerraformBackend: tfbe.Settings{Keys: k}}.For,
+			Formats: ecosystem.Settings{TerraformBackend: tfbe.Settings{Keys: k}}.For,
 		},
 		Keys: k,
 		Now:  func() time.Time { return time.UnixMilli(1792576800000) },
@@ -91,7 +91,7 @@ func TestAccTerraformBackendThroughTheItemRoutes(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		c.FormatSettings = formats.Settings{TerraformBackend: tfbe.Settings{Keys: k}}
+		c.FormatSettings = ecosystem.Settings{TerraformBackend: tfbe.Settings{Keys: k}}
 	})
 	seedTfbe(t, w.db, w.blobs, k, "tfbe-local")
 	seedTfbe(t, w.db, w.blobs, k, "tfbe-plain")

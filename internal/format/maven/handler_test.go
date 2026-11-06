@@ -10,12 +10,12 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/aql"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -30,8 +30,8 @@ func TestUnitServes(t *testing.T) {
 		if !maven.Serves(pt) {
 			t.Errorf("%s is not served", pt)
 		}
-		if _, ok := formats.For(pt).(maven.Handler); !ok {
-			t.Errorf("%s: %T", pt, formats.For(pt))
+		if _, ok := ecosystem.For(pt).(maven.Handler); !ok {
+			t.Errorf("%s: %T", pt, ecosystem.For(pt))
 		}
 	}
 	for _, pt := range []repo.PackageType{repo.P2, repo.Generic, repo.NPM} {
@@ -107,7 +107,7 @@ func newWorld(t *testing.T, tune func(*repo.Config)) *world {
 	w.items = &item.Service{Store: w.db, Blobs: blobs, Work: noQueue{}, Now: func() time.Time {
 		w.now = w.now.Add(time.Minute)
 		return w.now
-	}, Formats: formats.For}
+	}, Formats: ecosystem.For}
 	return w
 }
 

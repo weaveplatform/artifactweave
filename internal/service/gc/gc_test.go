@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/blobtest"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
@@ -37,7 +37,7 @@ func newWorld(t *testing.T) *world {
 	}
 	w := &world{db: inmem.New(), blobs: blobs}
 	w.set(time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC))
-	w.items = &item.Service{Store: w.db, Blobs: blobs, Now: w.now, Formats: formats.For}
+	w.items = &item.Service{Store: w.db, Blobs: blobs, Now: w.now, Formats: ecosystem.For}
 	if err := w.db.Repos().
 		Create(ctx, *repo.Defaults(&repo.Config{Key: "libs", Class: repo.Local})); err != nil {
 		t.Fatal(err)

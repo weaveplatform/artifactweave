@@ -25,7 +25,7 @@ func sample() *Ledger {
 				Name: "npmhttp", Ticket: "ECO-06",
 			},
 			{
-				From: "internal/format/formats", Action: ActionMove, To: "artifacts/ecosystem",
+				From: "internal/formatregistry", Action: ActionMove, To: "artifacts/ecosystem",
 				Rename: map[string]string{"formats.go": "registry.go"}, Ticket: "ART-05",
 			},
 			{From: "internal/layout", Action: ActionDelete, Ticket: "PRO-02"},
@@ -127,7 +127,7 @@ func TestUnitTranslate(t *testing.T) {
 		ok                         bool
 	}{
 		{module + "/internal/server/npm", module + "/migration/artifacts/ecosystem/npm/http", ActionMove, true},
-		{module + "/internal/format/formats", module + "/migration/artifacts/ecosystem", ActionMove, true},
+		{module + "/internal/formatregistry", module + "/migration/artifacts/ecosystem", ActionMove, true},
 		{module + "/internal/a", module + "/migration/platform/ab", ActionMerge, true},
 		{module + "/internal/fakeserver", module + "/test/server/support/fake", ActionMove, true},
 		{module + "/internal/server", "", ActionSplit, true},

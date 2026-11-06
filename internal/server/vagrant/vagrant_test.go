@@ -19,10 +19,10 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -75,7 +75,7 @@ func newFixture(t *testing.T, class repo.Class) *fixture {
 		db:     db,
 		faults: faults,
 		c:      c,
-		items:  &item.Service{Store: db, Blobs: blobs, Formats: formats.For},
+		items:  &item.Service{Store: db, Blobs: blobs, Formats: ecosystem.For},
 		router: router,
 	}
 }

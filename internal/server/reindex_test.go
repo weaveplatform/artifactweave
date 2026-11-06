@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	npmfmt "github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/reindexauth"
@@ -22,6 +21,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/service/work"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -158,7 +158,7 @@ func recording(f *reindexRecorder) func(repo.PackageType) format.Handler {
 		if slices.Contains(p8Types, t) {
 			return f
 		}
-		return formats.For(t)
+		return ecosystem.For(t)
 	}
 }
 
@@ -427,7 +427,7 @@ func TestAccHelmPartialReindex(t *testing.T) {
 // types no format here serves keep the stub, even for a format that
 // rebuilds an index.
 func TestAccReindexWithoutAReindexer(t *testing.T) {
-	w, _ := reindexWorld(t, formats.For, false)
+	w, _ := reindexWorld(t, ecosystem.For, false)
 	// Terraform's format has landed and rebuilds its index (#552).
 	wantText(t, w.do("POST", "/artifactory/api/terraform/terraform-local/reindex", "admin", ""),
 		"Reindexing of Terraform repository terraform-local was scheduled to run.")
@@ -453,7 +453,7 @@ func TestAccReindexWithoutAReindexer(t *testing.T) {
 }
 
 func TestUnitCocoaPodsReindex(t *testing.T) {
-	w, _ := reindexWorld(t, formats.For, false)
+	w, _ := reindexWorld(t, ecosystem.For, false)
 	c := repo.Config{Key: "pods-local", Class: repo.Local, PackageType: repo.CocoaPods}
 	if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
 		t.Fatal(err)

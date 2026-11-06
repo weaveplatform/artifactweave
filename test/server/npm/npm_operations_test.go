@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	npmfmt "github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/work"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -29,7 +29,12 @@ func npmOpsWorld(t *testing.T) (*itemWorld, *work.Queue) {
 		if q, err = work.New(cfg.Store, work.Options{}); err != nil {
 			t.Fatal(err)
 		}
-		derived := &item.Service{Store: cfg.Store, Blobs: cfg.Blobs, Work: q, Formats: formats.For}
+		derived := &item.Service{
+			Store:   cfg.Store,
+			Blobs:   cfg.Blobs,
+			Work:    q,
+			Formats: ecosystem.For,
+		}
 		if err := derived.RegisterWork(q); err != nil {
 			t.Fatal(err)
 		}

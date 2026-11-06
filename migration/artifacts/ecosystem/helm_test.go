@@ -1,4 +1,4 @@
-package formats
+package ecosystem
 
 import (
 	"testing"

@@ -20,12 +20,12 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/crypt"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	tfbe "github.com/weaveplatform/artifactweave/internal/format/terraformbackend"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/terraformstate"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -58,7 +58,7 @@ func newFixture(t *testing.T) *fixture {
 	f.items = &item.Service{
 		Store:   db,
 		Blobs:   blobs,
-		Formats: formats.Settings{TerraformBackend: tfbe.Settings{Keys: keys}}.For,
+		Formats: ecosystem.Settings{TerraformBackend: tfbe.Settings{Keys: keys}}.For,
 	}
 	for _, c := range []repo.Config{{Key: "states", Class: repo.Local, PackageType: repo.TerraformBackend}, {Key: "states__nested", Class: repo.Local, PackageType: repo.TerraformBackend}, {Key: "other", Class: repo.Local}} {
 		if err := db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {

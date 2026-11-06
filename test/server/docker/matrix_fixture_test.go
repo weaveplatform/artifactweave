@@ -9,9 +9,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/registryfixture"
@@ -31,7 +31,7 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 	setup := func(cfg *Config) {
 		ctx := t.Context()
 		f.db = cfg.Store
-		f.items = &item.Service{Store: cfg.Store, Blobs: cfg.Blobs, Formats: formats.For}
+		f.items = &item.Service{Store: cfg.Store, Blobs: cfg.Blobs, Formats: ecosystem.For}
 		must := func(err error) {
 			t.Helper()
 			if err != nil {

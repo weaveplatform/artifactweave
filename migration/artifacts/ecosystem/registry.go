@@ -1,7 +1,4 @@
-// Package formats picks the format of a package type. It is apart from
-// migration/artifacts/core/format so a format package can implement that
-// contract without an import cycle.
-package formats
+package ecosystem
 
 import (
 	"github.com/weaveplatform/artifactweave/internal/format/agentpackages"
@@ -54,6 +51,8 @@ import (
 // item service built with Settings.For applies them, whichever route the
 // write came by.
 type Settings struct {
+	// Conda is the conda format's: conda.shards_enabled, which adds CEP-16
+	// sharded repodata beside the classic indexes.
 	Conda conda.Settings
 	// Helm is the classic Helm protocol's URL mode (decision 0039).
 	Helm helm.Settings

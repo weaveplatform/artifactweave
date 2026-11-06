@@ -12,11 +12,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -86,7 +86,7 @@ func TestUnitSwiftCachedMetadataBlobAndPermissionFence(t *testing.T) {
 		t.Fatal(err)
 	}
 	k := pkgroute.Mount(chi.NewRouter(), pkgroute.Options{
-		Items: func() *item.Service { return &item.Service{Blobs: blobs, Formats: formats.For} },
+		Items: func() *item.Service { return &item.Service{Blobs: blobs, Formats: ecosystem.For} },
 	}, pkgroute.Protocol{Name: "swift"})
 	h := handler{k: k}
 	r := httptest.NewRequest(http.MethodGet, "/swift/acme/Widget", nil)

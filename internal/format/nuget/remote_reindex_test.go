@@ -17,7 +17,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/format/formattest"
 	"github.com/weaveplatform/artifactweave/internal/format/nuget"
 	"github.com/weaveplatform/artifactweave/internal/reindexauth"
@@ -25,6 +24,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/service/work"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -107,7 +107,7 @@ func TestUnitRemoteReindexStores(t *testing.T) {
 				Store:   faultyStore,
 				Blobs:   w.items.Blobs,
 				Now:     func() time.Time { return w.now },
-				Formats: formats.For,
+				Formats: ecosystem.For,
 			}
 			q := restartedReindexWorker(t, w, svc)
 			if err = q.EnsureFresh(w.ctx, format.KindReindex, w.c.Key); !errors.Is(err, errFault) {
@@ -129,7 +129,7 @@ func TestUnitRemoteReindexStores(t *testing.T) {
 					Store:   w.st,
 					Blobs:   w.items.Blobs,
 					Now:     func() time.Time { return w.now },
-					Formats: formats.For,
+					Formats: ecosystem.For,
 				},
 			)
 			if err = q.EnsureFresh(w.ctx, format.KindReindex, w.c.Key); err != nil {

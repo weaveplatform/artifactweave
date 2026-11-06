@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/format/terraform"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/trash"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -50,7 +50,7 @@ func newWorldOn(t *testing.T, st store.Store) *world {
 		now: time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC),
 	}
 	now := func() time.Time { w.now = w.now.Add(time.Minute); return w.now }
-	w.items = &item.Service{Store: st, Blobs: w.blobs, Formats: formats.For, Now: now}
+	w.items = &item.Service{Store: st, Blobs: w.blobs, Formats: ecosystem.For, Now: now}
 	w.trash = &trash.Service{Store: st, Items: w.items, Now: now}
 	return w
 }

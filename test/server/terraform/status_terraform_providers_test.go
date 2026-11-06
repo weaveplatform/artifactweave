@@ -5,9 +5,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/format/terraform/terraformtest"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -42,7 +42,7 @@ func seedRegistryProvider(t *testing.T, db store.Store, blobs blob.Store) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := &item.Service{Store: db, Blobs: blobs, Formats: formats.For}
+	svc := &item.Service{Store: db, Blobs: blobs, Formats: ecosystem.For}
 	for name, b := range (terraformtest.Release{Type: "null", Version: "3.3.2", Platforms: []string{"linux_amd64"}}).Files(k) {
 		if _, err = svc.Deploy(
 			t.Context(),

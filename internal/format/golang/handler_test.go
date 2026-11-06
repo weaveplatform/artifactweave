@@ -11,11 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/format/golang"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/aql"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
@@ -48,7 +48,7 @@ func newWorld(t *testing.T) *world {
 		now: time.Date(2026, 10, 17, 9, 0, 0, 0, time.UTC),
 	}
 	w.items = &item.Service{
-		Store: w.st, Blobs: blobs, Formats: formats.For,
+		Store: w.st, Blobs: blobs, Formats: ecosystem.For,
 		Now: func() time.Time { w.now = w.now.Add(time.Minute); return w.now },
 	}
 	return w
@@ -108,8 +108,8 @@ func (w *world) version(
 // Go repositories have the Go format, which the item service calls on
 // every write.
 func TestUnitRegistered(t *testing.T) {
-	if _, ok := formats.For(repo.Go).(golang.Handler); !ok {
-		t.Fatalf("%T", formats.For(repo.Go))
+	if _, ok := ecosystem.For(repo.Go).(golang.Handler); !ok {
+		t.Fatalf("%T", ecosystem.For(repo.Go))
 	}
 	if golang.Serves(repo.Generic) {
 		t.Fatal("serves generic")

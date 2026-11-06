@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/blobtest"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
@@ -240,7 +240,7 @@ func raceOnce(t *testing.T, base store.Store, orphan bool, order []string) {
 	}
 	clock := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
 	now := func() time.Time { return clock }
-	plain := &item.Service{Store: base, Blobs: disk, Now: now, Formats: formats.For}
+	plain := &item.Service{Store: base, Blobs: disk, Now: now, Formats: ecosystem.For}
 	if err := base.Repos().
 		Create(ctx, *repo.Defaults(&repo.Config{Key: "libs", Class: repo.Local})); err != nil {
 		t.Fatal(err)
@@ -281,7 +281,7 @@ func raceOnce(t *testing.T, base store.Store, orphan bool, order []string) {
 	seq := newSequence(order)
 	st := seqStore{base, seq}
 	blobs := seqBlobs{disk, seq}
-	racing := &item.Service{Store: st, Blobs: blobs, Now: now, Formats: formats.For}
+	racing := &item.Service{Store: st, Blobs: blobs, Now: now, Formats: ecosystem.For}
 	// One collector throughout: it remembers when it first saw an orphan, and
 	// its hooks only sequence calls made as "gc", so this first pass runs
 	// straight through.

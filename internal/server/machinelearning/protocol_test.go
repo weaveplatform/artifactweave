@@ -15,11 +15,11 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	ml "github.com/weaveplatform/artifactweave/internal/format/machinelearning"
 	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -48,7 +48,7 @@ func newFixture(t *testing.T, class repo.Class, configure ...func(*server.Config
 		t:     t,
 		db:    db,
 		c:     c,
-		items: &item.Service{Store: db, Blobs: b, Formats: formats.For},
+		items: &item.Service{Store: db, Blobs: b, Formats: ecosystem.For},
 	}
 	config := server.Config{Store: db, Blobs: b}
 	for _, apply := range configure {

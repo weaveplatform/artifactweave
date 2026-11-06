@@ -8,9 +8,9 @@ import (
 	"testing"
 
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/registry"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/aql"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -232,7 +232,7 @@ func TestAccRetentionFailures(t *testing.T) {
 				Store:   &f,
 				Blobs:   faultyOpens{w.blobs, tc.open},
 				Now:     w.svc.Now,
-				Formats: formats.For,
+				Formats: ecosystem.For,
 			}
 			if err := tc.run(w, svc); !errors.Is(err, errBoom) {
 				t.Fatalf("err = %v", err)

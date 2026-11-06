@@ -21,7 +21,7 @@ migration evidence. `stub` describes a current response, not a permanent scope c
 
 The audit uses the [previous scope inventory](../research/10-scope-and-tiers.md),
 [open questions](../research/12-open-questions.md), all decision records,
-[`migration/artifacts/api/repo`](../../migration/artifacts/api/repo/repo.go), the [format selector](../../internal/format/formats/formats.go),
+[`migration/artifacts/api/repo`](../../migration/artifacts/api/repo/repo.go), the [format selector](../../migration/artifacts/ecosystem/registry.go),
 the authored/generated APIs, handwritten routes and
 [`api/parity-baseline.json`](../../api/parity-baseline.json).
 

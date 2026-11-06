@@ -14,11 +14,11 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/server/docker"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/registry"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -80,14 +80,14 @@ func seedRegistryStatus(t *testing.T, db store.Store, blobs blob.Store, secrets 
 		t.Fatal(err)
 	}
 	if _, err := (&item.Service{
-		Store: db, Blobs: blobs, Formats: formats.For,
+		Store: db, Blobs: blobs, Formats: ecosystem.For,
 	}).Deploy(ctx, item.Deploy{
 		Target: item.Target{Repo: c, Path: "app/v1/sha256__" + registryLayer[7:]},
 		Body:   strings.NewReader("registry layer"),
 	}); err != nil {
 		t.Fatal(err)
 	}
-	uploads := &registry.Service{Store: db, Blobs: blobs, Formats: formats.For}
+	uploads := &registry.Service{Store: db, Blobs: blobs, Formats: ecosystem.For}
 	for _, row := range []string{"patch", "put", "mismatch", "get", "delete"} {
 		id, err := uploads.Begin(ctx, registry.Owner{Repo: c, Name: "app", By: "admin"})
 		if err != nil {
@@ -197,7 +197,7 @@ func uploadSession(t *testing.T, f *matrixFixture, p string) {
 		t.Fatal(err)
 	}
 	id, err := (&registry.Service{
-		Store: f.db, Blobs: f.items.Blobs, Formats: formats.For,
+		Store: f.db, Blobs: f.items.Blobs, Formats: ecosystem.For,
 	}).Begin(ctx, registry.Owner{
 		Repo: c, Name: "work/" + p, By: matrixPrincipals[i].user,
 	})
@@ -1136,7 +1136,7 @@ func TestAccMultiArchDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := (&item.Service{
-		Store: w.db, Blobs: w.blobs, Formats: formats.For,
+		Store: w.db, Blobs: w.blobs, Formats: ecosystem.For,
 	}).Deploy(ctx, item.Deploy{
 		Target: item.Target{Repo: c, Path: "app/v0/sha256__" + registryLayer[7:]},
 		Body:   strings.NewReader("registry layer"),
