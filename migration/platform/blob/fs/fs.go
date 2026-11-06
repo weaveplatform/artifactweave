@@ -16,7 +16,7 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/weaveplatform/artifactweave/pkg/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 )
 
 const (

@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 )
 
 // errBadRequest models the 400s Azure returns for malformed block IDs and

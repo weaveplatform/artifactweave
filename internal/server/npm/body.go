@@ -13,7 +13,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 )
 
 // maxFields bounds the JSON of a publish body held in memory: everything

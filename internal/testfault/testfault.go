@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/weaveplatform/artifactweave/pkg/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 )
 
 // ErrDisconnected is what a Disconnect body fails with. It wraps

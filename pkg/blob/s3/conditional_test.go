@@ -8,8 +8,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/pkg/blob"
-	"github.com/weaveplatform/artifactweave/pkg/blob/blobtest"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/blobtest"
 )
 
 // writePath is one way a commit reaches the content key, and the operation
