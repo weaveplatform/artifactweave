@@ -72,7 +72,7 @@ access log line, never the credential it sent
 will follow hostweave 0015: an OpenTelemetry metric and trace API with no-op defaults and
 test recorders, so exporters can be configured without code changes. The persistent work
 queue already uses an OpenTelemetry meter with no-op defaults and recorder tests
-(`internal/service/work`); completing system-wide instrumentation/export remains P18.
+(`migration/platform/work`); completing system-wide instrumentation/export remains P18.
 
 P12 owns the configuration logger endpoints. P38 extends that baseline with
 application/Distribution metrics, live log and debug controls, lock and background-task

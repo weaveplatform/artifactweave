@@ -1,8 +1,3 @@
-// Package work runs the persistent work queue (decision 0033): a pool of
-// workers that lease due items, run the handler registered for each item's
-// kind, and complete, retry or park it. Work is asked for with Enqueue
-// inside the transaction of the change that needs it; readers that must see
-// the work done call EnsureFresh first.
 package work
 
 import (
@@ -24,8 +19,7 @@ import (
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/metric/noop"
 
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // Defaults for Options left zero.
@@ -62,7 +56,7 @@ var (
 // more than once, for example when a worker stops after the work but before
 // recording it. A cancelled ctx means the queue is stopping or the lease was
 // lost; the handler should return promptly.
-type Handler func(ctx context.Context, item types.WorkItem) error
+type Handler func(ctx context.Context, item WorkItem) error
 
 // Options configures a Queue.
 type Options struct {
@@ -88,10 +82,18 @@ type Options struct {
 	Meters metric.MeterProvider
 }
 
+// Store is what the queue needs from persistence: the queue table, and a
+// hook that runs fn once the caller's transaction commits (Enqueue wakes the
+// workers through it).
+type Store interface {
+	WorkQueue() WorkQueue
+	AfterCommit(ctx context.Context, fn func())
+}
+
 // Queue runs the persistent work queue for one node.
 type Queue struct {
-	st       store.Store
-	q        store.WorkQueue
+	st       Store
+	q        WorkQueue
 	o        Options
 	mu       sync.Mutex
 	handlers map[string]Handler
@@ -103,7 +105,7 @@ type Queue struct {
 }
 
 // New returns a queue over st; register handlers with Handle before Run.
-func New(st store.Store, o Options) (*Queue, error) {
+func New(st Store, o Options) (*Queue, error) {
 	if o.Workers == 0 {
 		o.Workers = DefaultWorkers
 	}
@@ -289,7 +291,7 @@ func (q *Queue) RunDue(ctx context.Context, kind string) (int, error) {
 		return 0, fmt.Errorf("%w for %q", ErrNoHandler, kind)
 	}
 	ran := map[string]bool{}
-	held := map[string]types.WorkItem{}
+	held := map[string]WorkItem{}
 	err := q.pass(ctx, kind, ran, held)
 	return len(ran), errors.Join(err, q.handBack(ctx, held))
 }
@@ -302,12 +304,12 @@ func (q *Queue) RunDue(ctx context.Context, kind string) (int, error) {
 // extended: should a long pass outlast it, another node may run the item,
 // or this pass meet it again and hold it anew.
 func (q *Queue) pass(ctx context.Context, kind string, ran map[string]bool,
-	held map[string]types.WorkItem,
+	held map[string]WorkItem,
 ) error {
 	kinds := []string{kind}
 	for ctx.Err() == nil {
 		now := q.o.Now()
-		items, err := q.q.Lease(ctx, store.WorkLease{
+		items, err := q.q.Lease(ctx, WorkLease{
 			Kinds: kinds, Holder: q.o.Holder, Limit: 1, Until: now.Add(q.o.Lease), Now: now,
 		})
 		switch {
@@ -330,7 +332,7 @@ func (q *Queue) pass(ctx context.Context, kind string, ran map[string]bool,
 // handBack releases the items a pass held, unrun, so their attempts are not
 // counted and the next pass takes them. It runs even when the pass was
 // cancelled, as settle does, or they would wait out their leases.
-func (q *Queue) handBack(ctx context.Context, held map[string]types.WorkItem) error {
+func (q *Queue) handBack(ctx context.Context, held map[string]WorkItem) error {
 	sctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), settle)
 	defer cancel()
 	var errs []error
@@ -338,7 +340,7 @@ func (q *Queue) handBack(ctx context.Context, held map[string]types.WorkItem) er
 		it := held[key]
 		err := q.q.Release(sctx, it.Kind, it.Key, it.Generation, q.o.Now())
 		// ErrConflict: its lease ran out and another node took it over.
-		if err != nil && !errors.Is(err, store.ErrConflict) {
+		if err != nil && !errors.Is(err, kernel.ErrConflict) {
 			errs = append(errs, fmt.Errorf("work: release %s/%s: %w", it.Kind, it.Key, err))
 		}
 	}
@@ -348,7 +350,7 @@ func (q *Queue) handBack(ctx context.Context, held map[string]types.WorkItem) er
 func (q *Queue) worker(ctx context.Context, kinds []string) {
 	for ctx.Err() == nil {
 		now := q.o.Now()
-		items, err := q.q.Lease(ctx, store.WorkLease{
+		items, err := q.q.Lease(ctx, WorkLease{
 			Kinds: kinds, Holder: q.o.Holder, Limit: 1, Until: now.Add(q.o.Lease), Now: now,
 		})
 		if err != nil {
@@ -381,7 +383,7 @@ func (q *Queue) idle(ctx context.Context) {
 
 // run runs a leased item's handler and records how it ended. It returns the
 // handler's error.
-func (q *Queue) run(ctx context.Context, it types.WorkItem) error {
+func (q *Queue) run(ctx context.Context, it WorkItem) error {
 	q.running.Add(1)
 	defer q.running.Add(-1)
 	h, ok := q.handler(it.Kind)
@@ -406,7 +408,7 @@ func (q *Queue) run(ctx context.Context, it types.WorkItem) error {
 func (q *Queue) heartbeat(
 	ctx context.Context,
 	cancel context.CancelFunc,
-	it types.WorkItem,
+	it WorkItem,
 	done chan<- struct{},
 ) {
 	defer close(done)
@@ -419,7 +421,7 @@ func (q *Queue) heartbeat(
 		case <-t.C:
 			now := q.o.Now()
 			err := q.q.Extend(ctx, it.Kind, it.Key, it.Generation, now.Add(q.o.Lease), now)
-			if errors.Is(err, store.ErrConflict) {
+			if errors.Is(err, kernel.ErrConflict) {
 				q.o.Log.Warn("work queue lease lost", "kind", it.Kind, "key", it.Key)
 				cancel()
 				return
@@ -433,7 +435,7 @@ func (q *Queue) heartbeat(
 
 // call runs h, turning a panic into an error so one bad item cannot stop a
 // worker.
-func call(ctx context.Context, h Handler, it types.WorkItem) (err error) {
+func call(ctx context.Context, h Handler, it WorkItem) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("%w: %v\n%s", ErrPanic, r, debug.Stack())
@@ -444,7 +446,7 @@ func call(ctx context.Context, h Handler, it types.WorkItem) (err error) {
 
 // settle records how a run ended: done, retried, parked, or handed back when
 // the queue is stopping.
-func (q *Queue) settle(ctx context.Context, it types.WorkItem, runErr error) {
+func (q *Queue) settle(ctx context.Context, it WorkItem, runErr error) {
 	sctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), settle)
 	defer cancel()
 	now := q.o.Now()
@@ -459,21 +461,21 @@ func (q *Queue) settle(ctx context.Context, it types.WorkItem, runErr error) {
 		outcome, err = "released", q.q.Release(sctx, it.Kind, it.Key, it.Generation, now)
 	case it.Attempts >= q.o.MaxAttempts || errors.Is(runErr, ErrPermanent):
 		outcome = "parked"
-		err = q.q.Fail(sctx, it.Kind, it.Key, it.Generation, store.WorkFailure{
+		err = q.q.Fail(sctx, it.Kind, it.Key, it.Generation, WorkFailure{
 			Error: runErr.Error(), Park: true, RetryAt: now.Add(q.o.Backoff(it.Attempts)), Now: now,
 		})
 		q.o.Log.Error("work item parked",
 			"kind", it.Kind, "key", it.Key, "attempts", it.Attempts, "error", runErr)
 	default:
 		outcome = "failed"
-		err = q.q.Fail(sctx, it.Kind, it.Key, it.Generation, store.WorkFailure{
+		err = q.q.Fail(sctx, it.Kind, it.Key, it.Generation, WorkFailure{
 			Error: runErr.Error(), RetryAt: now.Add(q.o.Backoff(it.Attempts)), Now: now,
 		})
 		q.o.Log.Warn("work item failed; retrying",
 			"kind", it.Kind, "key", it.Key, "attempt", it.Attempts, "error", runErr)
 	}
 	switch {
-	case errors.Is(err, store.ErrConflict):
+	case errors.Is(err, kernel.ErrConflict):
 		// Another worker took the item over after this run's lease ran out;
 		// its own run decides how the item ends.
 		outcome = "lost"
@@ -497,23 +499,23 @@ func (q *Queue) EnsureFresh(ctx context.Context, kind, key string) error {
 	// asks: a plain read says so without the locking transaction a lease
 	// takes, which on SQLite holds its one writer. Any other answer is left
 	// to the lease.
-	if _, err := q.q.Get(ctx, kind, key); errors.Is(err, store.ErrNotFound) {
+	if _, err := q.q.Get(ctx, kind, key); errors.Is(err, kernel.ErrNotFound) {
 		return nil
 	}
 	wait := 10 * time.Millisecond
 	for {
 		now := q.o.Now()
-		it, took, err := q.q.LeaseKey(ctx, kind, key, store.WorkLease{
+		it, took, err := q.q.LeaseKey(ctx, kind, key, WorkLease{
 			Holder: q.o.Holder, Until: now.Add(q.o.Lease), Now: now,
 		})
 		switch {
-		case errors.Is(err, store.ErrNotFound):
+		case errors.Is(err, kernel.ErrNotFound):
 			return nil
 		case err != nil:
 			return fmt.Errorf("work: ensure %s/%s: %w", kind, key, err)
 		case took:
 			return q.run(ctx, it)
-		case it.State == types.WorkParked:
+		case it.State == WorkParked:
 			return fmt.Errorf("%w: %s/%s: %s", ErrParked, kind, key, it.LastError)
 		}
 		// Running elsewhere: wait for that run to end.
@@ -564,11 +566,16 @@ func (q *Queue) WaitIdle(ctx context.Context) error {
 	}
 }
 
+// meterName is the queue's OpenTelemetry instrumentation scope: the path this
+// package has after promotion, set once in P9d so dashboards and alert rules
+// that select on the scope change once, not again at promotion.
+const meterName = "github.com/weaveplatform/artifactweave/internal/platform/work"
+
 // instrument registers the queue's metrics: items by kind and state, the
 // age of the oldest pending item, and runs by outcome. Kinds are code
 // constants, so the labels stay bounded (decision 0016).
 func (q *Queue) instrument() error {
-	m := q.o.Meters.Meter("github.com/weaveplatform/artifactweave/internal/service/work")
+	m := q.o.Meters.Meter(meterName)
 	var err error
 	if q.runs, err = m.Int64Counter("artifactweave.work.runs",
 		metric.WithDescription("Work queue runs, by kind and outcome"),
@@ -595,8 +602,8 @@ func (q *Queue) instrument() error {
 		now := q.o.Now()
 		for _, st := range stats {
 			kind := attribute.String("kind", st.Kind)
-			for state, n := range map[types.WorkState]int64{
-				types.WorkPending: st.Pending, types.WorkLeased: st.Leased, types.WorkParked: st.Parked,
+			for state, n := range map[WorkState]int64{
+				WorkPending: st.Pending, WorkLeased: st.Leased, WorkParked: st.Parked,
 			} {
 				o.ObserveInt64(
 					items,

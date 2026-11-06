@@ -1,4 +1,4 @@
-package store
+package work
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // Bounds on a work item, so the queue stays a queue of references to work
@@ -29,8 +29,8 @@ type WorkQueue interface {
 	//   - A leased key takes the new payload and is marked to run once more
 	//     when its current run ends.
 	//   - A parked key is pending again from now, its attempts reset.
-	// ErrInvalid for an empty or overlong kind or key, or a payload that is
-	// not JSON or exceeds MaxWorkPayload.
+	// kernel.ErrInvalid for an empty or overlong kind or key, or a payload
+	// that is not JSON or exceeds MaxWorkPayload.
 	Enqueue(ctx context.Context, kind, key string, payload []byte, now time.Time) error
 	// Lease takes up to req.Limit due items of req.Kinds (every kind when
 	// empty) for req.Holder until req.Until: pending items from their
@@ -38,33 +38,34 @@ type WorkQueue interface {
 	// first. Each taken item's Generation and Attempts go up by one and its
 	// DirtySince clears, since the new run covers that work. Concurrent
 	// callers never take the same item.
-	Lease(ctx context.Context, req WorkLease) ([]types.WorkItem, error)
+	Lease(ctx context.Context, req WorkLease) ([]WorkItem, error)
 	// LeaseKey takes the item of kind and key, as Lease would, when it is
 	// pending (whatever its NotBefore) or its lease ran out, so a reader
 	// can bring derived data up to date before using it. It returns the
-	// item as it stands and whether it was taken. ErrNotFound when there is
-	// no item.
-	LeaseKey(ctx context.Context, kind, key string, req WorkLease) (types.WorkItem, bool, error)
+	// item as it stands and whether it was taken. kernel.ErrNotFound when
+	// there is no item.
+	LeaseKey(ctx context.Context, kind, key string, req WorkLease) (WorkItem, bool, error)
 	// Extend moves the lease of the run with generation gen to until.
-	// ErrConflict when that run no longer holds the item.
+	// kernel.ErrConflict when that run no longer holds the item.
 	Extend(ctx context.Context, kind, key string, gen int64, until, now time.Time) error
 	// Complete ends the run with generation gen successfully. The item is
 	// deleted, or, when work was asked for again during the run, pending
-	// again from now with its attempts reset. ErrConflict when the run no
-	// longer holds the item.
+	// again from now with its attempts reset. kernel.ErrConflict when the
+	// run no longer holds the item.
 	Complete(ctx context.Context, kind, key string, gen int64, now time.Time) error
 	// Fail ends the run with generation gen unsuccessfully: pending again
 	// from f.RetryAt, or parked when f.Park and no work was asked for during
-	// the run. ErrConflict when the run no longer holds the item.
+	// the run. kernel.ErrConflict when the run no longer holds the item.
 	Fail(ctx context.Context, kind, key string, gen int64, f WorkFailure) error
 	// Release hands back the run with generation gen unfinished, as a
 	// stopping worker does: pending again from now, without counting the
-	// attempt. ErrConflict when the run no longer holds the item.
+	// attempt. kernel.ErrConflict when the run no longer holds the item.
 	Release(ctx context.Context, kind, key string, gen int64, now time.Time) error
-	// Get returns the item of kind and key; ErrNotFound when there is none.
-	Get(ctx context.Context, kind, key string) (types.WorkItem, error)
+	// Get returns the item of kind and key; kernel.ErrNotFound when there is
+	// none.
+	Get(ctx context.Context, kind, key string) (WorkItem, error)
 	// Stats counts each kind's items by state, ordered by kind.
-	Stats(ctx context.Context) ([]types.WorkStats, error)
+	Stats(ctx context.Context) ([]WorkStats, error)
 }
 
 // WorkLease is what a worker asks the queue for.
@@ -89,27 +90,32 @@ type WorkFailure struct {
 	Now  time.Time
 }
 
-// ValidateWork checks an item to enqueue against the queue's bounds.
+// ValidateWork checks an item to enqueue against the queue's bounds. It
+// returns an error wrapping kernel.ErrInvalid for an empty or overlong kind
+// or key, or a payload over MaxWorkPayload or not JSON.
 func ValidateWork(kind, key string, payload []byte) error {
 	switch {
 	case kind == "" || key == "":
-		return fmt.Errorf("work item %q/%q: kind and key are required: %w", kind, key, ErrInvalid)
+		return fmt.Errorf("work item %q/%q: kind and key are required: %w",
+			kind, key, kernel.ErrInvalid)
 	case len(kind) > MaxWorkKind || len(key) > MaxWorkKey:
-		return fmt.Errorf("work item %q: kind or key too long: %w", kind, ErrInvalid)
+		return fmt.Errorf("work item %q: kind or key too long: %w", kind, kernel.ErrInvalid)
 	case len(payload) > MaxWorkPayload:
 		return fmt.Errorf("work item %s/%s: payload of %d bytes is over %d: %w",
-			kind, key, len(payload), MaxWorkPayload, ErrInvalid)
+			kind, key, len(payload), MaxWorkPayload, kernel.ErrInvalid)
 	case len(payload) > 0 && !json.Valid(payload):
-		return fmt.Errorf("work item %s/%s: payload is not JSON: %w", kind, key, ErrInvalid)
+		return fmt.Errorf("work item %s/%s: payload is not JSON: %w", kind, key, kernel.ErrInvalid)
 	}
 	return nil
 }
 
-// ValidateLease checks a lease request.
+// ValidateLease checks a lease request. It returns an error wrapping
+// kernel.ErrInvalid unless the request names a holder and an expiry after
+// its Now.
 func ValidateLease(req WorkLease) error {
 	if req.Holder == "" || req.Until.IsZero() || !req.Until.After(req.Now) {
 		return fmt.Errorf("work lease: a holder and an expiry after now are required: %w",
-			ErrInvalid)
+			kernel.ErrInvalid)
 	}
 	return nil
 }

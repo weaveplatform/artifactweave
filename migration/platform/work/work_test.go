@@ -12,7 +12,7 @@ import (
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
-	"github.com/weaveplatform/artifactweave/internal/service/work"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -524,5 +524,49 @@ func TestUnitPermanentRefusalParksWithoutRetry(t *testing.T) {
 	}
 	if n, err := w.q.RunDue(t.Context(), kind); err != nil || n != 0 {
 		t.Fatal("permanent refusal retried", n, err)
+	}
+}
+
+// Dashboards and alert rules select the queue's metrics by their
+// instrumentation scope. It is set once to the package's path after
+// promotion (decision 0044), so a scope that followed the package through
+// migration/ would move them twice. The second kind has no handler, so its
+// item waits and the two gauges have a value to report.
+func TestUnitMeterName(t *testing.T) {
+	const want = "github.com/weaveplatform/artifactweave/internal/platform/work"
+	w := newWorld(t, work.Options{})
+	if err := w.q.Handle(
+		kind,
+		func(context.Context, work.WorkItem) error { return nil },
+	); err != nil {
+		t.Fatal(err)
+	}
+	w.enqueue("k")
+	w.enqueueKind("test.waiting", "w")
+	if n, err := w.q.RunDue(t.Context(), kind); err != nil || n != 1 {
+		t.Fatalf("RunDue made %d runs: %v", n, err)
+	}
+	var rm metricdata.ResourceMetrics
+	if err := w.reader.Collect(t.Context(), &rm); err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]bool{}
+	for _, sm := range rm.ScopeMetrics {
+		for _, m := range sm.Metrics {
+			if !strings.HasPrefix(m.Name, "artifactweave.work.") {
+				continue
+			}
+			seen[m.Name] = true
+			if sm.Scope.Name != want {
+				t.Errorf("%s is reported under the scope %q, want %q", m.Name, sm.Scope.Name, want)
+			}
+		}
+	}
+	for _, name := range []string{
+		"artifactweave.work.runs", "artifactweave.work.items", "artifactweave.work.oldest_pending",
+	} {
+		if !seen[name] {
+			t.Errorf("no %s was collected", name)
+		}
 	}
 }

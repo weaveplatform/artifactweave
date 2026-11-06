@@ -16,7 +16,7 @@
   "internal/server/huggingface/migration_scope_test.go": "ac04f19c0cc34bfec20e230ac9c6e900a303ad02deb222ee887d2257dc7a5936",
   "internal/server/huggingface/migration_test.go": "b548c034d8fbb5d4112ca23513f4d03dd608dd8f536d2b32b9450cf6e64ba288",
   "internal/server/swift/remote_test.go": "ddfe54f01da8a9d93008aed7a789efe3e6be9594be0fef4209ee449382d4fdd0",
-  "internal/server/swift/swift_test.go": "cdcf4cfa6688e816978d12c80a11e5d9998eee7d9fe1b5b13257bb054bfde836",
+  "internal/server/swift/swift_test.go": "6d94609522beed35d80a00ba7138ed152ccc8cbd0ce2a2aed217abad60c92c6d",
   "internal/server/vcs/archive_git_test.go": "639a747c6380fa0cd2b757ed2c6004ccaf23a3af6ddfbebf9b475ab28a728386",
   "internal/server/vcs/testdata/git-archives.json": "df28a545d0dbf8cac25008d086ccc71bdb0fc4bba01141128d93588abb219fa1",
   "internal/server/vcs_delivery_test.go": "4f27097e7816d3b810bd19656c364682522fca5e127e59f2a41eb0737d3acb95",
