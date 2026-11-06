@@ -25,8 +25,11 @@ func sample() *Ledger {
 				Name: "npmhttp", Ticket: "ECO-06",
 			},
 			{
-				From: "internal/format/formats", Action: ActionMove, To: "artifacts/ecosystem",
-				Rename: map[string]string{"formats.go": "registry.go"}, Ticket: "ART-05",
+				From:   "migration/artifacts/ecosystem",
+				Action: ActionMove,
+				To:     "artifacts/ecosystem",
+				Rename: map[string]string{"formats.go": "registry.go"},
+				Ticket: "ART-05",
 			},
 			{From: "internal/layout", Action: ActionDelete, Ticket: "PRO-02"},
 			{From: "internal/a", Action: ActionMerge, To: "platform/ab", Ticket: "PLT-03"},

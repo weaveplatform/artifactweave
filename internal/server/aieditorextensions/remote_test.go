@@ -19,7 +19,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/aieditorextensions"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
@@ -27,6 +26,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -91,7 +91,7 @@ func newFixture(t *testing.T) *fixture {
 		Create(t.Context(), types.Permission{Name: "editor-read", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{"reader": types.ActionRead, auth.AnonymousUser: types.ActionRead}}, Targets: map[string]types.Target{"editor-remote": {Include: []string{"extensions/ms-vscode/hexeditor/**"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
-	items := &item.Service{Store: db, Blobs: blobs, Formats: formats.For}
+	items := &item.Service{Store: db, Blobs: blobs, Formats: ecosystem.For}
 	resolver, err := remote.NewResolver(
 		db,
 		nil,

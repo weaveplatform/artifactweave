@@ -10,10 +10,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/registry"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -244,7 +244,7 @@ func TestAccRemoveTag(t *testing.T) {
 		w.deploy(w.docker, "app/direct/manifest.json", p4, start)
 		w.deploy(w.docker, "app/notes/readme.txt", "hello", start)
 		old := listOf(sum(p3))
-		items := &item.Service{Store: w.db, Blobs: w.blobs, Now: c.now, Formats: formats.For}
+		items := &item.Service{Store: w.db, Blobs: w.blobs, Now: c.now, Formats: ecosystem.For}
 		kept := "app/" + layout.DigestFolder(sum(old)) + "/list.manifest.json"
 		if _, err := items.Deploy(ctx, item.Deploy{
 			Target:     item.Target{Repo: w.docker, Path: kept},
@@ -302,7 +302,7 @@ func TestAccRemoveTag(t *testing.T) {
 func (w *world) treeOf(c repo.Config, dir string) map[string]string {
 	w.t.Helper()
 	items, err := (&item.Service{
-		Store: w.db, Blobs: w.blobs, Formats: formats.For,
+		Store: w.db, Blobs: w.blobs, Formats: ecosystem.For,
 	}).Tree(context.Background(),
 		item.Target{Repo: c, Path: dir})
 	if err != nil {

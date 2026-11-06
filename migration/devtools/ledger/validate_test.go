@@ -47,7 +47,7 @@ func TestUnitValidateRejectsInvalidEntries(t *testing.T) {
 			"rename value", func(l *Ledger) { l.Packages[2].Rename = map[string]string{"formats.go": "sub/registry.go"} },
 			`rename value "sub/registry.go" does not match`,
 		},
-		{"move without to", func(l *Ledger) { l.Packages[2].To = "" }, `package "internal/format/formats": to is empty`},
+		{"move without to", func(l *Ledger) { l.Packages[2].To = "" }, `package "migration/artifacts/ecosystem": to is empty`},
 		{
 			"target pattern", func(l *Ledger) { l.Packages[1].To = "artifacts/ecosystem/npm/HTTP" },
 			`to "artifacts/ecosystem/npm/HTTP" does not match`,

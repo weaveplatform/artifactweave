@@ -9,11 +9,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -108,12 +108,12 @@ func TestAccAnnotateAndDelete(t *testing.T) {
 	}
 	// The item service's failures, and a store that cannot say what the
 	// path holds, are faults.
-	f.items = &item.Service{Store: failingPatch{f.db}, Blobs: f.items.Blobs, Formats: formats.For}
+	f.items = &item.Service{Store: failingPatch{f.db}, Blobs: f.items.Blobs, Formats: ecosystem.For}
 	if rec := f.do(http.MethodPatch, base+local+"/props/a/b.txt", "annotator", ""); rec.Code !=
 		http.StatusInternalServerError {
 		t.Fatalf("annotate failure: %d %s", rec.Code, rec.Body)
 	}
-	f.items = &item.Service{Store: failingTrash{f.db}, Blobs: f.items.Blobs, Formats: formats.For}
+	f.items = &item.Service{Store: failingTrash{f.db}, Blobs: f.items.Blobs, Formats: ecosystem.For}
 	if rec := f.do(http.MethodDelete, base+local+"/files/work/new.txt", "writer", ""); rec.Code !=
 		http.StatusNotFound {
 		t.Fatalf("missing: %d %s", rec.Code, rec.Body)

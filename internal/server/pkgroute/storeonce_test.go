@@ -12,11 +12,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -186,7 +186,7 @@ func TestAccStoreOnceAnnotateFailure(t *testing.T) {
 	); rec.Code != http.StatusCreated {
 		t.Fatalf("first store: %d %s", rec.Code, rec.Body)
 	}
-	f.items = &item.Service{Store: failingPatch{f.db}, Blobs: f.items.Blobs, Formats: formats.For}
+	f.items = &item.Service{Store: failingPatch{f.db}, Blobs: f.items.Blobs, Formats: ecosystem.For}
 	rec := f.do(http.MethodPut, base+local+"/once/m/v1.zip;k=v", "updater", "v1")
 	if rec.Code != http.StatusInternalServerError || len(f.faults) != 1 {
 		t.Fatalf("annotate failure: %d %s, faults %v", rec.Code, rec.Body, f.faults)

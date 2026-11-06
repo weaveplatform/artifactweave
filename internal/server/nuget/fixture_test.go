@@ -18,7 +18,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	nugetfmt "github.com/weaveplatform/artifactweave/internal/format/nuget"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
@@ -27,6 +26,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -113,7 +113,7 @@ func newFixtureOn(t *testing.T, db store.Store, wrap ...func(store.Store) store.
 		t.Fatal(err)
 	}
 	f := &fixture{t: t, db: db, blobs: blobs, tick: time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC)}
-	f.items = &item.Service{Store: db, Blobs: blobs, Now: f.now, Formats: formats.For}
+	f.items = &item.Service{Store: db, Blobs: blobs, Now: f.now, Formats: ecosystem.For}
 	backend := db
 	for _, w := range wrap {
 		backend = w(backend)

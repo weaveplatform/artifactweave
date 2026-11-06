@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
@@ -113,7 +113,7 @@ var mavenStatusPart = statusPart{
 			"com/acme/app/1.0/app-1.0.jar", "com/acme/lib/1.0/lib-1.0.jar", "com/acme/readme.txt",
 		} {
 			if _, err := (&item.Service{
-				Store: db, Blobs: blobs, Formats: formats.For,
+				Store: db, Blobs: blobs, Formats: ecosystem.For,
 			}).Deploy(ctx, item.Deploy{
 				Target: item.Target{Repo: c, Path: p},
 				Body:   strings.NewReader("jar"),

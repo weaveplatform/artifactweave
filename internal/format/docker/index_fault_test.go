@@ -8,10 +8,10 @@ import (
 	"time"
 
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/aql"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -187,7 +187,7 @@ func newIndexed(t *testing.T) *indexed {
 	x := &indexed{db: db, c: c, items: &item.Service{
 		Store: db, Blobs: blobs,
 		Now:     func() time.Time { return time.Date(2026, 10, 16, 9, 0, 0, 0, time.UTC) },
-		Formats: formats.For,
+		Formats: ecosystem.For,
 	}}
 	deploy := func(path, body string) types.Item {
 		t.Helper()

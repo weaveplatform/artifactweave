@@ -20,7 +20,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
 	ansiblefmt "github.com/weaveplatform/artifactweave/internal/format/ansible"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/ansible"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
@@ -30,6 +29,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -61,7 +61,7 @@ func newFixture(t *testing.T) *fixture {
 	if err := db.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
-	items := &item.Service{Store: db, Blobs: blobs, Formats: formats.For}
+	items := &item.Service{Store: db, Blobs: blobs, Formats: ecosystem.For}
 	data := repopath.Read(t, "internal/format/ansible/testdata/weave-sample-1.2.3.tar.gz")
 	f := &fixture{t: t, db: db, items: items, repo: c, data: data}
 	f.mount(nil)

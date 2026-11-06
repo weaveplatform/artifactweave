@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/registry"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/postgres"
@@ -19,6 +18,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -124,7 +124,7 @@ func (w *world) repo(key string) repo.Config {
 
 func (w *world) service(db store.Store) *registry.Service {
 	return &registry.Service{
-		Store: db, Blobs: w.blobs, Now: func() time.Time { return start }, Formats: formats.For,
+		Store: db, Blobs: w.blobs, Now: func() time.Time { return start }, Formats: ecosystem.For,
 	}
 }
 
@@ -136,7 +136,7 @@ func (w *world) owner(name string) registry.Owner {
 func (w *world) deploy(c repo.Config, path, body string, at time.Time) types.Item {
 	w.t.Helper()
 	items := &item.Service{
-		Store: w.db, Blobs: w.blobs, Now: func() time.Time { return at }, Formats: formats.For,
+		Store: w.db, Blobs: w.blobs, Now: func() time.Time { return at }, Formats: ecosystem.For,
 	}
 	it, err := items.Deploy(context.Background(), item.Deploy{
 		Target: item.Target{Repo: c, Path: path}, Body: strings.NewReader(body),
@@ -504,7 +504,7 @@ func TestAccExpireUploads(t *testing.T) {
 }
 
 func TestAccExpireWithoutImageRepositories(t *testing.T) {
-	svc := &registry.Service{Store: inmem.New(), Formats: formats.For}
+	svc := &registry.Service{Store: inmem.New(), Formats: ecosystem.For}
 	if n, err := svc.ExpireUploads(context.Background(), start); err != nil || n != 0 {
 		t.Fatalf("%d %v", n, err)
 	}

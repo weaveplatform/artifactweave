@@ -49,7 +49,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/trash"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/postgres"
@@ -57,6 +56,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -335,7 +335,7 @@ func newWorld(t *testing.T, st store.Store, f Format) *world {
 	}
 	w := &world{t: t, ctx: context.Background(), f: f, h: f.Handler, st: st, now: start}
 	if w.h == nil {
-		w.h = formats.For(f.Type)
+		w.h = ecosystem.For(f.Type)
 	}
 	now := func() time.Time { return w.now }
 	w.items = &item.Service{

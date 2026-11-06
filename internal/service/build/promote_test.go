@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -47,7 +47,7 @@ func (w *world) put(key string, cached bool, path, content string, props types.P
 		w.t.Fatal(err)
 	}
 	if _, err := (&item.Service{
-		Store: w.db, Blobs: w.blobs, Formats: formats.For,
+		Store: w.db, Blobs: w.blobs, Formats: ecosystem.For,
 	}).Deploy(ctx, item.Deploy{
 		Target: item.Target{Repo: c, Cached: cached, Path: path},
 		Body:   strings.NewReader(content), Properties: props,

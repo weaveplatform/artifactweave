@@ -17,12 +17,12 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -91,7 +91,7 @@ func TestAccMavenRemoteMetadataArtifactsAndOutage(t *testing.T) {
 		w.request("GET", "/artifactory/remote/org/acme/app/1.0/app-1.0.jar.sha1", "reader", ""),
 		200,
 	)
-	items := &item.Service{Store: w.rt.store, Blobs: w.rt.blobs, Formats: formats.For}
+	items := &item.Service{Store: w.rt.store, Blobs: w.rt.blobs, Formats: ecosystem.For}
 	if err := items.Reindex(t.Context(), w.c); err != nil {
 		t.Fatal(err)
 	}
@@ -334,7 +334,7 @@ func TestAccMavenRemoteEagerCompanionsAndRetention(t *testing.T) {
 		mavenSource(w, p, sourceJAR(t, fmt.Sprint(i)), "application/java-archive")
 		remoteStatus(t, w.request("GET", "/artifactory/remote/"+p, "reader", ""), 200)
 	}
-	items := &item.Service{Store: w.rt.store, Blobs: w.rt.blobs, Formats: formats.For}
+	items := &item.Service{Store: w.rt.store, Blobs: w.rt.blobs, Formats: ecosystem.For}
 	if err := (maven.Handler{}).Work(
 		t.Context(),
 		items.Env(),
@@ -391,7 +391,7 @@ func TestAccMavenFamilyLayoutRequests(t *testing.T) {
 				Get(t.Context(), w.c.Key, true, tc.request); err != nil {
 				t.Fatal("canonical cache path lost", err)
 			}
-			items := &item.Service{Store: w.rt.store, Blobs: w.rt.blobs, Formats: formats.For}
+			items := &item.Service{Store: w.rt.store, Blobs: w.rt.blobs, Formats: ecosystem.For}
 			if err := items.Reindex(t.Context(), w.c); err != nil {
 				t.Fatal(err)
 			}

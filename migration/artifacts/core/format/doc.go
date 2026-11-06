@@ -11,7 +11,7 @@
 //
 // artifacts module, core layer: the format contract. Each package type's
 // format is a package of its own, named after its ecosystem
-// (docs/implementation/repo-layout.md), and internal/format/formats picks
+// (docs/implementation/repo-layout.md), and migration/artifacts/ecosystem picks
 // one for a package type. Formats never import the HTTP layer, so they speak
 // to clients only through RejectionError and AcceptedError (decision 0032).
 // As artifacts core, the contract never imports the module's adapters or an
@@ -41,7 +41,7 @@
 //
 //   - Registry, the function from a package type to its Handler. The
 //     application builds one from the format registry's Settings.For
-//     (internal/format/formats) and gives it to the item, build and registry
+//     (migration/artifacts/ecosystem) and gives it to the item, build and registry
 //     services and the Docker registry; remote retrieval classifies with the
 //     item service's. A nil Registry means the generic handler, which indexes
 //     nothing. Core services take it as a value because importing the

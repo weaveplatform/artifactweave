@@ -12,7 +12,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -381,7 +381,7 @@ func TestAccListingAndDeleteStoreFailures(t *testing.T) {
 			o := Options{
 				Store: w.db, Blobs: w.blobs,
 				Fault:   func(_ *http.Request, err error) { noted = err },
-				Formats: formats.For,
+				Formats: ecosystem.For,
 			}
 			c.tune(w, &o)
 			rec := send(router(New(o)), c.method, c.target, "", nil)

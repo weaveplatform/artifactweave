@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 )
 
 // Token lifecycle tests need real identities, permissions, signing keys and one
@@ -37,7 +37,7 @@ func newTokenFixture(t *testing.T, tune ...func(*Config)) (http.Handler, statusS
 			t.Fatal(err)
 		}
 		if _, err = (&item.Service{
-			Store: c.Store, Blobs: c.Blobs, Formats: formats.For,
+			Store: c.Store, Blobs: c.Blobs, Formats: ecosystem.For,
 		}).Deploy(t.Context(), item.Deploy{
 			Target: item.Target{
 				Repo: libs,

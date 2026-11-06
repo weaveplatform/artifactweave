@@ -12,10 +12,10 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
@@ -126,7 +126,7 @@ func TestAccRegistryRemotePullRefreshAndOffline(t *testing.T) {
 	if got := w.request("GET", path, "reader", ""); got.Body.String() != string(manifest) {
 		t.Fatal("fresh tag unexpectedly changed")
 	}
-	service := item.Service{Store: w.rt.store, Blobs: w.rt.blobs, Formats: formats.For}
+	service := item.Service{Store: w.rt.store, Blobs: w.rt.blobs, Formats: ecosystem.For}
 	if _, err := service.Zap(
 		t.Context(),
 		item.Target{Repo: w.c, Cached: true, Path: "team/image"},

@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -244,7 +244,7 @@ func TestUnitOutranks(t *testing.T) {
 // byPublish turns npm.tag_latest_by_publish on for every write through
 // the world's item service, as the server's settings do.
 func (w *world) byPublish() {
-	w.items.Formats = formats.Settings{NPM: npm.Settings{TagLatestByPublish: true}}.For
+	w.items.Formats = ecosystem.Settings{NPM: npm.Settings{TagLatestByPublish: true}}.For
 }
 
 // With npm.tag_latest_by_publish, rules 2 and 4 rank versions by when

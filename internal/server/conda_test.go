@@ -15,11 +15,11 @@ import (
 	"testing"
 
 	condafmt "github.com/weaveplatform/artifactweave/internal/format/conda"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/work"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -593,7 +593,7 @@ func TestUnitCondaLocalAndVirtualNativeChannel(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		svc := &item.Service{Store: cfg.Store, Blobs: cfg.Blobs, Work: q, Formats: formats.For}
+		svc := &item.Service{Store: cfg.Store, Blobs: cfg.Blobs, Work: q, Formats: ecosystem.For}
 		if err := svc.RegisterWork(q); err != nil {
 			t.Fatal(err)
 		}

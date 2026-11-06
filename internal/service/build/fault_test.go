@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -282,7 +282,7 @@ func TestUnitFaults(t *testing.T) {
 	} {
 		w := newWorld(t)
 		w.seed("seeded")
-		s := &Service{Store: faulty{w.db, tc.fail}, Blobs: w.blobs, Formats: formats.For}
+		s := &Service{Store: faulty{w.db, tc.fail}, Blobs: w.blobs, Formats: ecosystem.For}
 		if err := tc.op(s); !errors.Is(err, errBoom) {
 			t.Errorf("failing %s: %v, want the store's error", tc.fail, err)
 		}
@@ -364,7 +364,7 @@ func TestUnitPromotionFaults(t *testing.T) {
 		w.put("libs-local", false, "dep/d.jar", "d.jar", nil)
 		w.publish(doc("app", "1", started0, fileModule([]string{"a.bin"}, []string{"d.jar"})))
 		w.publish(doc("app", "0", at(-1)))
-		s := &Service{Store: faulty{w.db, tc.fail}, Blobs: w.blobs, Formats: formats.For}
+		s := &Service{Store: faulty{w.db, tc.fail}, Blobs: w.blobs, Formats: ecosystem.For}
 		if err := tc.op(s); !errors.Is(err, errBoom) {
 			t.Errorf("failing %s: %v, want the store's error", tc.fail, err)
 		}

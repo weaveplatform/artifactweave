@@ -19,7 +19,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth/idtoken"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	"github.com/weaveplatform/artifactweave/internal/crypt"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/agentpackages"
 	"github.com/weaveplatform/artifactweave/internal/server/aieditorextensions"
@@ -73,6 +72,7 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/mirror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -192,7 +192,7 @@ type Config struct {
 	Formats format.Registry
 	// FormatSettings are the formats' server-wide options, such as
 	// npm.tag_latest_by_publish; the zero value is each format's default.
-	FormatSettings formats.Settings
+	FormatSettings ecosystem.Settings
 	// CranArchiveMoverEnabled enables the administrator-only legacy archive
 	// migration API. Its zero value leaves migration disabled.
 	CranArchiveMoverEnabled bool
@@ -322,7 +322,7 @@ func newRegistry(cfg Config, artSvc artifactoryService) *docker.Registry {
 		Fault:         func(r *http.Request, err error) { noteCause(r.Context(), err) },
 		// The registry serves only docker, oci and helmoci repositories,
 		// whose format takes no settings.
-		Formats: formats.For,
+		Formats: ecosystem.For,
 		// A layer downloads as any file does: redirected to a signed URL
 		// when the repository says so (decision 0029), and counted.
 		ServeBlob: func(w http.ResponseWriter, r *http.Request, c repo.Config, it types.Item) {

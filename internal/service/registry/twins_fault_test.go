@@ -8,9 +8,9 @@ import (
 	"time"
 
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/registry"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -145,7 +145,7 @@ func TestAccTwinFailures(t *testing.T) {
 			f := tc.faults(twin)
 			f.Store = w.db
 			svc := &registry.Service{
-				Store: &f, Blobs: w.blobs, Now: w.svc.Now, Formats: formats.For,
+				Store: &f, Blobs: w.blobs, Now: w.svc.Now, Formats: ecosystem.For,
 			}
 			if err := tc.run(w, svc); !errors.Is(err, errBoom) {
 				t.Fatalf("err = %v", err)

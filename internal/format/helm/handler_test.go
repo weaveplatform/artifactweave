@@ -9,12 +9,12 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/format/helm"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/trash"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -48,7 +48,7 @@ func newWorldOn(t *testing.T, st store.Store) *world {
 		now: time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC),
 	}
 	w.items = &item.Service{
-		Store: st, Blobs: blobs, Now: func() time.Time { return w.now }, Formats: formats.For,
+		Store: st, Blobs: blobs, Now: func() time.Time { return w.now }, Formats: ecosystem.For,
 	}
 	w.c = w.repo("helm-local", nil)
 	return w

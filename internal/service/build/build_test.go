@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -73,7 +73,7 @@ func newWorld(t *testing.T) *world {
 		t.Fatal(err)
 	}
 	return &world{t: t, db: db, blobs: blobs, svc: &Service{
-		Store: db, Blobs: blobs, Formats: formats.For,
+		Store: db, Blobs: blobs, Formats: ecosystem.For,
 	}}
 }
 
@@ -118,7 +118,7 @@ func (w *world) deploy(path, content string, props types.Properties) {
 		w.t.Fatal(err)
 	}
 	if _, err := (&item.Service{
-		Store: w.db, Blobs: w.blobs, Formats: formats.For,
+		Store: w.db, Blobs: w.blobs, Formats: ecosystem.For,
 	}).Deploy(ctx, item.Deploy{
 		Target: item.Target{Repo: c, Path: path}, Body: strings.NewReader(content),
 		Properties: props,
@@ -311,7 +311,7 @@ func TestUnitPublishOverStaleDocument(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := (&item.Service{
-		Store: w.db, Blobs: w.blobs, Formats: formats.For,
+		Store: w.db, Blobs: w.blobs, Formats: ecosystem.For,
 	}).Deploy(ctx, item.Deploy{
 		Target: item.Target{Repo: c, Path: runPath("app", "1", started0)},
 		Body:   bytes.NewReader([]byte("stale")),
@@ -549,7 +549,7 @@ func TestUnitDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := (&item.Service{
-		Store: w.db, Blobs: w.blobs, Formats: formats.For,
+		Store: w.db, Blobs: w.blobs, Formats: ecosystem.For,
 	}).Purge(ctx, item.Target{
 		Repo: c, Path: runPath("app", "2", at(2)),
 	}); err != nil {

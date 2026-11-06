@@ -8,11 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/work"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 )
 
 // newMavenWorld is an item world with a Maven repository, maven-local, and
@@ -25,7 +25,12 @@ func newMavenWorld(t *testing.T) *itemWorld {
 		if err != nil {
 			t.Fatal(err)
 		}
-		derived := &item.Service{Store: cfg.Store, Blobs: cfg.Blobs, Work: q, Formats: formats.For}
+		derived := &item.Service{
+			Store:   cfg.Store,
+			Blobs:   cfg.Blobs,
+			Work:    q,
+			Formats: ecosystem.For,
+		}
 		if err := derived.RegisterWork(q); err != nil {
 			t.Fatal(err)
 		}

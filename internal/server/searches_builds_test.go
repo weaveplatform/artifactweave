@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/build"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -55,7 +55,7 @@ func buildSearchWorld(t *testing.T, anonymous bool, tune ...func(*Config)) *item
 		return fmt.Sprintf(`{"name":%q,"sha1":%q}`, name, sha1Hex(content))
 	}
 	dep := `{"id":"org:dep:1.0","sha1":"` + sha1Hex("dep") + `"}`
-	svc := build.Service{Store: w.db, Blobs: w.blobs, Formats: formats.For}
+	svc := build.Service{Store: w.db, Blobs: w.blobs, Formats: ecosystem.For}
 	started := func(n int) string {
 		s, err := build.ParseStarted(testStarted)
 		if err != nil {

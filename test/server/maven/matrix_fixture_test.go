@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -100,7 +100,7 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 		}
 	})
 	f := &matrixFixture{h: h, db: db, items: &item.Service{
-		Store: db, Blobs: blobs, Formats: formats.For,
+		Store: db, Blobs: blobs, Formats: ecosystem.For,
 	}}
 	f.secrets = seedMavenMatrixTokens(t, db, tokens)
 	mavenMatrixPart.seed(t, f)

@@ -39,7 +39,7 @@ func TestUnitAffectedPlanChoosesOnlyOwnedChanges(t *testing.T) {
 		{"new server test", []change{{status: "A", path: "test/server/npm/new_test.go"}}, "full", ""},
 		{"unknown root test", []change{{status: "M", path: "internal/server/unknown_test.go"}}, "full", ""},
 		{"unknown format", []change{{status: "M", path: "migration/artifacts/ecosystem/newformat/handler.go"}}, "full", ""},
-		{"shared format code", []change{{status: "M", path: "internal/format/formats/formats.go"}}, "full", ""},
+		{"shared format code", []change{{status: "M", path: "migration/artifacts/ecosystem/registry.go"}}, "full", ""},
 		{"format and deployment", []change{{status: "M", path: "internal/format/npm/handler.go"}, {status: "M", path: "deploy/check.sh"}}, "full", ""},
 		{"two formats", []change{{status: "M", path: "internal/format/npm/handler.go"}, {status: "M", path: "internal/format/maven/handler.go"}}, "full", ""},
 		{"deleted source", []change{{status: "D", path: "internal/format/npm/handler.go"}}, "full", ""},

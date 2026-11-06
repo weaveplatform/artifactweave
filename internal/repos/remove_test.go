@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/trash"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -68,7 +68,7 @@ func newLifecycle(t *testing.T) *lifecycle {
 	// Remove dates its trash entries by the real clock, which this one
 	// starts from so that expiry is measured from the delete.
 	l := &lifecycle{db: inmem.New(), blobs: blobs, clock: time.Now().UTC()}
-	l.items = &item.Service{Store: l.db, Blobs: blobs, Now: l.now, Formats: formats.For}
+	l.items = &item.Service{Store: l.db, Blobs: blobs, Now: l.now, Formats: ecosystem.For}
 	for _, key := range []string{"libs", "other", "restored"} {
 		c := repo.Config{Key: key, Class: repo.Local, PackageType: repo.Generic}
 		if err := l.db.Repos().Create(context.Background(), *repo.Defaults(&c)); err != nil {

@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
@@ -79,7 +79,7 @@ var goStatusPart = statusPart{
 	},
 	seed: func(t *testing.T, db store.Store, blobs blob.Store) {
 		t.Helper()
-		seedGoModule(t, &item.Service{Store: db, Blobs: blobs, Formats: formats.For}, db)
+		seedGoModule(t, &item.Service{Store: db, Blobs: blobs, Formats: ecosystem.For}, db)
 		grantOverwriter(t, db, "go-local", goModule+"/")
 	},
 	rows: func() []statusCase { return append(goStatusRows(), goPublishStatusRows()...) },

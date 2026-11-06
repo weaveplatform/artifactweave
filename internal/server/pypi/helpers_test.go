@@ -22,13 +22,13 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	pypifmt "github.com/weaveplatform/artifactweave/internal/format/pypi"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/server/pypi"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -113,7 +113,7 @@ func newFixture(
 	f := &fixture{db: db, tick: time.Date(2026, 10, 1, 9, 0, 0, 123456000, time.UTC)}
 	f.items = &item.Service{
 		Store: db, Blobs: blobs, Now: func() time.Time { return f.tick },
-		Formats: formats.Settings{PyPI: settings}.For,
+		Formats: ecosystem.Settings{PyPI: settings}.For,
 	}
 	var backend store.Store = db
 	for _, w := range wrap {

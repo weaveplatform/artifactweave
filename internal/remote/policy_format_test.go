@@ -6,17 +6,17 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestAccPolicyMutableAndDerivedClassification(t *testing.T) {
 	w := remote.PolicyFixture(t)
-	w.Policy().Items.Formats = formats.For
+	w.Policy().Items.Formats = ecosystem.For
 	q := w.Request("file.txt", source.ResourceKindArtifact)
 	q.Resource.Mutable = true
 	w.Upstream().Set("/file.txt", fakeupstream.Resource{Body: []byte("one")})
@@ -39,7 +39,7 @@ func TestAccPolicyMutableAndDerivedClassification(t *testing.T) {
 
 func TestAccPolicyDerivedNeverFetches(t *testing.T) {
 	w := remote.PolicyFixture(t)
-	w.Policy().Items.Formats = formats.For
+	w.Policy().Items.Formats = ecosystem.For
 	q := w.Request("maven-metadata.xml", source.ResourceKindArtifact)
 	q.Repo.PackageType = repo.Maven
 	if _, err := w.Read(q); !errors.Is(err, store.ErrNotFound) {

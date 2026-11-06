@@ -21,7 +21,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	"github.com/weaveplatform/artifactweave/internal/server/chef"
@@ -31,6 +30,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -76,7 +76,7 @@ func newFixtureStore(
 	if wrap != nil {
 		st = wrap(st)
 	}
-	items := &item.Service{Store: st, Blobs: blobs, Work: q, Formats: formats.For}
+	items := &item.Service{Store: st, Blobs: blobs, Work: q, Formats: ecosystem.For}
 	if err := items.RegisterWork(q); err != nil {
 		t.Fatal(err)
 	}

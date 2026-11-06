@@ -10,9 +10,9 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 )
 
@@ -88,7 +88,7 @@ func TestAccPuppetRemoteCacheRefreshOfflineAndIntegrity(t *testing.T) {
 	w.c.RetrievalCachePeriodSecs = new(1)
 	w.c.AssumedOfflinePeriodSecs = new(0)
 	w.update()
-	service := item.Service{Store: w.rt.store, Blobs: w.rt.blobs, Formats: formats.For}
+	service := item.Service{Store: w.rt.store, Blobs: w.rt.blobs, Formats: ecosystem.For}
 	if _, err := service.Zap(
 		t.Context(),
 		item.Target{Repo: w.c, Cached: true, Path: "v3/releases"},

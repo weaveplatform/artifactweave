@@ -1,7 +1,7 @@
-// Package formats picks the format of a package type. It is apart from
+// Package ecosystem picks the format of a package type. It is apart from
 // migration/artifacts/core/format so a format package can implement that
 // contract without an import cycle.
-package formats
+package ecosystem
 
 import (
 	"github.com/weaveplatform/artifactweave/internal/format/agentpackages"
