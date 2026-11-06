@@ -1,6 +1,3 @@
-// Package blobtest is the contract every blob.Store backend must satisfy.
-// Backends call Run from their own tests; the s3 backend runs it twice, against
-// an in-memory fake everywhere and against MinIO where Docker is available.
 package blobtest
 
 import (

@@ -93,12 +93,12 @@ against Jira and the legacy release notes (2026-10-18, #378).
 No 7.x source covers any of this, so all of it is inferred **[I]** and on
 [#216](https://github.com/weaveplatform/artifactweave/issues/216).
 
-**Blobs.** `migration/platform/blob` is a content-addressed store keyed by sha256. Every upload computes
-four checksums in one pass: SHA-256, SHA-512, SHA-1 and MD5. The other three are recorded
-in the blob and item index, so checksum deploy, checksum search and checksum files work
-from the database. SHA-1 and MD5 are looked up by checksum deploy and the checksum
-searches, so they are indexed. SHA-512 is never a lookup key, because whatever holds one
-also holds the SHA-256, so it is stored but not indexed.
+**Blobs.** `migration/platform/blob` is a content-addressed store keyed by sha256. Every
+upload computes four checksums in one pass: SHA-256, SHA-512, SHA-1 and MD5. The other three
+are recorded in the blob and item index, so checksum deploy, checksum search and checksum
+files work from the database. SHA-1 and MD5 are looked up by checksum deploy and the
+checksum searches, so they are indexed. SHA-512 is never a lookup key, because whatever
+holds one also holds the SHA-256, so it is stored but not indexed.
 Backends: `fs` (temp-then-rename into a two-level hex tree), `s3` (aws-sdk-go-v2,
 multipart upload for large objects, no rename), and `gcs` and `azure` as decided in
 [0027](0027-cloud-blob-backends.md) (compose of temporary parts; staged blocks). The
@@ -177,10 +177,10 @@ one such session; see [research 09](../09-jfrog-cli-compatibility.md#multipart-u
   what Docker and the CLI check; indexing all three costs one table.
 - *SHA-3 as well*: no package client and no Artifactory API asks for it, so it would
   cost CPU on every upload for a digest nothing reads (maintainer decision, 2026-10-16).
-  The checksum set is defined in one place (`migration/platform/blob.Hasher` and `types.Checksums`), so
-  another algorithm can be added when required. P20's client/contract inventory must
-  assign any newly identified checksum requirement to its format phase; this is not a
-  permanent exclusion of algorithms required by the expanded ecosystems.
+  The checksum set is defined in one place (`migration/platform/blob.Hasher` and
+  `types.Checksums`), so another algorithm can be added when required. P20's client/contract
+  inventory must assign any newly identified checksum requirement to its format phase; this
+  is not a permanent exclusion of algorithms required by the expanded ecosystems.
 - *Storing sidecar files as items*: simpler, but then a sidecar can disagree with its
   artifact and `badChecksum` has nothing to compare.
 - *MySQL in the initial store phase*: scheduled for P34, including migration and contract
@@ -250,9 +250,9 @@ it is documented; a PUT of the checksum file fixes a missing checksum here. Six 
 
 ## Verification
 
-- `pkg/store/storetest` and `migration/platform/blob/blobtest` contract suites run against the in-memory
-  store, SQLite, PostgreSQL (testcontainers) and MinIO (testcontainers) on Linux CI and
-  skip cleanly where Docker is absent.
+- `pkg/store/storetest` and `migration/platform/blob/blobtest` contract suites run against
+  the in-memory store, SQLite, PostgreSQL (testcontainers) and MinIO (testcontainers) on
+  Linux CI and skip cleanly where Docker is absent.
 - Upload-session tests resume across simulated process boundaries on both blob backends.
 - Ranged download and checksum-sidecar tests in the item handler package.
 - Migration up, down, up tests per dialect.

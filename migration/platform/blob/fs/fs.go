@@ -1,8 +1,3 @@
-// Package fs is the local-disk blob store. Blobs live at
-// <root>/sha256/<ab>/<cd>/<hex>; the two shard levels keep directories small
-// enough for tools and filesystems that slow down on huge listings. Upload
-// sessions live at <root>/_uploads/<id>/ on the same filesystem, so committing
-// is an fsync and a rename rather than a copy.
 package fs
 
 import (

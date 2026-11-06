@@ -2,6 +2,8 @@ package blob
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"io"
 	"strings"
@@ -27,6 +29,70 @@ func TestUnitHasherSaveRestoreContinues(t *testing.T) {
 	_, _ = resumed.Write([]byte("world"))
 	if resumed.Sum() != whole.Sum() {
 		t.Fatalf("resumed %+v, whole %+v", resumed.Sum(), whole.Sum())
+	}
+}
+
+// hasherKnownStateSHA256 is the SHA-256 of the state a new Hasher saves
+// after reading "artifactweave upload, part one; ". Upload sessions persist
+// that state between requests and processes, so a session saved by one
+// build must restore in the next. A round trip within one build, as in
+// TestUnitHasherSaveRestoreContinues, cannot see a change of encoding.
+const hasherKnownStateSHA256 = "ce3f466f0c53391dfc65c9420c5feb2dc9e4bbdffeb8a701cdd095c101608d50"
+
+func TestUnitHasherStateKnownAnswer(t *testing.T) {
+	const head, tail = "artifactweave upload, part one; ", "part two"
+	h := NewHasher()
+	_, _ = h.Write([]byte(head))
+	state, err := h.MarshalBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The hash below covers the framing too; checking it first names the
+	// part that changed. Each standard library state starts with its magic.
+	rest := state
+	for _, part := range []struct {
+		name, magic string
+		size        int
+	}{
+		{"SHA-256", "sha\x03", 108},
+		{"SHA-512", "sha\x07", 204},
+		{"SHA-1", "sha\x01", 96},
+		{"MD5", "md5\x01", 92},
+	} {
+		if len(rest) < 2+len(part.magic) {
+			t.Fatalf("%s state: %d bytes left, want a length and a state", part.name, len(rest))
+		}
+		n := int(rest[0])<<8 | int(rest[1])
+		if n != part.size || string(rest[2:2+len(part.magic)]) != part.magic {
+			t.Fatalf("%s state: length %d and magic %q, want %d and %q",
+				part.name, n, rest[2:2+len(part.magic)], part.size, part.magic)
+		}
+		rest = rest[min(len(rest), 2+n):]
+	}
+	if len(rest) != 0 {
+		t.Fatalf("%d bytes after the MD5 state, want none", len(rest))
+	}
+	sum := sha256.Sum256(state)
+	if got := hex.EncodeToString(sum[:]); got != hasherKnownStateSHA256 {
+		t.Fatalf("the saved state changed: its SHA-256 is %s, want %s", got, hasherKnownStateSHA256)
+	}
+
+	// The saved state continues the stream: the digests are those of head
+	// and tail together, as shasum and md5 compute them.
+	resumed := NewHasher()
+	if err := resumed.UnmarshalBinary(state); err != nil {
+		t.Fatal(err)
+	}
+	_, _ = resumed.Write([]byte(tail))
+	want := Digests{
+		SHA256: "588b9b19885591f15d7a2913a4e65fe636c92567f213874a5e6481ebcad7473b",
+		SHA512: "877f0741f1af2c0b0b5699bb1cddaba3b2a13e804057aa13358e3d4f570e05b3" +
+			"9f4a94e932db030b68f5309545b7cd3132fb2f77aae08dfd524f94d6e1ce7686",
+		SHA1: "7862a220a899a8afa8dc21a573753e6097a26229",
+		MD5:  "50112c50eaac9359c718c69d557b4a24",
+	}
+	if got := resumed.Sum(); got != want {
+		t.Fatalf("resumed digests %+v, want %+v", got, want)
 	}
 }
 

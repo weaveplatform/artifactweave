@@ -61,8 +61,8 @@ var traversalInputs = map[exemption]string{
 		"climbs out of the channel, which shardURLs must reject",
 	{"internal/service/registry/registry_test.go", parentPrefix}: "prefixes an id that Status " +
 		"must not resolve",
-	{"migration/platform/blob/blob_test.go", parentPrefix}: "prefixes an upload id that ValidUploadID must " +
-		"reject",
+	{"migration/platform/blob/blob_test.go", parentPrefix}: "prefixes an upload id that " +
+		"ValidUploadID must reject",
 	{"test/acceptance/debian_steps_test.go", parentPrefix}: "the step refuses an expected " +
 		"file name with this prefix",
 	{"test/acceptance/pub_steps_test.go", parentPrefix}: "the step refuses a Dart project " +
