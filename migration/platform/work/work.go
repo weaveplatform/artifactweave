@@ -571,11 +571,16 @@ func (q *Queue) WaitIdle(ctx context.Context) error {
 	}
 }
 
+// meterName is the queue's OpenTelemetry instrumentation scope: the path this
+// package has after promotion, set once in P9d so dashboards and alert rules
+// that select on the scope change once, not again at promotion.
+const meterName = "github.com/weaveplatform/artifactweave/internal/platform/work"
+
 // instrument registers the queue's metrics: items by kind and state, the
 // age of the oldest pending item, and runs by outcome. Kinds are code
 // constants, so the labels stay bounded (decision 0016).
 func (q *Queue) instrument() error {
-	m := q.o.Meters.Meter("github.com/weaveplatform/artifactweave/migration/platform/work")
+	m := q.o.Meters.Meter(meterName)
 	var err error
 	if q.runs, err = m.Int64Counter("artifactweave.work.runs",
 		metric.WithDescription("Work queue runs, by kind and outcome"),
