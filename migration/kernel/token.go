@@ -1,4 +1,4 @@
-package types
+package kernel
 
 // TokenIdentity says how a token's subject resolves to a user. Access issues
 // tokens from an OIDC token exchange without checking that the mapped user

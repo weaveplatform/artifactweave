@@ -161,7 +161,11 @@
         {"from":"pkg/store/store_kernel.go","action":"move","to":"kernel","file":"page.go","ticket":"PLT-03"},
         {"from":"pkg/store/store_test.go","action":"move","to":"kernel","file":"page_test.go","ticket":"PLT-03"},
         {"from":"pkg/types/domain_kernel_test.go","action":"move","to":"kernel","file":"path_test.go","ticket":"PLT-03"},
-        {"from":"pkg/types/item_kernel.go","action":"move","to":"kernel","file":"path.go","ticket":"PLT-03"}
+        {"from":"pkg/types/item_kernel.go","action":"move","to":"kernel","file":"path.go","ticket":"PLT-03"},
+        {"from":"pkg/types/scope.go","action":"move","to":"kernel","file":"scope.go","ticket":"PLT-04"},
+        {"from":"pkg/types/scope_test.go","action":"move","to":"kernel","file":"scope_test.go","ticket":"PLT-04"},
+        {"from":"pkg/types/testdata/fuzz/FuzzParseScope/","action":"move","to":"kernel/testdata/fuzz","ticket":"PLT-04"},
+        {"from":"pkg/types/token_kernel.go","action":"move","to":"kernel","file":"token.go","ticket":"PLT-04"}
     ],
     "placeholders": [
         {"to":"access/adapters/crowd","phases":["P21"]},

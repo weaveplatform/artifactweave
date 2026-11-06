@@ -19,7 +19,7 @@ PLATFORMS ?= linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 win
 # platform-scenarios.yml, against a deployment, and is evidence rather than coverage.
 UNIT_PKGS = $(shell GOWORK=off $(GO) list ./... | grep -v -e /test/acceptance -e /test/platform)
 ACC_PKGS ?= $(UNIT_PKGS)
-FUZZ_PKGS ?= ./internal/authz ./internal/format/huggingface/xet ./internal/format/nuget ./pkg/types
+FUZZ_PKGS ?= ./internal/authz ./internal/format/huggingface/xet ./internal/format/nuget ./migration/kernel
 UNIT_RUN ?= ^TestUnit
 ACC_RUN ?= ^TestAcc
 ACCEPT_RUN ?= ^TestAcc
