@@ -24,7 +24,7 @@ func TestAccUnrelated() {}
 package server
 func TestUnitWindows() {}
 `,
-		"internal/format/demo/format_test.go": `package demo
+		"migration/artifacts/ecosystem/demo/format_test.go": `package demo
 func TestUnitFormat() {}
 `,
 		"pkg/seed_test.go": `package pkg
@@ -54,7 +54,10 @@ func TestAccCloud() {}
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(full.Unit, []string{"./internal/format/demo", "./internal/server"}) ||
+	if !slices.Equal(
+		full.Unit,
+		[]string{"./internal/server", "./migration/artifacts/ecosystem/demo"},
+	) ||
 		!slices.Equal(full.Acc, []string{"./internal/server"}) ||
 		!slices.Equal(full.Fuzz, []string{"./pkg"}) {
 		t.Fatalf("full test kinds: %+v", full)
@@ -73,7 +76,8 @@ func TestAccCloud() {}
 		t.Fatal("Windows-only TestUnit source was lost on this host")
 	}
 	format, err := scanKinds(root, plan{profile: "format", candidate: affectedPlan{
-		owner: "nuget", units: []string{"./internal/server", "./internal/format/demo/..."},
+		owner: "nuget",
+		units: []string{"./internal/server", "./migration/artifacts/ecosystem/demo/..."},
 	}})
 	if err != nil {
 		t.Fatal(err)

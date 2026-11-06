@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	api "github.com/weaveplatform/artifactweave/internal/format"
 	format "github.com/weaveplatform/artifactweave/internal/format/huggingface"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	api "github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 

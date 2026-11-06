@@ -79,7 +79,7 @@ type ref struct {
 // followers are the bytes that may follow an old path, besides "/" and the
 // end of the text: punctuation that ends a path in prose, code, YAML, JSON,
 // Makefiles and shell, and white space. A letter, digit, "_" or "-" means a
-// longer name, so internal/format never matches internal/formats.
+// longer name, so internal/alpha never matches internal/alphabet.
 const followers = `.:"'\` + "`" + " \t\n\r\v\f" + `)]},;$*?#=>`
 
 // find returns the references in text, ordered and without overlaps. Where

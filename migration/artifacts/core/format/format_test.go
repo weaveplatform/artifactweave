@@ -10,14 +10,12 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// hooks has the required hooks alone.
 type hooks struct{}
 
 func (hooks) Deployed(context.Context, Env, repo.Config, types.Item) error  { return nil }
 func (hooks) Deleting(context.Context, Env, repo.Config, types.Item) error  { return nil }
 func (hooks) Deleted(context.Context, Env, repo.Config, []types.Item) error { return nil }
 
-// derived classifies everything as derived.
 type derived struct{ hooks }
 
 func (derived) Classify(repo.Config, string) Class { return ClassDerived }

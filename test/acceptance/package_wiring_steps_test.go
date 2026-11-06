@@ -17,8 +17,8 @@ import (
 	"github.com/cucumber/godog"
 	_ "modernc.org/sqlite" // Observe the running binary's queue without opening a writable store.
 
-	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/format/terraform/terraformtest"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 )
 
 type wiringPackage struct {

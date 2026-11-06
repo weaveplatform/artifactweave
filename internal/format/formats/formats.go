@@ -1,10 +1,9 @@
 // Package formats picks the format of a package type. It is apart from
-// internal/format so a format package can implement that contract without
-// an import cycle.
+// migration/artifacts/core/format so a format package can implement that
+// contract without an import cycle.
 package formats
 
 import (
-	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/format/agentpackages"
 	"github.com/weaveplatform/artifactweave/internal/format/agentplugins"
 	"github.com/weaveplatform/artifactweave/internal/format/aieditorextensions"
@@ -45,6 +44,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/terraformbackend"
 	"github.com/weaveplatform/artifactweave/internal/format/vagrant"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 )
 
 // Settings are the server-wide options of the formats that take any, from

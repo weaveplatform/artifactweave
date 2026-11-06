@@ -12,7 +12,7 @@ import (
 	"strconv"
 
 	"github.com/weaveplatform/artifactweave/internal/crypt"
-	"github.com/weaveplatform/artifactweave/internal/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 )
 
 // Errors of reading a state.

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 )
 
 // A format's refusal keeps its status and message under the registry code

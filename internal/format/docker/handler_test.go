@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/format"
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 )
 
 // A tag's manifest is metadata, since a push moves the tag; digest
