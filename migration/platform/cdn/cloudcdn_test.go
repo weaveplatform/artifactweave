@@ -11,8 +11,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/blobtest"
-	"github.com/weaveplatform/artifactweave/pkg/cdn"
-	"github.com/weaveplatform/artifactweave/pkg/cdn/cdntest"
+	"github.com/weaveplatform/artifactweave/migration/platform/cdn"
+	"github.com/weaveplatform/artifactweave/migration/platform/cdn/cdntest"
 )
 
 // cloudCDNKey is the vectors' key: bytes 0 to 15, "AAECAwQFBgcICQoLDA0ODw==".

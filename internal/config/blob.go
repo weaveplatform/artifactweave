@@ -10,7 +10,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/weaveplatform/artifactweave/pkg/cdn"
+	"github.com/weaveplatform/artifactweave/migration/platform/cdn"
 )
 
 // Blob selects one blob store: the hot store (blob) or the archive

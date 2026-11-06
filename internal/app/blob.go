@@ -13,12 +13,12 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/config"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
+	"github.com/weaveplatform/artifactweave/migration/platform/cdn"
 	"github.com/weaveplatform/artifactweave/pkg/blob/azure"
 	"github.com/weaveplatform/artifactweave/pkg/blob/gcs"
 	"github.com/weaveplatform/artifactweave/pkg/blob/mirror"
 	"github.com/weaveplatform/artifactweave/pkg/blob/s3"
 	"github.com/weaveplatform/artifactweave/pkg/blob/session"
-	"github.com/weaveplatform/artifactweave/pkg/cdn"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 

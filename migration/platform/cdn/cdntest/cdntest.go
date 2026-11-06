@@ -1,12 +1,3 @@
-// Package cdntest is a fake CDN edge for tests (decision 0029). It checks a
-// provider's URL signature the way the real edge does, then serves the blob
-// the URL names from a blob store, honouring Range and the response
-// overrides, so a download redirect is tested end to end without a cloud.
-//
-// The edge listens on "localhost" by default. A registry under test listens
-// on 127.0.0.1, so Go clients, the JFrog CLI among them, treat the edge as
-// another host and drop their Authorization header on the redirect, as they
-// do for a real CDN; the edge records whether one arrived.
 package cdntest
 
 import (
@@ -87,10 +78,12 @@ type Edge struct {
 	reqs      []Request
 }
 
+var errNoValidatorOrOrigin = errors.New("cdntest: a validator and an origin are required")
+
 // Start listens and serves until Close.
 func Start(o Options) (*Edge, error) {
 	if o.Validator == nil || o.Origin == nil {
-		return nil, errors.New("cdntest: a validator and an origin are required")
+		return nil, errNoValidatorOrOrigin
 	}
 	if o.Host == "" {
 		o.Host = "localhost"

@@ -3,12 +3,12 @@ Feature: CDN delivery through Azure Front Door
   Decision 0029: a repository with cdnRedirect on an azure store with a
   Front Door answers a download with a 302 to the Front Door endpoint
   carrying a read SAS fixed to the current window. Front Door checks no
-  signature: the edge is pkg/cdn/cdntest's Front Door fake, which passes the
-  SAS through to Azurite, the registry's own storage, and Azurite checks it.
-  The edge caches whole-object responses under the full URL, SAS included,
-  so a window's repeated URL is served from the cache. The registry listens
-  on 127.0.0.1 and the edge on localhost, so clients drop their credentials
-  on the redirect, as they do for a real CDN.
+  signature: the edge is migration/platform/cdn/cdntest's Front Door fake,
+  which passes the SAS through to Azurite, the registry's own storage, and
+  Azurite checks it. The edge caches whole-object responses under the full
+  URL, SAS included, so a window's repeated URL is served from the cache.
+  The registry listens on 127.0.0.1 and the edge on localhost, so clients
+  drop their credentials on the redirect, as they do for a real CDN.
 
   Background:
     Given the registry is running on Azure behind a Front Door edge

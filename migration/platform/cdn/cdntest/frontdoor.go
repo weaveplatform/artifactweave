@@ -73,10 +73,12 @@ var hopByHop = map[string]bool{
 	"Connection": true, "Keep-Alive": true, "Transfer-Encoding": true, "Date": true,
 }
 
+var errNoFrontDoorOrigin = errors.New("cdntest: a Front Door edge needs an origin")
+
 // StartFrontDoor listens and serves a fake Front Door until Close.
 func StartFrontDoor(o FrontDoorOptions) (*Edge, error) {
 	if o.Origin == "" {
-		return nil, errors.New("cdntest: a Front Door edge needs an origin")
+		return nil, errNoFrontDoorOrigin
 	}
 	if o.Host == "" {
 		o.Host = "localhost"
@@ -130,6 +132,7 @@ func (f *frontDoorEdge) answer(w http.ResponseWriter, r *http.Request) bool {
 			return true
 		}
 	}
+	//nolint:gosec // G704: a test edge forwards to the origin its test set
 	req, err := http.NewRequestWithContext(r.Context(), r.Method, f.origin+key, nil)
 	if err != nil {
 		http.Error(w, "origin: "+err.Error(), http.StatusBadGateway)
@@ -140,6 +143,7 @@ func (f *frontDoorEdge) answer(w http.ResponseWriter, r *http.Request) bool {
 			req.Header.Set(h, v)
 		}
 	}
+	//nolint:gosec // G704: a test edge forwards to the origin its test set
 	resp, err := f.client.Do(req)
 	if err != nil {
 		http.Error(w, "origin: "+err.Error(), http.StatusBadGateway)

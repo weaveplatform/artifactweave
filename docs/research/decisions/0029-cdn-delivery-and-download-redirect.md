@@ -159,12 +159,13 @@ type Signer interface {
 - A repository whose flags ask for a redirect its store cannot sign is logged once at
   start. A signing failure at request time is logged at WARN at most once a minute and the
   download streams.
-- The CDN signers live in `pkg/cdn`, one per provider, and are injected through each
-  backend's `Options`, so `Signs` is known at construction. Front Door is the exception
-  in kind: it checks no signature, so `pkg/cdn.FrontDoor` only places a SAS on the
-  endpoint, and the azure store signs the SAS with its own credentials. A store is never wrapped in a
-  CDN decorator, because a wrapper hides the store's other interfaces, `blob.PartSizer` in
-  particular, which silently changes mirror chunk sizing (#39).
+- The CDN signers live in `migration/platform/cdn`, one per provider, and are injected
+  through each backend's `Options`, so `Signs` is known at construction. Front Door is the
+  exception in kind: it checks no signature, so `migration/platform/cdn.FrontDoor` only
+  places a SAS on the endpoint, and the azure store signs the SAS with its own
+  credentials. A store is never wrapped in a CDN decorator, because a wrapper hides the
+  store's other interfaces, `blob.PartSizer` in particular, which silently changes mirror
+  chunk sizing (#39).
 - s3, gcs and azure export `ObjectKey(sha256)`, the object name under the store's prefix,
   for the CDN signers.
 - A mirror signs with the first member in read order that holds the blob and `Signs` the
@@ -184,8 +185,10 @@ type Signer interface {
   out only in its own window, so it always has at least the TTL left. A TTL over half the
   V4 limit (3.5 days) is not windowed, so no URL outlives 7 days.
 - CDN URLs expire at the end of the current window plus the TTL, where a window is TTL long
-  and starts on a multiple of it. Every client in a window gets the same URL for a blob, so
-  edge caches keyed on the full URL still hit.
+  and starts on a multiple of it. Where the signature is deterministic (CloudFront with an
+  RSA key, Cloud CDN, and the window-aligned SAS on Front Door), every client in a window
+  gets the same URL for a blob, so edge caches keyed on the full URL still hit. An ECDSA
+  signature differs on each call, so CloudFront with an ECDSA key does not repeat its URLs.
 
 **Configuration.**
 
@@ -332,12 +335,16 @@ still redirects a HEAD is on #216.
   - download counts.
 - `blobtest` covers `Signs` and `SignURL` with overrides on fs, s3 (fake and MinIO), gcs
   (fake and emulator), azure (fake and Azurite) and the mirror.
-- `pkg/cdn` tests sign with generated keys and verify with the public key (CloudFront),
-  Google's documented algorithm (Cloud CDN) and the SAS string-to-sign (Front Door).
-- `pkg/cdn/cdntest`, a chi fake edge, validates each provider's signature and proxies to a
-  blob store. Acceptance serves artifactweave on `127.0.0.1` and the edge on `localhost`,
-  so Go strips `Authorization`, and runs `jf rt dl` of a file above 5 MiB through it, and
-  `crane pull` of an image whose manifest and layers redirect to it.
+- `migration/platform/cdn` tests sign with generated keys and verify with the public key
+  (CloudFront) and Google's documented algorithm (Cloud CDN), and check that a Front Door
+  URL carries the storage SAS unchanged. The azure store's tests check that its Front Door
+  URL repeats within a window, and Azurite checks the SAS through the fake edge.
+- `migration/platform/cdn/cdntest`, a chi fake edge, validates CloudFront and Cloud CDN
+  signatures and proxies to a blob store. As Front Door it checks no signature: it
+  forwards to a storage origin, which checks the SAS, and caches on the full URL.
+  Acceptance serves artifactweave on `127.0.0.1` and the edge on `localhost`, so Go strips
+  `Authorization`, and runs `jf rt dl` of a file above 5 MiB through it, and `crane pull`
+  of an image whose manifest and layers redirect to it.
 - The reference deployments' CDN scenarios check the real edges: signed downloads,
   unsigned and expired requests refused, and the Front Door cache cap.
 

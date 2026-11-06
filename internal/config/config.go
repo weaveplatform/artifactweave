@@ -23,7 +23,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/weaveplatform/artifactweave/internal/service/apilimit"
-	"github.com/weaveplatform/artifactweave/pkg/cdn"
+	"github.com/weaveplatform/artifactweave/migration/platform/cdn"
 )
 
 // EnvPrefix is prepended to every environment key. Nested keys join their
