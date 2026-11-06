@@ -1,4 +1,4 @@
-package store
+package apilimit
 
 import (
 	"context"
@@ -6,9 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // ErrBudgetCapacity means the bounded budget table cannot admit another key.
+// The budget stores return it, so its text starts "store:", as their other
+// errors do.
 var ErrBudgetCapacity = errors.New("store: request budget capacity exhausted")
 
 // RequestBudget selects a fixed-window request counter. Key is a lowercase
@@ -30,18 +34,21 @@ type BudgetRequest struct {
 	MaxKeys int
 }
 
-// Validate bounds both the persisted state and the work in one admission.
+// Validate bounds both the persisted state and the work in one admission. A
+// request out of bounds gives an error wrapping kernel.ErrInvalid, the
+// metadata store's invalid record, not this package's ErrInvalid, which
+// reports an invalid policy.
 func (r BudgetRequest) Validate() error {
 	if len(r.Budgets) < 1 || len(r.Budgets) > 8 || r.Now.IsZero() || r.MaxKeys < 1 ||
 		r.MaxKeys > 65536 {
-		return fmt.Errorf("request budget bounds: %w", ErrInvalid)
+		return fmt.Errorf("request budget bounds: %w", kernel.ErrInvalid)
 	}
 	seen := make(map[string]bool, len(r.Budgets))
 	for _, b := range r.Budgets {
 		raw, err := hex.DecodeString(b.Key)
 		if err != nil || len(raw) != 32 || hex.EncodeToString(raw) != b.Key || seen[b.Key] ||
 			b.Limit < 1 || b.Limit > 1_000_000_000 || b.Reset.UnixMicro() <= r.Now.UnixMicro() || b.Reset.Sub(r.Now) > time.Hour {
-			return fmt.Errorf("invalid request budget: %w", ErrInvalid)
+			return fmt.Errorf("invalid request budget: %w", kernel.ErrInvalid)
 		}
 		seen[b.Key] = true
 	}
@@ -62,7 +69,8 @@ type BudgetDecision struct {
 }
 
 // RequestBudgetStore enforces request rates across instances sharing metadata.
-// It does not count simultaneous work; the HTTP layer owns concurrency permits.
+// It does not count simultaneous work; Service holds the concurrency permits,
+// per process.
 type RequestBudgetStore interface {
 	// Take atomically tests every budget and increments all or none. Expired
 	// counters are reclaimed in bounded batches. Backend errors never grant
