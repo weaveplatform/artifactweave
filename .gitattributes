@@ -9,6 +9,9 @@
 *.xml text eol=lf
 # PyPI HTML goldens assert the exact response bytes on every OS.
 internal/server/pypi/testdata/*.html text eol=lf
+# Schema goldens are compared with the migrated schema byte for byte on every OS.
+internal/sqlstore/sqlite/testdata/schema.golden text eol=lf
+internal/sqlstore/postgres/testdata/schema.golden text eol=lf
 # Opkg Packages records require a blank line after the final stanza.
 internal/format/opkg/testdata/openwrt-Packages text eol=lf whitespace=-blank-at-eof
 # Nix cache text is native protocol data; CRLF is not a valid field delimiter.
