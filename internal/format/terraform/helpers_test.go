@@ -12,8 +12,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/format/terraform"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
-	"github.com/weaveplatform/artifactweave/internal/service/trash"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"

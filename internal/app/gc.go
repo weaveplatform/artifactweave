@@ -6,7 +6,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/config"
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
-	"github.com/weaveplatform/artifactweave/internal/service/usage"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 )
 
 // logGC logs each scheduled garbage collection pass: one that reclaimed
