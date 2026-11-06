@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/aql"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 )
 
 // searchCases are the query shapes the GET searches build in code

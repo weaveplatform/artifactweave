@@ -9,7 +9,7 @@
 // checksum, for the relation-path cases and the builds and
 // build.promotions cases (BuildCases).
 //
-// The pkg/aql tests run the cases through aql.SelectItems and
+// The migration/artifacts/core/aql tests run the cases through aql.SelectItems and
 // aql.SelectBuilds over Corpus; the store contract suite runs them through
 // every ItemStore.Search and BuildStore.Search. Both resolve each query
 // against Repositories first, as the server does.
@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/aql"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 

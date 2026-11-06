@@ -7,13 +7,13 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/pkg/aql"
-	"github.com/weaveplatform/artifactweave/pkg/aql/aqltest"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql/aqltest"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// testItemSearch runs the shared AQL cases (pkg/aql/aqltest): every backend
+// testItemSearch runs the shared AQL cases (migration/artifacts/core/aql/aqltest): every backend
 // must return the reference evaluator's rows in the reference order, with the
 // properties and statistics the query includes, which is what keeps the SQL
 // dialects' globbing, collation and NULL handling honest. The build runs

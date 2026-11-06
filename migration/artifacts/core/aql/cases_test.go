@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/pkg/aql"
-	"github.com/weaveplatform/artifactweave/pkg/aql/aqltest"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql/aqltest"
 )
 
 // TestUnitCases runs every shared fixture through the reference evaluator; the

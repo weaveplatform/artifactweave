@@ -16,7 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/aql"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -77,7 +77,7 @@ func (s artifactoryService) searchAQL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// At debug level the queries clients send are kept: the acceptance
-	// suite captures the JFrog CLI's from here as pkg/aql fixtures.
+	// suite captures the JFrog CLI's from here as migration/artifacts/core/aql fixtures.
 	s.log().DebugContext(ctx, "aql query", "request_id", requestIDFrom(ctx), "query", string(body))
 	q, err := aql.Parse(string(body))
 	if err != nil {

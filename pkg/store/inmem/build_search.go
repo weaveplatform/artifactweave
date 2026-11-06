@@ -6,7 +6,7 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/weaveplatform/artifactweave/pkg/aql"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 

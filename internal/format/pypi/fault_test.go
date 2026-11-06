@@ -9,8 +9,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/format/pypi"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
-	"github.com/weaveplatform/artifactweave/pkg/aql"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"

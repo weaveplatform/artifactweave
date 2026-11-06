@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/aql"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -238,7 +238,7 @@ func pathCases() []Case {
 
 // RelatedCases are queries whose include names fields of related domains
 // (#410), in both directions. The rows they nest come from an aql.Source,
-// so every store's (store.AQLSource) must nest what Corpus does; the pkg/aql
+// so every store's (store.AQLSource) must nest what Corpus does; the migration/artifacts/core/aql
 // tests pin what that is.
 func RelatedCases() []Case {
 	var out []Case
