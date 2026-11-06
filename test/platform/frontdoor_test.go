@@ -20,8 +20,8 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/azure"
 	"github.com/weaveplatform/artifactweave/migration/platform/cdn"
-	"github.com/weaveplatform/artifactweave/pkg/blob/azure"
 )
 
 // azure/cdn (#134): a storage account behind Azure Front Door Premium, which

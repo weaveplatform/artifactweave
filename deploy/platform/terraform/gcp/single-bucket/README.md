@@ -152,7 +152,7 @@ scenario: the app service account is not this scenario's.
 - **Locally**, this is the lab's GCS acceptance environment (`make gcp-<target>` from the
   repository root). `make apply`, `up`, `smoke`, `verify` and `destroy` run the checks above
   against it ([running a scenario locally](../../../../ci/README.md#running-a-scenario-locally));
-  `make conformance` runs the real-GCS blob contract and probes (`pkg/blob/gcs`) against it
+  `make conformance` runs the real-GCS blob contract and probes (`migration/platform/blob/gcs`) against it
   as the conformance service account; `make github-vars` sets `CONFORMANCE_GCS_BUCKET` for
   `cloud-conformance.yml`. The environment keeps the name, prefix and expiry it had before
   this root composed the module, and `moved.tf` moves its state, so a plan shows moves only.
