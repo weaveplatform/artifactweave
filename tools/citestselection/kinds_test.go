@@ -24,7 +24,7 @@ func TestAccUnrelated() {}
 package server
 func TestUnitWindows() {}
 `,
-		"migration/artifacts/core/format/demo/format_test.go": `package demo
+		"migration/artifacts/ecosystem/demo/format_test.go": `package demo
 func TestUnitFormat() {}
 `,
 		"pkg/seed_test.go": `package pkg
@@ -56,7 +56,7 @@ func TestAccCloud() {}
 	}
 	if !slices.Equal(
 		full.Unit,
-		[]string{"./migration/artifacts/core/format/demo", "./internal/server"},
+		[]string{"./internal/server", "./migration/artifacts/ecosystem/demo"},
 	) ||
 		!slices.Equal(full.Acc, []string{"./internal/server"}) ||
 		!slices.Equal(full.Fuzz, []string{"./pkg"}) {
@@ -77,7 +77,7 @@ func TestAccCloud() {}
 	}
 	format, err := scanKinds(root, plan{profile: "format", candidate: affectedPlan{
 		owner: "nuget",
-		units: []string{"./internal/server", "./migration/artifacts/core/format/demo/..."},
+		units: []string{"./internal/server", "./migration/artifacts/ecosystem/demo/..."},
 	}})
 	if err != nil {
 		t.Fatal(err)
