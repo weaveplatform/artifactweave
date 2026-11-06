@@ -70,9 +70,9 @@ include the route × principal matrix.
 **Fault injection.** Every handler package depends on narrow interfaces and the shared
 `internal/testfault` fakes (client disconnect mid-stream, blob write failure after headers,
 upstream 5xx, slow upstream, wrong content type), so error paths in streaming handlers are
-covered without real failures. The remote-repository design adds `internal/fakeupstream`
-chi fakes of each upstream registry with the same fault modes; that package is not part of
-the current local-protocol implementation.
+covered without real failures. The remote-repository design adds
+`migration/artifacts/adapters/upstream/fakeupstream` chi fakes of each upstream registry with the
+same fault modes; that package is not part of the current local-protocol implementation.
 
 **Acceptance** runs on `ubuntu-latest` only. The required non-Gradle scenarios
 are split between core and NuGet jobs, both added to the coverage and gate

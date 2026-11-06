@@ -1,6 +1,3 @@
-// Package fakeupstream provides deterministic, loopback-only HTTP fixtures for remote
-// repository tests. It models upstream mechanics, not observed Artifactory behavior.
-// Keep ecosystem documents in the adapter tests that understand their schemas.
 package fakeupstream
 
 import (
@@ -72,9 +69,9 @@ func (a Auth) challenge(w http.ResponseWriter, proxy bool) {
 	w.WriteHeader(status)
 }
 
-// Resource is an atomic response snapshot. Set copies Body and Header. A zero
-// Status serves normal content with HEAD, Range and HTTP validators. Other statuses
-// serve Body verbatim. Redirect uses Status or defaults to 302.
+// Resource is an atomic response snapshot. A zero Status serves normal content
+// with HEAD, Range and HTTP validators. Other statuses serve Body verbatim.
+// Redirect uses Status or defaults to 302.
 type Resource struct {
 	// Method optionally permits one explicit request method instead of GET/HEAD.
 	Method   string
@@ -113,6 +110,11 @@ type Server struct {
 	requests    []Request
 }
 
+// New starts a fixture server on a loopback listener, over HTTPS when
+// options.TLS is set, and registers Close with t.Cleanup. It records every
+// request, then answers one that fails options.Auth with 401 and a challenge.
+// A path with a resource serves it to GET and HEAD, or to the resource's own
+// Method; any other method gets 405, and a path with no resource 404.
 func New(t testing.TB, options Options) *Server {
 	t.Helper()
 	return start(t, options, func(s *Server) http.Handler { return http.HandlerFunc(s.serve) })
@@ -148,9 +150,20 @@ func start(t testing.TB, options Options, handler func(*Server) http.Handler) *S
 	return s
 }
 
-func (s *Server) Client() *http.Client           { return s.srv.Client() }
+// Client returns the server's shared HTTP client, which trusts its certificate
+// over HTTPS. Its transport reuses connections and may retry a request the
+// server dropped, so a test that counts the attempts against DropConnection
+// uses a fresh transport.
+func (s *Server) Client() *http.Client { return s.srv.Client() }
+
+// Certificate returns the server's TLS certificate, for the transport under
+// test to trust, or nil when the server serves plain HTTP.
 func (s *Server) Certificate() *x509.Certificate { return s.srv.Certificate() }
 
+// Close stops the server: it cancels every request in flight, which frees the
+// handlers held at a barrier, closes a proxy's live tunnels, then closes the
+// client connections and the listener. Only the first call acts, so the test's
+// cleanup and an early Close in the test may both run it.
 func (s *Server) Close() {
 	s.closeOnce.Do(func() {
 		s.cancel()
@@ -162,6 +175,12 @@ func (s *Server) Close() {
 	})
 }
 
+// Set makes resource the snapshot that later requests for path receive; path
+// is matched exactly against the decoded URL path. Set copies Body and Header,
+// fills a zero Modified from Options.Now and an empty ETag with the quoted hex
+// SHA-256 of Body. A request already being served keeps the snapshot it read,
+// so Set may run while requests are in flight; to change a resource under a
+// held request, wait for its barrier's Reached first.
 func (s *Server) Set(path string, resource Resource) {
 	resource.Body = bytes.Clone(resource.Body)
 	resource.Header = resource.Header.Clone()
@@ -176,6 +195,9 @@ func (s *Server) Set(path string, resource Resource) {
 	s.resources[path] = resource
 }
 
+// Delete removes the resource at path, so later GET and HEAD requests for it
+// get 404. A request already being served keeps the snapshot it read, and
+// deleting a path that has no resource does nothing.
 func (s *Server) Delete(path string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

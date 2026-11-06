@@ -14,8 +14,8 @@ import (
 
 	"github.com/cucumber/godog"
 
-	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
 	gemfmt "github.com/weaveplatform/artifactweave/internal/format/gems"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 )
 
 func (w *world) registerGems(sc *godog.ScenarioContext) {

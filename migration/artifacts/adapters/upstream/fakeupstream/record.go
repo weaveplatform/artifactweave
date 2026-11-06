@@ -9,11 +9,15 @@ import (
 	"time"
 )
 
+// Redacted is recorded in place of any value that could carry a secret: every
+// query value, every header but Accept, Accept-Encoding, Content-Length,
+// Content-Type, Range, User-Agent and the If- conditionals, and every
+// occurrence of Options.Secrets or the Auth password or token in a value the
+// recorder keeps. Tests compare recorded values with it.
 const Redacted = "[REDACTED]"
 
 // Request is safe to include in assertion failures. It never contains a request
 // body, URL userinfo, raw query values or credential/cookie header values.
-// HeaderMatches compares a candidate without storing its plaintext in the record.
 type Request struct {
 	Method                    string
 	Path                      string
@@ -27,6 +31,10 @@ type Request struct {
 	pathMatches               func(string) bool
 }
 
+// HeaderMatches reports whether the request's first value of header name equals
+// value. It compares keyed hashes, so a test can check a credential it knows
+// without the record holding the plaintext; a header the request lacked
+// matches nothing.
 func (r Request) HeaderMatches(name, value string) bool {
 	return r.matches != nil && r.matches(name, value)
 }

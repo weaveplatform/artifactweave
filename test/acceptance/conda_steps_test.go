@@ -17,8 +17,8 @@ import (
 
 	"github.com/cucumber/godog"
 
-	"github.com/weaveplatform/artifactweave/internal/fakeupstream"
 	condafmt "github.com/weaveplatform/artifactweave/internal/format/conda"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 )
 
 const condaFixtureName = "artifactweave-conda-fixture-1.0.0-0.tar.bz2"
