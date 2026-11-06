@@ -296,6 +296,7 @@ func (h *Hasher) MarshalBinary() ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("blob: save hasher: %w", err)
 		}
+		//nolint:gosec // G115: a digest state is far shorter than 64 KiB, so two bytes hold its length
 		out = append(out, byte(len(b)>>8), byte(len(b)))
 		out = append(out, b...)
 	}

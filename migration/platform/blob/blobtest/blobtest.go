@@ -492,6 +492,8 @@ func concurrent(ctx context.Context, t *testing.T, s blob.Store) {
 	}
 }
 
+var errStop = errors.New("stop")
+
 func walk(ctx context.Context, t *testing.T, s blob.Store) {
 	want := map[string]int64{}
 	for i := range 3 {
@@ -521,10 +523,9 @@ func walk(ctx context.Context, t *testing.T, s blob.Store) {
 			t.Fatalf("walk size for %s: %d, want %d", k, got[k], v)
 		}
 	}
-	stop := errors.New("stop")
 	calls := 0
-	err = s.Walk(ctx, func(blob.Info) error { calls++; return stop })
-	if !errors.Is(err, stop) || calls != 1 {
+	err = s.Walk(ctx, func(blob.Info) error { calls++; return errStop })
+	if !errors.Is(err, errStop) || calls != 1 {
 		t.Fatalf("walk must stop at the first error: %v after %d calls", err, calls)
 	}
 }

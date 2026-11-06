@@ -26,7 +26,7 @@ func openBlobFile(ctx context.Context, path string) (*os.File, error) {
 		select {
 		case <-ctx.Done():
 			timer.Stop()
-			return nil, ctx.Err()
+			return nil, ctx.Err() //nolint:wrapcheck // notFound in Open wraps it with the digest
 		case <-timer.C:
 		}
 	}
