@@ -171,6 +171,8 @@
         {"from":"pkg/store/aqlsource.go","action":"move","to":"artifacts/core/aql","file":"source.go","ticket":"ART-15"},
         {"from":"pkg/store/content_replicas.go","action":"move","to":"platform/blob/mirror","file":"replica_query.go","ticket":"PLT-15"},
         {"from":"pkg/store/content_uploads.go","action":"move","to":"platform/blob/session","file":"uploads.go","ticket":"PLT-11"},
+        {"from":"pkg/store/inmem/page.go","action":"move","to":"platform/tx/memtx","ticket":"STO-03"},
+        {"from":"pkg/store/inmem/unitofwork.go","action":"move","to":"platform/tx/memtx","file":"memtx.go","ticket":"STO-03"},
         {"from":"pkg/store/normalise.go","action":"move","to":"kernel","file":"normalise.go","ticket":"PLT-03"},
         {"from":"pkg/store/operations_configdoc.go","action":"move","to":"platform/configdoc","file":"store.go","ticket":"PLT-17"},
         {"from":"pkg/store/operations_settings.go","action":"move","to":"platform/settings","file":"store.go","ticket":"PLT-17"},
