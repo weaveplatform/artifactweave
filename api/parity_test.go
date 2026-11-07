@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/api"
-	"github.com/weaveplatform/artifactweave/internal/specoracle"
+	"github.com/weaveplatform/artifactweave/migration/devtools/specoracle"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 )
 

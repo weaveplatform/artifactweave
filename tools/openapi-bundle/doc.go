@@ -5,7 +5,7 @@
 //
 // Command, with the repository tooling under tools/: not part of the server
 // binary, and it keeps its path through the modular-monolith migration. The
-// merging itself is internal/openapibundle; make generate runs the bundle
+// merging itself is migration/devtools/openapibundle; make generate runs the bundle
 // before it generates code.
 //
 // # Inputs

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/weaveplatform/artifactweave/internal/openapibundle"
+	"github.com/weaveplatform/artifactweave/migration/devtools/openapibundle"
 )
 
 func main() {
