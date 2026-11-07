@@ -23,6 +23,7 @@ type ReplayRequest struct {
 }
 
 // Validate checks the fixed storage bounds and a positive retention interval.
+// A request out of bounds gives an error that wraps kernel.ErrInvalid.
 func (r ReplayRequest) Validate() error {
 	for _, v := range []string{r.Scope, r.Key, r.Fingerprint} {
 		b, err := hex.DecodeString(v)
@@ -55,14 +56,16 @@ type ReplayStore interface {
 	// not call effect. Waiting obeys context cancellation; there is no
 	// committed pending state to recover after a process crash. Callers must
 	// reauthorize the returned resource, including on replay, before their
-	// outer transaction commits.
+	// outer transaction commits. A request that Validate refuses, a nil
+	// effect and a resource ID that is not positive are kernel.ErrInvalid; an
+	// unexpired key with another fingerprint is ErrReplayMismatch.
 	Do(
 		ctx context.Context,
 		request ReplayRequest,
 		effect func(context.Context) (int64, error),
 	) (ReplayReceipt, error)
-	// Prune removes at most limit expired receipts (1..kernel.MaxLimit).
-	// Retention ends at expiry, whether or not the physical row has been
-	// pruned.
+	// Prune removes at most limit expired receipts (1..kernel.MaxLimit; any
+	// other limit is kernel.ErrInvalid). Retention ends at expiry, whether or
+	// not the physical row has been pruned.
 	Prune(ctx context.Context, now time.Time, limit int) (int64, error)
 }

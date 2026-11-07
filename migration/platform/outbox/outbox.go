@@ -75,7 +75,8 @@ func (h HLC) Merge(remote HLC, now time.Time) HLC {
 //nolint:gosec // Unix milliseconds after 1970 are not negative; ParseHLC converts back bit for bit.
 func (h HLC) String() string { return fmt.Sprintf("%016x.%08x", uint64(h.Wall), h.Logical) }
 
-// ParseHLC reads the String form.
+// ParseHLC reads the String form. Text that is not 16 and 8 hex digits
+// around a dot gives an error that wraps ErrInvalidHLC.
 func ParseHLC(s string) (HLC, error) {
 	wall, logical, ok := strings.Cut(s, ".")
 	if !ok || len(wall) != 16 || len(logical) != 8 {

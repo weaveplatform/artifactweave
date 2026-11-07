@@ -30,7 +30,8 @@ type OutboxStore interface {
 
 	// PutCursor creates or replaces a peer's position in a stream.
 	PutCursor(ctx context.Context, c PeerCursor) error
-	// Cursor returns a peer's position in a stream.
+	// Cursor returns a peer's position in a stream; kernel.ErrNotFound when
+	// the peer has none there.
 	Cursor(ctx context.Context, peer, stream string) (PeerCursor, error)
 	// Cursors returns a peer's positions ("" for every peer) ordered by
 	// (peer, stream).
