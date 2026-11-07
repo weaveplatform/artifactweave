@@ -115,6 +115,14 @@ linters:
       # operators see. Without these lines wrapcheck reports 465 such returns
       # in the SQL stores alone, and one for each new call in a module's SQL
       # adapter.
+      #
+      # The SQLite and PostgreSQL drivers' OpenDB names the engine in its
+      # errors as the dialect layer names the operation ("sqlite: open: ...",
+      # "postgres: parse dsn: ..."), or returns the sentinels ErrPathRequired
+      # and ErrDSNRequired. The composite stores' Open passes them up as it
+      # did while the code was its own, and the store opener adds
+      # "open store: "; wrapping them again would change those texts. STO-19
+      # moves the same call into app.
       extra-ignore-sigs:
         - apierror.New(
         - format.Rejectf(
@@ -127,6 +135,8 @@ linters:
         - dialect.Rollback(
         - dialect.Version(
         - dialect.Reseal(
+        - sqlite.OpenDB(
+        - postgres.OpenDB(
 
   # 4) Issue-filtering (not disabling analysis, just silencing reports)
   exclusions:
