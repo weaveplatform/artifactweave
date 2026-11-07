@@ -42,28 +42,32 @@ type Options struct {
 	Keyring *crypt.Keyring
 }
 
-// Open pings db, applies pending migrations unless o.SkipMigrate, and wraps
-// it. It closes db on failure. Each backend opens its pool and calls it.
+// Open pings db and wraps it. Unless o.SkipMigrate, it first applies the
+// pending migrations of every module's stream and then runs each module's
+// AfterMigrate hook, in the canonical module order of Modules. It closes db
+// on failure. Each backend opens its pool and calls it.
 func Open(ctx context.Context, db *sql.DB, d Dialect, o Options) (*Store, error) {
 	if err := db.PingContext(ctx); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("connect: %w", err)
 	}
+	mods := Modules()
 	if !o.SkipMigrate {
-		if _, err := Migrate(ctx, db, d); err != nil {
+		if _, err := Migrate(ctx, db, d, mods, ""); err != nil {
 			_ = db.Close()
 			return nil, err
 		}
 	}
 	s := New(db, d, o.Keyring)
 	if !o.SkipMigrate {
-		if _, err := s.backfillRepositoryHeaders(ctx); err != nil {
-			_ = db.Close()
-			return nil, err
-		}
-		if err := s.backfillIdentitySearch(ctx); err != nil {
-			_ = db.Close()
-			return nil, err
+		for _, m := range mods {
+			if m.AfterMigrate == nil {
+				continue
+			}
+			if err := m.AfterMigrate(ctx, s.Store); err != nil {
+				_ = db.Close()
+				return nil, err //nolint:wrapcheck // the module's store names the operation
+			}
 		}
 	}
 	return s, nil

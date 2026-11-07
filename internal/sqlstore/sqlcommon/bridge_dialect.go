@@ -5,15 +5,20 @@ package sqlcommon
 import "github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 
 type (
-	Dialect   = dialect.Dialect
-	Queryer   = dialect.Queryer
-	Migration = dialect.Migration
+	Dialect       = dialect.Dialect
+	Queryer       = dialect.Queryer
+	Migration     = dialect.Migration
+	Applied       = dialect.Applied
+	StreamVersion = dialect.StreamVersion
 )
 
 var (
-	ErrTransaction = dialect.ErrTransaction
-	ErrMigration   = dialect.ErrMigration
-	ErrNoKeyring   = dialect.ErrNoKeyring
+	ErrTransaction    = dialect.ErrTransaction
+	ErrMigration      = dialect.ErrMigration
+	ErrNoKeyring      = dialect.ErrNoKeyring
+	ErrLegacyHistory  = dialect.ErrLegacyHistory
+	ErrUnknownModule  = dialect.ErrUnknownModule
+	ErrModuleRequired = dialect.ErrModuleRequired
 )
 
 var (

@@ -6,6 +6,7 @@ import (
 	"database/sql/driver"
 	"errors"
 	"io"
+	"strings"
 	"testing"
 )
 
@@ -14,10 +15,19 @@ var errFault = errors.New("fault")
 
 // faults names the steps of the fault driver that fail. The others succeed:
 // a statement changes one row and a query returns no rows, or with oneRow
-// one row of its one column.
+// one row of its one column, which null makes NULL. query fails the query
+// itself. When on is set, exec, query, next and oneRow apply only to the
+// statements that contain it, so one statement can fail while the ones
+// before it succeed.
 type faults struct {
 	exec, begin, commit, next, rowsAffected, close bool
-	oneRow                                         bool
+	oneRow, null, query                            bool
+	on                                             string
+}
+
+// hits reports whether the faults that on limits apply to statement.
+func (f faults) hits(statement string) bool {
+	return f.on == "" || strings.Contains(statement, f.on)
 }
 
 // faultDB opens a pool over the fault driver, for the failures SQLite cannot
@@ -71,18 +81,25 @@ func (c faultConn) BeginTx(context.Context, driver.TxOptions) (driver.Tx, error)
 }
 
 func (c faultConn) ExecContext(
-	context.Context,
-	string,
-	[]driver.NamedValue,
+	_ context.Context,
+	statement string,
+	_ []driver.NamedValue,
 ) (driver.Result, error) {
-	if c.f.exec {
+	if c.f.exec && c.f.hits(statement) {
 		return nil, errFault
 	}
 	return faultResult(c), nil
 }
 
-func (c faultConn) QueryContext(context.Context, string, []driver.NamedValue) (driver.Rows, error) {
-	return &faultRows{f: c.f}, nil
+func (c faultConn) QueryContext(
+	_ context.Context,
+	statement string,
+	_ []driver.NamedValue,
+) (driver.Rows, error) {
+	if c.f.query && c.f.hits(statement) {
+		return nil, errFault
+	}
+	return &faultRows{f: c.f, hit: c.f.hits(statement)}, nil
 }
 
 type faultTx struct{ f faults }
@@ -103,8 +120,8 @@ func (r faultResult) RowsAffected() (int64, error) {
 }
 
 type faultRows struct {
-	f      faults
-	served bool
+	f           faults
+	hit, served bool
 }
 
 func (*faultRows) Columns() []string { return []string{"version"} }
@@ -113,11 +130,14 @@ func (*faultRows) Close() error { return nil }
 
 func (r *faultRows) Next(dest []driver.Value) error {
 	switch {
-	case r.f.next:
+	case r.f.next && r.hit:
 		return errFault
-	case r.f.oneRow && !r.served:
+	case r.f.oneRow && r.hit && !r.served:
 		r.served = true
 		dest[0] = int64(1)
+		if r.f.null {
+			dest[0] = nil
+		}
 		return nil
 	}
 	return io.EOF

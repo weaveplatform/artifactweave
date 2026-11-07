@@ -1,0 +1,81 @@
+-- The retention stream: cleanup policies and their runs, archive policies
+-- and their executions (research 15 section 4).
+-- +up
+
+CREATE TABLE cleanup_policies (
+    key              TEXT PRIMARY KEY,
+    description      TEXT NOT NULL DEFAULT '',
+    cron_exp         TEXT NOT NULL DEFAULT '',
+    project_key      TEXT NOT NULL DEFAULT '',
+    item_type        TEXT NOT NULL DEFAULT '',
+    duration_minutes INTEGER NOT NULL DEFAULT 0,
+    enabled          BOOLEAN NOT NULL DEFAULT FALSE,
+    skip_trashcan    BOOLEAN NOT NULL DEFAULT FALSE,
+    criteria         TEXT,
+    created_at       BIGINT,
+    created_by       TEXT NOT NULL DEFAULT '',
+    updated_at       BIGINT,
+    updated_by       TEXT NOT NULL DEFAULT ''
+);
+
+-- Runs outlive their policy (the run views keep them), so there is no
+-- foreign key to cleanup_policies.
+CREATE TABLE cleanup_runs (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    policy_key    TEXT NOT NULL,
+    trigger_id    BIGINT NOT NULL DEFAULT 0,
+    item_type     TEXT NOT NULL DEFAULT '',
+    status        TEXT NOT NULL DEFAULT '',
+    dry_run       BOOLEAN NOT NULL DEFAULT FALSE,
+    manual        BOOLEAN NOT NULL DEFAULT FALSE,
+    triggered_by  TEXT NOT NULL DEFAULT '',
+    started_at    BIGINT,
+    ended_at      BIGINT,
+    total_items   BIGINT NOT NULL DEFAULT 0,
+    cleaned_items BIGINT NOT NULL DEFAULT 0,
+    cleaned_size  BIGINT NOT NULL DEFAULT 0,
+    report        TEXT
+);
+CREATE INDEX cleanup_runs_policy ON cleanup_runs (policy_key, id);
+
+-- Both JFrog policy families (retention v1, smart archiving v2).
+CREATE TABLE archive_policies (
+    key               TEXT PRIMARY KEY,
+    family            TEXT NOT NULL,
+    description       TEXT NOT NULL DEFAULT '',
+    enabled           BOOLEAN NOT NULL DEFAULT FALSE,
+    cron_exp          TEXT NOT NULL DEFAULT '',
+    project_key       TEXT NOT NULL DEFAULT '',
+    duration_minutes  INTEGER NOT NULL DEFAULT 0,
+    expiration_months INTEGER NOT NULL DEFAULT 0,
+    skip_trashcan     BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at        BIGINT,
+    updated_at        BIGINT,
+    criteria          TEXT
+);
+CREATE INDEX archive_policies_family ON archive_policies (family, key);
+
+-- Archive, restore and purge executions.
+CREATE TABLE archive_executions (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    policy_key    TEXT NOT NULL DEFAULT '',
+    kind          TEXT NOT NULL,
+    state         TEXT NOT NULL,
+    started_at    BIGINT,
+    finished_at   BIGINT,
+    total         BIGINT NOT NULL DEFAULT 0,
+    completed     BIGINT NOT NULL DEFAULT 0,
+    failed        BIGINT NOT NULL DEFAULT 0,
+    total_bytes   BIGINT NOT NULL DEFAULT 0,
+    success_bytes BIGINT NOT NULL DEFAULT 0,
+    failure_bytes BIGINT NOT NULL DEFAULT 0,
+    triggered_by  TEXT NOT NULL DEFAULT '',
+    destination   TEXT
+);
+CREATE INDEX archive_executions_policy ON archive_executions (policy_key, id);
+CREATE INDEX archive_executions_kind ON archive_executions (kind, id);
+-- +down
+DROP TABLE archive_executions;
+DROP TABLE archive_policies;
+DROP TABLE cleanup_runs;
+DROP TABLE cleanup_policies;

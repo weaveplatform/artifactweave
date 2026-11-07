@@ -50,15 +50,15 @@ func TestAccMigrateCommand(t *testing.T) {
 	cfg := config.Default()
 	cfg.DataDir = filepath.Join(t.TempDir(), "nested", "data")
 	var out bytes.Buffer
-	run := func(action string, to int) string {
+	run := func(action string, to int, module string) string {
 		t.Helper()
 		out.Reset()
-		if err := Migrate(ctx, cfg, action, to, &out); err != nil {
+		if err := Migrate(ctx, cfg, action, to, module, &out); err != nil {
 			t.Fatalf("%s: %v", action, err)
 		}
 		return out.String()
 	}
-	if got := run("version", 0); !strings.HasPrefix(got, "schema version 0 of ") {
+	if got := run("version", 0, ""); !strings.HasPrefix(got, "schema version 0 of ") {
 		t.Fatalf("fresh version: %q", got)
 	}
 	if _, err := os.Stat(cfg.SQLitePath()); err != nil {
@@ -67,24 +67,65 @@ func TestAccMigrateCommand(t *testing.T) {
 	if got := run(
 		"up",
 		0,
+		"",
 	); !strings.HasPrefix(got, "applied ") ||
 		strings.HasPrefix(got, "applied 0") {
 		t.Fatalf("up: %q", got)
 	}
-	if got := run("up", 0); !strings.HasPrefix(got, "applied 0 ") {
+	if got := run("up", 0, ""); !strings.HasPrefix(got, "applied 0 ") {
 		t.Fatalf("second up: %q", got)
 	}
-	if got := run("down", -1); !strings.HasPrefix(got, "reverted 1 ") {
+	got := run("down", -1, "")
+	if !strings.HasPrefix(got, "reverted 1 ") {
 		t.Fatalf("down one step: %q", got)
 	}
-	if got := run("down", 0); strings.HasPrefix(got, "reverted 0 ") {
+	// One step back is the newest migration of the last stream in the
+	// canonical module order.
+	if got != "reverted 1 migration(s): [workers:1]\n" {
+		t.Fatalf("down one step reverted %q; want workers:1", got)
+	}
+	if got := run("down", 0, ""); strings.HasPrefix(got, "reverted 0 ") {
 		t.Fatalf("down to 0: %q", got)
 	}
-	if got := run("version", 0); !strings.HasPrefix(got, "schema version 0 of ") {
+	if got := run("version", 0, ""); !strings.HasPrefix(got, "schema version 0 of ") {
 		t.Fatalf("after down: %q", got)
 	}
-	if err := Migrate(ctx, cfg, "sideways", 0, &out); !errors.Is(err, ErrUnknownMigration) {
+	if err := Migrate(ctx, cfg, "sideways", 0, "", &out); !errors.Is(err, ErrUnknownMigration) {
 		t.Fatalf("unknown action: %v", err)
+	}
+
+	// --module limits each action to one stream.
+	if got := run("up", 0, "artifacts"); got != "applied 1 migration(s): [artifacts:1]\n" {
+		t.Fatalf("up --module artifacts: %q", got)
+	}
+	if got := run("version", 0, "artifacts"); got != "schema version 1 of 1 (sqlite, artifacts)\n" {
+		t.Fatalf("version --module artifacts: %q", got)
+	}
+	want := "schema version 0 of 1 (sqlite, platform)\n" +
+		"schema version 1 of 1 (sqlite, artifacts)\n"
+	for _, m := range []string{"access", "notifications", "retention", "federation", "releases", "workers"} {
+		want += "schema version 0 of 1 (sqlite, " + m + ")\n"
+	}
+	if got := run("version", 0, ""); got != want {
+		t.Fatalf("version of every stream: %q; want %q", got, want)
+	}
+	if got := run("down", -1, "platform"); got != "reverted 0 migration(s): []\n" {
+		t.Fatalf("down --module platform with nothing applied: %q", got)
+	}
+	if got := run("down", -1, "artifacts"); got != "reverted 1 migration(s): [artifacts:1]\n" {
+		t.Fatalf("down --module artifacts: %q", got)
+	}
+	for _, action := range []string{"up", "down", "version"} {
+		err := Migrate(ctx, cfg, action, -1, "nope", &out)
+		want := "migrate " + action + `: sqlcommon: migration: unknown module "nope"`
+		if !errors.Is(err, sqlcommon.ErrUnknownModule) || err.Error() != want {
+			t.Fatalf("%s --module nope: %v; want %s", action, err, want)
+		}
+	}
+	err := Migrate(ctx, cfg, "down", 2, "", &out)
+	if !errors.Is(err, sqlcommon.ErrModuleRequired) ||
+		err.Error() != "migrate down: sqlcommon: migration: a target version other than 0 needs a module" {
+		t.Fatalf("down --to 2 without a module: %v", err)
 	}
 }
 
@@ -95,7 +136,7 @@ func TestAccOpenStoreErrors(t *testing.T) {
 	if _, err := OpenStore(ctx, cfg, sqlcommon.Options{}); err == nil {
 		t.Fatal("a malformed PostgreSQL DSN opened")
 	}
-	if err := Migrate(ctx, cfg, "up", 0, &bytes.Buffer{}); err == nil {
+	if err := Migrate(ctx, cfg, "up", 0, "", &bytes.Buffer{}); err == nil {
 		t.Fatal("migrate against an unopenable store succeeded")
 	}
 	// A data directory that is a file cannot hold the database.

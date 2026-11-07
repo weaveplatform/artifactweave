@@ -20,9 +20,11 @@ import (
 // own type and a pointer only to a pointer to the identical type, so these
 // lines compile only while each pair is one type.
 var (
-	_ dialect.Dialect   = sqlcommon.Dialect{}
-	_ dialect.Migration = sqlcommon.Migration{}
-	_ *dialect.Queryer  = (*sqlcommon.Queryer)(nil)
+	_ dialect.Dialect       = sqlcommon.Dialect{}
+	_ dialect.Migration     = sqlcommon.Migration{}
+	_ dialect.Applied       = sqlcommon.Applied{}
+	_ dialect.StreamVersion = sqlcommon.StreamVersion{}
+	_ *dialect.Queryer      = (*sqlcommon.Queryer)(nil)
 )
 
 // If a bridged sentinel were a copy, it would still compile and print the
@@ -42,6 +44,18 @@ func TestUnitBridgeDialectSentinels(t *testing.T) {
 		{
 			sqlcommon.ErrNoKeyring, dialect.ErrNoKeyring,
 			"sqlcommon: value is sealed but no keyring is configured",
+		},
+		{
+			sqlcommon.ErrLegacyHistory, dialect.ErrLegacyHistory,
+			"sqlcommon: migration: database history predates per-module migrations; not upgraded",
+		},
+		{
+			sqlcommon.ErrUnknownModule, dialect.ErrUnknownModule,
+			"sqlcommon: migration: unknown module",
+		},
+		{
+			sqlcommon.ErrModuleRequired, dialect.ErrModuleRequired,
+			"sqlcommon: migration: a target version other than 0 needs a module",
 		},
 	}
 	for _, c := range cases {

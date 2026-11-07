@@ -98,6 +98,9 @@ func serveCmd(load func(*cobra.Command, string) (config.Config, error)) *cobra.C
 
 func migrateCmd(load func(*cobra.Command, string) (config.Config, error)) *cobra.Command {
 	c := &cobra.Command{Use: "migrate", Short: "Manage the database schema"}
+	var module string
+	c.PersistentFlags().StringVar(&module, "module", "",
+		"limit the command to one module's migrations, such as artifacts")
 	run := func(action string, to *int) func(*cobra.Command, []string) error {
 		return func(cmd *cobra.Command, _ []string) error {
 			cfg, err := load(cmd, "")
@@ -113,6 +116,7 @@ func migrateCmd(load func(*cobra.Command, string) (config.Config, error)) *cobra
 				cfg,
 				action,
 				target,
+				module,
 				cmd.OutOrStdout(),
 			) //nolint:wrapcheck // names the action
 		}
@@ -123,13 +127,14 @@ func migrateCmd(load func(*cobra.Command, string) (config.Config, error)) *cobra
 		Short: "Revert migrations newer than --to (default: the latest one)",
 		RunE:  run("down", &to),
 	}
-	down.Flags().IntVar(&to, "to", -1, "schema version to revert to; 0 reverts everything")
+	down.Flags().IntVar(&to, "to", -1,
+		"version of the --module stream to revert to; 0 reverts everything")
 	c.AddCommand(
 		&cobra.Command{Use: "up", Short: "Apply every pending migration", RunE: run("up", nil)},
 		down,
 		&cobra.Command{
 			Use:   "version",
-			Short: "Print the applied and latest schema versions",
+			Short: "Print each module's applied and latest schema versions",
 			RunE:  run("version", nil),
 		},
 	)

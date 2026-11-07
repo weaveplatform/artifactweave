@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/weaveplatform/artifactweave/internal/config"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
@@ -16,6 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 )
 
 // ErrUnknownMigration reports a migrate action other than up, down or
@@ -74,11 +76,23 @@ func OpenStore(
 	return s, nil
 }
 
-// Migrate runs `artifactweave migrate <action>`: "up" applies every pending
-// migration, "down" reverts those newer than to (one step when to is
-// negative, everything when it is 0), and "version" reports the applied and
-// latest versions. It writes one line of outcome to w.
-func Migrate(ctx context.Context, cfg config.Config, action string, to int, w io.Writer) error {
+// Migrate runs `artifactweave migrate <action>` over every module's stream,
+// or over module's stream alone when module is set. "up" applies every
+// pending migration. "down" reverts the migrations newer than to, which
+// needs a module unless to is 0, everything; a negative to reverts one
+// step, the newest migration of module's stream or, with no module, of the
+// last stream in the canonical order that has any applied. "version"
+// reports each stream's applied and latest versions, one line per stream.
+// up and down write one line of outcome to w. A module that no stream has
+// fails with sqlcommon.ErrUnknownModule.
+func Migrate(
+	ctx context.Context,
+	cfg config.Config,
+	action string,
+	to int,
+	module string,
+	w io.Writer,
+) error {
 	if action != "up" && action != "down" && action != "version" {
 		return fmt.Errorf("%w: %q", ErrUnknownMigration, action)
 	}
@@ -87,35 +101,66 @@ func Migrate(ctx context.Context, cfg config.Config, action string, to int, w io
 		return err
 	}
 	defer func() { _ = s.Close() }()
-	db, d := s.DB(), s.Dialect()
+	db, d, mods := s.DB(), s.Dialect(), sqlcommon.Modules()
 	switch action {
 	case "up":
-		done, err := sqlcommon.Migrate(ctx, db, d)
+		done, err := sqlcommon.Migrate(ctx, db, d, mods, module)
 		if err != nil {
 			return fmt.Errorf("migrate up: %w", err)
 		}
 		_, _ = fmt.Fprintf(w, "applied %d migration(s): %v\n", len(done), done)
 	case "down":
 		if to < 0 {
-			cur, _, err := sqlcommon.Version(ctx, db, d)
-			if err != nil {
+			if module, to, err = oneStep(ctx, s, mods, module); err != nil {
 				return fmt.Errorf("migrate down: %w", err)
 			}
-			to = max(cur-1, 0)
 		}
-		done, err := sqlcommon.Rollback(ctx, db, d, to)
+		done, err := sqlcommon.Rollback(ctx, db, d, mods, module, to)
 		if err != nil {
 			return fmt.Errorf("migrate down: %w", err)
 		}
 		_, _ = fmt.Fprintf(w, "reverted %d migration(s): %v\n", len(done), done)
 	default:
-		cur, latest, err := sqlcommon.Version(ctx, db, d)
+		known := slices.ContainsFunc(mods, func(m dialect.Module) bool { return m.Name == module })
+		if module != "" && !known {
+			return fmt.Errorf("migrate version: %w %q", sqlcommon.ErrUnknownModule, module)
+		}
+		streams, err := sqlcommon.Version(ctx, db, d, mods)
 		if err != nil {
 			return fmt.Errorf("migrate version: %w", err)
 		}
-		_, _ = fmt.Fprintf(w, "schema version %d of %d (%s)\n", cur, latest, d.Name)
+		for _, v := range streams {
+			if module == "" || v.Module == module {
+				_, _ = fmt.Fprintf(w, "schema version %d of %d (%s, %s)\n",
+					v.Current, v.Latest, d.Name, v.Module)
+			}
+		}
 	}
 	return nil
+}
+
+// oneStep returns the stream and the target version that revert one step:
+// the newest migration of module's stream or, with no module, of the last
+// stream in the canonical order that has any applied. With nothing applied
+// the target is 0, so the rollback reverts nothing; an unknown module is
+// returned as it is, for Rollback to refuse.
+func oneStep(
+	ctx context.Context,
+	s *sqlcommon.Store,
+	mods []dialect.Module,
+	module string,
+) (string, int, error) {
+	streams, err := sqlcommon.Version(ctx, s.DB(), s.Dialect(), mods)
+	if err != nil {
+		return "", 0, err //nolint:wrapcheck // the caller names the action
+	}
+	last := sqlcommon.StreamVersion{Module: module}
+	for _, v := range streams {
+		if v.Module == module || module == "" && v.Current > 0 {
+			last = v
+		}
+	}
+	return last.Module, max(last.Current-1, 0), nil
 }
 
 // RotateKeys runs `artifactweave keys rotate`: it opens the store with the

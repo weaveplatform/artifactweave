@@ -4,8 +4,8 @@ import (
 	"strconv"
 )
 
-// relTables are the tables of the domains a relation path reaches
-// (migration 0012 and the items tables).
+// relTables are the tables of the domains a relation path reaches: the
+// items tables and the build tables of the artifacts module's stream.
 var relTables = map[rel]string{
 	relItem: "items", relBuild: "builds", relPromotion: "build_promotions",
 	relModule: "build_modules", relArtifact: "build_artifacts", relDependency: "build_dependencies",

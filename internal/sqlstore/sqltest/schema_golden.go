@@ -13,9 +13,9 @@ import (
 
 // SchemaGolden compares Schema(db, dialect) with the golden file at path and
 // reports a mismatch as a line diff; update rewrites the file from db first.
-// The golden pins the schema today's migration history builds, so the
-// per-module baselines that replace the history (STO-06) can prove a fresh
-// database is unchanged.
+// The golden pins the schema that the module streams together build on a
+// fresh database, so a change to any stream shows as a diff of the golden
+// that review has to accept.
 //
 // A planned subtest then proves the comparison can fail: it adds a scratch
 // table and requires the description to differ from the golden. The table is

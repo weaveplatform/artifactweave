@@ -353,7 +353,7 @@ func (c *compiler) property(r rel, alias string, p *PropertyCriterion) {
 
 // propertyRows selects, as p, the property rows of the row at alias.
 // Builds and modules share build_properties, the build's own at
-// module_position -1 (migration 0012).
+// module_position -1 (the artifacts baseline).
 func propertyRows(r rel, alias string) string {
 	switch r {
 	case relBuild:
@@ -407,7 +407,7 @@ func (c *compiler) propertyRow(p *PropertyCriterion, op Op) {
 }
 
 // valuePrefixLen is the length, in characters, of the property value prefix
-// that PostgreSQL indexes (its migration 0013), because a whole value can be
+// that the PostgreSQL artifacts baseline indexes, because a whole value can be
 // longer than a B-tree entry holds.
 const valuePrefixLen = 255
 

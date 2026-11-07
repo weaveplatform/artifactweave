@@ -58,16 +58,17 @@ func PostgresDSN(t *testing.T) string {
 	return pgDSN
 }
 
-// Reset rolls every migration back and applies them again, leaving an empty
-// schema. Running it before each contract test also exercises every down
-// migration on every run.
+// Reset rolls every module's stream back and applies them all again,
+// leaving an empty schema. Running it before each contract test also
+// exercises every down migration on every run.
 func Reset(t *testing.T, db *sql.DB, d sqlcommon.Dialect) {
 	t.Helper()
 	ctx := context.Background()
-	if _, err := sqlcommon.Rollback(ctx, db, d, 0); err != nil {
+	mods := sqlcommon.Modules()
+	if _, err := sqlcommon.Rollback(ctx, db, d, mods, "", 0); err != nil {
 		t.Fatalf("reset rollback: %v", err)
 	}
-	if _, err := sqlcommon.Migrate(ctx, db, d); err != nil {
+	if _, err := sqlcommon.Migrate(ctx, db, d, mods, ""); err != nil {
 		t.Fatalf("reset migrate: %v", err)
 	}
 }

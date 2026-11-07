@@ -41,8 +41,8 @@ func TestAccSealedColumnsComplete(t *testing.T) {
 }
 
 // The modules register in the canonical module order (decision 0044,
-// "Persistence"), which Reseal follows, under the names the per-module
-// migration history will be keyed by, and each sealed column once.
+// "Persistence"), which Reseal follows, under the names that key the
+// per-module migration history, and each sealed column once.
 func TestUnitModulesRegisterInTheCanonicalOrder(t *testing.T) {
 	want := []string{
 		"platform", "artifacts", "access", "notifications",
