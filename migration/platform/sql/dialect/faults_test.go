@@ -1,0 +1,114 @@
+package dialect_test
+
+import (
+	"context"
+	"database/sql"
+	"database/sql/driver"
+	"errors"
+	"io"
+	"testing"
+)
+
+// errFault is what a failing step of the fault driver returns.
+var errFault = errors.New("fault")
+
+// faults names the steps of the fault driver that fail. The others succeed:
+// a statement changes one row and a query returns no rows.
+type faults struct {
+	exec, begin, commit, next, rowsAffected, close bool
+}
+
+// faultDB opens a pool over the fault driver, for the failures SQLite cannot
+// be made to produce on demand.
+func faultDB(t *testing.T, f faults) *sql.DB {
+	t.Helper()
+	db := sql.OpenDB(faultConnector{f})
+	t.Cleanup(func() { _ = db.Close() })
+	return db
+}
+
+func failIf(fail bool) error {
+	if fail {
+		return errFault
+	}
+	return nil
+}
+
+type faultConnector struct{ f faults }
+
+func (c faultConnector) Connect(context.Context) (driver.Conn, error) {
+	return faultConn(c), nil
+}
+
+func (c faultConnector) Driver() driver.Driver { return faultDriver(c) }
+
+// Close is called by sql.DB.Close, which returns its error.
+func (c faultConnector) Close() error { return failIf(c.f.close) }
+
+type faultDriver struct{ f faults }
+
+func (d faultDriver) Open(string) (driver.Conn, error) { return faultConn(d), nil }
+
+type faultConn struct{ f faults }
+
+func (faultConn) Prepare(string) (driver.Stmt, error) {
+	return nil, errors.New("the fault driver runs statements without preparing them")
+}
+
+func (faultConn) Close() error { return nil }
+
+func (c faultConn) Begin() (driver.Tx, error) {
+	return c.BeginTx(context.Background(), driver.TxOptions{})
+}
+
+func (c faultConn) BeginTx(context.Context, driver.TxOptions) (driver.Tx, error) {
+	if c.f.begin {
+		return nil, errFault
+	}
+	return faultTx(c), nil
+}
+
+func (c faultConn) ExecContext(
+	context.Context,
+	string,
+	[]driver.NamedValue,
+) (driver.Result, error) {
+	if c.f.exec {
+		return nil, errFault
+	}
+	return faultResult(c), nil
+}
+
+func (c faultConn) QueryContext(context.Context, string, []driver.NamedValue) (driver.Rows, error) {
+	return faultRows(c), nil
+}
+
+type faultTx struct{ f faults }
+
+func (t faultTx) Commit() error { return failIf(t.f.commit) }
+
+func (faultTx) Rollback() error { return nil }
+
+type faultResult struct{ f faults }
+
+func (faultResult) LastInsertId() (int64, error) { return 0, nil }
+
+func (r faultResult) RowsAffected() (int64, error) {
+	if r.f.rowsAffected {
+		return 0, errFault
+	}
+	return 1, nil
+}
+
+type faultRows struct{ f faults }
+
+func (faultRows) Columns() []string { return []string{"version"} }
+
+func (faultRows) Close() error { return nil }
+
+func (r faultRows) Next([]driver.Value) error {
+	if r.f.next {
+		return errFault
+	}
+	return io.EOF
+}
