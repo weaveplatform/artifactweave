@@ -7,24 +7,18 @@
 package sqltest
 
 import (
-	"context"
 	"database/sql"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
+	platsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
 )
 
-// Reset rolls every module's stream back and applies them all again,
-// leaving an empty schema. Running it before each contract test also
-// exercises every down migration on every run.
+// Reset rolls the stream of every module that sqlcommon.Modules registers
+// back and applies them all again, leaving an empty schema. Running it
+// before each contract test also exercises every down migration on every
+// run.
 func Reset(t *testing.T, db *sql.DB, d sqlcommon.Dialect) {
 	t.Helper()
-	ctx := context.Background()
-	mods := sqlcommon.Modules()
-	if _, err := sqlcommon.Rollback(ctx, db, d, mods, "", 0); err != nil {
-		t.Fatalf("reset rollback: %v", err)
-	}
-	if _, err := sqlcommon.Migrate(ctx, db, d, mods, ""); err != nil {
-		t.Fatalf("reset migrate: %v", err)
-	}
+	platsqltest.Reset(t, db, d, sqlcommon.Modules())
 }
