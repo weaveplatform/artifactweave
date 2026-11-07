@@ -1,19 +1,3 @@
-// Package sqlcommon implements pkg/store over database/sql for any SQL
-// dialect (decision 0004), following hostweave's dialect layer: one store
-// implementation, a Dialect describing what differs between engines, and
-// embedded per-dialect migrations.
-//
-// Schema conventions shared by every table (research 15 section 4):
-//
-//   - Times are BIGINT Unix microseconds, NULL for a zero time; durations
-//     are BIGINT milliseconds. Integers compare and sort identically on
-//     every engine, which keeps keyset pagination exact.
-//   - JSON documents are TEXT, so they round-trip byte for byte.
-//   - Sealed values are BLOB (BYTEA) columns of their own, never inside a
-//     document, sealed with the purpose and row id of decision 0017.
-//   - Text columns that lists sort by are byte-ordered (COLLATE "C" on
-//     PostgreSQL, SQLite's default), so every backend pages in the order
-//     inmem does.
 package sqlcommon
 
 import (

@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -141,15 +140,6 @@ func (s *Store) resealColumn(ctx context.Context, c sealedColumn) (int, error) {
 		changed += int(n)
 	}
 	return changed, nil
-}
-
-// resealValue re-seals one value, sealing a plain one for the first time.
-func (s *Store) resealValue(purpose, rowID string, v []byte) ([]byte, bool, error) {
-	if !crypt.IsSealed(v) {
-		sealed, err := s.keys.Seal(purpose, rowID, v)
-		return sealed, err == nil, err //nolint:wrapcheck // wrapped by the caller
-	}
-	return s.keys.Reseal(purpose, rowID, v) //nolint:wrapcheck // wrapped by the caller
 }
 
 // keyStrings renders scanned key values as the strings row ids are built
