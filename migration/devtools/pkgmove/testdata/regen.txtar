@@ -36,7 +36,7 @@ go $GOVERSION
     "final_root": "internal",
     "packages": [
         {"from":"internal/omega","action":"move","to":"platform/omega","ticket":"PLT-30"},
-        {"from":"internal/stubgen","action":"move","to":"platform/stubgen","ticket":"PLT-31"}
+        {"from":"internal/demo/stubgen","action":"move","to":"platform/stubgen","ticket":"PLT-31"}
     ],
     "files": [],
     "placeholders": []
@@ -47,7 +47,7 @@ package omega
 
 // Omega is omega.
 type Omega string
--- internal/stubgen/stubgen.go --
+-- internal/demo/stubgen/stubgen.go --
 // Package stubgen generates stubs.
 package stubgen
 -- internal/server/gen/g/g.gen.go --
