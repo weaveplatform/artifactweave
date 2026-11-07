@@ -12,6 +12,8 @@ import (
 // (ascending, or descending when desc). key returns a row's sort key as
 // string and int64 parts, the same parts the SQL backends page by, so a
 // cursor from one backend means the same position in the other.
+// It also returns the next page's cursor, "" after the last, and an error
+// that wraps kernel.ErrInvalidCursor for a malformed cursor.
 func Paginate[V any](rows []V, p kernel.Page, desc bool, key func(V) []any) ([]V, string, error) {
 	p, err := p.Normalize()
 	if err != nil {
@@ -47,6 +49,7 @@ func Paginate[V any](rows []V, p kernel.Page, desc bool, key func(V) []any) ([]V
 }
 
 // KeyStrings renders sort-key parts as cursor parts.
+// An int64 is written in decimal and any other part as fmt.Sprint prints it.
 func KeyStrings(parts []any) []string {
 	out := make([]string, len(parts))
 	for i, p := range parts {
@@ -62,6 +65,9 @@ func KeyStrings(parts []any) []string {
 
 // CompareKey compares a row's sort key with a decoded cursor, part by part,
 // integers numerically and everything else as strings.
+// cursor needs a part for each part of row. It returns -1, 0 or +1, and an
+// error that wraps kernel.ErrInvalidCursor when a cursor part it compares
+// with an int64 is not an integer.
 func CompareKey(row []any, cursor []string) (int, error) {
 	for i, part := range row {
 		var c int
