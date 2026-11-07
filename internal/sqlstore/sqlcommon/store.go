@@ -22,8 +22,14 @@ import (
 	"fmt"
 
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
+
+// Store implements store.Store over database/sql for one Dialect. The
+// embedded dialect store holds the pool, the dialect and the keyring and
+// runs the unit of work; Store adds the aggregate's accessors.
+type Store struct{ *dialect.Store }
 
 var _ store.Store = (*Store)(nil)
 
@@ -65,5 +71,5 @@ func Open(ctx context.Context, db *sql.DB, d Dialect, o Options) (*Store, error)
 
 // New wraps an open, migrated pool.
 func New(db *sql.DB, d Dialect, keys *crypt.Keyring) *Store {
-	return &Store{db: db, d: d, keys: keys}
+	return &Store{Store: dialect.New(db, d, keys)}
 }

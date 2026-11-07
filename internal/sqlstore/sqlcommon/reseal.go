@@ -75,7 +75,7 @@ type sealedRow struct {
 // replaced only if it still holds the bytes that were read, so a concurrent
 // write is never overwritten with a stale secret.
 func (s *Store) Reseal(ctx context.Context) (int, error) {
-	if s.keys == nil {
+	if !s.HasKeyring() {
 		return 0, ErrNoKeyring
 	}
 	changed, err := s.backfillRepositoryHeaders(ctx)
@@ -125,7 +125,7 @@ func (s *Store) resealColumn(ctx context.Context, c sealedColumn) (int, error) {
 	changed := 0
 	for _, row := range rows {
 		id := c.rowID(keyStrings(row.key))
-		next, did, err := s.resealValue(c.purpose, id, row.value)
+		next, did, err := s.ResealValue(c.purpose, id, row.value)
 		if err != nil {
 			return changed, fmt.Errorf("%s %q: %w", op, id, err)
 		}

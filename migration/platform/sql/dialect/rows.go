@@ -2,19 +2,19 @@ package dialect
 
 import "strings"
 
-// entRow is a *sql.Row or *sql.Rows.
-type entRow interface{ Scan(dest ...any) error }
+// EntRow is a *sql.Row or *sql.Rows.
+type EntRow interface{ Scan(dest ...any) error }
 
-// entBytes stores an empty byte slice as NULL.
-func entBytes(b []byte) any {
+// EntBytes stores an empty byte slice as NULL.
+func EntBytes(b []byte) any {
 	if len(b) == 0 {
 		return nil
 	}
 	return b
 }
 
-// peersScanner is a *sql.Row or *sql.Rows.
-type peersScanner interface{ Scan(dest ...any) error }
+// PeersScanner is a *sql.Row or *sql.Rows.
+type PeersScanner interface{ Scan(dest ...any) error }
 
-// opsCols splits a column list written as "a, b, c".
-func opsCols(list string) []string { return strings.Split(list, ", ") }
+// OpsCols splits a column list written as "a, b, c".
+func OpsCols(list string) []string { return strings.Split(list, ", ") }

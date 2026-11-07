@@ -20,7 +20,7 @@ import (
 // TestAccSealedColumnsComplete finds every purpose the store seals with and
 // requires Reseal to cover it, so a secret column added later cannot be
 // left out of `artifactweave keys rotate` and strand values under a retired
-// key. It reads the package source: seal(<purpose constant>, ...) calls and
+// key. It reads the package source: Seal(<purpose constant>, ...) calls and
 // the constants' values.
 func TestAccSealedColumnsComplete(t *testing.T) {
 	files, err := filepath.Glob("*.go")
@@ -49,7 +49,7 @@ func TestAccSealedColumnsComplete(t *testing.T) {
 					}
 				}
 			case *ast.CallExpr:
-				if sel, ok := n.Fun.(*ast.SelectorExpr); ok && sel.Sel.Name == "seal" &&
+				if sel, ok := n.Fun.(*ast.SelectorExpr); ok && sel.Sel.Name == "Seal" &&
 					len(n.Args) > 0 {
 					if id, ok := n.Args[0].(*ast.Ident); ok {
 						used = append(used, id.Name)
@@ -60,13 +60,13 @@ func TestAccSealedColumnsComplete(t *testing.T) {
 		})
 	}
 	if len(used) == 0 {
-		t.Fatal("found no seal calls; the scan is broken")
+		t.Fatal("found no Seal calls; the scan is broken")
 	}
 	covered := sqlcommon.SealedPurposes()
 	for _, name := range used {
 		purpose, ok := consts[name]
 		if !ok {
-			t.Fatalf("seal is called with %s, which is not a string constant in this package", name)
+			t.Fatalf("Seal is called with %s, which is not a string constant in this package", name)
 		}
 		if !slices.Contains(covered, purpose) {
 			t.Errorf("purpose %q is sealed but missing from sealedColumns", purpose)
@@ -132,15 +132,6 @@ func TestAccResealSealsPlainValues(t *testing.T) {
 	if _, err := s.Reseal(ctx); err == nil {
 		t.Fatal("Reseal over a missing table succeeded")
 	}
-}
-
-func TestAccMustJSONPanicsOnUnencodable(t *testing.T) {
-	defer func() {
-		if recover() == nil {
-			t.Fatal("encoding a channel did not panic")
-		}
-	}()
-	sqlcommon.MustJSON(make(chan int))
 }
 
 // contentKeysOther is a version-1 keyring under a different master key.

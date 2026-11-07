@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // ErrNoKeyring reports a sealed value read by a store opened without a
@@ -23,6 +23,12 @@ type Store struct {
 	db   *sql.DB
 	d    Dialect
 	keys *crypt.Keyring
+}
+
+// New wraps an open, migrated pool for one dialect. keys seals secret
+// columns and may be nil.
+func New(db *sql.DB, d Dialect, keys *crypt.Keyring) *Store {
+	return &Store{db: db, d: d, keys: keys}
 }
 
 // DB returns the pool, for tests and the migrate command.
@@ -39,6 +45,9 @@ func (s *Store) Tx(ctx context.Context, fn func(context.Context) error) error {
 // AfterCommit implements store.Store.
 func (*Store) AfterCommit(ctx context.Context, fn func()) { afterCommit(ctx, fn) }
 
+// InTx reports whether ctx carries a transaction on the store's pool.
+func (s *Store) InTx(ctx context.Context) bool { return inTx(ctx, s.db) }
+
 // Close implements store.Store.
 func (s *Store) Close() error {
 	if err := s.db.Close(); err != nil {
@@ -47,105 +56,105 @@ func (s *Store) Close() error {
 	return nil
 }
 
-// q returns the transaction ctx carries, or the pool.
-func (s *Store) q(ctx context.Context) Queryer { return query(ctx, s.db) }
+// Q returns the transaction ctx carries, or the pool.
+func (s *Store) Q(ctx context.Context) Queryer { return query(ctx, s.db) }
 
-// wrap maps driver errors onto the store sentinels and names the operation.
-func (s *Store) wrap(op string, err error) error {
+// Wrap maps driver errors onto the store sentinels and names the operation.
+func (s *Store) Wrap(op string, err error) error {
 	switch {
 	case err == nil:
 		return nil
 	case errors.Is(err, sql.ErrNoRows):
-		return fmt.Errorf("%s: %w", op, store.ErrNotFound)
+		return fmt.Errorf("%s: %w", op, kernel.ErrNotFound)
 	case s.d.uniqueViolation(err):
-		return fmt.Errorf("%s: %w", op, store.ErrConflict)
+		return fmt.Errorf("%s: %w", op, kernel.ErrConflict)
 	default:
 		return fmt.Errorf("%s: %s: %w", s.d.Name, op, err)
 	}
 }
 
-// exec runs a statement written with "?" placeholders and returns the
+// Exec runs a statement written with "?" placeholders and returns the
 // number of rows it changed.
-func (s *Store) exec(ctx context.Context, op, q string, args ...any) (int64, error) {
-	res, err := s.q(ctx).ExecContext(ctx, s.d.Rebind(q), args...)
+func (s *Store) Exec(ctx context.Context, op, q string, args ...any) (int64, error) {
+	res, err := s.Q(ctx).ExecContext(ctx, s.d.Rebind(q), args...)
 	if err != nil {
-		return 0, s.wrap(op, err)
+		return 0, s.Wrap(op, err)
 	}
 	n, err := res.RowsAffected()
 	if err != nil {
-		return 0, s.wrap(op, err)
+		return 0, s.Wrap(op, err)
 	}
 	return n, nil
 }
 
-// execOne runs a statement that must change exactly one row; ErrNotFound
+// ExecOne runs a statement that must change exactly one row; ErrNotFound
 // when it changed none.
-func (s *Store) execOne(ctx context.Context, op, q string, args ...any) error {
-	n, err := s.exec(ctx, op, q, args...)
+func (s *Store) ExecOne(ctx context.Context, op, q string, args ...any) error {
+	n, err := s.Exec(ctx, op, q, args...)
 	if err != nil {
 		return err
 	}
 	if n == 0 {
-		return fmt.Errorf("%s: %w", op, store.ErrNotFound)
+		return fmt.Errorf("%s: %w", op, kernel.ErrNotFound)
 	}
 	return nil
 }
 
-// insertID runs an INSERT ... RETURNING id and returns the new id.
-func (s *Store) insertID(ctx context.Context, op, q string, args ...any) (int64, error) {
+// InsertID runs an INSERT ... RETURNING id and returns the new id.
+func (s *Store) InsertID(ctx context.Context, op, q string, args ...any) (int64, error) {
 	var id int64
-	if err := s.q(ctx).
+	if err := s.Q(ctx).
 		QueryRowContext(ctx, s.d.Rebind(q+" RETURNING id"), args...).
 		Scan(&id); err != nil {
-		return 0, s.wrap(op, err)
+		return 0, s.Wrap(op, err)
 	}
 	return id, nil
 }
 
-// exists reports whether q (a SELECT 1 ...) returns a row.
-func (s *Store) exists(ctx context.Context, op, q string, args ...any) (bool, error) {
+// Exists reports whether q (a SELECT 1 ...) returns a row.
+func (s *Store) Exists(ctx context.Context, op, q string, args ...any) (bool, error) {
 	var one int
-	err := s.q(ctx).QueryRowContext(ctx, s.d.Rebind(q), args...).Scan(&one)
+	err := s.Q(ctx).QueryRowContext(ctx, s.d.Rebind(q), args...).Scan(&one)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}
 	if err != nil {
-		return false, s.wrap(op, err)
+		return false, s.Wrap(op, err)
 	}
 	return true, nil
 }
 
-// rows runs a query and calls scan for each row.
-func (s *Store) rows(
+// Rows runs a query and calls scan for each row.
+func (s *Store) Rows(
 	ctx context.Context,
 	op, q string,
 	args []any,
 	scan func(*sql.Rows) error,
 ) error {
-	rs, err := s.q(ctx).QueryContext(ctx, s.d.Rebind(q), args...)
+	rs, err := s.Q(ctx).QueryContext(ctx, s.d.Rebind(q), args...)
 	if err != nil {
-		return s.wrap(op, err)
+		return s.Wrap(op, err)
 	}
 	defer func() { _ = rs.Close() }()
 	for rs.Next() {
 		if err := scan(rs); err != nil {
-			return s.wrap(op, err)
+			return s.Wrap(op, err)
 		}
 	}
-	return s.wrap(op, rs.Err())
+	return s.Wrap(op, rs.Err())
 }
 
-// lockClause returns the row-lock suffix for a SELECT inside a transaction,
+// LockClause returns the row-lock suffix for a SELECT inside a transaction,
 // or "" outside one and on engines that serialise writers.
-func (s *Store) lockClause(ctx context.Context) string {
+func (s *Store) LockClause(ctx context.Context) string {
 	if s.d.ForUpdate == "" || !inTx(ctx, s.db) {
 		return ""
 	}
 	return " " + s.d.ForUpdate
 }
 
-// seal seals a secret for one column of one row; "" is stored as NULL.
-func (s *Store) seal(purpose, rowID, plain string) ([]byte, error) {
+// Seal seals a secret for one column of one row; "" is stored as NULL.
+func (s *Store) Seal(purpose, rowID, plain string) ([]byte, error) {
 	if plain == "" {
 		return nil, nil
 	}
@@ -159,9 +168,9 @@ func (s *Store) seal(purpose, rowID, plain string) ([]byte, error) {
 	return b, nil
 }
 
-// unseal opens a value seal stored; NULL reads as "". A value stored before
+// Unseal opens a value seal stored; NULL reads as "". A value stored before
 // a keyring was configured is returned as it is.
-func (s *Store) unseal(purpose, rowID string, stored []byte) (string, error) {
+func (s *Store) Unseal(purpose, rowID string, stored []byte) (string, error) {
 	if len(stored) == 0 {
 		return "", nil
 	}
@@ -178,30 +187,30 @@ func (s *Store) unseal(purpose, rowID string, stored []byte) (string, error) {
 	return string(b), nil
 }
 
-// micros is a time column value: Unix microseconds, NULL for a zero time.
-func micros(t time.Time) any {
+// Micros is a time column value: Unix microseconds, NULL for a zero time.
+func Micros(t time.Time) any {
 	if t.IsZero() {
 		return nil
 	}
 	return t.UnixMicro()
 }
 
-// fromMicros reads a time column.
-func fromMicros(v sql.NullInt64) time.Time {
+// FromMicros reads a time column.
+func FromMicros(v sql.NullInt64) time.Time {
 	if !v.Valid {
 		return time.Time{}
 	}
 	return time.UnixMicro(v.Int64).UTC()
 }
 
-// millis is a duration column value in milliseconds.
-func millis(d time.Duration) int64 { return d.Milliseconds() }
+// Millis is a duration column value in milliseconds.
+func Millis(d time.Duration) int64 { return d.Milliseconds() }
 
-// fromMillis reads a duration column.
-func fromMillis(ms int64) time.Duration { return time.Duration(ms) * time.Millisecond }
+// FromMillis reads a duration column.
+func FromMillis(ms int64) time.Duration { return time.Duration(ms) * time.Millisecond }
 
-// toJSON encodes a document column; nil and empty values store as NULL.
-func toJSON(v any) (any, error) {
+// ToJSON encodes a document column; nil and empty values store as NULL.
+func ToJSON(v any) (any, error) {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return nil, fmt.Errorf("encode document: %w", err)
@@ -212,21 +221,21 @@ func toJSON(v any) (any, error) {
 	return string(b), nil
 }
 
-// mustJSON is toJSON for documents built from the domain types, which are
+// MustJSON is ToJSON for documents built from the domain types, which are
 // structs, slices and string-keyed maps of plain values that encoding/json
 // cannot fail to encode. An error therefore means a field of an unsupported
 // kind was added to a type, a programming mistake that must fail loudly:
 // storing NULL instead would lose the document without a trace.
-func mustJSON(v any) any {
-	doc, err := toJSON(v)
+func MustJSON(v any) any {
+	doc, err := ToJSON(v)
 	if err != nil {
 		panic(fmt.Sprintf("sqlcommon: %v", err))
 	}
 	return doc
 }
 
-// fromJSON decodes a document column; NULL leaves into untouched.
-func fromJSON(doc sql.NullString, into any) error {
+// FromJSON decodes a document column; NULL leaves into untouched.
+func FromJSON(doc sql.NullString, into any) error {
 	if !doc.Valid || doc.String == "" {
 		return nil
 	}
@@ -236,40 +245,40 @@ func fromJSON(doc sql.NullString, into any) error {
 	return nil
 }
 
-// rawJSON stores an opaque JSON (or other) document given as bytes; empty
+// RawJSON stores an opaque JSON (or other) document given as bytes; empty
 // stores as NULL.
-func rawJSON(b []byte) any {
+func RawJSON(b []byte) any {
 	if len(b) == 0 {
 		return nil
 	}
 	return string(b)
 }
 
-// fromRaw reads an opaque document column.
-func fromRaw(doc sql.NullString) []byte {
+// FromRaw reads an opaque document column.
+func FromRaw(doc sql.NullString) []byte {
 	if !doc.Valid || doc.String == "" {
 		return nil
 	}
 	return []byte(doc.String)
 }
 
-// nullString stores "" as NULL, for optional foreign keys and unique
+// NullString stores "" as NULL, for optional foreign keys and unique
 // columns where an empty value must not collide.
-func nullString(v string) any {
+func NullString(v string) any {
 	if v == "" {
 		return nil
 	}
 	return v
 }
 
-// keyset is the condition that continues a list after the cursor in p, for
+// Keyset is the condition that continues a list after the cursor in p, for
 // a sort over cols (ascending, or descending when desc). Columns sorted as
 // integers must be listed in ints so their cursor parts bind as integers.
 // It returns "1 = 1" for the first page.
-func keyset(p store.Page, cols []string, ints map[string]bool, desc bool) (string, []any, error) {
+func Keyset(p kernel.Page, cols []string, ints map[string]bool, desc bool) (string, []any, error) {
 	parts, err := p.Key(len(cols))
 	if err != nil || parts == nil {
-		return "1 = 1", nil, err //nolint:wrapcheck // already a store sentinel
+		return "1 = 1", nil, err //nolint:wrapcheck // already a kernel sentinel
 	}
 	vals := make([]any, 0, len(parts))
 	for i, col := range cols {
@@ -280,7 +289,7 @@ func keyset(p store.Page, cols []string, ints map[string]bool, desc bool) (strin
 		}
 		n, err := strconv.ParseInt(part, 10, 64)
 		if err != nil {
-			return "", nil, fmt.Errorf("%w: %q is not an integer", store.ErrInvalidCursor, part)
+			return "", nil, fmt.Errorf("%w: %q is not an integer", kernel.ErrInvalidCursor, part)
 		}
 		vals = append(vals, n)
 	}
@@ -304,8 +313,8 @@ func keyset(p store.Page, cols []string, ints map[string]bool, desc bool) (strin
 	return "(" + strings.Join(ors, " OR ") + ")", args, nil
 }
 
-// orderBy renders ORDER BY cols in one direction.
-func orderBy(cols []string, desc bool) string {
+// OrderBy renders ORDER BY cols in one direction.
+func OrderBy(cols []string, desc bool) string {
 	dir := ""
 	if desc {
 		dir = " DESC"
@@ -313,19 +322,22 @@ func orderBy(cols []string, desc bool) string {
 	return " ORDER BY " + strings.Join(cols, dir+", ") + dir
 }
 
-// itoa formats an integer cursor part.
-func itoa(n int64) string { return strconv.FormatInt(n, 10) }
+// Itoa formats an integer cursor part.
+func Itoa(n int64) string { return strconv.FormatInt(n, 10) }
 
-// limitOr applies the default limit for "at most limit" queries.
-func limitOr(limit int) int {
+// LimitOr applies the default limit for "at most limit" queries.
+func LimitOr(limit int) int {
 	if limit <= 0 {
-		return store.DefaultLimit
+		return kernel.DefaultLimit
 	}
-	return min(limit, store.MaxLimit)
+	return min(limit, kernel.MaxLimit)
 }
 
-// resealValue re-seals one value, sealing a plain one for the first time.
-func (s *Store) resealValue(purpose, rowID string, v []byte) ([]byte, bool, error) {
+// HasKeyring reports whether the store was given a keyring.
+func (s *Store) HasKeyring() bool { return s.keys != nil }
+
+// ResealValue re-seals one value, sealing a plain one for the first time.
+func (s *Store) ResealValue(purpose, rowID string, v []byte) ([]byte, bool, error) {
 	if !crypt.IsSealed(v) {
 		sealed, err := s.keys.Seal(purpose, rowID, v)
 		return sealed, err == nil, err //nolint:wrapcheck // wrapped by the caller

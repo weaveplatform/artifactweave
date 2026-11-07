@@ -19,7 +19,7 @@ type Dialect struct {
 	// sections.
 	Migrations fs.FS
 	// IsUniqueViolation reports whether err is the engine's unique or
-	// primary-key constraint error, so the store returns store.ErrConflict
+	// primary-key constraint error, so the store returns kernel.ErrConflict
 	// instead of a driver error when two writers race for one key.
 	IsUniqueViolation func(error) bool
 }

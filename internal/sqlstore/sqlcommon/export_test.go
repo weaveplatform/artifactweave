@@ -8,6 +8,3 @@ func SealedPurposes() []string {
 	}
 	return out
 }
-
-// MustJSON exposes mustJSON so its failure mode can be tested.
-var MustJSON = mustJSON
