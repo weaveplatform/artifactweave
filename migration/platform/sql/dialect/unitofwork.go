@@ -11,7 +11,8 @@ import (
 // ErrTransaction reports a transaction that could not begin or commit.
 var ErrTransaction = errors.New("sqlcommon: transaction failed")
 
-// Queryer is a pool or the transaction a context carries.
+// Queryer is what Store.Q returns: the pool, or the transaction a context
+// carries on it. *sql.DB and *sql.Tx implement it.
 type Queryer interface {
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)

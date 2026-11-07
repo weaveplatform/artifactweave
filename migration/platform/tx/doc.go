@@ -11,10 +11,10 @@
 // around. The package declares only the interface and imports only the
 // standard library. Each family of stores implements it with a unit of work
 // of its own, because the families differ on purpose in one case (see
-// Invariants): platform/tx/memtx for the in-memory stores, and the SQL
-// stores' unit of work over database/sql, which the target layout places in
-// platform/sql/dialect. The metadata store's aggregate embeds Runner, so its
-// in-memory, SQLite and PostgreSQL stores implement it.
+// Invariants): platform/tx/memtx for the in-memory stores, and
+// platform/sql/dialect for the SQL stores, over database/sql. The metadata
+// store's aggregate embeds Runner, so its in-memory, SQLite and PostgreSQL
+// stores implement it.
 //
 // # Inputs
 //
@@ -78,7 +78,8 @@
 // and Cancelled subtests, and the rollback cases of the replay, outbox, work
 // queue, request budget and Git LFS lock subtests) runs Tx and AfterCommit
 // on its in-memory, SQLite and PostgreSQL stores. memtx's own tests cover the
-// in-memory unit of work, including the nested case that the suite leaves
-// out, and test files of the in-memory and SQL stores check at compile time
-// that both implement Runner.
+// in-memory unit of work and platform/sql/dialect's the SQL one, each with
+// the nested case that the suite leaves out, and test files of the in-memory
+// and SQL stores and of the dialect store check at compile time that they
+// implement Runner.
 package tx

@@ -6,7 +6,8 @@ import (
 	"strings"
 )
 
-// Dialect describes what differs between SQL engines.
+// Dialect describes what differs between SQL engines. Each driver declares
+// one value and passes it to New and to the migrator.
 type Dialect struct {
 	// Name is used in errors.
 	Name string
@@ -56,7 +57,8 @@ func (d Dialect) Rebind(query string) string {
 
 // Upsert renders INSERT ... ON CONFLICT (key) DO UPDATE SET col =
 // excluded.col for every non-key column; SQLite and PostgreSQL share the
-// syntax.
+// syntax. When every column is a key column it renders DO NOTHING instead,
+// because neither engine accepts a SET with nothing to set.
 func Upsert(table string, cols, key []string) string {
 	skip := make(map[string]bool, len(key))
 	for _, k := range key {
