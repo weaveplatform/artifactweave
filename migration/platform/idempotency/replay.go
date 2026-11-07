@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // ErrReplayMismatch means an unexpired key was reused with different intent.
@@ -25,11 +27,11 @@ func (r ReplayRequest) Validate() error {
 	for _, v := range []string{r.Scope, r.Key, r.Fingerprint} {
 		b, err := hex.DecodeString(v)
 		if err != nil || len(b) != 32 || hex.EncodeToString(b) != v {
-			return fmt.Errorf("replay digests must be lowercase SHA-256 hex: %w", ErrInvalid)
+			return fmt.Errorf("replay digests must be lowercase SHA-256 hex: %w", kernel.ErrInvalid)
 		}
 	}
 	if r.Now.IsZero() || r.Expires.UnixMicro() <= r.Now.UnixMicro() {
-		return fmt.Errorf("replay retention must be positive: %w", ErrInvalid)
+		return fmt.Errorf("replay retention must be positive: %w", kernel.ErrInvalid)
 	}
 	return nil
 }
@@ -49,16 +51,18 @@ type ReplayStore interface {
 	// and runs effect only for a new/expired key. effect must use its supplied
 	// context for all mutations and return a positive stable resource ID.
 	// The receipt and mutations commit together; any error rolls both back.
-	// A nested call joins the outer Store.Tx. Replays do not call effect.
-	// Waiting obeys context cancellation; there is no committed pending state
-	// to recover after a process crash. Callers must reauthorize the returned
-	// resource, including on replay, before their outer transaction commits.
+	// A nested call joins the metadata store's outer transaction. Replays do
+	// not call effect. Waiting obeys context cancellation; there is no
+	// committed pending state to recover after a process crash. Callers must
+	// reauthorize the returned resource, including on replay, before their
+	// outer transaction commits.
 	Do(
 		ctx context.Context,
 		request ReplayRequest,
 		effect func(context.Context) (int64, error),
 	) (ReplayReceipt, error)
-	// Prune removes at most limit expired receipts (1..MaxLimit). Retention
-	// ends at expiry, whether or not the physical row has been pruned.
+	// Prune removes at most limit expired receipts (1..kernel.MaxLimit).
+	// Retention ends at expiry, whether or not the physical row has been
+	// pruned.
 	Prune(ctx context.Context, now time.Time, limit int) (int64, error)
 }
