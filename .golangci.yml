@@ -106,9 +106,26 @@ linters:
       # return a custom error type as error, so every return of these failed.
       # Matching by signature, not by package, keeps errors passed up from
       # other packages of the module checked.
+      #
+      # The SQL dialect layer's methods and functions return errors that
+      # already name the operation and the dialect (Store.Wrap), or that are
+      # kernel sentinels a caller tests with errors.Is. The SQL stores pass
+      # them up as they are, as they did while the helpers were their own
+      # package's, and wrapping each again would change error texts that
+      # operators see. Without these lines wrapcheck reports 465 such returns
+      # in the SQL stores alone, and one for each new call in a module's SQL
+      # adapter.
       extra-ignore-sigs:
         - apierror.New(
         - format.Rejectf(
+        - dialect.Store).
+        - dialect.ToJSON(
+        - dialect.FromJSON(
+        - dialect.Keyset(
+        - dialect.LoadMigrations(
+        - dialect.Migrate(
+        - dialect.Rollback(
+        - dialect.Version(
 
   # 4) Issue-filtering (not disabling analysis, just silencing reports)
   exclusions:
