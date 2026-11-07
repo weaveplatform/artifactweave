@@ -1,4 +1,4 @@
-package inmem
+package memtx
 
 import (
 	"cmp"
