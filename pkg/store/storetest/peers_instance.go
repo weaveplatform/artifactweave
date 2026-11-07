@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/storekit"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -17,25 +18,30 @@ func testInstance(t *testing.T, s store.Store) {
 	ctx := context.Background()
 	is := s.Instance()
 	_, err := is.Get(ctx)
-	wantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, store.ErrNotFound)
 	pub, priv := peerKey(1)
 	id := types.InstanceIdentity{
 		InstanceID: peerID(1), PublicKey: pub, PrivateKey: priv,
 		NamespaceID: "ns-1", ProtocolVersion: types.ProtocolVersion,
 	}
-	wantErr(t, is.Update(ctx, id), store.ErrNotFound)
-	must(t, is.Init(ctx, id))
-	got := get[types.InstanceIdentity](t)(is.Get(ctx))
-	same(t, "Get", id, got)
+	storekit.WantErr(t, is.Update(ctx, id), store.ErrNotFound)
+	storekit.Must(t, is.Init(ctx, id))
+	got := storekit.Get[types.InstanceIdentity](t)(is.Get(ctx))
+	storekit.Same(t, "Get", id, got)
 
 	// Returned keys are copies.
 	got.PublicKey[0]++
 	got.PrivateKey[0]++
-	same(t, "Get after mutating a copy", id, get[types.InstanceIdentity](t)(is.Get(ctx)))
+	storekit.Same(
+		t,
+		"Get after mutating a copy",
+		id,
+		storekit.Get[types.InstanceIdentity](t)(is.Get(ctx)),
+	)
 
 	second := id
 	second.InstanceID = peerID(2)
-	wantErr(t, is.Init(ctx, second), store.ErrConflict)
+	storekit.WantErr(t, is.Init(ctx, second), store.ErrConflict)
 
 	// Key rotation, and an identity with no private key at all.
 	pub2, priv2 := peerKey(2)
@@ -48,11 +54,16 @@ func testInstance(t *testing.T, s store.Store) {
 		NamespaceID:     "ns-2",
 		ProtocolVersion: 2,
 	}
-	must(t, is.Update(ctx, rotated))
-	same(t, "Get after Update", rotated, get[types.InstanceIdentity](t)(is.Get(ctx)))
+	storekit.Must(t, is.Update(ctx, rotated))
+	storekit.Same(
+		t,
+		"Get after Update",
+		rotated,
+		storekit.Get[types.InstanceIdentity](t)(is.Get(ctx)),
+	)
 	bare := types.InstanceIdentity{InstanceID: peerID(3)}
-	must(t, is.Update(ctx, bare))
-	same(t, "Get with no keys", bare, get[types.InstanceIdentity](t)(is.Get(ctx)))
+	storekit.Must(t, is.Update(ctx, bare))
+	storekit.Same(t, "Get with no keys", bare, storekit.Get[types.InstanceIdentity](t)(is.Get(ctx)))
 	failsCancelled(t, map[string]func(context.Context) error{
 		"Get":    func(ctx context.Context) error { _, err := is.Get(ctx); return err },
 		"Init":   func(ctx context.Context) error { return is.Init(ctx, id) },

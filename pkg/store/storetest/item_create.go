@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/storekit"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -15,31 +16,31 @@ func testItemCreate(t *testing.T, st store.Store) {
 	ctx := t.Context()
 	items := st.Items()
 	original := fileItem("r", "archive/package.tar.gz", 1)
-	created := get[types.Item](t)(items.Create(ctx, original))
-	same(t, "created item", stored(original, created.ID), created)
+	created := storekit.Get[types.Item](t)(items.Create(ctx, original))
+	storekit.Same(t, "created item", stored(original, created.ID), created)
 	props := types.Properties{"owner": {"original"}}
-	must(t, items.SetProperties(ctx, created.ID, props, time.Now()))
+	storekit.Must(t, items.SetProperties(ctx, created.ID, props, time.Now()))
 	for _, replacement := range []types.Item{fileItem("r", original.FullPath(), 2), folderItem("r", original.FullPath())} {
 		_, err := items.Create(ctx, replacement)
-		wantErr(t, err, store.ErrConflict)
+		storekit.WantErr(t, err, store.ErrConflict)
 	}
-	same(
+	storekit.Same(
 		t,
 		"original bytes",
 		original.Actual,
-		get[types.Item](t)(items.Get(ctx, "r", false, original.FullPath())).Actual,
+		storekit.Get[types.Item](t)(items.Get(ctx, "r", false, original.FullPath())).Actual,
 	)
-	same(
+	storekit.Same(
 		t,
 		"original properties",
 		props,
-		get[types.Properties](t)(items.Properties(ctx, created.ID)),
+		storekit.Get[types.Properties](t)(items.Properties(ctx, created.ID)),
 	)
 	_, err := items.Create(ctx, types.Item{Name: "invalid"})
-	wantErr(t, err, store.ErrInvalid)
+	storekit.WantErr(t, err, store.ErrInvalid)
 	cached := original
 	cached.Cached = true
-	get[types.Item](t)(items.Create(ctx, cached))
+	storekit.Get[types.Item](t)(items.Create(ctx, cached))
 	rollback := errors.New("rollback")
 	err = st.Tx(ctx, func(ctx context.Context) error {
 		_, err := items.Create(ctx, fileItem("r", "rolled-back", 3))
@@ -48,9 +49,9 @@ func testItemCreate(t *testing.T, st store.Store) {
 		}
 		return rollback
 	})
-	wantErr(t, err, rollback)
+	storekit.WantErr(t, err, rollback)
 	_, err = items.Get(ctx, "r", false, "rolled-back")
-	wantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, store.ErrNotFound)
 
 	// Two writers racing for a fresh path cannot replace each other's bytes.
 	var wg sync.WaitGroup
@@ -68,7 +69,7 @@ func testItemCreate(t *testing.T, st store.Store) {
 		if err == nil {
 			createdCount++
 		} else {
-			wantErr(t, err, store.ErrConflict)
+			storekit.WantErr(t, err, store.ErrConflict)
 		}
 	}
 	if createdCount != 1 {

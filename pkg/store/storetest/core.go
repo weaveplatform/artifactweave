@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/storekit"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -30,7 +31,7 @@ func blob(i int) types.Blob {
 			MD5:    fmt.Sprintf("%032x", i),
 		},
 		Size:    int64(100 * i),
-		Created: at(i),
+		Created: storekit.At(i),
 	}
 }
 
@@ -39,7 +40,7 @@ var errBoom = errors.New("boom")
 func testTxCommit(t *testing.T, s store.Store) {
 	ctx := context.Background()
 	committed := false
-	must(t, s.Tx(ctx, func(ctx context.Context) error {
+	storekit.Must(t, s.Tx(ctx, func(ctx context.Context) error {
 		if _, err := s.Blobs().Ref(ctx, blob(1), 1); err != nil {
 			return err
 		}
@@ -52,7 +53,7 @@ func testTxCommit(t *testing.T, s store.Store) {
 	if !committed {
 		t.Fatal("AfterCommit did not run after the commit")
 	}
-	got := get[types.Blob](t)(s.Blobs().Get(ctx, blob(1).Checksums.SHA256))
+	got := storekit.Get[types.Blob](t)(s.Blobs().Get(ctx, blob(1).Checksums.SHA256))
 	if got.Refs != 1 {
 		t.Fatalf("refs = %d", got.Refs)
 	}
@@ -65,7 +66,7 @@ func testTxCommit(t *testing.T, s store.Store) {
 
 func testTxRollback(t *testing.T, s store.Store) {
 	ctx := context.Background()
-	get[types.Blob](t)(s.Blobs().Ref(ctx, blob(1), 1))
+	storekit.Get[types.Blob](t)(s.Blobs().Ref(ctx, blob(1), 1))
 	notified := false
 	err := s.Tx(ctx, func(ctx context.Context) error {
 		if _, err := s.Blobs().Ref(ctx, blob(2), 1); err != nil {
@@ -77,13 +78,17 @@ func testTxRollback(t *testing.T, s store.Store) {
 		s.AfterCommit(ctx, func() { notified = true })
 		return errBoom
 	})
-	wantErr(t, err, errBoom)
+	storekit.WantErr(t, err, errBoom)
 	if notified {
 		t.Fatal("AfterCommit ran after a rollback")
 	}
 	_, err = s.Blobs().Get(ctx, blob(2).Checksums.SHA256)
-	wantErr(t, err, store.ErrNotFound)
-	if got := get[types.Blob](t)(s.Blobs().Get(ctx, blob(1).Checksums.SHA256)); got.Refs != 1 {
+	storekit.WantErr(t, err, store.ErrNotFound)
+	if got := storekit.Get[types.Blob](
+		t,
+	)(
+		s.Blobs().Get(ctx, blob(1).Checksums.SHA256),
+	); got.Refs != 1 {
 		t.Fatalf("refs after rollback = %d, want 1", got.Refs)
 	}
 }
@@ -104,18 +109,18 @@ func testTxNested(t *testing.T, s store.Store) {
 			return errBoom
 		})
 	})
-	wantErr(t, err, errBoom)
+	storekit.WantErr(t, err, errBoom)
 	for _, i := range []int{1, 2} {
 		_, err := s.Blobs().Get(ctx, blob(i).Checksums.SHA256)
-		wantErr(t, err, store.ErrNotFound)
+		storekit.WantErr(t, err, store.ErrNotFound)
 	}
-	must(t, s.Tx(ctx, func(ctx context.Context) error {
+	storekit.Must(t, s.Tx(ctx, func(ctx context.Context) error {
 		return s.Tx(ctx, func(ctx context.Context) error {
 			_, err := s.Blobs().Ref(ctx, blob(3), 1)
 			return err
 		})
 	}))
-	get[types.Blob](t)(s.Blobs().Get(ctx, blob(3).Checksums.SHA256))
+	storekit.Get[types.Blob](t)(s.Blobs().Get(ctx, blob(3).Checksums.SHA256))
 }
 
 func testCancelled(t *testing.T, s store.Store) {
@@ -131,9 +136,9 @@ func testCancelled(t *testing.T, s store.Store) {
 
 func testBadCursor(t *testing.T, s store.Store) {
 	ctx := context.Background()
-	get[types.Blob](t)(s.Blobs().Ref(ctx, blob(1), 0))
+	storekit.Get[types.Blob](t)(s.Blobs().Ref(ctx, blob(1), 0))
 	_, _, err := s.Blobs().Unreferenced(ctx, store.Page{After: "%%%"})
-	wantErr(t, err, store.ErrInvalidCursor)
+	storekit.WantErr(t, err, store.ErrInvalidCursor)
 	_, _, err = s.Blobs().Unreferenced(ctx, store.Page{After: store.Cursor("a", "b")})
-	wantErr(t, err, store.ErrInvalidCursor)
+	storekit.WantErr(t, err, store.ErrInvalidCursor)
 }

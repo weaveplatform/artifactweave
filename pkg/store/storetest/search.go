@@ -9,6 +9,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql/aqltest"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/storekit"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -31,14 +32,14 @@ func testItemSearch(t *testing.T, st store.Store) {
 			// A root's record is made as setting a property on it makes it.
 			put = s.EnsureRoot
 		}
-		it := get[types.Item](t)(put(ctx, seed.Item))
+		it := storekit.Get[types.Item](t)(put(ctx, seed.Item))
 		key := aqltest.Paths([]aql.Hit{{Item: it}})[0]
 		if seed.Properties != nil {
-			must(t, s.SetProperties(ctx, it.ID, seed.Properties, base))
+			storekit.Must(t, s.SetProperties(ctx, it.ID, seed.Properties, storekit.Base))
 			props[key] = seed.Properties
 		}
 		if seed.Stats != nil {
-			must(t, s.PutStats(ctx, it.ID, *seed.Stats))
+			storekit.Must(t, s.PutStats(ctx, it.ID, *seed.Stats))
 			stats[key] = seed.Stats
 		}
 	}
@@ -46,9 +47,9 @@ func testItemSearch(t *testing.T, st store.Store) {
 	for _, c := range aqltest.Cases() {
 		t.Run(c.Name, func(t *testing.T) {
 			q, err := c.Parse()
-			must(t, err)
+			storekit.Must(t, err)
 			hits, err := s.Search(ctx, q, c.Options)
-			must(t, err)
+			storekit.Must(t, err)
 			if got := aqltest.Paths(hits); !slices.Equal(got, c.Want) {
 				t.Fatalf("got  %q\nwant %q", got, c.Want)
 			}
@@ -64,8 +65,8 @@ func testItemSearch(t *testing.T, st store.Store) {
 				if len(q.Stats()) > 0 {
 					wantStats = stats[key]
 				}
-				same(t, "properties of "+h.Item.FullPath(), wantProps, h.Properties)
-				same(t, "statistics of "+h.Item.FullPath(), wantStats, h.Stats)
+				storekit.Same(t, "properties of "+h.Item.FullPath(), wantProps, h.Properties)
+				storekit.Same(t, "statistics of "+h.Item.FullPath(), wantStats, h.Stats)
 			}
 		})
 	}
@@ -74,7 +75,7 @@ func testItemSearch(t *testing.T, st store.Store) {
 	cancelled, cancel := context.WithCancel(ctx)
 	cancel()
 	q, err := aql.Parse(`items.find()`)
-	must(t, err)
+	storekit.Must(t, err)
 	if _, err := s.Search(cancelled, q, aql.Options{}); err == nil {
 		t.Fatal("Search with a cancelled context succeeded")
 	}
@@ -89,43 +90,43 @@ func testRelatedSearch(t *testing.T, st store.Store) {
 	corpus := aqltest.Corpus()
 	render := func(res aql.Response) string {
 		b, err := json.Marshal(res)
-		must(t, err)
+		storekit.Must(t, err)
 		return string(b)
 	}
 	for _, c := range aqltest.RelatedCases() {
 		t.Run("related/"+c.Name, func(t *testing.T) {
 			q, err := c.Parse()
-			must(t, err)
+			storekit.Must(t, err)
 			var got, want string
 			if q.Domain == aql.DomainItems {
 				hits, err := st.Items().Search(ctx, q.ForNesting(), c.Options)
-				must(t, err)
+				storekit.Must(t, err)
 				rel, err := q.Nest(
 					ctx,
 					aql.AQLSource(st.Builds(), st.Items()),
 					aql.Nesting{Now: aqltest.Now},
 					hits,
 				)
-				must(t, err)
+				storekit.Must(t, err)
 				got = render(q.Response(hits).WithRelated(rel))
 				ref := aql.SelectItems(q.ForNesting(), c.Options, corpus)
 				rel, err = q.Nest(ctx, corpus, aql.Nesting{Now: aqltest.Now}, ref)
-				must(t, err)
+				storekit.Must(t, err)
 				want = render(q.Response(ref).WithRelated(rel))
 			} else {
 				hits, err := st.Builds().Search(ctx, q, c.Options)
-				must(t, err)
+				storekit.Must(t, err)
 				rel, err := q.NestBuilds(
 					ctx,
 					aql.AQLSource(st.Builds(), st.Items()),
 					aql.Nesting{},
 					hits,
 				)
-				must(t, err)
+				storekit.Must(t, err)
 				got = render(q.BuildResponse(hits).WithRelated(rel))
 				ref := aql.SelectBuilds(q, c.Options, corpus)
 				rel, err = q.NestBuilds(ctx, corpus, aql.Nesting{}, ref)
-				must(t, err)
+				storekit.Must(t, err)
 				want = render(q.BuildResponse(ref).WithRelated(rel))
 			}
 			if got != want {
@@ -154,10 +155,10 @@ func testRelatedSearch(t *testing.T, st store.Store) {
 func seedBuilds(t *testing.T, s store.BuildStore) {
 	ctx := context.Background()
 	for _, seed := range aqltest.BuildSeeds() {
-		b := get[types.Build](t)(s.Put(ctx, seed.Build))
+		b := storekit.Get[types.Build](t)(s.Put(ctx, seed.Build))
 		for _, p := range seed.Promotions {
 			p.BuildID = b.ID
-			get[types.BuildPromotion](t)(s.AddPromotion(ctx, p))
+			storekit.Get[types.BuildPromotion](t)(s.AddPromotion(ctx, p))
 		}
 	}
 }
@@ -171,10 +172,10 @@ func testBuildSearch(t *testing.T, s store.BuildStore) {
 	for _, c := range aqltest.BuildCases() {
 		t.Run(c.Name, func(t *testing.T) {
 			q, err := c.Parse()
-			must(t, err)
+			storekit.Must(t, err)
 			hits, err := s.Search(ctx, q, c.Options)
-			must(t, err)
-			same(t, "hits", aql.SelectBuilds(q, c.Options, corpus), hits)
+			storekit.Must(t, err)
+			storekit.Same(t, "hits", aql.SelectBuilds(q, c.Options, corpus), hits)
 			if got := aqltest.BuildRows(hits); !slices.Equal(got, c.Want) {
 				t.Fatalf("got  %q\nwant %q", got, c.Want)
 			}
@@ -183,12 +184,12 @@ func testBuildSearch(t *testing.T, s store.BuildStore) {
 	cancelled, cancel := context.WithCancel(ctx)
 	cancel()
 	q, err := aql.Parse(`builds.find()`)
-	must(t, err)
+	storekit.Must(t, err)
 	if _, err := s.Search(cancelled, q, aql.Options{}); err == nil {
 		t.Fatal("Search with a cancelled context succeeded")
 	}
 	q, err = aql.Parse(`items.find()`)
-	must(t, err)
+	storekit.Must(t, err)
 	if _, err := s.Search(ctx, q, aql.Options{}); !errors.Is(err, store.ErrInvalid) {
 		t.Fatalf("an items query on the build store: %v", err)
 	}

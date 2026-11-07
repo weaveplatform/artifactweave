@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/storekit"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -29,7 +30,7 @@ func testLongPropertyValues(t *testing.T, st store.Store) {
 	v1 := base + "a"
 	v2 := base + "b"
 	v3 := string([]rune(base)[:300]) + "!"
-	props := get[types.Properties](t)
+	props := storekit.Get[types.Properties](t)
 	set := map[string]types.Properties{
 		"r/a.txt": {"notes": {v1}},
 		"r/b.txt": {"notes": {v3}},
@@ -46,31 +47,41 @@ func testLongPropertyValues(t *testing.T, st store.Store) {
 	}
 	ids := map[string]int64{}
 	for n, path := range []string{"r/a.txt", "r/b.txt", "r/c.txt", "r/d.txt"} {
-		it := get[types.Item](t)(s.Put(ctx, fileItem("r", strings.TrimPrefix(path, "r/"), n+1)))
+		it := storekit.Get[types.Item](
+			t,
+		)(
+			s.Put(ctx, fileItem("r", strings.TrimPrefix(path, "r/"), n+1)),
+		)
 		ids[path] = it.ID
-		must(t, s.SetProperties(ctx, it.ID, set[path], at(1)))
-		same(t, "SetProperties "+path, want[path], props(s.Properties(ctx, it.ID)))
+		storekit.Must(t, s.SetProperties(ctx, it.ID, set[path], storekit.At(1)))
+		storekit.Same(t, "SetProperties "+path, want[path], props(s.Properties(ctx, it.ID)))
 	}
 	// A patch cuts too; a surrogate pair that would straddle the limit goes
 	// whole.
-	must(
+	storekit.Must(
 		t,
-		s.PatchProperties(ctx, ids["r/b.txt"], types.Properties{"pair": {base + "😀"}}, nil, at(2)),
+		s.PatchProperties(
+			ctx,
+			ids["r/b.txt"],
+			types.Properties{"pair": {base + "😀"}},
+			nil,
+			storekit.At(2),
+		),
 	)
-	same(t, "PatchProperties", types.Properties{"notes": {v3}, "pair": {base}},
+	storekit.Same(t, "PatchProperties", types.Properties{"notes": {v3}, "pair": {base}},
 		props(s.Properties(ctx, ids["r/b.txt"])))
 
 	quote := func(v string) string {
 		b, err := json.Marshal(v)
-		must(t, err)
+		storekit.Must(t, err)
 		return string(b)
 	}
 	find := func(criteria string) []string {
 		t.Helper()
 		q, err := aql.Parse(`items.find(` + criteria + `)`)
-		must(t, err)
+		storekit.Must(t, err)
 		hits, err := s.Search(ctx, q, aql.Options{})
-		must(t, err)
+		storekit.Must(t, err)
 		out := make([]string, len(hits))
 		for n, h := range hits {
 			out[n] = h.Item.RepoKey + "/" + h.Item.FullPath()
@@ -110,18 +121,23 @@ func testLongPropertyValues(t *testing.T, st store.Store) {
 	b := fxBuild("", "long", "1", 0)
 	b.Properties = types.Properties{"notes": {long + "past", long}}
 	b.Modules[0].Properties = types.Properties{"notes": {short + "😀"}}
-	run := get[types.Build](t)(st.Builds().Put(ctx, b))
-	got := get[types.Build](t)(st.Builds().ByID(ctx, run.ID))
-	same(t, "build properties", types.Properties{"notes": {long}}, got.Properties)
-	same(t, "module properties", types.Properties{"notes": {short}}, got.Modules[0].Properties)
+	run := storekit.Get[types.Build](t)(st.Builds().Put(ctx, b))
+	got := storekit.Get[types.Build](t)(st.Builds().ByID(ctx, run.ID))
+	storekit.Same(t, "build properties", types.Properties{"notes": {long}}, got.Properties)
+	storekit.Same(
+		t,
+		"module properties",
+		types.Properties{"notes": {short}},
+		got.Modules[0].Properties,
+	)
 	for _, criteria := range []string{
 		`{"@notes":` + quote(long) + `}`,
 		`{"module.@notes":{"$match":` + quote(string([]rune(short)[:5])+"*") + `}}`,
 	} {
 		q, err := aql.Parse(`builds.find(` + criteria + `)`)
-		must(t, err)
+		storekit.Must(t, err)
 		hits, err := st.Builds().Search(ctx, q, aql.Options{})
-		must(t, err)
+		storekit.Must(t, err)
 		if len(hits) != 1 || hits[0].Build.ID != run.ID {
 			t.Errorf("builds.find(%.40s…): %d hits", criteria, len(hits))
 		}
@@ -154,7 +170,7 @@ func testLongPropertyKeys(t *testing.T, st store.Store) {
 	key := wideText(types.PropertyKeyMax)
 	long := wideText(types.PropertyKeyMax + 1)
 	value := wideText(types.PropertyValueMax / 2)
-	props := get[types.Properties](t)
+	props := storekit.Get[types.Properties](t)
 	tooLong := func(what string, err error) {
 		t.Helper()
 		if !errors.Is(err, store.ErrInvalid) || !errors.Is(err, types.ErrPropertyKeyTooLong) {
@@ -162,19 +178,19 @@ func testLongPropertyKeys(t *testing.T, st store.Store) {
 		}
 	}
 
-	it := get[types.Item](t)(s.Put(ctx, fileItem("r", "keys.txt", 1)))
+	it := storekit.Get[types.Item](t)(s.Put(ctx, fileItem("r", "keys.txt", 1)))
 	want := types.Properties{key: {value}}
-	must(t, s.SetProperties(ctx, it.ID, want, at(1)))
-	same(t, "a key at the limit", want, props(s.Properties(ctx, it.ID)))
+	storekit.Must(t, s.SetProperties(ctx, it.ID, want, storekit.At(1)))
+	storekit.Same(t, "a key at the limit", want, props(s.Properties(ctx, it.ID)))
 	tooLong(
 		"SetProperties",
-		s.SetProperties(ctx, it.ID, types.Properties{"ok": {"1"}, long: {"1"}}, at(2)),
+		s.SetProperties(ctx, it.ID, types.Properties{"ok": {"1"}, long: {"1"}}, storekit.At(2)),
 	)
 	tooLong(
 		"PatchProperties",
-		s.PatchProperties(ctx, it.ID, types.Properties{long: {"1"}}, []string{key}, at(2)),
+		s.PatchProperties(ctx, it.ID, types.Properties{long: {"1"}}, []string{key}, storekit.At(2)),
 	)
-	same(t, "after the refused writes", want, props(s.Properties(ctx, it.ID)))
+	storekit.Same(t, "after the refused writes", want, props(s.Properties(ctx, it.ID)))
 
 	bs := st.Builds()
 	b := fxBuild("", "keys", "1", 0)
@@ -186,18 +202,23 @@ func testLongPropertyKeys(t *testing.T, st store.Store) {
 	_, err = bs.Put(ctx, b)
 	tooLong("Put with a module property", err)
 	_, err = bs.Latest(ctx, "", "keys")
-	wantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, store.ErrNotFound)
 	moduleValue := wideText(types.BuildPropertyValueMax / 2)
 	b.Modules[0].Properties = types.Properties{key: {moduleValue}}
-	run := get[types.Build](t)(bs.Put(ctx, b))
-	got := get[types.Build](t)(bs.ByID(ctx, run.ID))
-	same(t, "build properties", types.Properties{key: {"v"}}, got.Properties)
-	same(t, "module properties", types.Properties{key: {moduleValue}}, got.Modules[0].Properties)
+	run := storekit.Get[types.Build](t)(bs.Put(ctx, b))
+	got := storekit.Get[types.Build](t)(bs.ByID(ctx, run.ID))
+	storekit.Same(t, "build properties", types.Properties{key: {"v"}}, got.Properties)
+	storekit.Same(
+		t,
+		"module properties",
+		types.Properties{key: {moduleValue}},
+		got.Modules[0].Properties,
+	)
 	changed := got
 	changed.Properties = types.Properties{long: {"v"}}
 	tooLong("Replace", bs.Replace(ctx, changed))
-	same(t, "after the refused Replace", types.Properties{key: {"v"}},
-		get[types.Build](t)(bs.ByID(ctx, run.ID)).Properties)
+	storekit.Same(t, "after the refused Replace", types.Properties{key: {"v"}},
+		storekit.Get[types.Build](t)(bs.ByID(ctx, run.ID)).Properties)
 }
 
 // wideText returns n random characters of four bytes of UTF-8 each (emoji,

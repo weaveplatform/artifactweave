@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/storekit"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -35,9 +36,9 @@ func cleanupPolicy(key string, item types.CleanupItemType, project string) types
 			KeepLastNVersions:   3,
 			IncludedProperties:  map[string][]string{"stage": {"dev", "test"}},
 		},
-		Created:   at(0),
+		Created:   storekit.At(0),
 		CreatedBy: "admin",
-		Updated:   at(1),
+		Updated:   storekit.At(1),
 		UpdatedBy: "ann",
 	}
 }
@@ -49,58 +50,63 @@ func testCleanupPolicies(t *testing.T, s store.Store) {
 	k2 := cleanupPolicy("k2", types.CleanupBuild, "")
 	k3 := cleanupPolicy("k3", types.CleanupPackage, "p1")
 	for _, p := range []types.CleanupPolicy{k3, k2, k1} {
-		must(t, cs.CreatePolicy(ctx, p))
+		storekit.Must(t, cs.CreatePolicy(ctx, p))
 	}
-	wantErr(t, cs.CreatePolicy(ctx, k1), store.ErrConflict)
-	same(t, "Policy", k1, get[types.CleanupPolicy](t)(cs.Policy(ctx, "k1")))
+	storekit.WantErr(t, cs.CreatePolicy(ctx, k1), store.ErrConflict)
+	storekit.Same(t, "Policy", k1, storekit.Get[types.CleanupPolicy](t)(cs.Policy(ctx, "k1")))
 	_, err := cs.Policy(ctx, "nope")
-	wantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, store.ErrNotFound)
 
 	policies := func(f store.PolicyFilter) []types.CleanupPolicy {
-		return get[[]types.CleanupPolicy](t)(cs.Policies(ctx, f))
+		return storekit.Get[[]types.CleanupPolicy](t)(cs.Policies(ctx, f))
 	}
-	same(t, "all", []types.CleanupPolicy{k1, k2, k3}, policies(store.PolicyFilter{}))
-	same(
+	storekit.Same(t, "all", []types.CleanupPolicy{k1, k2, k3}, policies(store.PolicyFilter{}))
+	storekit.Same(
 		t,
 		"packages",
 		[]types.CleanupPolicy{k1, k3},
 		policies(store.PolicyFilter{ItemType: types.CleanupPackage}),
 	)
-	same(
+	storekit.Same(
 		t,
 		"builds",
 		[]types.CleanupPolicy{k2},
 		policies(store.PolicyFilter{ItemType: types.CleanupBuild}),
 	)
-	same(
+	storekit.Same(
 		t,
 		"project",
 		[]types.CleanupPolicy{k1, k3},
 		policies(store.PolicyFilter{ProjectKey: "p1"}),
 	)
 
-	got := get[types.CleanupPolicy](t)(cs.Policy(ctx, "k1"))
+	got := storekit.Get[types.CleanupPolicy](t)(cs.Policy(ctx, "k1"))
 	got.Criteria.IncludedProperties["stage"][0] = "mutated"
-	same(t, "Policy is a copy", k1, get[types.CleanupPolicy](t)(cs.Policy(ctx, "k1")))
+	storekit.Same(
+		t,
+		"Policy is a copy",
+		k1,
+		storekit.Get[types.CleanupPolicy](t)(cs.Policy(ctx, "k1")),
+	)
 
-	k1.Enabled, k1.Criteria, k1.Updated = false, types.CleanupCriteria{}, at(9)
-	must(t, cs.UpdatePolicy(ctx, k1))
-	same(t, "after Update", k1, get[types.CleanupPolicy](t)(cs.Policy(ctx, "k1")))
-	wantErr(
+	k1.Enabled, k1.Criteria, k1.Updated = false, types.CleanupCriteria{}, storekit.At(9)
+	storekit.Must(t, cs.UpdatePolicy(ctx, k1))
+	storekit.Same(t, "after Update", k1, storekit.Get[types.CleanupPolicy](t)(cs.Policy(ctx, "k1")))
+	storekit.WantErr(
 		t,
 		cs.UpdatePolicy(ctx, cleanupPolicy("nope", types.CleanupPackage, "")),
 		store.ErrNotFound,
 	)
 
-	must(t, cs.DeletePolicy(ctx, "k1"))
-	wantErr(t, cs.DeletePolicy(ctx, "k1"), store.ErrNotFound)
-	same(t, "after delete", []types.CleanupPolicy{k2, k3}, policies(store.PolicyFilter{}))
+	storekit.Must(t, cs.DeletePolicy(ctx, "k1"))
+	storekit.WantErr(t, cs.DeletePolicy(ctx, "k1"), store.ErrNotFound)
+	storekit.Same(t, "after delete", []types.CleanupPolicy{k2, k3}, policies(store.PolicyFilter{}))
 }
 
 func testCleanupRuns(t *testing.T, s store.Store) {
 	ctx := context.Background()
 	cs := s.Cleanup()
-	must(t, cs.CreatePolicy(ctx, cleanupPolicy("a", types.CleanupPackage, "")))
+	storekit.Must(t, cs.CreatePolicy(ctx, cleanupPolicy("a", types.CleanupPackage, "")))
 	statuses := []types.RunStatus{
 		types.RunCompleted,
 		types.RunFailed,
@@ -118,7 +124,7 @@ func testCleanupRuns(t *testing.T, s store.Store) {
 			DryRun:      i%2 == 0,
 			Manual:      i == 1,
 			TriggeredBy: "scheduler",
-			Started: at(
+			Started: storekit.At(
 				i,
 			),
 			TotalItems:   int64(10 * i),
@@ -130,59 +136,70 @@ func testCleanupRuns(t *testing.T, s store.Store) {
 			r.PolicyKey, r.ItemType = "b", types.CleanupBuild
 		}
 		if st != types.RunInProgress {
-			r.Ended = at(i).Add(30 * time.Second)
+			r.Ended = storekit.At(i).Add(30 * time.Second)
 		}
-		got := get[types.CleanupRun](t)(cs.CreateRun(ctx, r))
+		got := storekit.Get[types.CleanupRun](t)(cs.CreateRun(ctx, r))
 		if i > 0 && got.ID <= runs[i-1].ID {
 			t.Fatalf("run ID %d after %d", got.ID, runs[i-1].ID)
 		}
 		r.ID = got.ID
-		same(t, "CreateRun", r, got)
+		storekit.Same(t, "CreateRun", r, got)
 		runs = append(runs, r)
 	}
-	same(t, "Run", runs[2], get[types.CleanupRun](t)(cs.Run(ctx, runs[2].ID)))
+	storekit.Same(t, "Run", runs[2], storekit.Get[types.CleanupRun](t)(cs.Run(ctx, runs[2].ID)))
 	_, err := cs.Run(ctx, runs[4].ID+100)
-	wantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, store.ErrNotFound)
 
-	runs[2].Status, runs[2].Ended, runs[2].Report = types.RunCompletedWithErrors, at(20), nil
-	must(t, cs.UpdateRun(ctx, runs[2]))
-	same(t, "after UpdateRun", runs[2], get[types.CleanupRun](t)(cs.Run(ctx, runs[2].ID)))
-	wantErr(t, cs.UpdateRun(ctx, types.CleanupRun{ID: runs[4].ID + 100}), store.ErrNotFound)
+	runs[2].Status, runs[2].Ended, runs[2].Report = types.RunCompletedWithErrors, storekit.At(
+		20,
+	), nil
+	storekit.Must(t, cs.UpdateRun(ctx, runs[2]))
+	storekit.Same(
+		t,
+		"after UpdateRun",
+		runs[2],
+		storekit.Get[types.CleanupRun](t)(cs.Run(ctx, runs[2].ID)),
+	)
+	storekit.WantErr(
+		t,
+		cs.UpdateRun(ctx, types.CleanupRun{ID: runs[4].ID + 100}),
+		store.ErrNotFound,
+	)
 
 	// Deleting the policy keeps its runs for the run views.
-	must(t, cs.DeletePolicy(ctx, "a"))
+	storekit.Must(t, cs.DeletePolicy(ctx, "a"))
 	list := func(f store.RunFilter) []types.CleanupRun {
-		return pages(
+		return storekit.Pages(
 			t,
 			2,
 			func(p store.Page) ([]types.CleanupRun, string, error) { return cs.Runs(ctx, f, p) },
 		)
 	}
-	same(
+	storekit.Same(
 		t,
 		"newest first",
 		[]types.CleanupRun{runs[4], runs[3], runs[2], runs[1], runs[0]},
 		list(store.RunFilter{}),
 	)
-	same(
+	storekit.Same(
 		t,
 		"by policy",
 		[]types.CleanupRun{runs[3], runs[2], runs[1], runs[0]},
 		list(store.RunFilter{PolicyKey: "a"}),
 	)
-	same(
+	storekit.Same(
 		t,
 		"by item type",
 		[]types.CleanupRun{runs[4]},
 		list(store.RunFilter{ItemType: types.CleanupBuild}),
 	)
-	same(t, "by status", []types.CleanupRun{runs[3], runs[1], runs[0]},
+	storekit.Same(t, "by status", []types.CleanupRun{runs[3], runs[1], runs[0]},
 		list(store.RunFilter{Statuses: []types.RunStatus{types.RunCompleted, types.RunFailed}}))
 
 	_, _, err = cs.Runs(ctx, store.RunFilter{}, store.Page{After: store.Cursor("x")})
-	wantErr(t, err, store.ErrInvalidCursor)
+	storekit.WantErr(t, err, store.ErrInvalidCursor)
 
-	same(t, "LastRun", runs[3], get[types.CleanupRun](t)(cs.LastRun(ctx, "a")))
+	storekit.Same(t, "LastRun", runs[3], storekit.Get[types.CleanupRun](t)(cs.LastRun(ctx, "a")))
 	_, err = cs.LastRun(ctx, "nope")
-	wantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, store.ErrNotFound)
 }
