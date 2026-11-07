@@ -1,7 +1,6 @@
 package dialect
 
 import (
-	"io/fs"
 	"strconv"
 	"strings"
 )
@@ -16,9 +15,12 @@ type Dialect struct {
 	// ForUpdate is appended to row-locking SELECTs inside transactions, or
 	// empty when the engine serialises writers (SQLite).
 	ForUpdate string
-	// Migrations holds NNNN_name.sql files with "-- +up" and "-- +down"
-	// sections.
-	Migrations fs.FS
+	// Columns is a query that lists the column names of the table its one
+	// "?" parameter names, in the current schema only, so the migrator can
+	// tell a history table that predates the per-module streams from a
+	// missing one without writing anything (ErrLegacyHistory). Rebind
+	// converts its placeholder.
+	Columns string
 	// IsUniqueViolation reports whether err is the engine's unique or
 	// primary-key constraint error, so the store returns kernel.ErrConflict
 	// instead of a driver error when two writers race for one key.
@@ -80,7 +82,8 @@ func Upsert(table string, cols, key []string) string {
 // InsertIgnore renders INSERT ... ON CONFLICT (key) DO NOTHING, or ON
 // CONFLICT DO NOTHING for any unique index when key is empty: a target must
 // name a unique index's exact columns, and the property tables' differ
-// between dialects (PostgreSQL migration 0013).
+// between dialects (the PostgreSQL artifacts baseline keys a digest of the
+// value, SQLite the whole value).
 func InsertIgnore(table string, cols, key []string) string {
 	if len(key) == 0 {
 		return Insert(table, cols) + " ON CONFLICT DO NOTHING"

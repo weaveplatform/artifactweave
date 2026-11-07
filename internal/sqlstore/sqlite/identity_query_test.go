@@ -4,7 +4,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -21,14 +20,13 @@ func TestAccIdentityPagingAtScale(t *testing.T) {
 
 func TestAccIdentitySearchUpgrade(t *testing.T) {
 	ctx := t.Context()
-	path := filepath.Join(t.TempDir(), "legacy.db")
+	path := filepath.Join(t.TempDir(), "identity.db")
 	s, err := sqlite.Open(ctx, path, sqlite.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := sqlcommon.Rollback(ctx, s.DB(), sqlite.Dialect, 17); err != nil {
-		t.Fatal(err)
-	}
+	// Rows with no search name, which the access module's AfterMigrate hook
+	// fills at the next open.
 	for _, query := range []string{
 		"INSERT INTO users (name) VALUES ('ÉLODIE_%')",
 		"INSERT INTO user_groups (name) VALUES ('ÉQUIPE_%')",

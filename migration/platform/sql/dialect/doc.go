@@ -1,9 +1,10 @@
 // Package dialect is the SQL layer that every SQL store is built on: the
 // Dialect that describes what differs between engines, the unit of work that
-// a context carries over one *sql.DB, the migrator, Store, the handle whose
-// helpers run statements, encode columns, page lists and seal secret
-// columns, and the registration through which key rotation reaches every
-// module's sealed columns.
+// a context carries over one *sql.DB, the migrator of the modules' migration
+// streams, Store, the handle whose helpers run statements, encode columns,
+// page lists and seal secret columns, and the registration through which
+// the migrator and key rotation reach every module's stream and sealed
+// columns.
 //
 // # Role
 //
@@ -11,9 +12,9 @@
 // reseal engine that every module SQL adapter uses. One unit of work spans
 // every module store (decision 0044, "Persistence"), so the platform owns it,
 // with the dialect layer and the migrator. The SQLite and PostgreSQL drivers
-// each declare a Dialect with their embedded migrations; the module SQL
-// adapters are built over one Store, call its helpers and describe the
-// columns they seal in a Module each. The reseal engine sits beside the
+// each declare a Dialect; the module SQL adapters are built over one Store,
+// call its helpers, and register in a Module each their migration stream,
+// the columns they seal and their hooks. The reseal engine sits beside the
 // keyring because re-sealing opens and seals values, and the keyring never
 // leaves the package. The package imports only the kernel, for its sentinels
 // and paging, and platform/crypt, for the keyring.
@@ -21,14 +22,16 @@
 // # Inputs
 //
 //   - An open *sql.DB and the engine's Dialect: its placeholder style, its
-//     row-lock suffix, its migrations and its test for a unique violation.
+//     row-lock suffix, its query for a table's columns and its test for a
+//     unique violation.
 //   - A *crypt.Keyring for the sealed columns, or nil.
-//   - Each module's registration, in the canonical module order: the sealed
-//     columns its store writes, and a hook to run before them.
+//   - Each module's registration, in the canonical module order: its
+//     migration stream, the sealed columns its store writes, a hook to run
+//     before them and a hook to run after migrating.
 //   - Statements written with "?" placeholders, which Rebind converts to $1
 //     style for PostgreSQL.
 //   - Migration files named NNNN_name.sql, with "-- +up" and "-- +down"
-//     sections.
+//     sections, in a directory per dialect named like the dialect.
 //
 // # Outputs
 //
@@ -43,9 +46,12 @@
 //     FromJSON, RawJSON, FromRaw, NullString and EntBytes. Keyset paging:
 //     Keyset, OrderBy, Itoa and LimitOr. Scanning: EntRow, PeersScanner and
 //     OpsCols.
-//   - The migrator: Migration, LoadMigrations, Migrate, Rollback, Version and
-//     MustSub.
-//   - ErrTransaction, ErrMigration and ErrNoKeyring.
+//   - The migrator: Migration, LoadMigrations, Migrate, Rollback, Version,
+//     Applied, StreamVersion and MustSub. Migrate, Rollback and Version take
+//     the module list, and Migrate and Rollback can work on one stream.
+//   - ErrTransaction, ErrMigration, ErrNoKeyring, and the migrator's
+//     refusals ErrLegacyHistory, ErrUnknownModule and ErrModuleRequired,
+//     which wrap ErrMigration.
 //
 // # Invariants
 //
@@ -90,11 +96,21 @@
 //     cursor binds the parts of integer columns as integers (Keyset), so a
 //     cursor means the same position on every store, the in-memory ones
 //     included.
-//   - The schema_migrations table, its columns and the statements the
-//     migrator runs on it, and the SQL text the helpers render, are persisted
-//     or observed by the engines. Error and panic texts reach operators and
-//     logs, the "sqlcommon:" prefix of the sentinels and panics included. All
-//     of them stay byte-identical.
+//   - Each module's migrations are recorded in schema_migrations under the
+//     module's name, keyed by (module, version), and every stream numbers its
+//     versions from 1 on its own. Migrate applies the streams in the order of
+//     the module list, the canonical module order (decision 0044,
+//     "Persistence"), and Rollback reverts them in the reverse order, so a
+//     table is created before any later stream's and dropped after it.
+//   - A schema_migrations table without a module column predates the
+//     streams. Migrate, Rollback and Version refuse it with ErrLegacyHistory
+//     before writing anything, through the dialect's Columns query: there is
+//     no upgrade path, and such a database is recreated.
+//   - The SQL text the helpers render is observed by the engines, and error
+//     and panic texts reach operators and logs, the "sqlcommon:" prefix of
+//     the sentinels and panics included. They stay byte-identical, except
+//     the migrator's step errors, which name the module because every stream
+//     has a 1_baseline.
 //
 // # References
 //
@@ -105,14 +121,17 @@
 //     (sealed columns, with the purpose and the row identity as additional
 //     authenticated data).
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md
-//     ("Persistence": one unit of work for every module store, one *sql.DB
-//     with platform/sql/dialect; "Names the migration introduces").
+//     ("Persistence": per-module migration streams in the canonical module
+//     order, refused legacy histories, one unit of work for every module
+//     store, one *sql.DB with platform/sql/dialect; "Names the migration
+//     introduces").
 //   - Research 15: docs/research/15-data-model.md, section 4 (the derived
 //     storage model and its column conventions).
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     lines 130 and 131 (platform/sql/dialect), line 483 and line 583 (its
 //     files), line 579 (the platform owns the dialect layer, the unit of work
-//     and the migrator), line 917 (Tx opens the unit of work through it),
+//     and the migrator), lines 624 to 633 (one migration stream per module,
+//     recorded by module), line 917 (Tx opens the unit of work through it),
 //     line 1042 (the mapping row) and lines 1091 to 1094 (the unit of work
 //     is platform-level and context-carried).
 //   - Plan: docs/implementation/plan.md#p2-stores, task 2, and
@@ -120,6 +139,7 @@
 //     (https://github.com/weaveplatform/artifactweave/issues/939).
 //   - https://github.com/weaveplatform/artifactweave/issues/992
 //   - https://github.com/weaveplatform/artifactweave/issues/993
+//   - https://github.com/weaveplatform/artifactweave/issues/994
 //
 // # Status
 //
@@ -131,25 +151,35 @@
 // gathered into one file (issue 959, pull request 1122), and the layer leaves
 // the SQL stores' shared package for this one, exported for the module SQL
 // adapters (issue 992). The reseal engine joins the keyring here, and each
-// module registers its sealed columns (issue 993).
+// module registers its sealed columns (issue 993). Each module registers its
+// own migration stream, which replaces the global history, and the migrator
+// records the streams by module and refuses an older history (issue 994).
 //
 // # Testing
 //
 //   - The metadata store's contract suite on SQLite and PostgreSQL
 //     (TestAccContractFile, TestAccContractMemory and TestAccContract), the
 //     SQL stores' fault tests, TestAccKeyRotation and TestAccMigrationsUpDownUp
-//     run every helper through the SQL stores.
+//     run every helper through the SQL stores. TestAccSchemaGolden,
+//     TestAccLegacyHistoryRefused and TestAccStreamsMigrateAlone run the
+//     migrator over the modules' streams on the real engines.
 //   - TestAccTxDroppedInnerErrorFailsOuter covers the nested case that the
 //     contract suite leaves out, and TestAccTxJoinsTheTransactionOfItsPool
 //     the pool the unit of work is keyed to.
 //   - TestAccMigratorStopsAtAFailingStep,
-//     TestAccMigratorRecordsEachStepInItsTransaction and
-//     TestAccMigratorReportsAnUnreadableVersionTable run the migrator on
-//     SQLite, through modernc.org/sqlite, which the test package registers.
+//     TestAccMigratorRecordsEachStepInItsTransaction,
+//     TestAccMigratorReportsAnUnreadableVersionTable,
+//     TestAccMigratorFollowsTheModuleOrder, TestAccMigratorMovesOneStream,
+//     TestAccMigratorLeavesOtherModulesAlone and
+//     TestAccMigratorRefusesALegacyHistory run the migrator over streams in
+//     memory on SQLite, through modernc.org/sqlite, which the test package
+//     registers.
 //   - TestUnitLoadMigrationsReadsSections and
 //     TestUnitLoadMigrationsRejectsMalformedFiles parse migrations from file
-//     systems in memory, and TestUnitMustSubPanicsOnInvalidDirectory checks
-//     MustSub's refusal.
+//     systems in memory, TestUnitMustSubPanicsOnInvalidDirectory checks
+//     MustSub's refusal, TestUnitMigratorChecksItsArguments the refusals
+//     that come before the database is touched, and TestUnitAppliedString
+//     the form the migrate command prints.
 //   - TestUnitTxReportsCommitFailure, TestUnitMigratorReportsDriverFaults,
 //     TestUnitMigratorReportsUnreadableMigrations and
 //     TestUnitStoreReportsDriverFaults use a database/sql driver whose named

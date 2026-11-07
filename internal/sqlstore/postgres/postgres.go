@@ -4,7 +4,6 @@ package postgres
 
 import (
 	"context"
-	"embed"
 	"errors"
 	"fmt"
 	"time"
@@ -16,9 +15,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 )
 
-//go:embed migrations/*.sql
-var migrationFS embed.FS
-
 // ErrDSNRequired is returned by Open for an empty DSN.
 var ErrDSNRequired = errors.New("postgres: dsn is required")
 
@@ -27,10 +23,14 @@ const uniqueViolation = "23505"
 
 // Dialect is PostgreSQL's sqlcommon.Dialect.
 var Dialect = sqlcommon.Dialect{
-	Name:              "postgres",
-	Dollar:            true,
-	ForUpdate:         "FOR UPDATE",
-	Migrations:        sqlcommon.MustSub(migrationFS, "migrations"),
+	Name:      "postgres",
+	Dollar:    true,
+	ForUpdate: "FOR UPDATE",
+	// current_schema() is the first schema of the search_path, the one an
+	// unqualified CREATE TABLE writes to, so a scratch schema selected in
+	// the DSN sees only its own history table.
+	Columns: "SELECT column_name FROM information_schema.columns " +
+		"WHERE table_schema = current_schema() AND table_name = ?",
 	IsUniqueViolation: IsUniqueViolation,
 }
 

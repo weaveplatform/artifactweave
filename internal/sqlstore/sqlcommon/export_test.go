@@ -5,7 +5,7 @@ package sqlcommon
 // order and with any repeat kept.
 func SealedPurposes() []string {
 	var out []string
-	for _, m := range modules() {
+	for _, m := range Modules() {
 		for _, c := range m.Sealed {
 			out = append(out, c.Purpose)
 		}
@@ -17,7 +17,7 @@ func SealedPurposes() []string {
 // external tests.
 func ModuleNames() []string {
 	var out []string
-	for _, m := range modules() {
+	for _, m := range Modules() {
 		out = append(out, m.Name)
 	}
 	return out

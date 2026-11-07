@@ -10,7 +10,6 @@ package sqlite
 import (
 	"context"
 	"database/sql"
-	"embed"
 	"errors"
 	"fmt"
 	"net/url"
@@ -23,9 +22,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 )
 
-//go:embed migrations/*.sql
-var migrationFS embed.FS
-
 // ErrPathRequired is returned by Open for an empty path.
 var ErrPathRequired = errors.New("sqlite: path is required")
 
@@ -34,8 +30,10 @@ const Memory = ":memory:"
 
 // Dialect is SQLite's sqlcommon.Dialect.
 var Dialect = sqlcommon.Dialect{
-	Name:              "sqlite",
-	Migrations:        sqlcommon.MustSub(migrationFS, "migrations"),
+	Name: "sqlite",
+	// The table-valued form of PRAGMA table_info, so the table name binds
+	// as a parameter.
+	Columns:           "SELECT name FROM pragma_table_info(?)",
 	IsUniqueViolation: IsUniqueViolation,
 }
 

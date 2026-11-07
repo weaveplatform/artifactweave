@@ -158,18 +158,24 @@ func TestAccMigrationsUpDownUp(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = s.Close() }()
-	cur, latest, err := sqlcommon.Version(ctx, s.DB(), sqlite.Dialect)
-	if err != nil || cur != latest || latest == 0 {
-		t.Fatalf("Version = %d, %d, %v", cur, latest, err)
+	mods := sqlcommon.Modules()
+	streams, err := sqlcommon.Version(ctx, s.DB(), sqlite.Dialect, mods)
+	if err != nil || len(streams) != len(mods) {
+		t.Fatalf("Version = %v, %v", streams, err)
+	}
+	for _, v := range streams {
+		if v.Current != v.Latest || v.Latest == 0 {
+			t.Errorf("stream %s at version %d of %d after Open", v.Module, v.Current, v.Latest)
+		}
 	}
 	// Versions may skip numbers (parallel branches reserve them), so count
 	// the applied migrations rather than assuming 1..latest.
 	var applied int
 	if err := s.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM schema_migrations").
-		Scan(&applied); err != nil || applied == 0 {
+		Scan(&applied); err != nil || applied < len(mods) {
 		t.Fatalf("applied migrations = %d, %v", applied, err)
 	}
-	down, err := sqlcommon.Rollback(ctx, s.DB(), sqlite.Dialect, 0)
+	down, err := sqlcommon.Rollback(ctx, s.DB(), sqlite.Dialect, mods, "", 0)
 	if err != nil || len(down) != applied {
 		t.Fatalf("Rollback = %v, %v", down, err)
 	}
@@ -181,10 +187,33 @@ func TestAccMigrationsUpDownUp(t *testing.T) {
 		Scan(&n); err != nil || n != 0 {
 		t.Fatalf("%d tables left after rolling back, %v", n, err)
 	}
-	up, err := sqlcommon.Migrate(ctx, s.DB(), sqlite.Dialect)
+	up, err := sqlcommon.Migrate(ctx, s.DB(), sqlite.Dialect, mods, "")
 	if err != nil || len(up) != applied {
 		t.Fatalf("Migrate = %v, %v", up, err)
 	}
+	// The streams applied again build the schema a fresh database has.
+	golden := filepath.Join("testdata", "schema.golden")
+	sqltest.SchemaGolden(t, s.DB(), sqlite.Dialect.Name, golden, false)
+}
+
+// TestAccLegacyHistoryRefused opens a database whose history predates the
+// per-module migration streams: the store and the migrator refuse it and
+// write nothing.
+func TestAccLegacyHistoryRefused(t *testing.T) {
+	ctx := t.Context()
+	path := filepath.Join(t.TempDir(), "legacy.db")
+	s, err := sqlite.Open(ctx, path, sqlite.Options{Options: sqlcommon.Options{SkipMigrate: true}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	sqltest.LegacyHistoryRefused(t, s.DB(), sqlite.Dialect, func() error {
+		refused, err := sqlite.Open(ctx, path, sqlite.Options{})
+		if err == nil {
+			_ = refused.Close()
+		}
+		return err
+	})
 }
 
 func TestAccOpenErrors(t *testing.T) {

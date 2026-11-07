@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"io/fs"
 	"strings"
 )
 
@@ -28,18 +29,28 @@ type SealedColumn struct {
 // key column, such as a table keyed by name alone.
 func FirstKey(k []string) string { return k[0] }
 
-// Module is one module's registration with the SQL layer: its Name, one of
-// the canonical module names, the Sealed columns its store writes, and
-// BeforeReseal, which Reseal runs, when it is set, before the module's
-// columns, for work such as a backfill that seals values first; the count
-// it returns is added to Reseal's. The module SQL adapters register each
-// module once, in the canonical module order (decision 0044,
-// "Persistence"): platform, artifacts, access, notifications, retention,
-// federation, releases, workers.
+// Module is one module's registration with the SQL layer. Name is one of
+// the canonical module names, and keys the module's rows in the migration
+// history. Migrations is the module's migration stream: a directory per
+// dialect, named like the dialect ("sqlite", "postgres"), of NNNN_name.sql
+// files, or nil for a module with no tables. Sealed lists the sealed columns
+// its store writes. BeforeReseal, when it is set, runs before the module's
+// columns in Reseal, for work such as a backfill that seals values first;
+// the count it returns is added to Reseal's. AfterMigrate, when it is set,
+// runs after Migrate each time the store opens with migrations, for work DDL
+// cannot do: a conversion that seals values with the configured keyring,
+// because DDL never sees key material (decision 0017), or one that needs Go
+// rather than the engine to fold text (decision 0043). The module SQL
+// adapters register each module once, in the canonical module order
+// (decision 0044, "Persistence"): platform, artifacts, access,
+// notifications, retention, federation, releases, workers. Migrate,
+// Rollback, Version and Reseal take the modules in that order.
 type Module struct {
 	Name         string
+	Migrations   fs.FS
 	Sealed       []SealedColumn
 	BeforeReseal func(ctx context.Context, s *Store) (int, error)
+	AfterMigrate func(ctx context.Context, s *Store) error
 }
 
 // sealedRow is one value read for re-sealing, with its key values as the

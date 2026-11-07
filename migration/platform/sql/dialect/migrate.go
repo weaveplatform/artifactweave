@@ -15,8 +15,33 @@ import (
 // ErrMigration reports a malformed or failing migration.
 var ErrMigration = errors.New("sqlcommon: migration")
 
-// migrationsTable records the applied schema versions.
+// ErrLegacyHistory reports a database whose schema_migrations table has no
+// module column: its history predates the per-module streams, so its versions
+// cannot be matched to them. The migrator refuses it before writing anything,
+// and there is no upgrade path (decision 0044, "Persistence"): such a database
+// is recreated. It wraps ErrMigration.
+var ErrLegacyHistory = fmt.Errorf(
+	"%w: database history predates per-module migrations; not upgraded", ErrMigration)
+
+// ErrUnknownModule reports a module name that none of the modules passed to
+// the migrator has. The error names it. It wraps ErrMigration.
+var ErrUnknownModule = fmt.Errorf("%w: unknown module", ErrMigration)
+
+// ErrModuleRequired reports a rollback to a version other than 0 with no
+// module: each stream numbers its versions on its own, so a version names a
+// point in one stream only. It wraps ErrMigration.
+var ErrModuleRequired = fmt.Errorf("%w: a target version other than 0 needs a module", ErrMigration)
+
+// migrationsTable records the applied migrations of every stream.
 const migrationsTable = "schema_migrations"
+
+// The statements that record a migration in the history and remove it, with
+// "?" placeholders for Rebind.
+const (
+	recordMigration = "INSERT INTO " + migrationsTable +
+		" (module, version, name, applied_at) VALUES (?, ?, ?, ?)"
+	forgetMigration = "DELETE FROM " + migrationsTable + " WHERE module = ? AND version = ?"
+)
 
 // Migration is one parsed migration file: the version and name its file name
 // gives, and the statements of its up and down sections.
@@ -130,108 +155,247 @@ func splitStatements(text string) []string {
 	return out
 }
 
-// Migrate applies every pending migration in order, each in its own
-// transaction with the row that records its version, and returns the versions
-// applied. It creates the version table when it is absent. On a failure it
-// returns the versions applied before it and an error that wraps ErrMigration
-// and names the migration and the first line of a failing statement.
-func Migrate(ctx context.Context, db *sql.DB, d Dialect) ([]int, error) {
-	ms, applied, err := state(ctx, db, d)
+// Applied names one migration of one stream: the Module whose stream holds
+// it and its Version.
+type Applied struct {
+	Module  string
+	Version int
+}
+
+// String returns the module and the version as "module:version", the form
+// the migrate command prints, such as "platform:1".
+func (a Applied) String() string { return a.Module + ":" + strconv.Itoa(a.Version) }
+
+// StreamVersion is one module's stream: the highest version its history
+// records, Current (0 when none), and the highest version the stream holds,
+// Latest, so a caller can report a pending schema.
+type StreamVersion struct {
+	Module          string
+	Current, Latest int
+}
+
+// Migrate applies every pending migration of each module's stream, the
+// streams in the order of mods and each stream by version, and returns the
+// migrations applied. When only is set it applies that module's stream
+// alone, and a name that no module has fails with ErrUnknownModule. Each
+// migration runs in its own transaction with the row that records it. On a
+// failure it returns the migrations applied before it and an error that
+// wraps ErrMigration and names the module, the migration and the first line
+// of a failing statement.
+//
+// Like Rollback and Version, it first loads every stream and then reads the
+// history table's columns: a table with no module column fails with
+// ErrLegacyHistory, and nothing has been written to the database. Only then
+// does it create the history table when it is absent.
+func Migrate(
+	ctx context.Context,
+	db *sql.DB,
+	d Dialect,
+	mods []Module,
+	only string,
+) ([]Applied, error) {
+	if only != "" && !hasModule(mods, only) {
+		return nil, fmt.Errorf("%w %q", ErrUnknownModule, only)
+	}
+	streams, err := state(ctx, db, d, mods)
 	if err != nil {
 		return nil, err
 	}
-	var done []int
-	for _, m := range ms {
-		if applied[m.Version] {
+	var done []Applied
+	for _, s := range streams {
+		if only != "" && s.module != only {
 			continue
 		}
-		err := step(ctx, db, m.Up, func(tx *sql.Tx) error {
-			_, err := tx.ExecContext(ctx, d.Rebind(
-				"INSERT INTO "+migrationsTable+" (version, name, applied_at) VALUES (?, ?, ?)"),
-				m.Version, m.Name, time.Now().UTC().UnixMicro())
-			return err //nolint:wrapcheck // wrapped by step
-		})
-		if err != nil {
-			return done, fmt.Errorf("%w: %d_%s: %w", ErrMigration, m.Version, m.Name, err)
+		for _, m := range s.migrations {
+			if s.applied[m.Version] {
+				continue
+			}
+			err := step(ctx, db, m.Up, func(tx *sql.Tx) error {
+				_, err := tx.ExecContext(ctx, d.Rebind(recordMigration),
+					s.module, m.Version, m.Name, time.Now().UTC().UnixMicro())
+				return err //nolint:wrapcheck // wrapped by step
+			})
+			if err != nil {
+				return done, fmt.Errorf("%w: %s: %w", ErrMigration, s.label(m), err)
+			}
+			done = append(done, Applied{Module: s.module, Version: m.Version})
 		}
-		done = append(done, m.Version)
 	}
 	return done, nil
 }
 
-// Rollback reverts applied migrations newer than target (0 reverts all),
-// newest first, each in its own transaction with the removal of its version,
-// and returns the versions reverted. On a failure it returns the versions
-// reverted before it and an error that wraps ErrMigration.
-func Rollback(ctx context.Context, db *sql.DB, d Dialect, target int) ([]int, error) {
-	ms, applied, err := state(ctx, db, d)
+// Rollback reverts the applied migrations of module's stream that are newer
+// than target, newest first, and returns the migrations reverted. With no
+// module it reverts every stream, the streams in the reverse order of mods,
+// and accepts only target 0: any other target fails with ErrModuleRequired.
+// A module that none of mods has fails with ErrUnknownModule. Each migration
+// is reverted in its own transaction with the removal of its row. On a
+// failure it returns the migrations reverted before it and an error that
+// wraps ErrMigration. It refuses a legacy history as Migrate does.
+func Rollback(
+	ctx context.Context,
+	db *sql.DB,
+	d Dialect,
+	mods []Module,
+	module string,
+	target int,
+) ([]Applied, error) {
+	switch {
+	case module == "" && target != 0:
+		return nil, ErrModuleRequired
+	case module != "" && !hasModule(mods, module):
+		return nil, fmt.Errorf("%w %q", ErrUnknownModule, module)
+	}
+	streams, err := state(ctx, db, d, mods)
 	if err != nil {
 		return nil, err
 	}
-	var done []int
-	for _, m := range slices.Backward(ms) {
-		if m.Version <= target || !applied[m.Version] {
+	var done []Applied
+	for _, s := range slices.Backward(streams) {
+		if module != "" && s.module != module {
 			continue
 		}
-		err := step(ctx, db, m.Down, func(tx *sql.Tx) error {
-			_, err := tx.ExecContext(ctx, d.Rebind(
-				"DELETE FROM "+migrationsTable+" WHERE version = ?"), m.Version)
-			return err //nolint:wrapcheck // wrapped by step
-		})
-		if err != nil {
-			return done, fmt.Errorf("%w: %d_%s down: %w", ErrMigration, m.Version, m.Name, err)
+		for _, m := range slices.Backward(s.migrations) {
+			if m.Version <= target || !s.applied[m.Version] {
+				continue
+			}
+			err := step(ctx, db, m.Down, func(tx *sql.Tx) error {
+				_, err := tx.ExecContext(ctx, d.Rebind(forgetMigration), s.module, m.Version)
+				return err //nolint:wrapcheck // wrapped by step
+			})
+			if err != nil {
+				return done, fmt.Errorf("%w: %s down: %w", ErrMigration, s.label(m), err)
+			}
+			done = append(done, Applied{Module: s.module, Version: m.Version})
 		}
-		done = append(done, m.Version)
 	}
 	return done, nil
 }
 
-// Version returns the highest applied version (0 when none) and the highest
-// version the dialect knows, so callers can report a pending schema. Errors
-// wrap ErrMigration.
-func Version(ctx context.Context, db *sql.DB, d Dialect) (current, latest int, err error) {
-	ms, applied, err := state(ctx, db, d)
+// Version returns every module's stream in the order of mods, with the
+// highest version its history records and the highest it holds. It refuses
+// a legacy history as Migrate does, and its errors wrap ErrMigration.
+func Version(ctx context.Context, db *sql.DB, d Dialect, mods []Module) ([]StreamVersion, error) {
+	streams, err := state(ctx, db, d, mods)
 	if err != nil {
-		return 0, 0, err
+		return nil, err
 	}
-	for v := range applied {
-		current = max(current, v)
+	out := make([]StreamVersion, 0, len(streams))
+	for _, s := range streams {
+		v := StreamVersion{Module: s.module}
+		for a := range s.applied {
+			v.Current = max(v.Current, a)
+		}
+		if len(s.migrations) > 0 {
+			v.Latest = s.migrations[len(s.migrations)-1].Version
+		}
+		out = append(out, v)
 	}
-	if len(ms) > 0 {
-		latest = ms[len(ms)-1].Version
-	}
-	return current, latest, nil
+	return out, nil
 }
 
-// state loads the migrations and the applied versions, creating the
-// version table when absent.
-func state(ctx context.Context, db *sql.DB, d Dialect) ([]Migration, map[int]bool, error) {
-	ms, err := LoadMigrations(d.Migrations)
-	if err != nil {
-		return nil, nil, err
+// stream is one module's migrations for a dialect and the versions the
+// history records for that module.
+type stream struct {
+	module     string
+	migrations []Migration
+	applied    map[int]bool
+}
+
+// label names m in an error with its module, because every stream starts
+// with a 1_baseline.
+func (s stream) label(m Migration) string {
+	return s.module + " " + strconv.Itoa(m.Version) + "_" + m.Name
+}
+
+// hasModule reports whether one of mods is called name.
+func hasModule(mods []Module, name string) bool {
+	return slices.ContainsFunc(mods, func(m Module) bool { return m.Name == name })
+}
+
+// state loads the stream of every module, refuses a legacy history, creates
+// the history table when it is absent and reads the applied versions. A row
+// of a module that mods does not name is left alone.
+func state(ctx context.Context, db *sql.DB, d Dialect, mods []Module) ([]stream, error) {
+	streams := make([]stream, 0, len(mods))
+	index := make(map[string]int, len(mods))
+	for _, m := range mods {
+		if m.Name == "" {
+			return nil, fmt.Errorf("%w: a module has no name", ErrMigration)
+		}
+		if _, dup := index[m.Name]; dup {
+			return nil, fmt.Errorf("%w: module %q registered twice", ErrMigration, m.Name)
+		}
+		var ms []Migration
+		if m.Migrations != nil {
+			var err error
+			if ms, err = LoadMigrations(MustSub(m.Migrations, d.Name)); err != nil {
+				return nil, err
+			}
+		}
+		index[m.Name] = len(streams)
+		streams = append(streams, stream{module: m.Name, migrations: ms, applied: map[int]bool{}})
+	}
+	if err := probe(ctx, db, d); err != nil {
+		return nil, err
 	}
 	if _, err := db.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS "+migrationsTable+
-		" (version INTEGER NOT NULL PRIMARY KEY, name VARCHAR(255) NOT NULL, applied_at BIGINT NOT NULL)",
+		" (module VARCHAR(64) NOT NULL, version INTEGER NOT NULL, name VARCHAR(255) NOT NULL,"+
+		" applied_at BIGINT NOT NULL, PRIMARY KEY (module, version))",
 	); err != nil {
-		return nil, nil, fmt.Errorf("%w: create %s: %w", ErrMigration, migrationsTable, err)
+		return nil, fmt.Errorf("%w: create %s: %w", ErrMigration, migrationsTable, err)
 	}
-	rows, err := db.QueryContext(ctx, "SELECT version FROM "+migrationsTable)
+	rows, err := db.QueryContext(ctx, "SELECT module, version FROM "+migrationsTable)
 	if err != nil {
-		return nil, nil, fmt.Errorf("%w: read versions: %w", ErrMigration, err)
+		return nil, fmt.Errorf("%w: read versions: %w", ErrMigration, err)
 	}
 	defer func() { _ = rows.Close() }()
-	applied := map[int]bool{}
 	for rows.Next() {
+		var module string
 		var v int
-		if err := rows.Scan(&v); err != nil {
-			return nil, nil, fmt.Errorf("%w: scan version: %w", ErrMigration, err)
+		if err := rows.Scan(&module, &v); err != nil {
+			return nil, fmt.Errorf("%w: scan version: %w", ErrMigration, err)
 		}
-		applied[v] = true
+		if i, ok := index[module]; ok {
+			streams[i].applied[v] = true
+		}
 	}
 	if err := rows.Err(); err != nil {
-		return nil, nil, fmt.Errorf("%w: read versions: %w", ErrMigration, err)
+		return nil, fmt.Errorf("%w: read versions: %w", ErrMigration, err)
 	}
-	return ms, applied, nil
+	return streams, nil
+}
+
+// probe fails with ErrLegacyHistory when the history table exists without a
+// module column. It reads the columns through the dialect's Columns query
+// and writes nothing: on the old table CREATE TABLE IF NOT EXISTS does
+// nothing and the version read fails on the missing column, an error that
+// does not tell the operator the database has to be recreated. A dialect
+// without that query fails rather than skipping the check.
+func probe(ctx context.Context, db *sql.DB, d Dialect) error {
+	if d.Columns == "" {
+		return fmt.Errorf("%w: dialect %s has no Columns query", ErrMigration, d.Name)
+	}
+	rows, err := db.QueryContext(ctx, d.Rebind(d.Columns), migrationsTable)
+	if err != nil {
+		return fmt.Errorf("%w: read %s columns: %w", ErrMigration, migrationsTable, err)
+	}
+	defer func() { _ = rows.Close() }()
+	found, module := false, false
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return fmt.Errorf("%w: scan %s column: %w", ErrMigration, migrationsTable, err)
+		}
+		found, module = true, module || name == "module"
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("%w: read %s columns: %w", ErrMigration, migrationsTable, err)
+	}
+	if found && !module {
+		return ErrLegacyHistory
+	}
+	return nil
 }
 
 // step runs stmts and then record in one transaction.
@@ -261,11 +425,13 @@ func firstLine(s string) string {
 	return line
 }
 
-// MustSub returns the sub-tree dir of fsys. A driver calls it in the
-// initialiser of its Dialect variable, where no error can be returned, to give
-// the dialect its embedded migrations. It panics when fs.Sub refuses dir, as
-// it does a path that is not valid; a directory that does not exist surfaces
-// later, as the error LoadMigrations returns.
+// MustSub returns the sub-tree dir of fsys. The migrator reads a module's
+// stream for a dialect through it, from the directory named like the
+// dialect, and a dialect's name is fixed when its driver is built, so a name
+// that is not a valid path is a programming error rather than a run-time
+// one. It panics when fs.Sub refuses dir, as it does a path that is not
+// valid; a directory that does not exist surfaces as the error
+// LoadMigrations returns.
 func MustSub(fsys fs.FS, dir string) fs.FS {
 	sub, err := fs.Sub(fsys, dir)
 	if err != nil {

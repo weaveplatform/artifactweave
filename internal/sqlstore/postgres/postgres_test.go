@@ -2,11 +2,13 @@ package postgres_test
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
+	"net/url"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/postgres"
@@ -15,7 +17,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/storetest"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestAccContract(t *testing.T) {
@@ -91,93 +92,98 @@ func TestAccKeyRotation(t *testing.T) {
 	})
 }
 
-// TestAccPropertyValuesMigration upgrades a database written at migration 0012,
-// whose property keys hold the whole value, to 0013, and back again.
-func TestAccPropertyValuesMigration(t *testing.T) {
-	ctx := context.Background()
-	s, err := postgres.Open(ctx, sqltest.PostgresDSN(t), postgres.Options{})
+// TestAccLegacyHistoryRefused opens a database whose history predates the
+// per-module migration streams: the store and the migrator refuse it and
+// write nothing. It runs in a scratch schema, so the refused history never
+// meets the server's shared schema.
+func TestAccLegacyHistoryRefused(t *testing.T) {
+	ctx := t.Context()
+	dsn := scratchSchema(t)
+	sqltest.LegacyHistoryRefused(t, openUnmigrated(t, dsn).DB(), postgres.Dialect, func() error {
+		refused, err := postgres.Open(ctx, dsn, postgres.Options{})
+		if err == nil {
+			_ = refused.Close()
+		}
+		return err
+	})
+}
+
+// TestAccStreamsMigrateAlone migrates each module's stream up and down on its
+// own in an empty scratch schema. A baseline that references a table of
+// another stream, such as a foreign key across modules, fails here, because
+// that table does not exist (decision 0044, "No cross-module foreign keys").
+func TestAccStreamsMigrateAlone(t *testing.T) {
+	mods := sqlcommon.Modules()
+	for _, m := range mods {
+		t.Run(m.Name, func(t *testing.T) {
+			ctx := t.Context()
+			db := openUnmigrated(t, scratchSchema(t)).DB()
+			up, err := sqlcommon.Migrate(ctx, db, postgres.Dialect, mods, m.Name)
+			if err != nil || len(up) == 0 {
+				t.Fatalf("Migrate %s = %v, %v", m.Name, up, err)
+			}
+			got, err := sqltest.Schema(ctx, db, postgres.Dialect.Name)
+			if err != nil || got == "\n" {
+				t.Fatalf("Migrate %s created no table (%v)", m.Name, err)
+			}
+			down, err := sqlcommon.Rollback(ctx, db, postgres.Dialect, mods, m.Name, 0)
+			if err != nil || len(down) != len(up) {
+				t.Fatalf("Rollback %s = %v, %v; want %v reverted", m.Name, down, err, up)
+			}
+			got, err = sqltest.Schema(ctx, db, postgres.Dialect.Name)
+			if err != nil || got != "\n" {
+				t.Fatalf("Rollback %s left (%v):\n%s", m.Name, err, got)
+			}
+		})
+	}
+}
+
+// scratchSchema creates an empty schema of its own on the test server and
+// returns a DSN that selects it. pgx passes an unknown DSN parameter such as
+// search_path to the server as a run-time parameter, so every connection of
+// a pool opened with the DSN starts in the schema, and current_schema(),
+// which the migrator's probe and sqltest.Schema read, names it. The schema
+// is dropped when the test ends, because one server serves every test of
+// the binary.
+func scratchSchema(t *testing.T) string {
+	t.Helper()
+	dsn := sqltest.PostgresDSN(t)
+	name := "scratch_" + strings.ToLower(rand.Text())
+	admin := openUnmigrated(t, dsn)
+	if _, err := admin.DB().ExecContext(t.Context(), "CREATE SCHEMA "+name); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		// Registered after admin's own cleanup, so it runs before admin closes.
+		drop := "DROP SCHEMA " + name + " CASCADE"
+		if _, err := admin.DB().ExecContext(context.Background(), drop); err != nil {
+			t.Errorf("drop schema %s: %v", name, err)
+		}
+	})
+	if strings.HasPrefix(dsn, "postgres://") || strings.HasPrefix(dsn, "postgresql://") {
+		u, err := url.Parse(dsn)
+		if err != nil {
+			t.Fatal(err)
+		}
+		q := u.Query()
+		q.Set("search_path", name)
+		u.RawQuery = q.Encode()
+		return u.String()
+	}
+	return dsn + " search_path=" + name
+}
+
+// openUnmigrated opens a store over dsn without migrating, closed when the
+// test ends.
+func openUnmigrated(t *testing.T, dsn string) *sqlcommon.Store {
+	t.Helper()
+	s, err := postgres.Open(t.Context(), dsn,
+		postgres.Options{Options: sqlcommon.Options{SkipMigrate: true}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = s.Close() })
-	sqltest.Reset(t, s.DB(), postgres.Dialect)
-	if _, err := sqlcommon.Rollback(ctx, s.DB(), postgres.Dialect, 12); err != nil {
-		t.Fatal(err)
-	}
-	// The store reads and writes items.props_modified_at, which migration
-	// 0014 adds. The 0012 schema borrows the column while the store seeds
-	// it, and gives it back before the upgrade adds it again.
-	lend := func(stmt string) {
-		t.Helper()
-		if _, err := s.DB().ExecContext(ctx, stmt); err != nil {
-			t.Fatal(err)
-		}
-	}
-	lend("ALTER TABLE items ADD COLUMN props_modified_at BIGINT")
-
-	short := types.Properties{"k": {"v1", "v2"}, "other": {"x"}}
-	it, err := s.Items().Put(ctx, types.Item{RepoKey: "r", Name: "a.txt"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := s.Items().SetProperties(ctx, it.ID, short, time.Unix(1, 0)); err != nil {
-		t.Fatal(err)
-	}
-	run, err := s.Builds().Put(ctx, types.Build{
-		Name: "app", Number: "1", Started: time.Unix(1, 0).UTC(), Properties: short,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	long := storetest.LongText(types.PropertyValueMax)
-	err = s.Items().
-		PatchProperties(ctx, it.ID, types.Properties{"long": {long}}, nil, time.Unix(2, 0))
-	var pgErr *pgconn.PgError
-	if !errors.As(err, &pgErr) || pgErr.Code != "54000" {
-		t.Fatalf(
-			"migration 0012 stored a long value (%v); this test no longer shows the upgrade",
-			err,
-		)
-	}
-	lend("ALTER TABLE items DROP COLUMN props_modified_at")
-
-	if _, err := sqlcommon.Migrate(ctx, s.DB(), postgres.Dialect); err != nil {
-		t.Fatal(err)
-	}
-	props := func() types.Properties {
-		t.Helper()
-		p, err := s.Items().Properties(ctx, it.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return p
-	}
-	if diff := cmp.Diff(short, props()); diff != "" {
-		t.Fatalf("item properties after the upgrade (-want +got):\n%s", diff)
-	}
-	b, err := s.Builds().ByID(ctx, run.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if diff := cmp.Diff(short, b.Properties); diff != "" {
-		t.Fatalf("build properties after the upgrade (-want +got):\n%s", diff)
-	}
-	if err := s.Items().
-		PatchProperties(ctx, it.ID, types.Properties{"long": {long}}, nil, time.Unix(3, 0)); err != nil {
-		t.Fatal(err)
-	}
-
-	// Rolling back drops the rows the old keys cannot index and keeps the
-	// rest.
-	if _, err := sqlcommon.Rollback(ctx, s.DB(), postgres.Dialect, 12); err != nil {
-		t.Fatal(err)
-	}
-	if diff := cmp.Diff(short, props()); diff != "" {
-		t.Fatalf("item properties after the rollback (-want +got):\n%s", diff)
-	}
-	if _, err := sqlcommon.Migrate(ctx, s.DB(), postgres.Dialect); err != nil {
-		t.Fatal(err)
-	}
+	return s
 }
 
 func TestAccRemoteCachePersistence(t *testing.T) {

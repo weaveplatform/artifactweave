@@ -13,8 +13,9 @@
 //     the flags, with flag over environment over file; internal/config
 //     rejects unknown keys. Secrets have no flags, so they stay out of shell
 //     history.
-//   - The subcommand and its arguments: serve; migrate up, down and version;
-//     config validate and apply; keys rotate; version.
+//   - The subcommand and its arguments: serve; migrate up, down and version,
+//     which --module limits to one module's migration stream; config
+//     validate and apply; keys rotate; version.
 //   - The version, commit and build date stamped into
 //     migration/platform/buildinfo at link time (the -X flags in the Makefile
 //     and the release build).

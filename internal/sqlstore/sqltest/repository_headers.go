@@ -193,8 +193,12 @@ func repositoryHeaderEnvironmentRename(t *testing.T, s *sqlcommon.Store) {
 	headerMust(t, service.DeleteEnvironment(ctx, "STAGE"))
 }
 
-// RepositoryHeadersMigration upgrades a real version-15 database, preserving
-// legacy values and unrelated document fields while eliminating live plaintext.
+// RepositoryHeadersMigration writes a repository whose document still holds
+// its sensitive header values: the values in the document, no secret rows and
+// header_secrets_version 0, the row the artifacts module's AfterMigrate hook
+// converts. Reopening the store converts it, preserving the values and
+// unrelated document fields while eliminating live plaintext, and a later
+// open leaves it alone.
 func RepositoryHeadersMigration(t *testing.T, open Opener) {
 	t.Helper()
 	ctx := t.Context()
@@ -212,8 +216,6 @@ func RepositoryHeadersMigration(t *testing.T, open Opener) {
 		},
 	}
 	headerMust(t, s.Repos().Create(ctx, config))
-	_, err := sqlcommon.Rollback(ctx, s.DB(), s.Dialect(), 15)
-	headerMust(t, err)
 	raw, err := json.Marshal(config)
 	headerMust(t, err)
 	var document map[string]any
@@ -221,8 +223,12 @@ func RepositoryHeadersMigration(t *testing.T, open Opener) {
 	document["futureUnknownField"] = "preserved"
 	raw, err = json.Marshal(document)
 	headerMust(t, err)
-	_, err = s.DB().
-		ExecContext(ctx, s.Dialect().Rebind(`UPDATE repositories SET doc = ? WHERE key = ?`), string(raw), config.Key)
+	_, err = s.DB().ExecContext(ctx, s.Dialect().Rebind(
+		`UPDATE repositories SET doc = ?, header_secrets_version = 0 WHERE key = ?`),
+		string(raw), config.Key)
+	headerMust(t, err)
+	_, err = s.DB().ExecContext(ctx, s.Dialect().Rebind(
+		`DELETE FROM repository_header_secrets WHERE repo_key = ?`), config.Key)
 	headerMust(t, err)
 	headerMust(t, s.Close())
 	upgraded := open(t, keys)

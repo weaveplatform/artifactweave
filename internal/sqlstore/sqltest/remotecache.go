@@ -14,36 +14,25 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// RemoteCachePersistence exercises upgrading real pre-cache repositories and
-// reopening the backend with completed and in-flight retrieval records.
+// RemoteCachePersistence checks that each repository keeps a durable
+// lifetime of its own, and that the lifetime and the completed and in-flight
+// retrieval records survive reopening the backend.
 func RemoteCachePersistence(t *testing.T, s *sqlcommon.Store, reopen func() *sqlcommon.Store) {
 	t.Helper()
 	ctx := context.Background()
 	Reset(t, s.DB(), s.Dialect())
-	if _, err := sqlcommon.Rollback(ctx, s.DB(), s.Dialect(), 14); err != nil {
-		t.Fatal(err)
-	}
-	for _, key := range []string{"legacy", "second"} {
+	for _, key := range []string{"first", "second"} {
 		c := repo.Config{
 			Key:         key,
 			Class:       repo.Remote,
 			PackageType: repo.Generic,
 			URL:         "https://upstream.example",
 		}
-		doc, err := json.Marshal(c)
-		if err != nil {
-			t.Fatal(err)
-		}
-		_, err = s.DB().
-			ExecContext(ctx, s.Dialect().Rebind("INSERT INTO repositories (key,rclass,package_type,project_key,created_at,updated_at,doc) VALUES (?,?,?,?,?,?,?)"), key, "remote", "generic", "", 1, 1, string(doc))
-		if err != nil {
+		if err := s.Repos().Create(ctx, c); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if _, err := sqlcommon.Migrate(ctx, s.DB(), s.Dialect()); err != nil {
-		t.Fatal(err)
-	}
-	source, err := s.RemoteCache().Source(ctx, "legacy")
+	source, err := s.RemoteCache().Source(ctx, "first")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,9 +41,9 @@ func RemoteCachePersistence(t *testing.T, s *sqlcommon.Store, reopen func() *sql
 		t.Fatal(err)
 	}
 	if source.Repository == "" || source.Repository == other.Repository || source.Generation == "" {
-		t.Fatal("upgrade did not allocate distinct durable lifetimes")
+		t.Fatal("the repositories did not get distinct durable lifetimes")
 	}
-	k := types.RemoteCacheKey{RepoKey: "legacy", Path: "index.json", Variant: "raw"}
+	k := types.RemoteCacheKey{RepoKey: "first", Path: "index.json", Variant: "raw"}
 	token, err := s.RemoteCache().Begin(ctx, k)
 	if err != nil {
 		t.Fatal(err)
@@ -78,7 +67,7 @@ func RemoteCachePersistence(t *testing.T, s *sqlcommon.Store, reopen func() *sql
 		t.Fatal(err)
 	}
 	s = reopen()
-	got, err := s.RemoteCache().Source(ctx, "legacy")
+	got, err := s.RemoteCache().Source(ctx, "first")
 	if err != nil || got != source {
 		t.Fatal("restart changed lifetime", got, err)
 	}
@@ -89,37 +78,19 @@ func RemoteCachePersistence(t *testing.T, s *sqlcommon.Store, reopen func() *sql
 	if err = s.RemoteCache().Check(ctx, pending); err != nil {
 		t.Fatal("restart lost in-flight fence", err)
 	}
-	if _, err = s.RemoteCache().Invalidate(ctx, "legacy", "pending", false); err != nil {
+	if _, err = s.RemoteCache().Invalidate(ctx, "first", "pending", false); err != nil {
 		t.Fatal(err)
 	}
 	if err = s.RemoteCache().Check(ctx, pending); !errors.Is(err, store.ErrConflict) {
 		t.Fatal("restart invalidation did not fence", err)
 	}
-	s = remoteLayoutPersistence(t, s, reopen)
-	if _, err = sqlcommon.Rollback(ctx, s.DB(), s.Dialect(), 14); err != nil {
-		t.Fatal(err)
-	}
-	b, err := s.Blobs().Get(ctx, strings.Repeat("a", 64))
-	if err != nil || b.Refs != 0 {
-		t.Fatal("down migration leaked metadata reference", b, err)
-	}
-	if _, err = sqlcommon.Migrate(ctx, s.DB(), s.Dialect()); err != nil {
-		t.Fatal(err)
-	}
-	got, err = s.RemoteCache().Source(ctx, "legacy")
-	if err != nil || got.Repository == source.Repository {
-		t.Fatal("fresh cache schema reused old lifetime", got, err)
-	}
+	remoteLayoutPersistence(t, s, reopen)
 }
 
-func remoteLayoutPersistence(
-	t *testing.T,
-	s *sqlcommon.Store,
-	reopen func() *sqlcommon.Store,
-) *sqlcommon.Store {
+func remoteLayoutPersistence(t *testing.T, s *sqlcommon.Store, reopen func() *sqlcommon.Store) {
 	t.Helper()
 	ctx := t.Context()
-	c, err := s.Repos().Get(ctx, "legacy")
+	c, err := s.Repos().Get(ctx, "first")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,5 +132,4 @@ func remoteLayoutPersistence(
 	if err != nil || string(stored.Document) != string(doc.Document) {
 		t.Fatal("layout and generation did not persist together", stored, err)
 	}
-	return s
 }
