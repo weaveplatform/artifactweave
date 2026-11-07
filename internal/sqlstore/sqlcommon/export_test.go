@@ -1,10 +1,24 @@
 package sqlcommon
 
-// SealedPurposes exposes the purposes Reseal covers to the external tests.
+// SealedPurposes exposes the purpose of every sealed column the modules
+// register, which Reseal covers, to the external tests, in registration
+// order and with any repeat kept.
 func SealedPurposes() []string {
-	out := make([]string, 0, len(sealedColumns))
-	for _, c := range sealedColumns {
-		out = append(out, c.purpose)
+	var out []string
+	for _, m := range modules() {
+		for _, c := range m.Sealed {
+			out = append(out, c.Purpose)
+		}
+	}
+	return out
+}
+
+// ModuleNames exposes the names of the registered modules, in order, to the
+// external tests.
+func ModuleNames() []string {
+	var out []string
+	for _, m := range modules() {
+		out = append(out, m.Name)
 	}
 	return out
 }

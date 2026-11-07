@@ -1,24 +1,30 @@
 // Package dialect is the SQL layer that every SQL store is built on: the
 // Dialect that describes what differs between engines, the unit of work that
-// a context carries over one *sql.DB, the migrator, and Store, the handle
-// whose helpers run statements, encode columns, page lists and seal secret
-// columns.
+// a context carries over one *sql.DB, the migrator, Store, the handle whose
+// helpers run statements, encode columns, page lists and seal secret
+// columns, and the registration through which key rotation reaches every
+// module's sealed columns.
 //
 // # Role
 //
-// platform layer: the SQL dialect, unit of work, migrator and sealing helpers
-// that every module SQL adapter uses. One unit of work spans every module
-// store (decision 0044, "Persistence"), so the platform owns it, with the
-// dialect layer and the migrator. The SQLite and PostgreSQL drivers each
-// declare a Dialect with their embedded migrations; the module SQL adapters
-// are built over one Store and call its helpers. The package imports only the
-// kernel, for its sentinels and paging, and platform/crypt, for the keyring.
+// platform layer: the SQL dialect, unit of work, migrator, sealing helpers and
+// reseal engine that every module SQL adapter uses. One unit of work spans
+// every module store (decision 0044, "Persistence"), so the platform owns it,
+// with the dialect layer and the migrator. The SQLite and PostgreSQL drivers
+// each declare a Dialect with their embedded migrations; the module SQL
+// adapters are built over one Store, call its helpers and describe the
+// columns they seal in a Module each. The reseal engine sits beside the
+// keyring because re-sealing opens and seals values, and the keyring never
+// leaves the package. The package imports only the kernel, for its sentinels
+// and paging, and platform/crypt, for the keyring.
 //
 // # Inputs
 //
 //   - An open *sql.DB and the engine's Dialect: its placeholder style, its
 //     row-lock suffix, its migrations and its test for a unique violation.
 //   - A *crypt.Keyring for the sealed columns, or nil.
+//   - Each module's registration, in the canonical module order: the sealed
+//     columns its store writes, and a hook to run before them.
 //   - Statements written with "?" placeholders, which Rebind converts to $1
 //     style for PostgreSQL.
 //   - Migration files named NNNN_name.sql, with "-- +up" and "-- +down"
@@ -28,8 +34,10 @@
 //
 //   - Store and New. The unit of work: Tx, AfterCommit and InTx. Statements:
 //     Q, Exec, ExecOne, InsertID, Exists, Rows, Wrap and LockClause. Sealed
-//     columns: Seal, Unseal, HasKeyring and ResealValue. And DB, Dialect and
-//     Close.
+//     columns: Seal and Unseal. And DB, Dialect and Close.
+//   - Module registration and key rotation: SealedColumn, FirstKey, Module
+//     and Reseal, which re-seals the columns the modules register under the
+//     keyring's active version.
 //   - Statement text: Upsert, InsertIgnore, Insert and Placeholders. Column
 //     values: Micros, FromMicros, Millis, FromMillis, ToJSON, MustJSON,
 //     FromJSON, RawJSON, FromRaw, NullString and EntBytes. Keyset paging:
@@ -53,15 +61,24 @@
 //     committed, never after a rollback or a failed commit, and at once
 //     outside a transaction.
 //   - The keyring never leaves the package: stores seal and open values only
-//     through Seal, Unseal and ResealValue, which bind each value to its
-//     column's purpose and its row (decision 0017), and HasKeyring is all
-//     they learn about it.
+//     through Seal and Unseal, which bind each value to its column's purpose
+//     and its row (decision 0017), and Reseal re-seals them under the same
+//     binding, which it takes from the column's registration.
+//   - Every sealed column belongs to exactly one module registration. Reseal
+//     reaches only registered columns, so the values of a column left out
+//     stay under a retired key and no longer open once that key leaves the
+//     configuration. Reseal takes the modules in the canonical module order
+//     (decision 0044, "Persistence"), and each module's hook before its
+//     columns. TestAccSealedColumnsComplete matches every Seal call in the
+//     repository against the registrations, and fails on a purpose
+//     registered twice.
 //   - A store that embeds *Store gets its methods promoted, and a method the
 //     store declares under the same name hides the promoted one without a
 //     compile error. So Store exports no method named like an accessor of the
 //     metadata store's aggregate (Keys, Items, Repos, ...) other than Tx,
 //     AfterCommit and Close, or like a method an embedding store declares,
-//     such as Reseal. TestUnitDialectStoreShadowsNoAccessor checks it.
+//     such as Reseal, which is why the layer's Reseal is a function.
+//     TestUnitDialectStoreShadowsNoAccessor checks it.
 //   - Every SQL adapter keeps the schema conventions of research 15, section
 //     4. Times are BIGINT Unix microseconds, NULL for a zero time (Micros),
 //     and durations BIGINT milliseconds (Millis): integers compare and sort
@@ -102,6 +119,7 @@
 //     #p9d-modular-monolith-migration, epic STO
 //     (https://github.com/weaveplatform/artifactweave/issues/939).
 //   - https://github.com/weaveplatform/artifactweave/issues/992
+//   - https://github.com/weaveplatform/artifactweave/issues/993
 //
 // # Status
 //
@@ -112,7 +130,8 @@
 // (issue 338, pull request 339). Staged in P9d: the scanner helpers were
 // gathered into one file (issue 959, pull request 1122), and the layer leaves
 // the SQL stores' shared package for this one, exported for the module SQL
-// adapters (issue 992).
+// adapters (issue 992). The reseal engine joins the keyring here, and each
+// module registers its sealed columns (issue 993).
 //
 // # Testing
 //
@@ -135,6 +154,13 @@
 //     TestUnitMigratorReportsUnreadableMigrations and
 //     TestUnitStoreReportsDriverFaults use a database/sql driver whose named
 //     steps fail, for the failures SQLite cannot produce on demand.
+//   - TestUnitResealNeedsAKeyring, TestAccResealFollowsTheModuleOrder,
+//     TestAccResealStopsAtTheFirstError,
+//     TestUnitResealReportsAnUnscannableRow,
+//     TestAccResealKeepsAValueChangedSinceItsRead and
+//     TestAccResealReadsByteKeysAsText run Reseal over tables of their own,
+//     for the order, the failures and the concurrent write that
+//     TestAccKeyRotation leaves out.
 //   - TestUnitSealReportsTheKeyringsRefusal,
 //     TestUnitUpsertOfKeyColumnsOnlyDoesNothing and
 //     TestAccMustJSONPanicsOnUnencodable cover the rest, and a test file

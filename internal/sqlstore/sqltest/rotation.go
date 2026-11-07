@@ -19,7 +19,7 @@ type Opener func(t *testing.T, keys *crypt.Keyring) *sqlcommon.Store
 
 // sealedValues is the number of sealed values Rotation writes, one per
 // sealed column.
-const sealedValues = 11
+const sealedValues = 13
 
 // Rotation is decision 0017's rotation test over a populated store: every
 // sealed column gets a value under version 1, Reseal under versions 1 and 2
@@ -96,6 +96,12 @@ func populate(t *testing.T, s *sqlcommon.Store) {
 		Alias:      "sk",
 		PrivateKey: "sk-private", Passphrase: "sk-pass", IsDefault: true,
 	}))
+	check(s.Keys().PutCertificate(ctx, types.Certificate{
+		Alias: "cert", PEM: "cert-pem", PrivateKey: "cert-private",
+	}))
+	check(s.Tokens().Create(ctx, types.Token{
+		ID: "tok", Subject: "alice", Scope: types.UserScope(), Secret: "token-secret",
+	}))
 	check(s.Replications().Put(ctx, types.Replication{
 		RepoKey: "remote", Key: "rep",
 		URL: "https://peer.example/artifactory/remote", Password: "rep-pw",
@@ -149,6 +155,10 @@ func verify(t *testing.T, s *sqlcommon.Store) {
 	want("key pair passphrase", kp.Passphrase, "kp-pass", err)
 	sk, err := s.Keys().SigningKey(ctx, "sk")
 	want("signing key", sk.PrivateKey+"/"+sk.Passphrase, "sk-private/sk-pass", err)
+	cert, err := s.Keys().Certificate(ctx, "cert")
+	want("certificate private key", cert.PrivateKey, "cert-private", err)
+	tok, err := s.Tokens().Get(ctx, "tok")
+	want("token secret", tok.Secret, "token-secret", err)
 	rep, err := s.Replications().Get(ctx, "rep")
 	want("replication password", rep.Password, "rep-pw", err)
 	h, err := s.Webhooks().Get(ctx, "hook")

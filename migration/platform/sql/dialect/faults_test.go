@@ -13,9 +13,11 @@ import (
 var errFault = errors.New("fault")
 
 // faults names the steps of the fault driver that fail. The others succeed:
-// a statement changes one row and a query returns no rows.
+// a statement changes one row and a query returns no rows, or with oneRow
+// one row of its one column.
 type faults struct {
 	exec, begin, commit, next, rowsAffected, close bool
+	oneRow                                         bool
 }
 
 // faultDB opens a pool over the fault driver, for the failures SQLite cannot
@@ -80,7 +82,7 @@ func (c faultConn) ExecContext(
 }
 
 func (c faultConn) QueryContext(context.Context, string, []driver.NamedValue) (driver.Rows, error) {
-	return faultRows(c), nil
+	return &faultRows{f: c.f}, nil
 }
 
 type faultTx struct{ f faults }
@@ -100,15 +102,23 @@ func (r faultResult) RowsAffected() (int64, error) {
 	return 1, nil
 }
 
-type faultRows struct{ f faults }
+type faultRows struct {
+	f      faults
+	served bool
+}
 
-func (faultRows) Columns() []string { return []string{"version"} }
+func (*faultRows) Columns() []string { return []string{"version"} }
 
-func (faultRows) Close() error { return nil }
+func (*faultRows) Close() error { return nil }
 
-func (r faultRows) Next([]driver.Value) error {
-	if r.f.next {
+func (r *faultRows) Next(dest []driver.Value) error {
+	switch {
+	case r.f.next:
 		return errFault
+	case r.f.oneRow && !r.served:
+		r.served = true
+		dest[0] = int64(1)
+		return nil
 	}
 	return io.EOF
 }

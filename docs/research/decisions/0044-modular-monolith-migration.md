@@ -88,6 +88,14 @@ the work.
   the canonical module order: platform, artifacts, access, notifications, retention,
   federation, releases, workers. A database whose history predates this is refused with
   `ErrLegacyHistory` before any write.
+- **Reseal follows the canonical order.** Each module registers the sealed columns its store
+  writes in one `dialect.Module`, with a hook that runs before them, and `keys rotate`
+  re-seals the modules in the canonical order. That deliberately changes the order of the
+  single list the SQL stores kept before: the platform columns (`config_secrets`, `instance`)
+  now come first, the repository header backfill runs after them, and `webhook_secrets`
+  comes before `replications`. The change cannot be observed: `keys rotate` prints only
+  totals, and re-sealing is idempotent, so every value ends under the active key whatever
+  the order. Only when several values fail to open can the error name a different one first.
 - **No cross-module foreign keys.** A cascade one would have provided becomes an explicit
   call inside the owning transaction.
 - **One unit of work for every module store:** one `*sql.DB` with `platform/sql/dialect`,
@@ -238,13 +246,16 @@ change that adds a name appends its row; the change column gives the ticket of t
 | `Store`, `New` | `platform/sql/dialect` | The handle every SQL store is built over: one pool, its `Dialect` and the keyring, with the unit of work (`Tx` and `AfterCommit`), `DB`, `Dialect` and `Close`. Every store built over one `Store` shares its transactions. The target document maps the SQL stores' `store.go` to the package without naming them | STO-04 |
 | `InTx` | `platform/sql/dialect` | Whether a context carries a transaction on the store's pool: the builds store made the check through the unexported `inTx`, which the target document names, and a module's SQL adapter outside the package needs it | STO-04 |
 | `Q`, `Wrap`, `Exec`, `ExecOne`, `InsertID`, `Exists`, `Rows`, `LockClause` | `platform/sql/dialect` | The statement helpers of `Store` that every SQL adapter calls: the pool or the context's transaction, driver errors mapped onto the kernel sentinels and named with the dialect and the operation, a statement meant to change one row, an insert that returns its id, an existence check, a loop over rows, and the row-lock suffix inside a transaction | STO-04 |
-| `Seal`, `Unseal`, `HasKeyring`, `ResealValue` | `platform/sql/dialect` | Sealed columns through the store's keyring, which stays unexported (decision 0017): seal and open one column value, whether a keyring is configured, and the re-seal of one value that `keys rotate` runs. STO-05 may unexport the last two once its reseal engine sits beside them | STO-04 |
+| `Seal`, `Unseal` | `platform/sql/dialect` | Sealed columns through the store's keyring, which stays unexported (decision 0017): seal and open one column value | STO-04 |
 | `Micros`, `FromMicros`, `Millis`, `FromMillis`, `ToJSON`, `MustJSON`, `FromJSON`, `RawJSON`, `FromRaw`, `NullString`, `EntBytes` | `platform/sql/dialect` | The column encodings every SQL adapter keeps: times as Unix microseconds, durations as milliseconds, documents as JSON text and empty values as NULL | STO-04 |
 | `Keyset`, `OrderBy`, `Itoa`, `LimitOr` | `platform/sql/dialect` | Keyset paging over `kernel.Page`: the condition that continues a list after a cursor, its `ORDER BY`, an integer cursor part, and the default and maximum list limits, so that a cursor means the same position in every SQL adapter | STO-04 |
 | `EntRow`, `PeersScanner`, `OpsCols` | `platform/sql/dialect` | A `*sql.Row` or `*sql.Rows` to scan, under each of the two names the SQL stores' files use, and the split of a column list written as `a, b, c` | STO-04 |
 | `Upsert`, `InsertIgnore`, `Insert`, `Placeholders` | `platform/sql/dialect` | Statement text that SQLite and PostgreSQL share: an insert that updates the row whose key is taken, one that keeps the row already there, a plain insert and a list of placeholders, all with `?` placeholders that `Dialect.Rebind` converts for PostgreSQL. The target document names their file, `dialect.go`, but not them | STO-04 |
 | `Migration`, `LoadMigrations`, `Migrate`, `Rollback`, `Version`, `MustSub` | `platform/sql/dialect` | The migrator over a dialect's embedded `NNNN_name.sql` files: a parsed file and the parse of a directory, applying and reverting migrations each in one transaction with the `schema_migrations` row that records it, the applied and the latest version, and the sub-tree a driver gives its `Dialect`. The target document names `migrate.go` only for the per-module streams that STO-06 adds | STO-04 |
 | `ErrTransaction`, `ErrMigration`, `ErrNoKeyring` | `platform/sql/dialect` | The layer's sentinels: a transaction that could not begin or commit, a malformed or failing migration, and a sealed value read by a store without a keyring. Their texts keep the `sqlcommon:` prefix that operators and logs have always shown | STO-04 |
+| `SealedColumn`, `FirstKey` | `platform/sql/dialect` | One column of sealed values as its module registers it: the table, the column, the purpose, the key columns and the row id built from their values, which must equal what the module's store seals with, because both are authenticated with the value (decision 0017). `FirstKey` is the row id of a column whose row id is its first key column. `keys rotate` reaches only registered columns, so the values of a column left out stay under a retired key | STO-05 |
+| `Module` | `platform/sql/dialect` | One module's registration with the SQL layer: its canonical name, the sealed columns its store writes and a hook that runs before them, such as the artifacts module's backfill of repository headers. STO-06 adds the migration stream and its hook | STO-05 |
+| `Reseal` | `platform/sql/dialect` | The re-seal that `keys rotate` runs: the modules in the order given, each module's hook and then its columns, under the keyring's active version, returning how many values changed. A function rather than a method of `Store`, because the SQL stores embed `Store` and declare a `Reseal` of their own, which would hide a method of that name without a compile error | STO-05 |
 
 ### Placeholders
 

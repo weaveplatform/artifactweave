@@ -126,6 +126,7 @@ linters:
         - dialect.Migrate(
         - dialect.Rollback(
         - dialect.Version(
+        - dialect.Reseal(
 
   # 4) Issue-filtering (not disabling analysis, just silencing reports)
   exclusions:

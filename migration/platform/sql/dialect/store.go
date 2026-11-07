@@ -364,15 +364,11 @@ func LimitOr(limit int) int {
 	return min(limit, kernel.MaxLimit)
 }
 
-// HasKeyring reports whether the store was given a keyring. The keyring
-// itself stays inside the package.
-func (s *Store) HasKeyring() bool { return s.keys != nil }
-
-// ResealValue re-seals one stored value under the keyring's active version
+// resealValue re-seals one stored value under the keyring's active version
 // and reports whether it changed: a plain value is sealed for the first time,
 // and a value already under the active version is returned as it is. The
-// store must have a keyring (HasKeyring).
-func (s *Store) ResealValue(purpose, rowID string, v []byte) ([]byte, bool, error) {
+// store must have a keyring, which Reseal checks first.
+func (s *Store) resealValue(purpose, rowID string, v []byte) ([]byte, bool, error) {
 	if !crypt.IsSealed(v) {
 		sealed, err := s.keys.Seal(purpose, rowID, v)
 		return sealed, err == nil, err //nolint:wrapcheck // wrapped by the caller
