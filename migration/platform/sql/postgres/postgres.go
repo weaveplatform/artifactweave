@@ -4,12 +4,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/stdlib"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 )
 
 // ErrDSNRequired is returned by Open for an empty DSN.
@@ -18,8 +19,8 @@ var ErrDSNRequired = errors.New("postgres: dsn is required")
 // uniqueViolation is SQLSTATE 23505.
 const uniqueViolation = "23505"
 
-// Dialect is PostgreSQL's sqlcommon.Dialect.
-var Dialect = sqlcommon.Dialect{
+// Dialect is PostgreSQL's dialect.Dialect.
+var Dialect = dialect.Dialect{
 	Name:      "postgres",
 	Dollar:    true,
 	ForUpdate: "FOR UPDATE",
@@ -35,6 +36,14 @@ var Dialect = sqlcommon.Dialect{
 func IsUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == uniqueViolation
+}
+
+// Options configures OpenDB.
+type Options struct {
+	// MaxOpenConns bounds the pool; 0 keeps the database/sql default.
+	MaxOpenConns int
+	// ConnMaxLifetime recycles connections; 0 keeps them.
+	ConnMaxLifetime time.Duration
 }
 
 // OpenDB opens the pool for dsn, sized and recycled as o says. It returns

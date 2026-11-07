@@ -11,7 +11,7 @@ import (
 	msqlite "modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 )
 
 // ErrPathRequired is returned by Open for an empty path.
@@ -20,8 +20,8 @@ var ErrPathRequired = errors.New("sqlite: path is required")
 // Memory is the path that opens a private in-memory database.
 const Memory = ":memory:"
 
-// Dialect is SQLite's sqlcommon.Dialect.
-var Dialect = sqlcommon.Dialect{
+// Dialect is SQLite's dialect.Dialect.
+var Dialect = dialect.Dialect{
 	Name: "sqlite",
 	// The table-valued form of PRAGMA table_info, so the table name binds
 	// as a parameter.
@@ -37,6 +37,12 @@ func IsUniqueViolation(err error) bool {
 	}
 	return e.Code() == sqlite3.SQLITE_CONSTRAINT_UNIQUE ||
 		e.Code() == sqlite3.SQLITE_CONSTRAINT_PRIMARYKEY
+}
+
+// Options configures DSN and OpenDB.
+type Options struct {
+	// BusyTimeout bounds lock waits; 10s when zero.
+	BusyTimeout time.Duration
 }
 
 // DSN builds the modernc connection string for path.

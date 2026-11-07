@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
+	pgdrv "github.com/weaveplatform/artifactweave/migration/platform/sql/postgres"
 )
 
 // Options configures Open.
@@ -21,11 +22,14 @@ type Options struct {
 
 // Open connects to dsn and migrates the schema.
 func Open(ctx context.Context, dsn string, o Options) (*sqlcommon.Store, error) {
-	db, err := OpenDB(dsn, o)
+	db, err := pgdrv.OpenDB(dsn, pgdrv.Options{
+		MaxOpenConns:    o.MaxOpenConns,
+		ConnMaxLifetime: o.ConnMaxLifetime,
+	})
 	if err != nil {
 		return nil, err
 	}
-	s, err := sqlcommon.Open(ctx, db, Dialect, o.Options)
+	s, err := sqlcommon.Open(ctx, db, pgdrv.Dialect, o.Options)
 	if err != nil {
 		return nil, fmt.Errorf("postgres: %w", err)
 	}

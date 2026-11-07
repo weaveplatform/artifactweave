@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
+	sqlitedrv "github.com/weaveplatform/artifactweave/migration/platform/sql/sqlite"
 )
 
 // Options configures Open.
@@ -27,11 +28,11 @@ type Options struct {
 // because each connection to ":memory:" would otherwise see its own empty
 // database.
 func Open(ctx context.Context, path string, o Options) (*sqlcommon.Store, error) {
-	db, err := OpenDB(path, o)
+	db, err := sqlitedrv.OpenDB(path, sqlitedrv.Options{BusyTimeout: o.BusyTimeout})
 	if err != nil {
 		return nil, err
 	}
-	s, err := sqlcommon.Open(ctx, db, Dialect, o.Options)
+	s, err := sqlcommon.Open(ctx, db, sqlitedrv.Dialect, o.Options)
 	if err != nil {
 		return nil, fmt.Errorf("sqlite: %w", err)
 	}
