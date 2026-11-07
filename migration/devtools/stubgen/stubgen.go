@@ -1,8 +1,3 @@
-// Package stubgen writes a type that implements a generated strict server
-// interface by answering 501 for every operation. oapi-codegen emits an
-// Unimplemented type for the plain ServerInterface but not for the strict one,
-// and the strict one is what internal/server implements; without a stub every
-// scaffolded operation would have to be hand-stubbed before the tree compiles.
 package stubgen
 
 import (

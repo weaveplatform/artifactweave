@@ -13,7 +13,7 @@ exclude:
     # oapi-codegen output (decision 0002): regenerated, never hand-edited.
     - ^internal/server/gen/
     - ^pkg/client/
-    # Developer tools: thin main packages over internal/ (specoracle).
+    # Developer tools: thin main packages over migration/devtools/ (specoracle).
     - ^tools/
     # Contract-suite harnesses (decision 0015): their remaining branches are
     # the t.Fatal paths taken only when a backend violates the contract.

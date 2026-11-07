@@ -1,8 +1,3 @@
-// Package openapibundle merges the per-family spec fragments under
-// api/src/<service>/ into the one document oapi-codegen and the parity test
-// read. Authors edit fragments so several families can be written in
-// parallel without one enormous file; the bundle is generated and committed
-// so a reader of api/<service>.openapi.yaml sees the whole surface.
 package openapibundle
 
 import (

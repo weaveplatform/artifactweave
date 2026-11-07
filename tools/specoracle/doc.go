@@ -5,8 +5,8 @@
 //
 // Command, with the repository tooling under tools/: not part of the server
 // binary, and it keeps its path through the modular-monolith migration. The
-// work is internal/specoracle; the Makefile's oracle targets run its
-// subcommands.
+// work is migration/devtools/specoracle; the Makefile's oracle targets run
+// its subcommands.
 //
 // # Inputs
 //

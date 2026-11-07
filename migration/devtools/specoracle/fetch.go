@@ -1,9 +1,3 @@
-// Package specoracle keeps a local, gitignored cache of the OpenAPI blocks
-// JFrog embeds on each docs.jfrog.com endpoint page and compares them with the
-// specs this project authors under api/. JFrog's definitions are proprietary,
-// so the cache is a test oracle only: it is fetched on demand, never committed,
-// and the committed artefact is the parity baseline, which lists only paths,
-// field names and status codes (decision record 0001).
 package specoracle
 
 import (

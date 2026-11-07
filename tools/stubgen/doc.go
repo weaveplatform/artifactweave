@@ -5,7 +5,7 @@
 //
 // Command, with the repository tooling under tools/: not part of the server
 // binary, and it keeps its path through the modular-monolith migration. The
-// work is internal/stubgen.
+// work is migration/devtools/stubgen.
 //
 // # Inputs
 //

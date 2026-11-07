@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/weaveplatform/artifactweave/internal/stubgen"
+	"github.com/weaveplatform/artifactweave/migration/devtools/stubgen"
 )
 
 func main() {
