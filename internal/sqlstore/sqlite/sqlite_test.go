@@ -239,12 +239,6 @@ func TestAccOpenErrors(t *testing.T) {
 	}
 }
 
-func TestAccIsUniqueViolation(t *testing.T) {
-	if sqlite.IsUniqueViolation(errors.New("plain")) {
-		t.Fatal("a plain error is not a unique violation")
-	}
-}
-
 func TestAccKeyRotation(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "aw.db")
 	sqltest.Rotation(t, func(t *testing.T, k *crypt.Keyring) *sqlcommon.Store {

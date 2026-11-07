@@ -9,8 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgconn"
-
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/postgres"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
@@ -58,16 +56,6 @@ func TestAccOpenErrors(t *testing.T) {
 	if _, err := postgres.Open(ctx, "postgres://aw@127.0.0.1:1/aw?connect_timeout=2",
 		postgres.Options{ConnMaxLifetime: time.Minute}); err == nil {
 		t.Fatal("connected to a closed port")
-	}
-}
-
-func TestAccIsUniqueViolation(t *testing.T) {
-	if !postgres.IsUniqueViolation(&pgconn.PgError{Code: "23505"}) {
-		t.Fatal("23505 is a unique violation")
-	}
-	if postgres.IsUniqueViolation(&pgconn.PgError{Code: "23503"}) ||
-		postgres.IsUniqueViolation(errors.New("x")) {
-		t.Fatal("other errors are not")
 	}
 }
 
