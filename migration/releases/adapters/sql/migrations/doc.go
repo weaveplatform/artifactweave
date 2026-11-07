@@ -54,7 +54,7 @@
 //
 // # Testing
 //
-// The SQLite and PostgreSQL drivers' tests run every stream:
+// The composite store's tests on SQLite and PostgreSQL run every stream:
 // TestAccSchemaGolden compares a fresh database with the goldens,
 // TestAccMigrationsUpDownUp rolls every stream back and applies it again on
 // SQLite, and TestAccStreamsMigrateAlone migrates each stream up and down alone

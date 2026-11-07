@@ -11,14 +11,15 @@ import (
 )
 
 // The bridge must alias the dialect layer's types, not declare its own
-// (decision 0044, "Type-alias bridges"): the SQLite and PostgreSQL packages
-// declare their dialects as sqlcommon.Dialect values, which New passes to
-// dialect.New, and the bridged LoadMigrations and Q return dialect values to
-// callers that use the sqlcommon names, with no conversion on either side. A
-// declared Queryer would still compile everywhere, because interfaces with the
-// same methods are assignable both ways. A struct is assignable only to its
-// own type and a pointer only to a pointer to the identical type, so these
-// lines compile only while each pair is one type.
+// (decision 0044, "Type-alias bridges"): the SQLite and PostgreSQL drivers
+// declare their dialects as dialect.Dialect values, which Open, New and the
+// SQL test harness take as sqlcommon.Dialect, and the bridged LoadMigrations
+// and Q return dialect values to callers that use the sqlcommon names, with
+// no conversion on either side. A declared Queryer would still compile
+// everywhere, because interfaces with the same methods are assignable both
+// ways. A struct is assignable only to its own type and a pointer only to a
+// pointer to the identical type, so these lines compile only while each pair
+// is one type.
 var (
 	_ dialect.Dialect       = sqlcommon.Dialect{}
 	_ dialect.Migration     = sqlcommon.Migration{}

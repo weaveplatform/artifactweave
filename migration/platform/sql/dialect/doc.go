@@ -11,13 +11,14 @@
 // platform layer: the SQL dialect, unit of work, migrator, sealing helpers and
 // reseal engine that every module SQL adapter uses. One unit of work spans
 // every module store (decision 0044, "Persistence"), so the platform owns it,
-// with the dialect layer and the migrator. The SQLite and PostgreSQL drivers
-// each declare a Dialect; the module SQL adapters are built over one Store,
-// call its helpers, and register in a Module each their migration stream,
-// the columns they seal and their hooks. The reseal engine sits beside the
-// keyring because re-sealing opens and seals values, and the keyring never
-// leaves the package. The package imports only the kernel, for its sentinels
-// and paging, and platform/crypt, for the keyring.
+// with the dialect layer and the migrator. The SQLite and PostgreSQL drivers,
+// platform/sql/sqlite and platform/sql/postgres, each declare a Dialect; the
+// module SQL adapters are built over one Store, call its helpers, and register
+// in a Module each their migration stream, the columns they seal and their
+// hooks. The reseal engine sits beside the keyring because re-sealing opens
+// and seals values, and the keyring never leaves the package. The package
+// imports only the kernel, for its sentinels and paging, and platform/crypt,
+// for the keyring.
 //
 // # Inputs
 //

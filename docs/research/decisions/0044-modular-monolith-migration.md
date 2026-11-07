@@ -102,7 +102,13 @@ the work.
   and one in-memory database with `platform/tx/memtx`.
 - **Platform-owned adapters** live in `platform/store/{sql,inmem,storetest}`, with the
   platform stream in `platform/store/sql/migrations`. The target document's `platform/sql`
-  is the dialect layer.
+  is the dialect layer and the engine drivers.
+- **Engine drivers.** `platform/sql/sqlite` and `platform/sql/postgres` open a pool for
+  their engine (`OpenDB`) and describe it as a `dialect.Dialect`, with no store,
+  migration or keyring knowledge. Opening the composite store (the driver's pool, migrated
+  and wrapped in the SQL store) stays legacy, in the `Open` of `internal/sqlstore/sqlite`
+  and `internal/sqlstore/postgres`, with its signature, options and error texts, until
+  STO-19 moves it into `app`.
 - **The composite store** (every module store over the one unit of work) lives in
   `app/adapters/{sql,inmem}`, with its contract suite in `app/storetest` and test openers
   in `app/apptest`. Module tests reach it only through those test-support packages, and
@@ -261,6 +267,11 @@ change that adds a name appends its row; the change column gives the ticket of t
 | `Module.Migrations`, `Module.AfterMigrate` | `platform/sql/dialect` | A module's migration stream, its embedded files under `sqlite/` and `postgres/`, and a hook that runs when a store opens, after every stream is current, for work that DDL cannot do: the artifacts module's conversion of repository headers needs the keyring (decision 0017), and the access module's search names need Go's case folding (decision 0043) | STO-06 |
 | `Dialect.Columns` | `platform/sql/dialect` | The query that lists the columns of the table its one parameter names, in the current schema only, which the migrator reads to refuse a legacy history before it writes anything. Each driver's `Dialect` sets it | STO-06 |
 | `FS` | `platform/store/sql/migrations` and the `adapters/sql/migrations` package of each of the seven other modules | A stream's migration files, embedded under `sqlite/` and `postgres/` and starting at `0001_baseline.sql`, which the module's registration passes as `Migrations`. The target document places the platform stream in `platform/sql/migrations`; "Persistence" records why it is under `platform/store/sql` | STO-06 |
+| `OpenDB` | `platform/sql/sqlite`, `platform/sql/postgres` | Returns a pool for one database of the engine with the driver's settings: SQLite's pragmas and IMMEDIATE transactions, and the in-memory database on one connection; PostgreSQL's pool size and connection lifetime. It does not connect, migrate or wrap the pool in a store, so the composite store's open and STO-08's module SQL test harness both build on it. The target document gives the packages "open + driver settings" without naming the function | STO-07 |
+| `Options` | `platform/sql/sqlite`, `platform/sql/postgres` | The driver settings `OpenDB` takes: SQLite's busy timeout, which `DSN` also takes, and PostgreSQL's pool size and connection lifetime. The composite store's `Options`, which also carries the store's options, keeps these fields and copies them in | STO-07 |
+| `Dialect`, `IsUniqueViolation` | `platform/sql/sqlite`, `platform/sql/postgres` | Each engine's `dialect.Dialect` value, and the test it carries for a unique or primary-key violation, which the SQL store turns into `kernel.ErrConflict`. The target document names the `Dialect` type, not the drivers' values | STO-07 |
+| `DSN`, `Memory`, `ErrPathRequired` | `platform/sql/sqlite` | The modernc connection string with its pragmas and IMMEDIATE transactions, the path of a private in-memory database, and the sentinel for an empty path, whose text keeps its `sqlite:` prefix | STO-07 |
+| `ErrDSNRequired` | `platform/sql/postgres` | The sentinel for an empty DSN, whose text keeps its `postgres:` prefix | STO-07 |
 
 ### Placeholders
 
