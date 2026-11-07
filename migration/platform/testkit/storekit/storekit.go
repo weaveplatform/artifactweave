@@ -1,4 +1,4 @@
-package storetest
+package storekit
 
 import (
 	"errors"
