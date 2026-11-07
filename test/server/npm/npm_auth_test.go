@@ -12,10 +12,10 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // npmAuthWorld is the server over a seeded store with npm-local and
@@ -58,7 +58,7 @@ func newNPMAuthWorld(t *testing.T) *npmAuthWorld {
 	}
 	var log bytes.Buffer
 	return &npmAuthWorld{
-		h: server.New(server.Config{
+		h: harness.Router(harness.Config{
 			BaseURL: "https://reg.example", CompatVersion: "7.155.0", Store: db, Auth: a,
 			Tokens: tokens, Logger: slog.New(slog.NewJSONHandler(&log, nil)),
 		}),
@@ -309,7 +309,7 @@ func TestAccNPMCredentialWithoutOne(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := server.New(server.Config{Store: db, Auth: a, CompatVersion: "7.155.0"})
+	h := harness.Router(harness.Config{Store: db, Auth: a, CompatVersion: "7.155.0"})
 	for _, tc := range []struct {
 		path    string
 		headers map[string]string

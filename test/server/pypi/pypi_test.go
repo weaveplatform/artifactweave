@@ -9,8 +9,8 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // Follow pip's negotiation and link-resolution sequence through the full
@@ -18,7 +18,7 @@ import (
 func TestAccPypiInstallSequence(t *testing.T) {
 	for _, mode := range []string{"html", "json"} {
 		t.Run(mode, func(t *testing.T) {
-			w := newItemWorld(t, false, func(c *server.Config) {
+			w := newItemWorld(t, false, func(c *harness.Config) {
 				c.FormatSettings.PyPI.SimpleJSON = mode == "json"
 				c.FormatSettings.PyPI.CoreMetadata = true
 			})

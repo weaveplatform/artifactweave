@@ -7,17 +7,17 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/reindexauth"
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 func newPypiReindexWorld(t *testing.T) *itemWorld {
 	t.Helper()
-	w := newItemWorld(t, false, func(cfg *server.Config) {
+	w := newItemWorld(t, false, func(cfg *harness.Config) {
 		queue, err := work.New(cfg.Store, work.Options{})
 		if err != nil {
 			t.Fatal(err)

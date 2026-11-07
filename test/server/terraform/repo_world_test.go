@@ -8,10 +8,10 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 var errBoom = errors.New("boom")
@@ -37,7 +37,7 @@ func newRepoWorld(t *testing.T) *repoWorld {
 		t.Fatal(err)
 	}
 	w := &repoWorld{t: t, db: db, fail: map[string]bool{}}
-	w.h = server.New(
+	w.h = harness.Router(
 		Config{
 			BaseURL:       "https://reg.example",
 			CompatVersion: "7.155.0",

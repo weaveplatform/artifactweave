@@ -6,9 +6,9 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 type npmStatusWorld struct {
@@ -18,7 +18,7 @@ type npmStatusWorld struct {
 
 func newNPMStatusWorld(t *testing.T, anonymous bool) npmStatusWorld {
 	t.Helper()
-	h, _, tokens := npmServer(t, func(cfg *server.Config) {
+	h, _, tokens := npmServer(t, func(cfg *harness.Config) {
 		if anonymous {
 			if err := cfg.Store.Settings().
 				Put(t.Context(), types.SettingAnonymousAccess, true); err != nil {

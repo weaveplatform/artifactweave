@@ -9,13 +9,13 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 var (
@@ -70,7 +70,7 @@ func fixtureRepos(name string, kind repo.PackageType) []repo.Config {
 // this package. Each matrix/status fixture adds its own permission model.
 func pypiServer(
 	t *testing.T,
-	tune ...func(*server.Config),
+	tune ...harness.Tune,
 ) (http.Handler, *inmem.Store, *token.Service) {
 	t.Helper()
 	db := inmem.New()
@@ -101,19 +101,19 @@ func pypiServer(
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := server.Config{
+	cfg := harness.Config{
 		BaseURL: "https://reg.example", CompatVersion: "7.155.0", Store: db, Blobs: blobs, Auth: a,
 		Tokens: tokens, PasswordHash: testHash,
 	}
 	for _, fn := range tune {
 		fn(&cfg)
 	}
-	return server.New(cfg), db, tokens
+	return harness.Router(cfg), db, tokens
 }
 
-func statusFixture(t *testing.T, anonymous bool, tune ...func(*server.Config)) http.Handler {
+func statusFixture(t *testing.T, anonymous bool, tune ...harness.Tune) http.Handler {
 	t.Helper()
-	h, _, _ := pypiServer(t, func(c *server.Config) {
+	h, _, _ := pypiServer(t, func(c *harness.Config) {
 		if pypiStatusPart.tune != nil {
 			pypiStatusPart.tune(c)
 		}
@@ -131,7 +131,7 @@ func statusFixture(t *testing.T, anonymous bool, tune ...func(*server.Config)) h
 	return h
 }
 
-func allowBasicTokens(c *server.Config) { c.AllowBasicAuthTokens = true }
+func allowBasicTokens(c *harness.Config) { c.AllowBasicAuthTokens = true }
 
 func mintAdmin(t *testing.T, h http.Handler, body string) map[string]any {
 	t.Helper()

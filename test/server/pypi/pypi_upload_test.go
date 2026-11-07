@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 func TestAccPypiUploadBasicToken(t *testing.T) {
@@ -39,7 +39,7 @@ func TestAccPypiPutUsesItemDeploy(t *testing.T) {
 		w := newItemWorld(
 			t,
 			false,
-			func(c *server.Config) { c.EnforceIdenticalChecksumDeploy = strict },
+			func(c *harness.Config) { c.EnforceIdenticalChecksumDeploy = strict },
 		)
 		if err := w.db.Repos().
 			Create(context.Background(), *repo.Defaults(&repo.Config{Key: "pypi-local", Class: repo.Local, PackageType: repo.PyPI})); err != nil {

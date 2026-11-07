@@ -5,13 +5,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 const overwriter = "overwriter:pw"
@@ -28,7 +28,7 @@ type statusPart struct {
 	generated   map[string]bool
 	seed        func(*testing.T, store.Store, blob.Store)
 	rows        func() []statusCase
-	tune        func(*server.Config)
+	tune        harness.Tune
 }
 
 func grantOverwriter(t *testing.T, db store.Store, key, under string) {
@@ -52,7 +52,7 @@ type pypiStatusWorld struct {
 
 func newPypiStatusWorld(t *testing.T, anonymous bool) pypiStatusWorld {
 	t.Helper()
-	h, _, _ := pypiServer(t, func(cfg *server.Config) {
+	h, _, _ := pypiServer(t, func(cfg *harness.Config) {
 		if pypiStatusPart.tune != nil {
 			pypiStatusPart.tune(cfg)
 		}

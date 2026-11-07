@@ -8,7 +8,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	nugetfmt "github.com/weaveplatform/artifactweave/internal/format/nuget"
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
@@ -16,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 type matrixFixture struct {
@@ -29,7 +29,7 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 	t.Helper()
 	var tokens *token.Service
 	var blobs blob.Store
-	h, db, _ := nugetServer(t, func(cfg *server.Config) {
+	h, db, _ := nugetServer(t, func(cfg *harness.Config) {
 		tokens, blobs = cfg.Tokens, cfg.Blobs
 		for _, c := range []repo.Config{
 			{Key: "libs-local", Class: repo.Local},

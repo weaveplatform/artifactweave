@@ -9,7 +9,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/multipart"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -18,6 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 var (
@@ -57,7 +57,7 @@ func fixtureRepos(name string, kind repo.PackageType) []repo.Config {
 // before construction so package fixtures can add permissions and work.
 func npmServer(
 	t *testing.T,
-	tune ...func(*server.Config),
+	tune ...harness.Tune,
 ) (http.Handler, *inmem.Store, *token.Service) {
 	t.Helper()
 	ctx := t.Context()
@@ -95,7 +95,7 @@ func npmServer(
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := server.Config{
+	cfg := harness.Config{
 		BaseURL: "https://reg.example", CompatVersion: "7.155.0",
 		Store: db, Blobs: blobs, Auth: a, Tokens: tokens, PasswordHash: testHash,
 		Multipart: &multipart.Service{Store: db, Blobs: blobs, Dir: t.TempDir()},
@@ -103,7 +103,7 @@ func npmServer(
 	for _, f := range tune {
 		f(&cfg)
 	}
-	return server.New(cfg), db, tokens
+	return harness.Router(cfg), db, tokens
 }
 
 type statusPart struct {
@@ -126,10 +126,10 @@ func wantStatus(t *testing.T, rec *httptest.ResponseRecorder, want int) {
 	}
 }
 
-func newItemWorld(t *testing.T, anonymous bool, tune ...func(*server.Config)) *itemWorld {
+func newItemWorld(t *testing.T, anonymous bool, tune ...harness.Tune) *itemWorld {
 	t.Helper()
 	var blobs blob.Store
-	h, db, _ := npmServer(t, func(cfg *server.Config) {
+	h, db, _ := npmServer(t, func(cfg *harness.Config) {
 		for _, name := range []string{"deployer"} {
 			if err := cfg.Store.Users().
 				Create(t.Context(), types.User{Name: name, PasswordHash: cheapHash}); err != nil {

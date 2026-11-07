@@ -7,13 +7,13 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/remote"
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // Adapter activation is explicit. The general status fixture still verifies a
@@ -36,7 +36,7 @@ func TestAccStatusNuGetV3Remote(t *testing.T) {
 			Header: http.Header{"Content-Type": []string{"application/json"}},
 		},
 	)
-	h, _, _ := nugetServer(t, func(cfg *server.Config) {
+	h, _, _ := nugetServer(t, func(cfg *harness.Config) {
 		c := repo.Config{
 			Key: "nuget-remote", Class: repo.Remote, PackageType: repo.NuGet,
 			URL: up.URL, V3FeedURL: up.URL + "/v3/index.json",
