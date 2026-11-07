@@ -1,11 +1,12 @@
 # Server route test packages
 
-Server-assembly tests exercise `internal/server.New` with the protocol routes,
+Server-assembly tests exercise the production router with the protocol routes,
 authentication, repositories, and storage wired together. Protocol suites should
 live in separate Go packages under `test/server/<family>`. This makes the test
 package, rather than a test-name regular expression, the unit that CI can select.
-A package may import `internal/server` and its public configuration surface;
-fixtures used by that package live with it.
+A package builds the router through `test/server/support/harness`, with
+`harness.Router` and a `harness.Config`, and does not import `internal/server`
+itself; fixtures used by that package live with it.
 
 `test/server/support` owns reproducible authentication seeds, request helpers,
 NuGet package bytes, npm tarballs and Artifactory error decoding used by more
@@ -14,6 +15,17 @@ Docker route inventory. It imports no server package, so both `internal/server` 
 server-assembly packages can use it without an import cycle. Production code
 must not import it. Server configuration and storage setup stay with each suite
 because their repository and permission models differ.
+
+`test/server/support/harness` is the one place the suites build the router
+from. `Config` and `Tune` alias the router's configuration and its option
+function, and `Router` builds the production handler, so a change of router
+edits the harness and no suite. The harness also exports the item world of the
+root `internal/server` tests (`NewItemWorld`, with `Do`, `Item` and
+`WantStatus`) for the route suites that move out of that package, and
+`RepoFile`, which resolves a root-relative fixture path. Because the harness
+imports `internal/server`, `test/server/support` must never import it, and the
+root tests keep their in-package `newItemWorld`, which must build the same
+world.
 
 `test/server/registryfixture` assembles the full server with the registry's
 authentication, repository, and signed blob setup for Docker and Helm OCI.
