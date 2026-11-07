@@ -75,7 +75,7 @@ internal/
                                # (decision 0032)
   sqlstore/
     sqlcommon/                 # Dialect, unit of work, migrator
-    sqlite/ postgres/          # dialect packages, each with migrations/*.sql
+    sqlite/ postgres/          # dialect packages; migrations live in each module's stream
     sqltest/                   # shared SQL store contract-test harness
   crypt/                       # keyring, sealed columns, key rotation
   archive/                     # zip and tar walker, bounded reads of one file from a package

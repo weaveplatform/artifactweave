@@ -32,10 +32,12 @@ an older value. Keep previous key versions until rotation completes.
 
 ## Upgrade behavior
 
-Schema migration 0016 creates the secret table and marks existing repository rows for
-a key-aware backfill. Normal store startup performs that backfill before serving
-requests. It reads bounded batches and locks each repository while saving sealed
-headers, redacting its document and completing its marker in one transaction.
+The artifacts module's baseline creates the secret table, and `header_secrets_version`
+0 marks a repository whose document may still hold sensitive header values. The
+artifacts module's `AfterMigrate` hook converts such repositories with the configured
+keyring when the store opens, before it serves requests. It reads bounded batches and
+locks each repository while saving sealed headers, redacting its document and
+completing its marker in one transaction.
 Unrelated document fields, repository timestamps and source generations are preserved.
 A failed conversion leaves that repository unchanged and aborts startup; retrying with
 the problem corrected resumes remaining rows. Completed rows are not converted again.
@@ -44,14 +46,15 @@ headers, preventing conversion under a key that cannot open that repository's ex
 credentials.
 
 `migrate up` performs schema changes without requiring a master key; normal startup
-then completes the data backfill with the configured keyring. `keys rotate` also
-completes any pending backfill. Stop older binaries before the upgrade: they do not
-know the new secret table and could write sensitive values into documents again while
-leaving the completed backfill marker intact. Mixed-version writers are unsupported:
-new readers fail closed on that inconsistent state, and historical plaintext remains.
-Downgrading schema 0016 discards the new secret table; use a compatible backup for an
-application rollback, rather than treating the down migration as a secret-preserving
-conversion to the former plaintext format.
+then completes the conversion with the configured keyring. `keys rotate` also completes
+any pending conversion. A database whose migration history predates the per-module
+streams is refused rather than upgraded, and must be recreated (see
+[Schema migrations](../operations/configuration-reference.md#schema-migrations)). A
+writer that puts sensitive values back into a converted document is unsupported:
+readers fail closed on that inconsistent state, and historical plaintext remains.
+Rolling the artifacts stream back drops the secret table with the other artifacts
+tables; use a compatible backup for an application rollback, rather than treating the
+down migration as a secret-preserving conversion to a plaintext format.
 
 Explicitly unencrypted stores retain the existing no-key behavior: values are separate
 from the document but are plaintext in the secret table. Configure the keyring and run

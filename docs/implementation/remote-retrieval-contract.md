@@ -11,8 +11,8 @@ authorization, format hooks and durable work queue are building blocks.
 ## Storage implementation checkpoint (#619)
 
 `Store.RemoteCache` now has matching reference, SQLite and PostgreSQL implementations.
-Migration 0015 allocates durable repository incarnations for existing configurations;
-repository creation, source edits and deletion maintain those lifetimes transactionally.
+Repository creation allocates a durable repository incarnation, and source edits and
+deletion maintain those lifetimes transactionally.
 `Begin` captures a path epoch and completion revision before upstream I/O. `Put`,
 `Negative` and `Revalidate` compare those fences when publishing. `PolicyRevision`
 separately fences edits such as offline, TTL and no-store without invalidating the

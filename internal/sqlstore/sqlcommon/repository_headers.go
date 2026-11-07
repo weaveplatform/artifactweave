@@ -132,9 +132,12 @@ func (r repos) readConfigs(ctx context.Context, where string, args []any) ([]rep
 	return out, nil
 }
 
-// Schema version 0016 marks legacy rows for a key-aware data migration. The
-// marker and values commit with the redacted document, so a failed or interrupted
-// conversion is retried at the next open. No key material enters SQL migrations.
+// header_secrets_version 0 marks a repository whose document may still hold
+// sensitive header values, which the artifacts module's AfterMigrate hook
+// converts with the configured keyring at every open (decision 0017). The
+// marker and values commit with the redacted document, so a failed or
+// interrupted conversion is retried at the next open. No key material enters
+// SQL migrations.
 func (s *Store) backfillRepositoryHeaders(ctx context.Context) (int, error) {
 	changed := 0
 	for {

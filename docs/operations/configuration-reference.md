@@ -269,18 +269,40 @@ counts the values in the document (each scalar, null and list element), changed 
 
 ## Schema migrations
 
+Each module owns one migration stream, which starts at its own `0001_baseline.sql`. The
+streams run in this order: `platform`, `artifacts`, `access`, `notifications`,
+`retention`, `federation`, `releases` and `workers`. The `schema_migrations` table
+records every applied migration under its module and version, because each stream
+numbers its versions on its own.
+
 The server applies pending migrations when it opens the store. The `migrate` commands
-manage the schema by hand and need no master key:
+manage the schema by hand and need no master key. `--module` limits any of them to one
+module's stream:
 
 | Command | Effect |
 |---|---|
-| `artifactweave migrate version` | Prints the applied and the latest schema version |
-| `artifactweave migrate up` | Applies every pending migration, each in its own transaction |
-| `artifactweave migrate down [--to N]` | Reverts the latest migration, or every migration newer than `N` (`--to 0` reverts everything) |
+| `artifactweave migrate version` | Prints one line per stream: its applied and its latest version |
+| `artifactweave migrate up` | Applies every pending migration, the streams in order and each migration in its own transaction |
+| `artifactweave migrate down` | Reverts the newest migration of the last stream that has one applied |
+| `artifactweave migrate down --to 0` | Reverts every stream, the last one first |
+| `artifactweave migrate --module <module> up` | Applies that stream's pending migrations alone |
+| `artifactweave migrate --module <module> down [--to N]` | Reverts that stream's newest migration, or every migration of it newer than `N` |
+| `artifactweave migrate --module <module> version` | Prints that stream's line alone |
 
-Migration 0016 separates sensitive repository HTTP headers from repository documents.
-Normal startup completes its key-aware data backfill before serving requests; schema
-migration alone does not encrypt existing header values. See the
+`down --to N` with any `N` other than 0 needs `--module`, because a version number names
+a migration only within its stream.
+
+A database whose migration history predates the per-module streams is refused: opening
+it and every `migrate` command fail with `database history predates per-module
+migrations; not upgraded`, and nothing is written to it. Such a database has no upgrade
+path and must be recreated. For PostgreSQL, recreate the database or the schema the
+store uses (`DROP SCHEMA public CASCADE; CREATE SCHEMA public;` for the default
+schema); for SQLite, remove the database file.
+
+Sensitive repository HTTP header values live in sealed rows apart from the repository
+documents. When the store opens, the artifacts module converts any repository whose
+document may still hold such values with the configured keyring, before the server
+serves requests; schema migration alone does not encrypt header values. See the
 [header sealing upgrade notes](../implementation/repository-header-sealing.md#upgrade-behavior)
 for restart, rollback and historical-copy limitations.
 
