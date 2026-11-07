@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -28,7 +29,7 @@ var nameKeyset = []string{"name"}
 // key column, or nil when all exist.
 func (s *Store) requireRows(ctx context.Context, table, col, what string, names []string) error {
 	for _, n := range names {
-		ok, err := s.exists(ctx, "find "+what, "SELECT 1 FROM "+table+" WHERE "+col+" = ?", n)
+		ok, err := s.Exists(ctx, "find "+what, "SELECT 1 FROM "+table+" WHERE "+col+" = ?", n)
 		if err != nil {
 			return err
 		}
@@ -55,13 +56,13 @@ func (s *Store) memberships(
 	for i, k := range keys {
 		args[i] = k
 	}
-	err := s.rows(ctx, "list memberships",
+	err := s.Rows(ctx, "list memberships",
 		"SELECT "+col+", "+other+" FROM group_members WHERE "+col+" IN ("+Placeholders(len(keys))+
 			") ORDER BY "+col+", "+other, args,
 		func(r *sql.Rows) error {
 			var k, v string
 			if err := r.Scan(&k, &v); err != nil {
-				return err //nolint:wrapcheck // wrapped by rows
+				return err //nolint:wrapcheck // wrapped by Rows
 			}
 			out[k] = append(out[k], v)
 			return nil
@@ -79,7 +80,7 @@ func sortedUnique(names []string) []string {
 // addMembers inserts group_members rows, ignoring existing ones.
 func (s *Store) addMembers(ctx context.Context, group string, users []string) error {
 	for _, u := range users {
-		if _, err := s.exec(
+		if _, err := s.Exec(
 			ctx,
 			"add member",
 			InsertIgnore(
@@ -112,8 +113,8 @@ func userArgs(u types.User) []any {
 	return []any{
 		u.Name, u.Email, hash, u.Admin, u.ProfileUpdatable, u.InternalPasswordDisabled,
 		u.DisableUIAccess, u.Realm, string(u.Status), string(u.MFA),
-		micros(u.LastLoggedIn), micros(u.Created), mustJSON(u.Roles),
-		u.FailedLogins, micros(u.PasswordChanged), u.PasswordExpired,
+		dialect.Micros(u.LastLoggedIn), dialect.Micros(u.Created), dialect.MustJSON(u.Roles),
+		u.FailedLogins, dialect.Micros(u.PasswordChanged), u.PasswordExpired,
 	}
 }
 
@@ -131,12 +132,12 @@ func scanUser(row interface{ Scan(...any) error }) (types.User, error) {
 		return u, err //nolint:wrapcheck // wrapped by the caller
 	}
 	u.Status, u.MFA = types.UserStatus(status), types.MFAStatus(mfa)
-	u.LastLoggedIn, u.Created = fromMicros(lastLogin), fromMicros(create)
-	u.PasswordChanged = fromMicros(changed)
+	u.LastLoggedIn, u.Created = dialect.FromMicros(lastLogin), dialect.FromMicros(create)
+	u.PasswordChanged = dialect.FromMicros(changed)
 	if len(u.PasswordHash) == 0 {
 		u.PasswordHash = nil
 	}
-	return u, fromJSON(roles, &u.Roles)
+	return u, dialect.FromJSON(roles, &u.Roles)
 }
 
 func (us users) Create(ctx context.Context, u types.User) error {
@@ -146,7 +147,7 @@ func (us users) Create(ctx context.Context, u types.User) error {
 		if err := us.s.requireRows(ctx, "user_groups", "name", "group", groups); err != nil {
 			return err
 		}
-		if _, err := us.s.exec(ctx, "create user "+u.Name,
+		if _, err := us.s.Exec(ctx, "create user "+u.Name,
 			Insert("users", strings.Split(userCols, ", ")), args...); err != nil {
 			return err
 		}
@@ -163,10 +164,10 @@ func (us users) Create(ctx context.Context, u types.User) error {
 }
 
 func (us users) Get(ctx context.Context, name string) (types.User, error) {
-	u, err := scanUser(us.s.q(ctx).QueryRowContext(ctx,
-		us.s.d.Rebind("SELECT "+userCols+" FROM users WHERE name = ?"), name))
+	u, err := scanUser(us.s.Q(ctx).QueryRowContext(ctx,
+		us.s.Dialect().Rebind("SELECT "+userCols+" FROM users WHERE name = ?"), name))
 	if err != nil {
-		return u, us.s.wrap(fmt.Sprintf("get user %q", name), err)
+		return u, us.s.Wrap(fmt.Sprintf("get user %q", name), err)
 	}
 	m, err := us.s.memberships(ctx, "user_name", "group_name", []string{name})
 	u.Groups = m[name]
@@ -181,12 +182,12 @@ func (us users) Update(ctx context.Context, u types.User) error {
 			return err
 		}
 		cols := strings.Split(userCols, ", ")[1:]
-		if err := us.s.execOne(ctx, fmt.Sprintf("update user %q", u.Name),
+		if err := us.s.ExecOne(ctx, fmt.Sprintf("update user %q", u.Name),
 			"UPDATE users SET "+strings.Join(cols, " = ?, ")+" = ? WHERE name = ?",
 			append(args[1:], u.Name)...); err != nil {
 			return err
 		}
-		if _, err := us.s.exec(
+		if _, err := us.s.Exec(
 			ctx,
 			"clear groups",
 			"DELETE FROM group_members WHERE user_name = ?",
@@ -208,7 +209,7 @@ func (us users) Update(ctx context.Context, u types.User) error {
 
 func (us users) Delete(ctx context.Context, name string) error {
 	return us.s.Tx(ctx, func(ctx context.Context) error {
-		if _, err := us.s.exec(
+		if _, err := us.s.Exec(
 			ctx,
 			"delete memberships",
 			"DELETE FROM group_members WHERE user_name = ?",
@@ -216,7 +217,7 @@ func (us users) Delete(ctx context.Context, name string) error {
 		); err != nil {
 			return err
 		}
-		return us.s.execOne(
+		return us.s.ExecOne(
 			ctx,
 			fmt.Sprintf("delete user %q", name),
 			"DELETE FROM users WHERE name = ?",
@@ -230,13 +231,13 @@ func (us users) List(ctx context.Context, p store.Page) ([]types.User, string, e
 	if err != nil {
 		return nil, "", err //nolint:wrapcheck // already a store sentinel
 	}
-	cond, args, err := keyset(p, nameKeyset, nil, false)
+	cond, args, err := dialect.Keyset(p, nameKeyset, nil, false)
 	if err != nil {
 		return nil, "", err
 	}
 	var out []types.User
-	err = us.s.rows(ctx, "list users",
-		"SELECT "+userCols+" FROM users WHERE "+cond+orderBy(nameKeyset, false)+" LIMIT ?",
+	err = us.s.Rows(ctx, "list users",
+		"SELECT "+userCols+" FROM users WHERE "+cond+dialect.OrderBy(nameKeyset, false)+" LIMIT ?",
 		append(args, p.Limit+1),
 		func(r *sql.Rows) error {
 			u, err := scanUser(r)
@@ -262,11 +263,11 @@ func (us users) List(ctx context.Context, p store.Page) ([]types.User, string, e
 }
 
 func (us users) RecordLogin(ctx context.Context, name string, at time.Time) error {
-	return us.s.execOne(
+	return us.s.ExecOne(
 		ctx,
 		fmt.Sprintf("record login %q", name),
 		"UPDATE users SET last_logged_in_at = ?, failed_logins = 0 WHERE name = ?",
-		micros(at),
+		dialect.Micros(at),
 		name,
 	)
 }
@@ -276,7 +277,7 @@ func (us users) RecordLogin(ctx context.Context, name string, at time.Time) erro
 func (us users) RecordFailedLogin(ctx context.Context, name string, lockAt int) (bool, error) {
 	var locked bool
 	err := us.s.Tx(ctx, func(ctx context.Context) error {
-		if err := us.s.execOne(ctx, fmt.Sprintf("record failed login %q", name),
+		if err := us.s.ExecOne(ctx, fmt.Sprintf("record failed login %q", name),
 			"UPDATE users SET failed_logins = failed_logins + 1, status = CASE "+
 				"WHEN ? > 0 AND failed_logins + 1 >= ? AND status IN ('', ?) THEN ? "+
 				"ELSE status END WHERE name = ?",
@@ -284,11 +285,11 @@ func (us users) RecordFailedLogin(ctx context.Context, name string, lockAt int) 
 			return err
 		}
 		var status string
-		if err := us.s.q(ctx).QueryRowContext(ctx,
-			us.s.d.Rebind("SELECT status FROM users WHERE name = ?"),
+		if err := us.s.Q(ctx).QueryRowContext(ctx,
+			us.s.Dialect().Rebind("SELECT status FROM users WHERE name = ?"),
 			name).
 			Scan(&status); err != nil {
-			return us.s.wrap(fmt.Sprintf("read user %q", name), err)
+			return us.s.Wrap(fmt.Sprintf("read user %q", name), err)
 		}
 		locked = status == string(types.UserLocked)
 		return nil
@@ -300,7 +301,7 @@ func (us users) Unlock(ctx context.Context, names ...string) error {
 	unlock := "UPDATE users SET failed_logins = 0, status = CASE WHEN status = ? THEN ? ELSE status END"
 	args := []any{string(types.UserLocked), string(types.UserEnabled)}
 	if len(names) == 0 {
-		_, err := us.s.exec(
+		_, err := us.s.Exec(
 			ctx,
 			"unlock users",
 			unlock+" WHERE status = ? OR failed_logins > 0",
@@ -310,19 +311,19 @@ func (us users) Unlock(ctx context.Context, names ...string) error {
 	for _, n := range names {
 		args = append(args, n)
 	}
-	_, err := us.s.exec(ctx, "unlock users",
+	_, err := us.s.Exec(ctx, "unlock users",
 		unlock+" WHERE name IN ("+Placeholders(len(names))+")", args...)
 	return err
 }
 
 func (us users) Locked(ctx context.Context) ([]string, error) {
 	out := []string{}
-	err := us.s.rows(ctx, "list locked users",
+	err := us.s.Rows(ctx, "list locked users",
 		"SELECT name FROM users WHERE status = ? ORDER BY name", []any{string(types.UserLocked)},
 		func(r *sql.Rows) error {
 			var n string
 			if err := r.Scan(&n); err != nil {
-				return err //nolint:wrapcheck // wrapped by rows
+				return err //nolint:wrapcheck // wrapped by Rows
 			}
 			out = append(out, n)
 			return nil
@@ -339,7 +340,7 @@ const groupCols = "name, description, auto_join, admin_privileges, realm, realm_
 func groupArgs(g types.Group) []any {
 	return []any{
 		g.Name, g.Description, g.AutoJoin, g.AdminPrivileges, g.Realm, g.RealmAttributes,
-		g.ExternalID, mustJSON(g.Roles),
+		g.ExternalID, dialect.MustJSON(g.Roles),
 	}
 }
 
@@ -352,7 +353,7 @@ func scanGroup(row interface{ Scan(...any) error }) (types.Group, error) {
 		&g.RealmAttributes, &g.ExternalID, &roles); err != nil {
 		return g, err //nolint:wrapcheck // wrapped by the caller
 	}
-	return g, fromJSON(roles, &g.Roles)
+	return g, dialect.FromJSON(roles, &g.Roles)
 }
 
 func (gs groups) Create(ctx context.Context, g types.Group) error {
@@ -362,7 +363,7 @@ func (gs groups) Create(ctx context.Context, g types.Group) error {
 		if err := gs.s.requireRows(ctx, "users", "name", "user", members); err != nil {
 			return err
 		}
-		if _, err := gs.s.exec(ctx, "create group "+g.Name,
+		if _, err := gs.s.Exec(ctx, "create group "+g.Name,
 			Insert("user_groups", strings.Split(groupCols, ", ")), args...); err != nil {
 			return err
 		}
@@ -374,10 +375,10 @@ func (gs groups) Create(ctx context.Context, g types.Group) error {
 }
 
 func (gs groups) Get(ctx context.Context, name string) (types.Group, error) {
-	g, err := scanGroup(gs.s.q(ctx).QueryRowContext(ctx,
-		gs.s.d.Rebind("SELECT "+groupCols+" FROM user_groups WHERE name = ?"), name))
+	g, err := scanGroup(gs.s.Q(ctx).QueryRowContext(ctx,
+		gs.s.Dialect().Rebind("SELECT "+groupCols+" FROM user_groups WHERE name = ?"), name))
 	if err != nil {
-		return g, gs.s.wrap(fmt.Sprintf("get group %q", name), err)
+		return g, gs.s.Wrap(fmt.Sprintf("get group %q", name), err)
 	}
 	m, err := gs.s.memberships(ctx, "group_name", "user_name", []string{name})
 	g.Members = m[name]
@@ -392,12 +393,12 @@ func (gs groups) Update(ctx context.Context, g types.Group) error {
 			return err
 		}
 		cols := strings.Split(groupCols, ", ")[1:]
-		if err := gs.s.execOne(ctx, fmt.Sprintf("update group %q", g.Name),
+		if err := gs.s.ExecOne(ctx, fmt.Sprintf("update group %q", g.Name),
 			"UPDATE user_groups SET "+strings.Join(cols, " = ?, ")+" = ? WHERE name = ?",
 			append(args[1:], g.Name)...); err != nil {
 			return err
 		}
-		if _, err := gs.s.exec(
+		if _, err := gs.s.Exec(
 			ctx,
 			"clear members",
 			"DELETE FROM group_members WHERE group_name = ?",
@@ -414,7 +415,7 @@ func (gs groups) Update(ctx context.Context, g types.Group) error {
 
 func (gs groups) Delete(ctx context.Context, name string) error {
 	return gs.s.Tx(ctx, func(ctx context.Context) error {
-		if _, err := gs.s.exec(
+		if _, err := gs.s.Exec(
 			ctx,
 			"delete members",
 			"DELETE FROM group_members WHERE group_name = ?",
@@ -422,7 +423,7 @@ func (gs groups) Delete(ctx context.Context, name string) error {
 		); err != nil {
 			return err
 		}
-		return gs.s.execOne(
+		return gs.s.ExecOne(
 			ctx,
 			fmt.Sprintf("delete group %q", name),
 			"DELETE FROM user_groups WHERE name = ?",
@@ -436,13 +437,14 @@ func (gs groups) List(ctx context.Context, p store.Page) ([]types.Group, string,
 	if err != nil {
 		return nil, "", err //nolint:wrapcheck // already a store sentinel
 	}
-	cond, args, err := keyset(p, nameKeyset, nil, false)
+	cond, args, err := dialect.Keyset(p, nameKeyset, nil, false)
 	if err != nil {
 		return nil, "", err
 	}
 	var out []types.Group
-	err = gs.s.rows(ctx, "list groups",
-		"SELECT "+groupCols+" FROM user_groups WHERE "+cond+orderBy(nameKeyset, false)+" LIMIT ?",
+	err = gs.s.Rows(ctx, "list groups",
+		"SELECT "+groupCols+" FROM user_groups WHERE "+cond+dialect.OrderBy(nameKeyset, false)+
+			" LIMIT ?",
 		append(args, p.Limit+1),
 		func(r *sql.Rows) error {
 			g, err := scanGroup(r)
@@ -498,7 +500,7 @@ func (gs groups) RemoveMembers(ctx context.Context, group string, users ...strin
 			return err
 		}
 		for _, u := range users {
-			if _, err := gs.s.exec(
+			if _, err := gs.s.Exec(
 				ctx,
 				"remove member",
 				"DELETE FROM group_members WHERE group_name = ? AND user_name = ?",
@@ -514,13 +516,13 @@ func (gs groups) RemoveMembers(ctx context.Context, group string, users ...strin
 
 func (gs groups) AutoJoin(ctx context.Context) ([]string, error) {
 	var out []string
-	err := gs.s.rows(ctx, "list auto-join groups",
+	err := gs.s.Rows(ctx, "list auto-join groups",
 		"SELECT name FROM user_groups WHERE auto_join = ? ORDER BY name", []any{true},
 		func(r *sql.Rows) error {
 			var n string
 			err := r.Scan(&n)
 			out = append(out, n)
-			return err //nolint:wrapcheck // wrapped by rows
+			return err //nolint:wrapcheck // wrapped by Rows
 		})
 	return out, err
 }
@@ -540,15 +542,15 @@ func scanPermission(row interface{ Scan(...any) error }) (types.Permission, erro
 	if err := row.Scan(&p.Name, &p.Description, &created, &updated, &resources); err != nil {
 		return p, err //nolint:wrapcheck // wrapped by the caller
 	}
-	p.Created, p.Updated = fromMicros(created), fromMicros(updated)
-	return p, fromJSON(resources, &p.Resources)
+	p.Created, p.Updated = dialect.FromMicros(created), dialect.FromMicros(updated)
+	return p, dialect.FromJSON(resources, &p.Resources)
 }
 
 // mirror replaces the grant and target rows of p, which ForPrincipal and
 // WithTarget query.
 func (ps permissions) mirror(ctx context.Context, p types.Permission) error {
 	for _, table := range []string{"permission_grants", "permission_targets"} {
-		if _, err := ps.s.exec(ctx, "clear "+table,
+		if _, err := ps.s.Exec(ctx, "clear "+table,
 			"DELETE FROM "+table+" WHERE permission_name = ?", p.Name); err != nil {
 			return err
 		}
@@ -560,7 +562,7 @@ func (ps permissions) mirror(ctx context.Context, p types.Permission) error {
 			grants map[string]types.Actions
 		}{{types.PrincipalUser, res.Actions.Users}, {types.PrincipalGroup, res.Actions.Groups}} {
 			for name, a := range principal.grants {
-				if _, err := ps.s.exec(ctx, "mirror grant", Insert(
+				if _, err := ps.s.Exec(ctx, "mirror grant", Insert(
 					"permission_grants",
 					[]string{
 						"permission_name",
@@ -576,7 +578,7 @@ func (ps permissions) mirror(ctx context.Context, p types.Permission) error {
 			}
 		}
 		for target, tg := range res.Targets {
-			if _, err := ps.s.exec(
+			if _, err := ps.s.Exec(
 				ctx,
 				"mirror target",
 				Insert(
@@ -592,8 +594,8 @@ func (ps permissions) mirror(ctx context.Context, p types.Permission) error {
 				p.Name,
 				string(rt),
 				target,
-				mustJSON(tg.Include),
-				mustJSON(tg.Exclude),
+				dialect.MustJSON(tg.Include),
+				dialect.MustJSON(tg.Exclude),
 			); err != nil {
 				return err
 			}
@@ -604,15 +606,15 @@ func (ps permissions) mirror(ctx context.Context, p types.Permission) error {
 
 func (ps permissions) Create(ctx context.Context, p types.Permission) error {
 	return ps.s.Tx(ctx, func(ctx context.Context) error {
-		if _, err := ps.s.exec(
+		if _, err := ps.s.Exec(
 			ctx,
 			"create permission "+p.Name,
 			Insert("permissions", strings.Split(permissionCols, ", ")),
 			p.Name,
 			p.Description,
-			micros(p.Created),
-			micros(p.Updated),
-			mustJSON(p.Resources),
+			dialect.Micros(p.Created),
+			dialect.Micros(p.Updated),
+			dialect.MustJSON(p.Resources),
 		); err != nil {
 			return err
 		}
@@ -621,21 +623,21 @@ func (ps permissions) Create(ctx context.Context, p types.Permission) error {
 }
 
 func (ps permissions) Get(ctx context.Context, name string) (types.Permission, error) {
-	p, err := scanPermission(ps.s.q(ctx).QueryRowContext(ctx,
-		ps.s.d.Rebind("SELECT "+permissionCols+" FROM permissions WHERE name = ?"), name))
-	return p, ps.s.wrap(fmt.Sprintf("get permission %q", name), err)
+	p, err := scanPermission(ps.s.Q(ctx).QueryRowContext(ctx,
+		ps.s.Dialect().Rebind("SELECT "+permissionCols+" FROM permissions WHERE name = ?"), name))
+	return p, ps.s.Wrap(fmt.Sprintf("get permission %q", name), err)
 }
 
 func (ps permissions) Update(ctx context.Context, p types.Permission) error {
 	return ps.s.Tx(ctx, func(ctx context.Context) error {
-		if err := ps.s.execOne(
+		if err := ps.s.ExecOne(
 			ctx,
 			fmt.Sprintf("update permission %q", p.Name),
 			"UPDATE permissions SET description = ?, created_at = ?, updated_at = ?, resources = ? WHERE name = ?",
 			p.Description,
-			micros(p.Created),
-			micros(p.Updated),
-			mustJSON(p.Resources),
+			dialect.Micros(p.Created),
+			dialect.Micros(p.Updated),
+			dialect.MustJSON(p.Resources),
 			p.Name,
 		); err != nil {
 			return err
@@ -647,12 +649,12 @@ func (ps permissions) Update(ctx context.Context, p types.Permission) error {
 func (ps permissions) Delete(ctx context.Context, name string) error {
 	return ps.s.Tx(ctx, func(ctx context.Context) error {
 		for _, table := range []string{"permission_grants", "permission_targets"} {
-			if _, err := ps.s.exec(ctx, "clear "+table,
+			if _, err := ps.s.Exec(ctx, "clear "+table,
 				"DELETE FROM "+table+" WHERE permission_name = ?", name); err != nil {
 				return err
 			}
 		}
-		return ps.s.execOne(ctx, fmt.Sprintf("delete permission %q", name),
+		return ps.s.ExecOne(ctx, fmt.Sprintf("delete permission %q", name),
 			"DELETE FROM permissions WHERE name = ?", name)
 	})
 }
@@ -665,10 +667,10 @@ func (ps permissions) query(
 	args []any,
 ) ([]types.Permission, error) {
 	var out []types.Permission
-	err := ps.s.rows(
+	err := ps.s.Rows(
 		ctx,
 		op,
-		"SELECT "+permissionCols+" FROM permissions WHERE "+where+orderBy(
+		"SELECT "+permissionCols+" FROM permissions WHERE "+where+dialect.OrderBy(
 			nameKeyset,
 			false,
 		)+tail,
@@ -687,7 +689,7 @@ func (ps permissions) List(ctx context.Context, p store.Page) ([]types.Permissio
 	if err != nil {
 		return nil, "", err //nolint:wrapcheck // already a store sentinel
 	}
-	cond, args, err := keyset(p, nameKeyset, nil, false)
+	cond, args, err := dialect.Keyset(p, nameKeyset, nil, false)
 	if err != nil {
 		return nil, "", err
 	}

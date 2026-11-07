@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -42,7 +43,8 @@ func scanBlob(row interface{ Scan(...any) error }) (types.Blob, error) {
 	); err != nil {
 		return b, err //nolint:wrapcheck // wrapped by the caller
 	}
-	b.Created, b.Deleted, b.State = fromMicros(created), fromMicros(deleted), types.BlobState(state)
+	b.Created, b.Deleted, b.State = dialect.FromMicros(created), dialect.FromMicros(deleted),
+		types.BlobState(state)
 	return b, nil
 }
 
@@ -55,11 +57,11 @@ func (b blobIndex) insertRow(
 	state types.BlobState,
 	deleted time.Time,
 ) error {
-	_, err := b.s.exec(ctx, "insert "+b.table,
+	_, err := b.s.Exec(ctx, "insert "+b.table,
 		InsertIgnore(b.table, strings.Split(blobCols, ", "), []string{"sha256"}),
 		blob.Checksums.SHA256, blob.Checksums.SHA512, blob.Checksums.SHA1, blob.Checksums.MD5,
 		blob.Size,
-		micros(blob.Created), 0, string(state), micros(deleted))
+		dialect.Micros(blob.Created), 0, string(state), dialect.Micros(deleted))
 	return err
 }
 
@@ -99,11 +101,11 @@ func (b blobIndex) Ref(ctx context.Context, blob types.Blob, n int64) (types.Blo
 				" sha1 = CASE WHEN sha1 = '' THEN ? ELSE sha1 END," +
 				" md5 = CASE WHEN md5 = '' THEN ? ELSE md5 END WHERE sha256 = ?"
 			args = []any{
-				string(types.BlobLive), n, micros(blob.Created),
+				string(types.BlobLive), n, dialect.Micros(blob.Created),
 				blob.Checksums.SHA512, blob.Checksums.SHA1, blob.Checksums.MD5, sha,
 			}
 		}
-		if _, err := b.s.exec(ctx, "ref "+b.table, q, args...); err != nil {
+		if _, err := b.s.Exec(ctx, "ref "+b.table, q, args...); err != nil {
 			return err
 		}
 		out, err = b.get(ctx, sha, false)
@@ -129,16 +131,16 @@ func sameContent(stored, b types.Blob) bool {
 func (b blobIndex) get(ctx context.Context, sha256 string, lock bool) (types.Blob, error) {
 	q := "SELECT " + blobCols + " FROM " + b.table + " WHERE sha256 = ?"
 	if lock {
-		q += b.s.lockClause(ctx)
+		q += b.s.LockClause(ctx)
 	}
-	out, err := scanBlob(b.s.q(ctx).QueryRowContext(ctx, b.s.d.Rebind(q), sha256))
-	return out, b.s.wrap(fmt.Sprintf("get %s %s", b.table, sha256), err)
+	out, err := scanBlob(b.s.Q(ctx).QueryRowContext(ctx, b.s.Dialect().Rebind(q), sha256))
+	return out, b.s.Wrap(fmt.Sprintf("get %s %s", b.table, sha256), err)
 }
 
 func (b blobIndex) Unref(ctx context.Context, sha256 string, n int64) (types.Blob, error) {
 	var out types.Blob
 	err := b.s.Tx(ctx, func(ctx context.Context) error {
-		if err := b.s.execOne(ctx, "unref "+b.table+" "+sha256, "UPDATE "+b.table+
+		if err := b.s.ExecOne(ctx, "unref "+b.table+" "+sha256, "UPDATE "+b.table+
 			" SET ref_count = CASE WHEN ref_count > ? THEN ref_count - ? ELSE 0 END WHERE sha256 = ?",
 			n, n, sha256); err != nil {
 			return err
@@ -169,9 +171,9 @@ func (b blobIndex) Find(ctx context.Context, c types.Checksums) (types.Blob, err
 	q := "SELECT " + blobCols + " FROM " + b.table + " WHERE " + col + " = ? AND state = ?" +
 		" ORDER BY sha256 LIMIT 1"
 	out, err := scanBlob(
-		b.s.q(ctx).QueryRowContext(ctx, b.s.d.Rebind(q), val, string(types.BlobLive)),
+		b.s.Q(ctx).QueryRowContext(ctx, b.s.Dialect().Rebind(q), val, string(types.BlobLive)),
 	)
-	return out, b.s.wrap(fmt.Sprintf("find %s %s %s", b.table, col, val), err)
+	return out, b.s.Wrap(fmt.Sprintf("find %s %s %s", b.table, col, val), err)
 }
 
 // list pages the rows matching where (with args), ordered by sha256.
@@ -185,14 +187,14 @@ func (b blobIndex) list(
 	if err != nil {
 		return nil, "", err //nolint:wrapcheck // already a store sentinel
 	}
-	cond, kargs, err := keyset(p, []string{"sha256"}, nil, false)
+	cond, kargs, err := dialect.Keyset(p, []string{"sha256"}, nil, false)
 	if err != nil {
 		return nil, "", err
 	}
 	var out []types.Blob
-	err = b.s.rows(ctx, "list "+b.table,
+	err = b.s.Rows(ctx, "list "+b.table,
 		"SELECT "+blobCols+" FROM "+b.table+" WHERE "+where+" AND "+cond+
-			orderBy([]string{"sha256"}, false)+" LIMIT ?",
+			dialect.OrderBy([]string{"sha256"}, false)+" LIMIT ?",
 		append(append(args, kargs...), p.Limit+1),
 		func(r *sql.Rows) error {
 			v, err := scanBlob(r)
@@ -243,9 +245,9 @@ func (b blobIndex) MarkDeleting(
 		case cur.Refs > 0:
 			return fmt.Errorf("%s %s still referenced: %w", b.table, sha, store.ErrConflict)
 		}
-		if _, err := b.s.exec(ctx, "mark "+b.table, "UPDATE "+b.table+
+		if _, err := b.s.Exec(ctx, "mark "+b.table, "UPDATE "+b.table+
 			" SET state = ?, deleted_at = ? WHERE sha256 = ?",
-			string(types.BlobDeleting), micros(at), sha); err != nil {
+			string(types.BlobDeleting), dialect.Micros(at), sha); err != nil {
 			return err
 		}
 		out, err = b.get(ctx, sha, false)
@@ -264,9 +266,9 @@ func (b blobIndex) FinishDelete(ctx context.Context, sha256 string, at time.Time
 		case types.BlobDeleted:
 			return nil
 		case types.BlobDeleting:
-			_, err := b.s.exec(ctx, "finish "+b.table, "UPDATE "+b.table+
+			_, err := b.s.Exec(ctx, "finish "+b.table, "UPDATE "+b.table+
 				" SET state = ?, deleted_at = ? WHERE sha256 = ?",
-				string(types.BlobDeleted), micros(at), sha256)
+				string(types.BlobDeleted), dialect.Micros(at), sha256)
 			return err
 		default:
 			return fmt.Errorf("%s %s is live: %w", b.table, sha256, store.ErrConflict)
@@ -277,15 +279,15 @@ func (b blobIndex) FinishDelete(ctx context.Context, sha256 string, at time.Time
 func (b blobIndex) Prune(ctx context.Context, before time.Time) (int64, error) {
 	var n int64
 	err := b.s.Tx(ctx, func(ctx context.Context) error {
-		dropped, err := b.s.exec(ctx, "prune "+b.table,
+		dropped, err := b.s.Exec(ctx, "prune "+b.table,
 			"DELETE FROM "+b.table+" WHERE state = ? AND deleted_at < ?",
-			string(types.BlobDeleted), micros(before))
+			string(types.BlobDeleted), dialect.Micros(before))
 		if err != nil {
 			return err
 		}
-		cleared, err := b.s.exec(ctx, "prune "+b.table,
+		cleared, err := b.s.Exec(ctx, "prune "+b.table,
 			"UPDATE "+b.table+" SET deleted_at = NULL WHERE state = ? AND deleted_at < ?",
-			string(types.BlobLive), micros(before))
+			string(types.BlobLive), dialect.Micros(before))
 		n = dropped + cleared
 		return err
 	})
@@ -293,8 +295,8 @@ func (b blobIndex) Prune(ctx context.Context, before time.Time) (int64, error) {
 }
 
 func (b blobIndex) Totals(ctx context.Context) (count, bytes int64, err error) {
-	err = b.s.q(ctx).QueryRowContext(ctx, b.s.d.Rebind(
+	err = b.s.Q(ctx).QueryRowContext(ctx, b.s.Dialect().Rebind(
 		"SELECT COUNT(*), COALESCE(SUM(size), 0) FROM "+b.table+" WHERE state = ?"),
 		string(types.BlobLive)).Scan(&count, &bytes)
-	return count, bytes, b.s.wrap("totals "+b.table, err)
+	return count, bytes, b.s.Wrap("totals "+b.table, err)
 }

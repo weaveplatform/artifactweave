@@ -21,7 +21,7 @@ func (b bowerRegistrations) Create(ctx context.Context, v types.BowerRegistratio
 	if _, err := b.s.Repos().Get(ctx, v.RepoKey); err != nil {
 		return fmt.Errorf("create Bower registration: %w", err)
 	}
-	_, err := b.s.exec(
+	_, err := b.s.Exec(
 		ctx,
 		"create Bower registration",
 		Insert("bower_registrations", []string{"repo_key", "name", "url"}),
@@ -37,10 +37,10 @@ func (b bowerRegistrations) Get(
 	repoKey, name string,
 ) (types.BowerRegistration, error) {
 	out := types.BowerRegistration{RepoKey: repoKey, Name: name}
-	err := b.s.q(ctx).
-		QueryRowContext(ctx, b.s.d.Rebind("SELECT url FROM bower_registrations WHERE repo_key = ? AND name = ?"), repoKey, name).
+	err := b.s.Q(ctx).
+		QueryRowContext(ctx, b.s.Dialect().Rebind("SELECT url FROM bower_registrations WHERE repo_key = ? AND name = ?"), repoKey, name).
 		Scan(&out.URL)
-	return out, b.s.wrap("get Bower registration", err)
+	return out, b.s.Wrap("get Bower registration", err)
 }
 
 func (b bowerRegistrations) List(
@@ -66,7 +66,7 @@ func (b bowerRegistrations) List(
 		args = append(args, cursor[0])
 	}
 	var out []types.BowerRegistration
-	err = b.s.rows(
+	err = b.s.Rows(
 		ctx,
 		"list Bower registrations",
 		"SELECT name, url FROM bower_registrations"+where+" ORDER BY name LIMIT ?",

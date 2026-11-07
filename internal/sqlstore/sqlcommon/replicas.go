@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -59,7 +60,7 @@ func (r replicaIndex) Put(ctx context.Context, v types.BlobReplica) error {
 	if v.SHA256 == "" || v.Member == "" {
 		return fmt.Errorf("%s: sha256 and member are required: %w", r.table, store.ErrInvalid)
 	}
-	_, err := r.s.exec(
+	_, err := r.s.Exec(
 		ctx,
 		"put "+r.table,
 		Upsert(r.table, strings.Split(replicaCols, ", "), []string{"sha256", "member"}),
@@ -75,9 +76,9 @@ func (r replicaIndex) Put(ctx context.Context, v types.BlobReplica) error {
 }
 
 func (r replicaIndex) Get(ctx context.Context, sha256, member string) (types.BlobReplica, error) {
-	out, err := scanReplica(r.s.q(ctx).QueryRowContext(ctx, r.s.d.Rebind(
+	out, err := scanReplica(r.s.Q(ctx).QueryRowContext(ctx, r.s.Dialect().Rebind(
 		"SELECT "+replicaCols+" FROM "+r.table+" WHERE sha256 = ? AND member = ?"), sha256, member))
-	return out, r.s.wrap(fmt.Sprintf("get %s %s@%s", r.table, sha256, member), err)
+	return out, r.s.Wrap(fmt.Sprintf("get %s %s@%s", r.table, sha256, member), err)
 }
 
 func (r replicaIndex) query(
@@ -86,7 +87,7 @@ func (r replicaIndex) query(
 	args ...any,
 ) ([]types.BlobReplica, error) {
 	var out []types.BlobReplica
-	err := r.s.rows(ctx, op, q, args, func(rs *sql.Rows) error {
+	err := r.s.Rows(ctx, op, q, args, func(rs *sql.Rows) error {
 		v, err := scanReplica(rs)
 		out = append(out, v)
 		return err
@@ -111,7 +112,7 @@ func (r replicaIndex) List(
 	if err != nil {
 		return nil, "", err //nolint:wrapcheck // already a store sentinel
 	}
-	cond, args, err := keyset(p, replicaOrder, map[string]bool{"updated_at": true}, false)
+	cond, args, err := dialect.Keyset(p, replicaOrder, map[string]bool{"updated_at": true}, false)
 	if err != nil {
 		return nil, "", err
 	}
@@ -128,38 +129,38 @@ func (r replicaIndex) List(
 	}
 	rows, err := r.query(ctx, "list "+r.table,
 		"SELECT "+replicaCols+" FROM "+r.table+" WHERE "+strings.Join(where, " AND ")+
-			orderBy(replicaOrder, false)+" LIMIT ?", append(args, p.Limit+1)...)
+			dialect.OrderBy(replicaOrder, false)+" LIMIT ?", append(args, p.Limit+1)...)
 	if err != nil {
 		return nil, "", err
 	}
 	page, next := store.Trim(rows, p.Limit, func(v types.BlobReplica) []string {
-		return []string{itoa(replicaMicros(v.Updated)), v.SHA256, v.Member}
+		return []string{dialect.Itoa(replicaMicros(v.Updated)), v.SHA256, v.Member}
 	})
 	return page, next, nil
 }
 
 func (r replicaIndex) Delete(ctx context.Context, sha256, member string) error {
-	return r.s.execOne(ctx, fmt.Sprintf("delete %s %s@%s", r.table, sha256, member),
+	return r.s.ExecOne(ctx, fmt.Sprintf("delete %s %s@%s", r.table, sha256, member),
 		"DELETE FROM "+r.table+" WHERE sha256 = ? AND member = ?", sha256, member)
 }
 
 func (r replicaIndex) DeleteBlob(ctx context.Context, sha256 string) (int64, error) {
-	return r.s.exec(ctx, "delete "+r.table, "DELETE FROM "+r.table+" WHERE sha256 = ?", sha256)
+	return r.s.Exec(ctx, "delete "+r.table, "DELETE FROM "+r.table+" WHERE sha256 = ?", sha256)
 }
 
 func (r replicaIndex) UnderReplicated(ctx context.Context, redundancy int) (int64, error) {
 	var n int64
-	err := r.s.q(ctx).QueryRowContext(ctx, r.s.d.Rebind(
+	err := r.s.Q(ctx).QueryRowContext(ctx, r.s.Dialect().Rebind(
 		"SELECT COUNT(*) FROM (SELECT sha256 FROM "+r.table+" GROUP BY sha256"+
 			" HAVING SUM(CASE WHEN state = 'deleting' THEN 1 ELSE 0 END) = 0"+
 			" AND SUM(CASE WHEN state = 'present' THEN 1 ELSE 0 END) < ?) under"),
 		redundancy).Scan(&n)
-	return n, r.s.wrap("under-replicated "+r.table, err)
+	return n, r.s.Wrap("under-replicated "+r.table, err)
 }
 
 func (r replicaIndex) SoleCopies(ctx context.Context) (map[string]int64, error) {
 	out := map[string]int64{}
-	err := r.s.rows(ctx, "sole copies "+r.table,
+	err := r.s.Rows(ctx, "sole copies "+r.table,
 		"SELECT member, COUNT(*) FROM "+r.table+" WHERE state = 'present' AND sha256 IN"+
 			" (SELECT sha256 FROM "+r.table+" GROUP BY sha256"+
 			" HAVING SUM(CASE WHEN state = 'deleting' THEN 1 ELSE 0 END) = 0"+
@@ -171,7 +172,7 @@ func (r replicaIndex) SoleCopies(ctx context.Context) (map[string]int64, error) 
 				n      int64
 			)
 			if err := rs.Scan(&member, &n); err != nil {
-				return err //nolint:wrapcheck // wrapped by rows
+				return err //nolint:wrapcheck // wrapped by Rows
 			}
 			out[member] = n
 			return nil
@@ -184,7 +185,7 @@ func (r replicaIndex) SoleCopies(ctx context.Context) (map[string]int64, error) 
 
 func (r replicaIndex) Counts(ctx context.Context) ([]store.ReplicaCount, error) {
 	var out []store.ReplicaCount
-	err := r.s.rows(ctx, "count "+r.table,
+	err := r.s.Rows(ctx, "count "+r.table,
 		"SELECT member, state, COUNT(*), COALESCE(SUM(size), 0) FROM "+r.table+
 			" GROUP BY member, state ORDER BY member, state", nil,
 		func(rs *sql.Rows) error {
@@ -193,7 +194,7 @@ func (r replicaIndex) Counts(ctx context.Context) ([]store.ReplicaCount, error) 
 				state string
 			)
 			if err := rs.Scan(&c.Member, &state, &c.Count, &c.Bytes); err != nil {
-				return err //nolint:wrapcheck // wrapped by rows
+				return err //nolint:wrapcheck // wrapped by Rows
 			}
 			c.State = types.ReplicaState(state)
 			out = append(out, c)

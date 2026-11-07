@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 )
 
 const purposeRepoHeader = "repositories.http_header"
@@ -24,7 +25,7 @@ func repositoryHeaderID(key string, position int, name string) string {
 }
 
 func (r repos) writeHeaderSecrets(ctx context.Context, c repo.Config) error {
-	if _, err := r.s.exec(
+	if _, err := r.s.Exec(
 		ctx,
 		"replace repository header secrets",
 		"DELETE FROM repository_header_secrets WHERE repo_key = ?",
@@ -36,13 +37,13 @@ func (r repos) writeHeaderSecrets(ctx context.Context, c repo.Config) error {
 		if !h.Sensitive {
 			continue
 		}
-		sealed, err := r.s.seal(purposeRepoHeader, repositoryHeaderID(c.Key, i, h.Name), h.Value)
+		sealed, err := r.s.Seal(purposeRepoHeader, repositoryHeaderID(c.Key, i, h.Name), h.Value)
 		if err != nil {
 			return err
 		}
 		// Retain an explicit NULL row for an intentionally empty sensitive header.
 		// A missing row must fail closed instead of silently dropping authentication.
-		if _, err = r.s.exec(
+		if _, err = r.s.Exec(
 			ctx,
 			"store repository header secret",
 			Insert("repository_header_secrets", []string{"repo_key", "position", "name", "value"}),
@@ -66,14 +67,14 @@ func (r repos) readConfigs(ctx context.Context, where string, args []any) ([]rep
 	var out []repo.Config
 	last := ""
 	read, expected := 0, 0
-	err := r.s.rows(ctx, "read repository configurations", query, args, func(rs *sql.Rows) error {
+	err := r.s.Rows(ctx, "read repository configurations", query, args, func(rs *sql.Rows) error {
 		var key, doc string
 		var version int
 		var password, value []byte
 		var position sql.NullInt64
 		var name sql.NullString
 		if err := rs.Scan(&key, &doc, &version, &password, &position, &name, &value); err != nil {
-			return err //nolint:wrapcheck // wrapped by rows
+			return err //nolint:wrapcheck // wrapped by Rows
 		}
 		if version != 1 {
 			return errRepositoryHeader
@@ -86,7 +87,7 @@ func (r repos) readConfigs(ctx context.Context, where string, args []any) ([]rep
 			if err != nil {
 				return err
 			}
-			config.Password, err = r.s.unseal(purposeRepoPassword, key, password)
+			config.Password, err = r.s.Unseal(purposeRepoPassword, key, password)
 			if err != nil {
 				return err
 			}
@@ -110,7 +111,7 @@ func (r repos) readConfigs(ctx context.Context, where string, args []any) ([]rep
 		if !name.Valid || !header.Sensitive || header.Name != name.String || header.Value != "" {
 			return errRepositoryHeader
 		}
-		plain, err := r.s.unseal(
+		plain, err := r.s.Unseal(
 			purposeRepoHeader,
 			repositoryHeaderID(key, int(position.Int64), name.String),
 			value,
@@ -138,7 +139,7 @@ func (s *Store) backfillRepositoryHeaders(ctx context.Context) (int, error) {
 	changed := 0
 	for {
 		var keys []string
-		err := s.rows(
+		err := s.Rows(
 			ctx,
 			"find legacy repository headers",
 			`SELECT key FROM repositories WHERE header_secrets_version = 0 ORDER BY key LIMIT 128`,
@@ -146,7 +147,7 @@ func (s *Store) backfillRepositoryHeaders(ctx context.Context) (int, error) {
 			func(rows *sql.Rows) error {
 				var key string
 				if err := rows.Scan(&key); err != nil {
-					return err //nolint:wrapcheck // wrapped by rows
+					return err //nolint:wrapcheck // wrapped by Rows
 				}
 				keys = append(keys, key)
 				return nil
@@ -173,14 +174,14 @@ func (s *Store) backfillRepositoryHeader(ctx context.Context, key string) (int, 
 	err := s.Tx(ctx, func(tx context.Context) error {
 		var doc string
 		var version int
-		err := s.q(tx).
-			QueryRowContext(tx, s.d.Rebind(`SELECT doc, header_secrets_version FROM repositories WHERE key = ?`+s.lockClause(tx)), key).
+		err := s.Q(tx).
+			QueryRowContext(tx, s.Dialect().Rebind(`SELECT doc, header_secrets_version FROM repositories WHERE key = ?`+s.LockClause(tx)), key).
 			Scan(&doc, &version)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil
 		}
 		if err != nil {
-			return s.wrap("read legacy repository headers", err)
+			return s.Wrap("read legacy repository headers", err)
 		}
 		if version != 0 {
 			return nil
@@ -200,7 +201,7 @@ func (s *Store) backfillRepositoryHeader(ctx context.Context, key string) (int, 
 		if err != nil {
 			return err
 		}
-		if err = s.execOne(
+		if err = s.ExecOne(
 			tx,
 			"redact legacy repository headers",
 			`UPDATE repositories SET doc = ?, header_secrets_version = 1 WHERE key = ?`,
@@ -231,7 +232,7 @@ func redactRepositoryHeaderDocument(doc string, headers []repo.CustomHTTPHeader)
 		return "", fmt.Errorf("decode legacy repository document: %w", err)
 	}
 	object["customHttpHeaders"] = json.RawMessage(
-		mustJSON(maskedRepositoryHeaders(headers)).(string),
+		dialect.MustJSON(maskedRepositoryHeaders(headers)).(string),
 	)
 	encoded, err := json.Marshal(object)
 	if err != nil {
@@ -255,15 +256,15 @@ func (s *Store) verifyRepositoryHeaderKey(ctx context.Context, c repo.Config) er
 		return nil
 	}
 	var password []byte
-	err := s.q(ctx).
-		QueryRowContext(ctx, s.d.Rebind("SELECT password FROM repository_secrets WHERE repo_key = ?"), c.Key).
+	err := s.Q(ctx).
+		QueryRowContext(ctx, s.Dialect().Rebind("SELECT password FROM repository_secrets WHERE repo_key = ?"), c.Key).
 		Scan(&password)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil
 	}
 	if err != nil {
-		return s.wrap("verify legacy repository sealing key", err)
+		return s.Wrap("verify legacy repository sealing key", err)
 	}
-	_, err = s.unseal(purposeRepoPassword, c.Key, password)
+	_, err = s.Unseal(purposeRepoPassword, c.Key, password)
 	return err
 }

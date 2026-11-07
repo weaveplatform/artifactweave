@@ -1,4 +1,4 @@
-package sqlcommon
+package dialect
 
 import (
 	"context"
@@ -18,7 +18,8 @@ var ErrMigration = errors.New("sqlcommon: migration")
 // migrationsTable records the applied schema versions.
 const migrationsTable = "schema_migrations"
 
-// Migration is one parsed migration file.
+// Migration is one parsed migration file: the version and name its file name
+// gives, and the statements of its up and down sections.
 type Migration struct {
 	Version int
 	Name    string
@@ -26,7 +27,12 @@ type Migration struct {
 	Down    []string
 }
 
-// LoadMigrations parses every NNNN_name.sql file in fsys, sorted by version.
+// LoadMigrations parses every NNNN_name.sql file at the top of fsys, sorted
+// by version. A statement ends with a semicolon at the end of a line, the
+// last one of a section may leave it out, and comment and blank lines are
+// dropped. It fails with ErrMigration for a directory or file it cannot read,
+// a malformed file name, a version below 1, a version defined twice and a
+// file with no up statements.
 func LoadMigrations(fsys fs.FS) ([]Migration, error) {
 	entries, err := fs.ReadDir(fsys, ".")
 	if err != nil {
@@ -125,7 +131,10 @@ func splitStatements(text string) []string {
 }
 
 // Migrate applies every pending migration in order, each in its own
-// transaction, and returns the versions applied.
+// transaction with the row that records its version, and returns the versions
+// applied. It creates the version table when it is absent. On a failure it
+// returns the versions applied before it and an error that wraps ErrMigration
+// and names the migration and the first line of a failing statement.
 func Migrate(ctx context.Context, db *sql.DB, d Dialect) ([]int, error) {
 	ms, applied, err := state(ctx, db, d)
 	if err != nil {
@@ -151,8 +160,9 @@ func Migrate(ctx context.Context, db *sql.DB, d Dialect) ([]int, error) {
 }
 
 // Rollback reverts applied migrations newer than target (0 reverts all),
-// newest first, each in its own transaction, and returns the versions
-// reverted.
+// newest first, each in its own transaction with the removal of its version,
+// and returns the versions reverted. On a failure it returns the versions
+// reverted before it and an error that wraps ErrMigration.
 func Rollback(ctx context.Context, db *sql.DB, d Dialect, target int) ([]int, error) {
 	ms, applied, err := state(ctx, db, d)
 	if err != nil {
@@ -177,7 +187,8 @@ func Rollback(ctx context.Context, db *sql.DB, d Dialect, target int) ([]int, er
 }
 
 // Version returns the highest applied version (0 when none) and the highest
-// version the dialect knows, so callers can report a pending schema.
+// version the dialect knows, so callers can report a pending schema. Errors
+// wrap ErrMigration.
 func Version(ctx context.Context, db *sql.DB, d Dialect) (current, latest int, err error) {
 	ms, applied, err := state(ctx, db, d)
 	if err != nil {
@@ -250,8 +261,11 @@ func firstLine(s string) string {
 	return line
 }
 
-// MustSub returns the sub-tree dir of fsys and panics when it is missing.
-// Backends use it to expose their embedded migrations as a Dialect value.
+// MustSub returns the sub-tree dir of fsys. A driver calls it in the
+// initialiser of its Dialect variable, where no error can be returned, to give
+// the dialect its embedded migrations. It panics when fs.Sub refuses dir, as
+// it does a path that is not valid; a directory that does not exist surfaces
+// later, as the error LoadMigrations returns.
 func MustSub(fsys fs.FS, dir string) fs.FS {
 	sub, err := fs.Sub(fsys, dir)
 	if err != nil {

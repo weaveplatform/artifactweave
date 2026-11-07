@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -22,7 +23,7 @@ type projectStore struct{ s *Store }
 const projectCols = "key, display_name, description, storage_quota_bytes, soft_limit, quota_email, admin_privileges"
 
 func projectArgs(v types.Project) ([]any, error) {
-	priv, err := toJSON(v.AdminPrivileges)
+	priv, err := dialect.ToJSON(v.AdminPrivileges)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +41,7 @@ func scanProject(row interface{ Scan(...any) error }) (types.Project, error) {
 		&v.SoftLimit, &v.QuotaEmail, &priv); err != nil {
 		return v, err //nolint:wrapcheck // wrapped by the caller
 	}
-	return v, fromJSON(priv, &v.AdminPrivileges)
+	return v, dialect.FromJSON(priv, &v.AdminPrivileges)
 }
 
 func (p projectStore) Create(ctx context.Context, v types.Project) error {
@@ -48,18 +49,18 @@ func (p projectStore) Create(ctx context.Context, v types.Project) error {
 	if err != nil {
 		return err
 	}
-	_, err = p.s.exec(
+	_, err = p.s.Exec(
 		ctx,
 		"create project "+v.Key,
-		Insert("projects", opsCols(projectCols)),
+		Insert("projects", dialect.OpsCols(projectCols)),
 		args...)
 	return err
 }
 
 func (p projectStore) Get(ctx context.Context, key string) (types.Project, error) {
-	v, err := scanProject(p.s.q(ctx).QueryRowContext(ctx,
-		p.s.d.Rebind("SELECT "+projectCols+" FROM projects WHERE key = ?"), key))
-	return v, p.s.wrap("get project "+key, err)
+	v, err := scanProject(p.s.Q(ctx).QueryRowContext(ctx,
+		p.s.Dialect().Rebind("SELECT "+projectCols+" FROM projects WHERE key = ?"), key))
+	return v, p.s.Wrap("get project "+key, err)
 }
 
 func (p projectStore) Update(ctx context.Context, v types.Project) error {
@@ -67,7 +68,7 @@ func (p projectStore) Update(ctx context.Context, v types.Project) error {
 	if err != nil {
 		return err
 	}
-	return p.s.execOne(
+	return p.s.ExecOne(
 		ctx,
 		"update project "+v.Key,
 		"UPDATE projects SET display_name = ?, description = ?, "+
@@ -77,7 +78,7 @@ func (p projectStore) Update(ctx context.Context, v types.Project) error {
 
 func (p projectStore) Delete(ctx context.Context, key string) error {
 	return p.s.Tx(ctx, func(ctx context.Context) error {
-		if err := p.s.execOne(
+		if err := p.s.ExecOne(
 			ctx,
 			"delete project "+key,
 			"DELETE FROM projects WHERE key = ?",
@@ -94,7 +95,7 @@ func (p projectStore) Delete(ctx context.Context, key string) error {
 				"(SELECT repo_key FROM project_repositories WHERE project_key = ?)",
 			"DELETE FROM project_repositories WHERE project_key = ?",
 		} {
-			if _, err := p.s.exec(ctx, "delete project "+key, q, key); err != nil {
+			if _, err := p.s.Exec(ctx, "delete project "+key, q, key); err != nil {
 				return err
 			}
 		}
@@ -104,7 +105,7 @@ func (p projectStore) Delete(ctx context.Context, key string) error {
 
 func (p projectStore) List(ctx context.Context) ([]types.Project, error) {
 	var out []types.Project
-	err := p.s.rows(ctx, "list projects", "SELECT "+projectCols+" FROM projects ORDER BY key", nil,
+	err := p.s.Rows(ctx, "list projects", "SELECT "+projectCols+" FROM projects ORDER BY key", nil,
 		func(r *sql.Rows) error {
 			v, err := scanProject(r)
 			out = append(out, v)
@@ -119,7 +120,7 @@ func (p projectStore) requireProject(ctx context.Context, key string) error {
 	if key == "" {
 		return nil
 	}
-	ok, err := p.s.exists(ctx, "find project "+key, "SELECT 1 FROM projects WHERE key = ?", key)
+	ok, err := p.s.Exists(ctx, "find project "+key, "SELECT 1 FROM projects WHERE key = ?", key)
 	if err != nil {
 		return err
 	}
@@ -139,10 +140,10 @@ func scanRole(row interface{ Scan(...any) error }) (types.Role, error) {
 	if err := row.Scan(&v.ProjectKey, &v.Name, &v.Type, &v.Description, &envs, &acts); err != nil {
 		return v, err //nolint:wrapcheck // wrapped by the caller
 	}
-	if err := fromJSON(envs, &v.Environments); err != nil {
+	if err := dialect.FromJSON(envs, &v.Environments); err != nil {
 		return v, err
 	}
-	return v, fromJSON(acts, &v.Actions)
+	return v, dialect.FromJSON(acts, &v.Actions)
 }
 
 func (p projectStore) PutRole(ctx context.Context, r types.Role) error {
@@ -150,18 +151,18 @@ func (p projectStore) PutRole(ctx context.Context, r types.Role) error {
 		if err := p.requireProject(ctx, r.ProjectKey); err != nil {
 			return err
 		}
-		envs, err := toJSON(r.Environments)
+		envs, err := dialect.ToJSON(r.Environments)
 		if err != nil {
 			return err
 		}
-		acts, err := toJSON(r.Actions)
+		acts, err := dialect.ToJSON(r.Actions)
 		if err != nil {
 			return err
 		}
-		_, err = p.s.exec(
+		_, err = p.s.Exec(
 			ctx,
 			"put role "+r.Name,
-			Upsert("roles", opsCols(roleCols), []string{"project_key", "name"}),
+			Upsert("roles", dialect.OpsCols(roleCols), []string{"project_key", "name"}),
 			r.ProjectKey,
 			r.Name,
 			r.Type,
@@ -174,11 +175,11 @@ func (p projectStore) PutRole(ctx context.Context, r types.Role) error {
 }
 
 func (p projectStore) Role(ctx context.Context, projectKey, name string) (types.Role, error) {
-	v, err := scanRole(p.s.q(ctx).QueryRowContext(ctx,
-		p.s.d.Rebind("SELECT "+roleCols+" FROM roles WHERE project_key = ? AND name = ?"),
+	v, err := scanRole(p.s.Q(ctx).QueryRowContext(ctx,
+		p.s.Dialect().Rebind("SELECT "+roleCols+" FROM roles WHERE project_key = ? AND name = ?"),
 		projectKey, name),
 	)
-	return v, p.s.wrap(fmt.Sprintf("get role %s/%s", projectKey, name), err)
+	return v, p.s.Wrap(fmt.Sprintf("get role %s/%s", projectKey, name), err)
 }
 
 func (p projectStore) Roles(ctx context.Context, projectKey string) ([]types.Role, error) {
@@ -191,7 +192,7 @@ func (p projectStore) Roles(ctx context.Context, projectKey string) ([]types.Rol
 
 func (p projectStore) roles(ctx context.Context, q string, args ...any) ([]types.Role, error) {
 	var out []types.Role
-	err := p.s.rows(ctx, "list roles", q, args, func(r *sql.Rows) error {
+	err := p.s.Rows(ctx, "list roles", q, args, func(r *sql.Rows) error {
 		v, err := scanRole(r)
 		out = append(out, v)
 		return err
@@ -200,7 +201,7 @@ func (p projectStore) roles(ctx context.Context, q string, args ...any) ([]types
 }
 
 func (p projectStore) DeleteRole(ctx context.Context, projectKey, name string) error {
-	return p.s.execOne(ctx, fmt.Sprintf("delete role %s/%s", projectKey, name),
+	return p.s.ExecOne(ctx, fmt.Sprintf("delete role %s/%s", projectKey, name),
 		"DELETE FROM roles WHERE project_key = ? AND name = ?", projectKey, name)
 }
 
@@ -209,7 +210,7 @@ func (p projectStore) CreateEnvironment(ctx context.Context, e types.Environment
 		if err := p.requireProject(ctx, e.ProjectKey); err != nil {
 			return err
 		}
-		_, err := p.s.exec(ctx, "create environment "+e.Name,
+		_, err := p.s.Exec(ctx, "create environment "+e.Name,
 			Insert("environments", []string{"name", "project_key"}), e.Name, e.ProjectKey)
 		return err
 	})
@@ -220,7 +221,7 @@ func (p projectStore) Environments(
 	projectKey string,
 ) ([]types.Environment, error) {
 	var out []types.Environment
-	err := p.s.rows(
+	err := p.s.Rows(
 		ctx,
 		"list environments",
 		"SELECT name, project_key FROM environments WHERE project_key = ? ORDER BY name",
@@ -229,7 +230,7 @@ func (p projectStore) Environments(
 			var v types.Environment
 			err := r.Scan(&v.Name, &v.ProjectKey)
 			out = append(out, v)
-			return err //nolint:wrapcheck // wrapped by rows
+			return err //nolint:wrapcheck // wrapped by Rows
 		},
 	)
 	return out, err
@@ -237,7 +238,7 @@ func (p projectStore) Environments(
 
 func (p projectStore) RenameEnvironment(ctx context.Context, projectKey, from, to string) error {
 	return p.s.Tx(ctx, func(ctx context.Context) error {
-		if err := p.s.execOne(
+		if err := p.s.ExecOne(
 			ctx,
 			fmt.Sprintf("rename environment %s/%s", projectKey, from),
 			"UPDATE environments SET name = ? WHERE name = ? AND project_key = ?",
@@ -253,11 +254,11 @@ func (p projectStore) RenameEnvironment(ctx context.Context, projectKey, from, t
 		}
 		for _, r := range roles {
 			if renameIn(r.Environments, from, to) {
-				envs, err := toJSON(r.Environments)
+				envs, err := dialect.ToJSON(r.Environments)
 				if err != nil {
 					return err
 				}
-				if _, err := p.s.exec(ctx, "rename environment in role "+r.Name,
+				if _, err := p.s.Exec(ctx, "rename environment in role "+r.Name,
 					"UPDATE roles SET environments = ? WHERE project_key = ? AND name = ?",
 					envs, r.ProjectKey, r.Name); err != nil {
 					return err
@@ -270,11 +271,11 @@ func (p projectStore) RenameEnvironment(ctx context.Context, projectKey, from, t
 		}
 		for _, a := range assigned {
 			if renameIn(a.Environments, from, to) {
-				envs, err := toJSON(a.Environments)
+				envs, err := dialect.ToJSON(a.Environments)
 				if err != nil {
 					return err
 				}
-				if _, err := p.s.exec(
+				if _, err := p.s.Exec(
 					ctx,
 					"rename environment in assignment "+a.RepoKey,
 					"UPDATE project_repositories SET environments = ? WHERE repo_key = ?",
@@ -302,7 +303,7 @@ func renameIn(names []string, from, to string) bool {
 }
 
 func (p projectStore) DeleteEnvironment(ctx context.Context, projectKey, name string) error {
-	return p.s.execOne(ctx, fmt.Sprintf("delete environment %s/%s", projectKey, name),
+	return p.s.ExecOne(ctx, fmt.Sprintf("delete environment %s/%s", projectKey, name),
 		"DELETE FROM environments WHERE name = ? AND project_key = ?", name, projectKey)
 }
 
@@ -316,7 +317,7 @@ func scanMember(row interface{ Scan(...any) error }) (types.ProjectMember, error
 	if err := row.Scan(&v.ProjectKey, &v.Type, &v.Name, &roles); err != nil {
 		return v, err //nolint:wrapcheck // wrapped by the caller
 	}
-	return v, fromJSON(roles, &v.Roles)
+	return v, dialect.FromJSON(roles, &v.Roles)
 }
 
 func (p projectStore) PutMember(ctx context.Context, m types.ProjectMember) error {
@@ -324,16 +325,16 @@ func (p projectStore) PutMember(ctx context.Context, m types.ProjectMember) erro
 		if err := p.requireProject(ctx, m.ProjectKey); err != nil {
 			return err
 		}
-		roles, err := toJSON(m.Roles)
+		roles, err := dialect.ToJSON(m.Roles)
 		if err != nil {
 			return err
 		}
-		_, err = p.s.exec(
+		_, err = p.s.Exec(
 			ctx,
 			"put member "+m.Name,
 			Upsert(
 				"project_members",
-				opsCols(memberCols),
+				dialect.OpsCols(memberCols),
 				[]string{"project_key", "principal_type", "principal_name"},
 			),
 			m.ProjectKey,
@@ -348,17 +349,17 @@ func (p projectStore) PutMember(ctx context.Context, m types.ProjectMember) erro
 func (p projectStore) Member(
 	ctx context.Context, projectKey string, typ types.PrincipalType, name string,
 ) (types.ProjectMember, error) {
-	v, err := scanMember(p.s.q(ctx).QueryRowContext(ctx, p.s.d.Rebind("SELECT "+memberCols+
+	v, err := scanMember(p.s.Q(ctx).QueryRowContext(ctx, p.s.Dialect().Rebind("SELECT "+memberCols+
 		" FROM project_members WHERE project_key = ? AND principal_type = ? AND principal_name = ?"),
 		projectKey, typ, name))
-	return v, p.s.wrap(fmt.Sprintf("get member %s/%s/%s", projectKey, typ, name), err)
+	return v, p.s.Wrap(fmt.Sprintf("get member %s/%s/%s", projectKey, typ, name), err)
 }
 
 func (p projectStore) Members(
 	ctx context.Context, projectKey string, typ types.PrincipalType,
 ) ([]types.ProjectMember, error) {
 	var out []types.ProjectMember
-	err := p.s.rows(ctx, "list members", "SELECT "+memberCols+
+	err := p.s.Rows(ctx, "list members", "SELECT "+memberCols+
 		" FROM project_members WHERE project_key = ? AND principal_type = ? ORDER BY principal_name",
 		[]any{projectKey, typ}, func(r *sql.Rows) error {
 			v, err := scanMember(r)
@@ -374,7 +375,7 @@ func (p projectStore) DeleteMember(
 	typ types.PrincipalType,
 	name string,
 ) error {
-	return p.s.execOne(
+	return p.s.ExecOne(
 		ctx,
 		fmt.Sprintf("delete member %s/%s/%s", projectKey, typ, name),
 		"DELETE FROM project_members WHERE project_key = ? AND principal_type = ? AND principal_name = ?",
@@ -391,29 +392,29 @@ func (p projectStore) PutAssignment(ctx context.Context, a types.RepositoryAssig
 		if err := p.requireProject(ctx, a.ProjectKey); err != nil {
 			return err
 		}
-		envs, err := toJSON(a.Environments)
+		envs, err := dialect.ToJSON(a.Environments)
 		if err != nil {
 			return err
 		}
-		if _, err := p.s.exec(
+		if _, err := p.s.Exec(
 			ctx,
 			"put assignment "+a.RepoKey,
-			Upsert("project_repositories", opsCols(assignmentCols), []string{"repo_key"}),
+			Upsert("project_repositories", dialect.OpsCols(assignmentCols), []string{"repo_key"}),
 			a.RepoKey,
 			a.ProjectKey,
 			envs,
 			a.SharedWithAll,
 			a.SharedReadOnly,
-			micros(a.Updated),
+			dialect.Micros(a.Updated),
 		); err != nil {
 			return err
 		}
-		if _, err := p.s.exec(ctx, "put assignment "+a.RepoKey,
+		if _, err := p.s.Exec(ctx, "put assignment "+a.RepoKey,
 			"DELETE FROM project_repository_shares WHERE repo_key = ?", a.RepoKey); err != nil {
 			return err
 		}
 		for _, k := range uniqueShares(a.SharedWith) {
-			if _, err := p.s.exec(
+			if _, err := p.s.Exec(
 				ctx,
 				"share "+a.RepoKey,
 				Insert(
@@ -446,7 +447,7 @@ func (p projectStore) assignments(
 	args ...any,
 ) ([]types.RepositoryAssignment, error) {
 	var out []types.RepositoryAssignment
-	err := p.s.rows(ctx, "list assignments",
+	err := p.s.Rows(ctx, "list assignments",
 		"SELECT "+assignmentCols+" FROM project_repositories "+where+" ORDER BY repo_key", args,
 		func(r *sql.Rows) error {
 			var (
@@ -462,10 +463,10 @@ func (p projectStore) assignments(
 				&v.SharedReadOnly,
 				&updated,
 			); err != nil {
-				return err //nolint:wrapcheck // wrapped by rows
+				return err //nolint:wrapcheck // wrapped by Rows
 			}
-			v.Updated = fromMicros(updated)
-			err := fromJSON(envs, &v.Environments)
+			v.Updated = dialect.FromMicros(updated)
+			err := dialect.FromJSON(envs, &v.Environments)
 			out = append(out, v)
 			return err
 		})
@@ -475,7 +476,7 @@ func (p projectStore) assignments(
 	// Shares are read after the listing is closed: an in-memory SQLite
 	// database has one connection, which the open listing would hold.
 	for i := range out {
-		err := p.s.rows(
+		err := p.s.Rows(
 			ctx,
 			"list shares",
 			"SELECT project_key FROM project_repository_shares WHERE repo_key = ? ORDER BY project_key",
@@ -484,7 +485,7 @@ func (p projectStore) assignments(
 				var k string
 				err := r.Scan(&k)
 				out[i].SharedWith = append(out[i].SharedWith, k)
-				return err //nolint:wrapcheck // wrapped by rows
+				return err //nolint:wrapcheck // wrapped by Rows
 			},
 		)
 		if err != nil {
@@ -522,11 +523,11 @@ func (p projectStore) Assignments(
 
 func (p projectStore) DeleteAssignment(ctx context.Context, repoKey string) error {
 	return p.s.Tx(ctx, func(ctx context.Context) error {
-		if _, err := p.s.exec(ctx, "delete assignment "+repoKey,
+		if _, err := p.s.Exec(ctx, "delete assignment "+repoKey,
 			"DELETE FROM project_repository_shares WHERE repo_key = ?", repoKey); err != nil {
 			return err
 		}
-		return p.s.execOne(ctx, "delete assignment "+repoKey,
+		return p.s.ExecOne(ctx, "delete assignment "+repoKey,
 			"DELETE FROM project_repositories WHERE repo_key = ?", repoKey)
 	})
 }

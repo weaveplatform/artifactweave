@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -20,13 +21,14 @@ const policyCols = "key, description, cron_exp, project_key, item_type, duration
 	"skip_trashcan, criteria, created_at, created_by, updated_at, updated_by"
 
 func policyArgs(p types.CleanupPolicy) ([]any, error) {
-	criteria, err := toJSON(p.Criteria)
+	criteria, err := dialect.ToJSON(p.Criteria)
 	if err != nil {
 		return nil, err
 	}
 	return []any{
 		p.Key, p.Description, p.CronExp, p.ProjectKey, p.ItemType, p.DurationMinutes, p.Enabled,
-		p.SkipTrashcan, criteria, micros(p.Created), p.CreatedBy, micros(p.Updated), p.UpdatedBy,
+		p.SkipTrashcan, criteria, dialect.Micros(p.Created), p.CreatedBy, dialect.Micros(p.Updated),
+		p.UpdatedBy,
 	}, nil
 }
 
@@ -53,8 +55,8 @@ func scanPolicy(row interface{ Scan(...any) error }) (types.CleanupPolicy, error
 	); err != nil {
 		return p, err //nolint:wrapcheck // wrapped by the caller
 	}
-	p.Created, p.Updated = fromMicros(created), fromMicros(updated)
-	return p, fromJSON(criteria, &p.Criteria)
+	p.Created, p.Updated = dialect.FromMicros(created), dialect.FromMicros(updated)
+	return p, dialect.FromJSON(criteria, &p.Criteria)
 }
 
 func (c cleanupStore) CreatePolicy(ctx context.Context, p types.CleanupPolicy) error {
@@ -62,18 +64,18 @@ func (c cleanupStore) CreatePolicy(ctx context.Context, p types.CleanupPolicy) e
 	if err != nil {
 		return err
 	}
-	_, err = c.s.exec(
+	_, err = c.s.Exec(
 		ctx,
 		"create cleanup policy "+p.Key,
-		Insert("cleanup_policies", opsCols(policyCols)),
+		Insert("cleanup_policies", dialect.OpsCols(policyCols)),
 		args...)
 	return err
 }
 
 func (c cleanupStore) Policy(ctx context.Context, key string) (types.CleanupPolicy, error) {
-	p, err := scanPolicy(c.s.q(ctx).QueryRowContext(ctx,
-		c.s.d.Rebind("SELECT "+policyCols+" FROM cleanup_policies WHERE key = ?"), key))
-	return p, c.s.wrap("get cleanup policy "+key, err)
+	p, err := scanPolicy(c.s.Q(ctx).QueryRowContext(ctx,
+		c.s.Dialect().Rebind("SELECT "+policyCols+" FROM cleanup_policies WHERE key = ?"), key))
+	return p, c.s.Wrap("get cleanup policy "+key, err)
 }
 
 func (c cleanupStore) UpdatePolicy(ctx context.Context, p types.CleanupPolicy) error {
@@ -82,10 +84,10 @@ func (c cleanupStore) UpdatePolicy(ctx context.Context, p types.CleanupPolicy) e
 		return err
 	}
 	sets := make([]string, 0, len(args)-1)
-	for _, col := range opsCols(policyCols)[1:] {
+	for _, col := range dialect.OpsCols(policyCols)[1:] {
 		sets = append(sets, col+" = ?")
 	}
-	return c.s.execOne(
+	return c.s.ExecOne(
 		ctx,
 		"update cleanup policy "+p.Key,
 		"UPDATE cleanup_policies SET "+strings.Join(
@@ -96,7 +98,7 @@ func (c cleanupStore) UpdatePolicy(ctx context.Context, p types.CleanupPolicy) e
 }
 
 func (c cleanupStore) DeletePolicy(ctx context.Context, key string) error {
-	return c.s.execOne(
+	return c.s.ExecOne(
 		ctx,
 		"delete cleanup policy "+key,
 		"DELETE FROM cleanup_policies WHERE key = ?",
@@ -117,7 +119,7 @@ func (c cleanupStore) Policies(
 		where, args = append(where, "project_key = ?"), append(args, f.ProjectKey)
 	}
 	var out []types.CleanupPolicy
-	err := c.s.rows(
+	err := c.s.Rows(
 		ctx,
 		"list cleanup policies",
 		"SELECT "+policyCols+" FROM cleanup_policies WHERE "+
@@ -144,14 +146,14 @@ func runArgs(r types.CleanupRun) []any {
 		r.DryRun,
 		r.Manual,
 		r.TriggeredBy,
-		micros(
+		dialect.Micros(
 			r.Started,
 		),
-		micros(r.Ended),
+		dialect.Micros(r.Ended),
 		r.TotalItems,
 		r.CleanedItems,
 		r.CleanedSize,
-		rawJSON(r.Report),
+		dialect.RawJSON(r.Report),
 	}
 }
 
@@ -179,15 +181,16 @@ func scanRun(row interface{ Scan(...any) error }) (types.CleanupRun, error) {
 	); err != nil {
 		return r, err //nolint:wrapcheck // wrapped by the caller
 	}
-	r.Started, r.Ended, r.Report = fromMicros(started), fromMicros(ended), fromRaw(report)
+	r.Started, r.Ended, r.Report = dialect.FromMicros(started), dialect.FromMicros(ended),
+		dialect.FromRaw(report)
 	return r, nil
 }
 
 func (c cleanupStore) CreateRun(ctx context.Context, r types.CleanupRun) (types.CleanupRun, error) {
-	id, err := c.s.insertID(
+	id, err := c.s.InsertID(
 		ctx,
 		"create cleanup run "+r.PolicyKey,
-		Insert("cleanup_runs", opsCols(runCols)),
+		Insert("cleanup_runs", dialect.OpsCols(runCols)),
 		runArgs(r)...)
 	if err != nil {
 		return types.CleanupRun{}, err
@@ -197,17 +200,17 @@ func (c cleanupStore) CreateRun(ctx context.Context, r types.CleanupRun) (types.
 }
 
 func (c cleanupStore) Run(ctx context.Context, id int64) (types.CleanupRun, error) {
-	r, err := scanRun(c.s.q(ctx).QueryRowContext(ctx,
-		c.s.d.Rebind("SELECT id, "+runCols+" FROM cleanup_runs WHERE id = ?"), id))
-	return r, c.s.wrap(fmt.Sprintf("get cleanup run %d", id), err)
+	r, err := scanRun(c.s.Q(ctx).QueryRowContext(ctx,
+		c.s.Dialect().Rebind("SELECT id, "+runCols+" FROM cleanup_runs WHERE id = ?"), id))
+	return r, c.s.Wrap(fmt.Sprintf("get cleanup run %d", id), err)
 }
 
 func (c cleanupStore) UpdateRun(ctx context.Context, r types.CleanupRun) error {
 	sets := make([]string, 0, 13)
-	for _, col := range opsCols(runCols) {
+	for _, col := range dialect.OpsCols(runCols) {
 		sets = append(sets, col+" = ?")
 	}
-	return c.s.execOne(
+	return c.s.ExecOne(
 		ctx,
 		fmt.Sprintf("update cleanup run %d", r.ID),
 		"UPDATE cleanup_runs SET "+strings.Join(
@@ -226,7 +229,7 @@ func (c cleanupStore) Runs(
 	if err != nil {
 		return nil, "", err //nolint:wrapcheck // already a store sentinel
 	}
-	cond, args, err := keyset(p, []string{"id"}, map[string]bool{"id": true}, true)
+	cond, args, err := dialect.Keyset(p, []string{"id"}, map[string]bool{"id": true}, true)
 	if err != nil {
 		return nil, "", err
 	}
@@ -244,11 +247,11 @@ func (c cleanupStore) Runs(
 		}
 	}
 	var out []types.CleanupRun
-	err = c.s.rows(ctx, "list cleanup runs", "SELECT id, "+runCols+" FROM cleanup_runs WHERE "+
+	err = c.s.Rows(ctx, "list cleanup runs", "SELECT id, "+runCols+" FROM cleanup_runs WHERE "+
 		strings.Join(
 			where,
 			" AND ",
-		)+orderBy([]string{"id"}, true)+" LIMIT ?", append(args, p.Limit+1),
+		)+dialect.OrderBy([]string{"id"}, true)+" LIMIT ?", append(args, p.Limit+1),
 		func(r *sql.Rows) error {
 			v, err := scanRun(r)
 			out = append(out, v)
@@ -260,14 +263,14 @@ func (c cleanupStore) Runs(
 	page, next := store.Trim(
 		out,
 		p.Limit,
-		func(r types.CleanupRun) []string { return []string{itoa(r.ID)} },
+		func(r types.CleanupRun) []string { return []string{dialect.Itoa(r.ID)} },
 	)
 	return page, next, nil
 }
 
 func (c cleanupStore) LastRun(ctx context.Context, policyKey string) (types.CleanupRun, error) {
-	r, err := scanRun(c.s.q(ctx).QueryRowContext(ctx, c.s.d.Rebind(
+	r, err := scanRun(c.s.Q(ctx).QueryRowContext(ctx, c.s.Dialect().Rebind(
 		"SELECT id, "+runCols+" FROM cleanup_runs WHERE policy_key = ? ORDER BY id DESC LIMIT 1",
 	), policyKey))
-	return r, c.s.wrap("last cleanup run of "+policyKey, err)
+	return r, c.s.Wrap("last cleanup run of "+policyKey, err)
 }

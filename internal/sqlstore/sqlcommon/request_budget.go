@@ -34,12 +34,12 @@ func (b requestBudgets) Take(
 		// One permanent guard serializes multi-counter admission and the table
 		// capacity check. No user-controlled lock rows or pending claims exist.
 		var guard int
-		if err := b.s.q(ctx).
-			QueryRowContext(ctx, "SELECT id FROM request_budget_guard WHERE id = 1 "+b.s.d.ForUpdate).
+		if err := b.s.Q(ctx).
+			QueryRowContext(ctx, "SELECT id FROM request_budget_guard WHERE id = 1 "+b.s.Dialect().ForUpdate).
 			Scan(&guard); err != nil {
-			return b.s.wrap("lock request budgets", err)
+			return b.s.Wrap("lock request budgets", err)
 		}
-		if _, err := b.s.exec(
+		if _, err := b.s.Exec(
 			ctx,
 			"prune request budgets",
 			"DELETE FROM request_budgets WHERE key_hash IN (SELECT key_hash FROM request_budgets WHERE resets_at <= ? ORDER BY resets_at, key_hash LIMIT 128)",
@@ -81,7 +81,7 @@ func (b requestBudgets) Take(
 			return err
 		}
 		for i, budget := range r.Budgets {
-			if _, err := b.s.exec(
+			if _, err := b.s.Exec(
 				ctx,
 				"charge request budget",
 				Upsert(
@@ -110,13 +110,13 @@ func (b requestBudgets) Take(
 
 func (b requestBudgets) get(ctx context.Context, key string) (budgetWindow, bool, error) {
 	var v budgetWindow
-	err := b.s.q(ctx).
-		QueryRowContext(ctx, b.s.d.Rebind("SELECT used, resets_at FROM request_budgets WHERE key_hash = ?"), key).
+	err := b.s.Q(ctx).
+		QueryRowContext(ctx, b.s.Dialect().Rebind("SELECT used, resets_at FROM request_budgets WHERE key_hash = ?"), key).
 		Scan(&v.used, &v.reset)
 	if errors.Is(err, sql.ErrNoRows) {
 		return v, false, nil
 	}
-	return v, err == nil, b.s.wrap("read request budget", err)
+	return v, err == nil, b.s.Wrap("read request budget", err)
 }
 
 func (b requestBudgets) capacity(ctx context.Context, newKeys, maxKeys int) error {
@@ -124,10 +124,10 @@ func (b requestBudgets) capacity(ctx context.Context, newKeys, maxKeys int) erro
 		return nil
 	}
 	var count int
-	if err := b.s.q(ctx).
+	if err := b.s.Q(ctx).
 		QueryRowContext(ctx, "SELECT COUNT(*) FROM request_budgets").
 		Scan(&count); err != nil {
-		return b.s.wrap("count request budgets", err)
+		return b.s.Wrap("count request budgets", err)
 	}
 	if count+newKeys > maxKeys {
 		return store.ErrBudgetCapacity

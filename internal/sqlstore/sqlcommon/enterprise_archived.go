@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -52,21 +53,21 @@ func archivedRow(a types.ArchivedItem) ([]any, error) {
 		it.Actual.SHA1,
 		it.Actual.MD5,
 		it.Size,
-		micros(it.Created),
+		dialect.Micros(it.Created),
 		it.CreatedBy,
-		micros(it.Modified),
+		dialect.Micros(it.Modified),
 		it.ModifiedBy,
 		a.PackageType,
 		a.PackageName,
 		a.PackageVersion,
 		a.PolicyKey,
 		a.ExecutionID,
-		micros(a.ArchivedAt),
-		micros(a.ExpiresAt),
+		dialect.Micros(a.ArchivedAt),
+		dialect.Micros(a.ExpiresAt),
 		a.ColdBlobSHA256,
-		mustJSON(a.Item),
-		mustJSON(a.Properties),
-		mustJSON(a.Stats),
+		dialect.MustJSON(a.Item),
+		dialect.MustJSON(a.Properties),
+		dialect.MustJSON(a.Stats),
 	}, nil
 }
 
@@ -75,7 +76,7 @@ func archivedRow(a types.ArchivedItem) ([]any, error) {
 const archivedSelect = "SELECT id, namespace, package_type, package_name, package_version, policy_key," +
 	" execution_id, archived_at, expires_at, cold_blob_sha256, item, properties, stats FROM archived_items"
 
-func scanArchived(r entRow) (types.ArchivedItem, error) {
+func scanArchived(r dialect.EntRow) (types.ArchivedItem, error) {
 	var (
 		a                  types.ArchivedItem
 		archived, expires  sql.NullInt64
@@ -86,14 +87,14 @@ func scanArchived(r entRow) (types.ArchivedItem, error) {
 		&item, &props, &stats); err != nil {
 		return a, err //nolint:wrapcheck // wrapped by the caller
 	}
-	a.ArchivedAt, a.ExpiresAt = fromMicros(archived), fromMicros(expires)
-	if err := fromJSON(item, &a.Item); err != nil {
+	a.ArchivedAt, a.ExpiresAt = dialect.FromMicros(archived), dialect.FromMicros(expires)
+	if err := dialect.FromJSON(item, &a.Item); err != nil {
 		return a, err
 	}
-	if err := fromJSON(props, &a.Properties); err != nil {
+	if err := dialect.FromJSON(props, &a.Properties); err != nil {
 		return a, err
 	}
-	return a, fromJSON(stats, &a.Stats)
+	return a, dialect.FromJSON(stats, &a.Stats)
 }
 
 func (a archiveStore) AddItem(
@@ -105,7 +106,7 @@ func (a archiveStore) AddItem(
 	if err != nil {
 		return types.ArchivedItem{}, err
 	}
-	if it.ID, err = a.s.insertID(
+	if it.ID, err = a.s.InsertID(
 		ctx,
 		"add archived item",
 		Insert("archived_items", archivedCols),
@@ -117,9 +118,9 @@ func (a archiveStore) AddItem(
 
 func (a archiveStore) Item(ctx context.Context, id int64) (types.ArchivedItem, error) {
 	out, err := scanArchived(
-		a.s.q(ctx).QueryRowContext(ctx, a.s.d.Rebind(archivedSelect+" WHERE id = ?"), id),
+		a.s.Q(ctx).QueryRowContext(ctx, a.s.Dialect().Rebind(archivedSelect+" WHERE id = ?"), id),
 	)
-	return out, a.s.wrap(fmt.Sprintf("get archived item %d", id), err)
+	return out, a.s.Wrap(fmt.Sprintf("get archived item %d", id), err)
 }
 
 // archived runs an archived-item query.
@@ -129,7 +130,7 @@ func (a archiveStore) archived(
 	args ...any,
 ) ([]types.ArchivedItem, error) {
 	var out []types.ArchivedItem
-	err := a.s.rows(ctx, "list archived items", q, args, func(r *sql.Rows) error {
+	err := a.s.Rows(ctx, "list archived items", q, args, func(r *sql.Rows) error {
 		v, err := scanArchived(r)
 		out = append(out, v)
 		return err
@@ -161,7 +162,7 @@ func (a archiveStore) Items(
 	if err != nil {
 		return nil, "", err //nolint:wrapcheck // already a store sentinel
 	}
-	cond, args, err := keyset(p, []string{"id"}, map[string]bool{"id": true}, false)
+	cond, args, err := dialect.Keyset(p, []string{"id"}, map[string]bool{"id": true}, false)
 	if err != nil {
 		return nil, "", err
 	}
@@ -188,13 +189,13 @@ func (a archiveStore) Items(
 	page, next := store.Trim(
 		out,
 		p.Limit,
-		func(v types.ArchivedItem) []string { return []string{itoa(v.ID)} },
+		func(v types.ArchivedItem) []string { return []string{dialect.Itoa(v.ID)} },
 	)
 	return page, next, nil
 }
 
 func (a archiveStore) DeleteItem(ctx context.Context, id int64) error {
-	return a.s.execOne(
+	return a.s.ExecOne(
 		ctx,
 		fmt.Sprintf("delete archived item %d", id),
 		"DELETE FROM archived_items WHERE id = ?",
@@ -209,5 +210,5 @@ func (a archiveStore) ExpiredItems(
 ) ([]types.ArchivedItem, error) {
 	return a.archived(ctx, archivedSelect+
 		" WHERE expires_at IS NOT NULL AND expires_at < ? ORDER BY expires_at, id LIMIT ?",
-		before.UnixMicro(), limitOr(limit))
+		before.UnixMicro(), dialect.LimitOr(limit))
 }

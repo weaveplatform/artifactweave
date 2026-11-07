@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -76,7 +75,7 @@ type sealedRow struct {
 // replaced only if it still holds the bytes that were read, so a concurrent
 // write is never overwritten with a stale secret.
 func (s *Store) Reseal(ctx context.Context) (int, error) {
-	if s.keys == nil {
+	if !s.HasKeyring() {
 		return 0, ErrNoKeyring
 	}
 	changed, err := s.backfillRepositoryHeaders(ctx)
@@ -98,7 +97,7 @@ func (s *Store) resealColumn(ctx context.Context, c sealedColumn) (int, error) {
 	// Read everything first: an in-memory SQLite database has one
 	// connection, which an open result set would hold while updating.
 	var rows []sealedRow
-	err := s.rows(ctx, op,
+	err := s.Rows(ctx, op,
 		"SELECT "+strings.Join(c.keys, ", ")+", "+c.column+" FROM "+c.table+
 			" WHERE "+c.column+" IS NOT NULL",
 		nil,
@@ -109,7 +108,7 @@ func (s *Store) resealColumn(ctx context.Context, c sealedColumn) (int, error) {
 				dest = append(dest, &row.key[i])
 			}
 			if err := r.Scan(append(dest, &row.value)...); err != nil {
-				return err //nolint:wrapcheck // wrapped by rows
+				return err //nolint:wrapcheck // wrapped by Rows
 			}
 			rows = append(rows, row)
 			return nil
@@ -126,7 +125,7 @@ func (s *Store) resealColumn(ctx context.Context, c sealedColumn) (int, error) {
 	changed := 0
 	for _, row := range rows {
 		id := c.rowID(keyStrings(row.key))
-		next, did, err := s.resealValue(c.purpose, id, row.value)
+		next, did, err := s.ResealValue(c.purpose, id, row.value)
 		if err != nil {
 			return changed, fmt.Errorf("%s %q: %w", op, id, err)
 		}
@@ -134,22 +133,13 @@ func (s *Store) resealColumn(ctx context.Context, c sealedColumn) (int, error) {
 			continue
 		}
 		args := append(append([]any{next}, row.key...), row.value)
-		n, err := s.exec(ctx, op, update, args...)
+		n, err := s.Exec(ctx, op, update, args...)
 		if err != nil {
 			return changed, err
 		}
 		changed += int(n)
 	}
 	return changed, nil
-}
-
-// resealValue re-seals one value, sealing a plain one for the first time.
-func (s *Store) resealValue(purpose, rowID string, v []byte) ([]byte, bool, error) {
-	if !crypt.IsSealed(v) {
-		sealed, err := s.keys.Seal(purpose, rowID, v)
-		return sealed, err == nil, err //nolint:wrapcheck // wrapped by the caller
-	}
-	return s.keys.Reseal(purpose, rowID, v) //nolint:wrapcheck // wrapped by the caller
 }
 
 // keyStrings renders scanned key values as the strings row ids are built

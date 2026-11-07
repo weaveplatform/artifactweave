@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -20,7 +21,7 @@ type peerStore struct{ s *Store }
 const peerCols = "instance_id, base_url, public_key, protocol_version, status, last_seen_at, " +
 	"display_name, city_name, country_code, edge_role"
 
-func scanPeer(r peersScanner) (types.Peer, error) {
+func scanPeer(r dialect.PeersScanner) (types.Peer, error) {
 	var (
 		p    types.Peer
 		pub  []byte
@@ -31,13 +32,13 @@ func scanPeer(r peersScanner) (types.Peer, error) {
 	if len(pub) > 0 {
 		p.PublicKey = pub
 	}
-	p.LastSeen = fromMicros(seen)
+	p.LastSeen = dialect.FromMicros(seen)
 	return p, err //nolint:wrapcheck // wrapped by the caller
 }
 
 func (p peerStore) Put(ctx context.Context, peer types.Peer) error {
 	return p.s.Tx(ctx, func(ctx context.Context) error {
-		if _, err := p.s.exec(
+		if _, err := p.s.Exec(
 			ctx,
 			"put peer "+peer.InstanceID,
 			Upsert("peers", strings.Split(peerCols, ", "), []string{"instance_id"}),
@@ -46,7 +47,7 @@ func (p peerStore) Put(ctx context.Context, peer types.Peer) error {
 			[]byte(peer.PublicKey),
 			peer.ProtocolVersion,
 			string(peer.Status),
-			micros(peer.LastSeen),
+			dialect.Micros(peer.LastSeen),
 			peer.DisplayName,
 			peer.CityName,
 			peer.CountryCode,
@@ -54,12 +55,12 @@ func (p peerStore) Put(ctx context.Context, peer types.Peer) error {
 		); err != nil {
 			return err
 		}
-		if _, err := p.s.exec(ctx, "put peer use cases",
+		if _, err := p.s.Exec(ctx, "put peer use cases",
 			"DELETE FROM peer_use_cases WHERE peer = ?", peer.InstanceID); err != nil {
 			return err
 		}
 		for _, u := range peerUseCaseSet(peer.UseCases) {
-			if _, err := p.s.exec(
+			if _, err := p.s.Exec(
 				ctx,
 				"put peer use cases",
 				"INSERT INTO peer_use_cases (peer, use_case) VALUES (?, ?)",
@@ -82,10 +83,10 @@ func peerUseCaseSet(in []types.UseCase) []types.UseCase {
 }
 
 func (p peerStore) Get(ctx context.Context, instanceID string) (types.Peer, error) {
-	peer, err := scanPeer(p.s.q(ctx).QueryRowContext(ctx,
-		p.s.d.Rebind("SELECT "+peerCols+" FROM peers WHERE instance_id = ?"), instanceID))
+	peer, err := scanPeer(p.s.Q(ctx).QueryRowContext(ctx,
+		p.s.Dialect().Rebind("SELECT "+peerCols+" FROM peers WHERE instance_id = ?"), instanceID))
 	if err != nil {
-		return types.Peer{}, p.s.wrap("get peer "+instanceID, err)
+		return types.Peer{}, p.s.Wrap("get peer "+instanceID, err)
 	}
 	uses, err := p.useCases(ctx, "WHERE peer = ?", instanceID)
 	if err != nil {
@@ -103,12 +104,12 @@ func (p peerStore) useCases(
 	args ...any,
 ) (map[string][]types.UseCase, error) {
 	out := map[string][]types.UseCase{}
-	err := p.s.rows(ctx, "list peer use cases",
+	err := p.s.Rows(ctx, "list peer use cases",
 		"SELECT peer, use_case FROM peer_use_cases "+where+" ORDER BY peer, use_case", args,
 		func(r *sql.Rows) error {
 			var peer, use string
 			if err := r.Scan(&peer, &use); err != nil {
-				return err //nolint:wrapcheck // wrapped by rows
+				return err //nolint:wrapcheck // wrapped by Rows
 			}
 			out[peer] = append(out[peer], types.UseCase(use))
 			return nil
@@ -123,7 +124,7 @@ func (p peerStore) List(ctx context.Context, f store.PeerFilter) ([]types.Peer, 
 		args = []any{string(f.UseCase)}
 	}
 	var out []types.Peer
-	err := p.s.rows(
+	err := p.s.Rows(
 		ctx,
 		"list peers",
 		"SELECT "+peerCols+" FROM peers"+where+" ORDER BY instance_id",
@@ -151,11 +152,11 @@ func (p peerStore) Delete(ctx context.Context, instanceID string) error {
 	return p.s.Tx(ctx, func(ctx context.Context) error {
 		// Explicit rather than relying on ON DELETE CASCADE, which SQLite
 		// honours only with the foreign_keys pragma on.
-		if _, err := p.s.exec(ctx, "delete peer use cases",
+		if _, err := p.s.Exec(ctx, "delete peer use cases",
 			"DELETE FROM peer_use_cases WHERE peer = ?", instanceID); err != nil {
 			return err
 		}
-		return p.s.execOne(
+		return p.s.ExecOne(
 			ctx,
 			"delete peer "+instanceID,
 			"DELETE FROM peers WHERE instance_id = ?",
@@ -165,14 +166,14 @@ func (p peerStore) Delete(ctx context.Context, instanceID string) error {
 }
 
 func (p peerStore) AddNonce(ctx context.Context, n types.PairingNonce) error {
-	_, err := p.s.exec(
+	_, err := p.s.Exec(
 		ctx,
 		"add pairing nonce",
 		"INSERT INTO pairing_nonces (nonce_hash, use_case, expires_at, redeemed_at) VALUES (?, ?, ?, ?)",
 		n.NonceHash,
 		string(n.UseCase),
-		micros(n.ExpiresAt),
-		micros(n.RedeemedAt),
+		dialect.Micros(n.ExpiresAt),
+		dialect.Micros(n.RedeemedAt),
 	)
 	return err
 }
@@ -186,7 +187,7 @@ func (p peerStore) RedeemNonce(
 	err := p.s.Tx(ctx, func(ctx context.Context) error {
 		// The conditional update is the redemption: of two concurrent
 		// redeemers exactly one changes the row.
-		n, err := p.s.exec(
+		n, err := p.s.Exec(
 			ctx,
 			"redeem pairing nonce",
 			"UPDATE pairing_nonces SET redeemed_at = ? "+
@@ -200,16 +201,16 @@ func (p peerStore) RedeemNonce(
 		}
 		var exp, red sql.NullInt64
 		var use string
-		err = p.s.q(ctx).QueryRowContext(ctx, p.s.d.Rebind(
+		err = p.s.Q(ctx).QueryRowContext(ctx, p.s.Dialect().Rebind(
 			"SELECT use_case, expires_at, redeemed_at FROM pairing_nonces WHERE nonce_hash = ?",
 		), hash).
 			Scan(&use, &exp, &red)
 		if err != nil {
-			return p.s.wrap(fmt.Sprintf("redeem pairing nonce %x", hash), err)
+			return p.s.Wrap(fmt.Sprintf("redeem pairing nonce %x", hash), err)
 		}
 		out = types.PairingNonce{
 			NonceHash: hash, UseCase: types.UseCase(use),
-			ExpiresAt: fromMicros(exp), RedeemedAt: fromMicros(red),
+			ExpiresAt: dialect.FromMicros(exp), RedeemedAt: dialect.FromMicros(red),
 		}
 		switch {
 		case n == 1:
@@ -227,7 +228,7 @@ func (p peerStore) RedeemNonce(
 }
 
 func (p peerStore) PruneNonces(ctx context.Context, before time.Time) (int64, error) {
-	return p.s.exec(ctx, "prune pairing nonces",
+	return p.s.Exec(ctx, "prune pairing nonces",
 		"DELETE FROM pairing_nonces WHERE expires_at IS NULL OR expires_at < ?", before.UnixMicro())
 }
 
@@ -254,12 +255,12 @@ func (f federationStore) SetMembers(
 		}
 	}
 	return f.s.Tx(ctx, func(ctx context.Context) error {
-		if _, err := f.s.exec(ctx, "set federation members",
+		if _, err := f.s.Exec(ctx, "set federation members",
 			"DELETE FROM federation_members WHERE repo_key = ?", repoKey); err != nil {
 			return err
 		}
 		for _, m := range members {
-			if _, err := f.s.exec(
+			if _, err := f.s.Exec(
 				ctx,
 				"set federation members",
 				Insert("federation_members", strings.Split(fedMemberCols, ", ")),
@@ -282,7 +283,7 @@ func (f federationStore) members(
 	arg string,
 ) ([]types.FederationMember, error) {
 	var out []types.FederationMember
-	err := f.s.rows(
+	err := f.s.Rows(
 		ctx,
 		"list federation members",
 		"SELECT "+fedMemberCols+" FROM federation_members WHERE "+where+" = ? ORDER BY "+order,
@@ -291,7 +292,7 @@ func (f federationStore) members(
 			var m types.FederationMember
 			err := r.Scan(&m.RepoKey, &m.PeerInstanceID, &m.BaseURL, &m.RemoteRepoKey, &m.Enabled)
 			out = append(out, m)
-			return err //nolint:wrapcheck // wrapped by rows
+			return err //nolint:wrapcheck // wrapped by Rows
 		},
 	)
 	return out, err
@@ -313,7 +314,7 @@ func (f federationStore) MembersWithPeer(
 
 const fullSyncCols = "repo_key, peer, forced, snapshot_seq, started_at, finished_at, status, result_paths"
 
-func scanFullSync(r peersScanner) (types.FullSyncRun, error) {
+func scanFullSync(r dialect.PeersScanner) (types.FullSyncRun, error) {
 	var (
 		run               types.FullSyncRun
 		started, finished sql.NullInt64
@@ -324,30 +325,31 @@ func scanFullSync(r peersScanner) (types.FullSyncRun, error) {
 		&started, &finished, &status, &paths); err != nil {
 		return run, err //nolint:wrapcheck // wrapped by the caller
 	}
-	run.Started, run.Finished, run.Status = fromMicros(
+	run.Started, run.Finished, run.Status = dialect.FromMicros(
 		started,
-	), fromMicros(
+	), dialect.FromMicros(
 		finished,
 	), types.RunStatus(
 		status,
 	)
-	return run, fromJSON(paths, &run.ResultPaths)
+	return run, dialect.FromJSON(paths, &run.ResultPaths)
 }
 
 // fullSyncArgs returns the column values of r after the id.
 func fullSyncArgs(r types.FullSyncRun) []any {
 	return []any{
 		r.RepoKey, r.PeerInstanceID, r.Forced, r.SnapshotSeq,
-		micros(r.Started), micros(r.Finished), string(r.Status), peersDoc(r.ResultPaths),
+		dialect.Micros(r.Started), dialect.Micros(r.Finished), string(r.Status),
+		peersDoc(r.ResultPaths),
 	}
 }
 
 // peersDoc encodes a document column of this group. Every document here is a
 // string slice, a map of string slices or a types.PatternFilter, none of
-// which can fail to marshal, so the error toJSON reports for other types
+// which can fail to marshal, so the error dialect.ToJSON reports for other types
 // cannot occur.
 func peersDoc(v any) any {
-	doc, _ := toJSON(v)
+	doc, _ := dialect.ToJSON(v)
 	return doc
 }
 
@@ -356,7 +358,7 @@ func (f federationStore) CreateFullSync(
 	r types.FullSyncRun,
 ) (types.FullSyncRun, error) {
 	var err error
-	if r.ID, err = f.s.insertID(
+	if r.ID, err = f.s.InsertID(
 		ctx,
 		"create full sync",
 		Insert(
@@ -370,16 +372,16 @@ func (f federationStore) CreateFullSync(
 }
 
 func (f federationStore) FullSync(ctx context.Context, id int64) (types.FullSyncRun, error) {
-	r, err := scanFullSync(f.s.q(ctx).QueryRowContext(ctx, f.s.d.Rebind(
+	r, err := scanFullSync(f.s.Q(ctx).QueryRowContext(ctx, f.s.Dialect().Rebind(
 		"SELECT id, "+fullSyncCols+" FROM full_sync_runs WHERE id = ?"), id))
 	if err != nil {
-		return types.FullSyncRun{}, f.s.wrap(fmt.Sprintf("get full sync %d", id), err)
+		return types.FullSyncRun{}, f.s.Wrap(fmt.Sprintf("get full sync %d", id), err)
 	}
 	return r, nil
 }
 
 func (f federationStore) UpdateFullSync(ctx context.Context, r types.FullSyncRun) error {
-	return f.s.execOne(ctx, fmt.Sprintf("update full sync %d", r.ID), "UPDATE full_sync_runs SET "+
+	return f.s.ExecOne(ctx, fmt.Sprintf("update full sync %d", r.ID), "UPDATE full_sync_runs SET "+
 		"repo_key = ?, peer = ?, forced = ?, snapshot_seq = ?, started_at = ?, finished_at = ?, "+
 		"status = ?, result_paths = ? WHERE id = ?", append(fullSyncArgs(r), r.ID)...)
 }
@@ -391,7 +393,7 @@ func (f federationStore) FullSyncs(
 	if err != nil {
 		return nil, "", err //nolint:wrapcheck // already a store sentinel
 	}
-	cond, args, err := keyset(p, []string{"id"}, map[string]bool{"id": true}, true)
+	cond, args, err := dialect.Keyset(p, []string{"id"}, map[string]bool{"id": true}, true)
 	if err != nil {
 		return nil, "", err
 	}
@@ -400,10 +402,10 @@ func (f federationStore) FullSyncs(
 		args = append(args, repoKey)
 	}
 	var out []types.FullSyncRun
-	err = f.s.rows(
+	err = f.s.Rows(
 		ctx,
 		"list full syncs",
-		"SELECT id, "+fullSyncCols+" FROM full_sync_runs WHERE "+cond+orderBy(
+		"SELECT id, "+fullSyncCols+" FROM full_sync_runs WHERE "+cond+dialect.OrderBy(
 			[]string{"id"},
 			true,
 		)+" LIMIT ?",
@@ -420,7 +422,7 @@ func (f federationStore) FullSyncs(
 	page, next := store.Trim(
 		out,
 		p.Limit,
-		func(r types.FullSyncRun) []string { return []string{itoa(r.ID)} },
+		func(r types.FullSyncRun) []string { return []string{dialect.Itoa(r.ID)} },
 	)
 	return page, next, nil
 }
@@ -432,7 +434,7 @@ type platformStore struct{ s *Store }
 
 const accessTargetCols = "name, peer, active, created_at, entities, permission_filters, group_filters"
 
-func scanAccessTarget(r peersScanner) (types.AccessFederationTarget, error) {
+func scanAccessTarget(r dialect.PeersScanner) (types.AccessFederationTarget, error) {
 	var (
 		t                       types.AccessFederationTarget
 		created                 sql.NullInt64
@@ -449,12 +451,12 @@ func scanAccessTarget(r peersScanner) (types.AccessFederationTarget, error) {
 	); err != nil {
 		return t, err //nolint:wrapcheck // wrapped by the caller
 	}
-	t.Created = fromMicros(created)
+	t.Created = dialect.FromMicros(created)
 	for _, d := range []struct {
 		doc  sql.NullString
 		into any
 	}{{entities, &t.Entities}, {perms, &t.PermissionFilters}, {groups, &t.GroupFilters}} {
-		if err := fromJSON(d.doc, d.into); err != nil {
+		if err := dialect.FromJSON(d.doc, d.into); err != nil {
 			return t, err
 		}
 	}
@@ -462,7 +464,7 @@ func scanAccessTarget(r peersScanner) (types.AccessFederationTarget, error) {
 }
 
 func (p platformStore) PutAccessTarget(ctx context.Context, t types.AccessFederationTarget) error {
-	_, err := p.s.exec(
+	_, err := p.s.Exec(
 		ctx,
 		"put access federation target "+t.Name,
 		Upsert(
@@ -473,7 +475,7 @@ func (p platformStore) PutAccessTarget(ctx context.Context, t types.AccessFedera
 		t.Name,
 		t.PeerInstanceID,
 		t.Active,
-		micros(t.Created),
+		dialect.Micros(t.Created),
 		peersDoc(t.Entities),
 		peersDoc(t.PermissionFilters),
 		peersDoc(t.GroupFilters),
@@ -485,17 +487,17 @@ func (p platformStore) AccessTarget(
 	ctx context.Context,
 	name string,
 ) (types.AccessFederationTarget, error) {
-	t, err := scanAccessTarget(p.s.q(ctx).QueryRowContext(ctx, p.s.d.Rebind(
+	t, err := scanAccessTarget(p.s.Q(ctx).QueryRowContext(ctx, p.s.Dialect().Rebind(
 		"SELECT "+accessTargetCols+" FROM access_federation_targets WHERE name = ?"), name))
 	if err != nil {
-		return types.AccessFederationTarget{}, p.s.wrap("get access federation target "+name, err)
+		return types.AccessFederationTarget{}, p.s.Wrap("get access federation target "+name, err)
 	}
 	return t, nil
 }
 
 func (p platformStore) AccessTargets(ctx context.Context) ([]types.AccessFederationTarget, error) {
 	var out []types.AccessFederationTarget
-	err := p.s.rows(ctx, "list access federation targets",
+	err := p.s.Rows(ctx, "list access federation targets",
 		"SELECT "+accessTargetCols+" FROM access_federation_targets ORDER BY name", nil,
 		func(r *sql.Rows) error {
 			t, err := scanAccessTarget(r)
@@ -506,13 +508,13 @@ func (p platformStore) AccessTargets(ctx context.Context) ([]types.AccessFederat
 }
 
 func (p platformStore) DeleteAccessTarget(ctx context.Context, name string) error {
-	return p.s.execOne(ctx, "delete access federation target "+name,
+	return p.s.ExecOne(ctx, "delete access federation target "+name,
 		"DELETE FROM access_federation_targets WHERE name = ?", name)
 }
 
 const platformFedCols = "id, name, description, connection_groups, entities"
 
-func scanPlatformFed(r peersScanner) (types.PlatformFederation, error) {
+func scanPlatformFed(r dialect.PeersScanner) (types.PlatformFederation, error) {
 	var (
 		f              types.PlatformFederation
 		groups, entity sql.NullString
@@ -520,14 +522,14 @@ func scanPlatformFed(r peersScanner) (types.PlatformFederation, error) {
 	if err := r.Scan(&f.ID, &f.Name, &f.Description, &groups, &entity); err != nil {
 		return f, err //nolint:wrapcheck // wrapped by the caller
 	}
-	if err := fromJSON(groups, &f.ConnectionGroups); err != nil {
+	if err := dialect.FromJSON(groups, &f.ConnectionGroups); err != nil {
 		return f, err
 	}
-	return f, fromJSON(entity, &f.Entities)
+	return f, dialect.FromJSON(entity, &f.Entities)
 }
 
 func (p platformStore) PutFederation(ctx context.Context, f types.PlatformFederation) error {
-	_, err := p.s.exec(ctx, "put platform federation "+f.ID,
+	_, err := p.s.Exec(ctx, "put platform federation "+f.ID,
 		Upsert("platform_federations", strings.Split(platformFedCols, ", "), []string{"id"}),
 		f.ID, f.Name, f.Description, peersDoc(f.ConnectionGroups), peersDoc(f.Entities))
 	return err
@@ -537,17 +539,17 @@ func (p platformStore) Federation(
 	ctx context.Context,
 	id string,
 ) (types.PlatformFederation, error) {
-	f, err := scanPlatformFed(p.s.q(ctx).QueryRowContext(ctx, p.s.d.Rebind(
+	f, err := scanPlatformFed(p.s.Q(ctx).QueryRowContext(ctx, p.s.Dialect().Rebind(
 		"SELECT "+platformFedCols+" FROM platform_federations WHERE id = ?"), id))
 	if err != nil {
-		return types.PlatformFederation{}, p.s.wrap("get platform federation "+id, err)
+		return types.PlatformFederation{}, p.s.Wrap("get platform federation "+id, err)
 	}
 	return f, nil
 }
 
 func (p platformStore) Federations(ctx context.Context) ([]types.PlatformFederation, error) {
 	var out []types.PlatformFederation
-	err := p.s.rows(ctx, "list platform federations",
+	err := p.s.Rows(ctx, "list platform federations",
 		"SELECT "+platformFedCols+" FROM platform_federations ORDER BY id", nil,
 		func(r *sql.Rows) error {
 			f, err := scanPlatformFed(r)
@@ -558,7 +560,7 @@ func (p platformStore) Federations(ctx context.Context) ([]types.PlatformFederat
 }
 
 func (p platformStore) DeleteFederation(ctx context.Context, id string) error {
-	return p.s.execOne(
+	return p.s.ExecOne(
 		ctx,
 		"delete platform federation "+id,
 		"DELETE FROM platform_federations WHERE id = ?",
@@ -570,17 +572,18 @@ const topologyCols = "key, name, description, created_at, modified_at"
 
 func (p platformStore) PutTopology(ctx context.Context, t types.Topology) error {
 	return p.s.Tx(ctx, func(ctx context.Context) error {
-		if _, err := p.s.exec(ctx, "put topology "+t.Key,
+		if _, err := p.s.Exec(ctx, "put topology "+t.Key,
 			Upsert("topologies", strings.Split(topologyCols, ", "), []string{"key"}),
-			t.Key, t.Name, t.Description, micros(t.Created), micros(t.Modified)); err != nil {
+			t.Key, t.Name, t.Description, dialect.Micros(t.Created),
+			dialect.Micros(t.Modified)); err != nil {
 			return err
 		}
-		if _, err := p.s.exec(ctx, "put topology sites",
+		if _, err := p.s.Exec(ctx, "put topology sites",
 			"DELETE FROM topology_sites WHERE topology_key = ?", t.Key); err != nil {
 			return err
 		}
 		for _, site := range t.Sites {
-			if _, err := p.s.exec(ctx, "put topology site "+site.SiteName,
+			if _, err := p.s.Exec(ctx, "put topology site "+site.SiteName,
 				"INSERT INTO topology_sites (topology_key, site_name, peer) VALUES (?, ?, ?)",
 				t.Key, site.SiteName, site.PeerInstanceID); err != nil {
 				return err
@@ -597,7 +600,7 @@ func (p platformStore) topologies(
 	args ...any,
 ) ([]types.Topology, error) {
 	var out []types.Topology
-	err := p.s.rows(ctx, "list topologies",
+	err := p.s.Rows(ctx, "list topologies",
 		"SELECT "+topologyCols+" FROM topologies"+where+" ORDER BY key", args,
 		func(r *sql.Rows) error {
 			var (
@@ -605,16 +608,16 @@ func (p platformStore) topologies(
 				created, modified sql.NullInt64
 			)
 			err := r.Scan(&t.Key, &t.Name, &t.Description, &created, &modified)
-			t.Created, t.Modified = fromMicros(created), fromMicros(modified)
+			t.Created, t.Modified = dialect.FromMicros(created), dialect.FromMicros(modified)
 			out = append(out, t)
-			return err //nolint:wrapcheck // wrapped by rows
+			return err //nolint:wrapcheck // wrapped by Rows
 		})
 	if err != nil || len(out) == 0 {
 		return out, err
 	}
 	sites := map[string][]types.TopologySite{}
 	siteWhere := strings.ReplaceAll(where, "key", "topology_key")
-	err = p.s.rows(
+	err = p.s.Rows(
 		ctx,
 		"list topology sites",
 		"SELECT topology_key, site_name, peer FROM topology_sites"+siteWhere+" ORDER BY topology_key, site_name",
@@ -626,7 +629,7 @@ func (p platformStore) topologies(
 			)
 			err := r.Scan(&key, &site.SiteName, &site.PeerInstanceID)
 			sites[key] = append(sites[key], site)
-			return err //nolint:wrapcheck // wrapped by rows
+			return err //nolint:wrapcheck // wrapped by Rows
 		},
 	)
 	if err != nil {
@@ -655,10 +658,10 @@ func (p platformStore) Topologies(ctx context.Context) ([]types.Topology, error)
 
 func (p platformStore) DeleteTopology(ctx context.Context, key string) error {
 	return p.s.Tx(ctx, func(ctx context.Context) error {
-		if _, err := p.s.exec(ctx, "delete topology sites",
+		if _, err := p.s.Exec(ctx, "delete topology sites",
 			"DELETE FROM topology_sites WHERE topology_key = ?", key); err != nil {
 			return err
 		}
-		return p.s.execOne(ctx, "delete topology "+key, "DELETE FROM topologies WHERE key = ?", key)
+		return p.s.ExecOne(ctx, "delete topology "+key, "DELETE FROM topologies WHERE key = ?", key)
 	})
 }

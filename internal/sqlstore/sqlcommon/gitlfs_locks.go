@@ -35,17 +35,19 @@ func (l gitLFSLocks) Create(ctx context.Context, v types.GitLFSLock) error {
 	if _, err := l.s.Repos().Get(ctx, v.RepoKey); err != nil {
 		return fmt.Errorf("create git lfs lock %s: %w", v.ID, err)
 	}
-	_, err := l.s.exec(ctx, "create Git LFS lock "+v.ID,
+	_, err := l.s.Exec(ctx, "create Git LFS lock "+v.ID,
 		Insert("gitlfs_locks", strings.Split(gitLFSLockCols, ", ")),
 		v.ID, v.RepoKey, v.Path, v.Owner, store.Normalise(v.LockedAt).UnixMicro())
 	return err
 }
 
 func (l gitLFSLocks) Get(ctx context.Context, repoKey, id string) (types.GitLFSLock, error) {
-	out, err := scanGitLFSLock(l.s.q(ctx).QueryRowContext(ctx,
-		l.s.d.Rebind("SELECT "+gitLFSLockCols+" FROM gitlfs_locks WHERE repo_key = ? AND id = ?"),
-		repoKey, id))
-	return out, l.s.wrap("get Git LFS lock "+id, err)
+	out, err := scanGitLFSLock(l.s.Q(ctx).QueryRowContext(ctx,
+		l.s.Dialect().
+			Rebind("SELECT "+gitLFSLockCols+" FROM gitlfs_locks WHERE repo_key = ? AND id = ?"),
+		repoKey, id),
+	)
+	return out, l.s.Wrap("get Git LFS lock "+id, err)
 }
 
 func (l gitLFSLocks) List(
@@ -77,7 +79,7 @@ func (l gitLFSLocks) List(
 		args = append(args, cursor[0])
 	}
 	var out []types.GitLFSLock
-	err = l.s.rows(ctx, "list Git LFS locks",
+	err = l.s.Rows(ctx, "list Git LFS locks",
 		"SELECT "+gitLFSLockCols+" FROM gitlfs_locks"+where+" ORDER BY path LIMIT ?",
 		append(args, p.Limit+1), func(r *sql.Rows) error {
 			v, err := scanGitLFSLock(r)
@@ -101,7 +103,7 @@ func (l gitLFSLocks) Delete(ctx context.Context, repoKey, id string) (types.GitL
 		if err != nil {
 			return err
 		}
-		return l.s.execOne(ctx, "delete Git LFS lock "+id,
+		return l.s.ExecOne(ctx, "delete Git LFS lock "+id,
 			"DELETE FROM gitlfs_locks WHERE repo_key = ? AND id = ?", repoKey, id)
 	})
 	return out, err

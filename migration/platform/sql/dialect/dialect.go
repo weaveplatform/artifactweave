@@ -1,20 +1,4 @@
-// Package sqlcommon implements pkg/store over database/sql for any SQL
-// dialect (decision 0004), following hostweave's dialect layer: one store
-// implementation, a Dialect describing what differs between engines, and
-// embedded per-dialect migrations.
-//
-// Schema conventions shared by every table (research 15 section 4):
-//
-//   - Times are BIGINT Unix microseconds, NULL for a zero time; durations
-//     are BIGINT milliseconds. Integers compare and sort identically on
-//     every engine, which keeps keyset pagination exact.
-//   - JSON documents are TEXT, so they round-trip byte for byte.
-//   - Sealed values are BLOB (BYTEA) columns of their own, never inside a
-//     document, sealed with the purpose and row id of decision 0017.
-//   - Text columns that lists sort by are byte-ordered (COLLATE "C" on
-//     PostgreSQL, SQLite's default), so every backend pages in the order
-//     inmem does.
-package sqlcommon
+package dialect
 
 import (
 	"io/fs"
@@ -22,7 +6,8 @@ import (
 	"strings"
 )
 
-// Dialect describes what differs between SQL engines.
+// Dialect describes what differs between SQL engines. Each driver declares
+// one value and passes it to New and to the migrator.
 type Dialect struct {
 	// Name is used in errors.
 	Name string
@@ -35,7 +20,7 @@ type Dialect struct {
 	// sections.
 	Migrations fs.FS
 	// IsUniqueViolation reports whether err is the engine's unique or
-	// primary-key constraint error, so the store returns store.ErrConflict
+	// primary-key constraint error, so the store returns kernel.ErrConflict
 	// instead of a driver error when two writers race for one key.
 	IsUniqueViolation func(error) bool
 }
@@ -72,7 +57,8 @@ func (d Dialect) Rebind(query string) string {
 
 // Upsert renders INSERT ... ON CONFLICT (key) DO UPDATE SET col =
 // excluded.col for every non-key column; SQLite and PostgreSQL share the
-// syntax.
+// syntax. When every column is a key column it renders DO NOTHING instead,
+// because neither engine accepts a SET with nothing to set.
 func Upsert(table string, cols, key []string) string {
 	skip := make(map[string]bool, len(key))
 	for _, k := range key {

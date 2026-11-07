@@ -27,7 +27,7 @@ func (s replayStore) Do(
 	}
 	err := s.s.Tx(ctx, func(ctx context.Context) error {
 		cols := []string{"scope", "key_hash", "fingerprint", "resource_id", "expires_at"}
-		_, err := s.s.exec(
+		_, err := s.s.Exec(
 			ctx,
 			"claim replay",
 			InsertIgnore("api_replays", cols, []string{"scope", "key_hash"}),
@@ -43,10 +43,10 @@ func (s replayStore) Do(
 		var fingerprint string
 		var expires int64
 		query := "SELECT fingerprint, resource_id, expires_at FROM api_replays " +
-			"WHERE scope = ? AND key_hash = ? " + s.s.d.ForUpdate
-		if err := s.s.q(ctx).QueryRowContext(ctx, s.s.d.Rebind(query), r.Scope, r.Key).
+			"WHERE scope = ? AND key_hash = ? " + s.s.Dialect().ForUpdate
+		if err := s.s.Q(ctx).QueryRowContext(ctx, s.s.Dialect().Rebind(query), r.Scope, r.Key).
 			Scan(&fingerprint, &out.ResourceID, &expires); err != nil {
-			return s.s.wrap("read replay", err)
+			return s.s.Wrap("read replay", err)
 		}
 		if expires > r.Now.UnixMicro() {
 			if fingerprint != r.Fingerprint {
@@ -62,7 +62,7 @@ func (s replayStore) Do(
 		if id <= 0 {
 			return fmt.Errorf("replay resource ID must be positive: %w", store.ErrInvalid)
 		}
-		_, err = s.s.exec(
+		_, err = s.s.Exec(
 			ctx,
 			"complete replay",
 			"UPDATE api_replays SET fingerprint = ?, resource_id = ?, expires_at = ? WHERE scope = ? AND key_hash = ?",
@@ -82,7 +82,7 @@ func (s replayStore) Prune(ctx context.Context, now time.Time, limit int) (int64
 	if limit < 1 || limit > store.MaxLimit {
 		return 0, fmt.Errorf("replay prune limit: %w", store.ErrInvalid)
 	}
-	return s.s.exec(
+	return s.s.Exec(
 		ctx,
 		"prune replays",
 		"DELETE FROM api_replays WHERE expires_at <= ? AND (scope, key_hash) IN ("+

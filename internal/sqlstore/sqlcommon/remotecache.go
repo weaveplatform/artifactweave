@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -21,30 +22,30 @@ func (r remoteRecords) Source(ctx context.Context, key string) (types.RemoteSour
 	// The lifetime lock precedes the cache row lock in every mutation, including
 	// configuration edits and deletion. No network I/O runs while it is held.
 	var found string
-	err := r.s.q(ctx).
-		QueryRowContext(ctx, r.s.d.Rebind("SELECT key FROM repositories WHERE key = ?"+r.s.lockClause(ctx)), key).
+	err := r.s.Q(ctx).
+		QueryRowContext(ctx, r.s.Dialect().Rebind("SELECT key FROM repositories WHERE key = ?"+r.s.LockClause(ctx)), key).
 		Scan(&found)
 	if err != nil {
-		return types.RemoteSourceState{}, r.s.wrap("lock remote repository", err)
+		return types.RemoteSourceState{}, r.s.Wrap("lock remote repository", err)
 	}
-	err = r.s.q(ctx).
-		QueryRowContext(ctx, r.s.d.Rebind("SELECT doc FROM remote_sources WHERE repo_key = ?"+r.s.lockClause(ctx)), key).
+	err = r.s.Q(ctx).
+		QueryRowContext(ctx, r.s.Dialect().Rebind("SELECT doc FROM remote_sources WHERE repo_key = ?"+r.s.LockClause(ctx)), key).
 		Scan(&doc)
 	var out types.RemoteSourceState
 	if err != nil {
-		return out, r.s.wrap("read remote source", err)
+		return out, r.s.Wrap("read remote source", err)
 	}
-	err = fromJSON(doc, &out)
+	err = dialect.FromJSON(doc, &out)
 	return out, err
 }
 
 func (r remoteRecords) PutSource(ctx context.Context, key string, s types.RemoteSourceState) error {
-	_, err := r.s.exec(
+	_, err := r.s.Exec(
 		ctx,
 		"write remote source",
 		Upsert("remote_sources", []string{"repo_key", "doc"}, []string{"repo_key"}),
 		key,
-		mustJSON(store.Normalise(s)),
+		dialect.MustJSON(store.Normalise(s)),
 	)
 	return err
 }
@@ -54,14 +55,14 @@ func (r remoteRecords) Entry(
 	k types.RemoteCacheKey,
 ) (types.RemoteCacheEntry, error) {
 	var doc sql.NullString
-	err := r.s.q(ctx).
-		QueryRowContext(ctx, r.s.d.Rebind("SELECT doc FROM remote_cache WHERE repo_key = ? AND cache_id = ?"), k.RepoKey, store.RemoteCacheID(k)).
+	err := r.s.Q(ctx).
+		QueryRowContext(ctx, r.s.Dialect().Rebind("SELECT doc FROM remote_cache WHERE repo_key = ? AND cache_id = ?"), k.RepoKey, store.RemoteCacheID(k)).
 		Scan(&doc)
 	var out types.RemoteCacheEntry
 	if err != nil {
-		return out, r.s.wrap("read remote cache", err)
+		return out, r.s.Wrap("read remote cache", err)
 	}
-	if err = fromJSON(doc, &out); err != nil {
+	if err = dialect.FromJSON(doc, &out); err != nil {
 		return out, err
 	}
 	if out.Token.Key != k {
@@ -71,7 +72,7 @@ func (r remoteRecords) Entry(
 }
 
 func (r remoteRecords) PutEntry(ctx context.Context, e types.RemoteCacheEntry) error {
-	_, err := r.s.exec(
+	_, err := r.s.Exec(
 		ctx,
 		"write remote cache",
 		Upsert(
@@ -82,7 +83,7 @@ func (r remoteRecords) PutEntry(ctx context.Context, e types.RemoteCacheEntry) e
 		e.Token.Key.RepoKey,
 		store.RemoteCacheID(e.Token.Key),
 		e.Token.Key.Path,
-		mustJSON(store.Normalise(e)),
+		dialect.MustJSON(store.Normalise(e)),
 	)
 	return err
 }
@@ -135,13 +136,13 @@ func (r remoteRecords) listEntries(
 	q += " ORDER BY cache_id LIMIT ?"
 	args = append(args, p.Limit+1)
 	var out []types.RemoteCacheEntry
-	err = r.s.rows(ctx, "list remote cache", q, args, func(rows *sql.Rows) error {
+	err = r.s.Rows(ctx, "list remote cache", q, args, func(rows *sql.Rows) error {
 		var doc sql.NullString
 		if err := rows.Scan(&doc); err != nil {
-			return err //nolint:wrapcheck // rows wraps scan errors
+			return err //nolint:wrapcheck // Rows wraps scan errors
 		}
 		var e types.RemoteCacheEntry
-		if err := fromJSON(doc, &e); err != nil {
+		if err := dialect.FromJSON(doc, &e); err != nil {
 			return err
 		}
 		out = append(out, e)
