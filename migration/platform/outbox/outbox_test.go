@@ -1,4 +1,4 @@
-package types_test
+package outbox_test
 
 import (
 	"errors"

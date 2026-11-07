@@ -1,4 +1,4 @@
-package types
+package outbox
 
 import (
 	"errors"
