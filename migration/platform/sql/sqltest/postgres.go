@@ -2,12 +2,17 @@ package sqltest
 
 import (
 	"context"
+	"crypto/rand"
+	"database/sql"
+	"net/url"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/postgres"
 	"github.com/weaveplatform/artifactweave/pkg/containertest"
 )
 
@@ -48,4 +53,52 @@ func PostgresDSN(t *testing.T) string {
 		t.Fatalf("postgres container: %v", pgErr)
 	}
 	return pgDSN
+}
+
+// ScratchDSN creates an empty schema of its own on the server that dsn
+// names and returns dsn with that schema as its search_path. pgx passes an
+// unknown DSN parameter such as search_path to the server as a run-time
+// parameter, so every connection of a pool opened with the result starts in
+// the schema: unqualified tables are created and read there, and
+// current_schema(), which the migrator's legacy-history check reads, names
+// it. dsn is a postgres:// or postgresql:// URL or key=value pairs. The
+// schema is dropped when t ends, after the cleanups registered later, such
+// as closing a pool opened with the result, because one server serves every
+// test of the process and may serve other processes too.
+func ScratchDSN(t *testing.T, dsn string) string {
+	t.Helper()
+	admin := postgresDB(t, dsn)
+	name := "scratch_" + strings.ToLower(rand.Text())
+	if _, err := admin.ExecContext(t.Context(), "CREATE SCHEMA "+name); err != nil {
+		t.Fatalf("create schema %s: %v", name, err)
+	}
+	t.Cleanup(func() {
+		// Registered after admin's own cleanup, so it runs before admin closes;
+		// t's context is already cancelled here.
+		drop := "DROP SCHEMA " + name + " CASCADE"
+		if _, err := admin.ExecContext(context.Background(), drop); err != nil {
+			t.Errorf("drop schema %s: %v", name, err)
+		}
+	})
+	if !strings.HasPrefix(dsn, "postgres://") && !strings.HasPrefix(dsn, "postgresql://") {
+		return dsn + " search_path=" + name
+	}
+	u, err := url.Parse(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	q := u.Query()
+	q.Set("search_path", name)
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
+func postgresDB(t *testing.T, dsn string) *sql.DB {
+	t.Helper()
+	db, err := postgres.OpenDB(dsn, postgres.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	return db
 }
