@@ -7,19 +7,40 @@ import (
 	"strings"
 )
 
-// sealedColumn is one column holding sealed values: the purpose and the row
-// id it is sealed with (decision 0017), and the key columns that identify
-// its rows. Every column a store seals must be listed here, or
-// `artifactweave keys rotate` leaves its values under the old key and they
-// become unreadable once that key is removed; TestAccSealedColumnsComplete
-// fails when a sealed column is missing.
-type sealedColumn struct {
-	table, column, purpose string
-	keys                   []string
-	rowID                  func(key []string) string
+// SealedColumn is one column that holds sealed values (decision 0017): the
+// Table and Column, the Purpose its values are sealed under, the Keys
+// columns that identify a row, and RowID, which builds a row's id from the
+// values of those columns, read as strings. Purpose and RowID must give
+// exactly what the module's store passes to Seal for the same row, because
+// both are authenticated with the value: Reseal fails on a sealed value
+// that does not open under them, and would seal a plain value under a
+// binding the store cannot open. A module registers every column it seals,
+// because Reseal reaches only registered columns: `artifactweave keys
+// rotate` would leave the values of a missing one under the old key, and
+// once that key is removed from the configuration they no longer open.
+type SealedColumn struct {
+	Table, Column, Purpose string
+	Keys                   []string
+	RowID                  func(key []string) string
 }
 
-func firstKey(k []string) string { return k[0] }
+// FirstKey is the RowID of a column whose row id is the value of its first
+// key column, such as a table keyed by name alone.
+func FirstKey(k []string) string { return k[0] }
+
+// Module is one module's registration with the SQL layer: its Name, one of
+// the canonical module names, the Sealed columns its store writes, and
+// BeforeReseal, which Reseal runs, when it is set, before the module's
+// columns, for work such as a backfill that seals values first; the count
+// it returns is added to Reseal's. The module SQL adapters register each
+// module once, in the canonical module order (decision 0044,
+// "Persistence"): platform, artifacts, access, notifications, retention,
+// federation, releases, workers.
+type Module struct {
+	Name         string
+	Sealed       []SealedColumn
+	BeforeReseal func(ctx context.Context, s *Store) (int, error)
+}
 
 // sealedRow is one value read for re-sealing, with its key values as the
 // driver returned them so the UPDATE binds them with their own types.
@@ -28,18 +49,57 @@ type sealedRow struct {
 	value []byte
 }
 
-func (s *Store) resealColumn(ctx context.Context, c sealedColumn) (int, error) {
-	op := "reseal " + c.table + "." + c.column
+// Reseal re-seals the sealed columns of mods under the keyring's active
+// version and returns how many values changed. It takes the modules in
+// order and, for each, runs BeforeReseal, when it is set, and then its
+// columns in order. Values already under the active version are left
+// alone, and values stored before a keyring was configured are sealed for
+// the first time, so running it again is harmless. Each value is replaced
+// only if it still holds the bytes that were read, so a concurrent write is
+// never overwritten with a stale secret. Without a keyring it returns
+// ErrNoKeyring and runs nothing. Otherwise it stops at the first error,
+// from a hook, a statement or a value the keyring cannot open, and returns
+// it with the number of values changed before it. Reseal opens no
+// transaction of its own: its statements run in the one ctx carries, if
+// any. It is a function, not a method of Store, because a store that
+// embeds *Store and declares a Reseal method would hide one of that name
+// without a compile error.
+func Reseal(ctx context.Context, s *Store, mods []Module) (int, error) {
+	if s.keys == nil {
+		return 0, ErrNoKeyring
+	}
+	changed := 0
+	for _, m := range mods {
+		if m.BeforeReseal != nil {
+			n, err := m.BeforeReseal(ctx, s)
+			changed += n
+			if err != nil {
+				return changed, err
+			}
+		}
+		for _, c := range m.Sealed {
+			n, err := s.resealColumn(ctx, c)
+			changed += n
+			if err != nil {
+				return changed, err
+			}
+		}
+	}
+	return changed, nil
+}
+
+func (s *Store) resealColumn(ctx context.Context, c SealedColumn) (int, error) {
+	op := "reseal " + c.Table + "." + c.Column
 	// Read everything first: an in-memory SQLite database has one
 	// connection, which an open result set would hold while updating.
 	var rows []sealedRow
 	err := s.Rows(ctx, op,
-		"SELECT "+strings.Join(c.keys, ", ")+", "+c.column+" FROM "+c.table+
-			" WHERE "+c.column+" IS NOT NULL",
+		"SELECT "+strings.Join(c.Keys, ", ")+", "+c.Column+" FROM "+c.Table+
+			" WHERE "+c.Column+" IS NOT NULL",
 		nil,
 		func(r *sql.Rows) error {
-			row := sealedRow{key: make([]any, len(c.keys))}
-			dest := make([]any, 0, len(c.keys)+1)
+			row := sealedRow{key: make([]any, len(c.Keys))}
+			dest := make([]any, 0, len(c.Keys)+1)
 			for i := range row.key {
 				dest = append(dest, &row.key[i])
 			}
@@ -52,16 +112,16 @@ func (s *Store) resealColumn(ctx context.Context, c sealedColumn) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	where := make([]string, 0, len(c.keys)+1)
-	for _, k := range c.keys {
+	where := make([]string, 0, len(c.Keys)+1)
+	for _, k := range c.Keys {
 		where = append(where, k+" = ?")
 	}
-	update := "UPDATE " + c.table + " SET " + c.column + " = ? WHERE " +
-		strings.Join(append(where, c.column+" = ?"), " AND ")
+	update := "UPDATE " + c.Table + " SET " + c.Column + " = ? WHERE " +
+		strings.Join(append(where, c.Column+" = ?"), " AND ")
 	changed := 0
 	for _, row := range rows {
-		id := c.rowID(keyStrings(row.key))
-		next, did, err := s.ResealValue(c.purpose, id, row.value)
+		id := c.RowID(keyStrings(row.key))
+		next, did, err := s.resealValue(c.Purpose, id, row.value)
 		if err != nil {
 			return changed, fmt.Errorf("%s %q: %w", op, id, err)
 		}
