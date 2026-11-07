@@ -12,3 +12,13 @@ func SealedPurposes() []string {
 	}
 	return out
 }
+
+// ModuleNames exposes the names of the registered modules, in order, to the
+// external tests.
+func ModuleNames() []string {
+	var out []string
+	for _, m := range modules() {
+		out = append(out, m.Name)
+	}
+	return out
+}

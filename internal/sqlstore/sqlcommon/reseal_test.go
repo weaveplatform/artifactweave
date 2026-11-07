@@ -2,12 +2,8 @@ package sqlcommon_test
 
 import (
 	"context"
-	"go/ast"
-	"go/parser"
-	"go/token"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -15,62 +11,52 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 )
 
-// TestAccSealedColumnsComplete finds every purpose the store seals with and
-// requires Reseal to cover it, so a secret column added later cannot be
-// left out of `artifactweave keys rotate` and strand values under a retired
-// key. It reads the package source: Seal(<purpose constant>, ...) calls and
-// the constants' values.
+// sealExempt names the purposes that are sealed outside any SQL column, each
+// with its reason, so that no module registers them.
+var sealExempt = map[string]string{
+	"terraform-state": "Terraform state blobs, which keys rotate re-seals through " +
+		"resealStates, decision 0041",
+}
+
+// TestAccSealedColumnsComplete finds every purpose the repository seals with
+// and requires a module to register its column, so a secret column added in
+// any module adapter cannot be left out of `artifactweave keys rotate` and
+// strand its values under a retired key. It scans the repository's source
+// (scanSeals) and also fails on a purpose it cannot read, on a registered
+// purpose that nothing seals any more and on a stale exemption.
 func TestAccSealedColumnsComplete(t *testing.T) {
-	files, err := filepath.Glob("*.go")
+	scan, err := scanSeals(repopath.Root(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-	consts := map[string]string{}
-	var used []string
-	fset := token.NewFileSet()
-	for _, name := range files {
-		if strings.HasSuffix(name, "_test.go") {
-			continue
-		}
-		f, err := parser.ParseFile(fset, name, nil, 0)
-		if err != nil {
-			t.Fatal(err)
-		}
-		ast.Inspect(f, func(n ast.Node) bool {
-			switch n := n.(type) {
-			case *ast.ValueSpec:
-				for i, id := range n.Names {
-					if i < len(n.Values) {
-						if lit, ok := n.Values[i].(*ast.BasicLit); ok && lit.Kind == token.STRING {
-							consts[id.Name], _ = strconv.Unquote(lit.Value)
-						}
-					}
-				}
-			case *ast.CallExpr:
-				if sel, ok := n.Fun.(*ast.SelectorExpr); ok && sel.Sel.Name == "Seal" &&
-					len(n.Args) > 0 {
-					if id, ok := n.Args[0].(*ast.Ident); ok {
-						used = append(used, id.Name)
-					}
-				}
-			}
-			return true
-		})
-	}
-	if len(used) == 0 {
+	if len(scan.purposes) == 0 {
 		t.Fatal("found no Seal calls; the scan is broken")
 	}
-	covered := sqlcommon.SealedPurposes()
-	for _, name := range used {
-		purpose, ok := consts[name]
-		if !ok {
-			t.Fatalf("Seal is called with %s, which is not a string constant in this package", name)
+	for _, problem := range checkSealedPurposes(scan, sqlcommon.SealedPurposes(), sealExempt) {
+		t.Error(problem)
+	}
+}
+
+// The modules register in the canonical module order (decision 0044,
+// "Persistence"), which Reseal follows, under the names the per-module
+// migration history will be keyed by, and each sealed column once.
+func TestUnitModulesRegisterInTheCanonicalOrder(t *testing.T) {
+	want := []string{
+		"platform", "artifacts", "access", "notifications",
+		"retention", "federation", "releases", "workers",
+	}
+	if got := sqlcommon.ModuleNames(); !slices.Equal(got, want) {
+		t.Errorf("modules = %q; want %q", got, want)
+	}
+	seen := map[string]bool{}
+	for _, p := range sqlcommon.SealedPurposes() {
+		if seen[p] {
+			t.Errorf("purpose %q is registered more than once", p)
 		}
-		if !slices.Contains(covered, purpose) {
-			t.Errorf("purpose %q is sealed but missing from sealedColumns", purpose)
-		}
+		seen[p] = true
 	}
 }
 
