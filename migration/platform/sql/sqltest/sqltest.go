@@ -30,7 +30,8 @@ func Reset(t *testing.T, db *sql.DB, d dialect.Dialect, mods []dialect.Module) {
 	}
 }
 
-// Option configures RunModule.
+// Option changes how RunModule runs a suite; WithPostgres and WithKeyring
+// return one.
 type Option func(*options)
 
 type options struct {

@@ -114,8 +114,14 @@ the work.
   in `app/apptest`. Module tests reach it only through those test-support packages, and
   `formattest.Run` takes its backends as a parameter, so artifacts core never imports
   `app`.
-- **Contract suites.** Module SQL contract suites run on SQLite; PostgreSQL runs stay in
-  the composite packages, with one container per test process.
+- **Contract suites.** Module SQL contract suites run on SQLite through
+  `platform/sql/sqltest`'s `RunModule`, which gives every store a fresh database migrated
+  with the module's streams alone, and they share their assertions through
+  `platform/testkit/storekit`. PostgreSQL runs stay in the composite packages, with one
+  container per test process, and stay legacy, in `internal/sqlstore/postgres` and the
+  composite suites of `internal/sqlstore/sqltest`, until STO-19. A module suite that asks
+  for a PostgreSQL run (`WithPostgres`) gets a scratch schema of its own on the shared
+  server for each store.
 - **Ownership of shared models.**
   - `PackageType` and the version comparators stay out of the kernel. They live in
     `artifacts/api/repo` and `artifacts/core/model`.
@@ -272,6 +278,14 @@ change that adds a name appends its row; the change column gives the ticket of t
 | `Dialect`, `IsUniqueViolation` | `platform/sql/sqlite`, `platform/sql/postgres` | Each engine's `dialect.Dialect` value, and the test it carries for a unique or primary-key violation, which the SQL store turns into `kernel.ErrConflict`. The target document names the `Dialect` type, not the drivers' values | STO-07 |
 | `DSN`, `Memory`, `ErrPathRequired` | `platform/sql/sqlite` | The modernc connection string with its pragmas and IMMEDIATE transactions, the path of a private in-memory database, and the sentinel for an empty path, whose text keeps its `sqlite:` prefix | STO-07 |
 | `ErrDSNRequired` | `platform/sql/postgres` | The sentinel for an empty DSN, whose text keeps its `postgres:` prefix | STO-07 |
+| `Opts`, `Want`, `Same`, `Must`, `WantErr`, `Get` | `platform/testkit/storekit` | The checks every store contract suite makes: a value read back against `kernel.Normalise` of the value written, compared with go-cmp options that treat empty and nil collections as equal and require times in the same location, and a call's error, expected or not. The metadata store's suite kept them unexported; the module suites (STO-12 to STO-18) share them | STO-08 |
+| `Base`, `At`, `Pages` | `platform/testkit/storekit` | A fixed instant in a non-UTC zone with sub-microsecond digits and the instants after it, so a stored time also checks UTC and precision normalisation, and the reader of every page of a keyset list over `kernel.Page`, which fails on a page larger than asked for or a list that does not end | STO-08 |
+| `PostgresDSN` | `platform/sql/sqltest` | The DSN of the one PostgreSQL server a test process shares: `ARTIFACTWEAVE_TEST_POSTGRES_DSN`, or a `postgres:17-alpine` container started once; it skips where Docker cannot run Linux containers. The legacy harness bridges it until PRO-02 | STO-08 |
+| `ScratchDSN` | `platform/sql/sqltest` | A DSN for the same server whose connections start in an empty schema of their own, selected through `search_path` and dropped when the test ends, so each PostgreSQL store of `RunModule` holds its modules' tables alone and the composite tables in `public` are left alone | STO-08 |
+| `Reset` | `platform/sql/sqltest` | Rolls every stream of the given modules back to zero and migrates it again, emptying their tables and leaving other streams' tables alone; the legacy harness's `Reset` calls it with the composite module list | STO-08 |
+| `OpenSQLite` | `platform/sql/sqltest` | A fresh in-memory SQLite store migrated with the given modules, sealed with the test keyring, with each module's `AfterMigrate` run, for a test that needs one store rather than a suite | STO-08 |
+| `Option`, `WithPostgres`, `WithKeyring` | `platform/sql/sqltest` | `RunModule`'s options: the PostgreSQL run, which a module suite asks for because module suites run on SQLite ("Persistence"), and a keyring in place of the test keyring, nil for none. The target document's `RunModule(t, open, suite)` takes neither, nor the modules whose streams make the schema | STO-08 |
+| `Exec`, `Fails`, `Err`, `Err3`, `FailTrigger`, `DropTable` | `platform/sql/sqltest` | The fault-test helpers of the SQL stores' fault tests: statements run behind a store's back, a check that every listed call failed, the error of a call with two or three results, and the SQLite statements that make a table's writes fail or drop the table | STO-08 |
 
 ### Placeholders
 

@@ -27,10 +27,14 @@ var Base = time.Date(2026, 10, 13, 14, 45, 12, 123456789, time.FixedZone("BST", 
 // At returns Base plus n minutes.
 func At(n int) time.Time { return Base.Add(time.Duration(n) * time.Minute) }
 
-// Want is what a store returns for v.
+// Want returns what a store returns for v: kernel.Normalise's deep copy,
+// with times in UTC truncated to microseconds and durations truncated to
+// milliseconds.
 func Want[V any](v V) V { return kernel.Normalise(v) }
 
-// Same fails t when got differs from Want(v).
+// Same stops the test when got, the value read back, differs under Opts
+// from Want(v), v being the value written; the message names what and
+// gives the -want +got diff.
 func Same[V any](t *testing.T, what string, v, got V) {
 	t.Helper()
 	if diff := cmp.Diff(Want(v), got, Opts); diff != "" {
@@ -38,7 +42,7 @@ func Same[V any](t *testing.T, what string, v, got V) {
 	}
 }
 
-// Must fails the test on error.
+// Must stops the test with err when err is not nil.
 func Must(t *testing.T, err error) {
 	t.Helper()
 	if err != nil {
@@ -46,7 +50,7 @@ func Must(t *testing.T, err error) {
 	}
 }
 
-// WantErr asserts errors.Is(err, target).
+// WantErr stops the test unless errors.Is(err, target), printing both.
 func WantErr(t *testing.T, err, target error) {
 	t.Helper()
 	if !errors.Is(err, target) {
@@ -54,7 +58,9 @@ func WantErr(t *testing.T, err, target error) {
 	}
 }
 
-// Get returns v or fails the test.
+// Get returns a function that stops the test when a call's error is not nil
+// and otherwise returns the call's value, so Get[V](t)(call()) reads a value
+// from a call that must succeed.
 func Get[V any](t *testing.T) func(V, error) V {
 	return func(v V, err error) V {
 		t.Helper()

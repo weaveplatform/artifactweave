@@ -26,9 +26,15 @@ var (
 	pgErr  error
 )
 
-// PostgresDSN returns a DSN for the PostgreSQL server shared by the test
-// binary, or skips t when there is none and Docker cannot run Linux
-// containers.
+// PostgresDSN returns the DSN of the PostgreSQL server that every test of the
+// process shares: ARTIFACTWEAVE_TEST_POSTGRES_DSN when it is set, or else that
+// of a postgres:17-alpine container, database artifactweave with user and
+// password aw, which the first call starts and later calls reuse. Without the
+// variable it skips t in a -short run and where Docker cannot run Linux
+// containers, and it fails t when the container does not start; a failed
+// start is not retried, so every later call fails too. Tables a test creates
+// in the server's public schema are seen by every other test of the process;
+// ScratchDSN gives a test a schema of its own.
 func PostgresDSN(t *testing.T) string {
 	t.Helper()
 	if dsn := os.Getenv("ARTIFACTWEAVE_TEST_POSTGRES_DSN"); dsn != "" {
