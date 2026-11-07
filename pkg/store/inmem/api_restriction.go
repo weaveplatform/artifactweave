@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
@@ -14,21 +15,21 @@ func (s *Store) APIRestrictions() store.APIRestrictionStore { return apiRestrict
 
 type apiRestrictions struct{ s *Store }
 
-func (a apiRestrictions) current() *table[string, store.APIRestriction] {
-	return tableOf[string, store.APIRestriction](a.s, "api_restrictions")
+func (a apiRestrictions) current() *memtx.Table[string, store.APIRestriction] {
+	return memtx.TableOf[string, store.APIRestriction](a.s.Store, "api_restrictions")
 }
 
-func (a apiRestrictions) audit() *table[int64, store.APIRestriction] {
-	return tableOf[int64, store.APIRestriction](a.s, "api_restriction_audit")
+func (a apiRestrictions) audit() *memtx.Table[int64, store.APIRestriction] {
+	return memtx.TableOf[int64, store.APIRestriction](a.s.Store, "api_restriction_audit")
 }
 
 func (a apiRestrictions) Get(ctx context.Context, user string) (store.APIRestriction, error) {
 	var out store.APIRestriction
-	err := a.s.do(ctx, func() error {
+	err := a.s.Do(ctx, func() error {
 		var ok bool
-		out, ok = a.current().get(user)
+		out, ok = a.current().Get(user)
 		if !ok {
-			return notFound("API restriction", user)
+			return memtx.NotFound("API restriction", user)
 		}
 		return nil
 	})
@@ -42,14 +43,14 @@ func (a apiRestrictions) Put(
 	if err := r.Validate(); err != nil {
 		return r, err
 	}
-	err := a.s.do(ctx, func() error {
-		if !a.s.usersT().has(r.User) {
-			return notFound("restricted user", r.User)
+	err := a.s.Do(ctx, func() error {
+		if !a.s.usersT().Has(r.User) {
+			return memtx.NotFound("restricted user", r.User)
 		}
-		r.Sequence = a.s.nextID("api_restriction_audit")
+		r.Sequence = a.s.NextID("api_restriction_audit")
 		r = store.Normalise(r)
-		a.current().put(r.User, r)
-		a.audit().put(r.Sequence, r)
+		a.current().Put(r.User, r)
+		a.audit().Put(r.Sequence, r)
 		return nil
 	})
 	return r, err
@@ -76,8 +77,8 @@ func (a apiRestrictions) History(
 		}
 	}
 	var out []store.APIRestriction
-	err = a.s.do(ctx, func() error {
-		for _, r := range a.audit().rows {
+	err = a.s.Do(ctx, func() error {
+		for _, r := range a.audit().Rows {
 			if user != "" && r.User != user || after != 0 && r.Sequence >= after {
 				continue
 			}

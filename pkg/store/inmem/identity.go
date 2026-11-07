@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -22,14 +23,16 @@ func (s *Store) Permissions() store.PermissionStore { return permissions{s} }
 // membership is a group_members row.
 type membership struct{ Group, User string }
 
-func (s *Store) usersT() *table[string, types.User] { return tableOf[string, types.User](s, "users") }
-
-func (s *Store) groupsT() *table[string, types.Group] {
-	return tableOf[string, types.Group](s, "user_groups")
+func (s *Store) usersT() *memtx.Table[string, types.User] {
+	return memtx.TableOf[string, types.User](s.Store, "users")
 }
 
-func (s *Store) membersT() *table[membership, struct{}] {
-	return tableOf[membership, struct{}](s, "group_members")
+func (s *Store) groupsT() *memtx.Table[string, types.Group] {
+	return memtx.TableOf[string, types.Group](s.Store, "user_groups")
+}
+
+func (s *Store) membersT() *memtx.Table[membership, struct{}] {
+	return memtx.TableOf[membership, struct{}](s.Store, "group_members")
 }
 
 // sortedUnique returns names sorted and without repeats.
@@ -40,10 +43,10 @@ func sortedUnique(names []string) []string {
 }
 
 // requireKeys returns ErrNotFound for the first of names t has no row for.
-func requireKeys[V any](t *table[string, V], what string, names []string) error {
+func requireKeys[V any](t *memtx.Table[string, V], what string, names []string) error {
 	for _, n := range names {
-		if !t.has(n) {
-			return notFound(what, n)
+		if !t.Has(n) {
+			return memtx.NotFound(what, n)
 		}
 	}
 	return nil
@@ -52,7 +55,7 @@ func requireKeys[V any](t *table[string, V], what string, names []string) error 
 // groupsOf returns a user's groups, sorted.
 func (s *Store) groupsOf(user string) []string {
 	var out []string
-	for m := range s.membersT().rows {
+	for m := range s.membersT().Rows {
 		if m.User == user {
 			out = append(out, m.Group)
 		}
@@ -64,7 +67,7 @@ func (s *Store) groupsOf(user string) []string {
 // membersOf returns a group's members, sorted.
 func (s *Store) membersOf(group string) []string {
 	var out []string
-	for m := range s.membersT().rows {
+	for m := range s.membersT().Rows {
 		if m.Group == group {
 			out = append(out, m.User)
 		}
@@ -84,9 +87,9 @@ type users struct{ s *Store }
 func userName(u types.User) string { return u.Name }
 
 func (us users) Create(ctx context.Context, u types.User) error {
-	return us.s.do(ctx, func() error {
-		if us.s.usersT().has(u.Name) {
-			return conflict("user", u.Name)
+	return us.s.Do(ctx, func() error {
+		if us.s.usersT().Has(u.Name) {
+			return memtx.Conflict("user", u.Name)
 		}
 		return us.write(u)
 	})
@@ -99,20 +102,20 @@ func (us users) write(u types.User) error {
 		return err
 	}
 	u.Groups = nil
-	us.s.usersT().put(u.Name, u)
-	us.s.membersT().deleteWhere(func(m membership, _ struct{}) bool { return m.User == u.Name })
+	us.s.usersT().Put(u.Name, u)
+	us.s.membersT().DeleteWhere(func(m membership, _ struct{}) bool { return m.User == u.Name })
 	for _, g := range groups {
-		us.s.membersT().put(membership{g, u.Name}, struct{}{})
+		us.s.membersT().Put(membership{g, u.Name}, struct{}{})
 	}
 	return nil
 }
 
 func (us users) Get(ctx context.Context, name string) (types.User, error) {
 	var out types.User
-	err := us.s.do(ctx, func() error {
-		u, ok := us.s.usersT().get(name)
+	err := us.s.Do(ctx, func() error {
+		u, ok := us.s.usersT().Get(name)
 		if !ok {
-			return notFound("user", name)
+			return memtx.NotFound("user", name)
 		}
 		u.Groups = us.s.groupsOf(name)
 		out = u
@@ -122,21 +125,21 @@ func (us users) Get(ctx context.Context, name string) (types.User, error) {
 }
 
 func (us users) Update(ctx context.Context, u types.User) error {
-	return us.s.do(ctx, func() error {
-		if !us.s.usersT().has(u.Name) {
-			return notFound("user", u.Name)
+	return us.s.Do(ctx, func() error {
+		if !us.s.usersT().Has(u.Name) {
+			return memtx.NotFound("user", u.Name)
 		}
 		return us.write(u)
 	})
 }
 
 func (us users) Delete(ctx context.Context, name string) error {
-	return us.s.do(ctx, func() error {
-		if !us.s.usersT().del(name) {
-			return notFound("user", name)
+	return us.s.Do(ctx, func() error {
+		if !us.s.usersT().Del(name) {
+			return memtx.NotFound("user", name)
 		}
-		us.s.membersT().deleteWhere(func(m membership, _ struct{}) bool { return m.User == name })
-		apiRestrictions{us.s}.current().del(name)
+		us.s.membersT().DeleteWhere(func(m membership, _ struct{}) bool { return m.User == name })
+		apiRestrictions{us.s}.current().Del(name)
 		return nil
 	})
 }
@@ -146,10 +149,15 @@ func (us users) List(ctx context.Context, p store.Page) ([]types.User, string, e
 		out  []types.User
 		next string
 	)
-	err := us.s.do(ctx, func() error {
-		rows := us.s.usersT().all(nil, compareByKey(userName))
+	err := us.s.Do(ctx, func() error {
+		rows := us.s.usersT().All(nil, compareByKey(userName))
 		var err error
-		out, next, err = paginate(rows, p, false, func(u types.User) []any { return []any{u.Name} })
+		out, next, err = memtx.Paginate(
+			rows,
+			p,
+			false,
+			func(u types.User) []any { return []any{u.Name} },
+		)
 		for i := range out {
 			out[i].Groups = us.s.groupsOf(out[i].Name)
 		}
@@ -159,24 +167,24 @@ func (us users) List(ctx context.Context, p store.Page) ([]types.User, string, e
 }
 
 func (us users) RecordLogin(ctx context.Context, name string, at time.Time) error {
-	return us.s.do(ctx, func() error {
-		u, ok := us.s.usersT().get(name)
+	return us.s.Do(ctx, func() error {
+		u, ok := us.s.usersT().Get(name)
 		if !ok {
-			return notFound("user", name)
+			return memtx.NotFound("user", name)
 		}
 		u.LastLoggedIn = at
 		u.FailedLogins = 0
-		us.s.usersT().put(name, u)
+		us.s.usersT().Put(name, u)
 		return nil
 	})
 }
 
 func (us users) RecordFailedLogin(ctx context.Context, name string, lockAt int) (bool, error) {
 	var locked bool
-	err := us.s.do(ctx, func() error {
-		u, ok := us.s.usersT().get(name)
+	err := us.s.Do(ctx, func() error {
+		u, ok := us.s.usersT().Get(name)
 		if !ok {
-			return notFound("user", name)
+			return memtx.NotFound("user", name)
 		}
 		u.FailedLogins++
 		enabled := u.Status == "" || u.Status == types.UserEnabled
@@ -184,19 +192,19 @@ func (us users) RecordFailedLogin(ctx context.Context, name string, lockAt int) 
 			u.Status = types.UserLocked
 		}
 		locked = u.Status == types.UserLocked
-		us.s.usersT().put(name, u)
+		us.s.usersT().Put(name, u)
 		return nil
 	})
 	return locked, err
 }
 
 func (us users) Unlock(ctx context.Context, names ...string) error {
-	return us.s.do(ctx, func() error {
+	return us.s.Do(ctx, func() error {
 		want := map[string]bool{}
 		for _, n := range names {
 			want[n] = true
 		}
-		for _, u := range us.s.usersT().all(nil, compareByKey(userName)) {
+		for _, u := range us.s.usersT().All(nil, compareByKey(userName)) {
 			switch {
 			case len(names) > 0 && !want[u.Name]:
 				continue
@@ -207,7 +215,7 @@ func (us users) Unlock(ctx context.Context, names ...string) error {
 				u.Status = types.UserEnabled
 			}
 			u.FailedLogins = 0
-			us.s.usersT().put(u.Name, u)
+			us.s.usersT().Put(u.Name, u)
 		}
 		return nil
 	})
@@ -215,8 +223,8 @@ func (us users) Unlock(ctx context.Context, names ...string) error {
 
 func (us users) Locked(ctx context.Context) ([]string, error) {
 	out := []string{}
-	err := us.s.do(ctx, func() error {
-		for _, u := range us.s.usersT().all(nil, compareByKey(userName)) {
+	err := us.s.Do(ctx, func() error {
+		for _, u := range us.s.usersT().All(nil, compareByKey(userName)) {
 			if u.Status == types.UserLocked {
 				out = append(out, u.Name)
 			}
@@ -233,9 +241,9 @@ type groups struct{ s *Store }
 func groupName(g types.Group) string { return g.Name }
 
 func (gs groups) Create(ctx context.Context, g types.Group) error {
-	return gs.s.do(ctx, func() error {
-		if gs.s.groupsT().has(g.Name) {
-			return conflict("group", g.Name)
+	return gs.s.Do(ctx, func() error {
+		if gs.s.groupsT().Has(g.Name) {
+			return memtx.Conflict("group", g.Name)
 		}
 		return gs.write(g)
 	})
@@ -248,20 +256,20 @@ func (gs groups) write(g types.Group) error {
 		return err
 	}
 	g.Members = nil
-	gs.s.groupsT().put(g.Name, g)
-	gs.s.membersT().deleteWhere(func(m membership, _ struct{}) bool { return m.Group == g.Name })
+	gs.s.groupsT().Put(g.Name, g)
+	gs.s.membersT().DeleteWhere(func(m membership, _ struct{}) bool { return m.Group == g.Name })
 	for _, u := range members {
-		gs.s.membersT().put(membership{g.Name, u}, struct{}{})
+		gs.s.membersT().Put(membership{g.Name, u}, struct{}{})
 	}
 	return nil
 }
 
 func (gs groups) Get(ctx context.Context, name string) (types.Group, error) {
 	var out types.Group
-	err := gs.s.do(ctx, func() error {
-		g, ok := gs.s.groupsT().get(name)
+	err := gs.s.Do(ctx, func() error {
+		g, ok := gs.s.groupsT().Get(name)
 		if !ok {
-			return notFound("group", name)
+			return memtx.NotFound("group", name)
 		}
 		g.Members = gs.s.membersOf(name)
 		out = g
@@ -271,20 +279,20 @@ func (gs groups) Get(ctx context.Context, name string) (types.Group, error) {
 }
 
 func (gs groups) Update(ctx context.Context, g types.Group) error {
-	return gs.s.do(ctx, func() error {
-		if !gs.s.groupsT().has(g.Name) {
-			return notFound("group", g.Name)
+	return gs.s.Do(ctx, func() error {
+		if !gs.s.groupsT().Has(g.Name) {
+			return memtx.NotFound("group", g.Name)
 		}
 		return gs.write(g)
 	})
 }
 
 func (gs groups) Delete(ctx context.Context, name string) error {
-	return gs.s.do(ctx, func() error {
-		if !gs.s.groupsT().del(name) {
-			return notFound("group", name)
+	return gs.s.Do(ctx, func() error {
+		if !gs.s.groupsT().Del(name) {
+			return memtx.NotFound("group", name)
 		}
-		gs.s.membersT().deleteWhere(func(m membership, _ struct{}) bool { return m.Group == name })
+		gs.s.membersT().DeleteWhere(func(m membership, _ struct{}) bool { return m.Group == name })
 		return nil
 	})
 }
@@ -294,10 +302,10 @@ func (gs groups) List(ctx context.Context, p store.Page) ([]types.Group, string,
 		out  []types.Group
 		next string
 	)
-	err := gs.s.do(ctx, func() error {
-		rows := gs.s.groupsT().all(nil, compareByKey(groupName))
+	err := gs.s.Do(ctx, func() error {
+		rows := gs.s.groupsT().All(nil, compareByKey(groupName))
 		var err error
-		out, next, err = paginate(
+		out, next, err = memtx.Paginate(
 			rows,
 			p,
 			false,
@@ -312,28 +320,28 @@ func (gs groups) List(ctx context.Context, p store.Page) ([]types.Group, string,
 }
 
 func (gs groups) AddMembers(ctx context.Context, group string, users ...string) error {
-	return gs.s.do(ctx, func() error {
-		if !gs.s.groupsT().has(group) {
-			return notFound("group", group)
+	return gs.s.Do(ctx, func() error {
+		if !gs.s.groupsT().Has(group) {
+			return memtx.NotFound("group", group)
 		}
 		users = sortedUnique(users)
 		if err := requireKeys(gs.s.usersT(), "user", users); err != nil {
 			return err
 		}
 		for _, u := range users {
-			gs.s.membersT().put(membership{group, u}, struct{}{})
+			gs.s.membersT().Put(membership{group, u}, struct{}{})
 		}
 		return nil
 	})
 }
 
 func (gs groups) RemoveMembers(ctx context.Context, group string, users ...string) error {
-	return gs.s.do(ctx, func() error {
-		if !gs.s.groupsT().has(group) {
-			return notFound("group", group)
+	return gs.s.Do(ctx, func() error {
+		if !gs.s.groupsT().Has(group) {
+			return memtx.NotFound("group", group)
 		}
 		for _, u := range users {
-			gs.s.membersT().del(membership{group, u})
+			gs.s.membersT().Del(membership{group, u})
 		}
 		return nil
 	})
@@ -341,8 +349,8 @@ func (gs groups) RemoveMembers(ctx context.Context, group string, users ...strin
 
 func (gs groups) AutoJoin(ctx context.Context) ([]string, error) {
 	var out []string
-	err := gs.s.do(ctx, func() error {
-		for _, g := range gs.s.groupsT().all(func(_ string, g types.Group) bool { return g.AutoJoin }, compareByKey(groupName)) {
+	err := gs.s.Do(ctx, func() error {
+		for _, g := range gs.s.groupsT().All(func(_ string, g types.Group) bool { return g.AutoJoin }, compareByKey(groupName)) {
 			out = append(out, g.Name)
 		}
 		return nil
@@ -354,28 +362,28 @@ func (gs groups) AutoJoin(ctx context.Context) ([]string, error) {
 
 type permissions struct{ s *Store }
 
-func (s *Store) permissionsT() *table[string, types.Permission] {
-	return tableOf[string, types.Permission](s, "permissions")
+func (s *Store) permissionsT() *memtx.Table[string, types.Permission] {
+	return memtx.TableOf[string, types.Permission](s.Store, "permissions")
 }
 
 func permissionName(p types.Permission) string { return p.Name }
 
 func (ps permissions) Create(ctx context.Context, p types.Permission) error {
-	return ps.s.do(ctx, func() error {
-		if ps.s.permissionsT().has(p.Name) {
-			return conflict("permission", p.Name)
+	return ps.s.Do(ctx, func() error {
+		if ps.s.permissionsT().Has(p.Name) {
+			return memtx.Conflict("permission", p.Name)
 		}
-		ps.s.permissionsT().put(p.Name, p)
+		ps.s.permissionsT().Put(p.Name, p)
 		return nil
 	})
 }
 
 func (ps permissions) Get(ctx context.Context, name string) (types.Permission, error) {
 	var out types.Permission
-	err := ps.s.do(ctx, func() error {
+	err := ps.s.Do(ctx, func() error {
 		var ok bool
-		if out, ok = ps.s.permissionsT().get(name); !ok {
-			return notFound("permission", name)
+		if out, ok = ps.s.permissionsT().Get(name); !ok {
+			return memtx.NotFound("permission", name)
 		}
 		return nil
 	})
@@ -383,19 +391,19 @@ func (ps permissions) Get(ctx context.Context, name string) (types.Permission, e
 }
 
 func (ps permissions) Update(ctx context.Context, p types.Permission) error {
-	return ps.s.do(ctx, func() error {
-		if !ps.s.permissionsT().has(p.Name) {
-			return notFound("permission", p.Name)
+	return ps.s.Do(ctx, func() error {
+		if !ps.s.permissionsT().Has(p.Name) {
+			return memtx.NotFound("permission", p.Name)
 		}
-		ps.s.permissionsT().put(p.Name, p)
+		ps.s.permissionsT().Put(p.Name, p)
 		return nil
 	})
 }
 
 func (ps permissions) Delete(ctx context.Context, name string) error {
-	return ps.s.do(ctx, func() error {
-		if !ps.s.permissionsT().del(name) {
-			return notFound("permission", name)
+	return ps.s.Do(ctx, func() error {
+		if !ps.s.permissionsT().Del(name) {
+			return memtx.NotFound("permission", name)
 		}
 		return nil
 	})
@@ -406,10 +414,10 @@ func (ps permissions) List(ctx context.Context, p store.Page) ([]types.Permissio
 		out  []types.Permission
 		next string
 	)
-	err := ps.s.do(ctx, func() error {
-		rows := ps.s.permissionsT().all(nil, compareByKey(permissionName))
+	err := ps.s.Do(ctx, func() error {
+		rows := ps.s.permissionsT().All(nil, compareByKey(permissionName))
 		var err error
-		out, next, err = paginate(
+		out, next, err = memtx.Paginate(
 			rows,
 			p,
 			false,
@@ -426,9 +434,9 @@ func (ps permissions) where(
 	keep func(types.Permission) bool,
 ) ([]types.Permission, error) {
 	var out []types.Permission
-	err := ps.s.do(ctx, func() error {
+	err := ps.s.Do(ctx, func() error {
 		out = ps.s.permissionsT().
-			all(func(_ string, p types.Permission) bool { return keep(p) }, compareByKey(permissionName))
+			All(func(_ string, p types.Permission) bool { return keep(p) }, compareByKey(permissionName))
 		return nil
 	})
 	return out, err

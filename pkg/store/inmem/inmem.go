@@ -14,23 +14,14 @@
 package inmem
 
 import (
+	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // Store is an in-memory store.Store. The zero value is not usable; call New.
-type Store struct {
-	gate   chan struct{}
-	tables map[string]snapshotter
-	seqs   map[string]int64
-}
+type Store struct{ *memtx.Store }
 
 var _ store.Store = (*Store)(nil)
 
 // New returns an empty store.
-func New() *Store {
-	return &Store{
-		gate:   make(chan struct{}, 1),
-		tables: map[string]snapshotter{},
-		seqs:   map[string]int64{},
-	}
-}
+func New() *Store { return &Store{Store: memtx.New()} }

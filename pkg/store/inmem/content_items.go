@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -25,16 +26,20 @@ type itemKey struct {
 
 func keyOf(it types.Item) itemKey { return itemKey{it.RepoKey, it.Cached, it.Path, it.Name} }
 
-func (i items) t() *table[int64, types.Item] { return tableOf[int64, types.Item](i.s, "items") }
-
-func (i items) byPath() *table[itemKey, int64] { return tableOf[itemKey, int64](i.s, "items_by_path") }
-
-func (i items) props() *table[int64, types.Properties] {
-	return tableOf[int64, types.Properties](i.s, "item_properties")
+func (i items) t() *memtx.Table[int64, types.Item] {
+	return memtx.TableOf[int64, types.Item](i.s.Store, "items")
 }
 
-func (i items) stats() *table[int64, types.ItemStats] {
-	return tableOf[int64, types.ItemStats](i.s, "item_stats")
+func (i items) byPath() *memtx.Table[itemKey, int64] {
+	return memtx.TableOf[itemKey, int64](i.s.Store, "items_by_path")
+}
+
+func (i items) props() *memtx.Table[int64, types.Properties] {
+	return memtx.TableOf[int64, types.Properties](i.s.Store, "item_properties")
+}
+
+func (i items) stats() *memtx.Table[int64, types.ItemStats] {
+	return memtx.TableOf[int64, types.ItemStats](i.s.Store, "item_stats")
 }
 
 // canonical derives Path, Name and Depth from the item's full path.
@@ -77,23 +82,23 @@ func (i items) put(ctx context.Context, it types.Item, create bool) (types.Item,
 	if err != nil {
 		return it, err
 	}
-	err = i.s.do(ctx, func() error {
+	err = i.s.Do(ctx, func() error {
 		// Only the property methods write PropertiesModified, as the SQL
 		// stores leave its column out of Put.
 		it.PropertiesModified = time.Time{}
-		if id, ok := i.byPath().get(keyOf(it)); ok {
+		if id, ok := i.byPath().Get(keyOf(it)); ok {
 			if create {
 				return fmt.Errorf("create item %s: %w", it.FullPath(), store.ErrConflict)
 			}
 			it.ID = id
-			cur, _ := i.t().get(id)
+			cur, _ := i.t().Get(id)
 			it.PropertiesModified = cur.PropertiesModified
 		} else {
-			it.ID = i.s.nextID("items")
-			i.byPath().put(keyOf(it), it.ID)
+			it.ID = i.s.NextID("items")
+			i.byPath().Put(keyOf(it), it.ID)
 		}
-		i.t().put(it.ID, it)
-		it, _ = i.t().get(it.ID)
+		i.t().Put(it.ID, it)
+		it, _ = i.t().Get(it.ID)
 		return nil
 	})
 	return it, err
@@ -103,12 +108,12 @@ func (i items) put(ctx context.Context, it types.Item, create bool) (types.Item,
 func (i items) lookup(repoKey string, cached bool, fullPath string) (types.Item, error) {
 	parent, name, _, err := types.SplitItemPath(fullPath)
 	if err == nil {
-		if id, ok := i.byPath().get(itemKey{repoKey, cached, parent, name}); ok {
-			it, _ := i.t().get(id)
+		if id, ok := i.byPath().Get(itemKey{repoKey, cached, parent, name}); ok {
+			it, _ := i.t().Get(id)
 			return it, nil
 		}
 	}
-	return types.Item{}, notFound("item", repoKey+":"+fullPath)
+	return types.Item{}, memtx.NotFound("item", repoKey+":"+fullPath)
 }
 
 func (i items) Get(
@@ -118,7 +123,7 @@ func (i items) Get(
 	fullPath string,
 ) (types.Item, error) {
 	var out types.Item
-	err := i.s.do(ctx, func() error {
+	err := i.s.Do(ctx, func() error {
 		var err error
 		out, err = i.lookup(repoKey, cached, fullPath)
 		return err
@@ -128,10 +133,10 @@ func (i items) Get(
 
 func (i items) GetByID(ctx context.Context, id int64) (types.Item, error) {
 	var out types.Item
-	err := i.s.do(ctx, func() error {
+	err := i.s.Do(ctx, func() error {
 		var ok bool
-		if out, ok = i.t().get(id); !ok {
-			return notFound("item", id)
+		if out, ok = i.t().Get(id); !ok {
+			return memtx.NotFound("item", id)
 		}
 		return nil
 	})
@@ -147,10 +152,10 @@ func (i items) page(
 		out  []types.Item
 		next string
 	)
-	err := i.s.do(ctx, func() error {
-		rows := i.t().all(func(_ int64, it types.Item) bool { return keep(it) }, order)
+	err := i.s.Do(ctx, func() error {
+		rows := i.t().All(func(_ int64, it types.Item) bool { return keep(it) }, order)
 		var err error
-		out, next, err = paginate(rows, p, false, key)
+		out, next, err = memtx.Paginate(rows, p, false, key)
 		return err
 	})
 	return out, next, err
@@ -192,7 +197,7 @@ func (i items) Delete(
 	ctx context.Context, repoKey string, cached bool, fullPath string,
 ) (store.DeleteResult, error) {
 	res := store.DeleteResult{BlobRefs: map[string]int64{}}
-	err := i.s.do(ctx, func() error {
+	err := i.s.Do(ctx, func() error {
 		match := func(it types.Item) bool {
 			return it.RepoKey == repoKey && it.Cached == cached && !it.IsRoot()
 		}
@@ -207,7 +212,7 @@ func (i items) Delete(
 					(target.Folder && it.RepoKey == repoKey && it.Cached == cached && below(it.Path, full))
 			}
 		}
-		for _, it := range i.t().all(func(_ int64, it types.Item) bool { return match(it) }, nil) {
+		for _, it := range i.t().All(func(_ int64, it types.Item) bool { return match(it) }, nil) {
 			if it.Folder {
 				res.Folders++
 			} else {
@@ -230,22 +235,22 @@ func (i items) Delete(
 // remove deletes an item with everything that hangs off it, as the SQL
 // foreign keys cascade.
 func (i items) remove(it types.Item) {
-	i.t().del(it.ID)
-	i.byPath().del(keyOf(it))
-	i.props().del(it.ID)
-	i.stats().del(it.ID)
-	tableOf[types.VersionFile, bool](i.s, "package_version_files").deleteWhere(
+	i.t().Del(it.ID)
+	i.byPath().Del(keyOf(it))
+	i.props().Del(it.ID)
+	i.stats().Del(it.ID)
+	memtx.TableOf[types.VersionFile, bool](i.s.Store, "package_version_files").DeleteWhere(
 		func(f types.VersionFile, _ bool) bool { return f.ItemID == it.ID })
 }
 
 func (i items) Root(ctx context.Context, repoKey string, cached bool) (types.Item, error) {
 	var out types.Item
-	err := i.s.do(ctx, func() error {
-		id, ok := i.byPath().get(keyOf(types.RootItem(repoKey, cached)))
+	err := i.s.Do(ctx, func() error {
+		id, ok := i.byPath().Get(keyOf(types.RootItem(repoKey, cached)))
 		if !ok {
-			return notFound("repository root", repoKey)
+			return memtx.NotFound("repository root", repoKey)
 		}
-		out, _ = i.t().get(id)
+		out, _ = i.t().Get(id)
 		return nil
 	})
 	return out, err
@@ -259,24 +264,24 @@ func (i items) EnsureRoot(ctx context.Context, r types.Item) (types.Item, error)
 	root.Created, root.CreatedBy = r.Created, r.CreatedBy
 	root.Modified, root.ModifiedBy, root.Updated = r.Modified, r.ModifiedBy, r.Updated
 	var out types.Item
-	err := i.s.do(ctx, func() error {
-		id, ok := i.byPath().get(keyOf(root))
+	err := i.s.Do(ctx, func() error {
+		id, ok := i.byPath().Get(keyOf(root))
 		if !ok {
-			id = i.s.nextID("items")
+			id = i.s.NextID("items")
 			root.ID = id
-			i.byPath().put(keyOf(root), id)
-			i.t().put(id, root)
+			i.byPath().Put(keyOf(root), id)
+			i.t().Put(id, root)
 		}
-		out, _ = i.t().get(id)
+		out, _ = i.t().Get(id)
 		return nil
 	})
 	return out, err
 }
 
 func (i items) DeleteRoot(ctx context.Context, repoKey string, cached bool) error {
-	return i.s.do(ctx, func() error {
-		if id, ok := i.byPath().get(keyOf(types.RootItem(repoKey, cached))); ok {
-			it, _ := i.t().get(id)
+	return i.s.Do(ctx, func() error {
+		if id, ok := i.byPath().Get(keyOf(types.RootItem(repoKey, cached))); ok {
+			it, _ := i.t().Get(id)
 			i.remove(it)
 		}
 		return nil
@@ -300,7 +305,7 @@ func (i items) FindByChecksum(
 
 func (i items) Search(ctx context.Context, q *aql.Query, o aql.Options) ([]aql.Hit, error) {
 	var out []aql.Hit
-	err := i.s.do(ctx, func() error {
+	err := i.s.Do(ctx, func() error {
 		c := &aql.Corpus{Items: i.hits(true)}
 		if q.Joins() {
 			buildStore{i.s}.addBuilds(c)
@@ -318,9 +323,9 @@ func (i items) Search(ctx context.Context, q *aql.Query, o aql.Options) ([]aql.H
 
 func (i items) Usage(ctx context.Context) ([]store.RepoUsage, error) {
 	var out []store.RepoUsage
-	err := i.s.do(ctx, func() error {
+	err := i.s.Do(ctx, func() error {
 		totals := map[itemKey]*store.RepoUsage{}
-		for _, it := range i.t().rows {
+		for _, it := range i.t().Rows {
 			if it.IsRoot() {
 				continue
 			}
@@ -363,8 +368,8 @@ func compareBool(a, b bool) int {
 // requireItem fails with ErrNotFound when no item has id; call it under the
 // lock.
 func (i items) requireItem(id int64) error {
-	if !i.t().has(id) {
-		return notFound("item", id)
+	if !i.t().Has(id) {
+		return memtx.NotFound("item", id)
 	}
 	return nil
 }
@@ -376,11 +381,11 @@ func cleanProperties(props types.Properties) types.Properties {
 
 func (i items) Properties(ctx context.Context, id int64) (types.Properties, error) {
 	var out types.Properties
-	err := i.s.do(ctx, func() error {
+	err := i.s.Do(ctx, func() error {
 		if err := i.requireItem(id); err != nil {
 			return err
 		}
-		out, _ = i.props().get(id)
+		out, _ = i.props().Get(id)
 		if out == nil {
 			out = types.Properties{}
 		}
@@ -393,18 +398,18 @@ func (i items) Properties(ctx context.Context, id int64) (types.Properties, erro
 // stamping the item when they changed (store.ItemStore); call it under the
 // lock.
 func (i items) writeProperties(id int64, props types.Properties, at time.Time) {
-	before, _ := i.props().get(id)
+	before, _ := i.props().Get(id)
 	props = cleanProperties(props)
-	i.props().put(id, props)
+	i.props().Put(id, props)
 	if props.Equal(before) {
 		return
 	}
-	it, _ := i.t().get(id)
+	it, _ := i.t().Get(id)
 	it.PropertiesModified = at
 	if len(props) == 0 {
 		it.PropertiesModified = time.Time{}
 	}
-	i.t().put(id, it)
+	i.t().Put(id, it)
 }
 
 func (i items) SetProperties(
@@ -416,7 +421,7 @@ func (i items) SetProperties(
 	if err := store.CheckPropertyKeys(props); err != nil {
 		return fmt.Errorf("properties of item %d: %w", id, err)
 	}
-	return i.s.do(ctx, func() error {
+	return i.s.Do(ctx, func() error {
 		if err := i.requireItem(id); err != nil {
 			return err
 		}
@@ -435,11 +440,11 @@ func (i items) PatchProperties(
 	if err := store.CheckPropertyKeys(set); err != nil {
 		return fmt.Errorf("properties of item %d: %w", id, err)
 	}
-	return i.s.do(ctx, func() error {
+	return i.s.Do(ctx, func() error {
 		if err := i.requireItem(id); err != nil {
 			return err
 		}
-		cur, _ := i.props().get(id)
+		cur, _ := i.props().Get(id)
 		if cur == nil {
 			cur = types.Properties{}
 		}
@@ -456,22 +461,22 @@ func (i items) PatchProperties(
 
 func (i items) Stats(ctx context.Context, id int64) (types.ItemStats, error) {
 	var out types.ItemStats
-	err := i.s.do(ctx, func() error {
+	err := i.s.Do(ctx, func() error {
 		if err := i.requireItem(id); err != nil {
 			return err
 		}
-		out, _ = i.stats().get(id)
+		out, _ = i.stats().Get(id)
 		return nil
 	})
 	return out, err
 }
 
 func (i items) RecordDownload(ctx context.Context, id int64, d store.Download) error {
-	return i.s.do(ctx, func() error {
+	return i.s.Do(ctx, func() error {
 		if err := i.requireItem(id); err != nil {
 			return err
 		}
-		st, _ := i.stats().get(id)
+		st, _ := i.stats().Get(id)
 		if d.Remote {
 			st.RemoteDownloadCount++
 			st.RemoteLastDownloaded, st.RemoteLastDownloadedBy = d.At, d.By
@@ -480,17 +485,17 @@ func (i items) RecordDownload(ctx context.Context, id int64, d store.Download) e
 			st.DownloadCount++
 			st.LastDownloaded, st.LastDownloadedBy = d.At, d.By
 		}
-		i.stats().put(id, st)
+		i.stats().Put(id, st)
 		return nil
 	})
 }
 
 func (i items) PutStats(ctx context.Context, id int64, st types.ItemStats) error {
-	return i.s.do(ctx, func() error {
+	return i.s.Do(ctx, func() error {
 		if err := i.requireItem(id); err != nil {
 			return err
 		}
-		i.stats().put(id, st)
+		i.stats().Put(id, st)
 		return nil
 	})
 }

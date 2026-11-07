@@ -7,6 +7,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -18,8 +19,8 @@ type workQueue struct{ s *Store }
 
 type workKey struct{ kind, key string }
 
-func (w workQueue) items() *table[workKey, types.WorkItem] {
-	return tableOf[workKey, types.WorkItem](w.s, "work_items")
+func (w workQueue) items() *memtx.Table[workKey, types.WorkItem] {
+	return memtx.TableOf[workKey, types.WorkItem](w.s.Store, "work_items")
 }
 
 // micro compares times at the precision the SQL columns store.
@@ -34,9 +35,9 @@ func (w workQueue) Enqueue(
 	if err := store.ValidateWork(kind, key, payload); err != nil {
 		return err
 	}
-	return w.s.do(ctx, func() error {
+	return w.s.Do(ctx, func() error {
 		k := workKey{kind, key}
-		it, ok := w.items().get(k)
+		it, ok := w.items().Get(k)
 		if !ok {
 			it = types.WorkItem{
 				Kind: kind, Key: key, State: types.WorkPending, NotBefore: now, Enqueued: now,
@@ -53,7 +54,7 @@ func (w workQueue) Enqueue(
 		case types.WorkPending:
 		}
 		it.Updated = now
-		w.items().put(k, it)
+		w.items().Put(k, it)
 		return nil
 	})
 }
@@ -85,13 +86,13 @@ func (w workQueue) Lease(ctx context.Context, req store.WorkLease) ([]types.Work
 		return nil, err
 	}
 	var out []types.WorkItem
-	err := w.s.do(ctx, func() error {
+	err := w.s.Do(ctx, func() error {
 		type candidate struct {
 			it  types.WorkItem
 			due time.Time
 		}
 		var cands []candidate
-		for _, it := range w.items().rows {
+		for _, it := range w.items().Rows {
 			if len(req.Kinds) > 0 && !slices.Contains(req.Kinds, it.Kind) {
 				continue
 			}
@@ -109,7 +110,7 @@ func (w workQueue) Lease(ctx context.Context, req store.WorkLease) ([]types.Work
 		})
 		for _, c := range cands[:min(len(cands), max(req.Limit, 0))] {
 			it := take(c.it, req)
-			w.items().put(workKey{it.Kind, it.Key}, it)
+			w.items().Put(workKey{it.Kind, it.Key}, it)
 			out = append(out, store.Normalise(it))
 		}
 		return nil
@@ -129,16 +130,16 @@ func (w workQueue) LeaseKey(
 		out  types.WorkItem
 		took bool
 	)
-	err := w.s.do(ctx, func() error {
+	err := w.s.Do(ctx, func() error {
 		k := workKey{kind, key}
-		it, ok := w.items().get(k)
+		it, ok := w.items().Get(k)
 		if !ok {
 			return fmt.Errorf("work item %s/%s: %w", kind, key, store.ErrNotFound)
 		}
 		_, expired := due(it, req.Now)
 		if it.State == types.WorkPending || it.State == types.WorkLeased && expired {
 			it, took = take(it, req), true
-			w.items().put(k, it)
+			w.items().Put(k, it)
 		}
 		out = store.Normalise(it)
 		return nil
@@ -154,17 +155,17 @@ func (w workQueue) run(
 	gen int64,
 	fn func(it *types.WorkItem) (keep bool),
 ) error {
-	return w.s.do(ctx, func() error {
+	return w.s.Do(ctx, func() error {
 		k := workKey{kind, key}
-		it, ok := w.items().get(k)
+		it, ok := w.items().Get(k)
 		if !ok || it.State != types.WorkLeased || it.Generation != gen {
 			return fmt.Errorf("work item %s/%s run %d: %w", kind, key, gen, store.ErrConflict)
 		}
 		if !fn(&it) {
-			w.items().del(k)
+			w.items().Del(k)
 			return nil
 		}
-		w.items().put(k, it)
+		w.items().Put(k, it)
 		return nil
 	})
 }
@@ -238,8 +239,8 @@ func (w workQueue) Release(
 
 func (w workQueue) Get(ctx context.Context, kind, key string) (types.WorkItem, error) {
 	var out types.WorkItem
-	err := w.s.do(ctx, func() error {
-		it, ok := w.items().get(workKey{kind, key})
+	err := w.s.Do(ctx, func() error {
+		it, ok := w.items().Get(workKey{kind, key})
 		if !ok {
 			return fmt.Errorf("work item %s/%s: %w", kind, key, store.ErrNotFound)
 		}
@@ -251,9 +252,9 @@ func (w workQueue) Get(ctx context.Context, kind, key string) (types.WorkItem, e
 
 func (w workQueue) Stats(ctx context.Context) ([]types.WorkStats, error) {
 	var out []types.WorkStats
-	err := w.s.do(ctx, func() error {
+	err := w.s.Do(ctx, func() error {
 		by := map[string]*types.WorkStats{}
-		for _, it := range w.items().rows {
+		for _, it := range w.items().Rows {
 			st := by[it.Kind]
 			if st == nil {
 				st = &types.WorkStats{Kind: it.Kind}

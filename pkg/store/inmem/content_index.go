@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -24,8 +25,8 @@ func limitOr(limit int) int {
 
 type trash struct{ s *Store }
 
-func (t trash) t() *table[int64, types.TrashEntry] {
-	return tableOf[int64, types.TrashEntry](t.s, "trash")
+func (t trash) t() *memtx.Table[int64, types.TrashEntry] {
+	return memtx.TableOf[int64, types.TrashEntry](t.s.Store, "trash")
 }
 
 func (t trash) Add(ctx context.Context, e types.TrashEntry) (types.TrashEntry, error) {
@@ -34,10 +35,10 @@ func (t trash) Add(ctx context.Context, e types.TrashEntry) (types.TrashEntry, e
 		return e, err
 	}
 	e.Record.Item = it
-	err = t.s.do(ctx, func() error {
-		e.ID = t.s.nextID("trash")
-		t.t().put(e.ID, e)
-		e, _ = t.t().get(e.ID)
+	err = t.s.Do(ctx, func() error {
+		e.ID = t.s.NextID("trash")
+		t.t().Put(e.ID, e)
+		e, _ = t.t().Get(e.ID)
 		return nil
 	})
 	return e, err
@@ -45,10 +46,10 @@ func (t trash) Add(ctx context.Context, e types.TrashEntry) (types.TrashEntry, e
 
 func (t trash) Get(ctx context.Context, id int64) (types.TrashEntry, error) {
 	var out types.TrashEntry
-	err := t.s.do(ctx, func() error {
+	err := t.s.Do(ctx, func() error {
 		var ok bool
-		if out, ok = t.t().get(id); !ok {
-			return notFound("trash entry", id)
+		if out, ok = t.t().Get(id); !ok {
+			return memtx.NotFound("trash entry", id)
 		}
 		return nil
 	})
@@ -70,8 +71,8 @@ func (t trash) Find(ctx context.Context, repoKey, fullPath string) ([]types.Tras
 		return nil, nil //nolint:nilerr // a path that cannot name an item has no entries
 	}
 	var out []types.TrashEntry
-	err = t.s.do(ctx, func() error {
-		out = t.t().all(func(_ int64, e types.TrashEntry) bool {
+	err = t.s.Do(ctx, func() error {
+		out = t.t().All(func(_ int64, e types.TrashEntry) bool {
 			it := e.Record.Item
 			return it.RepoKey == repoKey && it.Path == parent && it.Name == name
 		}, func(a, b types.TrashEntry) int {
@@ -100,8 +101,8 @@ func (t trash) List(
 		out  []types.TrashEntry
 		next string
 	)
-	err := t.s.do(ctx, func() error {
-		rows := t.t().all(func(_ int64, e types.TrashEntry) bool {
+	err := t.s.Do(ctx, func() error {
+		rows := t.t().All(func(_ int64, e types.TrashEntry) bool {
 			return (repoKey == "" || e.Record.Item.RepoKey == repoKey) && keep(e)
 		}, func(a, b types.TrashEntry) int {
 			x, y := a.Record.Item, b.Record.Item
@@ -109,7 +110,7 @@ func (t trash) List(
 				cmp.Compare(x.Name, y.Name), cmp.Compare(a.ID, b.ID))
 		})
 		var err error
-		out, next, err = paginate(rows, p, false, func(e types.TrashEntry) []any {
+		out, next, err = memtx.Paginate(rows, p, false, func(e types.TrashEntry) []any {
 			return []any{e.Record.Item.RepoKey, e.Record.Item.Path, e.Record.Item.Name, e.ID}
 		})
 		return err
@@ -118,9 +119,9 @@ func (t trash) List(
 }
 
 func (t trash) Delete(ctx context.Context, id int64) error {
-	return t.s.do(ctx, func() error {
-		if !t.t().del(id) {
-			return notFound("trash entry", id)
+	return t.s.Do(ctx, func() error {
+		if !t.t().Del(id) {
+			return memtx.NotFound("trash entry", id)
 		}
 		return nil
 	})
@@ -132,9 +133,9 @@ func (t trash) Expired(
 	limit int,
 ) ([]types.TrashEntry, error) {
 	var out []types.TrashEntry
-	err := t.s.do(ctx, func() error {
+	err := t.s.Do(ctx, func() error {
 		cutoff := before.UnixMicro()
-		out = t.t().all(func(_ int64, e types.TrashEntry) bool {
+		out = t.t().All(func(_ int64, e types.TrashEntry) bool {
 			return !e.DeletedAt.IsZero() && e.DeletedAt.UnixMicro() < cutoff
 		}, func(a, b types.TrashEntry) int {
 			return cmp.Or(cmp.Compare(deletedKey(a), deletedKey(b)), cmp.Compare(a.ID, b.ID))
@@ -149,22 +150,22 @@ func (t trash) Expired(
 
 type packages struct{ s *Store }
 
-func (p packages) t() *table[int64, types.Package] {
-	return tableOf[int64, types.Package](p.s, "packages")
+func (p packages) t() *memtx.Table[int64, types.Package] {
+	return memtx.TableOf[int64, types.Package](p.s.Store, "packages")
 }
 
-func (p packages) versions() *table[int64, types.PackageVersion] {
-	return tableOf[int64, types.PackageVersion](p.s, "package_versions")
+func (p packages) versions() *memtx.Table[int64, types.PackageVersion] {
+	return memtx.TableOf[int64, types.PackageVersion](p.s.Store, "package_versions")
 }
 
-func (p packages) files() *table[types.VersionFile, bool] {
-	return tableOf[types.VersionFile, bool](p.s, "package_version_files")
+func (p packages) files() *memtx.Table[types.VersionFile, bool] {
+	return memtx.TableOf[types.VersionFile, bool](p.s.Store, "package_version_files")
 }
 
 // find returns the package (repoKey, name); call it under the lock.
 func (p packages) find(repoKey, name string) (types.Package, bool) {
 	rows := p.t().
-		all(func(_ int64, v types.Package) bool { return v.RepoKey == repoKey && v.Name == name }, nil)
+		All(func(_ int64, v types.Package) bool { return v.RepoKey == repoKey && v.Name == name }, nil)
 	if len(rows) == 0 {
 		return types.Package{}, false
 	}
@@ -179,14 +180,14 @@ func (p packages) Ensure(ctx context.Context, pkg types.Package) (types.Package,
 		)
 	}
 	var out types.Package
-	err := p.s.do(ctx, func() error {
+	err := p.s.Do(ctx, func() error {
 		if cur, ok := p.find(pkg.RepoKey, pkg.Name); ok {
 			out = cur
 			return nil
 		}
-		pkg.ID = p.s.nextID("packages")
-		p.t().put(pkg.ID, pkg)
-		out, _ = p.t().get(pkg.ID)
+		pkg.ID = p.s.NextID("packages")
+		p.t().Put(pkg.ID, pkg)
+		out, _ = p.t().Get(pkg.ID)
 		return nil
 	})
 	return out, err
@@ -194,10 +195,10 @@ func (p packages) Ensure(ctx context.Context, pkg types.Package) (types.Package,
 
 func (p packages) Get(ctx context.Context, id int64) (types.Package, error) {
 	var out types.Package
-	err := p.s.do(ctx, func() error {
+	err := p.s.Do(ctx, func() error {
 		var ok bool
-		if out, ok = p.t().get(id); !ok {
-			return notFound("package", id)
+		if out, ok = p.t().Get(id); !ok {
+			return memtx.NotFound("package", id)
 		}
 		return nil
 	})
@@ -206,10 +207,10 @@ func (p packages) Get(ctx context.Context, id int64) (types.Package, error) {
 
 func (p packages) Find(ctx context.Context, repoKey, name string) (types.Package, error) {
 	var out types.Package
-	err := p.s.do(ctx, func() error {
+	err := p.s.Do(ctx, func() error {
 		var ok bool
 		if out, ok = p.find(repoKey, name); !ok {
-			return notFound("package", repoKey+":"+name)
+			return memtx.NotFound("package", repoKey+":"+name)
 		}
 		return nil
 	})
@@ -225,11 +226,11 @@ func (p packages) List(
 		out  []types.Package
 		next string
 	)
-	err := p.s.do(ctx, func() error {
-		rows := p.t().all(func(_ int64, v types.Package) bool { return v.RepoKey == repoKey },
+	err := p.s.Do(ctx, func() error {
+		rows := p.t().All(func(_ int64, v types.Package) bool { return v.RepoKey == repoKey },
 			func(a, b types.Package) int { return cmp.Compare(a.Name, b.Name) })
 		var err error
-		out, next, err = paginate(
+		out, next, err = memtx.Paginate(
 			rows,
 			pg,
 			false,
@@ -241,11 +242,11 @@ func (p packages) List(
 }
 
 func (p packages) Delete(ctx context.Context, id int64) error {
-	return p.s.do(ctx, func() error {
-		if !p.t().del(id) {
-			return notFound("package", id)
+	return p.s.Do(ctx, func() error {
+		if !p.t().Del(id) {
+			return memtx.NotFound("package", id)
 		}
-		for _, v := range p.versions().all(func(_ int64, v types.PackageVersion) bool { return v.PackageID == id }, nil) {
+		for _, v := range p.versions().All(func(_ int64, v types.PackageVersion) bool { return v.PackageID == id }, nil) {
 			p.removeVersion(v.ID)
 		}
 		return nil
@@ -255,14 +256,14 @@ func (p packages) Delete(ctx context.Context, id int64) error {
 // removeVersion deletes a version and its file links; call it under the
 // lock.
 func (p packages) removeVersion(id int64) {
-	p.versions().del(id)
-	p.files().deleteWhere(func(f types.VersionFile, _ bool) bool { return f.VersionID == id })
+	p.versions().Del(id)
+	p.files().DeleteWhere(func(f types.VersionFile, _ bool) bool { return f.VersionID == id })
 }
 
 // sorted returns a package's versions ordered by order key, then version.
 func (p packages) sorted(packageID int64) []types.PackageVersion {
 	return p.versions().
-		all(func(_ int64, v types.PackageVersion) bool { return v.PackageID == packageID },
+		All(func(_ int64, v types.PackageVersion) bool { return v.PackageID == packageID },
 			func(a, b types.PackageVersion) int {
 				return cmp.Or(
 					cmp.Compare(a.OrderKey, b.OrderKey),
@@ -277,7 +278,7 @@ func (p packages) reorder(pkg types.Package) {
 	vs := p.sorted(pkg.ID)
 	types.AssignOrderKeys(types.ComparatorFor(pkg.Type), vs)
 	for _, v := range vs {
-		p.versions().put(v.ID, v)
+		p.versions().Put(v.ID, v)
 	}
 }
 
@@ -289,10 +290,10 @@ func (p packages) PutVersion(
 		return v, fmt.Errorf("put package version: version is required: %w", store.ErrInvalid)
 	}
 	var out types.PackageVersion
-	err := p.s.do(ctx, func() error {
-		pkg, ok := p.t().get(v.PackageID)
+	err := p.s.Do(ctx, func() error {
+		pkg, ok := p.t().Get(v.PackageID)
 		if !ok {
-			return notFound("package", v.PackageID)
+			return memtx.NotFound("package", v.PackageID)
 		}
 		v.ID, v.OrderKey = 0, 0
 		for _, cur := range p.sorted(pkg.ID) {
@@ -301,14 +302,14 @@ func (p packages) PutVersion(
 			}
 		}
 		if v.ID == 0 {
-			v.ID = p.s.nextID("package_versions")
+			v.ID = p.s.NextID("package_versions")
 		}
 		if len(v.Metadata) == 0 {
 			v.Metadata = nil
 		}
-		p.versions().put(v.ID, v)
+		p.versions().Put(v.ID, v)
 		p.reorder(pkg)
-		out, _ = p.versions().get(v.ID)
+		out, _ = p.versions().Get(v.ID)
 		return nil
 	})
 	return out, err
@@ -320,21 +321,21 @@ func (p packages) Version(
 	version string,
 ) (types.PackageVersion, error) {
 	var out types.PackageVersion
-	err := p.s.do(ctx, func() error {
+	err := p.s.Do(ctx, func() error {
 		for _, v := range p.sorted(packageID) {
 			if v.Version == version {
 				out = v
 				return nil
 			}
 		}
-		return notFound("package version", fmt.Sprintf("%d/%s", packageID, version))
+		return memtx.NotFound("package version", fmt.Sprintf("%d/%s", packageID, version))
 	})
 	return out, err
 }
 
 func (p packages) Versions(ctx context.Context, packageID int64) ([]types.PackageVersion, error) {
 	var out []types.PackageVersion
-	err := p.s.do(ctx, func() error {
+	err := p.s.Do(ctx, func() error {
 		out = p.sorted(packageID)
 		return nil
 	})
@@ -342,13 +343,13 @@ func (p packages) Versions(ctx context.Context, packageID int64) ([]types.Packag
 }
 
 func (p packages) DeleteVersion(ctx context.Context, id int64) error {
-	return p.s.do(ctx, func() error {
-		v, ok := p.versions().get(id)
+	return p.s.Do(ctx, func() error {
+		v, ok := p.versions().Get(id)
 		if !ok {
-			return notFound("package version", id)
+			return memtx.NotFound("package version", id)
 		}
 		p.removeVersion(id)
-		if pkg, ok := p.t().get(v.PackageID); ok {
+		if pkg, ok := p.t().Get(v.PackageID); ok {
 			p.reorder(pkg)
 		}
 		return nil
@@ -356,22 +357,22 @@ func (p packages) DeleteVersion(ctx context.Context, id int64) error {
 }
 
 func (p packages) LinkFile(ctx context.Context, f types.VersionFile) error {
-	return p.s.do(ctx, func() error {
-		if !p.versions().has(f.VersionID) {
-			return notFound("link file: package version", f.VersionID)
+	return p.s.Do(ctx, func() error {
+		if !p.versions().Has(f.VersionID) {
+			return memtx.NotFound("link file: package version", f.VersionID)
 		}
-		if !tableOf[int64, types.Item](p.s, "items").has(f.ItemID) {
-			return notFound("link file: item", f.ItemID)
+		if !memtx.TableOf[int64, types.Item](p.s.Store, "items").Has(f.ItemID) {
+			return memtx.NotFound("link file: item", f.ItemID)
 		}
-		p.files().put(f, true)
+		p.files().Put(f, true)
 		return nil
 	})
 }
 
 func (p packages) Files(ctx context.Context, versionID int64) ([]int64, error) {
 	var out []int64
-	err := p.s.do(ctx, func() error {
-		for f := range p.files().rows {
+	err := p.s.Do(ctx, func() error {
+		for f := range p.files().Rows {
 			if f.VersionID == versionID {
 				out = append(out, f.ItemID)
 			}
@@ -384,30 +385,30 @@ func (p packages) Files(ctx context.Context, versionID int64) ([]int64, error) {
 
 func (p packages) VersionOf(ctx context.Context, itemID int64) (types.PackageVersion, error) {
 	var out types.PackageVersion
-	err := p.s.do(ctx, func() error {
+	err := p.s.Do(ctx, func() error {
 		var ids []int64
-		for f := range p.files().rows {
+		for f := range p.files().Rows {
 			if f.ItemID == itemID {
 				ids = append(ids, f.VersionID)
 			}
 		}
 		if len(ids) == 0 {
-			return notFound("version of item", itemID)
+			return memtx.NotFound("version of item", itemID)
 		}
-		out, _ = p.versions().get(slices.Min(ids))
+		out, _ = p.versions().Get(slices.Min(ids))
 		return nil
 	})
 	return out, err
 }
 
 func (p packages) RecordVersionDownload(ctx context.Context, versionID int64, at time.Time) error {
-	return p.s.do(ctx, func() error {
-		v, ok := p.versions().get(versionID)
+	return p.s.Do(ctx, func() error {
+		v, ok := p.versions().Get(versionID)
 		if !ok {
-			return notFound("package version", versionID)
+			return memtx.NotFound("package version", versionID)
 		}
 		v.LastDownloaded = at
-		p.versions().put(versionID, v)
+		p.versions().Put(versionID, v)
 		return nil
 	})
 }

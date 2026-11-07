@@ -7,6 +7,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -21,16 +22,16 @@ func (s *Store) Builds() store.BuildStore { return buildStore{s} }
 
 type buildStore struct{ s *Store }
 
-func (b buildStore) runs() *table[int64, types.Build] {
-	return tableOf[int64, types.Build](b.s, "builds")
+func (b buildStore) runs() *memtx.Table[int64, types.Build] {
+	return memtx.TableOf[int64, types.Build](b.s.Store, "builds")
 }
 
-func (b buildStore) promotions() *table[int64, types.BuildPromotion] {
-	return tableOf[int64, types.BuildPromotion](b.s, "build_promotions")
+func (b buildStore) promotions() *memtx.Table[int64, types.BuildPromotion] {
+	return memtx.TableOf[int64, types.BuildPromotion](b.s.Store, "build_promotions")
 }
 
-func (b buildStore) retention() *table[buildName, types.BuildRetention] {
-	return tableOf[buildName, types.BuildRetention](b.s, "build_retention")
+func (b buildStore) retention() *memtx.Table[buildName, types.BuildRetention] {
+	return memtx.TableOf[buildName, types.BuildRetention](b.s.Store, "build_retention")
 }
 
 // validBuild rejects a run the store cannot key.
@@ -58,16 +59,16 @@ func runsOldestFirst(x, y types.Build) int { return runsNewestFirst(y, x) }
 
 // named returns the runs of a name, sorted by order.
 func (b buildStore) named(project, name string, order func(x, y types.Build) int) []types.Build {
-	return b.runs().all(func(_ int64, r types.Build) bool {
+	return b.runs().All(func(_ int64, r types.Build) bool {
 		return r.ProjectKey == project && r.Name == name
 	}, order)
 }
 
 // delete removes a run with its promotions.
 func (b buildStore) delete(id int64) {
-	b.runs().del(id)
+	b.runs().Del(id)
 	b.promotions().
-		deleteWhere(func(_ int64, p types.BuildPromotion) bool { return p.BuildID == id })
+		DeleteWhere(func(_ int64, p types.BuildPromotion) bool { return p.BuildID == id })
 }
 
 func (b buildStore) Put(ctx context.Context, r types.Build) (types.Build, error) {
@@ -75,17 +76,17 @@ func (b buildStore) Put(ctx context.Context, r types.Build) (types.Build, error)
 		return types.Build{}, err
 	}
 	r = store.NormaliseBuild(r)
-	err := b.s.do(ctx, func() error {
+	err := b.s.Do(ctx, func() error {
 		for _, cur := range b.named(r.ProjectKey, r.Name, nil) {
 			if cur.Number == r.Number && cur.Started.Equal(r.Started) {
-				return conflict(
+				return memtx.Conflict(
 					"build run",
 					fmt.Sprintf("%s/%s/%s", buildName{r.ProjectKey, r.Name}, r.Number, r.Started),
 				)
 			}
 		}
-		r.ID = b.s.nextID("builds")
-		b.runs().put(r.ID, r)
+		r.ID = b.s.NextID("builds")
+		b.runs().Put(r.ID, r)
 		return nil
 	})
 	if err != nil {
@@ -99,14 +100,14 @@ func (b buildStore) Replace(ctx context.Context, r types.Build) error {
 		return fmt.Errorf("build run %d: %w", r.ID, err)
 	}
 	r = store.NormaliseBuild(r)
-	return b.s.do(ctx, func() error {
-		cur, ok := b.runs().get(r.ID)
+	return b.s.Do(ctx, func() error {
+		cur, ok := b.runs().Get(r.ID)
 		if !ok {
-			return notFound("build run", r.ID)
+			return memtx.NotFound("build run", r.ID)
 		}
 		cur.URL, cur.Modified, cur.ModifiedBy = r.URL, r.Modified, r.ModifiedBy
 		cur.Properties, cur.Modules, cur.Document = r.Properties, r.Modules, r.Document
-		b.runs().put(cur.ID, cur)
+		b.runs().Put(cur.ID, cur)
 		return nil
 	})
 }
@@ -116,24 +117,24 @@ func (b buildStore) Get(
 ) (types.Build, error) {
 	started = store.Normalise(started)
 	var out types.Build
-	err := b.s.do(ctx, func() error {
+	err := b.s.Do(ctx, func() error {
 		for _, r := range b.named(project, name, runsNewestFirst) {
 			if r.Number == number && (started.IsZero() || r.Started.Equal(started)) {
 				out = r
 				return nil
 			}
 		}
-		return notFound("build run", fmt.Sprintf("%s/%s", buildName{project, name}, number))
+		return memtx.NotFound("build run", fmt.Sprintf("%s/%s", buildName{project, name}, number))
 	})
 	return out, err
 }
 
 func (b buildStore) ByID(ctx context.Context, id int64) (types.Build, error) {
 	var out types.Build
-	err := b.s.do(ctx, func() error {
+	err := b.s.Do(ctx, func() error {
 		var ok bool
-		if out, ok = b.runs().get(id); !ok {
-			return notFound("build run", id)
+		if out, ok = b.runs().Get(id); !ok {
+			return memtx.NotFound("build run", id)
 		}
 		return nil
 	})
@@ -145,7 +146,7 @@ func (b buildStore) GetForUpdate(
 	project, name, number string,
 	started time.Time,
 ) (types.Build, error) {
-	if ctx.Value(txKey{b.s}) == nil {
+	if !b.s.InTx(ctx) {
 		return types.Build{}, fmt.Errorf(
 			"get build for update requires a transaction: %w",
 			store.ErrInvalid,
@@ -156,10 +157,10 @@ func (b buildStore) GetForUpdate(
 
 func (b buildStore) Latest(ctx context.Context, project, name string) (types.Build, error) {
 	var out types.Build
-	err := b.s.do(ctx, func() error {
+	err := b.s.Do(ctx, func() error {
 		runs := b.named(project, name, runsNewestFirst)
 		if len(runs) == 0 {
-			return notFound("build", buildName{project, name})
+			return memtx.NotFound("build", buildName{project, name})
 		}
 		out = runs[0]
 		return nil
@@ -168,7 +169,7 @@ func (b buildStore) Latest(ctx context.Context, project, name string) (types.Bui
 }
 
 func (b buildStore) ByIDForUpdate(ctx context.Context, id int64) (types.Build, error) {
-	if ctx.Value(txKey{b.s}) == nil {
+	if !b.s.InTx(ctx) {
 		return types.Build{}, fmt.Errorf(
 			"get build by ID for update requires a transaction: %w",
 			store.ErrInvalid,
@@ -184,13 +185,13 @@ func (b buildStore) Runs(
 		out  []types.BuildRun
 		next string
 	)
-	err := b.s.do(ctx, func() error {
+	err := b.s.Do(ctx, func() error {
 		runs := make([]types.BuildRun, 0)
 		for _, r := range b.named(project, name, runsNewestFirst) {
 			runs = append(runs, r.Run())
 		}
 		var err error
-		out, next, err = paginate(runs, p, true, func(r types.BuildRun) []any {
+		out, next, err = memtx.Paginate(runs, p, true, func(r types.BuildRun) []any {
 			return []any{r.Started.UnixMicro(), r.ID}
 		})
 		return err
@@ -207,9 +208,9 @@ func (b buildStore) Names(
 		out  []types.BuildName
 		next string
 	)
-	err := b.s.do(ctx, func() error {
+	err := b.s.Do(ctx, func() error {
 		latest := map[string]time.Time{}
-		for _, r := range b.runs().rows {
+		for _, r := range b.runs().Rows {
 			if r.ProjectKey == project && r.Started.After(latest[r.Name]) {
 				latest[r.Name] = r.Started
 			}
@@ -223,7 +224,7 @@ func (b buildStore) Names(
 			func(x, y types.BuildName) int { return cmp.Compare(x.Name, y.Name) },
 		)
 		var err error
-		out, next, err = paginate(
+		out, next, err = memtx.Paginate(
 			names,
 			p,
 			false,
@@ -238,7 +239,7 @@ func (b buildStore) DeleteNumbers(
 	ctx context.Context, project, name string, numbers []string,
 ) ([]types.BuildRun, error) {
 	var out []types.BuildRun
-	err := b.s.do(ctx, func() error {
+	err := b.s.Do(ctx, func() error {
 		for _, number := range numbers {
 			for _, r := range b.named(project, name, runsOldestFirst) {
 				if r.Number == number {
@@ -255,39 +256,39 @@ func (b buildStore) DeleteNumbers(
 
 func (b buildStore) DeleteAll(ctx context.Context, project, name string) ([]types.BuildRun, error) {
 	var out []types.BuildRun
-	err := b.s.do(ctx, func() error {
+	err := b.s.Do(ctx, func() error {
 		for _, r := range b.named(project, name, runsOldestFirst) {
 			b.delete(r.ID)
 			out = append(out, r.Run())
 		}
-		b.retention().del(buildName{project, name})
+		b.retention().Del(buildName{project, name})
 		return nil
 	})
 	return out, err
 }
 
 func (b buildStore) Rename(ctx context.Context, project, from, to string) error {
-	return b.s.do(ctx, func() error {
+	return b.s.Do(ctx, func() error {
 		runs := b.named(project, from, nil)
 		if len(runs) == 0 {
-			return notFound("build", buildName{project, from})
+			return memtx.NotFound("build", buildName{project, from})
 		}
 		if from == to {
 			return nil
 		}
 		if len(b.named(project, to, nil)) > 0 {
-			return conflict("build", buildName{project, to})
+			return memtx.Conflict("build", buildName{project, to})
 		}
 		for _, r := range runs {
 			r.Name = to
-			b.runs().put(r.ID, r)
+			b.runs().Put(r.ID, r)
 		}
-		ret, ok := b.retention().get(buildName{project, from})
-		b.retention().del(buildName{project, from})
-		b.retention().del(buildName{project, to})
+		ret, ok := b.retention().Get(buildName{project, from})
+		b.retention().Del(buildName{project, from})
+		b.retention().Del(buildName{project, to})
 		if ok {
 			ret.Name = to
-			b.retention().put(buildName{project, to}, ret)
+			b.retention().Put(buildName{project, to}, ret)
 		}
 		return nil
 	})
@@ -297,12 +298,12 @@ func (b buildStore) AddPromotion(
 	ctx context.Context,
 	p types.BuildPromotion,
 ) (types.BuildPromotion, error) {
-	err := b.s.do(ctx, func() error {
-		if !b.runs().has(p.BuildID) {
-			return notFound("build run", p.BuildID)
+	err := b.s.Do(ctx, func() error {
+		if !b.runs().Has(p.BuildID) {
+			return memtx.NotFound("build run", p.BuildID)
 		}
-		p.ID = b.s.nextID("build_promotions")
-		b.promotions().put(p.ID, p)
+		p.ID = b.s.NextID("build_promotions")
+		b.promotions().Put(p.ID, p)
 		return nil
 	})
 	if err != nil {
@@ -313,11 +314,11 @@ func (b buildStore) AddPromotion(
 
 func (b buildStore) Promotions(ctx context.Context, buildID int64) ([]types.BuildPromotion, error) {
 	var out []types.BuildPromotion
-	err := b.s.do(ctx, func() error {
-		if !b.runs().has(buildID) {
-			return notFound("build run", buildID)
+	err := b.s.Do(ctx, func() error {
+		if !b.runs().Has(buildID) {
+			return memtx.NotFound("build run", buildID)
 		}
-		out = b.promotions().all(
+		out = b.promotions().All(
 			func(_ int64, p types.BuildPromotion) bool { return p.BuildID == buildID },
 			func(x, y types.BuildPromotion) int {
 				if c := x.Created.Compare(y.Created); c != 0 {
@@ -354,8 +355,8 @@ func (b buildStore) find(
 		return nil, err
 	}
 	var out []types.BuildFileRef
-	err := b.s.do(ctx, func() error {
-		runs := b.runs().all(nil, func(x, y types.Build) int { return cmp.Compare(x.ID, y.ID) })
+	err := b.s.Do(ctx, func() error {
+		runs := b.runs().All(nil, func(x, y types.Build) int { return cmp.Compare(x.ID, y.ID) })
 		for _, r := range runs {
 			for _, m := range r.Modules {
 				for _, f := range files(m) {
@@ -385,8 +386,8 @@ func (b buildStore) FindDependencies(
 }
 
 func (b buildStore) PutRetention(ctx context.Context, r types.BuildRetention) error {
-	return b.s.do(ctx, func() error {
-		b.retention().put(buildName{r.ProjectKey, r.Name}, r)
+	return b.s.Do(ctx, func() error {
+		b.retention().Put(buildName{r.ProjectKey, r.Name}, r)
 		return nil
 	})
 }
@@ -396,10 +397,10 @@ func (b buildStore) Retention(
 	project, name string,
 ) (types.BuildRetention, error) {
 	var out types.BuildRetention
-	err := b.s.do(ctx, func() error {
+	err := b.s.Do(ctx, func() error {
 		var ok bool
-		if out, ok = b.retention().get(buildName{project, name}); !ok {
-			return notFound("build retention", buildName{project, name})
+		if out, ok = b.retention().Get(buildName{project, name}); !ok {
+			return memtx.NotFound("build retention", buildName{project, name})
 		}
 		return nil
 	})

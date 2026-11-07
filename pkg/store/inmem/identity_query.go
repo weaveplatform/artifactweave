@@ -24,8 +24,8 @@ func (us users) ListSummaries(ctx context.Context, f store.UserFilter, p store.P
 	compare := func(a, b store.UserSummary) int {
 		return identityOrder(a.Name, b.Name, f.Descending)
 	}
-	err = us.s.do(ctx, func() error {
-		for _, u := range us.s.usersT().rows {
+	err = us.s.Do(ctx, func() error {
+		for _, u := range us.s.usersT().Rows {
 			if !identityName(u.Name, f.IdentityFilter, after) {
 				continue
 			}
@@ -42,7 +42,7 @@ func (us users) ListSummaries(ctx context.Context, f store.UserFilter, p store.P
 			}
 			admin := u.Admin
 			for _, name := range memberships {
-				g, _ := us.s.groupsT().get(name)
+				g, _ := us.s.groupsT().Get(name)
 				admin = admin || g.AdminPrivileges
 			}
 			if f.OnlyAdmins && !admin ||
@@ -81,8 +81,8 @@ func (gs groups) ListNames(
 	}
 	var out []string
 	compare := func(a, b string) int { return identityOrder(a, b, f.Descending) }
-	err = gs.s.do(ctx, func() error {
-		for name := range gs.s.groupsT().rows {
+	err = gs.s.Do(ctx, func() error {
+		for name := range gs.s.groupsT().Rows {
 			if identityName(name, f, after) && gs.s.identityGranted(name, nil, f.Resource, true) {
 				i, _ := slices.BinarySearchFunc(out, name, compare)
 				out = slices.Insert(out, i, name)
@@ -120,7 +120,7 @@ func (s *Store) identityGranted(
 	if target == nil {
 		return true
 	}
-	for _, p := range s.permissionsT().rows {
+	for _, p := range s.permissionsT().Rows {
 		r := p.Resources[target.Type]
 		if _, ok := r.Targets[target.Name]; !ok {
 			continue

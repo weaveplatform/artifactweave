@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -15,21 +16,21 @@ func (s *Store) RemoteCache() store.RemoteCacheStore {
 
 type remoteRecords struct{ s *Store }
 
-func (r remoteRecords) sources() *table[string, types.RemoteSourceState] {
-	return tableOf[string, types.RemoteSourceState](r.s, "remote_sources")
+func (r remoteRecords) sources() *memtx.Table[string, types.RemoteSourceState] {
+	return memtx.TableOf[string, types.RemoteSourceState](r.s.Store, "remote_sources")
 }
 
-func (r remoteRecords) entries() *table[string, types.RemoteCacheEntry] {
-	return tableOf[string, types.RemoteCacheEntry](r.s, "remote_cache")
+func (r remoteRecords) entries() *memtx.Table[string, types.RemoteCacheEntry] {
+	return memtx.TableOf[string, types.RemoteCacheEntry](r.s.Store, "remote_cache")
 }
 
 func (r remoteRecords) Source(ctx context.Context, key string) (types.RemoteSourceState, error) {
 	var out types.RemoteSourceState
-	err := r.s.do(ctx, func() error {
+	err := r.s.Do(ctx, func() error {
 		var ok bool
-		out, ok = r.sources().get(key)
+		out, ok = r.sources().Get(key)
 		if !ok {
-			return notFound("remote source", key)
+			return memtx.NotFound("remote source", key)
 		}
 		return nil
 	})
@@ -37,7 +38,7 @@ func (r remoteRecords) Source(ctx context.Context, key string) (types.RemoteSour
 }
 
 func (r remoteRecords) PutSource(ctx context.Context, key string, s types.RemoteSourceState) error {
-	return r.s.do(ctx, func() error { r.sources().put(key, s); return nil })
+	return r.s.Do(ctx, func() error { r.sources().Put(key, s); return nil })
 }
 
 func (r remoteRecords) Entry(
@@ -45,11 +46,11 @@ func (r remoteRecords) Entry(
 	k types.RemoteCacheKey,
 ) (types.RemoteCacheEntry, error) {
 	var out types.RemoteCacheEntry
-	err := r.s.do(ctx, func() error {
+	err := r.s.Do(ctx, func() error {
 		var ok bool
-		out, ok = r.entries().get(store.RemoteCacheID(k))
+		out, ok = r.entries().Get(store.RemoteCacheID(k))
 		if !ok {
-			return notFound("remote cache", k.Path)
+			return memtx.NotFound("remote cache", k.Path)
 		}
 		if out.Token.Key != k {
 			return store.ErrConflict
@@ -60,9 +61,9 @@ func (r remoteRecords) Entry(
 }
 
 func (r remoteRecords) PutEntry(ctx context.Context, e types.RemoteCacheEntry) error {
-	return r.s.do(
+	return r.s.Do(
 		ctx,
-		func() error { r.entries().put(store.RemoteCacheID(e.Token.Key), e); return nil },
+		func() error { r.entries().Put(store.RemoteCacheID(e.Token.Key), e); return nil },
 	)
 }
 
@@ -90,8 +91,8 @@ func (r remoteRecords) listEntries(
 ) ([]types.RemoteCacheEntry, string, error) {
 	var out []types.RemoteCacheEntry
 	var next string
-	err := r.s.do(ctx, func() error {
-		rows := r.entries().all(func(_ string, e types.RemoteCacheEntry) bool {
+	err := r.s.Do(ctx, func() error {
+		rows := r.entries().All(func(_ string, e types.RemoteCacheEntry) bool {
 			return e.Token.Key.RepoKey == key &&
 				(exact && e.Token.Key.Path == prefix || !exact && store.RemotePathMatches(e.Token.Key.Path, prefix))
 		},
@@ -102,7 +103,7 @@ func (r remoteRecords) listEntries(
 				)
 			})
 		var err error
-		out, next, err = paginate(
+		out, next, err = memtx.Paginate(
 			rows,
 			p,
 			false,
