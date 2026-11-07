@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -15,30 +16,30 @@ func (s *Store) Cleanup() store.CleanupStore { return cleanupStore{s} }
 
 type cleanupStore struct{ s *Store }
 
-func (c cleanupStore) policies() *table[string, types.CleanupPolicy] {
-	return tableOf[string, types.CleanupPolicy](c.s, "cleanup_policies")
+func (c cleanupStore) policies() *memtx.Table[string, types.CleanupPolicy] {
+	return memtx.TableOf[string, types.CleanupPolicy](c.s.Store, "cleanup_policies")
 }
 
-func (c cleanupStore) runs() *table[int64, types.CleanupRun] {
-	return tableOf[int64, types.CleanupRun](c.s, "cleanup_runs")
+func (c cleanupStore) runs() *memtx.Table[int64, types.CleanupRun] {
+	return memtx.TableOf[int64, types.CleanupRun](c.s.Store, "cleanup_runs")
 }
 
 func (c cleanupStore) CreatePolicy(ctx context.Context, p types.CleanupPolicy) error {
-	return c.s.do(ctx, func() error {
-		if c.policies().has(p.Key) {
-			return conflict("cleanup policy", p.Key)
+	return c.s.Do(ctx, func() error {
+		if c.policies().Has(p.Key) {
+			return memtx.Conflict("cleanup policy", p.Key)
 		}
-		c.policies().put(p.Key, p)
+		c.policies().Put(p.Key, p)
 		return nil
 	})
 }
 
 func (c cleanupStore) Policy(ctx context.Context, key string) (types.CleanupPolicy, error) {
 	var out types.CleanupPolicy
-	err := c.s.do(ctx, func() error {
+	err := c.s.Do(ctx, func() error {
 		var ok bool
-		if out, ok = c.policies().get(key); !ok {
-			return notFound("cleanup policy", key)
+		if out, ok = c.policies().Get(key); !ok {
+			return memtx.NotFound("cleanup policy", key)
 		}
 		return nil
 	})
@@ -46,19 +47,19 @@ func (c cleanupStore) Policy(ctx context.Context, key string) (types.CleanupPoli
 }
 
 func (c cleanupStore) UpdatePolicy(ctx context.Context, p types.CleanupPolicy) error {
-	return c.s.do(ctx, func() error {
-		if !c.policies().has(p.Key) {
-			return notFound("cleanup policy", p.Key)
+	return c.s.Do(ctx, func() error {
+		if !c.policies().Has(p.Key) {
+			return memtx.NotFound("cleanup policy", p.Key)
 		}
-		c.policies().put(p.Key, p)
+		c.policies().Put(p.Key, p)
 		return nil
 	})
 }
 
 func (c cleanupStore) DeletePolicy(ctx context.Context, key string) error {
-	return c.s.do(ctx, func() error {
-		if !c.policies().del(key) {
-			return notFound("cleanup policy", key)
+	return c.s.Do(ctx, func() error {
+		if !c.policies().Del(key) {
+			return memtx.NotFound("cleanup policy", key)
 		}
 		return nil
 	})
@@ -69,8 +70,8 @@ func (c cleanupStore) Policies(
 	f store.PolicyFilter,
 ) ([]types.CleanupPolicy, error) {
 	var out []types.CleanupPolicy
-	err := c.s.do(ctx, func() error {
-		out = c.policies().all(func(_ string, p types.CleanupPolicy) bool {
+	err := c.s.Do(ctx, func() error {
+		out = c.policies().All(func(_ string, p types.CleanupPolicy) bool {
 			return (f.ItemType == "" || p.ItemType == f.ItemType) &&
 				(f.ProjectKey == "" || p.ProjectKey == f.ProjectKey)
 		}, func(a, b types.CleanupPolicy) int { return strings.Compare(a.Key, b.Key) })
@@ -81,10 +82,10 @@ func (c cleanupStore) Policies(
 
 func (c cleanupStore) CreateRun(ctx context.Context, r types.CleanupRun) (types.CleanupRun, error) {
 	var out types.CleanupRun
-	err := c.s.do(ctx, func() error {
-		r.ID = c.s.nextID("cleanup_runs")
-		c.runs().put(r.ID, r)
-		out, _ = c.runs().get(r.ID)
+	err := c.s.Do(ctx, func() error {
+		r.ID = c.s.NextID("cleanup_runs")
+		c.runs().Put(r.ID, r)
+		out, _ = c.runs().Get(r.ID)
 		return nil
 	})
 	return out, err
@@ -92,10 +93,10 @@ func (c cleanupStore) CreateRun(ctx context.Context, r types.CleanupRun) (types.
 
 func (c cleanupStore) Run(ctx context.Context, id int64) (types.CleanupRun, error) {
 	var out types.CleanupRun
-	err := c.s.do(ctx, func() error {
+	err := c.s.Do(ctx, func() error {
 		var ok bool
-		if out, ok = c.runs().get(id); !ok {
-			return notFound("cleanup run", id)
+		if out, ok = c.runs().Get(id); !ok {
+			return memtx.NotFound("cleanup run", id)
 		}
 		return nil
 	})
@@ -103,11 +104,11 @@ func (c cleanupStore) Run(ctx context.Context, id int64) (types.CleanupRun, erro
 }
 
 func (c cleanupStore) UpdateRun(ctx context.Context, r types.CleanupRun) error {
-	return c.s.do(ctx, func() error {
-		if !c.runs().has(r.ID) {
-			return notFound("cleanup run", r.ID)
+	return c.s.Do(ctx, func() error {
+		if !c.runs().Has(r.ID) {
+			return memtx.NotFound("cleanup run", r.ID)
 		}
-		c.runs().put(r.ID, r)
+		c.runs().Put(r.ID, r)
 		return nil
 	})
 }
@@ -124,14 +125,14 @@ func (c cleanupStore) Runs(
 		out  []types.CleanupRun
 		next string
 	)
-	err := c.s.do(ctx, func() error {
-		rows := c.runs().all(func(_ int64, r types.CleanupRun) bool {
+	err := c.s.Do(ctx, func() error {
+		rows := c.runs().All(func(_ int64, r types.CleanupRun) bool {
 			return (f.PolicyKey == "" || r.PolicyKey == f.PolicyKey) &&
 				(f.ItemType == "" || r.ItemType == f.ItemType) &&
 				(len(f.Statuses) == 0 || slices.Contains(f.Statuses, r.Status))
 		}, newestFirst)
 		var err error
-		out, next, err = paginate(
+		out, next, err = memtx.Paginate(
 			rows,
 			p,
 			true,
@@ -144,11 +145,11 @@ func (c cleanupStore) Runs(
 
 func (c cleanupStore) LastRun(ctx context.Context, policyKey string) (types.CleanupRun, error) {
 	var out types.CleanupRun
-	err := c.s.do(ctx, func() error {
+	err := c.s.Do(ctx, func() error {
 		rows := c.runs().
-			all(func(_ int64, r types.CleanupRun) bool { return r.PolicyKey == policyKey }, newestFirst)
+			All(func(_ int64, r types.CleanupRun) bool { return r.PolicyKey == policyKey }, newestFirst)
 		if len(rows) == 0 {
-			return notFound("cleanup run of policy", policyKey)
+			return memtx.NotFound("cleanup run of policy", policyKey)
 		}
 		out = rows[0]
 		return nil

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
@@ -19,8 +20,8 @@ type (
 	}
 )
 
-func (s replayStore) rows() *table[replayKey, replayRecord] {
-	return tableOf[replayKey, replayRecord](s.s, "api_replays")
+func (s replayStore) rows() *memtx.Table[replayKey, replayRecord] {
+	return memtx.TableOf[replayKey, replayRecord](s.s.Store, "api_replays")
 }
 
 func (s replayStore) Do(
@@ -37,7 +38,7 @@ func (s replayStore) Do(
 	}
 	err := s.s.Tx(ctx, func(ctx context.Context) error {
 		key := replayKey{r.Scope, r.Key}
-		cur, ok := s.rows().rows[key]
+		cur, ok := s.rows().Rows[key]
 		if ok && cur.receipt.Expires.UnixMicro() > r.Now.UnixMicro() {
 			if cur.fingerprint != r.Fingerprint {
 				return store.ErrReplayMismatch
@@ -57,7 +58,7 @@ func (s replayStore) Do(
 			return fmt.Errorf("replay: %w", err)
 		}
 		out = store.ReplayReceipt{ResourceID: id, Expires: store.Normalise(r.Expires)}
-		s.rows().rows[key] = replayRecord{r.Fingerprint, out}
+		s.rows().Rows[key] = replayRecord{r.Fingerprint, out}
 		return nil
 	})
 	return out, err
@@ -68,10 +69,10 @@ func (s replayStore) Prune(ctx context.Context, now time.Time, limit int) (int64
 		return 0, fmt.Errorf("replay prune limit: %w", store.ErrInvalid)
 	}
 	var n int64
-	err := s.s.do(ctx, func() error {
-		for key, v := range s.rows().rows {
+	err := s.s.Do(ctx, func() error {
+		for key, v := range s.rows().Rows {
 			if v.receipt.Expires.UnixMicro() <= now.UnixMicro() {
-				delete(s.rows().rows, key)
+				delete(s.rows().Rows, key)
 				n++
 				if n == int64(limit) {
 					break

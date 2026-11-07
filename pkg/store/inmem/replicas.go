@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -24,26 +25,26 @@ type replicaIndex struct {
 
 type replicaKey struct{ sha256, member string }
 
-func (r replicaIndex) t() *table[replicaKey, types.BlobReplica] {
-	return tableOf[replicaKey, types.BlobReplica](r.s, r.table)
+func (r replicaIndex) t() *memtx.Table[replicaKey, types.BlobReplica] {
+	return memtx.TableOf[replicaKey, types.BlobReplica](r.s.Store, r.table)
 }
 
 func (r replicaIndex) Put(ctx context.Context, v types.BlobReplica) error {
-	return r.s.do(ctx, func() error {
+	return r.s.Do(ctx, func() error {
 		if v.SHA256 == "" || v.Member == "" {
 			return fmt.Errorf("%s: sha256 and member are required: %w", r.table, store.ErrInvalid)
 		}
-		r.t().put(replicaKey{v.SHA256, v.Member}, v)
+		r.t().Put(replicaKey{v.SHA256, v.Member}, v)
 		return nil
 	})
 }
 
 func (r replicaIndex) Get(ctx context.Context, sha256, member string) (types.BlobReplica, error) {
 	var out types.BlobReplica
-	err := r.s.do(ctx, func() error {
+	err := r.s.Do(ctx, func() error {
 		var ok bool
-		if out, ok = r.t().get(replicaKey{sha256, member}); !ok {
-			return notFound(r.table, sha256+"@"+member)
+		if out, ok = r.t().Get(replicaKey{sha256, member}); !ok {
+			return memtx.NotFound(r.table, sha256+"@"+member)
 		}
 		return nil
 	})
@@ -52,8 +53,8 @@ func (r replicaIndex) Get(ctx context.Context, sha256, member string) (types.Blo
 
 func (r replicaIndex) ForBlob(ctx context.Context, sha256 string) ([]types.BlobReplica, error) {
 	var out []types.BlobReplica
-	err := r.s.do(ctx, func() error {
-		out = r.t().all(func(k replicaKey, _ types.BlobReplica) bool { return k.sha256 == sha256 },
+	err := r.s.Do(ctx, func() error {
+		out = r.t().All(func(k replicaKey, _ types.BlobReplica) bool { return k.sha256 == sha256 },
 			func(a, b types.BlobReplica) int { return strings.Compare(a.Member, b.Member) })
 		return nil
 	})
@@ -89,22 +90,22 @@ func (r replicaIndex) List(
 		out  []types.BlobReplica
 		next string
 	)
-	err := r.s.do(ctx, func() error {
-		rows := r.t().all(func(_ replicaKey, v types.BlobReplica) bool {
+	err := r.s.Do(ctx, func() error {
+		rows := r.t().All(func(_ replicaKey, v types.BlobReplica) bool {
 			return (f.Member == "" || v.Member == f.Member) &&
 				(len(f.States) == 0 || slices.Contains(f.States, v.State))
 		}, compareReplicas)
 		var err error
-		out, next, err = paginate(rows, p, false, replicaSortKey)
+		out, next, err = memtx.Paginate(rows, p, false, replicaSortKey)
 		return err
 	})
 	return out, next, err
 }
 
 func (r replicaIndex) Delete(ctx context.Context, sha256, member string) error {
-	return r.s.do(ctx, func() error {
-		if !r.t().del(replicaKey{sha256, member}) {
-			return notFound(r.table, sha256+"@"+member)
+	return r.s.Do(ctx, func() error {
+		if !r.t().Del(replicaKey{sha256, member}) {
+			return memtx.NotFound(r.table, sha256+"@"+member)
 		}
 		return nil
 	})
@@ -112,9 +113,9 @@ func (r replicaIndex) Delete(ctx context.Context, sha256, member string) error {
 
 func (r replicaIndex) DeleteBlob(ctx context.Context, sha256 string) (int64, error) {
 	var n int64
-	err := r.s.do(ctx, func() error {
+	err := r.s.Do(ctx, func() error {
 		n = r.t().
-			deleteWhere(func(k replicaKey, _ types.BlobReplica) bool { return k.sha256 == sha256 })
+			DeleteWhere(func(k replicaKey, _ types.BlobReplica) bool { return k.sha256 == sha256 })
 		return nil
 	})
 	return n, err
@@ -122,9 +123,9 @@ func (r replicaIndex) DeleteBlob(ctx context.Context, sha256 string) (int64, err
 
 func (r replicaIndex) UnderReplicated(ctx context.Context, redundancy int) (int64, error) {
 	var n int64
-	err := r.s.do(ctx, func() error {
+	err := r.s.Do(ctx, func() error {
 		seen, present, deleting := map[string]bool{}, map[string]int{}, map[string]bool{}
-		for _, v := range r.t().rows {
+		for _, v := range r.t().Rows {
 			seen[v.SHA256] = true
 			switch v.State {
 			case types.ReplicaPresent:
@@ -145,9 +146,9 @@ func (r replicaIndex) UnderReplicated(ctx context.Context, redundancy int) (int6
 
 func (r replicaIndex) SoleCopies(ctx context.Context) (map[string]int64, error) {
 	out := map[string]int64{}
-	err := r.s.do(ctx, func() error {
+	err := r.s.Do(ctx, func() error {
 		holders, deleting := map[string][]string{}, map[string]bool{}
-		for _, v := range r.t().rows {
+		for _, v := range r.t().Rows {
 			switch v.State {
 			case types.ReplicaPresent:
 				holders[v.SHA256] = append(holders[v.SHA256], v.Member)
@@ -167,9 +168,9 @@ func (r replicaIndex) SoleCopies(ctx context.Context) (map[string]int64, error) 
 
 func (r replicaIndex) Counts(ctx context.Context) ([]store.ReplicaCount, error) {
 	var out []store.ReplicaCount
-	err := r.s.do(ctx, func() error {
+	err := r.s.Do(ctx, func() error {
 		agg := map[[2]string]*store.ReplicaCount{}
-		for _, v := range r.t().rows {
+		for _, v := range r.t().Rows {
 			k := [2]string{v.Member, string(v.State)}
 			c, ok := agg[k]
 			if !ok {

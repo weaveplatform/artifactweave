@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -20,11 +21,13 @@ type blobIndex struct {
 	table string
 }
 
-func (b blobIndex) t() *table[string, types.Blob] { return tableOf[string, types.Blob](b.s, b.table) }
+func (b blobIndex) t() *memtx.Table[string, types.Blob] {
+	return memtx.TableOf[string, types.Blob](b.s.Store, b.table)
+}
 
 func (b blobIndex) Ref(ctx context.Context, blob types.Blob, n int64) (types.Blob, error) {
 	var out types.Blob
-	err := b.s.do(ctx, func() error {
+	err := b.s.Do(ctx, func() error {
 		if blob.Checksums.SHA256 == "" || n < 0 {
 			return fmt.Errorf(
 				"%s: sha256 and a non-negative count are required: %w",
@@ -32,7 +35,7 @@ func (b blobIndex) Ref(ctx context.Context, blob types.Blob, n int64) (types.Blo
 				store.ErrInvalid,
 			)
 		}
-		cur, ok := b.t().get(blob.Checksums.SHA256)
+		cur, ok := b.t().Get(blob.Checksums.SHA256)
 		switch {
 		case !ok:
 			cur = blob
@@ -40,7 +43,7 @@ func (b blobIndex) Ref(ctx context.Context, blob types.Blob, n int64) (types.Blo
 		case cur.State == types.BlobDeleting:
 			return fmt.Errorf("%s %s: %w", b.table, blob.Checksums.SHA256, store.ErrDeleting)
 		case !sameContent(cur, blob):
-			return conflict(b.table+" sha256", blob.Checksums.SHA256)
+			return memtx.Conflict(b.table+" sha256", blob.Checksums.SHA256)
 		case cur.State == types.BlobDeleted:
 			// Revived by content written again: the missing digests are
 			// filled in and Deleted stays, as on the SQL stores.
@@ -51,8 +54,8 @@ func (b blobIndex) Ref(ctx context.Context, blob types.Blob, n int64) (types.Blo
 		default:
 			cur.Refs += n
 		}
-		b.t().put(cur.Checksums.SHA256, cur)
-		out, _ = b.t().get(cur.Checksums.SHA256)
+		b.t().Put(cur.Checksums.SHA256, cur)
+		out, _ = b.t().Get(cur.Checksums.SHA256)
 		return nil
 	})
 	return out, err
@@ -79,13 +82,13 @@ func sameContent(stored, b types.Blob) bool {
 
 func (b blobIndex) Unref(ctx context.Context, sha256 string, n int64) (types.Blob, error) {
 	var out types.Blob
-	err := b.s.do(ctx, func() error {
-		cur, ok := b.t().get(sha256)
+	err := b.s.Do(ctx, func() error {
+		cur, ok := b.t().Get(sha256)
 		if !ok {
-			return notFound(b.table, sha256)
+			return memtx.NotFound(b.table, sha256)
 		}
 		cur.Refs = max(0, cur.Refs-n)
-		b.t().put(sha256, cur)
+		b.t().Put(sha256, cur)
 		out = cur
 		return nil
 	})
@@ -94,10 +97,10 @@ func (b blobIndex) Unref(ctx context.Context, sha256 string, n int64) (types.Blo
 
 func (b blobIndex) Get(ctx context.Context, sha256 string) (types.Blob, error) {
 	var out types.Blob
-	err := b.s.do(ctx, func() error {
+	err := b.s.Do(ctx, func() error {
 		var ok bool
-		if out, ok = b.t().get(sha256); !ok {
-			return notFound(b.table, sha256)
+		if out, ok = b.t().Get(sha256); !ok {
+			return memtx.NotFound(b.table, sha256)
 		}
 		return nil
 	})
@@ -106,16 +109,16 @@ func (b blobIndex) Get(ctx context.Context, sha256 string) (types.Blob, error) {
 
 func (b blobIndex) Find(ctx context.Context, c types.Checksums) (types.Blob, error) {
 	var out types.Blob
-	err := b.s.do(ctx, func() error {
+	err := b.s.Do(ctx, func() error {
 		match, what, err := strongest(c)
 		if err != nil {
 			return err
 		}
-		rows := b.t().all(func(_ string, v types.Blob) bool {
+		rows := b.t().All(func(_ string, v types.Blob) bool {
 			return v.State == types.BlobLive && match(v.Checksums)
 		}, compareBlobs)
 		if len(rows) == 0 {
-			return notFound(b.table+" "+what, c)
+			return memtx.NotFound(b.table+" "+what, c)
 		}
 		out = rows[0]
 		return nil
@@ -151,10 +154,10 @@ func (b blobIndex) list(
 		out  []types.Blob
 		next string
 	)
-	err := b.s.do(ctx, func() error {
-		rows := b.t().all(func(_ string, v types.Blob) bool { return keep(v) }, compareBlobs)
+	err := b.s.Do(ctx, func() error {
+		rows := b.t().All(func(_ string, v types.Blob) bool { return keep(v) }, compareBlobs)
 		var err error
-		out, next, err = paginate(
+		out, next, err = memtx.Paginate(
 			rows,
 			p,
 			false,
@@ -183,12 +186,12 @@ func (b blobIndex) MarkDeleting(
 	at time.Time,
 ) (types.Blob, error) {
 	var out types.Blob
-	err := b.s.do(ctx, func() error {
+	err := b.s.Do(ctx, func() error {
 		sha := blob.Checksums.SHA256
 		if sha == "" {
 			return fmt.Errorf("%s: sha256 is required: %w", b.table, store.ErrInvalid)
 		}
-		cur, ok := b.t().get(sha)
+		cur, ok := b.t().Get(sha)
 		switch {
 		case !ok:
 			cur = blob
@@ -197,45 +200,45 @@ func (b blobIndex) MarkDeleting(
 			out = cur
 			return nil
 		case cur.Refs > 0:
-			return conflict(b.table+" still referenced", sha)
+			return memtx.Conflict(b.table+" still referenced", sha)
 		}
 		cur.State, cur.Deleted = types.BlobDeleting, at
-		b.t().put(sha, cur)
-		out, _ = b.t().get(sha)
+		b.t().Put(sha, cur)
+		out, _ = b.t().Get(sha)
 		return nil
 	})
 	return out, err
 }
 
 func (b blobIndex) FinishDelete(ctx context.Context, sha256 string, at time.Time) error {
-	return b.s.do(ctx, func() error {
-		cur, ok := b.t().get(sha256)
+	return b.s.Do(ctx, func() error {
+		cur, ok := b.t().Get(sha256)
 		switch {
 		case !ok:
-			return notFound(b.table, sha256)
+			return memtx.NotFound(b.table, sha256)
 		case cur.State == types.BlobDeleted:
 			return nil
 		case cur.State != types.BlobDeleting:
-			return conflict(b.table+" is live", sha256)
+			return memtx.Conflict(b.table+" is live", sha256)
 		}
 		cur.State, cur.Deleted = types.BlobDeleted, at
-		b.t().put(sha256, cur)
+		b.t().Put(sha256, cur)
 		return nil
 	})
 }
 
 func (b blobIndex) Prune(ctx context.Context, before time.Time) (int64, error) {
 	var n int64
-	err := b.s.do(ctx, func() error {
-		for sha, v := range b.t().rows {
+	err := b.s.Do(ctx, func() error {
+		for sha, v := range b.t().Rows {
 			switch {
 			case v.Deleted.IsZero() || !v.Deleted.Before(before):
 			case v.State == types.BlobDeleted:
-				b.t().del(sha)
+				b.t().Del(sha)
 				n++
 			case v.State == types.BlobLive:
 				v.Deleted = time.Time{}
-				b.t().put(sha, v)
+				b.t().Put(sha, v)
 				n++
 			}
 		}
@@ -245,8 +248,8 @@ func (b blobIndex) Prune(ctx context.Context, before time.Time) (int64, error) {
 }
 
 func (b blobIndex) Totals(ctx context.Context) (count, bytes int64, err error) {
-	err = b.s.do(ctx, func() error {
-		for _, v := range b.t().rows {
+	err = b.s.Do(ctx, func() error {
+		for _, v := range b.t().Rows {
 			if v.State == types.BlobLive {
 				count++
 				bytes += v.Size

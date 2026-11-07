@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
@@ -17,8 +18,8 @@ type (
 	}
 )
 
-func (b requestBudgets) rows() *table[string, budgetWindow] {
-	return tableOf[string, budgetWindow](b.s, "request_budgets")
+func (b requestBudgets) rows() *memtx.Table[string, budgetWindow] {
+	return memtx.TableOf[string, budgetWindow](b.s.Store, "request_budgets")
 }
 
 func (b requestBudgets) Take(
@@ -29,8 +30,8 @@ func (b requestBudgets) Take(
 	if err := r.Validate(); err != nil {
 		return out, err
 	}
-	err := b.s.do(ctx, func() error {
-		rows := b.rows().rows
+	err := b.s.Do(ctx, func() error {
+		rows := b.rows().Rows
 		pruned := 0
 		for key, v := range rows {
 			if v.reset.UnixMicro() <= r.Now.UnixMicro() {

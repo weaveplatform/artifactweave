@@ -20,7 +20,7 @@ func (b buildStore) Search(
 		return nil, fmt.Errorf("search builds: an %s query: %w", q.Domain, store.ErrInvalid)
 	}
 	var out []aql.BuildHit
-	err := b.s.do(ctx, func() error {
+	err := b.s.Do(ctx, func() error {
 		c := &aql.Corpus{}
 		if q.Joins() {
 			c.Items = items{b.s}.hits(false)
@@ -36,17 +36,17 @@ func (b buildStore) Search(
 
 // addBuilds adds the stored runs and promotions to c, read in place.
 func (b buildStore) addBuilds(c *aql.Corpus) {
-	c.Builds = slices.Collect(maps.Values(b.runs().rows))
-	c.Promotions = slices.Collect(maps.Values(b.promotions().rows))
+	c.Builds = slices.Collect(maps.Values(b.runs().Rows))
+	c.Promotions = slices.Collect(maps.Values(b.promotions().Rows))
 }
 
 // hits returns every item with its properties and, with stats, its
 // statistics, read in place.
 func (i items) hits(stats bool) []aql.Hit {
-	props := i.props().rows
-	st := i.stats().rows
-	out := make([]aql.Hit, 0, len(i.t().rows))
-	for id, it := range i.t().rows {
+	props := i.props().Rows
+	st := i.stats().Rows
+	out := make([]aql.Hit, 0, len(i.t().Rows))
+	for id, it := range i.t().Rows {
 		h := aql.Hit{Item: it, Properties: props[id]}
 		if s, ok := st[id]; ok && stats {
 			h.Stats = &s

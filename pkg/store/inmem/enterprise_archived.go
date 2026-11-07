@@ -6,12 +6,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func (a archiveStore) items() *table[int64, types.ArchivedItem] {
-	return tableOf[int64, types.ArchivedItem](a.s, "archived_items")
+func (a archiveStore) items() *memtx.Table[int64, types.ArchivedItem] {
+	return memtx.TableOf[int64, types.ArchivedItem](a.s.Store, "archived_items")
 }
 
 // ColdBlobs implements store.ArchiveStore.
@@ -37,13 +38,13 @@ func (a archiveStore) AddItem(
 	it types.ArchivedItem,
 ) (types.ArchivedItem, error) {
 	var out types.ArchivedItem
-	err := a.s.do(ctx, func() error {
+	err := a.s.Do(ctx, func() error {
 		if _, _, err := archivedLocation(it.Item); err != nil {
 			return err
 		}
-		it.ID = a.s.nextID("archived_items")
-		a.items().put(it.ID, it)
-		out, _ = a.items().get(it.ID)
+		it.ID = a.s.NextID("archived_items")
+		a.items().Put(it.ID, it)
+		out, _ = a.items().Get(it.ID)
 		return nil
 	})
 	return out, err
@@ -51,10 +52,10 @@ func (a archiveStore) AddItem(
 
 func (a archiveStore) Item(ctx context.Context, id int64) (types.ArchivedItem, error) {
 	var out types.ArchivedItem
-	err := a.s.do(ctx, func() error {
+	err := a.s.Do(ctx, func() error {
 		var ok bool
-		if out, ok = a.items().get(id); !ok {
-			return notFound("archived item", id)
+		if out, ok = a.items().Get(id); !ok {
+			return memtx.NotFound("archived item", id)
 		}
 		return nil
 	})
@@ -70,8 +71,8 @@ func (a archiveStore) FindItems(
 		return nil, fmt.Errorf("find archived items: %w: %w", store.ErrInvalid, err)
 	}
 	var out []types.ArchivedItem
-	err = a.s.do(ctx, func() error {
-		out = a.items().all(func(_ int64, v types.ArchivedItem) bool {
+	err = a.s.Do(ctx, func() error {
+		out = a.items().All(func(_ int64, v types.ArchivedItem) bool {
 			p, n, err := archivedLocation(v.Item)
 			return err == nil && v.Item.RepoKey == repoKey && p == parent && n == name
 		}, func(x, y types.ArchivedItem) int { return cmp.Compare(y.ID, x.ID) })
@@ -87,14 +88,14 @@ func (a archiveStore) Items(
 		out  []types.ArchivedItem
 		next string
 	)
-	err := a.s.do(ctx, func() error {
-		rows := a.items().all(func(_ int64, v types.ArchivedItem) bool {
+	err := a.s.Do(ctx, func() error {
+		rows := a.items().All(func(_ int64, v types.ArchivedItem) bool {
 			return (f.RepoKey == "" || v.Item.RepoKey == f.RepoKey) &&
 				(f.PolicyKey == "" || v.PolicyKey == f.PolicyKey) &&
 				(f.ExecutionID == 0 || v.ExecutionID == f.ExecutionID)
 		}, func(x, y types.ArchivedItem) int { return cmp.Compare(x.ID, y.ID) })
 		var err error
-		out, next, err = paginate(
+		out, next, err = memtx.Paginate(
 			rows,
 			p,
 			false,
@@ -106,9 +107,9 @@ func (a archiveStore) Items(
 }
 
 func (a archiveStore) DeleteItem(ctx context.Context, id int64) error {
-	return a.s.do(ctx, func() error {
-		if !a.items().del(id) {
-			return notFound("archived item", id)
+	return a.s.Do(ctx, func() error {
+		if !a.items().Del(id) {
+			return memtx.NotFound("archived item", id)
 		}
 		return nil
 	})
@@ -122,8 +123,8 @@ func (a archiveStore) ExpiredItems(
 	// Compared at the stored precision, as the SQL column is.
 	before = before.Truncate(time.Microsecond)
 	var out []types.ArchivedItem
-	err := a.s.do(ctx, func() error {
-		out = a.items().all(func(_ int64, v types.ArchivedItem) bool {
+	err := a.s.Do(ctx, func() error {
+		out = a.items().All(func(_ int64, v types.ArchivedItem) bool {
 			return !v.ExpiresAt.IsZero() && v.ExpiresAt.Before(before)
 		}, func(x, y types.ArchivedItem) int {
 			return cmp.Or(x.ExpiresAt.Compare(y.ExpiresAt), cmp.Compare(x.ID, y.ID))

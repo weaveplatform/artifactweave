@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -21,7 +22,9 @@ func (s *Store) Keys() store.KeyStore { return keys{s} }
 
 type tokens struct{ s *Store }
 
-func (ts tokens) t() *table[string, types.Token] { return tableOf[string, types.Token](ts.s, "tokens") }
+func (ts tokens) t() *memtx.Table[string, types.Token] {
+	return memtx.TableOf[string, types.Token](ts.s.Store, "tokens")
+}
 
 // issuedKey is the token list's first sort key: Unix microseconds, 0 for an
 // unset time, as the SQL column stores it.
@@ -57,31 +60,31 @@ func digestOf(t types.Token, kind store.DigestKind) []byte {
 var digestKinds = []store.DigestKind{store.DigestAccess, store.DigestRefresh, store.DigestReference}
 
 func (ts tokens) Create(ctx context.Context, t types.Token) error {
-	return ts.s.do(ctx, func() error {
-		if ts.t().has(t.ID) {
-			return conflict("token", t.ID)
+	return ts.s.Do(ctx, func() error {
+		if ts.t().Has(t.ID) {
+			return memtx.Conflict("token", t.ID)
 		}
-		for _, other := range ts.t().rows {
+		for _, other := range ts.t().Rows {
 			if t.Purpose != "" && other.Purpose == t.Purpose && other.Subject == t.Subject {
-				return conflict("token of purpose "+t.Purpose+" for", t.Subject)
+				return memtx.Conflict("token of purpose "+t.Purpose+" for", t.Subject)
 			}
 			for _, k := range digestKinds {
 				if d := digestOf(t, k); len(d) > 0 && bytes.Equal(d, digestOf(other, k)) {
-					return conflict("token digest of", t.ID)
+					return memtx.Conflict("token digest of", t.ID)
 				}
 			}
 		}
-		ts.t().put(t.ID, t)
+		ts.t().Put(t.ID, t)
 		return nil
 	})
 }
 
 func (ts tokens) Get(ctx context.Context, id string) (types.Token, error) {
 	var out types.Token
-	err := ts.s.do(ctx, func() error {
+	err := ts.s.Do(ctx, func() error {
 		var ok bool
-		if out, ok = ts.t().get(id); !ok {
-			return notFound("token", id)
+		if out, ok = ts.t().Get(id); !ok {
+			return memtx.NotFound("token", id)
 		}
 		return nil
 	})
@@ -94,19 +97,19 @@ func (ts tokens) ByDigest(
 	d []byte,
 ) (types.Token, error) {
 	var out types.Token
-	err := ts.s.do(ctx, func() error {
+	err := ts.s.Do(ctx, func() error {
 		if kind < store.DigestAccess || kind > store.DigestReference {
 			return fmt.Errorf("token digest kind %d: %w", kind, store.ErrInvalid)
 		}
 		if len(d) > 0 {
-			for id, t := range ts.t().rows {
+			for id, t := range ts.t().Rows {
 				if bytes.Equal(digestOf(t, kind), d) {
-					out, _ = ts.t().get(id)
+					out, _ = ts.t().Get(id)
 					return nil
 				}
 			}
 		}
-		return notFound("token by digest kind", kind)
+		return memtx.NotFound("token by digest kind", kind)
 	})
 	return out, err
 }
@@ -120,13 +123,13 @@ func (ts tokens) List(
 		out  []types.Token
 		next string
 	)
-	err := ts.s.do(ctx, func() error {
-		rows := ts.t().all(func(_ string, t types.Token) bool {
+	err := ts.s.Do(ctx, func() error {
+		rows := ts.t().All(func(_ string, t types.Token) bool {
 			return (f.Subject == "" || t.Subject == f.Subject) &&
 				(f.Purpose == "" || t.Purpose == f.Purpose)
 		}, compareTokens)
 		var err error
-		out, next, err = paginate(
+		out, next, err = memtx.Paginate(
 			rows,
 			p,
 			false,
@@ -138,31 +141,31 @@ func (ts tokens) List(
 }
 
 func (ts tokens) Delete(ctx context.Context, id string) error {
-	return ts.s.do(ctx, func() error {
-		if !ts.t().del(id) {
-			return notFound("token", id)
+	return ts.s.Do(ctx, func() error {
+		if !ts.t().Del(id) {
+			return memtx.NotFound("token", id)
 		}
 		return nil
 	})
 }
 
 func (ts tokens) Touch(ctx context.Context, id string, at time.Time) error {
-	return ts.s.do(ctx, func() error {
-		t, ok := ts.t().get(id)
+	return ts.s.Do(ctx, func() error {
+		t, ok := ts.t().Get(id)
 		if !ok {
-			return notFound("token", id)
+			return memtx.NotFound("token", id)
 		}
 		t.LastUsed = at
-		ts.t().put(id, t)
+		ts.t().Put(id, t)
 		return nil
 	})
 }
 
 func (ts tokens) DeleteExpired(ctx context.Context, before time.Time) (int64, error) {
 	var n int64
-	err := ts.s.do(ctx, func() error {
+	err := ts.s.Do(ctx, func() error {
 		cut := before.UnixMicro()
-		n = ts.t().deleteWhere(func(_ string, t types.Token) bool {
+		n = ts.t().DeleteWhere(func(_ string, t types.Token) bool {
 			return !t.ExpiresAt.IsZero() && t.ExpiresAt.UnixMicro() < cut
 		})
 		return nil
@@ -174,34 +177,34 @@ func (ts tokens) DeleteExpired(ctx context.Context, before time.Time) (int64, er
 
 type keys struct{ s *Store }
 
-func (ks keys) keypairs() *table[string, types.Keypair] {
-	return tableOf[string, types.Keypair](ks.s, "keypairs")
+func (ks keys) keypairs() *memtx.Table[string, types.Keypair] {
+	return memtx.TableOf[string, types.Keypair](ks.s.Store, "keypairs")
 }
 
-func (ks keys) certificates() *table[string, types.Certificate] {
-	return tableOf[string, types.Certificate](ks.s, "certificates")
+func (ks keys) certificates() *memtx.Table[string, types.Certificate] {
+	return memtx.TableOf[string, types.Certificate](ks.s.Store, "certificates")
 }
 
-func (ks keys) trusted() *table[string, types.TrustedKey] {
-	return tableOf[string, types.TrustedKey](ks.s, "trusted_keys")
+func (ks keys) trusted() *memtx.Table[string, types.TrustedKey] {
+	return memtx.TableOf[string, types.TrustedKey](ks.s.Store, "trusted_keys")
 }
 
-func (ks keys) signing() *table[string, types.SigningKey] {
-	return tableOf[string, types.SigningKey](ks.s, "signing_keys")
+func (ks keys) signing() *memtx.Table[string, types.SigningKey] {
+	return memtx.TableOf[string, types.SigningKey](ks.s.Store, "signing_keys")
 }
 
 // getKeyed returns the row at key or ErrNotFound naming what.
 func getKeyed[V any](
 	s *Store,
 	ctx context.Context,
-	t func() *table[string, V],
+	t func() *memtx.Table[string, V],
 	what, key string,
 ) (V, error) {
 	var out V
-	err := s.do(ctx, func() error {
+	err := s.Do(ctx, func() error {
 		var ok bool
-		if out, ok = t().get(key); !ok {
-			return notFound(what, key)
+		if out, ok = t().Get(key); !ok {
+			return memtx.NotFound(what, key)
 		}
 		return nil
 	})
@@ -212,12 +215,12 @@ func getKeyed[V any](
 func deleteKeyed[V any](
 	s *Store,
 	ctx context.Context,
-	t func() *table[string, V],
+	t func() *memtx.Table[string, V],
 	what, key string,
 ) error {
-	return s.do(ctx, func() error {
-		if !t().del(key) {
-			return notFound(what, key)
+	return s.Do(ctx, func() error {
+		if !t().Del(key) {
+			return memtx.NotFound(what, key)
 		}
 		return nil
 	})
@@ -227,23 +230,23 @@ func deleteKeyed[V any](
 func listKeyed[V any](
 	s *Store,
 	ctx context.Context,
-	t func() *table[string, V],
+	t func() *memtx.Table[string, V],
 	key func(V) string,
 ) ([]V, error) {
 	var out []V
-	err := s.do(ctx, func() error {
-		out = t().all(nil, compareByKey(key))
+	err := s.Do(ctx, func() error {
+		out = t().All(nil, compareByKey(key))
 		return nil
 	})
 	return out, err
 }
 
 func (ks keys) CreateKeypair(ctx context.Context, k types.Keypair) error {
-	return ks.s.do(ctx, func() error {
-		if ks.keypairs().has(k.Name) {
-			return conflict("keypair", k.Name)
+	return ks.s.Do(ctx, func() error {
+		if ks.keypairs().Has(k.Name) {
+			return memtx.Conflict("keypair", k.Name)
 		}
-		ks.keypairs().put(k.Name, k)
+		ks.keypairs().Put(k.Name, k)
 		return nil
 	})
 }
@@ -257,11 +260,11 @@ func (ks keys) Keypairs(ctx context.Context) ([]types.Keypair, error) {
 }
 
 func (ks keys) UpdateKeypair(ctx context.Context, k types.Keypair) error {
-	return ks.s.do(ctx, func() error {
-		if !ks.keypairs().has(k.Name) {
-			return notFound("keypair", k.Name)
+	return ks.s.Do(ctx, func() error {
+		if !ks.keypairs().Has(k.Name) {
+			return memtx.NotFound("keypair", k.Name)
 		}
-		ks.keypairs().put(k.Name, k)
+		ks.keypairs().Put(k.Name, k)
 		return nil
 	})
 }
@@ -271,8 +274,8 @@ func (ks keys) DeleteKeypair(ctx context.Context, name string) error {
 }
 
 func (ks keys) PutCertificate(ctx context.Context, c types.Certificate) error {
-	return ks.s.do(ctx, func() error {
-		ks.certificates().put(c.Alias, c)
+	return ks.s.Do(ctx, func() error {
+		ks.certificates().Put(c.Alias, c)
 		return nil
 	})
 }
@@ -295,16 +298,16 @@ func (ks keys) DeleteCertificate(ctx context.Context, alias string) error {
 }
 
 func (ks keys) CreateTrustedKey(ctx context.Context, k types.TrustedKey) error {
-	return ks.s.do(ctx, func() error {
-		if ks.trusted().has(k.Kid) {
-			return conflict("trusted key", k.Kid)
+	return ks.s.Do(ctx, func() error {
+		if ks.trusted().Has(k.Kid) {
+			return memtx.Conflict("trusted key", k.Kid)
 		}
-		for _, other := range ks.trusted().rows {
+		for _, other := range ks.trusted().Rows {
 			if k.Alias != "" && other.Alias == k.Alias {
-				return conflict("trusted key alias", k.Alias)
+				return memtx.Conflict("trusted key alias", k.Alias)
 			}
 		}
-		ks.trusted().put(k.Kid, k)
+		ks.trusted().Put(k.Kid, k)
 		return nil
 	})
 }
@@ -322,16 +325,16 @@ func (ks keys) DeleteTrustedKey(ctx context.Context, kid string) error {
 }
 
 func (ks keys) PutSigningKey(ctx context.Context, k types.SigningKey) error {
-	return ks.s.do(ctx, func() error {
+	return ks.s.Do(ctx, func() error {
 		if k.IsDefault {
-			for alias, other := range ks.signing().rows {
+			for alias, other := range ks.signing().Rows {
 				if alias != k.Alias && other.IsDefault {
 					other.IsDefault = false
-					ks.signing().put(alias, other)
+					ks.signing().Put(alias, other)
 				}
 			}
 		}
-		ks.signing().put(k.Alias, k)
+		ks.signing().Put(k.Alias, k)
 		return nil
 	})
 }
@@ -346,17 +349,17 @@ func (ks keys) SigningKeys(ctx context.Context) ([]types.SigningKey, error) {
 
 func (ks keys) DefaultSigningKey(ctx context.Context) (types.SigningKey, error) {
 	var out types.SigningKey
-	err := ks.s.do(ctx, func() error {
+	err := ks.s.Do(ctx, func() error {
 		// PutSigningKey keeps at most one default; the lowest alias wins
 		// anyway, as the SQL query orders, should two ever exist.
 		found := false
-		for alias, k := range ks.signing().rows {
+		for alias, k := range ks.signing().Rows {
 			if k.IsDefault && (!found || alias < out.Alias) {
 				out, found = store.Clone(k), true
 			}
 		}
 		if !found {
-			return notFound("signing key", "default")
+			return memtx.NotFound("signing key", "default")
 		}
 		return nil
 	})

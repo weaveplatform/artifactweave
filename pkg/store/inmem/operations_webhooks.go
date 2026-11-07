@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -15,30 +16,30 @@ func (s *Store) Webhooks() store.WebhookStore { return webhookStore{s} }
 
 type webhookStore struct{ s *Store }
 
-func (w webhookStore) hooks() *table[string, types.WebhookSubscription] {
-	return tableOf[string, types.WebhookSubscription](w.s, "webhooks")
+func (w webhookStore) hooks() *memtx.Table[string, types.WebhookSubscription] {
+	return memtx.TableOf[string, types.WebhookSubscription](w.s.Store, "webhooks")
 }
 
-func (w webhookStore) deliveries() *table[int64, types.WebhookDelivery] {
-	return tableOf[int64, types.WebhookDelivery](w.s, "webhook_deliveries")
+func (w webhookStore) deliveries() *memtx.Table[int64, types.WebhookDelivery] {
+	return memtx.TableOf[int64, types.WebhookDelivery](w.s.Store, "webhook_deliveries")
 }
 
 func (w webhookStore) Create(ctx context.Context, v types.WebhookSubscription) error {
-	return w.s.do(ctx, func() error {
-		if w.hooks().has(v.Key) {
-			return conflict("webhook", v.Key)
+	return w.s.Do(ctx, func() error {
+		if w.hooks().Has(v.Key) {
+			return memtx.Conflict("webhook", v.Key)
 		}
-		w.hooks().put(v.Key, v)
+		w.hooks().Put(v.Key, v)
 		return nil
 	})
 }
 
 func (w webhookStore) Get(ctx context.Context, key string) (types.WebhookSubscription, error) {
 	var out types.WebhookSubscription
-	err := w.s.do(ctx, func() error {
+	err := w.s.Do(ctx, func() error {
 		var ok bool
-		if out, ok = w.hooks().get(key); !ok {
-			return notFound("webhook", key)
+		if out, ok = w.hooks().Get(key); !ok {
+			return memtx.NotFound("webhook", key)
 		}
 		return nil
 	})
@@ -46,22 +47,22 @@ func (w webhookStore) Get(ctx context.Context, key string) (types.WebhookSubscri
 }
 
 func (w webhookStore) Update(ctx context.Context, v types.WebhookSubscription) error {
-	return w.s.do(ctx, func() error {
-		if !w.hooks().has(v.Key) {
-			return notFound("webhook", v.Key)
+	return w.s.Do(ctx, func() error {
+		if !w.hooks().Has(v.Key) {
+			return memtx.NotFound("webhook", v.Key)
 		}
-		w.hooks().put(v.Key, v)
+		w.hooks().Put(v.Key, v)
 		return nil
 	})
 }
 
 func (w webhookStore) Delete(ctx context.Context, key string) error {
-	return w.s.do(ctx, func() error {
-		if !w.hooks().del(key) {
-			return notFound("webhook", key)
+	return w.s.Do(ctx, func() error {
+		if !w.hooks().Del(key) {
+			return memtx.NotFound("webhook", key)
 		}
 		w.deliveries().
-			deleteWhere(func(_ int64, d types.WebhookDelivery) bool { return d.WebhookKey == key })
+			DeleteWhere(func(_ int64, d types.WebhookDelivery) bool { return d.WebhookKey == key })
 		return nil
 	})
 }
@@ -71,8 +72,8 @@ func (w webhookStore) List(
 	f store.WebhookFilter,
 ) ([]types.WebhookSubscription, error) {
 	var out []types.WebhookSubscription
-	err := w.s.do(ctx, func() error {
-		out = w.hooks().all(func(_ string, v types.WebhookSubscription) bool {
+	err := w.s.Do(ctx, func() error {
+		out = w.hooks().All(func(_ string, v types.WebhookSubscription) bool {
 			return (f.Domain == "" || v.Domain == f.Domain) &&
 				(f.ProjectKey == "" || v.ProjectKey == f.ProjectKey) &&
 				(!f.EnabledOnly || v.Enabled)
@@ -87,13 +88,13 @@ func (w webhookStore) AddDelivery(
 	d types.WebhookDelivery,
 ) (types.WebhookDelivery, error) {
 	var out types.WebhookDelivery
-	err := w.s.do(ctx, func() error {
-		if !w.hooks().has(d.WebhookKey) {
-			return notFound("webhook", d.WebhookKey)
+	err := w.s.Do(ctx, func() error {
+		if !w.hooks().Has(d.WebhookKey) {
+			return memtx.NotFound("webhook", d.WebhookKey)
 		}
-		d.ID = w.s.nextID("webhook_deliveries")
-		w.deliveries().put(d.ID, d)
-		out, _ = w.deliveries().get(d.ID)
+		d.ID = w.s.NextID("webhook_deliveries")
+		w.deliveries().Put(d.ID, d)
+		out, _ = w.deliveries().Get(d.ID)
 		return nil
 	})
 	return out, err
@@ -113,8 +114,8 @@ func (w webhookStore) Deliveries(
 	f store.DeliveryFilter,
 ) ([]types.WebhookDelivery, error) {
 	var out []types.WebhookDelivery
-	err := w.s.do(ctx, func() error {
-		out = w.deliveries().all(func(_ int64, d types.WebhookDelivery) bool {
+	err := w.s.Do(ctx, func() error {
+		out = w.deliveries().All(func(_ int64, d types.WebhookDelivery) bool {
 			// Bounds compare at stored precision, as the SQL stores do.
 			at := d.AttemptedAt
 			return (f.WebhookKey == "" || d.WebhookKey == f.WebhookKey) &&
@@ -142,8 +143,8 @@ func deliveryLimit(limit int) int {
 
 func (w webhookStore) PruneDeliveries(ctx context.Context, before time.Time) (int64, error) {
 	var n int64
-	err := w.s.do(ctx, func() error {
-		n = w.deliveries().deleteWhere(func(_ int64, d types.WebhookDelivery) bool {
+	err := w.s.Do(ctx, func() error {
+		n = w.deliveries().DeleteWhere(func(_ int64, d types.WebhookDelivery) bool {
 			return !d.AttemptedAt.IsZero() && d.AttemptedAt.UnixMicro() < before.UnixMicro()
 		})
 		return nil

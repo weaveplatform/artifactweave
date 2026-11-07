@@ -3,6 +3,7 @@ package inmem
 import (
 	"context"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -18,26 +19,26 @@ func (s *Store) Instance() store.InstanceStore { return instanceStore{s} }
 
 type instanceStore struct{ s *Store }
 
-func (i instanceStore) t() *table[int, types.InstanceIdentity] {
-	return tableOf[int, types.InstanceIdentity](i.s, tInstance)
+func (i instanceStore) t() *memtx.Table[int, types.InstanceIdentity] {
+	return memtx.TableOf[int, types.InstanceIdentity](i.s.Store, tInstance)
 }
 
 func (i instanceStore) Init(ctx context.Context, id types.InstanceIdentity) error {
-	return i.s.do(ctx, func() error {
-		if i.t().has(instanceRowKey) {
-			return conflict("instance identity", id.InstanceID)
+	return i.s.Do(ctx, func() error {
+		if i.t().Has(instanceRowKey) {
+			return memtx.Conflict("instance identity", id.InstanceID)
 		}
-		i.t().put(instanceRowKey, id)
+		i.t().Put(instanceRowKey, id)
 		return nil
 	})
 }
 
 func (i instanceStore) Get(ctx context.Context) (types.InstanceIdentity, error) {
 	var out types.InstanceIdentity
-	err := i.s.do(ctx, func() error {
+	err := i.s.Do(ctx, func() error {
 		var ok bool
-		if out, ok = i.t().get(instanceRowKey); !ok {
-			return notFound("instance identity", "")
+		if out, ok = i.t().Get(instanceRowKey); !ok {
+			return memtx.NotFound("instance identity", "")
 		}
 		return nil
 	})
@@ -45,11 +46,11 @@ func (i instanceStore) Get(ctx context.Context) (types.InstanceIdentity, error) 
 }
 
 func (i instanceStore) Update(ctx context.Context, id types.InstanceIdentity) error {
-	return i.s.do(ctx, func() error {
-		if !i.t().has(instanceRowKey) {
-			return notFound("instance identity", "")
+	return i.s.Do(ctx, func() error {
+		if !i.t().Has(instanceRowKey) {
+			return memtx.NotFound("instance identity", "")
 		}
-		i.t().put(instanceRowKey, id)
+		i.t().Put(instanceRowKey, id)
 		return nil
 	})
 }
