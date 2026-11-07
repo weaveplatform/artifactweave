@@ -13,13 +13,13 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 )
 
-// ErrDSNRequired is returned by Open for an empty DSN.
+// ErrDSNRequired is returned by OpenDB for an empty DSN.
 var ErrDSNRequired = errors.New("postgres: dsn is required")
 
-// uniqueViolation is SQLSTATE 23505.
 const uniqueViolation = "23505"
 
-// Dialect is PostgreSQL's dialect.Dialect.
+// Dialect is PostgreSQL's dialect.Dialect, with IsUniqueViolation: $1
+// placeholders, and FOR UPDATE row locks inside transactions.
 var Dialect = dialect.Dialect{
 	Name:      "postgres",
 	Dollar:    true,
@@ -32,7 +32,9 @@ var Dialect = dialect.Dialect{
 	IsUniqueViolation: IsUniqueViolation,
 }
 
-// IsUniqueViolation reports a PostgreSQL unique violation.
+// IsUniqueViolation reports whether err is, or wraps, a PostgreSQL error with
+// SQLSTATE 23505, unique_violation, which the SQL store turns into
+// kernel.ErrConflict. Any other error reports false.
 func IsUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == uniqueViolation
@@ -46,9 +48,13 @@ type Options struct {
 	ConnMaxLifetime time.Duration
 }
 
-// OpenDB opens the pool for dsn, sized and recycled as o says. It returns
-// ErrDSNRequired for an empty DSN, and does not connect, migrate or wrap
-// the pool in a store.
+// OpenDB returns a pool over the PostgreSQL database that dsn names, through
+// pgx's database/sql adapter, sized and recycled as o says. It returns
+// ErrDSNRequired for an empty DSN, and pgx's parse error behind
+// "postgres: parse dsn: " for one that pgx cannot parse. It does not connect,
+// so a server that cannot be reached fails at the caller's first ping or
+// statement, and it does not migrate or wrap the pool in a store; the caller
+// closes the pool.
 func OpenDB(dsn string, o Options) (*sql.DB, error) {
 	if dsn == "" {
 		return nil, ErrDSNRequired

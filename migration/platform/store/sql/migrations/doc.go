@@ -9,7 +9,7 @@
 // module stream and records its migrations under the name platform in
 // schema_migrations (decision 0044, "Persistence"). It sits under
 // platform/store/sql because the target document's platform/sql is the dialect
-// layer.
+// layer and the engine drivers.
 //
 // # Inputs
 //
@@ -59,7 +59,7 @@
 //
 // # Testing
 //
-// The SQLite and PostgreSQL drivers' tests run every stream:
+// The composite store's tests on SQLite and PostgreSQL run every stream:
 // TestAccSchemaGolden compares a fresh database with the goldens,
 // TestAccMigrationsUpDownUp rolls every stream back and applies it again on
 // SQLite, and TestAccStreamsMigrateAlone migrates each stream up and down alone

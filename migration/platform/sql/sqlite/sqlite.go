@@ -14,13 +14,16 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 )
 
-// ErrPathRequired is returned by Open for an empty path.
+// ErrPathRequired is returned by OpenDB for an empty path.
 var ErrPathRequired = errors.New("sqlite: path is required")
 
-// Memory is the path that opens a private in-memory database.
+// Memory is the path that opens a private in-memory database, which lives as
+// long as the pool that OpenDB returns for it.
 const Memory = ":memory:"
 
-// Dialect is SQLite's dialect.Dialect.
+// Dialect is SQLite's dialect.Dialect, with IsUniqueViolation: "?"
+// placeholders, and no row-lock suffix, because IMMEDIATE transactions
+// already serialise writers.
 var Dialect = dialect.Dialect{
 	Name: "sqlite",
 	// The table-valued form of PRAGMA table_info, so the table name binds
@@ -29,7 +32,10 @@ var Dialect = dialect.Dialect{
 	IsUniqueViolation: IsUniqueViolation,
 }
 
-// IsUniqueViolation reports SQLite unique and primary-key failures.
+// IsUniqueViolation reports whether err is, or wraps, a SQLite unique or
+// primary-key constraint failure, which the SQL store turns into
+// kernel.ErrConflict. Any other error, another constraint failure included,
+// reports false.
 func IsUniqueViolation(err error) bool {
 	var e *msqlite.Error
 	if !errors.As(err, &e) {
@@ -45,7 +51,9 @@ type Options struct {
 	BusyTimeout time.Duration
 }
 
-// DSN builds the modernc connection string for path.
+// DSN returns the modernc connection string that OpenDB opens for path: the
+// busy timeout, 10s unless o sets one, WAL journaling, foreign keys,
+// synchronous NORMAL and IMMEDIATE transactions.
 func DSN(path string, o Options) string {
 	if o.BusyTimeout <= 0 {
 		o.BusyTimeout = 10 * time.Second
@@ -59,10 +67,14 @@ func DSN(path string, o Options) string {
 	return "file:" + path + "?" + q.Encode()
 }
 
-// OpenDB opens the pool of the SQLite database at path with the pragmas of
-// DSN. The path Memory opens a private in-memory database on one
-// connection. It returns ErrPathRequired for an empty path, and does not
-// ping, migrate or wrap the pool in a store.
+// OpenDB returns a pool over the SQLite database at path, through the
+// "sqlite" driver that modernc.org/sqlite registers, with the settings of
+// DSN. It does not connect: the pool's first connection creates a missing
+// database file, and a path that cannot be opened fails there. Memory opens a
+// private in-memory database on one connection that the pool never closes
+// for age or idleness, because each connection to ":memory:" sees its own
+// empty database. OpenDB returns ErrPathRequired for an empty path. It does
+// not ping, migrate or wrap the pool in a store; the caller closes the pool.
 func OpenDB(path string, o Options) (*sql.DB, error) {
 	if path == "" {
 		return nil, ErrPathRequired

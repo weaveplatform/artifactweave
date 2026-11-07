@@ -1,5 +1,6 @@
-// Package postgres opens an artifactweave store on PostgreSQL through pgx's
-// database/sql adapter (decision 0004).
+// Package postgres opens the composite artifactweave store on PostgreSQL: the
+// pool of the platform/sql/postgres driver, migrated and wrapped in the SQL
+// store.
 package postgres
 
 import (
@@ -11,7 +12,8 @@ import (
 	pgdrv "github.com/weaveplatform/artifactweave/migration/platform/sql/postgres"
 )
 
-// Options configures Open.
+// Options configures Open: the store's options, and the driver's, which Open
+// passes on.
 type Options struct {
 	sqlcommon.Options
 	// MaxOpenConns bounds the pool; 0 keeps the database/sql default.
@@ -20,7 +22,11 @@ type Options struct {
 	ConnMaxLifetime time.Duration
 }
 
-// Open connects to dsn and migrates the schema.
+// Open opens the composite store on the PostgreSQL database that dsn names:
+// the driver's pool with o's pool settings, which sqlcommon.Open pings,
+// migrates unless o.SkipMigrate, wraps in the SQL store and closes on
+// failure. The driver's errors, ErrDSNRequired among them, are returned as
+// they are, and sqlcommon.Open's behind "postgres: ".
 func Open(ctx context.Context, dsn string, o Options) (*sqlcommon.Store, error) {
 	db, err := pgdrv.OpenDB(dsn, pgdrv.Options{
 		MaxOpenConns:    o.MaxOpenConns,

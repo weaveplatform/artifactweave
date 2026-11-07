@@ -11,9 +11,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 )
 
-// sqliteDialect is as much of SQLite's dialect as these tests need. The
-// backend's own value is in a legacy package, which the dialect layer's tests
-// do not import.
+// sqliteDialect is as much of SQLite's dialect as these tests need, so the
+// layer's tests do not depend on the driver in platform/sql/sqlite, which is
+// built over the layer.
 var sqliteDialect = dialect.Dialect{
 	Name:    "sqlite",
 	Columns: "SELECT name FROM pragma_table_info(?)",
