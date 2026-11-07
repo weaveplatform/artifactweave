@@ -95,9 +95,12 @@ func testTxRollback(t *testing.T, s store.Store) {
 
 func testTxNested(t *testing.T, s store.Store) {
 	ctx := context.Background()
-	// An inner error the outer function drops must still roll the whole
-	// transaction back on the SQL stores; inmem reaches the same outcome
-	// because the outer function returns the error here.
+	// The outer function returns the inner error, and both store families
+	// then roll the whole transaction back. When the outer function drops
+	// it, they differ on purpose (the SQL stores fail the outer transaction,
+	// memtx commits it), so each unit of work checks that case itself:
+	// TestAccTxDroppedInnerErrorFailsOuter in the dialect package and
+	// TestUnitTxNestedJoinsOuter in memtx.
 	err := s.Tx(ctx, func(ctx context.Context) error {
 		if _, err := s.Blobs().Ref(ctx, blob(1), 1); err != nil {
 			return err
