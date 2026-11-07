@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/weaveplatform/artifactweave/compare/v0.2.0...v0.2.1) (2026-11-07)
+
+
+### Bug Fixes
+
+* **ci:** stop Terraform conformance failing on API admission timeouts ([#1153](https://github.com/weaveplatform/artifactweave/issues/1153)) ([71fc316](https://github.com/weaveplatform/artifactweave/commit/71fc316122f165e3fe6f79c5e6e85169e316d514))
+
 ## [0.2.0](https://github.com/weaveplatform/artifactweave/compare/v0.1.0...v0.2.0) (2026-11-04)
 
 
