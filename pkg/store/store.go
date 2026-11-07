@@ -41,8 +41,9 @@
 package store
 
 import (
-	"context"
 	"errors"
+
+	"github.com/weaveplatform/artifactweave/migration/platform/tx"
 )
 
 // ErrDeleting reports a blob whose content garbage collection is
@@ -93,13 +94,7 @@ type Store interface {
 
 	Builds() BuildStore
 
-	// Tx runs fn in one transaction. Store calls made with the context fn
-	// receives take part; an error from fn rolls all of them back. A nested
-	// Tx joins the outer transaction.
-	Tx(ctx context.Context, fn func(ctx context.Context) error) error
-	// AfterCommit defers fn until the enclosing transaction commits, or runs
-	// it at once outside a transaction. Nothing runs after a rollback.
-	AfterCommit(ctx context.Context, fn func())
+	tx.Runner
 	// Close releases resources.
 	Close() error
 }
