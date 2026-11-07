@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -34,7 +35,7 @@ func (b buildStore) Search(
 		return nil, fmt.Errorf("search builds: an %s query: %w", q.Domain, store.ErrInvalid)
 	}
 	d := aql.SQLite
-	if b.s.d.Name == "postgres" {
+	if b.s.Dialect().Name == "postgres" {
 		d = aql.PostgreSQL
 	}
 	c, err := q.Compile(d, o)
@@ -50,7 +51,7 @@ func (b buildStore) Search(
 			" FROM build_promotions JOIN builds pb ON pb.id = build_promotions.build_id"
 	}
 	var hits []aql.BuildHit
-	err = b.s.rows(ctx, "search builds", query+" WHERE "+c.Where+c.Tail, c.Args,
+	err = b.s.Rows(ctx, "search builds", query+" WHERE "+c.Where+c.Tail, c.Args,
 		func(r *sql.Rows) error {
 			h, err := scanBuildHit(r, q.Domain == aql.DomainPromotions)
 			hits = append(hits, h)
@@ -77,12 +78,12 @@ func scanBuildHit(r *sql.Rows, promoted bool) (aql.BuildHit, error) {
 	dest = append(dest, &b.ID, &b.ProjectKey, &b.Name, &b.Number, &started, &b.URL,
 		&created, &b.CreatedBy, &modified, &b.ModifiedBy)
 	if err := r.Scan(dest...); err != nil {
-		return h, err //nolint:wrapcheck // wrapped by rows
+		return h, err //nolint:wrapcheck // wrapped by Rows
 	}
-	b.Started = fromMicros(sql.NullInt64{Int64: started, Valid: true})
-	b.Created, b.Modified = fromMicros(created), fromMicros(modified)
+	b.Started = dialect.FromMicros(sql.NullInt64{Int64: started, Valid: true})
+	b.Created, b.Modified = dialect.FromMicros(created), dialect.FromMicros(modified)
 	if promoted {
-		p.Created = fromMicros(promotedAt)
+		p.Created = dialect.FromMicros(promotedAt)
 		h.Promotion = &p
 	}
 	return h, nil

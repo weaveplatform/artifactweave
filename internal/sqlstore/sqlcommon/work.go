@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -34,16 +35,16 @@ func scanWork(r interface{ Scan(...any) error }) (types.WorkItem, error) {
 		it.Payload = []byte(payload.String)
 	}
 	it.State = types.WorkState(state)
-	it.NotBefore, it.Enqueued, it.Updated = fromMicros(
+	it.NotBefore, it.Enqueued, it.Updated = dialect.FromMicros(
 		sql.NullInt64{Int64: notBefore, Valid: true},
 	),
-		fromMicros(
+		dialect.FromMicros(
 			sql.NullInt64{Int64: enqueued, Valid: true},
 		),
-		fromMicros(
+		dialect.FromMicros(
 			sql.NullInt64{Int64: updated, Valid: true},
 		)
-	it.LeaseUntil, it.DirtySince = fromMicros(leaseUntil), fromMicros(dirtySince)
+	it.LeaseUntil, it.DirtySince = dialect.FromMicros(leaseUntil), dialect.FromMicros(dirtySince)
 	return it, err //nolint:wrapcheck // wrapped by the caller
 }
 
@@ -67,7 +68,7 @@ func (w workQueue) Enqueue(
 	n := now.UnixMicro()
 	// One statement, so two enqueues of a key racing on PostgreSQL meet at
 	// the conflict and the second applies the rules of the first's row.
-	_, err := w.s.exec(
+	_, err := w.s.Exec(
 		ctx,
 		"enqueue work "+kind,
 		"INSERT INTO work_items ("+workCols+") VALUES (?, ?, ?, 'pending', 0, 0, ?, '', NULL, NULL, '', ?, ?) "+
@@ -101,14 +102,14 @@ func (w workQueue) take(
 	kind, key string,
 	req store.WorkLease,
 ) (types.WorkItem, error) {
-	row := w.s.q(ctx).QueryRowContext(ctx, w.s.d.Rebind(
+	row := w.s.Q(ctx).QueryRowContext(ctx, w.s.Dialect().Rebind(
 		"UPDATE work_items SET state = 'leased', leased_by = ?, lease_until = ?, "+
 			"generation = generation + 1, attempts = attempts + 1, dirty_since = NULL, updated_at = ? "+
 			"WHERE kind = ? AND key = ? RETURNING "+workCols),
 		req.Holder, req.Until.UnixMicro(), req.Now.UnixMicro(), kind, key)
 	it, err := scanWork(row)
 	if err != nil {
-		return it, w.s.wrap("lease work "+kind+"/"+key, err)
+		return it, w.s.Wrap("lease work "+kind+"/"+key, err)
 	}
 	return it, nil
 }
@@ -138,16 +139,16 @@ func (w workQueue) Lease(ctx context.Context, req store.WorkLease) ([]types.Work
 		// SKIP LOCKED lets several nodes lease at once on PostgreSQL, each
 		// passing over the rows another is taking; SQLite's one writer
 		// already keeps them apart.
-		if lock := w.s.lockClause(ctx); lock != "" {
+		if lock := w.s.LockClause(ctx); lock != "" {
 			q += lock + " SKIP LOCKED"
 		}
 		type ref struct{ kind, key string }
 		var refs []ref
-		if err := w.s.rows(ctx, "lease work", q, args, func(r *sql.Rows) error {
+		if err := w.s.Rows(ctx, "lease work", q, args, func(r *sql.Rows) error {
 			var x ref
 			err := r.Scan(&x.kind, &x.key)
 			refs = append(refs, x)
-			return err //nolint:wrapcheck // wrapped by rows
+			return err //nolint:wrapcheck // wrapped by Rows
 		}); err != nil {
 			return err
 		}
@@ -177,12 +178,12 @@ func (w workQueue) LeaseKey(
 	)
 	err := w.s.Tx(ctx, func(ctx context.Context) error {
 		took = false
-		row := w.s.q(ctx).QueryRowContext(ctx, w.s.d.Rebind(
-			"SELECT "+workCols+" FROM work_items WHERE kind = ? AND key = ?"+w.s.lockClause(ctx)),
+		row := w.s.Q(ctx).QueryRowContext(ctx, w.s.Dialect().Rebind(
+			"SELECT "+workCols+" FROM work_items WHERE kind = ? AND key = ?"+w.s.LockClause(ctx)),
 			kind, key)
 		it, err := scanWork(row)
 		if err != nil {
-			return w.s.wrap("get work "+kind+"/"+key, err)
+			return w.s.Wrap("get work "+kind+"/"+key, err)
 		}
 		out = it
 		expired := it.State == types.WorkLeased && it.LeaseUntil.UnixMicro() <= req.Now.UnixMicro()
@@ -211,7 +212,7 @@ func (w workQueue) held(
 	if cond != "" {
 		where += " AND " + cond
 	}
-	n, err := w.s.exec(ctx, op, q+where, append(args, kind, key, gen)...)
+	n, err := w.s.Exec(ctx, op, q+where, append(args, kind, key, gen)...)
 	if err != nil {
 		return err
 	}
@@ -307,18 +308,19 @@ func (w workQueue) Release(
 }
 
 func (w workQueue) Get(ctx context.Context, kind, key string) (types.WorkItem, error) {
-	row := w.s.q(ctx).QueryRowContext(ctx,
-		w.s.d.Rebind("SELECT "+workCols+" FROM work_items WHERE kind = ? AND key = ?"), kind, key)
+	row := w.s.Q(ctx).QueryRowContext(ctx,
+		w.s.Dialect().Rebind("SELECT "+workCols+" FROM work_items WHERE kind = ? AND key = ?"),
+		kind, key)
 	it, err := scanWork(row)
 	if err != nil {
-		return it, w.s.wrap("get work "+kind+"/"+key, err)
+		return it, w.s.Wrap("get work "+kind+"/"+key, err)
 	}
 	return it, nil
 }
 
 func (w workQueue) Stats(ctx context.Context) ([]types.WorkStats, error) {
 	var out []types.WorkStats
-	err := w.s.rows(ctx, "work stats",
+	err := w.s.Rows(ctx, "work stats",
 		"SELECT kind, "+
 			"SUM(CASE WHEN state = 'pending' THEN 1 ELSE 0 END), "+
 			"SUM(CASE WHEN state = 'leased' THEN 1 ELSE 0 END), "+
@@ -332,9 +334,9 @@ func (w workQueue) Stats(ctx context.Context) ([]types.WorkStats, error) {
 				oldest sql.NullInt64
 			)
 			err := r.Scan(&st.Kind, &st.Pending, &st.Leased, &st.Parked, &oldest)
-			st.OldestPending = fromMicros(oldest)
+			st.OldestPending = dialect.FromMicros(oldest)
 			out = append(out, st)
-			return err //nolint:wrapcheck // wrapped by rows
+			return err //nolint:wrapcheck // wrapped by Rows
 		})
 	return out, err
 }

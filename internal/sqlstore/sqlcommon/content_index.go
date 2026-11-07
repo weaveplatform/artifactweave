@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -29,7 +30,7 @@ func scanTrash(row interface{ Scan(...any) error }) (types.TrashEntry, error) {
 	if err := row.Scan(&e.ID, &doc, &deleted, &e.DeletedBy); err != nil {
 		return e, err //nolint:wrapcheck // wrapped by the caller
 	}
-	e.DeletedAt = fromMicros(deleted)
+	e.DeletedAt = dialect.FromMicros(deleted)
 	if err := json.Unmarshal([]byte(doc), &e.Record); err != nil {
 		return e, fmt.Errorf("decode trash record: %w", err)
 	}
@@ -47,14 +48,14 @@ func (t trash) Add(ctx context.Context, e types.TrashEntry) (types.TrashEntry, e
 	if err != nil {
 		return e, fmt.Errorf("encode trash record: %w", err)
 	}
-	e.ID, err = t.s.insertID(ctx, "add trash entry", Insert("trash", []string{
+	e.ID, err = t.s.InsertID(ctx, "add trash entry", Insert("trash", []string{
 		"original_repo_key",
 		"original_path",
 		"original_name",
 		"item_json",
 		"deleted_at",
 		"deleted_by",
-	}), it.RepoKey, it.Path, it.Name, string(doc), micros(e.DeletedAt), e.DeletedBy)
+	}), it.RepoKey, it.Path, it.Name, string(doc), dialect.Micros(e.DeletedAt), e.DeletedBy)
 	if err != nil {
 		return e, err
 	}
@@ -62,14 +63,14 @@ func (t trash) Add(ctx context.Context, e types.TrashEntry) (types.TrashEntry, e
 }
 
 func (t trash) Get(ctx context.Context, id int64) (types.TrashEntry, error) {
-	e, err := scanTrash(t.s.q(ctx).QueryRowContext(ctx, t.s.d.Rebind(
+	e, err := scanTrash(t.s.Q(ctx).QueryRowContext(ctx, t.s.Dialect().Rebind(
 		"SELECT "+trashCols+" FROM trash WHERE id = ?"), id))
-	return e, t.s.wrap(fmt.Sprintf("get trash entry %d", id), err)
+	return e, t.s.Wrap(fmt.Sprintf("get trash entry %d", id), err)
 }
 
 func (t trash) query(ctx context.Context, op, q string, args ...any) ([]types.TrashEntry, error) {
 	var out []types.TrashEntry
-	err := t.s.rows(ctx, op, q, args, func(rs *sql.Rows) error {
+	err := t.s.Rows(ctx, op, q, args, func(rs *sql.Rows) error {
 		e, err := scanTrash(rs)
 		out = append(out, e)
 		return err
@@ -95,7 +96,7 @@ func (t trash) List(
 		return nil, "", fmt.Errorf("list trash: %w", err)
 	}
 	cols := []string{"original_repo_key", "original_path", "original_name", "id"}
-	cond, args, err := keyset(p, cols, map[string]bool{"id": true}, false)
+	cond, args, err := dialect.Keyset(p, cols, map[string]bool{"id": true}, false)
 	if err != nil {
 		return nil, "", fmt.Errorf("list trash: %w", err)
 	}
@@ -114,18 +115,23 @@ func (t trash) List(
 		args = append(args, parent, name, prefix, utf8.RuneCountInString(below), below)
 	}
 	out, err := t.query(ctx, "list trash", "SELECT "+trashCols+" FROM trash WHERE "+where+
-		orderBy(cols, false)+" LIMIT ?", append(args, p.Limit+1)...)
+		dialect.OrderBy(cols, false)+" LIMIT ?", append(args, p.Limit+1)...)
 	if err != nil {
 		return nil, "", err
 	}
 	page, next := store.Trim(out, p.Limit, func(e types.TrashEntry) []string {
-		return []string{e.Record.Item.RepoKey, e.Record.Item.Path, e.Record.Item.Name, itoa(e.ID)}
+		return []string{
+			e.Record.Item.RepoKey,
+			e.Record.Item.Path,
+			e.Record.Item.Name,
+			dialect.Itoa(e.ID),
+		}
 	})
 	return page, next, nil
 }
 
 func (t trash) Delete(ctx context.Context, id int64) error {
-	return t.s.execOne(
+	return t.s.ExecOne(
 		ctx,
 		fmt.Sprintf("delete trash entry %d", id),
 		"DELETE FROM trash WHERE id = ?",
@@ -139,7 +145,7 @@ func (t trash) Expired(
 	limit int,
 ) ([]types.TrashEntry, error) {
 	return t.query(ctx, "expired trash entries", "SELECT "+trashCols+
-		" FROM trash WHERE deleted_at < ? ORDER BY deleted_at, id LIMIT ?", before.UnixMicro(), limitOr(limit))
+		" FROM trash WHERE deleted_at < ? ORDER BY deleted_at, id LIMIT ?", before.UnixMicro(), dialect.LimitOr(limit))
 }
 
 // --- Package index ---------------------------------------------------------
@@ -158,7 +164,7 @@ func scanPackage(row interface{ Scan(...any) error }) (types.Package, error) {
 		created sql.NullInt64
 	)
 	err := row.Scan(&p.ID, &p.RepoKey, &typ, &p.Name, &created)
-	p.Type, p.Created = repo.PackageType(typ), fromMicros(created)
+	p.Type, p.Created = repo.PackageType(typ), dialect.FromMicros(created)
 	return p, err //nolint:wrapcheck // wrapped by the caller
 }
 
@@ -169,11 +175,11 @@ func scanVersion(row interface{ Scan(...any) error }) (types.PackageVersion, err
 		metadata      sql.NullString
 	)
 	err := row.Scan(&v.ID, &v.PackageID, &v.Version, &v.OrderKey, &created, &last, &metadata)
-	v.Created, v.LastDownloaded, v.Metadata = fromMicros(
+	v.Created, v.LastDownloaded, v.Metadata = dialect.FromMicros(
 		created,
-	), fromMicros(
+	), dialect.FromMicros(
 		last,
-	), fromRaw(
+	), dialect.FromRaw(
 		metadata,
 	)
 	return v, err //nolint:wrapcheck // wrapped by the caller
@@ -188,10 +194,10 @@ func (p packages) Ensure(ctx context.Context, pkg types.Package) (types.Package,
 	}
 	var out types.Package
 	err := p.s.Tx(ctx, func(ctx context.Context) error {
-		if _, err := p.s.exec(ctx, "ensure package "+pkg.Name,
+		if _, err := p.s.Exec(ctx, "ensure package "+pkg.Name,
 			InsertIgnore("packages", []string{"repo_key", "package_type", "name", "created_at"},
 				[]string{"repo_key", "name"}),
-			pkg.RepoKey, string(pkg.Type), pkg.Name, micros(pkg.Created)); err != nil {
+			pkg.RepoKey, string(pkg.Type), pkg.Name, dialect.Micros(pkg.Created)); err != nil {
 			return err
 		}
 		var err error
@@ -202,15 +208,15 @@ func (p packages) Ensure(ctx context.Context, pkg types.Package) (types.Package,
 }
 
 func (p packages) Get(ctx context.Context, id int64) (types.Package, error) {
-	out, err := scanPackage(p.s.q(ctx).QueryRowContext(ctx, p.s.d.Rebind(
+	out, err := scanPackage(p.s.Q(ctx).QueryRowContext(ctx, p.s.Dialect().Rebind(
 		"SELECT "+packageCols+" FROM packages WHERE id = ?"), id))
-	return out, p.s.wrap(fmt.Sprintf("get package %d", id), err)
+	return out, p.s.Wrap(fmt.Sprintf("get package %d", id), err)
 }
 
 func (p packages) Find(ctx context.Context, repoKey, name string) (types.Package, error) {
-	out, err := scanPackage(p.s.q(ctx).QueryRowContext(ctx, p.s.d.Rebind(
+	out, err := scanPackage(p.s.Q(ctx).QueryRowContext(ctx, p.s.Dialect().Rebind(
 		"SELECT "+packageCols+" FROM packages WHERE repo_key = ? AND name = ?"), repoKey, name))
-	return out, p.s.wrap(fmt.Sprintf("find package %s:%s", repoKey, name), err)
+	return out, p.s.Wrap(fmt.Sprintf("find package %s:%s", repoKey, name), err)
 }
 
 func (p packages) List(
@@ -222,12 +228,12 @@ func (p packages) List(
 	if err != nil {
 		return nil, "", fmt.Errorf("list packages: %w", err)
 	}
-	cond, args, err := keyset(pg, []string{"name"}, nil, false)
+	cond, args, err := dialect.Keyset(pg, []string{"name"}, nil, false)
 	if err != nil {
 		return nil, "", fmt.Errorf("list packages: %w", err)
 	}
 	var out []types.Package
-	err = p.s.rows(
+	err = p.s.Rows(
 		ctx,
 		"list packages",
 		"SELECT "+packageCols+" FROM packages WHERE repo_key = ? AND "+cond+
@@ -251,7 +257,7 @@ func (p packages) List(
 }
 
 func (p packages) Delete(ctx context.Context, id int64) error {
-	return p.s.execOne(
+	return p.s.ExecOne(
 		ctx,
 		fmt.Sprintf("delete package %d", id),
 		"DELETE FROM packages WHERE id = ?",
@@ -272,7 +278,7 @@ func (p packages) PutVersion(
 		if err != nil {
 			return err
 		}
-		if _, err := p.s.exec(
+		if _, err := p.s.Exec(
 			ctx,
 			"put package version "+v.Version,
 			Upsert("package_versions",
@@ -280,9 +286,9 @@ func (p packages) PutVersion(
 				[]string{"package_id", "version"}),
 			v.PackageID,
 			v.Version,
-			micros(v.Created),
-			micros(v.LastDownloaded),
-			rawJSON(v.Metadata),
+			dialect.Micros(v.Created),
+			dialect.Micros(v.LastDownloaded),
+			dialect.RawJSON(v.Metadata),
 		); err != nil {
 			return err
 		}
@@ -311,7 +317,7 @@ func (p packages) reorder(ctx context.Context, pkg types.Package) error {
 		if old[v.ID] == v.OrderKey {
 			continue
 		}
-		if _, err := p.s.exec(
+		if _, err := p.s.Exec(
 			ctx,
 			"order package versions",
 			"UPDATE package_versions SET order_key = ? WHERE id = ?",
@@ -329,10 +335,10 @@ func (p packages) Version(
 	packageID int64,
 	version string,
 ) (types.PackageVersion, error) {
-	out, err := scanVersion(p.s.q(ctx).QueryRowContext(ctx, p.s.d.Rebind(
+	out, err := scanVersion(p.s.Q(ctx).QueryRowContext(ctx, p.s.Dialect().Rebind(
 		"SELECT "+versionCols+" FROM package_versions WHERE package_id = ? AND version = ?",
 	), packageID, version))
-	return out, p.s.wrap(fmt.Sprintf("get package %d version %s", packageID, version), err)
+	return out, p.s.Wrap(fmt.Sprintf("get package %d version %s", packageID, version), err)
 }
 
 func (p packages) versions(
@@ -341,7 +347,7 @@ func (p packages) versions(
 	args ...any,
 ) ([]types.PackageVersion, error) {
 	var out []types.PackageVersion
-	err := p.s.rows(ctx, op, q, args, func(rs *sql.Rows) error {
+	err := p.s.Rows(ctx, op, q, args, func(rs *sql.Rows) error {
 		v, err := scanVersion(rs)
 		out = append(out, v)
 		return err
@@ -357,11 +363,11 @@ func (p packages) Versions(ctx context.Context, packageID int64) ([]types.Packag
 func (p packages) DeleteVersion(ctx context.Context, id int64) error {
 	return p.s.Tx(ctx, func(ctx context.Context) error {
 		var pkgID int64
-		if err := p.s.q(ctx).QueryRowContext(ctx, p.s.d.Rebind(
+		if err := p.s.Q(ctx).QueryRowContext(ctx, p.s.Dialect().Rebind(
 			"SELECT package_id FROM package_versions WHERE id = ?"), id).Scan(&pkgID); err != nil {
-			return p.s.wrap(fmt.Sprintf("delete package version %d", id), err)
+			return p.s.Wrap(fmt.Sprintf("delete package version %d", id), err)
 		}
-		if _, err := p.s.exec(
+		if _, err := p.s.Exec(
 			ctx,
 			"delete package version",
 			"DELETE FROM package_versions WHERE id = ?",
@@ -387,7 +393,7 @@ func (p packages) LinkFile(ctx context.Context, f types.VersionFile) error {
 			{"package version", "SELECT 1 FROM package_versions WHERE id = ?", f.VersionID},
 			{"item", "SELECT 1 FROM items WHERE id = ?", f.ItemID},
 		} {
-			ok, err := p.s.exists(ctx, "link file", check.q, check.id)
+			ok, err := p.s.Exists(ctx, "link file", check.q, check.id)
 			if err != nil {
 				return err
 			}
@@ -395,7 +401,7 @@ func (p packages) LinkFile(ctx context.Context, f types.VersionFile) error {
 				return fmt.Errorf("link file: %s %d: %w", check.what, check.id, store.ErrNotFound)
 			}
 		}
-		_, err := p.s.exec(ctx, "link file", InsertIgnore(
+		_, err := p.s.Exec(ctx, "link file", InsertIgnore(
 			"package_version_files",
 			[]string{
 				"version_id",
@@ -409,7 +415,7 @@ func (p packages) LinkFile(ctx context.Context, f types.VersionFile) error {
 
 func (p packages) Files(ctx context.Context, versionID int64) ([]int64, error) {
 	var out []int64
-	err := p.s.rows(
+	err := p.s.Rows(
 		ctx,
 		"version files",
 		"SELECT item_id FROM package_version_files WHERE version_id = ? ORDER BY item_id",
@@ -418,22 +424,24 @@ func (p packages) Files(ctx context.Context, versionID int64) ([]int64, error) {
 			var id int64
 			err := rs.Scan(&id)
 			out = append(out, id)
-			return err //nolint:wrapcheck // wrapped by rows
+			return err //nolint:wrapcheck // wrapped by Rows
 		},
 	)
 	return out, err
 }
 
 func (p packages) VersionOf(ctx context.Context, itemID int64) (types.PackageVersion, error) {
-	out, err := scanVersion(p.s.q(ctx).QueryRowContext(ctx, p.s.d.Rebind(
+	out, err := scanVersion(p.s.Q(ctx).QueryRowContext(ctx, p.s.Dialect().Rebind(
 		"SELECT v.id, v.package_id, v.version, v.order_key, v.created_at, v.last_downloaded_at, v.metadata"+
 			" FROM package_versions v JOIN package_version_files f ON f.version_id = v.id"+
 			" WHERE f.item_id = ? ORDER BY v.id LIMIT 1",
-	), itemID))
-	return out, p.s.wrap(fmt.Sprintf("version of item %d", itemID), err)
+	),
+		itemID))
+	return out, p.s.Wrap(fmt.Sprintf("version of item %d", itemID), err)
 }
 
 func (p packages) RecordVersionDownload(ctx context.Context, versionID int64, at time.Time) error {
-	return p.s.execOne(ctx, fmt.Sprintf("record download of version %d", versionID),
-		"UPDATE package_versions SET last_downloaded_at = ? WHERE id = ?", micros(at), versionID)
+	return p.s.ExecOne(ctx, fmt.Sprintf("record download of version %d", versionID),
+		"UPDATE package_versions SET last_downloaded_at = ? WHERE id = ?", dialect.Micros(at),
+		versionID)
 }

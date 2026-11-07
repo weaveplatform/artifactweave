@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -27,7 +28,7 @@ var buildCols = []string{
 // buildSelect selects every run column.
 var buildSelect = "SELECT " + strings.Join(buildCols, ", ") + " FROM builds"
 
-func scanBuild(r entRow) (types.Build, error) {
+func scanBuild(r dialect.EntRow) (types.Build, error) {
 	var (
 		b                 types.Build
 		started           int64
@@ -39,8 +40,8 @@ func scanBuild(r entRow) (types.Build, error) {
 		return b, err //nolint:wrapcheck // wrapped by the caller
 	}
 	b.Started = time.UnixMicro(started).UTC()
-	b.Created, b.Modified = fromMicros(created), fromMicros(modified)
-	b.Document = fromRaw(document)
+	b.Created, b.Modified = dialect.FromMicros(created), dialect.FromMicros(modified)
+	b.Document = dialect.FromRaw(document)
 	return b, nil
 }
 
@@ -59,10 +60,10 @@ func validBuild(b types.Build) error {
 // one reads a single run selected by where, with its content.
 func (b buildStore) one(ctx context.Context, op, where string, args ...any) (types.Build, error) {
 	out, err := scanBuild(
-		b.s.q(ctx).QueryRowContext(ctx, b.s.d.Rebind(buildSelect+" WHERE "+where), args...),
+		b.s.Q(ctx).QueryRowContext(ctx, b.s.Dialect().Rebind(buildSelect+" WHERE "+where), args...),
 	)
 	if err != nil {
-		return types.Build{}, b.s.wrap(op, err)
+		return types.Build{}, b.s.Wrap(op, err)
 	}
 	return out, b.loadContent(ctx, &out)
 }
@@ -70,19 +71,19 @@ func (b buildStore) one(ctx context.Context, op, where string, args ...any) (typ
 // loadContent reads a run's properties and modules with their files.
 func (b buildStore) loadContent(ctx context.Context, run *types.Build) error {
 	op := fmt.Sprintf("read build run %d", run.ID)
-	if err := b.s.rows(ctx, op,
+	if err := b.s.Rows(ctx, op,
 		"SELECT module_id, type FROM build_modules WHERE build_id = ? ORDER BY position",
 		[]any{run.ID}, func(r *sql.Rows) error {
 			var m types.BuildModule
 			if err := r.Scan(&m.ID, &m.Type); err != nil {
-				return err //nolint:wrapcheck // wrapped by rows
+				return err //nolint:wrapcheck // wrapped by Rows
 			}
 			run.Modules = append(run.Modules, m)
 			return nil
 		}); err != nil {
 		return err
 	}
-	if err := b.s.rows(ctx, op,
+	if err := b.s.Rows(ctx, op,
 		"SELECT module_position, key, value FROM build_properties WHERE build_id = ?"+
 			" ORDER BY module_position, key, value",
 		[]any{run.ID}, func(r *sql.Rows) error {
@@ -91,7 +92,7 @@ func (b buildStore) loadContent(ctx context.Context, run *types.Build) error {
 				k, v string
 			)
 			if err := r.Scan(&pos, &k, &v); err != nil {
-				return err //nolint:wrapcheck // wrapped by rows
+				return err //nolint:wrapcheck // wrapped by Rows
 			}
 			props := &run.Properties
 			if pos != buildLevel {
@@ -105,7 +106,7 @@ func (b buildStore) loadContent(ctx context.Context, run *types.Build) error {
 		}); err != nil {
 		return err
 	}
-	if err := b.s.rows(ctx, op,
+	if err := b.s.Rows(ctx, op,
 		"SELECT module_position, name, type, path, sha1, sha256, md5 FROM build_artifacts"+
 			" WHERE build_id = ? ORDER BY module_position, position",
 		[]any{run.ID}, func(r *sql.Rows) error {
@@ -115,14 +116,14 @@ func (b buildStore) loadContent(ctx context.Context, run *types.Build) error {
 			)
 			if err := r.Scan(&pos, &f.Name, &f.Type, &f.Path,
 				&f.Checksums.SHA1, &f.Checksums.SHA256, &f.Checksums.MD5); err != nil {
-				return err //nolint:wrapcheck // wrapped by rows
+				return err //nolint:wrapcheck // wrapped by Rows
 			}
 			run.Modules[pos].Artifacts = append(run.Modules[pos].Artifacts, f)
 			return nil
 		}); err != nil {
 		return err
 	}
-	return b.s.rows(ctx, op,
+	return b.s.Rows(ctx, op,
 		"SELECT module_position, dependency_id, name, type, path, scopes, sha1, sha256, md5"+
 			" FROM build_dependencies WHERE build_id = ? ORDER BY module_position, position",
 		[]any{run.ID}, func(r *sql.Rows) error {
@@ -133,9 +134,9 @@ func (b buildStore) loadContent(ctx context.Context, run *types.Build) error {
 			)
 			if err := r.Scan(&pos, &f.ID, &f.Name, &f.Type, &f.Path, &scopes,
 				&f.Checksums.SHA1, &f.Checksums.SHA256, &f.Checksums.MD5); err != nil {
-				return err //nolint:wrapcheck // wrapped by rows
+				return err //nolint:wrapcheck // wrapped by Rows
 			}
-			if err := fromJSON(scopes, &f.Scopes); err != nil {
+			if err := dialect.FromJSON(scopes, &f.Scopes); err != nil {
 				return err
 			}
 			run.Modules[pos].Dependencies = append(run.Modules[pos].Dependencies, f)
@@ -154,7 +155,7 @@ func (b buildStore) writeProperties(
 	cols := []string{"build_id", "module_position", "key", "value"}
 	for k, values := range props {
 		for _, v := range values {
-			if _, err := b.s.exec(ctx, "add build property "+k,
+			if _, err := b.s.Exec(ctx, "add build property "+k,
 				InsertIgnore("build_properties", cols, nil), id, pos, k, v); err != nil {
 				return err
 			}
@@ -194,7 +195,7 @@ func (b buildStore) writeContent(ctx context.Context, id int64, run types.Build)
 		"md5",
 	}
 	for pos, m := range run.Modules {
-		if _, err := b.s.exec(ctx, "add build module "+m.ID,
+		if _, err := b.s.Exec(ctx, "add build module "+m.ID,
 			Insert("build_modules", []string{"build_id", "position", "module_id", "type"}),
 			id, pos, m.ID, m.Type); err != nil {
 			return err
@@ -203,7 +204,7 @@ func (b buildStore) writeContent(ctx context.Context, id int64, run types.Build)
 			return err
 		}
 		for n, f := range m.Artifacts {
-			if _, err := b.s.exec(
+			if _, err := b.s.Exec(
 				ctx,
 				"add build artifact "+f.Name,
 				Insert("build_artifacts", artCols),
@@ -221,7 +222,7 @@ func (b buildStore) writeContent(ctx context.Context, id int64, run types.Build)
 			}
 		}
 		for n, f := range m.Dependencies {
-			if _, err := b.s.exec(
+			if _, err := b.s.Exec(
 				ctx,
 				"add build dependency "+f.ID,
 				Insert("build_dependencies", depCols),
@@ -232,7 +233,7 @@ func (b buildStore) writeContent(ctx context.Context, id int64, run types.Build)
 				f.Name,
 				f.Type,
 				f.Path,
-				mustJSON(f.Scopes),
+				dialect.MustJSON(f.Scopes),
 				f.Checksums.SHA1,
 				f.Checksums.SHA256,
 				f.Checksums.MD5,
@@ -250,7 +251,7 @@ func (b buildStore) Put(ctx context.Context, run types.Build) (types.Build, erro
 	}
 	run = store.NormaliseBuild(run)
 	err := b.s.Tx(ctx, func(ctx context.Context) error {
-		id, err := b.s.insertID(
+		id, err := b.s.InsertID(
 			ctx,
 			fmt.Sprintf("create build run %s/%s/%s", run.ProjectKey, run.Name, run.Number),
 			Insert("builds", buildCols[1:]),
@@ -259,13 +260,13 @@ func (b buildStore) Put(ctx context.Context, run types.Build) (types.Build, erro
 			run.Number,
 			run.Started.UnixMicro(),
 			run.URL,
-			micros(
+			dialect.Micros(
 				run.Created,
 			),
 			run.CreatedBy,
-			micros(run.Modified),
+			dialect.Micros(run.Modified),
 			run.ModifiedBy,
-			rawJSON(run.Document),
+			dialect.RawJSON(run.Document),
 		)
 		if err != nil {
 			return err
@@ -286,14 +287,14 @@ func (b buildStore) Replace(ctx context.Context, run types.Build) error {
 	run = store.NormaliseBuild(run)
 	return b.s.Tx(ctx, func(ctx context.Context) error {
 		op := fmt.Sprintf("replace build run %d", run.ID)
-		if err := b.s.execOne(
+		if err := b.s.ExecOne(
 			ctx,
 			op,
 			"UPDATE builds SET url = ?, modified_at = ?, modified_by = ?, document = ? WHERE id = ?",
 			run.URL,
-			micros(run.Modified),
+			dialect.Micros(run.Modified),
 			run.ModifiedBy,
-			rawJSON(run.Document),
+			dialect.RawJSON(run.Document),
 			run.ID,
 		); err != nil {
 			return err
@@ -301,7 +302,7 @@ func (b buildStore) Replace(ctx context.Context, run types.Build) error {
 		for _, table := range []string{"build_properties", "build_modules"} {
 			// Deleting the modules cascades to their artifacts and
 			// dependencies.
-			if _, err := b.s.exec(
+			if _, err := b.s.Exec(
 				ctx,
 				op,
 				"DELETE FROM "+table+" WHERE build_id = ?",
@@ -325,13 +326,13 @@ func (b buildStore) GetForUpdate(
 	project, name, number string,
 	started time.Time,
 ) (types.Build, error) {
-	if !inTx(ctx, b.s.db) {
+	if !b.s.InTx(ctx) {
 		return types.Build{}, fmt.Errorf(
 			"get build for update requires a transaction: %w",
 			store.ErrInvalid,
 		)
 	}
-	return b.get(ctx, project, name, number, started, " "+b.s.d.ForUpdate)
+	return b.get(ctx, project, name, number, started, " "+b.s.Dialect().ForUpdate)
 }
 
 func (b buildStore) get(
@@ -355,13 +356,13 @@ func (b buildStore) ByID(ctx context.Context, id int64) (types.Build, error) {
 }
 
 func (b buildStore) ByIDForUpdate(ctx context.Context, id int64) (types.Build, error) {
-	if !inTx(ctx, b.s.db) {
+	if !b.s.InTx(ctx) {
 		return types.Build{}, fmt.Errorf(
 			"get build by ID for update requires a transaction: %w",
 			store.ErrInvalid,
 		)
 	}
-	return b.one(ctx, "lock replay build run", "id = ? "+b.s.d.ForUpdate, id)
+	return b.one(ctx, "lock replay build run", "id = ? "+b.s.Dialect().ForUpdate, id)
 }
 
 func (b buildStore) Latest(ctx context.Context, project, name string) (types.Build, error) {
@@ -376,7 +377,7 @@ func (b buildStore) runList(
 	args ...any,
 ) ([]types.BuildRun, error) {
 	var out []types.BuildRun
-	err := b.s.rows(ctx, op, buildSelect+" WHERE "+where+order, args, func(r *sql.Rows) error {
+	err := b.s.Rows(ctx, op, buildSelect+" WHERE "+where+order, args, func(r *sql.Rows) error {
 		v, err := scanBuild(r)
 		out = append(out, v.Run())
 		return err
@@ -392,18 +393,23 @@ func (b buildStore) Runs(
 		return nil, "", err //nolint:wrapcheck // already a store sentinel
 	}
 	order := []string{"started_at", "id"}
-	cond, args, err := keyset(p, order, map[string]bool{"started_at": true, "id": true}, true)
+	cond, args, err := dialect.Keyset(
+		p,
+		order,
+		map[string]bool{"started_at": true, "id": true},
+		true,
+	)
 	if err != nil {
 		return nil, "", err
 	}
 	out, err := b.runList(ctx, fmt.Sprintf("list build runs %s/%s", project, name),
-		"project_key = ? AND name = ? AND "+cond, orderBy(order, true)+" LIMIT ?",
+		"project_key = ? AND name = ? AND "+cond, dialect.OrderBy(order, true)+" LIMIT ?",
 		append(append([]any{project, name}, args...), p.Limit+1)...)
 	if err != nil {
 		return nil, "", err
 	}
 	page, next := store.Trim(out, p.Limit, func(r types.BuildRun) []string {
-		return []string{itoa(r.Started.UnixMicro()), itoa(r.ID)}
+		return []string{dialect.Itoa(r.Started.UnixMicro()), dialect.Itoa(r.ID)}
 	})
 	return page, next, nil
 }
@@ -417,12 +423,12 @@ func (b buildStore) Names(
 	if err != nil {
 		return nil, "", err //nolint:wrapcheck // already a store sentinel
 	}
-	cond, args, err := keyset(p, []string{"name"}, nil, false)
+	cond, args, err := dialect.Keyset(p, []string{"name"}, nil, false)
 	if err != nil {
 		return nil, "", err
 	}
 	var out []types.BuildName
-	err = b.s.rows(ctx, "list build names "+project,
+	err = b.s.Rows(ctx, "list build names "+project,
 		"SELECT name, MAX(started_at) FROM builds WHERE project_key = ? AND "+cond+
 			" GROUP BY name ORDER BY name LIMIT ?",
 		append(append([]any{project}, args...), p.Limit+1),
@@ -430,7 +436,7 @@ func (b buildStore) Names(
 			n := types.BuildName{ProjectKey: project}
 			var last int64
 			if err := r.Scan(&n.Name, &last); err != nil {
-				return err //nolint:wrapcheck // wrapped by rows
+				return err //nolint:wrapcheck // wrapped by Rows
 			}
 			n.LastStarted = time.UnixMicro(last).UTC()
 			out = append(out, n)
@@ -456,14 +462,14 @@ func (b buildStore) DeleteNumbers(
 		for _, number := range numbers {
 			op := fmt.Sprintf("delete build run %s/%s/%s", project, name, number)
 			runs, err := b.runList(ctx, op, "project_key = ? AND name = ? AND number = ?",
-				" ORDER BY started_at, id LIMIT 1"+b.s.lockClause(ctx), project, name, number)
+				" ORDER BY started_at, id LIMIT 1"+b.s.LockClause(ctx), project, name, number)
 			if err != nil {
 				return err
 			}
 			if len(runs) == 0 {
 				continue
 			}
-			if _, err := b.s.exec(
+			if _, err := b.s.Exec(
 				ctx,
 				op,
 				"DELETE FROM builds WHERE id = ?",
@@ -484,12 +490,12 @@ func (b buildStore) DeleteAll(ctx context.Context, project, name string) ([]type
 		op := fmt.Sprintf("delete build %s/%s", project, name)
 		var err error
 		out, err = b.runList(ctx, op, "project_key = ? AND name = ?",
-			" ORDER BY started_at, id"+b.s.lockClause(ctx), project, name)
+			" ORDER BY started_at, id"+b.s.LockClause(ctx), project, name)
 		if err != nil {
 			return err
 		}
 		for _, table := range []string{"builds", "build_retention"} {
-			if _, err := b.s.exec(
+			if _, err := b.s.Exec(
 				ctx,
 				op,
 				"DELETE FROM "+table+" WHERE project_key = ? AND name = ?",
@@ -508,7 +514,7 @@ func (b buildStore) Rename(ctx context.Context, project, from, to string) error 
 	return b.s.Tx(ctx, func(ctx context.Context) error {
 		op := fmt.Sprintf("rename build %s/%s to %s", project, from, to)
 		has := func(name string) (bool, error) {
-			return b.s.exists(ctx, op,
+			return b.s.Exists(ctx, op,
 				"SELECT 1 FROM builds WHERE project_key = ? AND name = ? LIMIT 1", project, name)
 		}
 		found, err := has(from)
@@ -536,7 +542,7 @@ func (b buildStore) Rename(ctx context.Context, project, from, to string) error 
 			{"DELETE FROM build_retention WHERE project_key = ? AND name = ?", []any{project, to}},
 			{"UPDATE build_retention SET name = ? WHERE project_key = ? AND name = ?", []any{to, project, from}},
 		} {
-			if _, err := b.s.exec(ctx, op, q.sql, q.args...); err != nil {
+			if _, err := b.s.Exec(ctx, op, q.sql, q.args...); err != nil {
 				return err
 			}
 		}
@@ -546,7 +552,7 @@ func (b buildStore) Rename(ctx context.Context, project, from, to string) error 
 
 // runExists reports whether a run exists, as ErrNotFound when it does not.
 func (b buildStore) runExists(ctx context.Context, op string, id int64) error {
-	found, err := b.s.exists(ctx, op, "SELECT 1 FROM builds WHERE id = ?", id)
+	found, err := b.s.Exists(ctx, op, "SELECT 1 FROM builds WHERE id = ?", id)
 	if err != nil {
 		return err
 	}
@@ -578,12 +584,12 @@ func (b buildStore) AddPromotion(
 		if err := b.runExists(ctx, op, p.BuildID); err != nil {
 			return err
 		}
-		id, err := b.s.insertID(
+		id, err := b.s.InsertID(
 			ctx,
 			op,
 			Insert("build_promotions", promotionCols[1:]),
 			p.BuildID,
-			micros(p.Created),
+			dialect.Micros(p.Created),
 			p.CreatedBy,
 			p.Status,
 			p.Comment,
@@ -608,7 +614,7 @@ func (b buildStore) Promotions(ctx context.Context, buildID int64) ([]types.Buil
 	var out []types.BuildPromotion
 	// COALESCE keeps a promotion without a time first on PostgreSQL too,
 	// which sorts NULLs last.
-	err := b.s.rows(ctx, op,
+	err := b.s.Rows(ctx, op,
 		"SELECT "+strings.Join(promotionCols, ", ")+" FROM build_promotions WHERE build_id = ?"+
 			" ORDER BY COALESCE(created_at, 0), id",
 		[]any{buildID}, func(r *sql.Rows) error {
@@ -618,9 +624,9 @@ func (b buildStore) Promotions(ctx context.Context, buildID int64) ([]types.Buil
 			)
 			if err := r.Scan(&p.ID, &p.BuildID, &created, &p.CreatedBy, &p.Status, &p.Comment,
 				&p.CIUser, &p.SourceRepo, &p.Repo); err != nil {
-				return err //nolint:wrapcheck // wrapped by rows
+				return err //nolint:wrapcheck // wrapped by Rows
 			}
-			p.Created = fromMicros(created)
+			p.Created = dialect.FromMicros(created)
 			out = append(out, p)
 			return nil
 		})
@@ -653,7 +659,7 @@ func (b buildStore) find(
 		fileCols = "f.dependency_id, f.scopes, " + fileCols
 	}
 	var out []types.BuildFileRef
-	err := b.s.rows(
+	err := b.s.Rows(
 		ctx,
 		"find in "+table,
 		"SELECT b.id, b.project_key, b.name, b.number, b.started_at, b.created_at, m.module_id, "+fileCols+
@@ -688,10 +694,11 @@ func (b buildStore) find(
 			dest = append(dest, &ref.File.Name, &ref.File.Type, &ref.File.Path,
 				&ref.File.Checksums.SHA1, &ref.File.Checksums.SHA256, &ref.File.Checksums.MD5)
 			if err := r.Scan(dest...); err != nil {
-				return err //nolint:wrapcheck // wrapped by rows
+				return err //nolint:wrapcheck // wrapped by Rows
 			}
-			ref.Run.Started, ref.Run.Created = time.UnixMicro(started).UTC(), fromMicros(created)
-			if err := fromJSON(scopes, &ref.File.Scopes); err != nil {
+			ref.Run.Started, ref.Run.Created = time.UnixMicro(started).UTC(),
+				dialect.FromMicros(created)
+			if err := dialect.FromJSON(scopes, &ref.File.Scopes); err != nil {
 				return err
 			}
 			out = append(out, ref)
@@ -721,16 +728,16 @@ var retentionCols = []string{
 
 func (b buildStore) PutRetention(ctx context.Context, r types.BuildRetention) error {
 	r = store.Normalise(r)
-	_, err := b.s.exec(
+	_, err := b.s.Exec(
 		ctx,
 		fmt.Sprintf("set build retention %s/%s", r.ProjectKey, r.Name),
 		Upsert("build_retention", retentionCols, retentionCols[:2]),
 		r.ProjectKey,
 		r.Name,
 		r.Count,
-		micros(r.MinimumBuildDate),
+		dialect.Micros(r.MinimumBuildDate),
 		r.DeleteArtifacts,
-		mustJSON(r.KeepNumbers),
+		dialect.MustJSON(r.KeepNumbers),
 	)
 	return err
 }
@@ -744,7 +751,7 @@ func (b buildStore) Retention(
 		minDate sql.NullInt64
 		keep    sql.NullString
 	)
-	err := b.s.q(ctx).QueryRowContext(ctx, b.s.d.Rebind(
+	err := b.s.Q(ctx).QueryRowContext(ctx, b.s.Dialect().Rebind(
 		"SELECT "+strings.Join(
 			retentionCols,
 			", ",
@@ -752,11 +759,11 @@ func (b buildStore) Retention(
 	),
 		project, name).Scan(&r.ProjectKey, &r.Name, &r.Count, &minDate, &r.DeleteArtifacts, &keep)
 	if err != nil {
-		return types.BuildRetention{}, b.s.wrap(
+		return types.BuildRetention{}, b.s.Wrap(
 			fmt.Sprintf("get build retention %s/%s", project, name),
 			err,
 		)
 	}
-	r.MinimumBuildDate = fromMicros(minDate)
-	return r, fromJSON(keep, &r.KeepNumbers)
+	r.MinimumBuildDate = dialect.FromMicros(minDate)
+	return r, dialect.FromJSON(keep, &r.KeepNumbers)
 }

@@ -42,7 +42,7 @@ func (r repos) Create(ctx context.Context, c repo.Config) error {
 			return err
 		}
 		now := time.Now().UnixMicro()
-		if _, err := r.s.exec(
+		if _, err := r.s.Exec(
 			ctx,
 			"create repository "+c.Key,
 			Insert(
@@ -97,7 +97,7 @@ func (r repos) writeChildren(ctx context.Context, c repo.Config) error {
 		if table == "repository_members" {
 			col = "virtual_key"
 		}
-		if _, err := r.s.exec(
+		if _, err := r.s.Exec(
 			ctx,
 			"clear "+table,
 			"DELETE FROM "+table+" WHERE "+col+" = ?",
@@ -107,11 +107,11 @@ func (r repos) writeChildren(ctx context.Context, c repo.Config) error {
 		}
 	}
 	if c.Password != "" {
-		sealed, err := r.s.seal(purposeRepoPassword, c.Key, c.Password)
+		sealed, err := r.s.Seal(purposeRepoPassword, c.Key, c.Password)
 		if err != nil {
 			return err
 		}
-		if _, err := r.s.exec(
+		if _, err := r.s.Exec(
 			ctx,
 			"store repository password",
 			Insert(
@@ -129,7 +129,7 @@ func (r repos) writeChildren(ctx context.Context, c repo.Config) error {
 	}
 	if c.Class == repo.Virtual {
 		for i, m := range c.Repositories {
-			if _, err := r.s.exec(ctx, "store repository member",
+			if _, err := r.s.Exec(ctx, "store repository member",
 				Insert("repository_members", []string{"virtual_key", "member_key", "position"}),
 				c.Key, m, i); err != nil {
 				return err
@@ -142,7 +142,7 @@ func (r repos) writeChildren(ctx context.Context, c repo.Config) error {
 		if name == "" {
 			continue
 		}
-		if _, err := r.s.exec(ctx, "store repository key pair",
+		if _, err := r.s.Exec(ctx, "store repository key pair",
 			Insert("repository_keypairs", []string{"repo_key", "role", "keypair_name"}),
 			c.Key, string(role), name); err != nil {
 			return err
@@ -184,7 +184,7 @@ func (r repos) Update(ctx context.Context, c repo.Config) error {
 		if err != nil {
 			return err
 		}
-		if err := r.s.execOne(
+		if err := r.s.ExecOne(
 			ctx,
 			"update repository "+c.Key,
 			"UPDATE repositories SET rclass = ?, package_type = ?, project_key = ?, updated_at = ?, doc = ?, header_secrets_version = 1 WHERE key = ?",
@@ -222,7 +222,7 @@ func (r repos) Delete(ctx context.Context, key string) error {
 		if _, err := r.s.RemoteCache().Invalidate(ctx, key, "", false); err != nil {
 			return fmt.Errorf("remove remote cache: %w", err)
 		}
-		return r.s.execOne(
+		return r.s.ExecOne(
 			ctx,
 			"delete repository "+key,
 			"DELETE FROM repositories WHERE key = ?",
@@ -274,11 +274,11 @@ func (r repos) UsingKeypair(ctx context.Context, name string) ([]string, error) 
 // keys runs a query returning one key per row.
 func (r repos) keys(ctx context.Context, op, q string, arg string) ([]string, error) {
 	var out []string
-	err := r.s.rows(ctx, op, q, []any{arg}, func(rs *sql.Rows) error {
+	err := r.s.Rows(ctx, op, q, []any{arg}, func(rs *sql.Rows) error {
 		var k string
 		err := rs.Scan(&k)
 		out = append(out, k)
-		return err //nolint:wrapcheck // wrapped by rows
+		return err //nolint:wrapcheck // wrapped by Rows
 	})
 	return out, err
 }

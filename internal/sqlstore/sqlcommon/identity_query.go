@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // Fold with Go on write: database LOWER follows engine/locale-specific rules,
 // while the existing Access name filter uses strings.ToLower.
 func (s *Store) writeIdentitySearch(ctx context.Context, table, name string) error {
-	_, err := s.exec(
+	_, err := s.Exec(
 		ctx,
 		"index identity name",
 		"UPDATE "+table+" SET search_name = ? WHERE name = ?",
@@ -29,12 +30,12 @@ func (s *Store) backfillIdentitySearch(ctx context.Context) error {
 		for {
 			var names []string
 			err := s.Tx(ctx, func(ctx context.Context) error {
-				err := s.rows(ctx, "read identity search backfill",
+				err := s.Rows(ctx, "read identity search backfill",
 					"SELECT name FROM "+table+" WHERE search_name IS NULL ORDER BY name LIMIT ?",
 					[]any{store.MaxLimit}, func(r *sql.Rows) error {
 						var name string
 						if err := r.Scan(&name); err != nil {
-							return err //nolint:wrapcheck // rows supplies context
+							return err //nolint:wrapcheck // Rows supplies context
 						}
 						names = append(names, name)
 						return nil
@@ -65,13 +66,13 @@ func (s *Store) identityWhere(
 	p store.Page,
 	group bool,
 ) (string, []any, error) {
-	where, args, err := keyset(p, []string{"i.name"}, nil, f.Descending)
+	where, args, err := dialect.Keyset(p, []string{"i.name"}, nil, f.Descending)
 	if err != nil {
 		return "", nil, err
 	}
 	if f.NameContains != "" {
 		contains := "instr(i.search_name, ?) > 0"
-		if s.d.Dollar {
+		if s.Dialect().Dollar {
 			contains = "position(? in i.search_name) > 0"
 		}
 		where += " AND " + contains
@@ -114,13 +115,13 @@ func (us users) ListSummaries(ctx context.Context, f store.UserFilter, p store.P
 			"WHERE m.user_name = i.name AND g.admin_privileges = TRUE))"
 	}
 	query := "SELECT i.name, i.realm, " + status + " FROM users i WHERE " + where +
-		orderBy([]string{"i.name"}, f.Descending) + " LIMIT ?"
+		dialect.OrderBy([]string{"i.name"}, f.Descending) + " LIMIT ?"
 	args = append(args, p.Limit+1)
 	out := make([]store.UserSummary, 0, p.Limit+1)
-	err = us.s.rows(ctx, "page user summaries", query, args, func(r *sql.Rows) error {
+	err = us.s.Rows(ctx, "page user summaries", query, args, func(r *sql.Rows) error {
 		var u store.UserSummary
 		if err := r.Scan(&u.Name, &u.Realm, &u.Status); err != nil {
-			return err //nolint:wrapcheck // rows supplies context
+			return err //nolint:wrapcheck // Rows supplies context
 		}
 		out = append(out, u)
 		return nil
@@ -147,9 +148,9 @@ func (gs groups) ListNames(
 		return nil, "", err
 	}
 	query := "SELECT i.name FROM user_groups i WHERE " + where +
-		orderBy([]string{"i.name"}, f.Descending) + " LIMIT ?"
+		dialect.OrderBy([]string{"i.name"}, f.Descending) + " LIMIT ?"
 	out := make([]string, 0, p.Limit+1)
-	err = gs.s.rows(
+	err = gs.s.Rows(
 		ctx,
 		"page group names",
 		query,
@@ -157,7 +158,7 @@ func (gs groups) ListNames(
 		func(r *sql.Rows) error {
 			var name string
 			if err := r.Scan(&name); err != nil {
-				return err //nolint:wrapcheck // rows supplies context
+				return err //nolint:wrapcheck // Rows supplies context
 			}
 			out = append(out, name)
 			return nil

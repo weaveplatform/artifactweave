@@ -20,7 +20,7 @@ const instanceCols = "instance_id, public_key, private_key, namespace_id, protoc
 
 // args returns the column values of id with its private key sealed.
 func (i instanceStore) args(id types.InstanceIdentity) ([]any, error) {
-	sealed, err := i.s.seal(purposeInstanceKey, id.InstanceID, string(id.PrivateKey))
+	sealed, err := i.s.Seal(purposeInstanceKey, id.InstanceID, string(id.PrivateKey))
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +38,7 @@ func (i instanceStore) Init(ctx context.Context, id types.InstanceIdentity) erro
 	if err != nil {
 		return err
 	}
-	_, err = i.s.exec(ctx, "init instance",
+	_, err = i.s.Exec(ctx, "init instance",
 		"INSERT INTO instance (id, "+instanceCols+") VALUES (1, ?, ?, ?, ?, ?)", args...)
 	return err
 }
@@ -48,15 +48,15 @@ func (i instanceStore) Get(ctx context.Context) (types.InstanceIdentity, error) 
 		out         types.InstanceIdentity
 		pub, sealed []byte
 	)
-	err := i.s.q(ctx).QueryRowContext(ctx, "SELECT "+instanceCols+" FROM instance WHERE id = 1").
+	err := i.s.Q(ctx).QueryRowContext(ctx, "SELECT "+instanceCols+" FROM instance WHERE id = 1").
 		Scan(&out.InstanceID, &pub, &sealed, &out.NamespaceID, &out.ProtocolVersion)
 	if err != nil {
-		return out, i.s.wrap("get instance", err)
+		return out, i.s.Wrap("get instance", err)
 	}
 	if len(pub) > 0 {
 		out.PublicKey = pub
 	}
-	priv, err := i.s.unseal(purposeInstanceKey, out.InstanceID, sealed)
+	priv, err := i.s.Unseal(purposeInstanceKey, out.InstanceID, sealed)
 	if err != nil {
 		return types.InstanceIdentity{}, err
 	}
@@ -71,7 +71,7 @@ func (i instanceStore) Update(ctx context.Context, id types.InstanceIdentity) er
 	if err != nil {
 		return err
 	}
-	return i.s.execOne(
+	return i.s.ExecOne(
 		ctx,
 		"update instance",
 		"UPDATE instance SET instance_id = ?, public_key = ?, "+

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
@@ -16,20 +17,21 @@ type apiRestrictions struct{ s *Store }
 
 const restrictionColumns = "id, user_name, actor, reason, until_at, changed_at"
 
-func scanAPIRestriction(row entRow) (store.APIRestriction, error) {
+func scanAPIRestriction(row dialect.EntRow) (store.APIRestriction, error) {
 	var r store.APIRestriction
 	var until, changed sql.NullInt64
 	err := row.Scan(&r.Sequence, &r.User, &r.Actor, &r.Reason, &until, &changed)
-	r.Until, r.Changed = fromMicros(until), fromMicros(changed)
+	r.Until, r.Changed = dialect.FromMicros(until), dialect.FromMicros(changed)
 	return r, err //nolint:wrapcheck // the caller supplies operation context
 }
 
 func (a apiRestrictions) Get(ctx context.Context, user string) (store.APIRestriction, error) {
-	r, err := scanAPIRestriction(a.s.q(ctx).QueryRowContext(ctx,
-		a.s.d.Rebind("SELECT "+restrictionColumns+" FROM api_restrictions WHERE user_name = ?"),
+	r, err := scanAPIRestriction(a.s.Q(ctx).QueryRowContext(ctx,
+		a.s.Dialect().
+			Rebind("SELECT "+restrictionColumns+" FROM api_restrictions WHERE user_name = ?"),
 		user),
 	)
-	return r, a.s.wrap("get API restriction", err)
+	return r, a.s.Wrap("get API restriction", err)
 }
 
 func (a apiRestrictions) Put(
@@ -42,13 +44,13 @@ func (a apiRestrictions) Put(
 	r = store.Normalise(r)
 	err := a.s.Tx(ctx, func(ctx context.Context) error {
 		var name string
-		if err := a.s.q(ctx).
-			QueryRowContext(ctx, a.s.d.Rebind("SELECT name FROM users WHERE name = ? "+a.s.d.ForUpdate), r.User).
+		if err := a.s.Q(ctx).
+			QueryRowContext(ctx, a.s.Dialect().Rebind("SELECT name FROM users WHERE name = ? "+a.s.Dialect().ForUpdate), r.User).
 			Scan(&name); err != nil {
-			return a.s.wrap("lock restricted user", err)
+			return a.s.Wrap("lock restricted user", err)
 		}
 		var err error
-		r.Sequence, err = a.s.insertID(
+		r.Sequence, err = a.s.InsertID(
 			ctx,
 			"audit API restriction",
 			Insert(
@@ -58,13 +60,13 @@ func (a apiRestrictions) Put(
 			r.User,
 			r.Actor,
 			r.Reason,
-			micros(r.Until),
-			micros(r.Changed),
+			dialect.Micros(r.Until),
+			dialect.Micros(r.Changed),
 		)
 		if err != nil {
 			return err
 		}
-		_, err = a.s.exec(
+		_, err = a.s.Exec(
 			ctx,
 			"set API restriction",
 			Upsert(
@@ -76,8 +78,8 @@ func (a apiRestrictions) Put(
 			r.User,
 			r.Actor,
 			r.Reason,
-			micros(r.Until),
-			micros(r.Changed),
+			dialect.Micros(r.Until),
+			dialect.Micros(r.Changed),
 		)
 		return err
 	})
@@ -113,7 +115,7 @@ func (a apiRestrictions) History(
 	}
 	args = append(args, p.Limit+1)
 	var out []store.APIRestriction
-	err = a.s.rows(
+	err = a.s.Rows(
 		ctx,
 		"page API restriction audit",
 		"SELECT "+restrictionColumns+" FROM api_restriction_audit WHERE "+where+" ORDER BY id DESC LIMIT ?",

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -21,11 +22,11 @@ type settingStore struct{ s *Store }
 
 func (st settingStore) Get(ctx context.Context, key string, into any) error {
 	var value string
-	err := st.s.q(ctx).
-		QueryRowContext(ctx, st.s.d.Rebind("SELECT value FROM settings WHERE key = ?"), key).
+	err := st.s.Q(ctx).
+		QueryRowContext(ctx, st.s.Dialect().Rebind("SELECT value FROM settings WHERE key = ?"), key).
 		Scan(&value)
 	if err != nil {
-		return st.s.wrap("get setting "+key, err)
+		return st.s.Wrap("get setting "+key, err)
 	}
 	if err := json.Unmarshal([]byte(value), into); err != nil {
 		return fmt.Errorf("decode setting %s: %w", key, err)
@@ -38,7 +39,7 @@ func (st settingStore) Put(ctx context.Context, key string, v any) error {
 	if err != nil {
 		return fmt.Errorf("encode setting %s: %w", key, err)
 	}
-	_, err = st.s.exec(
+	_, err = st.s.Exec(
 		ctx,
 		"put setting "+key,
 		Upsert("settings", []string{"key", "value"}, []string{"key"}),
@@ -49,12 +50,12 @@ func (st settingStore) Put(ctx context.Context, key string, v any) error {
 }
 
 func (st settingStore) Delete(ctx context.Context, key string) error {
-	return st.s.execOne(ctx, "delete setting "+key, "DELETE FROM settings WHERE key = ?", key)
+	return st.s.ExecOne(ctx, "delete setting "+key, "DELETE FROM settings WHERE key = ?", key)
 }
 
 func (st settingStore) Keys(ctx context.Context) ([]string, error) {
 	var out []string
-	err := st.s.rows(
+	err := st.s.Rows(
 		ctx,
 		"list settings",
 		"SELECT key FROM settings ORDER BY key",
@@ -63,7 +64,7 @@ func (st settingStore) Keys(ctx context.Context) ([]string, error) {
 			var k string
 			err := r.Scan(&k)
 			out = append(out, k)
-			return err //nolint:wrapcheck // wrapped by rows
+			return err //nolint:wrapcheck // wrapped by Rows
 		},
 	)
 	return out, err
@@ -93,24 +94,24 @@ func (l leaseStore) Acquire(ctx context.Context, lease types.Lease, now time.Tim
 			lease.Name,
 			lease.Holder,
 			lease.Task,
-			micros(lease.Acquired),
+			dialect.Micros(lease.Acquired),
 			lease.Expires.UnixMicro(),
 		}
-		if _, err := l.s.exec(
+		if _, err := l.s.Exec(
 			ctx,
 			"acquire lease "+lease.Name,
 			InsertIgnore("leases", cols, []string{"name"}),
 			args...); err != nil {
 			return err
 		}
-		n, err := l.s.exec(
+		n, err := l.s.Exec(
 			ctx,
 			"acquire lease "+lease.Name,
 			"UPDATE leases SET holder = ?, task = ?, "+
 				"acquired_at = ?, expires_at = ? WHERE name = ? AND (holder = ? OR expires_at <= ?)",
 			lease.Holder,
 			lease.Task,
-			micros(lease.Acquired),
+			dialect.Micros(lease.Acquired),
 			lease.Expires.UnixMicro(),
 			lease.Name,
 			lease.Holder,
@@ -123,7 +124,7 @@ func (l leaseStore) Acquire(ctx context.Context, lease types.Lease, now time.Tim
 }
 
 func (l leaseStore) Release(ctx context.Context, name, holder string) error {
-	_, err := l.s.exec(
+	_, err := l.s.Exec(
 		ctx,
 		"release lease "+name,
 		"DELETE FROM leases WHERE name = ? AND holder = ?",
@@ -135,7 +136,7 @@ func (l leaseStore) Release(ctx context.Context, name, holder string) error {
 
 func (l leaseStore) List(ctx context.Context) ([]types.Lease, error) {
 	var out []types.Lease
-	err := l.s.rows(
+	err := l.s.Rows(
 		ctx,
 		"list leases",
 		"SELECT name, holder, task, acquired_at, expires_at FROM leases ORDER BY name",
@@ -146,9 +147,9 @@ func (l leaseStore) List(ctx context.Context) ([]types.Lease, error) {
 				acquired, expires sql.NullInt64
 			)
 			err := r.Scan(&v.Name, &v.Holder, &v.Task, &acquired, &expires)
-			v.Acquired, v.Expires = fromMicros(acquired), fromMicros(expires)
+			v.Acquired, v.Expires = dialect.FromMicros(acquired), dialect.FromMicros(expires)
 			out = append(out, v)
-			return err //nolint:wrapcheck // wrapped by rows
+			return err //nolint:wrapcheck // wrapped by Rows
 		},
 	)
 	return out, err
@@ -188,12 +189,13 @@ func (c configStore) Put(ctx context.Context, d types.ConfigDocument) error {
 			}
 			changed = errors.Is(err, store.ErrNotFound) || !bytes.Equal(old.Document, d.Document)
 		}
-		if _, err := c.s.exec(ctx, op, Upsert("config_documents",
+		if _, err := c.s.Exec(ctx, op, Upsert("config_documents",
 			[]string{"kind", "key", "enabled", "document", "updated_at"}, []string{"kind", "key"}),
-			d.Kind, d.Key, d.Enabled, rawJSON(d.Document), micros(d.Updated)); err != nil {
+			d.Kind, d.Key, d.Enabled, dialect.RawJSON(d.Document),
+			dialect.Micros(d.Updated)); err != nil {
 			return err
 		}
-		if _, err := c.s.exec(ctx, op, "DELETE FROM config_secrets WHERE kind = ? AND key = ?",
+		if _, err := c.s.Exec(ctx, op, "DELETE FROM config_secrets WHERE kind = ? AND key = ?",
 			d.Kind, d.Key); err != nil {
 			return err
 		}
@@ -201,11 +203,11 @@ func (c configStore) Put(ctx context.Context, d types.ConfigDocument) error {
 			if value == "" {
 				continue
 			}
-			sealed, err := c.s.seal(purposeConfigSecret, configSecretID(d.Kind, d.Key, name), value)
+			sealed, err := c.s.Seal(purposeConfigSecret, configSecretID(d.Kind, d.Key, name), value)
 			if err != nil {
 				return err
 			}
-			if _, err := c.s.exec(
+			if _, err := c.s.Exec(
 				ctx,
 				op,
 				Insert("config_secrets", []string{"kind", "key", "name", "value"}),
@@ -231,7 +233,7 @@ func (c configStore) list(
 	args ...any,
 ) ([]types.ConfigDocument, error) {
 	var out []types.ConfigDocument
-	err := c.s.rows(
+	err := c.s.Rows(
 		ctx,
 		op,
 		"SELECT kind, key, enabled, document, updated_at FROM config_documents WHERE "+
@@ -244,9 +246,9 @@ func (c configStore) list(
 				updated sql.NullInt64
 			)
 			err := r.Scan(&d.Kind, &d.Key, &d.Enabled, &doc, &updated)
-			d.Document, d.Updated = fromRaw(doc), fromMicros(updated)
+			d.Document, d.Updated = dialect.FromRaw(doc), dialect.FromMicros(updated)
 			out = append(out, d)
-			return err //nolint:wrapcheck // wrapped by rows
+			return err //nolint:wrapcheck // wrapped by Rows
 		},
 	)
 	if err != nil {
@@ -259,7 +261,7 @@ func (c configStore) list(
 			value []byte
 		}
 		var sealed []sealedSecret
-		err := c.s.rows(
+		err := c.s.Rows(
 			ctx,
 			op,
 			"SELECT name, value FROM config_secrets WHERE kind = ? AND key = ?",
@@ -268,14 +270,14 @@ func (c configStore) list(
 				var v sealedSecret
 				err := r.Scan(&v.name, &v.value)
 				sealed = append(sealed, v)
-				return err //nolint:wrapcheck // wrapped by rows
+				return err //nolint:wrapcheck // wrapped by Rows
 			},
 		)
 		if err != nil {
 			return nil, err
 		}
 		for _, v := range sealed {
-			plain, err := c.s.unseal(
+			plain, err := c.s.Unseal(
 				purposeConfigSecret,
 				configSecretID(d.Kind, d.Key, v.name),
 				v.value,
@@ -318,7 +320,7 @@ func (c configStore) List(
 func (c configStore) Delete(ctx context.Context, kind types.ConfigKind, key string) error {
 	op := fmt.Sprintf("delete config %s/%s", kind, key)
 	return c.s.Tx(ctx, func(ctx context.Context) error {
-		if _, err := c.s.exec(
+		if _, err := c.s.Exec(
 			ctx,
 			op,
 			"DELETE FROM config_secrets WHERE kind = ? AND key = ?",
@@ -327,7 +329,7 @@ func (c configStore) Delete(ctx context.Context, kind types.ConfigKind, key stri
 		); err != nil {
 			return err
 		}
-		if err := c.s.execOne(
+		if err := c.s.ExecOne(
 			ctx,
 			op,
 			"DELETE FROM config_documents WHERE kind = ? AND key = ?",

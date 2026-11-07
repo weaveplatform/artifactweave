@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -28,12 +29,13 @@ var bundleCols = []string{
 func bundleRow(b types.ReleaseBundle) []any {
 	return []any{
 		b.Name, b.Version, string(b.State), b.StoringRepository, b.ProjectKey, string(b.Origin),
-		b.Description, micros(b.Created), b.CreatedBy, micros(b.SignedAt), b.SigningKeyAlias,
-		entBytes(b.Signature), mustJSON(b.Notes), mustJSON(b.Spec),
+		b.Description, dialect.Micros(b.Created), b.CreatedBy, dialect.Micros(b.SignedAt),
+		b.SigningKeyAlias,
+		dialect.EntBytes(b.Signature), dialect.MustJSON(b.Notes), dialect.MustJSON(b.Spec),
 	}
 }
 
-func scanBundle(r entRow) (types.ReleaseBundle, error) {
+func scanBundle(r dialect.EntRow) (types.ReleaseBundle, error) {
 	var (
 		b               types.ReleaseBundle
 		state, origin   string
@@ -46,11 +48,11 @@ func scanBundle(r entRow) (types.ReleaseBundle, error) {
 		return b, err //nolint:wrapcheck // wrapped by the caller
 	}
 	b.State, b.Origin = types.BundleState(state), types.BundleOrigin(origin)
-	b.Created, b.SignedAt = fromMicros(created), fromMicros(signed)
-	if err := fromJSON(notes, &b.Notes); err != nil {
+	b.Created, b.SignedAt = dialect.FromMicros(created), dialect.FromMicros(signed)
+	if err := dialect.FromJSON(notes, &b.Notes); err != nil {
 		return b, err
 	}
-	return b, fromJSON(spec, &b.Spec)
+	return b, dialect.FromJSON(spec, &b.Spec)
 }
 
 // get reads one bundle version, locking it inside a transaction when lock
@@ -65,10 +67,10 @@ func (b bundleStore) get(
 		", ",
 	) + " FROM release_bundles WHERE name = ? AND version = ?"
 	if lock {
-		q += b.s.lockClause(ctx)
+		q += b.s.LockClause(ctx)
 	}
-	out, err := scanBundle(b.s.q(ctx).QueryRowContext(ctx, b.s.d.Rebind(q), name, version))
-	return out, b.s.wrap(fmt.Sprintf("get release bundle %s/%s", name, version), err)
+	out, err := scanBundle(b.s.Q(ctx).QueryRowContext(ctx, b.s.Dialect().Rebind(q), name, version))
+	return out, b.s.Wrap(fmt.Sprintf("get release bundle %s/%s", name, version), err)
 }
 
 // insertArtifacts writes a bundle's artifact list, owned by (name, version).
@@ -82,7 +84,7 @@ func (b bundleStore) insertArtifacts(
 		"sha256", "sha512", "sha1", "md5", "size", "props",
 	}
 	for _, a := range list {
-		if _, err := b.s.exec(
+		if _, err := b.s.Exec(
 			ctx,
 			"add bundle artifact "+a.TargetPath,
 			Insert("bundle_artifacts", cols),
@@ -95,7 +97,7 @@ func (b bundleStore) insertArtifacts(
 			a.Checksums.SHA1,
 			a.Checksums.MD5,
 			a.Size,
-			mustJSON(a.Props),
+			dialect.MustJSON(a.Props),
 		); err != nil {
 			return err
 		}
@@ -110,7 +112,7 @@ func (b bundleStore) Create(
 ) error {
 	row := bundleRow(store.Normalise(rb))
 	return b.s.Tx(ctx, func(ctx context.Context) error {
-		if _, err := b.s.exec(ctx, "create release bundle "+rb.Name+"/"+rb.Version,
+		if _, err := b.s.Exec(ctx, "create release bundle "+rb.Name+"/"+rb.Version,
 			Insert("release_bundles", bundleCols), row...); err != nil {
 			return err
 		}
@@ -128,7 +130,7 @@ func (b bundleStore) Update(ctx context.Context, rb types.ReleaseBundle) error {
 	for _, c := range bundleCols[2:] {
 		sets = append(sets, c+" = ?")
 	}
-	return b.s.execOne(ctx, "update release bundle "+rb.Name+"/"+rb.Version,
+	return b.s.ExecOne(ctx, "update release bundle "+rb.Name+"/"+rb.Version,
 		"UPDATE release_bundles SET "+strings.Join(sets, ", ")+" WHERE name = ? AND version = ?",
 		append(row[2:], rb.Name, rb.Version)...)
 }
@@ -152,7 +154,7 @@ func (b bundleStore) ReplaceArtifacts(
 				store.ErrConflict,
 			)
 		}
-		if _, err := b.s.exec(
+		if _, err := b.s.Exec(
 			ctx,
 			"clear bundle artifacts",
 			"DELETE FROM bundle_artifacts WHERE bundle_name = ? AND bundle_version = ?",
@@ -168,7 +170,7 @@ func (b bundleStore) ReplaceArtifacts(
 func (b bundleStore) Delete(ctx context.Context, name, version string) error {
 	// Artifacts, the keep mark and the export go with the row (ON DELETE
 	// CASCADE); the audit trail has no foreign key and stays.
-	return b.s.execOne(ctx, fmt.Sprintf("delete release bundle %s/%s", name, version),
+	return b.s.ExecOne(ctx, fmt.Sprintf("delete release bundle %s/%s", name, version),
 		"DELETE FROM release_bundles WHERE name = ? AND version = ?", name, version)
 }
 
@@ -180,7 +182,7 @@ func (b bundleStore) List(
 		return nil, "", err //nolint:wrapcheck // already a store sentinel
 	}
 	order := []string{"name", "version"}
-	cond, args, err := keyset(p, order, nil, false)
+	cond, args, err := dialect.Keyset(p, order, nil, false)
 	if err != nil {
 		return nil, "", err
 	}
@@ -194,9 +196,9 @@ func (b bundleStore) List(
 		}
 	}
 	var out []types.ReleaseBundle
-	err = b.s.rows(ctx, "list release bundles",
+	err = b.s.Rows(ctx, "list release bundles",
 		"SELECT "+strings.Join(bundleCols, ", ")+" FROM release_bundles WHERE "+
-			strings.Join(where, " AND ")+orderBy(order, false)+" LIMIT ?",
+			strings.Join(where, " AND ")+dialect.OrderBy(order, false)+" LIMIT ?",
 		append(args, p.Limit+1),
 		func(r *sql.Rows) error {
 			v, err := scanBundle(r)
@@ -216,7 +218,7 @@ func (b bundleStore) List(
 
 // requireBundle fails with ErrNotFound when the bundle version is absent.
 func (b bundleStore) requireBundle(ctx context.Context, name, version string) error {
-	ok, err := b.s.exists(ctx, "find release bundle",
+	ok, err := b.s.Exists(ctx, "find release bundle",
 		"SELECT 1 FROM release_bundles WHERE name = ? AND version = ?", name, version)
 	if err != nil {
 		return err
@@ -235,7 +237,7 @@ func (b bundleStore) Artifacts(
 		return nil, err
 	}
 	var out []types.BundleArtifact
-	err := b.s.rows(
+	err := b.s.Rows(
 		ctx,
 		"list bundle artifacts",
 		"SELECT bundle_name, bundle_version, target_path, source_path,"+
@@ -259,9 +261,9 @@ func (b bundleStore) Artifacts(
 				&a.Size,
 				&props,
 			); err != nil {
-				return err //nolint:wrapcheck // wrapped by rows
+				return err //nolint:wrapcheck // wrapped by Rows
 			}
-			if err := fromJSON(props, &a.Props); err != nil {
+			if err := dialect.FromJSON(props, &a.Props); err != nil {
 				return err
 			}
 			out = append(out, a)
@@ -281,7 +283,7 @@ func (b bundleStore) SetKeep(ctx context.Context, name, version string, keep boo
 			q = InsertIgnore("bundle_keeps", []string{"bundle_name", "bundle_version"},
 				[]string{"bundle_name", "bundle_version"})
 		}
-		_, err := b.s.exec(ctx, "set bundle keep", q, name, version)
+		_, err := b.s.Exec(ctx, "set bundle keep", q, name, version)
 		return err
 	})
 }
@@ -290,12 +292,12 @@ func (b bundleStore) Kept(ctx context.Context, name, version string) (bool, erro
 	if err := b.requireBundle(ctx, name, version); err != nil {
 		return false, err
 	}
-	return b.s.exists(ctx, "find bundle keep",
+	return b.s.Exists(ctx, "find bundle keep",
 		"SELECT 1 FROM bundle_keeps WHERE bundle_name = ? AND bundle_version = ?", name, version)
 }
 
 func (b bundleStore) AddAudit(ctx context.Context, a types.BundleRetentionAudit) error {
-	_, err := b.s.exec(
+	_, err := b.s.Exec(
 		ctx,
 		"add bundle audit",
 		Insert(
@@ -305,7 +307,7 @@ func (b bundleStore) AddAudit(ctx context.Context, a types.BundleRetentionAudit)
 		a.BundleName,
 		a.BundleVersion,
 		string(a.Operation),
-		micros(a.Created),
+		dialect.Micros(a.Created),
 		a.CreatedBy,
 	)
 	return err
@@ -322,7 +324,11 @@ func (b bundleStore) Audits(
 		args = append(args, name)
 	}
 	var out []types.BundleRetentionAudit
-	err := b.s.rows(ctx, "list bundle audits", q+orderBy([]string{"created_at", "id"}, true), args,
+	err := b.s.Rows(
+		ctx,
+		"list bundle audits",
+		q+dialect.OrderBy([]string{"created_at", "id"}, true),
+		args,
 		func(r *sql.Rows) error {
 			var (
 				a       types.BundleRetentionAudit
@@ -336,12 +342,13 @@ func (b bundleStore) Audits(
 				&created,
 				&a.CreatedBy,
 			); err != nil {
-				return err //nolint:wrapcheck // wrapped by rows
+				return err //nolint:wrapcheck // wrapped by Rows
 			}
-			a.Operation, a.Created = types.BundleOperation(op), fromMicros(created)
+			a.Operation, a.Created = types.BundleOperation(op), dialect.FromMicros(created)
 			out = append(out, a)
 			return nil
-		})
+		},
+	)
 	return out, err
 }
 
@@ -350,11 +357,12 @@ func (b bundleStore) PutExport(ctx context.Context, e types.BundleExport) error 
 		if err := b.requireBundle(ctx, e.BundleName, e.BundleVersion); err != nil {
 			return err
 		}
-		_, err := b.s.exec(ctx, "put bundle export",
+		_, err := b.s.Exec(ctx, "put bundle export",
 			Upsert("bundle_exports",
 				[]string{"bundle_name", "bundle_version", "status", "archive_sha256", "created_at"},
 				[]string{"bundle_name", "bundle_version"}),
-			e.BundleName, e.BundleVersion, string(e.Status), e.ArchiveSHA256, micros(e.Created))
+			e.BundleName, e.BundleVersion, string(e.Status), e.ArchiveSHA256,
+			dialect.Micros(e.Created))
 		return err
 	})
 }
@@ -365,20 +373,21 @@ func (b bundleStore) Export(ctx context.Context, name, version string) (types.Bu
 		status  string
 		created sql.NullInt64
 	)
-	err := b.s.q(ctx).QueryRowContext(ctx, b.s.d.Rebind(
+	err := b.s.Q(ctx).QueryRowContext(ctx, b.s.Dialect().Rebind(
 		"SELECT bundle_name, bundle_version, status, archive_sha256, created_at FROM bundle_exports"+
 			" WHERE bundle_name = ? AND bundle_version = ?",
-	), name, version).
+	),
+		name, version).
 		Scan(&e.BundleName, &e.BundleVersion, &status, &e.ArchiveSHA256, &created)
 	if err != nil {
-		return e, b.s.wrap(fmt.Sprintf("get bundle export %s/%s", name, version), err)
+		return e, b.s.Wrap(fmt.Sprintf("get bundle export %s/%s", name, version), err)
 	}
-	e.Status, e.Created = types.JobStatus(status), fromMicros(created)
+	e.Status, e.Created = types.JobStatus(status), dialect.FromMicros(created)
 	return e, nil
 }
 
 func (b bundleStore) DeleteExport(ctx context.Context, name, version string) error {
-	return b.s.execOne(ctx, fmt.Sprintf("delete bundle export %s/%s", name, version),
+	return b.s.ExecOne(ctx, fmt.Sprintf("delete bundle export %s/%s", name, version),
 		"DELETE FROM bundle_exports WHERE bundle_name = ? AND bundle_version = ?", name, version)
 }
 
@@ -394,11 +403,11 @@ var trackerCols = []string{
 func trackerRow(t types.DistributionTracker) []any {
 	return []any{
 		t.BundleName, t.BundleVersion, string(t.Kind), t.DryRun, t.AutoCreateMissingRepositories,
-		string(t.Status), micros(t.Created), t.CreatedBy, mustJSON(t.Rules),
+		string(t.Status), dialect.Micros(t.Created), t.CreatedBy, dialect.MustJSON(t.Rules),
 	}
 }
 
-func scanTracker(r entRow) (types.DistributionTracker, error) {
+func scanTracker(r dialect.EntRow) (types.DistributionTracker, error) {
 	var (
 		t            types.DistributionTracker
 		kind, status string
@@ -413,10 +422,10 @@ func scanTracker(r entRow) (types.DistributionTracker, error) {
 		kind,
 	), types.JobStatus(
 		status,
-	), fromMicros(
+	), dialect.FromMicros(
 		created,
 	)
-	return t, fromJSON(rules, &t.Rules)
+	return t, dialect.FromJSON(rules, &t.Rules)
 }
 
 var jobCols = []string{
@@ -434,9 +443,9 @@ func (d distributionStore) putJob(ctx context.Context, j types.DistributionJob, 
 	if upsert {
 		q = Upsert("distribution_jobs", jobCols, []string{"tracker_id", "peer"})
 	}
-	_, err := d.s.exec(ctx, "put distribution job "+j.PeerInstanceID, q,
+	_, err := d.s.Exec(ctx, "put distribution job "+j.PeerInstanceID, q,
 		j.TrackerID, j.PeerInstanceID, string(j.Status), j.Priority,
-		micros(j.Started), micros(j.Finished), j.Error)
+		dialect.Micros(j.Started), dialect.Micros(j.Finished), j.Error)
 	return err
 }
 
@@ -445,7 +454,7 @@ func (d distributionStore) CreateTracker(
 ) (types.DistributionTracker, error) {
 	t = store.Normalise(t)
 	err := d.s.Tx(ctx, func(ctx context.Context) error {
-		id, err := d.s.insertID(ctx, "create distribution tracker",
+		id, err := d.s.InsertID(ctx, "create distribution tracker",
 			Insert("distribution_trackers", trackerCols), trackerRow(t)...)
 		if err != nil {
 			return err
@@ -469,13 +478,13 @@ func (d distributionStore) Tracker(
 	ctx context.Context,
 	id int64,
 ) (types.DistributionTracker, error) {
-	out, err := scanTracker(d.s.q(ctx).QueryRowContext(ctx, d.s.d.Rebind(
+	out, err := scanTracker(d.s.Q(ctx).QueryRowContext(ctx, d.s.Dialect().Rebind(
 		"SELECT id, "+strings.Join(
 			trackerCols,
 			", ",
 		)+" FROM distribution_trackers WHERE id = ?",
 	), id))
-	return out, d.s.wrap(fmt.Sprintf("get distribution tracker %d", id), err)
+	return out, d.s.Wrap(fmt.Sprintf("get distribution tracker %d", id), err)
 }
 
 func (d distributionStore) UpdateTracker(ctx context.Context, t types.DistributionTracker) error {
@@ -484,7 +493,7 @@ func (d distributionStore) UpdateTracker(ctx context.Context, t types.Distributi
 	for _, c := range trackerCols {
 		sets = append(sets, c+" = ?")
 	}
-	return d.s.execOne(
+	return d.s.ExecOne(
 		ctx,
 		fmt.Sprintf("update distribution tracker %d", t.ID),
 		"UPDATE distribution_trackers SET "+strings.Join(
@@ -509,7 +518,7 @@ func (d distributionStore) Trackers(
 		args = append(args, version)
 	}
 	var out []types.DistributionTracker
-	err := d.s.rows(
+	err := d.s.Rows(
 		ctx,
 		"list distribution trackers",
 		q+" ORDER BY id DESC",
@@ -534,7 +543,7 @@ func (d distributionStore) PutJob(ctx context.Context, j types.DistributionJob) 
 
 // requireTracker fails with ErrNotFound when the tracker is absent.
 func (d distributionStore) requireTracker(ctx context.Context, id int64) error {
-	ok, err := d.s.exists(
+	ok, err := d.s.Exists(
 		ctx,
 		"find distribution tracker",
 		"SELECT 1 FROM distribution_trackers WHERE id = ?",
@@ -556,7 +565,7 @@ func (d distributionStore) jobs(
 	args ...any,
 ) ([]types.DistributionJob, error) {
 	var out []types.DistributionJob
-	err := d.s.rows(
+	err := d.s.Rows(
 		ctx,
 		"list distribution jobs",
 		"SELECT "+strings.Join(
@@ -572,13 +581,13 @@ func (d distributionStore) jobs(
 			)
 			if err := r.Scan(&j.TrackerID, &j.PeerInstanceID, &status, &j.Priority,
 				&started, &finished, &j.Error); err != nil {
-				return err //nolint:wrapcheck // wrapped by rows
+				return err //nolint:wrapcheck // wrapped by Rows
 			}
 			j.Status, j.Started, j.Finished = types.JobStatus(
 				status,
-			), fromMicros(
+			), dialect.FromMicros(
 				started,
-			), fromMicros(
+			), dialect.FromMicros(
 				finished,
 			)
 			out = append(out, j)

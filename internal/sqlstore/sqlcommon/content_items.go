@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -45,14 +46,14 @@ func scanItem(row interface{ Scan(...any) error }) (types.Item, error) {
 		&it.Original.SHA256, &it.Original.SHA512, &it.Original.SHA1, &it.Original.MD5, &it.MimeType,
 		&created, &it.CreatedBy, &modified, &it.ModifiedBy, &updated, &it.RemoteURL, &propsTime)
 	it.Folder = typ == typeFolder
-	it.Created, it.Modified, it.Updated = fromMicros(
+	it.Created, it.Modified, it.Updated = dialect.FromMicros(
 		created,
-	), fromMicros(
+	), dialect.FromMicros(
 		modified,
-	), fromMicros(
+	), dialect.FromMicros(
 		updated,
 	)
-	it.PropertiesModified = fromMicros(propsTime)
+	it.PropertiesModified = dialect.FromMicros(propsTime)
 	return it, err //nolint:wrapcheck // wrapped by the caller
 }
 
@@ -62,7 +63,7 @@ func scanItem(row interface{ Scan(...any) error }) (types.Item, error) {
 // merges in those that match.
 func (i items) Search(ctx context.Context, q *aql.Query, o aql.Options) ([]aql.Hit, error) {
 	d := aql.SQLite
-	if i.s.d.Name == "postgres" {
+	if i.s.Dialect().Name == "postgres" {
 		d = aql.PostgreSQL
 	}
 	var hits []aql.Hit
@@ -102,7 +103,7 @@ func (i items) search(
 		return nil, fmt.Errorf("search items: %w", err)
 	}
 	var hits []aql.Hit
-	err = i.s.rows(ctx, "search items",
+	err = i.s.Rows(ctx, "search items",
 		"SELECT "+itemCols+" FROM items WHERE "+c.Where+c.Tail, c.Args,
 		func(rs *sql.Rows) error {
 			it, err := scanItem(rs)
@@ -125,14 +126,14 @@ func (i items) missingRoots(ctx context.Context, q *aql.Query, o aql.Options) ([
 			args = append(args, r.Key)
 		}
 		in := "IN (" + strings.TrimSuffix(strings.Repeat("?,", len(batch)), ",") + ")"
-		if err := i.s.rows(ctx, "search item roots",
+		if err := i.s.Rows(ctx, "search item roots",
 			"SELECT repo_key, cached FROM items WHERE path = ? AND name = ? AND repo_key "+in,
 			args,
 			func(rs *sql.Rows) error {
 				var r aql.RepoRef
 				err := rs.Scan(&r.Key, &r.Cached)
 				recorded[r] = true
-				return err //nolint:wrapcheck // wrapped by rows
+				return err //nolint:wrapcheck // wrapped by Rows
 			}); err != nil {
 			return nil, err
 		}
@@ -173,7 +174,7 @@ func hitIndex(hits []aql.Hit) map[int64]int {
 func (i items) hitProperties(ctx context.Context, hits []aql.Hit) error {
 	byID := hitIndex(hits)
 	return eachBatch(hits, func(in string, args []any) error {
-		return i.s.rows(ctx, "search item properties",
+		return i.s.Rows(ctx, "search item properties",
 			"SELECT item_id, key, value FROM item_properties WHERE item_id "+in+
 				" ORDER BY item_id, key, value",
 			args,
@@ -183,7 +184,7 @@ func (i items) hitProperties(ctx context.Context, hits []aql.Hit) error {
 					k, v string
 				)
 				if err := rs.Scan(&id, &k, &v); err != nil {
-					return err //nolint:wrapcheck // wrapped by rows
+					return err //nolint:wrapcheck // wrapped by Rows
 				}
 				h := &hits[byID[id]]
 				if h.Properties == nil {
@@ -199,7 +200,7 @@ func (i items) hitProperties(ctx context.Context, hits []aql.Hit) error {
 func (i items) hitStats(ctx context.Context, hits []aql.Hit) error {
 	byID := hitIndex(hits)
 	return eachBatch(hits, func(in string, args []any) error {
-		return i.s.rows(ctx, "search item statistics",
+		return i.s.Rows(ctx, "search item statistics",
 			"SELECT "+strings.Join(statsCols, ", ")+" FROM item_stats WHERE item_id "+in,
 			args,
 			func(rs *sql.Rows) error {
@@ -211,10 +212,10 @@ func (i items) hitStats(ctx context.Context, hits []aql.Hit) error {
 				if err := rs.Scan(&id, &st.DownloadCount, &last, &st.LastDownloadedBy,
 					&st.RemoteDownloadCount, &remoteLast, &st.RemoteLastDownloadedBy,
 					&st.RemoteOrigin, &st.RemotePath); err != nil {
-					return err //nolint:wrapcheck // wrapped by rows
+					return err //nolint:wrapcheck // wrapped by Rows
 				}
-				st.LastDownloaded = fromMicros(last)
-				st.RemoteLastDownloaded = fromMicros(remoteLast)
+				st.LastDownloaded = dialect.FromMicros(last)
+				st.RemoteLastDownloaded = dialect.FromMicros(remoteLast)
 				hits[byID[id]].Stats = &st
 				return nil
 			})
@@ -264,7 +265,7 @@ func (i items) put(ctx context.Context, it types.Item, statement string) (types.
 	if it.Folder {
 		typ = typeFolder
 	}
-	id, err := i.s.insertID(
+	id, err := i.s.InsertID(
 		ctx,
 		"put item "+it.FullPath(),
 		statement,
@@ -284,13 +285,13 @@ func (i items) put(ctx context.Context, it types.Item, statement string) (types.
 		it.Original.SHA1,
 		it.Original.MD5,
 		it.MimeType,
-		micros(
+		dialect.Micros(
 			it.Created,
 		),
 		it.CreatedBy,
-		micros(it.Modified),
+		dialect.Micros(it.Modified),
 		it.ModifiedBy,
-		micros(it.Updated),
+		dialect.Micros(it.Updated),
 		it.RemoteURL,
 	)
 	if err != nil {
@@ -309,17 +310,17 @@ func (i items) Get(
 	if err != nil {
 		return types.Item{}, fmt.Errorf("get item %q: %w", fullPath, store.ErrNotFound)
 	}
-	it, err := scanItem(i.s.q(ctx).QueryRowContext(ctx, i.s.d.Rebind(
+	it, err := scanItem(i.s.Q(ctx).QueryRowContext(ctx, i.s.Dialect().Rebind(
 		"SELECT "+itemCols+" FROM items WHERE repo_key = ? AND cached = ? AND path = ? AND name = ?",
 	),
 		repoKey, cached, parent, name))
-	return it, i.s.wrap(fmt.Sprintf("get item %s:%s", repoKey, fullPath), err)
+	return it, i.s.Wrap(fmt.Sprintf("get item %s:%s", repoKey, fullPath), err)
 }
 
 func (i items) GetByID(ctx context.Context, id int64) (types.Item, error) {
-	it, err := scanItem(i.s.q(ctx).QueryRowContext(ctx, i.s.d.Rebind(
-		"SELECT "+itemCols+" FROM items WHERE id = ?"+i.s.lockClause(ctx)), id))
-	return it, i.s.wrap(fmt.Sprintf("get item %d", id), err)
+	it, err := scanItem(i.s.Q(ctx).QueryRowContext(ctx, i.s.Dialect().Rebind(
+		"SELECT "+itemCols+" FROM items WHERE id = ?"+i.s.LockClause(ctx)), id))
+	return it, i.s.Wrap(fmt.Sprintf("get item %d", id), err)
 }
 
 // list reads one page of items matching where, ordered by cols.
@@ -336,13 +337,13 @@ func (i items) list(
 	if err != nil {
 		return nil, "", fmt.Errorf("%s: %w", op, err)
 	}
-	cond, cargs, err := keyset(p, cols, ints, false)
+	cond, cargs, err := dialect.Keyset(p, cols, ints, false)
 	if err != nil {
 		return nil, "", fmt.Errorf("%s: %w", op, err)
 	}
 	var out []types.Item
-	err = i.s.rows(ctx, op, "SELECT "+itemCols+" FROM items WHERE "+where+" AND "+cond+
-		orderBy(cols, false)+" LIMIT ?", append(append(args, cargs...), p.Limit+1),
+	err = i.s.Rows(ctx, op, "SELECT "+itemCols+" FROM items WHERE "+where+" AND "+cond+
+		dialect.OrderBy(cols, false)+" LIMIT ?", append(append(args, cargs...), p.Limit+1),
 		func(rs *sql.Rows) error {
 			it, err := scanItem(rs)
 			out = append(out, it)
@@ -429,7 +430,7 @@ func (i items) Delete(
 				args = append(args, it.ID)
 			}
 		}
-		err := i.s.rows(
+		err := i.s.Rows(
 			ctx,
 			"delete items",
 			"SELECT type, size, sha256 FROM items WHERE "+where,
@@ -440,7 +441,7 @@ func (i items) Delete(
 					size     int64
 				)
 				if err := rs.Scan(&typ, &size, &sha); err != nil {
-					return err //nolint:wrapcheck // wrapped by rows
+					return err //nolint:wrapcheck // wrapped by Rows
 				}
 				if typ == typeFolder {
 					res.Folders++
@@ -457,7 +458,7 @@ func (i items) Delete(
 		if err != nil {
 			return err
 		}
-		_, err = i.s.exec(ctx, "delete items", "DELETE FROM items WHERE "+where, args...)
+		_, err = i.s.Exec(ctx, "delete items", "DELETE FROM items WHERE "+where, args...)
 		return err
 	})
 	if err != nil {
@@ -467,11 +468,11 @@ func (i items) Delete(
 }
 
 func (i items) Root(ctx context.Context, repoKey string, cached bool) (types.Item, error) {
-	it, err := scanItem(i.s.q(ctx).QueryRowContext(ctx, i.s.d.Rebind(
+	it, err := scanItem(i.s.Q(ctx).QueryRowContext(ctx, i.s.Dialect().Rebind(
 		"SELECT "+itemCols+" FROM items WHERE repo_key = ? AND cached = ? AND path = ? AND name = ?",
 	),
 		repoKey, cached, types.RootPath, types.RootPath))
-	return it, i.s.wrap("get the root of "+repoKey, err)
+	return it, i.s.Wrap("get the root of "+repoKey, err)
 }
 
 func (i items) EnsureRoot(ctx context.Context, r types.Item) (types.Item, error) {
@@ -483,11 +484,12 @@ func (i items) EnsureRoot(ctx context.Context, r types.Item) (types.Item, error)
 	err := i.s.Tx(ctx, func(ctx context.Context) error {
 		// Ignoring the conflict keeps an existing record as it was, and two
 		// requests creating it at once end with one.
-		if _, err := i.s.exec(ctx, "create the root of "+r.RepoKey,
+		if _, err := i.s.Exec(ctx, "create the root of "+r.RepoKey,
 			InsertIgnore("items", itemWriteCols, []string{"repo_key", "cached", "path", "name"}),
 			root.RepoKey, root.Cached, root.Path, root.Name, root.Depth, typeFolder, int64(0),
 			"", "", "", "", "", "", "", "", "",
-			micros(r.Created), r.CreatedBy, micros(r.Modified), r.ModifiedBy, micros(r.Updated), "",
+			dialect.Micros(r.Created), r.CreatedBy, dialect.Micros(r.Modified), r.ModifiedBy,
+			dialect.Micros(r.Updated), "",
 		); err != nil {
 			return err
 		}
@@ -499,7 +501,7 @@ func (i items) EnsureRoot(ctx context.Context, r types.Item) (types.Item, error)
 }
 
 func (i items) DeleteRoot(ctx context.Context, repoKey string, cached bool) error {
-	_, err := i.s.exec(ctx, "delete the root of "+repoKey,
+	_, err := i.s.Exec(ctx, "delete the root of "+repoKey,
 		"DELETE FROM items WHERE repo_key = ? AND cached = ? AND path = ? AND name = ?",
 		repoKey, cached, types.RootPath, types.RootPath)
 	return err
@@ -523,12 +525,12 @@ func (i items) FindByChecksum(
 	}
 	return i.list(ctx, "find items by "+col, "type = ? AND "+col+" = ?", []any{typeFile, val},
 		p, []string{"id"}, map[string]bool{"id": true},
-		func(it types.Item) []string { return []string{itoa(it.ID)} })
+		func(it types.Item) []string { return []string{dialect.Itoa(it.ID)} })
 }
 
 func (i items) Usage(ctx context.Context) ([]store.RepoUsage, error) {
 	var out []store.RepoUsage
-	err := i.s.rows(ctx, "repository usage",
+	err := i.s.Rows(ctx, "repository usage",
 		"SELECT repo_key, cached,"+
 			// Cast because PostgreSQL sums BIGINT into NUMERIC.
 			" CAST(SUM(CASE WHEN type = 'file' THEN 1 ELSE 0 END) AS BIGINT),"+
@@ -539,17 +541,17 @@ func (i items) Usage(ctx context.Context) ([]store.RepoUsage, error) {
 			var u store.RepoUsage
 			err := rs.Scan(&u.RepoKey, &u.Cached, &u.Files, &u.Folders, &u.Bytes)
 			out = append(out, u)
-			return err //nolint:wrapcheck // wrapped by rows
+			return err //nolint:wrapcheck // wrapped by Rows
 		})
 	return out, err
 }
 
 // requireItem fails with ErrNotFound when no item has id.
 func (i items) requireItem(ctx context.Context, id int64) error {
-	ok, err := i.s.exists(
+	ok, err := i.s.Exists(
 		ctx,
 		"find item",
-		"SELECT 1 FROM items WHERE id = ?"+i.s.lockClause(ctx),
+		"SELECT 1 FROM items WHERE id = ?"+i.s.LockClause(ctx),
 		id,
 	)
 	if err != nil {
@@ -577,7 +579,7 @@ func (i items) Properties(ctx context.Context, id int64) (types.Properties, erro
 // props reads the properties of the item with id, which must exist.
 func (i items) props(ctx context.Context, id int64) (types.Properties, error) {
 	out := types.Properties{}
-	err := i.s.rows(
+	err := i.s.Rows(
 		ctx,
 		"item properties",
 		"SELECT key, value FROM item_properties WHERE item_id = ? ORDER BY key, value",
@@ -585,7 +587,7 @@ func (i items) props(ctx context.Context, id int64) (types.Properties, error) {
 		func(rs *sql.Rows) error {
 			var k, v string
 			if err := rs.Scan(&k, &v); err != nil {
-				return err //nolint:wrapcheck // wrapped by rows
+				return err //nolint:wrapcheck // wrapped by Rows
 			}
 			out[k] = append(out[k], v)
 			return nil
@@ -619,11 +621,11 @@ func (i items) changeProperties(
 		if err != nil || after.Equal(before) {
 			return err
 		}
-		stamp := micros(at)
+		stamp := dialect.Micros(at)
 		if len(after) == 0 {
 			stamp = nil
 		}
-		_, err = i.s.exec(ctx, "stamp properties",
+		_, err = i.s.Exec(ctx, "stamp properties",
 			"UPDATE items SET props_modified_at = ? WHERE id = ?", stamp, id)
 		return err
 	})
@@ -633,12 +635,12 @@ func (i items) changeProperties(
 // types.PropertyValueMax; values that become equal are stored once.
 func (i items) setKeys(ctx context.Context, id int64, props types.Properties) error {
 	for k, values := range props {
-		if _, err := i.s.exec(ctx, "set property "+k,
+		if _, err := i.s.Exec(ctx, "set property "+k,
 			"DELETE FROM item_properties WHERE item_id = ? AND key = ?", id, k); err != nil {
 			return err
 		}
 		for _, v := range values {
-			if _, err := i.s.exec(
+			if _, err := i.s.Exec(
 				ctx,
 				"set property "+k,
 				InsertIgnore("item_properties", []string{"item_id", "key", "value"}, nil),
@@ -663,7 +665,7 @@ func (i items) SetProperties(
 		return fmt.Errorf("properties of item %d: %w", id, err)
 	}
 	return i.changeProperties(ctx, id, at, func(ctx context.Context) error {
-		if _, err := i.s.exec(ctx, "clear properties",
+		if _, err := i.s.Exec(ctx, "clear properties",
 			"DELETE FROM item_properties WHERE item_id = ?", id); err != nil {
 			return err
 		}
@@ -683,7 +685,7 @@ func (i items) PatchProperties(
 	}
 	return i.changeProperties(ctx, id, at, func(ctx context.Context) error {
 		for _, k := range remove {
-			if _, err := i.s.exec(ctx, "remove property "+k,
+			if _, err := i.s.Exec(ctx, "remove property "+k,
 				"DELETE FROM item_properties WHERE item_id = ? AND key = ?", id, k); err != nil {
 				return err
 			}
@@ -705,7 +707,7 @@ func (i items) Stats(ctx context.Context, id int64) (types.ItemStats, error) {
 			return err
 		}
 		var last, remoteLast sql.NullInt64
-		err := i.s.q(ctx).QueryRowContext(ctx, i.s.d.Rebind(
+		err := i.s.Q(ctx).QueryRowContext(ctx, i.s.Dialect().Rebind(
 			"SELECT "+strings.Join(
 				statsCols[1:],
 				", ",
@@ -717,8 +719,9 @@ func (i items) Stats(ctx context.Context, id int64) (types.ItemStats, error) {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil
 		}
-		out.LastDownloaded, out.RemoteLastDownloaded = fromMicros(last), fromMicros(remoteLast)
-		return i.s.wrap("item statistics", err)
+		out.LastDownloaded, out.RemoteLastDownloaded = dialect.FromMicros(last),
+			dialect.FromMicros(remoteLast)
+		return i.s.Wrap("item statistics", err)
 	})
 	return out, err
 }
@@ -728,23 +731,23 @@ func (i items) RecordDownload(ctx context.Context, id int64, d store.Download) e
 		if err := i.requireItem(ctx, id); err != nil {
 			return err
 		}
-		if _, err := i.s.exec(ctx, "record download",
+		if _, err := i.s.Exec(ctx, "record download",
 			InsertIgnore("item_stats", []string{"item_id"}, []string{"item_id"}), id); err != nil {
 			return err
 		}
 		if d.Remote {
-			_, err := i.s.exec(ctx, "record download",
+			_, err := i.s.Exec(ctx, "record download",
 				"UPDATE item_stats SET remote_download_count = remote_download_count + 1,"+
 					" remote_last_downloaded_at = ?, remote_last_downloaded_by = ?, remote_origin = ?, remote_path = ?"+
-					" WHERE item_id = ?", micros(d.At), d.By, d.Origin, d.Path, id)
+					" WHERE item_id = ?", dialect.Micros(d.At), d.By, d.Origin, d.Path, id)
 			return err
 		}
-		_, err := i.s.exec(
+		_, err := i.s.Exec(
 			ctx,
 			"record download",
 			"UPDATE item_stats SET download_count = download_count + 1, last_downloaded_at = ?, last_downloaded_by = ?"+
 				" WHERE item_id = ?",
-			micros(d.At),
+			dialect.Micros(d.At),
 			d.By,
 			id,
 		)
@@ -757,16 +760,16 @@ func (i items) PutStats(ctx context.Context, id int64, st types.ItemStats) error
 		if err := i.requireItem(ctx, id); err != nil {
 			return err
 		}
-		_, err := i.s.exec(
+		_, err := i.s.Exec(
 			ctx,
 			"put statistics",
 			Upsert("item_stats", statsCols, []string{"item_id"}),
 			id,
 			st.DownloadCount,
-			micros(st.LastDownloaded),
+			dialect.Micros(st.LastDownloaded),
 			st.LastDownloadedBy,
 			st.RemoteDownloadCount,
-			micros(st.RemoteLastDownloaded),
+			dialect.Micros(st.RemoteLastDownloaded),
 			st.RemoteLastDownloadedBy,
 			st.RemoteOrigin,
 			st.RemotePath,

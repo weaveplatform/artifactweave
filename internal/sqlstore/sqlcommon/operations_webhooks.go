@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -31,7 +32,7 @@ type webhookDoc struct {
 const webhookCols = "key, project_key, description, enabled, debug, domain, created_at, updated_at, doc"
 
 func webhookArgs(w types.WebhookSubscription) ([]any, error) {
-	doc, err := toJSON(
+	doc, err := dialect.ToJSON(
 		webhookDoc{EventTypes: w.EventTypes, Criteria: w.Criteria, Handlers: w.Handlers},
 	)
 	if err != nil {
@@ -39,7 +40,7 @@ func webhookArgs(w types.WebhookSubscription) ([]any, error) {
 	}
 	return []any{
 		w.Key, w.ProjectKey, w.Description, w.Enabled, w.Debug, w.Domain,
-		micros(w.Created), micros(w.Updated), doc,
+		dialect.Micros(w.Created), dialect.Micros(w.Updated), doc,
 	}, nil
 }
 
@@ -51,7 +52,7 @@ func secretID(key string, handler int, name string) string {
 // putSecrets replaces a subscription's sealed secrets: each handler's single
 // secret under the name "" and each custom webhook secret under its name.
 func (w webhookStore) putSecrets(ctx context.Context, v types.WebhookSubscription) error {
-	if _, err := w.s.exec(ctx, "put webhook secrets "+v.Key,
+	if _, err := w.s.Exec(ctx, "put webhook secrets "+v.Key,
 		"DELETE FROM webhook_secrets WHERE webhook_key = ?", v.Key); err != nil {
 		return err
 	}
@@ -59,11 +60,11 @@ func (w webhookStore) putSecrets(ctx context.Context, v types.WebhookSubscriptio
 		if value == "" {
 			return nil
 		}
-		sealed, err := w.s.seal(purposeWebhookSecret, secretID(v.Key, i, name), value)
+		sealed, err := w.s.Seal(purposeWebhookSecret, secretID(v.Key, i, name), value)
 		if err != nil {
 			return err
 		}
-		_, err = w.s.exec(ctx, "put webhook secret "+v.Key, Upsert("webhook_secrets",
+		_, err = w.s.Exec(ctx, "put webhook secret "+v.Key, Upsert("webhook_secrets",
 			[]string{"webhook_key", "handler_index", "name", "value"},
 			[]string{"webhook_key", "handler_index", "name"}), v.Key, i, name, sealed)
 		return err
@@ -88,7 +89,7 @@ func (w webhookStore) fillSecrets(ctx context.Context, v *types.WebhookSubscript
 		name    string
 	}
 	sealed := map[slot][]byte{}
-	err := w.s.rows(
+	err := w.s.Rows(
 		ctx,
 		"get webhook secrets "+v.Key,
 		"SELECT handler_index, name, value FROM webhook_secrets WHERE webhook_key = ?",
@@ -100,14 +101,14 @@ func (w webhookStore) fillSecrets(ctx context.Context, v *types.WebhookSubscript
 			)
 			err := r.Scan(&k.handler, &k.name, &val)
 			sealed[k] = val
-			return err //nolint:wrapcheck // wrapped by rows
+			return err //nolint:wrapcheck // wrapped by Rows
 		},
 	)
 	if err != nil {
 		return err
 	}
 	open := func(i int, name string) (string, error) {
-		return w.s.unseal(purposeWebhookSecret, secretID(v.Key, i, name), sealed[slot{i, name}])
+		return w.s.Unseal(purposeWebhookSecret, secretID(v.Key, i, name), sealed[slot{i, name}])
 	}
 	for i := range v.Handlers {
 		h := &v.Handlers[i]
@@ -134,8 +135,8 @@ func scanWebhook(row interface{ Scan(...any) error }) (types.WebhookSubscription
 		&created, &updated, &raw); err != nil {
 		return v, err //nolint:wrapcheck // wrapped by the caller
 	}
-	v.Created, v.Updated = fromMicros(created), fromMicros(updated)
-	err := fromJSON(raw, &doc)
+	v.Created, v.Updated = dialect.FromMicros(created), dialect.FromMicros(updated)
+	err := dialect.FromJSON(raw, &doc)
 	v.EventTypes, v.Criteria, v.Handlers = doc.EventTypes, doc.Criteria, doc.Handlers
 	return v, err
 }
@@ -146,10 +147,10 @@ func (w webhookStore) Create(ctx context.Context, v types.WebhookSubscription) e
 		return err
 	}
 	return w.s.Tx(ctx, func(ctx context.Context) error {
-		if _, err := w.s.exec(
+		if _, err := w.s.Exec(
 			ctx,
 			"create webhook "+v.Key,
-			Insert("webhooks", opsCols(webhookCols)),
+			Insert("webhooks", dialect.OpsCols(webhookCols)),
 			args...); err != nil {
 			return err
 		}
@@ -158,10 +159,10 @@ func (w webhookStore) Create(ctx context.Context, v types.WebhookSubscription) e
 }
 
 func (w webhookStore) Get(ctx context.Context, key string) (types.WebhookSubscription, error) {
-	v, err := scanWebhook(w.s.q(ctx).QueryRowContext(ctx,
-		w.s.d.Rebind("SELECT "+webhookCols+" FROM webhooks WHERE key = ?"), key))
+	v, err := scanWebhook(w.s.Q(ctx).QueryRowContext(ctx,
+		w.s.Dialect().Rebind("SELECT "+webhookCols+" FROM webhooks WHERE key = ?"), key))
 	if err != nil {
-		return v, w.s.wrap("get webhook "+key, err)
+		return v, w.s.Wrap("get webhook "+key, err)
 	}
 	return v, w.fillSecrets(ctx, &v)
 }
@@ -172,7 +173,7 @@ func (w webhookStore) Update(ctx context.Context, v types.WebhookSubscription) e
 		return err
 	}
 	return w.s.Tx(ctx, func(ctx context.Context) error {
-		if err := w.s.execOne(
+		if err := w.s.ExecOne(
 			ctx,
 			"update webhook "+v.Key,
 			"UPDATE webhooks SET project_key = ?, description = ?, "+
@@ -190,11 +191,11 @@ func (w webhookStore) Delete(ctx context.Context, key string) error {
 			"DELETE FROM webhook_secrets WHERE webhook_key = ?",
 			"DELETE FROM webhook_deliveries WHERE webhook_key = ?",
 		} {
-			if _, err := w.s.exec(ctx, "delete webhook "+key, q, key); err != nil {
+			if _, err := w.s.Exec(ctx, "delete webhook "+key, q, key); err != nil {
 				return err
 			}
 		}
-		return w.s.execOne(ctx, "delete webhook "+key, "DELETE FROM webhooks WHERE key = ?", key)
+		return w.s.ExecOne(ctx, "delete webhook "+key, "DELETE FROM webhooks WHERE key = ?", key)
 	})
 }
 
@@ -214,7 +215,7 @@ func (w webhookStore) List(
 		where, args = append(where, "enabled = ?"), append(args, true)
 	}
 	var out []types.WebhookSubscription
-	err := w.s.rows(ctx, "list webhooks", "SELECT "+webhookCols+" FROM webhooks WHERE "+
+	err := w.s.Rows(ctx, "list webhooks", "SELECT "+webhookCols+" FROM webhooks WHERE "+
 		strings.Join(where, " AND ")+" ORDER BY key", args, func(r *sql.Rows) error {
 		v, err := scanWebhook(r)
 		out = append(out, v)
@@ -238,7 +239,7 @@ func (w webhookStore) AddDelivery(
 	d types.WebhookDelivery,
 ) (types.WebhookDelivery, error) {
 	err := w.s.Tx(ctx, func(ctx context.Context) error {
-		ok, err := w.s.exists(
+		ok, err := w.s.Exists(
 			ctx,
 			"find webhook "+d.WebhookKey,
 			"SELECT 1 FROM webhooks WHERE key = ?",
@@ -250,18 +251,18 @@ func (w webhookStore) AddDelivery(
 		if !ok {
 			return fmt.Errorf("webhook %s: %w", d.WebhookKey, store.ErrNotFound)
 		}
-		d.ID, err = w.s.insertID(
+		d.ID, err = w.s.InsertID(
 			ctx,
 			"add delivery",
-			Insert("webhook_deliveries", opsCols(deliveryCols)),
+			Insert("webhook_deliveries", dialect.OpsCols(deliveryCols)),
 			d.WebhookKey,
 			d.EventID,
 			d.EventType,
-			micros(d.AttemptedAt),
+			dialect.Micros(d.AttemptedAt),
 			d.Status,
-			millis(d.Elapsed),
-			rawJSON(d.Request),
-			rawJSON(d.Response),
+			dialect.Millis(d.Elapsed),
+			dialect.RawJSON(d.Request),
+			dialect.RawJSON(d.Response),
 		)
 		return err
 	})
@@ -287,7 +288,7 @@ func (w webhookStore) Deliveries(
 		where, args = append(where, "attempted_at < ?"), append(args, f.To.UnixMicro())
 	}
 	var out []types.WebhookDelivery
-	err := w.s.rows(
+	err := w.s.Rows(
 		ctx,
 		"list deliveries",
 		"SELECT id, "+deliveryCols+" FROM webhook_deliveries WHERE "+
@@ -295,7 +296,7 @@ func (w webhookStore) Deliveries(
 				where,
 				" AND ",
 			)+" ORDER BY COALESCE(attempted_at, 0) DESC, id DESC LIMIT ?",
-		append(args, limitOr(f.Limit)),
+		append(args, dialect.LimitOr(f.Limit)),
 		func(r *sql.Rows) error {
 			var (
 				v         types.WebhookDelivery
@@ -314,17 +315,17 @@ func (w webhookStore) Deliveries(
 				&req,
 				&resp,
 			)
-			v.AttemptedAt, v.Elapsed = fromMicros(attempted), fromMillis(elapsed)
-			v.Request, v.Response = fromRaw(req), fromRaw(resp)
+			v.AttemptedAt, v.Elapsed = dialect.FromMicros(attempted), dialect.FromMillis(elapsed)
+			v.Request, v.Response = dialect.FromRaw(req), dialect.FromRaw(resp)
 			out = append(out, v)
-			return err //nolint:wrapcheck // wrapped by rows
+			return err //nolint:wrapcheck // wrapped by Rows
 		},
 	)
 	return out, err
 }
 
 func (w webhookStore) PruneDeliveries(ctx context.Context, before time.Time) (int64, error) {
-	return w.s.exec(
+	return w.s.Exec(
 		ctx,
 		"prune deliveries",
 		"DELETE FROM webhook_deliveries WHERE attempted_at < ?",

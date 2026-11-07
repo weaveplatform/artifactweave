@@ -97,7 +97,7 @@ func (s *Store) resealColumn(ctx context.Context, c sealedColumn) (int, error) {
 	// Read everything first: an in-memory SQLite database has one
 	// connection, which an open result set would hold while updating.
 	var rows []sealedRow
-	err := s.rows(ctx, op,
+	err := s.Rows(ctx, op,
 		"SELECT "+strings.Join(c.keys, ", ")+", "+c.column+" FROM "+c.table+
 			" WHERE "+c.column+" IS NOT NULL",
 		nil,
@@ -108,7 +108,7 @@ func (s *Store) resealColumn(ctx context.Context, c sealedColumn) (int, error) {
 				dest = append(dest, &row.key[i])
 			}
 			if err := r.Scan(append(dest, &row.value)...); err != nil {
-				return err //nolint:wrapcheck // wrapped by rows
+				return err //nolint:wrapcheck // wrapped by Rows
 			}
 			rows = append(rows, row)
 			return nil
@@ -133,7 +133,7 @@ func (s *Store) resealColumn(ctx context.Context, c sealedColumn) (int, error) {
 			continue
 		}
 		args := append(append([]any{next}, row.key...), row.value)
-		n, err := s.exec(ctx, op, update, args...)
+		n, err := s.Exec(ctx, op, update, args...)
 		if err != nil {
 			return changed, err
 		}
