@@ -1,10 +1,6 @@
-package store
+package outbox
 
-import (
-	"context"
-
-	"github.com/weaveplatform/artifactweave/pkg/types"
-)
+import "context"
 
 // OutboxStore persists the ordered event streams of decision 0021: this
 // instance's outbox, each peer's acknowledged position in it, the receiver's
@@ -14,7 +10,7 @@ type OutboxStore interface {
 	// it with Seq assigned, one more than the stream's last. Call it inside
 	// the transaction that makes the change it records; concurrent appends
 	// to one stream are serialised, never given the same Seq.
-	Append(ctx context.Context, e types.OutboxEntry) (types.OutboxEntry, error)
+	Append(ctx context.Context, e OutboxEntry) (OutboxEntry, error)
 	// Read returns up to limit entries of a stream with Seq above after, in
 	// Seq order.
 	Read(
@@ -22,7 +18,7 @@ type OutboxStore interface {
 		origin, stream string,
 		after int64,
 		limit int,
-	) ([]types.OutboxEntry, error)
+	) ([]OutboxEntry, error)
 	// LastSeq returns the highest Seq of a stream, 0 when it has none.
 	LastSeq(ctx context.Context, origin, stream string) (int64, error)
 	// Streams returns the streams origin has entries or a sequence in,
@@ -33,32 +29,33 @@ type OutboxStore interface {
 	Prune(ctx context.Context, origin, stream string, upTo int64) (int64, error)
 
 	// PutCursor creates or replaces a peer's position in a stream.
-	PutCursor(ctx context.Context, c types.PeerCursor) error
-	// Cursor returns a peer's position in a stream.
-	Cursor(ctx context.Context, peer, stream string) (types.PeerCursor, error)
+	PutCursor(ctx context.Context, c PeerCursor) error
+	// Cursor returns a peer's position in a stream; kernel.ErrNotFound when
+	// the peer has none there.
+	Cursor(ctx context.Context, peer, stream string) (PeerCursor, error)
 	// Cursors returns a peer's positions ("" for every peer) ordered by
 	// (peer, stream).
-	Cursors(ctx context.Context, peer string) ([]types.PeerCursor, error)
+	Cursors(ctx context.Context, peer string) ([]PeerCursor, error)
 	// DeleteCursors removes every position of a peer; a peer with none is
 	// not an error.
 	DeleteCursors(ctx context.Context, peer string) error
 
 	// Applied returns the receiver's position in a peer's stream; a zero
 	// LastSeq and no error when nothing was applied yet.
-	Applied(ctx context.Context, origin, stream string) (types.AppliedMarker, error)
+	Applied(ctx context.Context, origin, stream string) (AppliedMarker, error)
 	// SetApplied records the position, in the transaction that applies the
 	// entry, which is what makes applying idempotent.
-	SetApplied(ctx context.Context, m types.AppliedMarker) error
+	SetApplied(ctx context.Context, m AppliedMarker) error
 
 	// RecordFailedFetch stores a failed blob fetch with Failures 1, or
 	// increments Failures and replaces LastError of the existing one, keeping
 	// its other fields, and returns the record as stored. Failures counts
 	// the calls; the value in f is ignored.
-	RecordFailedFetch(ctx context.Context, f types.FailedBlobFetch) (types.FailedBlobFetch, error)
+	RecordFailedFetch(ctx context.Context, f FailedBlobFetch) (FailedBlobFetch, error)
 	// FailedFetches returns a stream's failed fetches ("" for every stream)
 	// ordered by (stream, sha256).
-	FailedFetches(ctx context.Context, stream string) ([]types.FailedBlobFetch, error)
-	// ClearFailedFetch removes one after a successful retry; ErrNotFound
-	// when there is none.
+	FailedFetches(ctx context.Context, stream string) ([]FailedBlobFetch, error)
+	// ClearFailedFetch removes one after a successful retry;
+	// kernel.ErrNotFound when there is none.
 	ClearFailedFetch(ctx context.Context, stream, sha256 string) error
 }

@@ -1,4 +1,4 @@
-package types
+package outbox
 
 import (
 	"errors"
@@ -57,6 +57,7 @@ func (h HLC) Merge(remote HLC, now time.Time) HLC {
 	pt := now.UnixMilli()
 	wall := max(h.Wall, remote.Wall, pt)
 	switch {
+	//nolint:gocritic // Both clocks at the merged wall time: the clock rule's first case, not a typo.
 	case wall == h.Wall && wall == remote.Wall:
 		return HLC{Wall: wall, Logical: max(h.Logical, remote.Logical) + 1}
 	case wall == h.Wall:
@@ -70,9 +71,12 @@ func (h HLC) Merge(remote HLC, now time.Time) HLC {
 
 // String renders the timestamp as fixed-width hex, so the text form sorts the
 // same way Compare does and can be stored in an indexed column.
+//
+//nolint:gosec // Unix milliseconds after 1970 are not negative; ParseHLC converts back bit for bit.
 func (h HLC) String() string { return fmt.Sprintf("%016x.%08x", uint64(h.Wall), h.Logical) }
 
-// ParseHLC reads the String form.
+// ParseHLC reads the String form. Text that is not 16 and 8 hex digits
+// around a dot gives an error that wraps ErrInvalidHLC.
 func ParseHLC(s string) (HLC, error) {
 	wall, logical, ok := strings.Cut(s, ".")
 	if !ok || len(wall) != 16 || len(logical) != 8 {
@@ -86,6 +90,7 @@ func ParseHLC(s string) (HLC, error) {
 	if err != nil {
 		return HLC{}, fmt.Errorf("%w: %q", ErrInvalidHLC, s)
 	}
+	//nolint:gosec // The inverse of String's uint64(h.Wall), so every String form reads back.
 	return HLC{Wall: int64(w), Logical: uint32(l)}, nil
 }
 
