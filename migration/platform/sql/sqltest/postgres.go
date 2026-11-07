@@ -75,8 +75,8 @@ func ScratchDSN(t *testing.T, dsn string) string {
 	t.Cleanup(func() {
 		// Registered after admin's own cleanup, so it runs before admin closes;
 		// t's context is already cancelled here.
-		drop := "DROP SCHEMA " + name + " CASCADE"
-		if _, err := admin.ExecContext(context.Background(), drop); err != nil {
+		_, err := admin.ExecContext(context.Background(), "DROP SCHEMA "+name+" CASCADE")
+		if err != nil {
 			t.Errorf("drop schema %s: %v", name, err)
 		}
 	})
