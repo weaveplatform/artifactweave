@@ -1,4 +1,4 @@
-package sqlcommon
+package dialect
 
 import (
 	"io/fs"
