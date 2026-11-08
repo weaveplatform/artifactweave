@@ -11,10 +11,7 @@ import (
 
 const SmartOriginHeader = "X-Artifactory-Originated"
 
-type (
-	smartTraceKey  struct{}
-	smartActiveKey struct{}
-)
+type smartTraceKey struct{}
 
 // SmartTrace carries only loop-prevention evidence. It grants no authority and
 // is ignored by ordinary requests. A client can use it only to deny its own
@@ -54,7 +51,7 @@ func smartEnter(ctx context.Context, identity string) (context.Context, error) {
 
 func smartHeaders(req *http.Request) {
 	trace, _ := req.Context().Value(smartTraceKey{}).([]string)
-	if active, _ := req.Context().Value(smartActiveKey{}).(bool); !active {
+	if !SmartActive(req.Context()) {
 		return
 	}
 	req.Header.Del(SmartOriginHeader)

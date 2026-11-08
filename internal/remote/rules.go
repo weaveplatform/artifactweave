@@ -58,6 +58,10 @@ func (r cacheRules) permitsStale() bool {
 	return !r.mustNotStore && !r.shouldValidate && !r.mustRevalidate
 }
 
+func MustNotStore(h http.Header) bool {
+	return parseCacheRules(h.Get("Cache-Control")).mustNotStore || !cacheableVary(h.Get("Vary"))
+}
+
 // Responses varying on state outside the representation identity cannot be
 // shared. Accept is included in that identity; no automatic compression is used.
 func cacheableVary(v string) bool {

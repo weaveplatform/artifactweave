@@ -23,7 +23,7 @@ func (p *Policy) fill(
 	opts Options,
 	key types.RemoteCacheKey,
 ) (fillResult, error) {
-	e, err := p.readEntry(ctx, key, permit)
+	e, err := p.ReadEntry(ctx, key, permit)
 	if err != nil && !errors.Is(err, store.ErrNotFound) {
 		return fillResult{key: key}, err
 	}
@@ -33,18 +33,18 @@ func (p *Policy) fill(
 	if p.fresh(q, e) {
 		return fillResult{key: key, entry: e}, nil
 	}
-	state, err := p.state(ctx, q, opts.Revision)
+	state, err := p.State(ctx, q, opts.Revision)
 	if err != nil {
 		return fillResult{key: key}, err
 	}
-	if failure := p.cooldown(state); failure != nil {
+	if failure := p.Cooldown(state); failure != nil {
 		return p.fallback(q, key, e, failure)
 	}
 	if !state.OfflineUntil.IsZero() {
 		// Recovery is source-wide. Different paths share one probe; after a
 		// successful probe each path still resolves its own representation.
 		probeKey := p.probeKey(key, permit, state)
-		filled, probeErr := p.probes.do(
+		filled, probeErr := p.probes.Do(
 			ctx,
 			probeKey,
 			func(shared context.Context) (fillResult, error) { return p.fetch(shared, q, permit, opts, key, e) },
@@ -58,11 +58,11 @@ func (p *Policy) fill(
 		if probeErr == nil {
 			probeErr = filled.failure
 		}
-		latest, stateErr := p.state(ctx, q, opts.Revision)
+		latest, stateErr := p.State(ctx, q, opts.Revision)
 		if stateErr != nil {
 			return fillResult{key: key}, stateErr
 		}
-		if failure := p.cooldown(latest); failure != nil {
+		if failure := p.Cooldown(latest); failure != nil {
 			return p.fallback(q, key, e, failure)
 		}
 		if probeErr != nil && !errors.Is(probeErr, store.ErrNotFound) {
@@ -91,7 +91,7 @@ func (p *Policy) fetch(
 	res, err := p.fetchResponse(ctx, q, permit, opts, TransportRequest(q, e))
 	if err != nil {
 		failure := PolicyError(err)
-		if stateErr := p.recordFailure(ctx, q, permit, opts.Revision, failure); stateErr != nil {
+		if stateErr := p.RecordFailure(ctx, q, permit, opts.Revision, failure); stateErr != nil {
 			return out, stateErr
 		}
 		return p.fallback(q, key, e, failure)
@@ -107,7 +107,7 @@ func (p *Policy) fetch(
 	}
 	normalizeMissing(q, res)
 	if res.StatusCode != http.StatusOK {
-		if err = p.recordResponse(ctx, q, permit, opts.Revision, res); err != nil {
+		if err = p.RecordResponse(ctx, q, permit, opts.Revision, res); err != nil {
 			return out, err
 		}
 	}
@@ -121,8 +121,7 @@ func (p *Policy) fetch(
 		out.entry, err = p.revalidate(ctx, q, permit, opts.Revision, token, e, res)
 		return out, err
 	case http.StatusOK:
-		if parseCacheRules(res.Header.Get("Cache-Control")).mustNotStore ||
-			!cacheableVary(res.Header.Get("Vary")) {
+		if MustNotStore(res.Header) {
 			// Complete the probe before recording recovery. Headers alone cannot
 			// establish that a body will survive validation or truncation.
 			candidate, cacheErr := p.cache(
@@ -131,7 +130,7 @@ func (p *Policy) fetch(
 			)
 			if cacheErr != nil {
 				failure := PolicyError(cacheErr)
-				if stateErr := p.recordFailure(
+				if stateErr := p.RecordFailure(
 					ctx,
 					q,
 					permit,
@@ -143,7 +142,7 @@ func (p *Policy) fetch(
 				return p.fallback(q, key, e, failure)
 			}
 			_ = candidate.Body.Close()
-			if err = p.recordResponse(ctx, q, permit, opts.Revision, res); err != nil {
+			if err = p.RecordResponse(ctx, q, permit, opts.Revision, res); err != nil {
 				return out, err
 			}
 			out.isTransient = true
@@ -156,13 +155,13 @@ func (p *Policy) fetch(
 	committed, err := p.cache(ctx, q, permit, opts, u)
 	if err != nil {
 		failure := PolicyError(err)
-		if stateErr := p.recordFailure(ctx, q, permit, opts.Revision, failure); stateErr != nil {
+		if stateErr := p.RecordFailure(ctx, q, permit, opts.Revision, failure); stateErr != nil {
 			return out, stateErr
 		}
 		return p.fallback(q, key, e, failure)
 	}
 	out.entry = committed.Entry
-	if err = p.recordResponse(ctx, q, permit, opts.Revision, res); err != nil {
+	if err = p.RecordResponse(ctx, q, permit, opts.Revision, res); err != nil {
 		return out, err
 	}
 	return out, nil
@@ -175,12 +174,12 @@ func (p *Policy) direct(
 	var old types.RemoteCacheEntry
 	if !noStore {
 		var err error
-		old, err = p.readEntry(ctx, key, permit)
+		old, err = p.ReadEntry(ctx, key, permit)
 		if err != nil && !errors.Is(err, store.ErrNotFound) {
 			return source.Result{}, err
 		}
 	}
-	state, err := p.state(ctx, q, opts.Revision)
+	state, err := p.State(ctx, q, opts.Revision)
 	if err != nil {
 		return source.Result{}, err
 	}
@@ -191,11 +190,11 @@ func (p *Policy) direct(
 		}
 		return p.resultFor(ctx, q, filled.entry)
 	}
-	if failure := p.cooldown(state); failure != nil {
+	if failure := p.Cooldown(state); failure != nil {
 		return fallback(failure)
 	}
 	if !state.OfflineUntil.IsZero() {
-		probe, probeErr := p.probes.do(
+		probe, probeErr := p.probes.Do(
 			ctx,
 			p.probeKey(key, permit, state),
 			func(shared context.Context) (fillResult, error) {
@@ -219,11 +218,11 @@ func (p *Policy) direct(
 		if probeErr == nil {
 			probeErr = probe.failure
 		}
-		latest, stateErr := p.state(ctx, q, opts.Revision)
+		latest, stateErr := p.State(ctx, q, opts.Revision)
 		if stateErr != nil {
 			return source.Result{}, stateErr
 		}
-		if failure := p.cooldown(latest); failure != nil {
+		if failure := p.Cooldown(latest); failure != nil {
 			return fallback(failure)
 		}
 		if probeErr != nil && !errors.Is(probeErr, store.ErrNotFound) {
@@ -255,7 +254,7 @@ func (p *Policy) directOnce(
 	res, err := p.fetchResponse(ctx, q, permit, opts, TransportRequest(q, old))
 	if err != nil {
 		failure := PolicyError(err)
-		if stateErr := p.recordFailure(ctx, q, permit, opts.Revision, failure); stateErr != nil {
+		if stateErr := p.RecordFailure(ctx, q, permit, opts.Revision, failure); stateErr != nil {
 			return source.Result{}, stateErr
 		}
 		return source.Result{}, failure
@@ -271,7 +270,7 @@ func (p *Policy) directOnce(
 	}
 	normalizeMissing(q, res)
 	if res.StatusCode != http.StatusOK || q.Resource.Method == http.MethodHead {
-		if err = p.recordResponse(ctx, q, permit, opts.Revision, res); err != nil {
+		if err = p.RecordResponse(ctx, q, permit, opts.Revision, res); err != nil {
 			return source.Result{}, err
 		}
 	}
@@ -328,12 +327,12 @@ func (p *Policy) directOnce(
 	transient, err := p.cache(ctx, q, permit, opts, u)
 	if err != nil {
 		failure := PolicyError(err)
-		if stateErr := p.recordFailure(ctx, q, permit, opts.Revision, failure); stateErr != nil {
+		if stateErr := p.RecordFailure(ctx, q, permit, opts.Revision, failure); stateErr != nil {
 			return source.Result{}, stateErr
 		}
 		return source.Result{}, failure
 	}
-	if err = p.recordResponse(ctx, q, permit, opts.Revision, res); err != nil {
+	if err = p.RecordResponse(ctx, q, permit, opts.Revision, res); err != nil {
 		_ = transient.Body.Close()
 		return source.Result{}, err
 	}

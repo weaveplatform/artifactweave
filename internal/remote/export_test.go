@@ -31,7 +31,7 @@ func (p *Policy) FlightWaiters(key string) int { return waiters(&p.flights, key)
 
 func (p *Policy) ProbeWaiters(key string) int { return waiters(&p.probes, key) }
 
-func waiters[T any](g *flightGroup[T], key string) int {
+func waiters[T any](g *FlightGroup[T], key string) int {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if f := g.active[key]; f != nil {
@@ -50,13 +50,4 @@ var (
 	ResponseBase          = responseBase
 	MetadataResponse      = metadataResponse
 	ProjectModuleLocation = projectModuleLocation
-)
-
-// The Smart registry helpers, for smart_registry_test.go: that test passes
-// the Docker slice's parser, and an in-package test importing the slice is an
-// import cycle.
-var (
-	SmartRegistryGrant = smartRegistryGrant
-	SmartPropertyPath  = smartPropertyPath
-	SmartStoragePath   = smartStoragePath
 )

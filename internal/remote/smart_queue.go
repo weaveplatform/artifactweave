@@ -150,7 +150,7 @@ func (s *Smart) currentEntry(
 	if _, err := s.policy.Store.RemoteCache().Begin(ctx, key); err != nil {
 		return types.RemoteCacheEntry{}, fmt.Errorf("smart remote state lock: %w", err)
 	}
-	entry, err := s.policy.readEntry(ctx, key, permit)
+	entry, err := s.policy.ReadEntry(ctx, key, permit)
 	if err != nil || entry.ItemID == 0 {
 		return types.RemoteCacheEntry{}, source.ErrSuperseded
 	}
@@ -194,7 +194,7 @@ func (s *Smart) restore(
 		return ctx, q, permit, opts, source.ErrDenied
 	}
 	ctx = accessapi.WithCaller(ctx, p, d)
-	ctx = context.WithValue(ctx, smartActiveKey{}, true)
+	ctx = WithSmart(ctx, true)
 	ctx = WithOutbound(ctx, Outbound{Header: smartHeaders})
 	ctx = context.WithValue(ctx, smartTraceKey{}, job.Trace)
 	ctx, err = smartEnter(ctx, s.node+"/"+string(permit.Identity.Repository))
@@ -269,7 +269,7 @@ func (s *Smart) run(ctx context.Context, workItem types.WorkItem) error {
 	}
 	peer, err := s.Discover(ctx, q, permit)
 	if err == nil {
-		release, e := s.policy.capacity.acquire(ctx, q.Repo.Key)
+		release, e := s.policy.Acquire(ctx, q.Repo.Key)
 		if e != nil {
 			return PolicyError(e)
 		}

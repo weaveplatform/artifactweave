@@ -17,15 +17,15 @@ type flight[T any] struct {
 	err     error
 }
 
-// flightGroup gives the shared operation its own context. A departing waiter
+// FlightGroup gives the shared operation its own context. A departing waiter
 // cannot cancel its peers; the last departure cancels otherwise abandoned I/O.
 // Only persisted results may be shared: an owned stream is never multicast.
-type flightGroup[T any] struct {
+type FlightGroup[T any] struct {
 	mu     sync.Mutex
 	active map[string]*flight[T]
 }
 
-func (g *flightGroup[T]) do(
+func (g *FlightGroup[T]) Do(
 	ctx context.Context,
 	key string,
 	work func(context.Context) (T, error),

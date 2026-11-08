@@ -28,7 +28,7 @@ import (
 // source.Service; CheckCurrent repeats it inside the short publication transaction
 // and verifies the effective credential revision without network access.
 type Policy struct {
-	Smart *Smart
+	Smart Interceptor
 	// Fetch overrides only the protocol exchange. Authentication adapters retain
 	// the source identity and credential revision used by this cache operation.
 	Fetch func(context.Context, source.Request, source.Permit, Options, Request) (*http.Response, error)
@@ -63,8 +63,8 @@ type Policy struct {
 	Key           []byte
 	Now           func() time.Time
 	MetadataLimit int64
-	flights       flightGroup[fillResult]
-	probes        flightGroup[fillResult]
+	flights       FlightGroup[fillResult]
+	probes        FlightGroup[fillResult]
 	capacity      admission
 }
 
@@ -82,12 +82,16 @@ func (p *Policy) now() time.Time {
 	return time.Now().UTC()
 }
 
+func (p *Policy) Acquire(ctx context.Context, repoKey string) (func(), error) {
+	return p.capacity.acquire(ctx, repoKey)
+}
+
 func (p *Policy) Read(
 	ctx context.Context,
 	q source.Request,
 	permit source.Permit,
 ) (out source.Result, retErr error) {
-	if p.Smart != nil && ctx.Value(smartActiveKey{}) == nil {
+	if p.Smart != nil && ctx.Value(smartKey{}) == nil {
 		return p.Smart.Read(ctx, q, permit)
 	}
 	var revision string
@@ -117,7 +121,7 @@ func (p *Policy) Read(
 	key := p.CacheKey(q, opts.Revision)
 	noStore := transientResource(q)
 	if !noStore {
-		entry, readErr := p.readEntry(ctx, key, permit)
+		entry, readErr := p.ReadEntry(ctx, key, permit)
 		if readErr == nil {
 			if p.negativeFresh(q, entry) {
 				return source.Result{}, store.ErrNotFound
@@ -130,9 +134,9 @@ func (p *Policy) Read(
 		}
 	}
 	responseCtx := ctx
-	ctx, cancel := metadataContext(ctx, q)
+	ctx, cancel := MetadataContext(ctx, q)
 	defer cancel()
-	release, err := p.capacity.acquire(ctx, q.Repo.Key)
+	release, err := p.Acquire(ctx, q.Repo.Key)
 	if err != nil {
 		return source.Result{}, PolicyError(err)
 	}
@@ -143,7 +147,7 @@ func (p *Policy) Read(
 		return p.direct(ctx, q, permit, opts, key, noStore)
 	}
 	flightKey := p.FlightKey(key, permit.Identity)
-	filled, err := p.flights.do(ctx, flightKey, func(shared context.Context) (fillResult, error) {
+	filled, err := p.flights.Do(ctx, flightKey, func(shared context.Context) (fillResult, error) {
 		return p.fill(shared, q, permit, opts, key)
 	})
 	if err != nil {
@@ -172,7 +176,7 @@ func transientResource(q source.Request) bool {
 		q.Repo.StoreArtifactsLocally != nil && !*q.Repo.StoreArtifactsLocally
 }
 
-func metadataContext(ctx context.Context, q source.Request) (context.Context, context.CancelFunc) {
+func MetadataContext(ctx context.Context, q source.Request) (context.Context, context.CancelFunc) {
 	if q.Resource.Kind == source.ResourceKindArtifact {
 		return ctx, func() {}
 	}
@@ -327,7 +331,7 @@ func (p *Policy) kind(q source.Request) types.RemoteKind {
 	}
 }
 
-func (p *Policy) readEntry(
+func (p *Policy) ReadEntry(
 	ctx context.Context,
 	key types.RemoteCacheKey,
 	permit source.Permit,

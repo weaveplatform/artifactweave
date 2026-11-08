@@ -37,18 +37,18 @@ func (s *Smart) request(
 	if method == http.MethodPut {
 		remotePeer := peer
 		remotePeer.Class = repo.Remote
-		if target != peer.statisticsURL() && target != remotePeer.statisticsURL() {
+		if target != statisticsURL(peer) && target != statisticsURL(remotePeer) {
 			return nil, ErrSecurity
 		}
 	}
 	if err = s.policy.Check(ctx, q, permit, opts.Revision); err != nil {
 		return nil, err
 	}
-	state, err := s.policy.state(ctx, q, opts.Revision)
+	state, err := s.policy.State(ctx, q, opts.Revision)
 	if err != nil {
 		return nil, err
 	}
-	if err = s.policy.cooldown(state); err != nil {
+	if err = s.policy.Cooldown(state); err != nil {
 		return nil, err
 	}
 	conn, err := s.pool.Connection(q.Repo, opts)
@@ -59,7 +59,7 @@ func (s *Smart) request(
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	metadata := q
 	metadata.Resource.Kind = source.ResourceKindMetadata
-	ctx, metadataCancel := metadataContext(ctx, metadata)
+	ctx, metadataCancel := MetadataContext(ctx, metadata)
 	outerCancel := cancel
 	cancel = func() { metadataCancel(); outerCancel() }
 	if err = conn.CheckURL(ctx, u); err != nil {
@@ -93,7 +93,7 @@ func (s *Smart) request(
 	if err != nil {
 		cancel()
 		failure := PolicyError(err)
-		if stateErr := s.policy.recordFailure(
+		if stateErr := s.policy.RecordFailure(
 			stateContext,
 			q,
 			permit,
@@ -104,7 +104,7 @@ func (s *Smart) request(
 		}
 		return nil, failure
 	}
-	if err = s.policy.recordResponse(ctx, q, permit, opts.Revision, res); err != nil {
+	if err = s.policy.RecordResponse(ctx, q, permit, opts.Revision, res); err != nil {
 		_ = res.Body.Close()
 		cancel()
 		return nil, err

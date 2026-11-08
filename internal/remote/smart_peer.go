@@ -20,6 +20,13 @@ type SmartPeer struct {
 	revision   string
 }
 
+func (p SmartPeer) Revision() string { return p.revision }
+
+func (p SmartPeer) WithRevision(r string) SmartPeer {
+	p.revision = r
+	return p
+}
+
 // ParseSmartPeer accepts repository endpoints, including the documented
 // api/<package>/<repository> forms. Query-bearing and ambiguous endpoint paths
 // cannot safely identify a different management API and are refused.

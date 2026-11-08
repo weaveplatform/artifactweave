@@ -71,7 +71,7 @@ type Registry struct {
 	mu          sync.Mutex
 	challenges  map[string]registryChallenge
 	tokens      map[string]registryToken
-	flights     flightGroup[registryToken]
+	flights     FlightGroup[registryToken]
 	capacity    admission
 }
 

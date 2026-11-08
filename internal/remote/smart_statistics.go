@@ -62,7 +62,7 @@ func (s *Smart) statistics(
 	if err != nil {
 		return errSmartUncertain
 	}
-	res, err := s.request(ctx, q, permit, opts, http.MethodPut, peer.statisticsURL(), body)
+	res, err := s.request(ctx, q, permit, opts, http.MethodPut, statisticsURL(peer), body)
 	if err != nil {
 		return errSmartUncertain
 	}
@@ -83,7 +83,7 @@ func (s *Smart) statistics(
 	)
 }
 
-func (p SmartPeer) statisticsURL() string {
+func statisticsURL(p SmartPeer) string {
 	key := p.Repository
 	if p.Class == repo.Remote {
 		key += types.CacheSuffix

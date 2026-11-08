@@ -11,17 +11,17 @@ import (
 )
 
 func TestAccFlightCancellationDoesNotPoisonPeers(t *testing.T) {
-	var g flightGroup[int]
+	var g FlightGroup[int]
 	var calls atomic.Int32
 	gate := new(fakeupstream.Barrier)
 	work := func(ctx context.Context) (int, error) { calls.Add(1); return 42, gate.Wait(ctx) }
 	ctx, cancel := context.WithCancel(t.Context())
 	first := make(chan error, 1)
-	go func() { _, err := g.do(ctx, "key", work); first <- err }()
+	go func() { _, err := g.Do(ctx, "key", work); first <- err }()
 	<-gate.Reached()
 	second := make(chan error, 1)
 	go func() {
-		n, err := g.do(t.Context(), "key", work)
+		n, err := g.Do(t.Context(), "key", work)
 		if n != 42 && err == nil {
 			err = ErrRequest
 		}
@@ -46,12 +46,12 @@ func TestAccFlightCancellationDoesNotPoisonPeers(t *testing.T) {
 }
 
 func TestAccLastWaiterCancelsAndNewDemandStartsFresh(t *testing.T) {
-	var g flightGroup[int]
+	var g FlightGroup[int]
 	started, stopped := make(chan struct{}), make(chan struct{})
 	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan error, 1)
 	go func() {
-		_, err := g.do(ctx, "key", func(ctx context.Context) (int, error) {
+		_, err := g.Do(ctx, "key", func(ctx context.Context) (int, error) {
 			close(started)
 			<-ctx.Done()
 			close(stopped)
@@ -63,11 +63,11 @@ func TestAccLastWaiterCancelsAndNewDemandStartsFresh(t *testing.T) {
 	cancel()
 	<-done
 	<-stopped
-	n, err := g.do(t.Context(), "key", func(context.Context) (int, error) { return 7, nil })
+	n, err := g.Do(t.Context(), "key", func(context.Context) (int, error) { return 7, nil })
 	if err != nil || n != 7 {
 		t.Fatal(n, err)
 	}
-	_, err = g.do(
+	_, err = g.Do(
 		ctx,
 		"key",
 		func(context.Context) (int, error) { t.Error("canceled request started work"); return 0, nil },

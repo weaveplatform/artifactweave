@@ -39,7 +39,7 @@ type Smart struct {
 	queue        *work.Queue
 	kind         string
 	node         string
-	discovery    flightGroup[SmartPeer]
+	discovery    FlightGroup[SmartPeer]
 	cancel       context.CancelFunc
 	workers      sync.WaitGroup
 }
@@ -142,7 +142,7 @@ func (s *Smart) Read(
 	q source.Request,
 	permit source.Permit,
 ) (source.Result, error) {
-	ctx = context.WithValue(ctx, smartActiveKey{}, false)
+	ctx = WithSmart(ctx, false)
 	if q.Resource.SmartAQL != "" &&
 		(permit.Intent == source.RetrievalIntentCacheOnly || !permit.UpstreamNetworkAllowed || enabled(q.Repo.Offline)) {
 		return source.Result{}, source.ErrUnavailable
@@ -153,7 +153,7 @@ func (s *Smart) Read(
 			!enabled(q.Repo.SynchronizeProperties) {
 		return s.policy.Read(ctx, q, permit)
 	}
-	ctx = context.WithValue(ctx, smartActiveKey{}, true)
+	ctx = WithSmart(ctx, true)
 	ctx = WithOutbound(ctx, Outbound{Header: smartHeaders})
 	ctx, err := smartEnter(ctx, s.node+"/"+string(permit.Identity.Repository))
 	if err != nil {
@@ -173,7 +173,7 @@ func (s *Smart) Read(
 	if err != nil {
 		return source.Result{}, PolicyError(err)
 	}
-	if opts.Revision != peer.revision {
+	if opts.Revision != peer.Revision() {
 		return source.Result{}, source.ErrSuperseded
 	}
 	ctx = context.WithValue(ctx, smartSessionKey{}, smartSession{peer: peer, opts: opts})
@@ -189,7 +189,7 @@ func (s *Smart) Read(
 		return out, smartError("status", err)
 	}
 	key := s.policy.CacheKey(q, opts.Revision)
-	entry, err := s.policy.readEntry(ctx, key, permit)
+	entry, err := s.policy.ReadEntry(ctx, key, permit)
 	if err != nil {
 		return source.Result{}, smartError("read", err)
 	}

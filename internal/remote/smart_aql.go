@@ -32,10 +32,10 @@ func (s *Smart) query(
 		return source.Result{}, source.ErrInvalidRequest
 	}
 	opts, err := s.policy.Options(ctx, q.Repo)
-	if err != nil || opts.Revision != peer.revision {
+	if err != nil || opts.Revision != peer.Revision() {
 		return source.Result{}, source.ErrSuperseded
 	}
-	release, err := s.policy.capacity.acquire(ctx, q.Repo.Key)
+	release, err := s.policy.Acquire(ctx, q.Repo.Key)
 	if err != nil {
 		return source.Result{}, PolicyError(err)
 	}

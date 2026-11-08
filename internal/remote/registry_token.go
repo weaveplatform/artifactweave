@@ -13,7 +13,7 @@ import (
 )
 
 func (r *Registry) token(ctx context.Context, challenge registryChallenge) (registryToken, error) {
-	return r.flights.do(ctx, challenge.key(), func(shared context.Context) (registryToken, error) {
+	return r.flights.Do(ctx, challenge.key(), func(shared context.Context) (registryToken, error) {
 		r.mu.Lock()
 		cached := r.tokens[challenge.key()]
 		r.mu.Unlock()

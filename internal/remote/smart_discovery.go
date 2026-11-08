@@ -39,8 +39,8 @@ func (s *Smart) Discover(
 	if err = s.policy.Check(ctx, q, permit, opts.Revision); err != nil {
 		return SmartPeer{}, err
 	}
-	peer.revision = opts.Revision
-	state, err := s.policy.state(ctx, q, opts.Revision)
+	peer = peer.WithRevision(opts.Revision)
+	state, err := s.policy.State(ctx, q, opts.Revision)
 	if err != nil {
 		return SmartPeer{}, err
 	}
@@ -49,7 +49,7 @@ func (s *Smart) Discover(
 		peer.Class, peer.Version = repo.Class(cached.Class), cached.Version
 		return peer, smartCapabilities(q.Repo, peer)
 	}
-	if err = s.policy.cooldown(state); err != nil {
+	if err = s.policy.Cooldown(state); err != nil {
 		return SmartPeer{}, err
 	}
 	key := s.policy.FlightKey(
@@ -60,7 +60,7 @@ func (s *Smart) Discover(
 		},
 		permit.Identity,
 	)
-	peer, err = s.discovery.do(ctx, key, func(shared context.Context) (SmartPeer, error) {
+	peer, err = s.discovery.Do(ctx, key, func(shared context.Context) (SmartPeer, error) {
 		return s.discover(shared, q, permit, opts, peer)
 	})
 	if err == nil {
@@ -85,7 +85,7 @@ func (s *Smart) discover(
 ) (SmartPeer, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
-	release, err := s.policy.capacity.acquire(ctx, q.Repo.Key)
+	release, err := s.policy.Acquire(ctx, q.Repo.Key)
 	if err != nil {
 		return SmartPeer{}, PolicyError(err)
 	}
@@ -117,7 +117,7 @@ func (s *Smart) discover(
 			if e := s.policy.Check(tx, q, permit, opts.Revision); e != nil {
 				return smartError("operation", e)
 			}
-			state, e := s.policy.state(tx, q, opts.Revision)
+			state, e := s.policy.State(tx, q, opts.Revision)
 			if e != nil {
 				return smartError("operation", e)
 			}
@@ -199,8 +199,7 @@ func (s *Smart) document(
 	if err = s.policy.Check(ctx, q, permit, opts.Revision); err != nil {
 		return nil, false, err
 	}
-	return doc, parseCacheRules(res.Header.Get("Cache-Control")).mustNotStore ||
-		!cacheableVary(res.Header.Get("Vary")), nil
+	return doc, MustNotStore(res.Header), nil
 }
 
 func smartStatus(status int) error {

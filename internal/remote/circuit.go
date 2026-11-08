@@ -12,7 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func (p *Policy) state(
+func (p *Policy) State(
 	ctx context.Context,
 	q source.Request,
 	revision string,
@@ -35,7 +35,7 @@ func (p *Policy) state(
 	return state, nil
 }
 
-func (p *Policy) cooldown(state types.RemoteSourceState) error {
+func (p *Policy) Cooldown(state types.RemoteSourceState) error {
 	now := p.now()
 	if state.RetryAfterUntil.After(now) {
 		return &source.HTTPError{
@@ -62,7 +62,7 @@ func (p *Policy) changeState(
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
 	defer cancel()
 	err := p.Store.Tx(ctx, func(tx context.Context) error {
-		state, err := p.state(tx, q, revision)
+		state, err := p.State(tx, q, revision)
 		if err != nil {
 			return err
 		}
@@ -78,7 +78,7 @@ func (p *Policy) changeState(
 	return nil
 }
 
-func (p *Policy) recordFailure(
+func (p *Policy) RecordFailure(
 	ctx context.Context,
 	q source.Request,
 	permit source.Permit,
@@ -109,7 +109,7 @@ func (p *Policy) recordFailure(
 	})
 }
 
-func (p *Policy) recordResponse(
+func (p *Policy) RecordResponse(
 	ctx context.Context,
 	q source.Request,
 	permit source.Permit,
