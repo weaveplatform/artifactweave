@@ -166,7 +166,6 @@ func (p *pom) problem(target string, integration bool) string {
 		"path is a valid Maven repository root path.", target, prefix)
 }
 
-// isPlugin reports a POM with maven-plugin packaging.
 func (p *pom) isPlugin() bool { return p.Err == nil && p.Packaging == "maven-plugin" }
 
 // hasPrefixFold is StringUtils.startsWithIgnoreCase.

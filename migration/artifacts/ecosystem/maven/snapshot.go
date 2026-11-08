@@ -186,7 +186,6 @@ func (bs builds) current() int {
 	return n
 }
 
-// find returns the first file that matches.
 func (bs builds) find(match func(snapshotFile) bool) (snapshotFile, bool) {
 	for _, f := range bs {
 		if match(f) {

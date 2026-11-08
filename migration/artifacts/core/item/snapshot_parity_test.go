@@ -9,8 +9,8 @@ import (
 
 // The item service's copy of maven.IsNonUniqueSnapshot answers as the
 // original does, on the snapshot paths of the Maven naming table
-// (migration/artifacts/ecosystem/maven/naming_test.go) and on paths of other package
-// types, which the copy judges too.
+// (migration/artifacts/ecosystem/maven/naming_test.go) and on paths of
+// other package types, which the copy judges too.
 func TestUnitNonUniqueSnapshotMatchesMaven(t *testing.T) {
 	for _, p := range []string{
 		"com/acme/app/1.0-SNAPSHOT/maven-metadata.xml",

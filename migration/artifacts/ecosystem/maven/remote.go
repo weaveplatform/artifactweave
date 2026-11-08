@@ -27,6 +27,11 @@ type SourceMetadata struct {
 	Versioning SourceVersioning `xml:"versioning"`
 }
 
+// SourceVersioning is the <versioning> of an upstream maven-metadata.xml:
+// latest and release, which resolve the [LATEST] and [RELEASE] tokens, the
+// version list an upstream version search reads, and, in a SNAPSHOT
+// version's metadata, its newest build (Snapshot) and the unique build of
+// each artifact (Snapshots). Fields the upstream leaves out are empty.
 type SourceVersioning struct {
 	Latest    string                  `xml:"latest"`
 	Release   string                  `xml:"release"`
@@ -35,11 +40,19 @@ type SourceVersioning struct {
 	Snapshots []SourceSnapshotVersion `xml:"snapshotVersions>snapshotVersion"`
 }
 
+// SourceSnapshot is a SNAPSHOT version's <snapshot>: the timestamp and
+// build number of its newest unique build. Old Maven repositories publish
+// only this, so it names the build when SourceVersioning.Snapshots is
+// empty; it says nothing of which extensions or classifiers exist.
 type SourceSnapshot struct {
 	Timestamp   string `xml:"timestamp"`
 	BuildNumber int    `xml:"buildNumber"`
 }
 
+// SourceSnapshotVersion is one <snapshotVersion>: Value is the unique
+// version (such as 1.0-20260101.120000-3) of the artifact with this
+// classifier and extension, which a request for the SNAPSHOT file
+// resolves to.
 type SourceSnapshotVersion struct {
 	Classifier string `xml:"classifier"`
 	Extension  string `xml:"extension"`

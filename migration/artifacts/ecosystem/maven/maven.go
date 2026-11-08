@@ -1,12 +1,3 @@
-// Package maven is the format of maven, gradle, ivy and sbt repositories
-// (decision 0036): Maven's naming predicates, the coordinates a repository's
-// layout reads from a path, and the package index of decision 0018, kept by
-// the hooks on every write path and rebuilt by Reindex.
-//
-// A package is groupId:artifactId, from the layout's organisation and
-// module; a version is the name of its version folder, so every unique
-// build of 1.0-SNAPSHOT is a file of that one version; and versions order
-// by types.CompareMercury, as Artifactory's metadata and searches do.
 package maven
 
 import (
