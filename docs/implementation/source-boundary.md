@@ -12,12 +12,12 @@ per-disclosed-path checks. Operational behavior is documented in
 
 ## Contracts and ownership
 
-`migration/artifacts/core/remote/source` imports no server package and does not receive a transaction or
-format write-hook environment. `pkg/types/source.go` defines durable, secret-free
-`RepositoryIncarnation`, `SourceGeneration` and tagged `SourceIdentity` records;
-[#619](https://github.com/weaveplatform/artifactweave/issues/619) owns allocation,
-persistence and atomic publication fences. Reusing a repository key or changing a
-configuration away and back must not revive old source work.
+`migration/artifacts/core/remote/source` imports no server package and does not
+receive a transaction or format write-hook environment. `pkg/types/source.go` defines
+durable, secret-free `RepositoryIncarnation`, `SourceGeneration` and tagged
+`SourceIdentity` records; [#619](https://github.com/weaveplatform/artifactweave/issues/619)
+owns allocation, persistence and atomic publication fences. Reusing a repository key or
+changing a configuration away and back must not revive old source work.
 
 `Service.Read(context.Context, Request)` applies path validation, exact Read/token
 permission, blackout and include/exclude rules before identity lookup or backend work.
@@ -97,12 +97,12 @@ protocol adapters. Docker retains its separate routing seam; P10 must compose so
 permissions and intent deliberately, and P11
 adds project graph and sharing checks without administrator loopback HTTP.
 
-Tests in `migration/artifacts/core/remote/source/source_test.go`, `internal/server/source_test.go` and
-`internal/server/pkgroute/source_test.go` exercise the service and router through
-injected backends: permission/pattern/path refusals before work, explicit intent,
-representation validation, generation/revocation races, safe protocol errors, stream
-ownership, local/federated preservation, cache/virtual isolation and an unrelated store
-write completing while a fetch is blocked. These prove the boundary, not a production
+Tests in `migration/artifacts/core/remote/source/source_test.go`,
+`internal/server/source_test.go` and `internal/server/pkgroute/source_test.go` exercise
+the service and router through injected backends: permission/pattern/path refusals
+before work, explicit intent, representation validation, generation/revocation races,
+safe protocol errors, stream ownership, local/federated preservation, cache/virtual
+isolation and an unrelated store write completing while a fetch is blocked. These prove the boundary, not a production
 fetcher by themselves. `internal/app/remote_test.go` and the generic remote acceptance
 feature additionally prove production wiring, native curl/JFrog CLI downloads, restart
 identity, signed delivery, cache visibility and revocation before publication.

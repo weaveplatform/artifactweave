@@ -15,10 +15,11 @@
 //
 // # Inputs
 //
-//   - Driving: the source service (migration/artifacts/core/remote/source), which reads a remote
-//     repository through Policy.Read once it has authorised the request;
-//     the listing and discovery callers; Smart Remote; and the format
-//     slices' upstream rules, which call the policy's exported checks.
+//   - Driving: the source service (artifacts/core/remote/source), which
+//     reads a remote repository through Policy.Read once it has authorised
+//     the request; the listing and discovery callers; Smart Remote; and the
+//     format slices' upstream rules, which call the policy's exported
+//     checks.
 //   - Driven: the Upstream and Registries ports, for every upstream
 //     exchange; source.Request and source.Permit, the authorised request
 //     and its source identity; the store (repositories, the remote cache,

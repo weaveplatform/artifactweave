@@ -57,8 +57,8 @@ func (s Remote) Read(
 }
 
 // ReadSource is the optional stream-aware extension of a protocol Source.
-// Format packages consume migration/artifacts/core/remote/source directly and never import this HTTP
-// adapter interface.
+// Format packages consume migration/artifacts/core/remote/source directly
+// and never import this HTTP adapter interface.
 type ReadSource interface {
 	Read(*http.Request, repo.Config, source.Resource) (source.Result, error)
 }

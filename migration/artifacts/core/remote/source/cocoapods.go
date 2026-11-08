@@ -21,6 +21,13 @@ type CocoaPodsGitSource struct {
 	Submodules bool   `json:"submodules,omitempty"`
 }
 
+// Validate checks g against the closed contract before any Git exchange.
+// URL must be an absolute http or https URL of at most 2,048 bytes with a
+// host and a path of plain segments, and no user information, query,
+// fragment, percent escape, backslash, NUL or line break. Tag and Branch,
+// when set, must be safe Git reference names, and Commit, when set, a
+// 40-character hexadecimal object ID other than all zeros. Anything else
+// answers ErrInvalidRequest.
 func (g CocoaPodsGitSource) Validate() error {
 	u, err := url.Parse(g.URL)
 	if err != nil || u == nil || u.Host == "" || u.User != nil ||

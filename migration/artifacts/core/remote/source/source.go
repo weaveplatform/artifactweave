@@ -1,6 +1,3 @@
-// Package source is the read boundary shared by remote package adapters. It is
-// below HTTP routing and outside format write hooks: neither a resolver nor a
-// body reader may run inside the transaction that publishes a cached item.
 package source
 
 import (
@@ -32,6 +29,11 @@ import (
 // the subset of artifacts present in the local cache.
 type ResourceKind int
 
+// The kinds of resource an adapter reads. An artifact is the bytes cached
+// and authorised at their exact path; metadata and versions are protocol
+// documents, read under the repository's metadata retrieval timeout. The
+// adapter chooses the kind, and the kind selects the remote policy's cache
+// rules, not a status.
 const (
 	ResourceKindArtifact ResourceKind = iota + 1
 	ResourceKindMetadata
@@ -132,6 +134,10 @@ type Resource struct {
 // MayFetch flight, even if another request is already filling the same path.
 type RetrievalIntent int
 
+// The retrieval intents Service.Read puts in a Permit: CacheOnly when the
+// Request is CacheOnly, which serves only what the cache already holds, and
+// MayFetch otherwise, which may fill from the upstream. A backend never
+// widens a CacheOnly permit.
 const (
 	RetrievalIntentCacheOnly RetrievalIntent = iota + 1
 	RetrievalIntentMayFetch
@@ -682,6 +688,13 @@ var (
 // FailureKind distinguishes status-bearing faults for freshness policy.
 type FailureKind int
 
+// The failure kinds an HTTPError carries, which say what failed rather than
+// which status to answer: an upstream HTTP status, an unreachable upstream,
+// a timeout, a refused destination or TLS check, bytes that failed
+// validation, or a response the protocol does not allow. The remote policy
+// reads them to decide whether a stale entry may be served and whether the
+// assumed-offline circuit counts the failure; adapters map the error to
+// their own status and envelope.
 const (
 	FailureKindHTTP FailureKind = iota + 1
 	FailureKindConnectivity
@@ -700,6 +713,8 @@ type HTTPError struct {
 	RetryAfter time.Duration
 }
 
+// Error returns "source: " and the standard text of f's Status, never the
+// upstream's body, URL or challenge, so the error is safe to log.
 func (f *HTTPError) Error() string { return "source: " + http.StatusText(f.Status) }
 
 func safeError(err error) error {
