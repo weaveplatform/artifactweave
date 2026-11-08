@@ -573,7 +573,7 @@ func TestAccReindexFaults(t *testing.T) {
 		if st != nil {
 			cfg.Store = st
 		}
-		return artifactoryService{cfg: cfg}
+		return artifactoryService{cfg: withAccess(cfg)}
 	}
 	status := func(err error) int {
 		var e *apierror.Error

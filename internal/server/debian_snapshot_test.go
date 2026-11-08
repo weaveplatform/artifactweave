@@ -88,7 +88,7 @@ func TestUnitDebianSnapshotRequiresValidRepositoriesAndPermissions(t *testing.T)
 			if tc.user != "" {
 				p = auth.Principal{Name: tc.user}
 			}
-			acc, err := accessFor(ctx, st, p, nil)
+			acc, err := accessFor(ctx, authorizerOver(st), p, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -143,7 +143,7 @@ func TestUnitDebianSnapshotPreservesCompletedAndClaimedTags(t *testing.T) {
 				t.Fatal(err)
 			}
 			p := auth.Principal{Name: "admin", Admin: true}
-			acc, err := accessFor(ctx, st, p, nil)
+			acc, err := accessFor(ctx, authorizerOver(st), p, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -21,6 +21,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/debian"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -60,7 +61,8 @@ func (s artifactoryService) CreateDebianSnapshot(
 	if err != nil {
 		return nil, err
 	}
-	acc, err := accessFor(ctx, st, p, auth.DeciderFrom(ctx))
+	d, _ := accessapi.DeciderFrom(ctx)
+	acc, err := accessFor(ctx, s.cfg.Access.Authorizer, p, d)
 	if err != nil {
 		return nil, s.internalError(ctx, "Debian snapshot access", err)
 	}
@@ -214,7 +216,7 @@ func RegisterDebianSnapshotWork(q *work.Queue, cfg Config) error {
 		if err != nil {
 			return fmt.Errorf("snapshot current permissions: %w", err)
 		}
-		acc, err := accessFor(ctx, cfg.Store, p, d)
+		acc, err := accessFor(ctx, cfg.Access.Authorizer, p, d)
 		if err != nil {
 			return fmt.Errorf("snapshot access: %w", err)
 		}

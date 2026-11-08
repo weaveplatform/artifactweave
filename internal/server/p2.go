@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/format/p2"
@@ -87,7 +86,7 @@ func (s artifactoryService) serveP2Archive(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	q := source.Request{
-		Repo: c, Subject: auth.SubjectOf(p), Access: authz.AsAPI(acc.d),
+		Repo: c, Subject: auth.SubjectOf(p), Access: acc.d,
 		Project: c.ProjectKey, CacheOnly: cached,
 		Resource: source.Resource{
 			Kind: source.ResourceKindArtifact, Path: req.path, Method: http.MethodGet,

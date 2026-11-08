@@ -7,6 +7,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -34,7 +35,8 @@ func (s artifactoryService) aqlAction(
 		want = types.ActionAnnotate
 	}
 	if !p.Admin {
-		acc, err := accessFor(ctx, st, p, auth.DeciderFrom(ctx))
+		d, _ := accessapi.DeciderFrom(ctx)
+		acc, err := accessFor(ctx, s.cfg.Access.Authorizer, p, d)
 		if err != nil {
 			return nil, err
 		}

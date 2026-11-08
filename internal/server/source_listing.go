@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
@@ -25,7 +24,7 @@ func (s artifactoryService) getRemoteFolder(w http.ResponseWriter, r *http.Reque
 		return false
 	}
 	listing, err := remote.ListFolder(r.Context(), s.cfg.RemoteSources, source.Request{
-		Repo: c, Subject: auth.SubjectOf(p), Access: authz.AsAPI(acc.d), Project: c.ProjectKey,
+		Repo: c, Subject: auth.SubjectOf(p), Access: acc.d, Project: c.ProjectKey,
 	}, req.path, &remote.ListingBudget{})
 	if err != nil {
 		writeErr(w, r, pkgroute.SourceError(err, p.Anonymous))

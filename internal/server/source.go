@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format/alpine"
 	"github.com/weaveplatform/artifactweave/internal/format/cran"
 	"github.com/weaveplatform/artifactweave/internal/format/debian"
@@ -84,7 +83,7 @@ func (s artifactoryService) getRemoteItem(w http.ResponseWriter, r *http.Request
 	query := source.Request{
 		Repo:      c,
 		Subject:   auth.SubjectOf(p),
-		Access:    authz.AsAPI(acc.d),
+		Access:    acc.d,
 		Resource:  resource,
 		Matrix:    req.matrix(),
 		Project:   c.ProjectKey,

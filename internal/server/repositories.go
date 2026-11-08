@@ -17,6 +17,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/repos"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
@@ -213,7 +214,8 @@ func (s artifactoryService) readerFor(
 	if err != nil {
 		return p, nil, err
 	}
-	acc, err := accessFor(ctx, st, p, auth.DeciderFrom(ctx))
+	d, _ := accessapi.DeciderFrom(ctx)
+	acc, err := accessFor(ctx, s.cfg.Access.Authorizer, p, d)
 	if err != nil {
 		return p, nil, s.internalError(ctx, "repository read rights", err)
 	}

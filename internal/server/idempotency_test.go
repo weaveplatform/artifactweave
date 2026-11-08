@@ -133,7 +133,7 @@ func TestAccAppendIdempotencyReplayEvaluatesCurrentPermissions(t *testing.T) {
 		t.Fatalf("request decider: %v", err)
 	}
 	ctx := auth.WithAuthorized(t.Context(), p, decider)
-	svc := artifactoryService{cfg: Config{Store: w.db, Blobs: w.blobs, Auth: a}}
+	svc := artifactoryService{cfg: withAccess(Config{Store: w.db, Blobs: w.blobs, Auth: a})}
 	appendOnce := func() error {
 		return svc.appendOnce(
 			ctx,

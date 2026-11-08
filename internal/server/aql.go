@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -139,7 +140,7 @@ func (s artifactoryService) searchAQL(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	case !p.Admin:
-		if hits, err = readable(ctx, st, p, configs, hits); err != nil {
+		if hits, err = readable(ctx, s.cfg.Access.Authorizer, p, configs, hits); err != nil {
 			writeErr(w, r, s.internalError(ctx, "aql permissions", err))
 			return
 		}
@@ -152,7 +153,7 @@ func (s artifactoryService) searchAQL(w http.ResponseWriter, r *http.Request) {
 	}
 	var related aql.Related
 	if q.Relates() {
-		n, err := nesting(ctx, st, p, configs, o.Now)
+		n, err := nesting(ctx, s.cfg.Access.Authorizer, p, configs, o.Now)
 		if err == nil {
 			related, err = q.Nest(dbctx, aql.AQLSource(st.Builds(), st.Items()), n, hits)
 		}
@@ -211,7 +212,7 @@ func (s artifactoryService) aqlFailure(
 // rows are filtered.
 func nesting(
 	ctx context.Context,
-	st store.Store,
+	az accessapi.Authorizer,
 	p auth.Principal,
 	configs map[string]repo.Config,
 	now time.Time,
@@ -220,7 +221,8 @@ func nesting(
 	if p.Admin {
 		return n, nil
 	}
-	acc, err := accessFor(ctx, st, p, auth.DeciderFrom(ctx))
+	d, _ := accessapi.DeciderFrom(ctx)
+	acc, err := accessFor(ctx, az, p, d)
 	if err != nil {
 		return n, err
 	}
@@ -311,12 +313,13 @@ func aqlRepositories(configs map[string]repo.Config) aql.Repositories {
 // reads ahead.
 func readable(
 	ctx context.Context,
-	st store.Store,
+	az accessapi.Authorizer,
 	p auth.Principal,
 	configs map[string]repo.Config,
 	hits []aql.Hit,
 ) ([]aql.Hit, error) {
-	acc, err := accessFor(ctx, st, p, auth.DeciderFrom(ctx))
+	d, _ := accessapi.DeciderFrom(ctx)
+	acc, err := accessFor(ctx, az, p, d)
 	if err != nil {
 		return nil, err
 	}

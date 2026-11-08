@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/format/rpm"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
@@ -183,7 +182,7 @@ func (s artifactoryService) serveVirtualRemoteRPMPackage(
 	q := source.Request{
 		Repo:    c,
 		Subject: auth.SubjectOf(p),
-		Access:  authz.AsAPI(acc.d),
+		Access:  acc.d,
 		Project: c.ProjectKey,
 		Resource: source.Resource{
 			Kind:   source.ResourceKindArtifact,
@@ -329,7 +328,7 @@ func (s artifactoryService) rpmMemberBytes(
 			return nil, source.ErrUnavailable
 		}
 		q := source.Request{
-			Repo: c, Subject: auth.SubjectOf(p), Access: authz.AsAPI(acc.d), Project: c.ProjectKey,
+			Repo: c, Subject: auth.SubjectOf(p), Access: acc.d, Project: c.ProjectKey,
 			Resource: source.Resource{Path: path, Method: http.MethodGet},
 		}
 		q, err := rpmSourceRequest(q)

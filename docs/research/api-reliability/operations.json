@@ -8724,8 +8724,8 @@
     "handler": "internal/server/storageinfo.go: artifactoryService.GetStorageSummaryInfo",
     "direct_calls": [
       "a.d.System",
+      "accessapi.DeciderFrom",
       "artgen.GetStorageSummaryInfo200JSONResponse",
-      "auth.DeciderFrom",
       "auth.RequireAuthenticated",
       "s.cfg.Mirrors.Status",
       "s.content",

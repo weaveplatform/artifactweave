@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format/p2"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
@@ -177,7 +176,7 @@ func (s artifactoryService) p2Read(r *http.Request, c repo.Config, cached bool,
 	q := source.Request{
 		Repo:      c,
 		Subject:   auth.SubjectOf(p),
-		Access:    authz.AsAPI(acc.d),
+		Access:    acc.d,
 		Project:   c.ProjectKey,
 		CacheOnly: cached,
 		Resource: source.Resource{

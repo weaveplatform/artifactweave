@@ -327,7 +327,7 @@ func TestAccPermissionCallerWithoutMiddleware(t *testing.T) {
 	db := inmem.New()
 	cheapSeed(t, db)
 	f := &permFault{op: "forprincipal"}
-	cfg := Config{Store: permFaultStore{Store: db, f: f}}
+	cfg := withAccess(Config{Store: permFaultStore{Store: db, f: f}})
 	ctx := auth.WithPrincipal(context.Background(), auth.Principal{Name: "admin", Admin: true})
 	_, err := permissionCaller(ctx, cfg)
 	var ae *apierror.Error

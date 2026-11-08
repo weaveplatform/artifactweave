@@ -10,6 +10,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -80,7 +81,8 @@ func (s artifactoryService) searchBuildsAQL(
 		hits = hits[:limit]
 	}
 	if !p.Admin {
-		acc, err := accessFor(ctx, st, p, auth.DeciderFrom(ctx))
+		d, _ := accessapi.DeciderFrom(ctx)
+		acc, err := accessFor(ctx, s.cfg.Access.Authorizer, p, d)
 		if err != nil {
 			writeErr(w, r, s.internalError(ctx, "aql permissions", err))
 			return
@@ -120,7 +122,7 @@ func (s artifactoryService) nestBuilds(
 	if err != nil {
 		return aql.Related{}, err
 	}
-	n, err := nesting(ctx, st, p, configs, now)
+	n, err := nesting(ctx, s.cfg.Access.Authorizer, p, configs, now)
 	if err != nil {
 		return aql.Related{}, err
 	}

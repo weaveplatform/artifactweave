@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/server/vcs"
 	"github.com/weaveplatform/artifactweave/internal/source"
@@ -85,7 +84,7 @@ func (s artifactoryService) vcsRead(
 	result, err := s.cfg.RemoteSources.Read(ctx, source.Request{
 		Repo:      a.repo,
 		Subject:   auth.SubjectOf(a.principal),
-		Access:    authz.AsAPI(a.access.d),
+		Access:    a.access.d,
 		Resource:  resource,
 		Project:   a.repo.ProjectKey,
 		CacheOnly: a.isCacheOnly,
