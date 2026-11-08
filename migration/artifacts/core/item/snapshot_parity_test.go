@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
-	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 )
 
 // The item service's copy of maven.IsNonUniqueSnapshot answers as the

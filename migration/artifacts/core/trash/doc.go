@@ -1,5 +1,5 @@
 // Package trash restores, cleans and purges the trash can (decision 0010).
-// Deleting an item moves its record here (internal/service/item), as does
+// Deleting an item moves its record here (migration/artifacts/core/item), as does
 // deleting a repository (Keep, internal/repos).
 //
 // # Role
@@ -21,7 +21,7 @@
 //     format contract suite (artifacts/core/formattest), which restores.
 //   - Driven: the metadata store, for trash entries, items and their
 //     properties, blob references, the trash can settings and transactions;
-//     and the item service (internal/service/item), which recreates restored
+//     and the item service (migration/artifacts/core/item), which recreates restored
 //     items and names the sidecars a file's format keeps with it
 //     (format.SidecarKeeper).
 //   - The trash can settings: whether it is on, and the retention period in

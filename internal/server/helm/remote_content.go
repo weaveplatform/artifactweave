@@ -16,7 +16,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	helmfmt "github.com/weaveplatform/artifactweave/internal/format/helm"
-	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/platform/archive"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )

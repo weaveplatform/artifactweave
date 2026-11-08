@@ -437,7 +437,7 @@ func apiReviewPersistence(path string) (string, string, []string) {
 				"docs/research/api-reliability/README.md#native-protocols",
 				"internal/server/server.go",
 				"internal/server/pkgroute/pkgroute.go",
-				"internal/service/item/item.go",
+				"migration/artifacts/core/item/item.go",
 				"internal/sqlstore/sqlcommon/content_items.go",
 			}
 		}

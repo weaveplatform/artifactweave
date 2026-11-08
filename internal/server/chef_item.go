@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	cheffmt "github.com/weaveplatform/artifactweave/internal/format/chef"
-	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 )
 
 // Cached metadata describes versions outside an individual caller's permission

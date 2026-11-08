@@ -15,7 +15,7 @@
 //     version (Link, Sync) or look its version up (VersionOf), their
 //     reindexers rebuild a repository's index from their reading of its tree
 //     (Reconcile), and both find the files through Stored. The item service
-//     (internal/service/item) reads the versions of the items a delete or
+//     (migration/artifacts/core/item) reads the versions of the items a delete or
 //     move takes, and prunes after it (VersionOf, Prune). The Terraform
 //     state service and the PyPI and Hugging Face protocol handlers read or
 //     link versions directly, and the download path records a version's
