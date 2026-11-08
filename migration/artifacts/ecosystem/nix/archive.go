@@ -22,6 +22,14 @@ type Archive struct {
 	NarSize  int64
 }
 
+// ReadArchive checks that input, exactly size bytes compressed as
+// compression names (none, xz, bzip2, gzip or zstd, as ArchivePath spells
+// them), decompresses to one well-formed NAR and nothing more, and returns
+// the SHA-256, as lowercase hex, and size of both. The NAR must keep the
+// grammar and zero padding, name its directory entries safely and in
+// strictly increasing order, and stay within MaxNarBytes, 100,000 nodes
+// and a depth of 128; decoders are bounded to 64 MiB of memory. Every
+// refusal, a size outside 1 to MaxArchiveBytes included, is ErrInvalid.
 func ReadArchive(input io.Reader, size int64, compression string) (Archive, error) {
 	var out Archive
 	if size <= 0 || size > MaxArchiveBytes {
@@ -197,6 +205,8 @@ func (n *narReader) directory(depth int) bool {
 	}
 }
 
+// Matches reports whether a is the archive info describes: the file and
+// NAR hashes and sizes all agree.
 func (a Archive) Matches(info Info) bool {
 	return a.FileHash == info.FileHash && a.FileSize == info.FileSize &&
 		a.NarHash == info.NarHash &&

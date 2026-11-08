@@ -1,5 +1,3 @@
-// Package hex validates Hex tarballs and extracts metadata needed by the
-// signed registry v2 protocol. It never executes metadata.config as Erlang.
 package hex
 
 import (
@@ -19,6 +17,9 @@ import (
 )
 
 const (
+	// MaxTarballBytes is the largest package tarball, 64 MiB: InspectTarball
+	// refuses a longer one before it parses anything, and the protocol
+	// applies the same bound to an upstream tarball.
 	MaxTarballBytes = 64 << 20
 	maxContentBytes = 128 << 20
 	maxTarEntries   = 20000
@@ -32,6 +33,11 @@ var (
 	)
 )
 
+// Requirement is one dependency of a release, as a tarball's
+// metadata.config and the registry's dependency records carry it: the
+// package required, its version requirement, the OTP application that
+// provides it, the registry it comes from (empty for the release's own
+// registry) and whether it is optional.
 type Requirement struct {
 	Package     string
 	Requirement string
@@ -40,6 +46,12 @@ type Requirement struct {
 	Optional    bool
 }
 
+// Package is one release of a Hex package: its name, version and
+// requirements, and the two checksums the signed registry carries for it.
+// InnerChecksum is the SHA-256 of the tarball's VERSION, metadata.config
+// and contents.tar.gz, which its CHECKSUM file must state; OuterChecksum is
+// the SHA-256 of the whole tarball, and is zero where an older signed
+// registry record leaves it out.
 type Package struct {
 	Name          string
 	Version       string
@@ -53,12 +65,22 @@ type Package struct {
 	PublishedAt     []byte
 }
 
+// Serves reports whether t is the Hex package type.
 func Serves(t repo.PackageType) bool { return t == repo.Hex }
 
+// ValidName reports whether name can name a Hex package, an OTP
+// application or a registry here: an ASCII letter followed by up to 99
+// ASCII letters, digits, underscores and hyphens.
 func ValidName(name string) bool { return nameRE.MatchString(name) }
 
+// ValidVersion reports whether version is a release version: three
+// dot-separated numbers, then an optional -pre-release and +build, each of
+// ASCII letters, digits, dots and hyphens.
 func ValidVersion(version string) bool { return versionRE.MatchString(version) }
 
+// TarballPath is the canonical path of a release's tarball,
+// tarballs/NAME-VERSION.tar, as Mix requests it; the bool is false, with an
+// empty path, when name or version is invalid.
 func TarballPath(name, version string) (string, bool) {
 	if !ValidName(name) || !ValidVersion(version) {
 		return "", false
@@ -66,6 +88,10 @@ func TarballPath(name, version string) (string, bool) {
 	return "tarballs/" + name + "-" + version + ".tar", true
 }
 
+// IsTarballPath reports whether p has the shape of a tarball path: one
+// file name ending .tar under tarballs/, with no traversal, backslash or
+// NUL. It does not check the name and version, so a write is also compared
+// with the TarballPath its tarball's own metadata gives.
 func IsTarballPath(p string) bool {
 	if !strings.HasPrefix(p, "tarballs/") || !strings.HasSuffix(p, ".tar") {
 		return false

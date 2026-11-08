@@ -1,4 +1,3 @@
-// Package nix validates Nix binary-cache metadata and archive integrity.
 package nix
 
 import (
@@ -14,14 +13,24 @@ import (
 )
 
 const (
-	MaxMetadataBytes       = 1 << 20
-	MaxArchiveBytes  int64 = 512 << 20
-	MaxNarBytes      int64 = 2 << 30
-	CacheInfo              = "StoreDir: /nix/store\nWantMassQuery: 1\nPriority: 30\n"
-	alphabet               = "0123456789abcdfghijklmnpqrsvwxyz"
+	// MaxMetadataBytes is the largest narinfo, 1 MiB.
+	MaxMetadataBytes = 1 << 20
+	// MaxArchiveBytes is the largest archive as stored and transferred,
+	// 512 MiB.
+	MaxArchiveBytes int64 = 512 << 20
+	// MaxNarBytes is the largest NAR an archive may decompress to, 2 GiB.
+	MaxNarBytes int64 = 2 << 30
+	// CacheInfo is the nix-cache-info every repository serves, and the only
+	// content a write to that path may carry. Its store directory is fixed
+	// because Parse accepts only store paths under /nix/store.
+	CacheInfo = "StoreDir: /nix/store\nWantMassQuery: 1\nPriority: 30\n"
+	alphabet  = "0123456789abcdfghijklmnpqrsvwxyz"
 )
 
 var (
+	// ErrInvalid is returned, unwrapped, for narinfo or archive content that
+	// fails a check: by Parse, ReadInfo, ReadArchive, ReferencedArchive and
+	// Info.Sign.
 	ErrInvalid = errors.New("nix: invalid binary cache content")
 	storeName  = regexp.MustCompile(
 		`^[0123456789abcdfghijklmnpqrsvwxyz]{32}-[A-Za-z0-9+._?=-]{1,211}$`,
@@ -43,6 +52,8 @@ type Info struct {
 	Signatures  []string `json:"signatures"`
 }
 
+// IsInfoPath reports whether path is a narinfo path at the cache's root: a
+// 32-character store hash in Nix's base-32 alphabet, then .narinfo.
 func IsInfoPath(path string) bool {
 	return len(path) == 40 && strings.HasSuffix(path, ".narinfo") && validBase32(path[:32])
 }
@@ -57,6 +68,9 @@ func validBase32(s string) bool {
 }
 
 // ArchivePath admits only relative content-addressed archive names, never URLs.
+// A name is nar/, a SHA-256 in hex or Nix base-32, then .nar with an
+// optional .xz, .bz2, .gz or .zst suffix. It returns the compression the
+// suffix names (none, xz, bzip2, gzip or zstd) and whether path is a name.
 func ArchivePath(path string) (string, bool) {
 	name, ok := strings.CutPrefix(path, "nar/")
 	if !ok || strings.ContainsAny(name, "/%?#\\") {
@@ -84,6 +98,15 @@ func ArchivePath(path string) (string, bool) {
 	return "", false
 }
 
+// Parse reads the narinfo stored at path and checks it whole: known fields
+// only, each once, and at most 32 well-formed Ed25519 signatures; a store
+// path under /nix/store whose hash is path's; an archive URL that
+// ArchivePath accepts, whose compression is the Compression field's (bzip2
+// when absent) and whose hash is the FileHash; positive sizes within
+// MaxNarBytes and MaxArchiveBytes; at most 4,096 distinct valid
+// references, which it sorts; and a valid deriver, if any. Hashes may be
+// hex or Nix base-32 and come back as lowercase hex. Every refusal is
+// ErrInvalid.
 func Parse(data []byte, path string) (Info, error) {
 	var info Info
 	if !IsInfoPath(path) || len(data) == 0 || len(data) > MaxMetadataBytes ||
@@ -246,6 +269,12 @@ func nativeHash(
 	return "sha256:" + Nix32(b)
 }
 
+// Fingerprint is the message a Nix signature covers, version 1 of Nix's
+// narinfo fingerprint: "1;", the store path, the NAR hash as
+// sha256:<Nix base-32>, the NAR size and the references as full store
+// paths joined by commas, separated by semicolons. The URL, compression,
+// file hash and size and the deriver are outside it, so they may change
+// without invalidating a signature.
 func (i Info) Fingerprint() []byte {
 	refs := make([]string, len(i.References))
 	for n, ref := range i.References {
@@ -264,6 +293,11 @@ func (i Info) Fingerprint() []byte {
 	)
 }
 
+// Sign adds alias's Ed25519 signature of the fingerprint to i's signatures
+// unless i already carries it: Ed25519 signatures are deterministic, so
+// signing a narinfo again on every read adds nothing. An alias other than
+// 1 to 200 ASCII letters, digits, dots, underscores and hyphens, or a key
+// of the wrong size, is ErrInvalid.
 func (i *Info) Sign(alias string, key ed25519.PrivateKey) error {
 	if !keyName.MatchString(alias) || len(key) != ed25519.PrivateKeySize {
 		return ErrInvalid
@@ -275,6 +309,9 @@ func (i *Info) Sign(alias string, key ed25519.PrivateKey) error {
 	return nil
 }
 
+// Verify reports whether one of i's signatures named alias is a valid
+// Ed25519 signature of the fingerprint by key; a key of the wrong size
+// verifies nothing.
 func (i Info) Verify(alias string, key ed25519.PublicKey) bool {
 	if len(key) != ed25519.PublicKeySize {
 		return false

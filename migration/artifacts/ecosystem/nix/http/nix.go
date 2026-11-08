@@ -1,4 +1,3 @@
-// Package nixhttp serves the native Nix HTTP binary-cache protocol.
 package nixhttp
 
 import (

@@ -20,8 +20,15 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// Handler is the format of Nix repositories, which the item service calls
+// on every write and delete in them, whichever API carried it. It admits
+// nix-cache-info, narinfo files and the archives they name only once it
+// has read them whole, keeps a published store path's signed identity and
+// an archive's bytes immutable, and indexes a store path only while its
+// narinfo and archive are both stored and agree.
 type Handler struct{ generic.Handler }
 
+// Serves reports whether t is the Nix package type.
 func Serves(t repo.PackageType) bool { return t == repo.Nix }
 
 type inspection struct {
@@ -30,6 +37,13 @@ type inspection struct {
 	archive *Archive
 }
 
+// Inspect reads a write's content before the write's transaction, so Admit
+// and Deployed decide without parsing under the write lock: nix-cache-info
+// must be exactly CacheInfo, a narinfo must parse against its path, and
+// any other path must be an archive path whose content passes ReadArchive.
+// It answers nil for a checksum write. Content that fails is refused with
+// 400, an archive whose SHA-256 is not the one its path names with 409,
+// and a blob that cannot be opened is an error.
 func (Handler) Inspect(
 	ctx context.Context,
 	env format.Env,
@@ -97,6 +111,13 @@ func inspected(
 	return in, nil
 }
 
+// Admit applies the generic deploy policy, then refuses (400) a write to
+// a repository that is not local or federated, unless it is a remote's
+// cached write, and passes a checksum write. Any other write's content is
+// checked as Inspect checks it, reusing Inspect's result for the same
+// content. A narinfo a client deploys needs its archive already stored and
+// matching (409), and a write over an existing item may change neither an
+// archive's bytes nor a store path's signed fingerprint (409).
 func (Handler) Admit(
 	ctx context.Context,
 	env format.Env,
@@ -194,6 +215,10 @@ func (Handler) GuardWrite(
 }
 
 // ReferencedArchive verifies the complete compressed and uncompressed identity.
+// It returns the archive item info names in repository c (in its cache
+// when cached) once its size and SHA-256 match and its content, read again
+// with ReadArchive, matches info. A missing item is the store's error,
+// wrapped, so callers can tell it from a mismatch, which is ErrInvalid.
 func ReferencedArchive(
 	ctx context.Context,
 	env format.Env,
@@ -220,6 +245,9 @@ func ReferencedArchive(
 	return it, nil
 }
 
+// ReadInfo parses the narinfo stored as item it, against its full path, as
+// Parse does. A blob that cannot be opened or read is a wrapped error, and
+// content that does not parse is ErrInvalid.
 func ReadInfo(ctx context.Context, env format.Env, it types.Item) (Info, error) {
 	rc, _, err := env.Blobs.Open(ctx, it.Actual.SHA256)
 	if err != nil {
@@ -233,6 +261,13 @@ func ReadInfo(ctx context.Context, env format.Env, it types.Item) (Info, error) 
 	return Parse(data, it.FullPath())
 }
 
+// Deployed checks a stored file's content as Inspect does, then indexes
+// each store path the file completes: its own narinfo once the archive it
+// names is stored and matches, or, for an archive, every narinfo that
+// names it. A version is the store hash, under a package named for the
+// rest of the store path's name, with the narinfo's Info as JSON metadata
+// and both items as its files. Folders are skipped, and nix-cache-info is
+// checked but not indexed.
 func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
 	if it.Folder {
 		return nil
@@ -293,10 +328,17 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 	})
 }
 
+// Deleted rebuilds the repository's index with Reindex, so a store path
+// whose narinfo or archive was removed leaves it.
 func (Handler) Deleted(ctx context.Context, env format.Env, c repo.Config, _ []types.Item) error {
 	return (Handler{}).Reindex(ctx, env, c)
 }
 
+// Resolve guards a generic download without rewriting its path. It applies
+// the repository's download policy and refuses every remote read (400),
+// since only the native endpoint verifies upstream content. For a narinfo
+// it also requires that the caller may read its archive (404 otherwise)
+// and that the archive is stored and matches.
 func (Handler) Resolve(
 	ctx context.Context,
 	env format.Env,
@@ -332,6 +374,9 @@ func (Handler) Resolve(
 	return d.Path, nil
 }
 
+// Classify reports narinfo files and nix-cache-info as metadata, since a
+// narinfo's signatures, deriver and archive encoding may be replaced under
+// the same path, and every archive and other file as unique.
 func (Handler) Classify(_ repo.Config, path string) format.Class {
 	if IsInfoPath(path) || path == "nix-cache-info" {
 		return format.ClassMetadata
@@ -339,6 +384,11 @@ func (Handler) Classify(_ repo.Config, path string) format.Class {
 	return format.ClassUnique
 }
 
+// Reindex rebuilds the package index of repository c from its stored
+// narinfo files (a remote's cached ones), skipping a store path whose
+// archive is missing; a narinfo or archive that no longer verifies fails
+// the reindex. It checks env.CheckReindex, when set, before it writes, and
+// then reconciles the index to the store paths it found.
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	byName := map[string]*pkgindex.Indexed{}
 	cached := c.Class == repo.Remote

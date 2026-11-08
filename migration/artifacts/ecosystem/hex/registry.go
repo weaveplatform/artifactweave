@@ -30,6 +30,11 @@ type RegistryPackage struct {
 	Advisories [][]byte
 }
 
+// ParsePublicKey reads the RSA public key an upstream registry signs with
+// (a remote repository's hexPublicKey): one PEM block of type PUBLIC KEY
+// (PKIX) or RSA PUBLIC KEY (PKCS #1), with nothing after it but white
+// space. Any other block or key type, a malformed key and a key shorter
+// than 2048 bits are refused.
 func ParsePublicKey(value string) (*rsa.PublicKey, error) {
 	block, rest := pem.Decode([]byte(value))
 	if block == nil || len(bytes.TrimSpace(rest)) != 0 {
@@ -52,6 +57,9 @@ func ParsePublicKey(value string) (*rsa.PublicKey, error) {
 	return pub, nil
 }
 
+// PublicKeyPEM is the public half of key as a PKIX PEM block of type
+// PUBLIC KEY, the form a repository's public_key resource serves and mix
+// hex.repo add reads.
 func PublicKeyPEM(key *rsa.PrivateKey) string {
 	return string(pem.EncodeToMemory(&pem.Block{
 		Type: "PUBLIC KEY", Bytes: mustPublicDER(&key.PublicKey),
@@ -63,6 +71,14 @@ func mustPublicDER(key *rsa.PublicKey) []byte {
 	return b
 }
 
+// EncodePackage builds the signed packages/NAME resource of reg: the
+// registry v2 Package message, its releases in the given order, gzipped
+// and signed with private as EncodeNames signs. A zero OuterChecksum is
+// left out, as older signed records leave it. It refuses an invalid name
+// or version, an empty repository, a release of another package or
+// without an inner checksum, a malformed requirement, retirement,
+// publication time or advisory, an advisory index past reg.Advisories,
+// and the keys and payloads EncodeNames refuses.
 func EncodePackage(reg RegistryPackage, private *rsa.PrivateKey) ([]byte, error) {
 	if !ValidName(reg.Name) || reg.Repository == "" || private == nil {
 		return nil, errRegistry
@@ -130,6 +146,13 @@ func EncodePackage(reg RegistryPackage, private *rsa.PrivateKey) ([]byte, error)
 	return sign(payload, private)
 }
 
+// DecodePackage verifies a signed packages/NAME resource against key, then
+// reads it: every release takes the package's name, and fields it does not
+// know are skipped. It refuses a bad envelope or signature, a missing or
+// repeated name or repository, an invalid name or version, a repeated
+// version, a release without a version or inner checksum, a malformed
+// requirement or message, an advisory index past the advisories, and more
+// than 10,000 releases.
 func DecodePackage(body []byte, key *rsa.PublicKey) (RegistryPackage, error) {
 	var reg RegistryPackage
 	payload, err := verify(body, key)
@@ -307,6 +330,12 @@ func decodeDependency(data []byte) (Requirement, error) {
 	return out, nil
 }
 
+// EncodeNames builds the signed names resource of repository: each name
+// once, sorted, in a registry v2 Names message, wrapped in a Signed
+// message whose signature is RSA PKCS #1 v1.5 over the payload's SHA-512,
+// and gzipped, as Mix verifies every registry resource. It sorts names in
+// place. It refuses an empty repository, an invalid or repeated name, a
+// nil key or one shorter than 2048 bits, and a payload over 16 MiB.
 func EncodeNames(repository string, names []string, private *rsa.PrivateKey) ([]byte, error) {
 	if repository == "" || private == nil {
 		return nil, errRegistry
@@ -325,6 +354,11 @@ func EncodeNames(repository string, names []string, private *rsa.PrivateKey) ([]
 	return sign(payload, private)
 }
 
+// EncodeVersions builds the signed versions resource of repository: each
+// package once, sorted by name (in place), with its releases' versions in
+// the given order, gzipped and signed as EncodeNames signs. It refuses an
+// empty repository, an invalid or repeated name, an invalid version, and
+// the keys and payloads EncodeNames refuses.
 func EncodeVersions(
 	repository string,
 	packages []RegistryPackage,

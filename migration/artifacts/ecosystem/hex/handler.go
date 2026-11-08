@@ -16,6 +16,12 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// Handler is the format of Hex repositories, which the item service calls
+// on every write and delete in them, whichever API carried it. It admits
+// only package tarballs, each at the path its own metadata gives, and keeps
+// the package index of each name's versions. The registry resources
+// (names, versions, packages/NAME and public_key) are generated and signed
+// by the protocol on each read, so no deploy may supply them.
 type Handler struct{ generic.Handler }
 
 type inspection struct {
@@ -23,6 +29,11 @@ type inspection struct {
 	pkg       Package
 }
 
+// Inspect reads a tarball write's content before the write's transaction,
+// so Admit decides without parsing under the write lock. It answers nil
+// for a checksum write and for any path that is not a tarball path. A
+// tarball that does not validate, or whose name and version do not give
+// its path, is refused with 400; a blob that cannot be opened is an error.
 func (Handler) Inspect(
 	ctx context.Context, env format.Env, _ repo.Config, w format.Write,
 ) (any, error) {
@@ -36,6 +47,13 @@ func (Handler) Inspect(
 	return inspection{sha: w.Checksums.SHA256, path: w.Path, pkg: p}, nil
 }
 
+// Admit refuses every write to a federated repository (400), since Hex has
+// no federated class, then applies the generic deploy policy, and passes a
+// checksum write. Any other write must be a tarball at its canonical
+// path: a write of a registry resource that is not cached is refused with
+// 409, and any other path, or a tarball whose name and version do not give
+// its path, with 400. It reuses Inspect's result for the same content at
+// the same path, and reads the tarball again otherwise.
 func (Handler) Admit(
 	ctx context.Context, env format.Env, c repo.Config, w format.Write,
 ) (format.Write, error) {
@@ -78,6 +96,10 @@ func (Handler) Admit(
 	return w, nil
 }
 
+// Deployed reads a stored tarball again and links its name and version
+// into the package index. Folders and other paths are not indexed. A
+// tarball that no longer validates at its path fails the hook, which rolls
+// the change back.
 func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
 	if it.Folder || !IsTarballPath(it.FullPath()) {
 		return nil
@@ -94,6 +116,11 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 	return nil
 }
 
+// Reindex rebuilds the package index of repository c from its stored
+// tarballs (Files), reading each again: a version's files are the tarballs
+// of its name and version, and each version and package takes its oldest
+// file's creation time. A stored tarball that no longer validates fails
+// the reindex instead of being dropped from the index.
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	items, err := Files(ctx, env.Store, c)
 	if err != nil {
@@ -144,6 +171,8 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 	return nil
 }
 
+// Classify reports the registry resources as derived, since every
+// repository generates and signs its own, and every other path as unique.
 func (Handler) Classify(_ repo.Config, p string) format.Class {
 	if DerivedPath(p) {
 		return format.ClassDerived
@@ -151,6 +180,8 @@ func (Handler) Classify(_ repo.Config, p string) format.Class {
 	return format.ClassUnique
 }
 
+// DerivedPath reports whether p is a registry resource the protocol
+// generates: names, versions, public_key or anything under packages/.
 func DerivedPath(p string) bool {
 	return p == "names" || p == "versions" || p == "public_key" ||
 		strings.HasPrefix(p, "packages/")
@@ -179,6 +210,9 @@ func stored(ctx context.Context, blobs format.Blobs, sha, p string) (Package, er
 	return pkg, nil
 }
 
+// Files lists the files repository c's package index reads
+// (pkgindex.Stored): a remote's cached files, or a hosted repository's
+// own, in no promised order. A search failure is returned wrapped.
 func Files(ctx context.Context, st store.Store, c repo.Config) ([]types.Item, error) {
 	hits, err := st.Items().Search(ctx, &aql.Query{Criteria: aql.And{
 		aql.RepoSet{Refs: []aql.RepoRef{pkgindex.Stored(c)}},

@@ -1,4 +1,3 @@
-// Package hexhttp serves the signed Hex registry v2 protocol.
 package hexhttp
 
 import (
@@ -27,6 +26,7 @@ import (
 // request's context, so a server binds it over the store the router kit
 // serves.
 type Options struct {
+	// RemoteSources serves remote repositories; nil answers them 501.
 	RemoteSources *source.Service
 	// KeyPairs reads the RSA key pair a repository names, which signs its
 	// names, versions and package resources and whose public key it serves.
@@ -34,6 +34,12 @@ type Options struct {
 	KeyPairs accessapi.Keys
 }
 
+// Protocol returns the Hex registry protocol for the router kit: GET and
+// HEAD of every path, for local and virtual repositories, and for remote
+// ones when o.RemoteSources is set; a class without a source answers 501.
+// The protocol resolves a virtual repository's members itself, merging
+// their readable releases into one view signed with the virtual
+// repository's key, so the virtual source answers no generic item lookup.
 func Protocol(o Options) pkgroute.Protocol {
 	sources := map[repo.Class]pkgroute.Source{
 		repo.Local: pkgroute.Local{}, repo.Virtual: virtualSource{},
