@@ -1,5 +1,3 @@
-// Package terraformbackendhttp serves the TFE-shaped API used by Terraform's
-// remote backend (decision 0041). Repository items remain its source of truth.
 package terraformbackendhttp
 
 import (

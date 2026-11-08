@@ -1,14 +1,3 @@
-// Package terraformbackend is the format of Terraform backend repositories
-// (decision 0041): the workspaces and states of Terraform's remote backend,
-// kept as items under workspaces/<ws>/ as 7.x keeps them. Its hooks keep the
-// package index, in which a workspace is a package and each state a version
-// named by its epoch milliseconds, whose metadata answers the API without
-// reading the content. The content itself is written only through the
-// Terraform backend API (migration/artifacts/core/terraformstate), which marks its
-// writes with Writing: through the item routes a deploy, a folder create, a
-// copy or move into the repository, and a change to the lock's properties
-// are refused, so nothing passes the lock or the seal. Deletes are allowed,
-// into the trash can, as for any item.
 package terraformbackend
 
 import (
