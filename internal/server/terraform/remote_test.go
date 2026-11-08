@@ -23,6 +23,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/access"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
@@ -156,6 +157,10 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 }
 
 func (f *remoteFixture) mount() {
+	m, err := access.New(access.Deps{Store: f.db, Authenticator: f.auth})
+	if err != nil {
+		f.t.Fatal(err)
+	}
 	r := chi.NewRouter()
 	r.Use(baseurl.Middleware("https://registry.test"))
 	r.Use(func(next http.Handler) http.Handler {
@@ -204,10 +209,15 @@ func (f *remoteFixture) mount() {
 		},
 		Protocol(
 			Options{
-				Keys:          f.keys,
-				Now:           func() time.Time { return f.now },
-				RemoteSources: f.svc,
-				Auth:          f.auth,
+				Keys:            f.keys,
+				Now:             func() time.Time { return f.now },
+				RemoteSources:   f.svc,
+				Authenticator:   m.API().Authenticator,
+				Authorizer:      m.API().Authorizer,
+				KeyPairs:        m.API().Keys,
+				Restrictions:    m.API().Restrictions,
+				Identity:        m.API().Identity,
+				AnonymousAccess: m.API().AnonymousAccess,
 			},
 		),
 	)

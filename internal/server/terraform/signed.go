@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -30,22 +30,22 @@ var (
 )
 
 type claims struct {
-	Provider   *providerClaim           `json:"provider,omitempty"`
-	Credential *auth.DownloadCredential `json:"credential,omitempty"`
-	Source     *types.SourceIdentity    `json:"source,omitempty"`
-	Subject    string                   `json:"sub"`
-	Repo       string                   `json:"repo"`
-	Path       string                   `json:"path"`
-	SHA256     string                   `json:"sha256"`
-	Issued     int64                    `json:"iat"`
-	Expires    int64                    `json:"exp"`
+	Provider   *providerClaim             `json:"provider,omitempty"`
+	Credential *kernel.DownloadCredential `json:"credential,omitempty"`
+	Source     *types.SourceIdentity      `json:"source,omitempty"`
+	Subject    string                     `json:"sub"`
+	Repo       string                     `json:"repo"`
+	Path       string                     `json:"path"`
+	SHA256     string                     `json:"sha256"`
+	Issued     int64                      `json:"iat"`
+	Expires    int64                      `json:"exp"`
 }
 
 func (h handler) downloadURL(r *http.Request, it types.Item) (string, error) {
 	if h.o.Keys == nil {
 		return "", apierror.ErrNotImplemented
 	}
-	p, _ := auth.FromContext(r.Context())
+	p, _ := kernel.FromContext(r.Context())
 	now := h.o.Now()
 	c := claims{
 		Subject: p.Name,
@@ -171,7 +171,7 @@ func (h handler) signed(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, err)
 		return
 	}
-	r = r.WithContext(auth.WithAuthorized(r.Context(), p, d))
+	r = r.WithContext(accessapi.WithCaller(r.Context(), p, d))
 	if !h.k.Can(r, c.Path, types.ActionRead) {
 		h.k.Error(w, r, forbidden)
 		return
@@ -181,39 +181,33 @@ func (h handler) signed(w http.ResponseWriter, r *http.Request) {
 
 // Re-evaluate the user and permission targets at download time: a URL is
 // not a grant that outlives an account or its Read permission.
-func (h handler) principal(r *http.Request, name string) (auth.Principal, *authz.Decider, error) {
-	db, ctx := h.k.DB(), r.Context()
-	p := auth.Anonymous
+func (h handler) principal(
+	r *http.Request,
+	name string,
+) (kernel.Principal, accessapi.Decider, error) {
+	ctx := r.Context()
+	p := kernel.Anonymous
 	on := false
-	if name == auth.AnonymousUser {
-		err := db.Settings().Get(ctx, types.SettingAnonymousAccess, &on)
+	if name == kernel.AnonymousUser {
+		var err error
+		on, err = h.o.AnonymousAccess.Enabled(ctx)
 		if err != nil && !errors.Is(err, store.ErrNotFound) {
 			return p, nil, fmt.Errorf("terraform: anonymous setting: %w", err)
 		}
 	} else {
-		if err := auth.CheckAPIRestriction(
-			ctx,
-			db.APIRestrictions(),
-			name,
-			time.Now(),
-		); err != nil {
+		if err := h.o.Restrictions.Check(ctx, name, time.Now()); err != nil {
 			return p, nil, fmt.Errorf("terraform: restricted download: %w", err)
 		}
-		u, err := db.Users().Get(ctx, name)
-		if errors.Is(err, store.ErrNotFound) ||
-			err == nil && u.Status != types.UserEnabled && u.Status != "" {
+		u, err := h.o.Identity.User(ctx, name)
+		if errors.Is(err, store.ErrNotFound) || err == nil && !u.Enabled() {
 			return p, nil, forbidden
 		}
 		if err != nil {
 			return p, nil, fmt.Errorf("terraform: user: %w", err)
 		}
-		p = auth.Principal{Name: u.Name, Admin: u.Admin, Groups: u.Groups}
+		p = kernel.Principal{Name: u.Name, Admin: u.Admin, Groups: u.Groups}
 	}
-	p, d, err := auth.Authorize(
-		ctx,
-		authz.Sources{Permissions: db.Permissions(), Groups: db.Groups(), AnonymousEnabled: on},
-		p,
-	)
+	p, d, err := h.o.Authorizer.Authorize(ctx, p, on)
 	if err != nil {
 		return p, nil, fmt.Errorf("terraform: authorize download: %w", err)
 	}
@@ -233,7 +227,7 @@ func (h handler) remoteDownloadURL(
 	identity types.SourceIdentity,
 	subdir, archive string,
 ) (string, error) {
-	p, _ := auth.FromContext(r.Context())
+	p, _ := kernel.FromContext(r.Context())
 	reference, err := p.DownloadReference()
 	if err != nil {
 		return "", fmt.Errorf("terraform download identity: %w", err)

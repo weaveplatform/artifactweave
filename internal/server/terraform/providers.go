@@ -358,7 +358,7 @@ func (h handler) providerKeys(r *http.Request) ([]publicKey, error) {
 			}
 			continue
 		}
-		k, err := h.k.DB().Keys().Keypair(r.Context(), name)
+		k, err := h.o.KeyPairs.Keypair(r.Context(), name)
 		if errors.Is(err, store.ErrNotFound) || err == nil && k.Type != types.KeypairGPG {
 			if i == 0 {
 				return keys, nil

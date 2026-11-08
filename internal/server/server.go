@@ -247,9 +247,16 @@ var protocols = []func(Config) pkgroute.Protocol{
 		)
 	},
 	func(cfg Config) pkgroute.Protocol {
-		return terraform.Protocol(
-			terraform.Options{Keys: cfg.Keys, RemoteSources: cfg.RemoteSources, Auth: cfg.Auth},
-		)
+		return terraform.Protocol(terraform.Options{
+			Authenticator:   cfg.Access.Authenticator,
+			Authorizer:      cfg.Access.Authorizer,
+			KeyPairs:        cfg.Access.Keys,
+			Restrictions:    cfg.Access.Restrictions,
+			Identity:        cfg.Access.Identity,
+			AnonymousAccess: cfg.Access.AnonymousAccess,
+			RemoteSources:   cfg.RemoteSources,
+			Keys:            cfg.Keys,
+		})
 	},
 	func(cfg Config) pkgroute.Protocol {
 		return helm.Protocol(

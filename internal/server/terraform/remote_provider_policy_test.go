@@ -14,11 +14,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -292,7 +292,7 @@ func TestAccRemoteProviderSignedCredentialRevocation(t *testing.T) {
 	principal, err := f.auth.RestoreDownload(
 		t.Context(),
 		"reader",
-		auth.DownloadCredential{Kind: "token", TokenID: token.ID},
+		kernel.DownloadCredential{Kind: "token", TokenID: token.ID},
 		f.db.Tokens(),
 	)
 	if err != nil {

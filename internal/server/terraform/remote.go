@@ -13,11 +13,10 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	tf "github.com/weaveplatform/artifactweave/internal/format/terraform"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/platform/archive"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -386,33 +385,20 @@ func moduleArtifactResource(r *http.Request, m tf.Module, s moduleSource) source
 }
 
 func (h handler) remoteSignedModule(w http.ResponseWriter, r *http.Request, c claims) {
-	if h.o.Auth == nil || c.Credential == nil {
+	if h.o.Authenticator == nil || c.Credential == nil {
 		h.k.Error(w, r, forbidden)
 		return
 	}
-	principal, err := h.o.Auth.RestoreDownload(
-		r.Context(),
-		c.Subject,
-		*c.Credential,
-		h.k.DB().Tokens(),
-	)
-	var d *authz.Decider
+	principal, err := h.o.Authenticator.RestoreDownload(r.Context(), c.Subject, *c.Credential)
+	var d accessapi.Decider
 	if err == nil {
-		principal, d, err = auth.Authorize(
-			r.Context(),
-			authz.Sources{
-				Permissions:      h.k.DB().Permissions(),
-				Groups:           h.k.DB().Groups(),
-				AnonymousEnabled: principal.Anonymous,
-			},
-			principal,
-		)
+		principal, d, err = h.o.Authorizer.Authorize(r.Context(), principal, principal.Anonymous)
 	}
 	if err != nil {
 		h.k.Error(w, r, forbidden)
 		return
 	}
-	ctx := auth.WithAuthorized(r.Context(), principal, d)
+	ctx := accessapi.WithCaller(r.Context(), principal, d)
 	r = r.WithContext(ctx)
 	if !h.k.Require(w, r, c.Path, types.ActionRead) {
 		return
