@@ -14,7 +14,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/server/huggingface"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
-	"github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -50,11 +50,7 @@ func newMigrationPolicyWorld(t *testing.T) *migrationPolicyWorld {
 	}
 	f := &fixture{t: t, db: db, items: items}
 	f.legacyRevision("models", "1700000000", sha, false)
-	m, err := access.New(access.Deps{Store: db})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return &migrationPolicyWorld{f: f, access: m.API()}
+	return &migrationPolicyWorld{f: f, access: accesstest.Over(t, db).API()}
 }
 
 // migrate posts, as the administrator, the migration of the legacy revision
