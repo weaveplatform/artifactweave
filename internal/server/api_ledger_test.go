@@ -417,7 +417,7 @@ func apiReviewPersistence(path string) (string, string, []string) {
 		strings.HasPrefix(path, "/artifactory/api/v2/repositories") {
 		return "repository", "legacy arrays remain complete; store keysets are collected and filtered; not bounded by client page size", []string{
 			"internal/server/repositories.go",
-			"internal/repos/repos.go",
+			"migration/artifacts/core/repos/repos.go",
 			"internal/sqlstore/sqlcommon/content.go",
 		}
 	}

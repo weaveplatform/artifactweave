@@ -18,7 +18,7 @@
 // # Inputs
 //
 // None: the package holds interfaces, two values and a pure function. The
-// artifacts module implements the interfaces: internal/repos's
+// artifacts module implements the interfaces: migration/artifacts/core/repos's
 // NewRepositories binds Repositories over the store and access's Keys and
 // Projects, and artifacts/core/layout's Checker implements Layouts.
 //
@@ -59,7 +59,7 @@
 //     repo, Repositories and Layouts, and no Settings), "Dependency rules"
 //     and "Names the migration introduces".
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
-//     lines 174 to 185 (artifacts/api), line 1015 (internal/repos published
+//     lines 174 to 185 (artifacts/api), line 1015 (migration/artifacts/core/repos published
 //     as api.Repositories) and line 1053 (the layout engine published
 //     through api.Layouts).
 //   - Decision 0003: docs/research/decisions/0003-repository-model.md
@@ -89,7 +89,7 @@
 //
 //   - TestUnitIsNull: null with and without surrounding white space, and
 //     values that are not null.
-//   - The implementations are tested where they live: internal/repos's
+//   - The implementations are tested where they live: migration/artifacts/core/repos's
 //     TestUnitRepositories* tests, one per Repositories method, and
 //     artifacts/core/layout's TestUnitLayoutCheckerMatchesCompile.
 package api

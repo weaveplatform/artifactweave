@@ -1508,7 +1508,7 @@
     "pagination_execution": "legacy arrays remain complete; store keysets are collected and filtered; not bounded by client page size",
     "evidence": [
       "internal/server/repositories.go",
-      "internal/repos/repos.go",
+      "migration/artifacts/core/repos/repos.go",
       "internal/sqlstore/sqlcommon/content.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
@@ -2048,7 +2048,7 @@
     "pagination_execution": "legacy arrays remain complete; store keysets are collected and filtered; not bounded by client page size",
     "evidence": [
       "internal/server/repositories.go",
-      "internal/repos/repos.go",
+      "migration/artifacts/core/repos/repos.go",
       "internal/sqlstore/sqlcommon/content.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
@@ -7202,7 +7202,7 @@
     "pagination_execution": "legacy arrays remain complete; store keysets are collected and filtered; not bounded by client page size",
     "evidence": [
       "internal/server/repositories.go",
-      "internal/repos/repos.go",
+      "migration/artifacts/core/repos/repos.go",
       "internal/sqlstore/sqlcommon/content.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
@@ -7245,7 +7245,7 @@
     "pagination_execution": "legacy arrays remain complete; store keysets are collected and filtered; not bounded by client page size",
     "evidence": [
       "internal/server/repositories.go",
-      "internal/repos/repos.go",
+      "migration/artifacts/core/repos/repos.go",
       "internal/sqlstore/sqlcommon/content.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
@@ -7276,7 +7276,7 @@
     "pagination_execution": "legacy arrays remain complete; store keysets are collected and filtered; not bounded by client page size",
     "evidence": [
       "internal/server/repositories.go",
-      "internal/repos/repos.go",
+      "migration/artifacts/core/repos/repos.go",
       "internal/sqlstore/sqlcommon/content.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
@@ -7310,7 +7310,7 @@
     "pagination_execution": "legacy arrays remain complete; store keysets are collected and filtered; not bounded by client page size",
     "evidence": [
       "internal/server/repositories.go",
-      "internal/repos/repos.go",
+      "migration/artifacts/core/repos/repos.go",
       "internal/sqlstore/sqlcommon/content.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
@@ -7352,7 +7352,7 @@
     "pagination_execution": "legacy arrays remain complete; store keysets are collected and filtered; not bounded by client page size",
     "evidence": [
       "internal/server/repositories.go",
-      "internal/repos/repos.go",
+      "migration/artifacts/core/repos/repos.go",
       "internal/sqlstore/sqlcommon/content.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
@@ -9646,7 +9646,7 @@
     "pagination_execution": "legacy arrays remain complete; store keysets are collected and filtered; not bounded by client page size",
     "evidence": [
       "internal/server/repositories.go",
-      "internal/repos/repos.go",
+      "migration/artifacts/core/repos/repos.go",
       "internal/sqlstore/sqlcommon/content.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
@@ -9694,7 +9694,7 @@
     "pagination_execution": "legacy arrays remain complete; store keysets are collected and filtered; not bounded by client page size",
     "evidence": [
       "internal/server/repositories.go",
-      "internal/repos/repos.go",
+      "migration/artifacts/core/repos/repos.go",
       "internal/sqlstore/sqlcommon/content.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
@@ -17188,7 +17188,7 @@
     "pagination_execution": "legacy arrays remain complete; store keysets are collected and filtered; not bounded by client page size",
     "evidence": [
       "internal/server/repositories.go",
-      "internal/repos/repos.go",
+      "migration/artifacts/core/repos/repos.go",
       "internal/sqlstore/sqlcommon/content.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
@@ -18886,7 +18886,7 @@
     "pagination_execution": "legacy arrays remain complete; store keysets are collected and filtered; not bounded by client page size",
     "evidence": [
       "internal/server/repositories.go",
-      "internal/repos/repos.go",
+      "migration/artifacts/core/repos/repos.go",
       "internal/sqlstore/sqlcommon/content.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
@@ -21357,7 +21357,7 @@
     "pagination_execution": "legacy arrays remain complete; store keysets are collected and filtered; not bounded by client page size",
     "evidence": [
       "internal/server/repositories.go",
-      "internal/repos/repos.go",
+      "migration/artifacts/core/repos/repos.go",
       "internal/sqlstore/sqlcommon/content.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
@@ -21835,7 +21835,7 @@
     "pagination_execution": "legacy arrays remain complete; store keysets are collected and filtered; not bounded by client page size",
     "evidence": [
       "internal/server/repositories.go",
-      "internal/repos/repos.go",
+      "migration/artifacts/core/repos/repos.go",
       "internal/sqlstore/sqlcommon/content.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"

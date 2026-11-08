@@ -10,12 +10,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/repos"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
