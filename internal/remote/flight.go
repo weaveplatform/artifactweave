@@ -98,7 +98,9 @@ type admissionState struct{ active, queued int }
 
 // Admission bounds active work and queued callers without creating a goroutine
 // for each blocked request. A single notification wakes contenders to recheck
-// under the mutex; no repository reserves a global slot while it is full.
+// under the mutex; no repository reserves a global slot while it is full. Its
+// zero value is ready to use, with at most 8 active callers per key, 64 in
+// all and 256 queued per key; it must not be copied after first use.
 type Admission struct {
 	mu                     sync.Mutex
 	changed                chan struct{}
@@ -107,6 +109,9 @@ type Admission struct {
 	perRepo, global, queue int
 }
 
+// Acquire waits for a slot for repoKey and returns its release, which is
+// safe to call more than once. It answers ErrBusy at once when repoKey's
+// queue is full, and the context's error, wrapped, when ctx ends first.
 func (a *Admission) Acquire(ctx context.Context, repoKey string) (func(), error) {
 	a.mu.Lock()
 	if a.changed == nil {

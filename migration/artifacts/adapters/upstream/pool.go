@@ -25,6 +25,10 @@ type Pool struct {
 	isClosed bool
 }
 
+// Client returns the pooled client of repository c, or builds one with
+// NewClient when c's configuration or opts.Revision changed since the last,
+// closing the client it replaces. It answers remote.ErrClosed after Close,
+// and NewClient's errors. Safe for concurrent use.
 func (p *Pool) Client(c repo.Config, opts remote.Options) (*Client, error) {
 	b, err := json.Marshal(c)
 	if err != nil {
@@ -56,9 +60,9 @@ func (p *Pool) Client(c repo.Config, opts remote.Options) (*Client, error) {
 }
 
 // Connection returns Client(c, opts) as the Upstream port's Connection, with
-// Client's errors, ErrClosed after Close among them. On error it returns a
-// literal nil, never a nil *Client inside the interface, which would compare
-// unequal to nil.
+// Client's errors, remote.ErrClosed after Close among them. On error it
+// returns a literal nil, never a nil *Client inside the interface, which
+// would compare unequal to nil.
 func (p *Pool) Connection(c repo.Config, opts remote.Options) (remote.Connection, error) {
 	client, err := p.Client(c, opts)
 	if err != nil {
@@ -67,6 +71,8 @@ func (p *Pool) Connection(c repo.Config, opts remote.Options) (remote.Connection
 	return client, nil
 }
 
+// Remove closes and forgets the client of the repository named key, for a
+// deleted repository; a later Client builds a new one.
 func (p *Pool) Remove(key string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -76,6 +82,8 @@ func (p *Pool) Remove(key string) {
 	}
 }
 
+// Close closes every pooled client, for application shutdown; every later
+// Client answers remote.ErrClosed.
 func (p *Pool) Close() {
 	p.mu.Lock()
 	defer p.mu.Unlock()

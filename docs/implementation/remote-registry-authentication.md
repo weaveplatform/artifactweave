@@ -1,6 +1,7 @@
 # Upstream registry authentication
 
-`internal/remote.Registry` implements the authentication foundation for
+`Registry` in the transport adapter (`migration/artifacts/adapters/upstream`)
+implements the authentication foundation for
 [#623](https://github.com/weaveplatform/artifactweave/issues/623). It performs
 Distribution v2 discovery and read-only Basic/Bearer challenge exchanges using the
 [shared HTTP transport](remote-http-transport.md) and resolved source security.

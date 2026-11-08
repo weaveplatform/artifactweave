@@ -16,8 +16,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/upstreamtest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -34,7 +34,7 @@ type policyWorld struct {
 	clock  *fakeupstream.Clock
 	up     *fakeupstream.Server
 	p      *remote.Policy
-	pool   *upstream.Pool
+	pool   interface{ Remove(string) }
 	c      repo.Config
 	permit source.Permit
 }
@@ -58,7 +58,7 @@ func policyFixture(t *testing.T) *policyWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pool := new(upstream.Pool)
+	pool := upstreamtest.NewPool(t)
 	p := &remote.Policy{
 		Store: db,
 		Blobs: blobs,
@@ -72,7 +72,6 @@ func policyFixture(t *testing.T) *policyWorld {
 			return remote.Options{Revision: "credential-1"}, nil
 		},
 	}
-	t.Cleanup(pool.Close)
 	return &policyWorld{
 		t:     t,
 		db:    db,

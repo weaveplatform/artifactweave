@@ -49,6 +49,11 @@ type ResolverOptions struct {
 	Certificates accessapi.Keys
 }
 
+// Resolver turns a stored repository configuration into the transport's
+// remote.Options: its sealed credentials, headers, cookies, client
+// certificate and proxy, the destination policy, and the credential
+// revision that fences the remote cache against credential changes. It is
+// safe for concurrent use.
 type Resolver struct {
 	store   store.Store
 	key     []byte
@@ -56,6 +61,12 @@ type Resolver struct {
 	options ResolverOptions
 }
 
+// NewResolver returns the resolver over st. The credential revision key is
+// derived from keyring when there is one, else it is opts.RevisionKey, which
+// must then be at least 32 bytes and not all zero; otherwise, without a
+// store, or with an AllowedPrivateOrigins entry that is no checked URL, it
+// answers remote.ErrConfiguration. Root certificates that cannot be loaded
+// answer remote.ErrSecurity.
 func NewResolver(st store.Store, keyring *crypt.Keyring, opts ResolverOptions) (*Resolver, error) {
 	if st == nil || keyring == nil && len(opts.RevisionKey) < 32 {
 		return nil, remote.ErrConfiguration

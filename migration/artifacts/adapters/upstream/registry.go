@@ -18,6 +18,11 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// ErrRegistryChallenge reports an upstream registry's authentication
+// challenge that the registry client cannot answer: a malformed
+// WWW-Authenticate header, or a Bearer challenge to a repository without
+// token authentication. Its text keeps the remote: prefix of the
+// transport's other sentinels.
 var ErrRegistryChallenge = errors.New("remote: invalid upstream registry authentication challenge")
 
 // RegistryOptions comes from Resolver.RegistryOptions, never downstream headers.
@@ -76,6 +81,13 @@ type Registry struct {
 	capacity    remote.Admission
 }
 
+// NewRegistry builds the registry client of remote Docker, OCI or Helm OCI
+// repository c under opts, which Resolver.RegistryOptions returns: a
+// Distribution v2 client whose own Prepare replaces any Authorization with
+// the scoped Basic or Bearer exchange, and which keeps no cookies. A
+// repository of another class or type, options without Prepare, CheckURL or
+// a revision, an unsupported Docker API version or an invalid project ID is
+// refused with remote.ErrConfiguration.
 func NewRegistry(c repo.Config, opts RegistryOptions) (*Registry, error) {
 	if c.Class != repo.Remote ||
 		(c.PackageType != repo.Docker && c.PackageType != repo.OCI && c.PackageType != repo.HelmOCI) ||
@@ -318,6 +330,7 @@ func (r *Registry) checkRealm(ctx context.Context, raw string) error {
 	return nil
 }
 
+// Close releases the registry client's idle connections.
 func (r *Registry) Close() { r.client.Close() }
 
 // Base returns a copy of the registry's base URL, so that no caller can
@@ -340,6 +353,12 @@ type RegistryPool struct {
 	isClosed bool
 }
 
+// Client returns the pooled registry client of repository c for the source
+// identity, or builds one with NewRegistry when c, the identity or the
+// credential revision changed, closing the one it replaces, so its tokens
+// and challenges start empty. An identity that is not a complete external
+// HTTP source answers remote.ErrConfiguration, a closed pool
+// remote.ErrClosed.
 func (p *RegistryPool) Client(
 	c repo.Config,
 	identity types.SourceIdentity,
@@ -376,6 +395,8 @@ func (p *RegistryPool) Client(
 	return registry, nil
 }
 
+// Remove closes and forgets the registry client of the repository named
+// key, with its tokens.
 func (p *RegistryPool) Remove(key string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -439,6 +460,8 @@ func (r *RegistryClients) Foreign(
 	return client.Do(ctx, q)
 }
 
+// Close closes every pooled registry client, for application shutdown;
+// every later Client answers remote.ErrClosed.
 func (p *RegistryPool) Close() {
 	p.mu.Lock()
 	defer p.mu.Unlock()

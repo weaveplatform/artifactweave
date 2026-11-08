@@ -11,8 +11,10 @@
 // artifacts module, test support at the adapter layer: controlled upstream
 // registries for remote tests. Test files in any module may import it
 // (dependency rule 1); production code never does. It is a package of its
-// own beneath artifacts/adapters/upstream, where the target layout puts the
-// upstream transport, and it imports only chi and the standard library.
+// own beneath the upstream transport (artifacts/adapters/upstream), whose
+// tests, like core remote's and the slices', send to its servers; it
+// imports only chi and the standard library, never the transport, so that
+// any test may use it.
 //
 // # Inputs
 //
@@ -88,9 +90,9 @@
 // (https://github.com/weaveplatform/artifactweave/issues/618). P9c added
 // Resource.Method, for the POST of a Git fetch
 // (https://github.com/weaveplatform/artifactweave/issues/771). Staged in
-// P9d. Roadmap: the upstream transport moves into the parent directory as
-// package upstream
-// (https://github.com/weaveplatform/artifactweave/issues/1026).
+// P9d, beneath the transport that
+// https://github.com/weaveplatform/artifactweave/issues/1026 moved into the
+// parent directory.
 //
 // # Testing
 //

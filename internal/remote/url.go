@@ -1,5 +1,3 @@
-// Package remote owns outbound HTTP for remote repositories. Callers must
-// authorize the repository and path before consulting either cache or upstream.
 package remote
 
 import (
@@ -17,6 +15,10 @@ var (
 	ErrSecurity      = errors.New("remote: transport security validation failed")
 )
 
+// BaseURL parses a remote repository's configured URL: absolute http or
+// https with a host, and no user information, fragment or opaque part.
+// Anything else answers ErrURL. Unlike CheckedURL it does not judge the
+// host, port or path; the transport does that when it connects.
 func BaseURL(raw string) (*url.URL, error) {
 	u, err := url.Parse(raw)
 	if err != nil || u.Hostname() == "" || (u.Scheme != "http" && u.Scheme != "https") ||

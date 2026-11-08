@@ -19,7 +19,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/upstreamtest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
@@ -87,14 +87,7 @@ func smartFixture(t *testing.T) *smartWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resolver, err := upstream.NewResolver(
-		w.db,
-		nil,
-		upstream.ResolverOptions{RevisionKey: []byte("smart-test-only-credential-revision-key")},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	resolver := upstreamtest.NewResolver(t, w.db, []byte("smart-test-only-credential-revision-key"))
 	w.p.Options = resolver.Options
 	w.p.CheckCurrent = func(ctx context.Context, _ store.Store, q source.Request, permit source.Permit, revision string) error {
 		current, err := w.db.Repos().Get(ctx, q.Repo.Key)

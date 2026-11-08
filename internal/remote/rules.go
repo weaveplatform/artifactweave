@@ -79,6 +79,11 @@ func cacheableVary(v string) bool {
 	return true
 }
 
+// RetryAfter reads a Retry-After header value, in seconds or as an HTTP
+// date measured from now, and bounds the pause to between 1 and 300
+// seconds; an empty or unreadable value means 1 second. The circuit, the
+// policy's 429 answers and the registry token exchange share it, so every
+// upstream pause is bounded alike.
 func RetryAfter(raw string, now time.Time) time.Duration {
 	d := time.Second
 	if seconds, err := strconv.ParseInt(strings.TrimSpace(raw), 10, 32); err == nil {

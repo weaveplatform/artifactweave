@@ -32,6 +32,12 @@ type Client struct {
 
 type noCrossOriginAuthKey struct{}
 
+// NewClient builds the client of repository c under its resolved options,
+// as a Pool does for each configuration and credential revision. It copies
+// c's pointer-valued settings, so a later change to c never reaches the
+// client. An invalid repository URL is refused with remote.ErrURL; a
+// negative timeout, a local address that is no IP address or a proxy that
+// is neither HTTP nor HTTPS with remote.ErrConfiguration.
 func NewClient(c repo.Config, opts remote.Options) (*Client, error) {
 	// Snapshot pointer-valued settings: a caller applying a new configuration
 	// must not mutate an active client's path or timeout policy.
@@ -156,6 +162,17 @@ func redirectPolicy(opts remote.Options) func(*http.Request, []*http.Request) er
 	}
 }
 
+// Do sends r, a GET or HEAD relative to the repository URL, or to
+// r.ExternalURL when the client has a CheckURL, and returns the response
+// whatever its status; the caller owns and closes its body. The only POSTs
+// it admits are a closed set of protocol exchanges (the VS Code gallery
+// query, the Git LFS batch call and a CocoaPods Git upload-pack), each with
+// its exact path, size and Accept header. It applies the request's and the
+// options' checks, the credential preparation, the metadata deadline to a
+// metadata request, and the WithOutbound hooks. A refused request answers
+// remote.ErrRequest or remote.ErrSecurity; a transport failure comes back
+// classified, without the URL or headers it carried.
+//
 //nolint:gocyclo // Preserves transport guards while admitting closed protocol-specific POSTs.
 func (c *Client) Do(ctx context.Context, r remote.Request) (*http.Response, error) {
 	gitPOST := r.GitUploadPack && r.Method == http.MethodPost &&
@@ -358,6 +375,8 @@ func (c *Client) fetch(ctx context.Context, r remote.Request) (*http.Response, e
 	return c.Do(ctx, r)
 }
 
+// Close releases the client's idle connections; requests in flight finish
+// on their own connections.
 func (c *Client) Close() { c.close() }
 
 // http.Client errors embed URLs, including signed query strings. Preserve only
@@ -479,12 +498,13 @@ func (c *Client) requestClient(ctx context.Context, r remote.Request) *http.Clie
 	return &client
 }
 
-// Guarded reports whether c was built with Options.CheckURL, the check that
-// every absolute destination taken from metadata must pass.
+// Guarded reports whether c was built with remote.Options.CheckURL, the
+// check that every absolute destination taken from metadata must pass.
 func (c *Client) Guarded() bool { return c.checkURL != nil }
 
-// CheckURL applies Options.CheckURL to u, and returns ErrSecurity when c has
-// none, so that an unguarded client never vouches for a destination.
+// CheckURL applies remote.Options.CheckURL to u, and returns
+// remote.ErrSecurity when c has none, so that an unguarded client never
+// vouches for a destination.
 func (c *Client) CheckURL(ctx context.Context, u *url.URL) error {
 	if c.checkURL == nil {
 		return remote.ErrSecurity
@@ -492,8 +512,8 @@ func (c *Client) CheckURL(ctx context.Context, u *url.URL) error {
 	return c.checkURL(ctx, u)
 }
 
-// Prepare applies Options.Prepare to req, a request its caller built rather
-// than Do; without one it does nothing and returns nil.
+// Prepare applies remote.Options.Prepare to req, a request its caller built
+// rather than Do; without one it does nothing and returns nil.
 func (c *Client) Prepare(req *http.Request) error {
 	if c.prepare == nil {
 		return nil
@@ -502,11 +522,11 @@ func (c *Client) Prepare(req *http.Request) error {
 }
 
 // Send sends req over c's transport, proxy, TLS settings and cookie jar
-// included, and refuses every redirect with ErrRedirect, because a request
-// built outside Do has none of the redirect checks Do installs. It applies
-// neither Do's checks nor the WithOutbound hooks; its caller checks and
-// prepares req first. The error is the HTTP client's own, unwrapped and not
-// classified, and a successful call transfers response-body ownership.
+// included, and refuses every redirect with remote.ErrRedirect, because a
+// request built outside Do has none of the redirect checks Do installs. It
+// applies neither Do's checks nor the WithOutbound hooks; its caller checks
+// and prepares req first. The error is the HTTP client's own, unwrapped and
+// not classified, and a successful call transfers response-body ownership.
 func (c *Client) Send(req *http.Request) (*http.Response, error) {
 	transport := *c.http
 	transport.CheckRedirect = func(*http.Request, []*http.Request) error { return remote.ErrRedirect }

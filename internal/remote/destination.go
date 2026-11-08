@@ -20,6 +20,9 @@ func Origin(u *url.URL) string {
 	)
 }
 
+// Port is u's port, or the one its scheme implies when it names none: 443
+// for https and 80 otherwise, so that Origin, CheckedURL and the transport's
+// dialer compare and connect to the same port.
 func Port(u *url.URL) string {
 	if p := u.Port(); p != "" {
 		return p
