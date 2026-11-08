@@ -15,6 +15,15 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// Read reads q through the policy and holds a manifest or a blob to the
+// registry's evidence before it is served. Unless the read may not reach the
+// upstream (a cache-only intent, no network, an offline repository), it
+// revalidates the result, checks a blob's size against the descriptor a
+// manifest gave for it, and parses a manifest, remembering its descriptors
+// for the blobs and children read after it. A result that fails a check is
+// source.ErrInvalidResult, a credential revision that changed under the read
+// source.ErrSuperseded, and a store failure source.ErrUnavailable. Any other
+// request returns what the policy returned.
 func (c *RegistryContent) Read(
 	ctx context.Context,
 	q source.Request,

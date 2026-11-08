@@ -21,8 +21,16 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// RegistryContent installs Distribution authentication and validation on a fresh
-// shared policy. The pool and resolver belong to the application lifetime.
+// RegistryContent is the Docker, OCI and Helm OCI rules of remote repositories
+// (decision 0031): it fetches manifests, blobs, tag lists and referrers from
+// the upstream registry, checks every descriptor and foreign layer before
+// the cache publishes them, and joins paginated listings into one. Policy is
+// the shared policy of registry remotes, apart from the ordinary one;
+// Registries opens the upstream clients, whose pool and credentials belong to
+// the application lifetime. It remembers the descriptors of the manifests it
+// reads, by source identity and credential revision, so that a blob or a
+// child manifest is held to the descriptor that named it. It is safe for
+// concurrent use.
 type RegistryContent struct {
 	Policy      *remote.Policy
 	Registries  remote.Registries
@@ -30,6 +38,10 @@ type RegistryContent struct {
 	descriptors map[string]Descriptor
 }
 
+// Install makes c the policy's upstream fetch and its check of every cache
+// upload, replacing both hooks. Call it before anything wraps the policy's
+// PrepareUpload, as remote.NewSmart does, and before the policy serves a
+// request.
 func (c *RegistryContent) Install() {
 	c.Policy.Fetch = c.fetch
 	c.Policy.PrepareUpload = c.prepare
@@ -93,11 +105,21 @@ func (c *RegistryContent) fetch(
 // registryName is the Distribution name grammar the registry transport's
 // (*remote.Registry).Image checks before it sends a request. The parser must
 // accept exactly the names the transport does, or a cached path could name an
-// image the upstream is never asked for.
+// image the upstream is never asked for; Image also refuses a name over 255
+// characters, which this grammar leaves to it.
+// TestUnitRegistryPathNameGrammarMatchesTransport holds the two together.
 var registryName = regexp.MustCompile(
 	`^[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*(?:/[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*)*$`,
 )
 
+// ParseRegistryPath splits a registry API path, <image>/<operation>/<reference>,
+// as RegistryResource builds it for a remote read, into its image name,
+// operation and reference. The image must match the Distribution name
+// grammar the transport sends; the operation must be manifests with a tag or
+// a sha256 digest, blobs or referrers with a sha256 digest, or tags with
+// list. Anything else is remote.ErrRequest. Smart Remote is given it as its
+// registry path parser (remote.NewSmart), so that core remote never imports
+// this package. It reads neither store nor network.
 func ParseRegistryPath(path string) (image, operation, reference string, err error) {
 	parts := strings.Split(path, "/")
 	if len(parts) < 3 {

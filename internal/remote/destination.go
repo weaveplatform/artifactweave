@@ -18,6 +18,10 @@ type destinationPolicy struct {
 	lookup  func(context.Context, string) ([]net.IPAddr, error)
 }
 
+// Origin is u's scheme and host in lower case, without a trailing dot, with
+// the port the scheme implies when u names none: two URLs with the same
+// Origin reach the same server, which credential, redirect and pagination
+// checks compare.
 func Origin(u *url.URL) string {
 	return strings.ToLower(
 		u.Scheme,
@@ -37,6 +41,13 @@ func port(u *url.URL) string {
 	return "80"
 }
 
+// CheckedURL parses raw as an absolute http or https URL with a host and no
+// user information, fragment or opaque part, and refuses with ErrSecurity one
+// that could address something other than what it shows: an escaped or
+// control character in the host, a port outside 1 to 65535, a backslash, NUL
+// or line break in the decoded path, a dot segment, or a '#' or line break in
+// the query. It looks nothing up; the destination policy checks the
+// addresses before a request is sent.
 func CheckedURL(raw string) (*url.URL, error) {
 	u, err := baseURL(raw)
 	if err != nil || strings.ContainsAny(u.Hostname(), "%\\\x00\r\n") {

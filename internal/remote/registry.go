@@ -317,6 +317,8 @@ func (r *Registry) checkRealm(ctx context.Context, raw string) error {
 
 func (r *Registry) Close() { r.client.Close() }
 
+// Base returns a copy of the registry's base URL, so that no caller can
+// change where the client sends its requests.
 func (r *Registry) Base() *url.URL {
 	u := *r.base
 	return &u
@@ -380,11 +382,19 @@ func (p *RegistryPool) Remove(key string) {
 	}
 }
 
+// RegistryClients implements Registries over the application's RegistryPool
+// and the resolver's registry options (Resolver.RegistryOptions).
 type RegistryClients struct {
 	Pool    *RegistryPool
 	Options func(context.Context, repo.Config) (RegistryOptions, error)
 }
 
+// Open resolves c's registry options, refuses with source.ErrSuperseded when
+// their credential revision is not revision, the one the read was admitted
+// under, and returns the pool's client for c and id. On every error it
+// returns a literal nil, never a nil *Registry inside a non-nil
+// RegistryClient, which a caller that checks the client for nil would go on
+// to use.
 func (r *RegistryClients) Open(
 	ctx context.Context,
 	c repo.Config,
@@ -405,6 +415,13 @@ func (r *RegistryClients) Open(
 	return client, nil
 }
 
+// Foreign sends q once through a client built from opts for c, and closes
+// it, for a foreign layer a manifest names (decision 0031). It is unpooled on
+// purpose: the pool's fingerprint covers the repository, the source identity
+// and the credential revision but not opts.Prepare and opts.CheckRedirect,
+// which the caller sets to strip registry credentials and custom headers from
+// a foreign layer's request, so a pooled client could send them (decision
+// 0007).
 func (r *RegistryClients) Foreign(
 	ctx context.Context,
 	c repo.Config,

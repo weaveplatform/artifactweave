@@ -11,9 +11,10 @@
 // artifacts module, ecosystem layer: the storage layout and index hooks of
 // the registry slice, one format for the package types docker, oci and
 // helmoci (Serves), which share one protocol and one layout (decision
-// 0031). Its Handler plugs into the item service through the format hooks
-// (decision 0032), so every write and delete in those repositories reaches
-// it whichever API carried it: a push, a jf rt upload, a copy, a move or a
+// 0031), and the rules of their remote repositories (remote_*.go). Its
+// Handler plugs into the item service through the format hooks (decision
+// 0032), so every write and delete in those repositories reaches it
+// whichever API carried it: a push, a jf rt upload, a copy, a move or a
 // restore. The registry's writes are core's (artifacts/core/registry), and
 // its protocol is the slice's http package, ecosystem/docker/http.
 //
@@ -28,14 +29,21 @@
 //     referrers, set a stored manifest's properties and apply Max Unique
 //     Tags and Tag Retention (Retained, Manifests); the Docker REST
 //     endpoints (internal/server/docker_rest.go), which check a promotion's
-//     tag; and core remote's registry rules (internal/remote, registry_*.go),
-//     which parse what an upstream registry serves and store it under this
-//     layout's paths.
+//     tag; the registry source service the application builds over the
+//     shared policy of registry remotes, whose upstream fetches and cache
+//     uploads RegistryContent serves once installed, and whose reads it
+//     checks; the registry protocol's remote reads, which name their
+//     resources with RegistryResource; and Smart Remote, which the
+//     application gives ParseRegistryPath (remote.NewSmart).
 //   - Driven: the format hooks' environment (format.Env), through which
 //     Handler reads stored manifests and chart configs and keeps the
-//     package index (artifacts/core/pkgindex); and the item store's AQL
-//     search (store.ItemStore, artifacts/core/aql), through which the
-//     lookups find blobs, manifests, tags, images and referrers.
+//     package index (artifacts/core/pkgindex); the item store's AQL search
+//     (store.ItemStore, artifacts/core/aql), through which the lookups find
+//     blobs, manifests, tags, images and referrers; and core remote: the
+//     shared policy (remote.Policy), through which RegistryContent checks,
+//     reads and caches child manifests and configs and opens what the cache
+//     holds, and the registry port (remote.Registries), through which it
+//     opens upstream registry clients and sends foreign layer requests.
 //
 // # Outputs
 //
@@ -58,11 +66,17 @@
 //     manifest as metadata, admit writes under the generic deploy policy,
 //     settle the index after deletes and reindex a repository; and Chart,
 //     the Helm chart a tag holds (decision 0039).
+//   - The remote rules: RegistryContent (Install, Read), which serves a
+//     remote repository's manifests, blobs, tag lists and referrers
+//     verified; RegistryResource, the cache and permission paths of a
+//     registry read; and ParseRegistryPath, the registry path grammar.
 //
 // # Invariants
 //
 //   - This package never imports internal/server or its own http package
-//     (decision 0031), nor the item service, which calls the format hooks.
+//     (decision 0031). The item service calls its hooks and never imports
+//     it; the remote rules use only the item package's cache upload
+//     contract and its errors.
 //   - An image is a package while it holds any manifest, tagged or not; a
 //     tag folder holding one is a version whose files are the folder's
 //     items, ordered by the tag's last push; digest folders and _uploads
@@ -73,6 +87,15 @@
 //   - ParseManifest refuses a schema-1 manifest (DV-034), a type other than
 //     the four stored, and a descriptor without a valid digest; a manifest
 //     larger than MaxManifestSize (4 MiB) is never accepted.
+//   - A remote read caches only verified content: every descriptor of a
+//     manifest is checked before it is cached, a foreign layer is fetched
+//     only under the repository's external dependency patterns and never
+//     with registry credentials or custom headers (decision 0007), and a
+//     listing joined from pages carries no-store when any page did or
+//     carried Vary.
+//   - The cache variant registry-v1, the canonical manifest Accept list and
+//     the cache paths RegistryResource names stay byte-identical: a change
+//     would orphan every cached entry.
 //
 // # References
 //
@@ -83,7 +106,9 @@
 //     (repository model and Docker access method); decision 0032:
 //     docs/research/decisions/0032-package-format-handlers.md (format
 //     hooks); decision 0018: docs/research/decisions/0018-package-index.md;
-//     decision 0039: docs/research/decisions/0039-helm.md (Helm OCI).
+//     decision 0039: docs/research/decisions/0039-helm.md (Helm OCI);
+//     decision 0007: docs/research/decisions/0007-remote-repositories.md
+//     (remote repositories: proxy and cache).
 //   - docs/operations/registry-remote.md (Docker, OCI and Helm OCI remote
 //     repositories, and the paths their cache uses) and
 //     docs/testing/nimmodel.md (the Docker remote a NIM repository pairs
@@ -96,8 +121,8 @@
 //     and https://docs.jfrog.com/integrations/reference/promotedockerimage.
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     line 229 (ecosystem/docker, also oci and helmoci), line 382 (one
-//     registry protocol for the three types), line 656 (the registry rules
-//     that come here) and line 1001 (the mapping row).
+//     registry protocol for the three types), lines 656 and 657 (the
+//     registry remote rules, remote_*.go) and line 1001 (the mapping row).
 //   - Plan: docs/implementation/plan.md#p6-dockeroci,
 //     #p8-pypi-nuget-helm-terraform-locals, #p9-remote-repositories and
 //     #p9d-modular-monolith-migration, epic ECO
@@ -106,7 +131,8 @@
 //     storage layout), https://github.com/weaveplatform/artifactweave/issues/227
 //     (tags in the package index and tag retention),
 //     https://github.com/weaveplatform/artifactweave/issues/624 (remote
-//     reads) and https://github.com/weaveplatform/artifactweave/issues/1022
+//     reads), https://github.com/weaveplatform/artifactweave/issues/1022 and
+//     https://github.com/weaveplatform/artifactweave/issues/1023
 //
 // # Status
 //
@@ -128,6 +154,13 @@
 //     referrers lookup.
 //   - contract_test.go: the format contract suite
 //     (artifacts/core/formattest) for docker, with NoRemoteCache.
+//   - remote_content_test.go: registry path validation, listing pagination
+//     and its boundaries, descriptor integrity and the foreign layer
+//     policy; remote_path_test.go: the parser's name grammar against the
+//     transport's.
+//   - internal/app's registry remote tests drive the remote rules through
+//     the application's wiring, and core remote's smart_registry_test.go
+//     gives Smart Remote this package's parser.
 //   - The registry protocol's tests (ecosystem/docker/http) and the guard
 //     suites test/server/artifacts/docker and test/server/artifacts/helmoci
 //     drive the layout through the registry.
