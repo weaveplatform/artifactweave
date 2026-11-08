@@ -48,10 +48,10 @@ configuration PATCH.
 taken from the JFrog docs and from the JFrog CLI and Terraform provider sources. Handlers
 take their codes from that table, not from convention.
 
-**Error response profiles.** One table in `migration/platform/httpkit/apierror`, keyed by profile.
-A profile selects the error envelope, response media type, and default authentication
-challenge. Several API surfaces can share a profile; JFrog Distribution and OCI
-registries have distinct profiles.
+**Error response profiles.** One table in `migration/platform/httpkit/apierror`, keyed by
+profile. A profile selects the error envelope, response media type, and default
+authentication challenge. Several API surfaces can share a profile; JFrog Distribution and
+OCI registries have distinct profiles.
 
 | Error response profile | Envelope |
 |---|---|

@@ -1,15 +1,3 @@
-// Package baseurl resolves the public base URL a response must embed.
-//
-// npm tarball links, Helm chart URLs, the NuGet service index, Terraform
-// download URLs, Docker upload locations and file-info URIs all carry absolute
-// URLs. Behind a reverse proxy the request's own host is wrong, so the resolver
-// follows Artifactory's precedence (OSS 6.20 HttpUtils.getServletContextUrl,
-// research 17): the X-JFrog-Override-Base-Url header, then the configured base
-// URL, then the X-Forwarded-* headers, then the request. A configured base URL
-// is the operator naming the public URL, so a request header the operator does
-// not control never overrides it (#313). Every handler reads the result from
-// the context so there is exactly one place that implements the rule
-// (decision 0002).
 package baseurl
 
 import (
