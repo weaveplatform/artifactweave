@@ -5,7 +5,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
+	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 )
 
 // TestAccMethodAndPorts: a user who is no administrator keeps the Docker

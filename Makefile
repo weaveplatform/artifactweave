@@ -257,14 +257,14 @@ generate: bundle
 		echo "generate $$s"; \
 		$(GO) run $(OAPI_CODEGEN) -config api/oapi-server-$$s.yaml api/$$s.openapi.yaml || exit 1; \
 		$(GO) run $(OAPI_CODEGEN) -config api/oapi-client-$$s.yaml api/$$s.openapi.yaml || exit 1; \
-		$(GO) run ./tools/stubgen internal/server/gen/$$s/server.gen.go || exit 1; \
+		$(GO) run ./tools/stubgen migration/platform/gen/$$s/server.gen.go || exit 1; \
 	done
 
 ## verify-generate: fail if make generate would change the committed generated code
 # Outputs owned by make generate; verify-generate checks exactly these paths.
 # git diff passes on a pathspec that matches nothing and ignores untracked
 # files, so without the two extra checks a moved output would pass unnoticed.
-GEN_PATHS := api/*.openapi.yaml internal/server/gen pkg/client
+GEN_PATHS := api/*.openapi.yaml migration/platform/gen pkg/client
 verify-generate: generate
 	@for p in $(GEN_PATHS); do [ -e "$$p" ] || { echo "verify-generate: missing $$p" >&2; exit 1; }; done
 	git diff --exit-code -- $(GEN_PATHS)

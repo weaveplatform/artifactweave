@@ -146,8 +146,8 @@ func (t *tree) fileRow(f ledger.FileStatus, asked string) statusRow {
 // locate returns where the legacy path p lives: through a file entry for p
 // or an asset directory above it, else through the deepest package entry at
 // or above p, applying its rename to a file directly in it. A directory that
-// is no entry but holds entries below it, such as internal/server/gen, lists
-// them.
+// is no entry but holds entries below it, such as one that only groups
+// generated server packages, lists them.
 func (t *tree) locate(p string) ([]statusRow, error) {
 	p = strings.TrimSuffix(path.Clean(strings.ReplaceAll(p, `\`, "/")), "/")
 	if !fs.ValidPath(p) {

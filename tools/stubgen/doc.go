@@ -1,5 +1,6 @@
-// Command stubgen writes internal/server/gen/<service>/unimplemented.gen.go
-// from the generated strict server interface (make generate).
+// Command stubgen writes
+// migration/platform/gen/<service>/unimplemented.gen.go from the generated
+// strict server interface (make generate).
 //
 // # Role
 //

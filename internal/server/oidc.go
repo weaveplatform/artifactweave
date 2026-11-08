@@ -9,8 +9,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/idtoken"
-	accessgen "github.com/weaveplatform/artifactweave/internal/server/gen/access"
 	"github.com/weaveplatform/artifactweave/internal/service/oidc"
+	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 

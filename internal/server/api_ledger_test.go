@@ -81,7 +81,7 @@ func TestAccAPIReliabilityLedger(t *testing.T) {
 					e.Handler = "internal/server/server.go: handwritten routes precede generated handlers"
 				default:
 					e.State = "stub: 501"
-					e.Handler = "internal/server/gen/" + strings.TrimSuffix(
+					e.Handler = "migration/platform/gen/" + strings.TrimSuffix(
 						spec,
 						".openapi.yaml",
 					) + "/unimplemented.gen.go"
@@ -148,7 +148,7 @@ func TestAccAPIReliabilityLedger(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			if strings.Contains(rel, "internal/server/gen/") {
+			if strings.Contains(rel, "migration/platform/gen/") {
 				return fmt.Errorf("generated route missing from specs: %s", route)
 			}
 			entries[route] = apiReviewOperation{

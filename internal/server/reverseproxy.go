@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
+	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 )
 

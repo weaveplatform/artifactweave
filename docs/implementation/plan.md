@@ -270,7 +270,7 @@ features before any store is written.
    representation per entity with converters to the legacy, Access and YAML wire
    forms. Binding is right only where the wire and internal shapes coincide, which is
    the repository configuration (`RepositoryConfiguration` is bound to `repo.Config`).
-   The generated wire models in `internal/server/gen` and `pkg/client` are the P1
+   The generated wire models in `migration/platform/gen` and `pkg/client` are the P1
    deliverable; the internal domain types are designed with the store contracts at the
    start of P2, before any SQL, so the model still precedes the database.
 
@@ -370,7 +370,7 @@ Decisions: [0004](../research/decisions/0004-storage-sql-metadata-and-blobs.md),
 **Tasks**
 0. `pkg/types`: the internal domain types for every entity in
    [research 15](../research/15-data-model.md) section 2, with converters to and from
-   the generated wire models (`internal/server/gen`) and table-driven round-trip tests
+   the generated wire models (`migration/platform/gen`) and table-driven round-trip tests
    per wire form (legacy, Access, YAML descriptor). Written and reviewed before task 1
    so the store contracts are expressed in these types.
 1. `pkg/store` contracts (`Repos`, `Items`, `Properties`, `Stats`, `Principals`, `Groups`, `Permissions`, `Tokens`, `Projects`, `Webhooks`, `Policies`, `Runs`, `Packages`) with `Tx`, sentinel errors and keyset cursors; `pkg/store/inmem`.
