@@ -1,4 +1,3 @@
-// Package rpm reads bounded RPM v4 headers for native repository metadata.
 package rpm
 
 import (

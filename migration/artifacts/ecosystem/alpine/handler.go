@@ -16,6 +16,16 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// KindIndex is the work kind that regenerates a local or federated
+// repository's indexes (Work), keyed by the repository. IndexName is the
+// file name of an architecture folder's index,
+// <branch>/<repository>/<architecture>/APKINDEX.tar.gz. PropName,
+// PropVersion, PropBranch, PropComponent and PropArchitecture are the item
+// properties Deployed and Reindex set on every package from its .PKGINFO
+// and path; PropComponent holds the path's second folder, which Alpine
+// calls the repository (main or community) and this package the
+// component. The work queue and the items keep these values, so they never
+// change.
 const (
 	KindIndex        = "alpine.index"
 	IndexName        = "APKINDEX.tar.gz"
@@ -26,8 +36,14 @@ const (
 	PropArchitecture = "alpine.architecture"
 )
 
+// Serves reports whether t is the Alpine package type.
 func Serves(t repo.PackageType) bool { return t == repo.Alpine }
 
+// Handler is the Alpine format's hooks: it checks every APK v2 package
+// written to an Alpine repository, keeps the package index and alpine.*
+// properties in step with the packages, and derives a local or federated
+// repository's indexes as queued work (KindIndex), signed when the
+// repository names a key pair.
 type Handler struct{ generic.Handler }
 
 type inspection struct {
@@ -36,6 +52,11 @@ type inspection struct {
 	packageInfo Package
 }
 
+// Inspect reads and checks the stored package a write puts at a .apk path,
+// before the write's transaction, and returns its metadata for Admit and
+// Deployed, so a package is read once per write. A checksum deploy and any
+// other path inspect nothing. A write with no content digest, or whose
+// package is invalid or does not match its path, is refused with 400.
 func (Handler) Inspect(
 	ctx context.Context, env format.Env, _ repo.Config, w format.Write,
 ) (any, error) {
@@ -49,6 +70,13 @@ func (Handler) Inspect(
 	return inspection{sha: w.Checksums.SHA256, path: w.Path, packageInfo: pkg}, nil
 }
 
+// Admit applies the generic deploy policy, wrapping its refusal, then
+// passes a checksum deploy. No write may put an APKINDEX.tar.gz into a
+// local or federated repository, which derives its own (409). A .apk path
+// must be <branch>/<repository>/<architecture>/<name>-<version>.apk
+// (400), and its package must pass the checks Inspect makes, which Admit
+// repeats unless Inspect already read the same content at the same path.
+// Any other file passes.
 func (Handler) Admit(
 	ctx context.Context, env format.Env, c repo.Config, w format.Write,
 ) (format.Write, error) {
@@ -80,6 +108,12 @@ func (Handler) Admit(
 	return w, nil
 }
 
+// Deployed sets a stored package's alpine.* properties, brings its version
+// in the package index up to date and, for a local or federated
+// repository's own write, queues the index rebuild. A version's files are
+// every package in the repository whose .PKGINFO gives that name and
+// version, so Deployed reads them all rather than trusting their paths.
+// Folders and other files change nothing.
 func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
 	if it.Folder || !strings.HasSuffix(it.FullPath(), ".apk") {
 		return nil
@@ -97,6 +131,9 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 	return queue(ctx, env, c, it.Cached)
 }
 
+// Deleting queues the index rebuild when a local or federated repository's
+// own package is about to be deleted, so the rebuild is asked for exactly
+// when the delete commits.
 func (Handler) Deleting(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
 	if it.Folder || !strings.HasSuffix(it.FullPath(), ".apk") {
 		return nil
@@ -104,6 +141,10 @@ func (Handler) Deleting(ctx context.Context, env format.Env, c repo.Config, it t
 	return queue(ctx, env, c, it.Cached)
 }
 
+// Deleted re-syncs each removed package's version in the package index,
+// once per name and version, from that version's remaining packages. A
+// version with none left is not its concern: the item service has already
+// pruned it.
 func (Handler) Deleted(
 	ctx context.Context,
 	env format.Env,
@@ -142,8 +183,12 @@ func queue(ctx context.Context, env format.Env, c repo.Config, cached bool) erro
 	return env.Enqueue(ctx, KindIndex, c.Key, nil) //nolint:wrapcheck
 }
 
+// WorkKinds returns KindIndex, the only work the format queues.
 func (Handler) WorkKinds() []string { return []string{KindIndex} }
 
+// Owed makes a read of a local or federated repository's index wait for
+// its pending rebuild, so a client never reads an index that lags a
+// completed write. A remote's cache owes nothing.
 func (Handler) Owed(c repo.Config, cached bool, path string) []format.WorkRef {
 	if !cached && derives(c) && strings.HasSuffix(path, "/"+IndexName) {
 		return []format.WorkRef{{Kind: KindIndex, Key: c.Key}}
@@ -151,6 +196,9 @@ func (Handler) Owed(c repo.Config, cached bool, path string) []format.WorkRef {
 	return nil
 }
 
+// Classify classes every APKINDEX.tar.gz as derived, so replication and
+// federation skip it and each side generates its own, and every other path
+// as unique.
 func (Handler) Classify(_ repo.Config, path string) format.Class {
 	if strings.HasSuffix(path, "/"+IndexName) {
 		return format.ClassDerived
@@ -158,6 +206,12 @@ func (Handler) Classify(_ repo.Config, path string) format.Class {
 	return format.ClassUnique
 }
 
+// Reindex rebuilds repository c's package index from its packages (a
+// remote's from its cache): a package per name and a version per version,
+// whose files are its packages and whose creation time is the oldest
+// file's. It reads every package, failing on the first that is missing or
+// invalid, and restores the alpine.* properties. A local or federated
+// repository's index rebuild is then queued.
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	items, err := files(ctx, env.Store, c)
 	if err != nil {

@@ -1,4 +1,3 @@
-// Package alpine implements Alpine APK v2 package and index metadata.
 package alpine
 
 import (

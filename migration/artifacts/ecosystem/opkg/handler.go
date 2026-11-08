@@ -23,6 +23,12 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// KindIndex is the work kind that regenerates a local or federated
+// repository's feed metadata (Work), keyed by the repository. PropName,
+// PropVersion, PropArchitecture and PropFeed are the item properties
+// Deployed and Reindex set on every IPK from its control file and its
+// folder, the feed. The work queue and the items keep these values, so
+// they never change.
 const (
 	KindIndex        = "opkg.index"
 	PropName         = "opkg.name"
@@ -31,8 +37,14 @@ const (
 	PropFeed         = "opkg.feed"
 )
 
+// Serves reports whether t is the Opkg package type.
 func Serves(t repo.PackageType) bool { return t == repo.Opkg }
 
+// Handler is the Opkg format's hooks: it checks every IPK written to an
+// Opkg repository, keeps the package index and opkg.* properties in step
+// with the IPKs, and derives a local or federated repository's feed
+// metadata as queued work (KindIndex), signed when the repository names a
+// key pair.
 type Handler struct{ generic.Handler }
 
 type inspection struct {
@@ -40,6 +52,12 @@ type inspection struct {
 	pkg       Package
 }
 
+// Inspect reads and checks the stored IPK a write puts at a .ipk path,
+// before the write's transaction, and returns its control metadata for
+// Admit and Deployed, so an archive is read once per write. A checksum
+// deploy and any other path inspect nothing. A write with no content
+// digest, or whose IPK is invalid or does not match its path, is refused
+// with 400.
 func (Handler) Inspect(
 	ctx context.Context, env format.Env, _ repo.Config, w format.Write,
 ) (any, error) {
@@ -53,6 +71,13 @@ func (Handler) Inspect(
 	return inspection{sha: w.Checksums.SHA256, path: w.Path, pkg: pkg}, nil
 }
 
+// Admit applies the generic deploy policy, wrapping its refusal, then
+// passes a checksum deploy. No write may put feed metadata (Packages,
+// Packages.gz, Release or Packages.sig, in any folder) into a local or
+// federated repository, which derives its own (409). A .ipk path must be
+// valid (ValidPath, 400), and its IPK must pass the checks Inspect makes,
+// which Admit repeats unless Inspect already read the same content at the
+// same path. Any other file passes.
 func (Handler) Admit(
 	ctx context.Context, env format.Env, c repo.Config, w format.Write,
 ) (format.Write, error) {
@@ -84,6 +109,12 @@ func (Handler) Admit(
 	return w, nil
 }
 
+// Deployed sets a stored IPK's opkg.* properties, brings its version in
+// the package index up to date and, for a local or federated repository's
+// own write, queues the feed rebuild. A version's files are every IPK in
+// the repository whose control file gives that name and version, in any
+// feed, so Deployed reads them all rather than trusting their paths.
+// Folders and other files change nothing.
 func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
 	if it.Folder || !strings.HasSuffix(it.FullPath(), ".ipk") {
 		return nil
@@ -101,6 +132,9 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 	return queue(ctx, env, c, it.Cached)
 }
 
+// Deleting queues the feed rebuild when a local or federated repository's
+// own IPK is about to be deleted, so the rebuild is asked for exactly when
+// the delete commits.
 func (Handler) Deleting(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
 	if it.Folder || !strings.HasSuffix(it.FullPath(), ".ipk") {
 		return nil
@@ -108,6 +142,9 @@ func (Handler) Deleting(ctx context.Context, env format.Env, c repo.Config, it t
 	return queue(ctx, env, c, it.Cached)
 }
 
+// Deleted re-syncs each removed IPK's version in the package index, once
+// per name and version, from that version's remaining IPKs. A version with
+// none left is not its concern: the item service has already pruned it.
 func (Handler) Deleted(
 	ctx context.Context, env format.Env, c repo.Config, removed []types.Item,
 ) error {
@@ -141,8 +178,12 @@ func queue(ctx context.Context, env format.Env, c repo.Config, cached bool) erro
 	return env.Enqueue(ctx, KindIndex, c.Key, nil) //nolint:wrapcheck
 }
 
+// WorkKinds returns KindIndex, the only work the format queues.
 func (Handler) WorkKinds() []string { return []string{KindIndex} }
 
+// Owed makes a read of a local or federated repository's feed metadata
+// wait for its pending rebuild, so a client never reads a feed that lags a
+// completed write. A remote's cache owes nothing.
 func (Handler) Owed(c repo.Config, cached bool, p string) []format.WorkRef {
 	if !cached && derives(c) && IsIndex(p) {
 		return []format.WorkRef{{Kind: KindIndex, Key: c.Key}}
@@ -150,6 +191,9 @@ func (Handler) Owed(c repo.Config, cached bool, p string) []format.WorkRef {
 	return nil
 }
 
+// Classify classes feed metadata as derived, so replication and
+// federation skip it and each side generates its own, and every other path
+// as unique.
 func (Handler) Classify(_ repo.Config, p string) format.Class {
 	if IsIndex(p) {
 		return format.ClassDerived
@@ -157,6 +201,13 @@ func (Handler) Classify(_ repo.Config, p string) format.Class {
 	return format.ClassUnique
 }
 
+// Reindex rebuilds repository c's package index from its IPKs (a
+// remote's from its cache): a package per name and a version per version,
+// whose files are its IPKs and whose creation time is the oldest file's.
+// It reads every IPK, failing on the first that is missing or invalid, and
+// restores the opkg.* properties unless Env.SkipProperties is set, as the
+// reindex operation's writeProps=0 asks. A local or federated repository's
+// feed rebuild is then queued.
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	items, err := files(ctx, env.Store, c)
 	if err != nil {
@@ -205,6 +256,16 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 	return queue(ctx, env, c, pkgindex.Stored(c).Cached)
 }
 
+// Work runs one KindIndex item: it regenerates the feed metadata of the
+// local or federated Opkg repository the item names, and ignores any other
+// kind and a repository that is gone or no longer qualifies. Each feed's
+// Packages, Packages.gz and Release are derived from the IPKs in its
+// folder, with sizes and digests from the stored bytes, and Packages is
+// signed (SignFeed) when the repository names a key pair; metadata no
+// longer produced, such as that of a feed whose last IPK is gone, is
+// removed.
+// More than 100,000 IPKs fail the run. It reads the repository afresh, so
+// a repeated run gives the same result.
 func (Handler) Work(ctx context.Context, env format.Env, work types.WorkItem) error {
 	if work.Kind != KindIndex {
 		return nil

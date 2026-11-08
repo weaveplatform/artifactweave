@@ -1,4 +1,3 @@
-// Package opkg reads bounded IPK archives and their control metadata.
 package opkg
 
 import (
@@ -55,6 +54,9 @@ func ValidPath(p string) bool {
 	return true
 }
 
+// Feed returns the feed of the repository path p: its folder, or "" for a
+// file at the repository root. A client's src/gz line names a feed, and
+// Work writes each feed's metadata from the IPKs directly in it.
 func Feed(p string) string {
 	if i := strings.LastIndexByte(p, '/'); i >= 0 {
 		return p[:i]
@@ -62,6 +64,8 @@ func Feed(p string) string {
 	return ""
 }
 
+// IndexPath returns the repository path of the file name in feed, which
+// is name itself in the root feed.
 func IndexPath(feed, name string) string {
 	if feed == "" {
 		return name
@@ -358,6 +362,8 @@ func parseFields(body []byte) (map[string]string, error) {
 	return fields, nil
 }
 
+// Digest returns the lowercase hexadecimal SHA-256 of body, the form
+// Release and the SHA256sum fields of Packages give.
 func Digest(body []byte) string {
 	sum := sha256.Sum256(body)
 	return hex.EncodeToString(sum[:])

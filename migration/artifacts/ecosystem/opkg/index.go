@@ -15,6 +15,10 @@ import (
 	"unicode/utf8"
 )
 
+// PackagesName, PackagesGzipName, ReleaseName and SignatureName are the
+// file names of a feed's metadata, in the feed's folder beside its IPKs:
+// the Packages index, its gzip form, the Release file that gives the
+// SHA-256 and size of both, and the detached GPG signature of Packages.
 const (
 	PackagesName     = "Packages"
 	PackagesGzipName = "Packages.gz"
@@ -26,6 +30,8 @@ const (
 
 var errInvalidIndex = errors.New("opkg: invalid Packages index")
 
+// IsIndex reports whether p names feed metadata: a file whose base name is
+// Packages, Packages.gz, Release or Packages.sig, in any folder.
 func IsIndex(p string) bool {
 	switch path.Base(p) {
 	case PackagesName, PackagesGzipName, ReleaseName, SignatureName:
@@ -34,6 +40,10 @@ func IsIndex(p string) bool {
 	return false
 }
 
+// FeedPath returns the feed of the feed metadata at p: its folder, or ""
+// at the repository root. It reports false when p is not feed metadata or
+// a folder of its feed is not a valid path segment, which ValidPath
+// requires of an IPK's folders too.
 func FeedPath(p string) (string, bool) {
 	if !IsIndex(p) {
 		return "", false
@@ -211,6 +221,11 @@ func EncodeIndex(packages []Package, feed string) (map[string][]byte, error) {
 	}, nil
 }
 
+// ValidateRelease checks an upstream Release file before a remote caches
+// it: at most 1 MiB of UTF-8 text without NUL, ending in a newline, whose
+// every line is a "SHA256: <digest> <size> <name>" record with a 64-digit
+// hexadecimal digest and a size within the Packages bound, one each for
+// Packages and Packages.gz and nothing else.
 func ValidateRelease(body []byte) error {
 	if len(body) == 0 || len(body) > 1<<20 || !utf8.Valid(body) ||
 		bytes.IndexByte(body, 0) >= 0 || !bytes.HasSuffix(body, []byte("\n")) {

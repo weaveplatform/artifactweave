@@ -19,6 +19,11 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// KindIndex is the work kind that regenerates a local or federated
+// repository's repodata (Work), keyed by the repository. PropName,
+// PropVersion, PropRelease and PropArch are the item properties Deployed
+// and Reindex set on every package from its header. The work queue and the
+// items keep these values, so they never change.
 const (
 	KindIndex   = "rpm.index"
 	PropName    = "rpm.name"
@@ -27,8 +32,14 @@ const (
 	PropArch    = "rpm.architecture"
 )
 
+// Serves reports whether t is the RPM package type.
 func Serves(t repo.PackageType) bool { return t == repo.RPM }
 
+// Handler is the RPM format's hooks: it checks every RPM package written
+// to an RPM repository, keeps the package index and rpm.* properties in
+// step with the packages, and derives a local or federated repository's
+// repodata as queued work (KindIndex), signed when the repository names a
+// key pair.
 type Handler struct{ generic.Handler }
 
 type inspection struct {
@@ -36,6 +47,12 @@ type inspection struct {
 	pkg       Package
 }
 
+// Inspect reads and checks the stored package a write puts at a .rpm path,
+// before the write's transaction, and returns its header metadata for
+// Admit and Deployed, so a package is read once per write. A checksum
+// deploy and any other path inspect nothing. A write with no content
+// digest, or whose package is invalid or does not match its path, is
+// refused with 400.
 func (Handler) Inspect(
 	ctx context.Context,
 	env format.Env,
@@ -52,6 +69,15 @@ func (Handler) Inspect(
 	return inspection{sha: w.Checksums.SHA256, path: w.Path, pkg: pkg}, nil
 }
 
+// Admit applies the generic deploy policy, wrapping its refusal, then
+// passes a checksum deploy. No write may put generated repodata into a
+// local or federated repository, which derives its own (409): a path that
+// begins with repodata/repomd.xml in any folder, such as the manifest's
+// .asc and .key, or a primary index (-primary.xml.gz or -primary.xml.zst)
+// under repodata/. A .rpm path must be clean and relative with safe folder
+// names (400), and its package must pass the checks Inspect makes, which
+// Admit repeats unless Inspect already read the same content at the same
+// path. Any other file passes.
 func (Handler) Admit(
 	ctx context.Context,
 	env format.Env,
@@ -83,6 +109,11 @@ func (Handler) Admit(
 	return w, nil
 }
 
+// Deployed sets a stored package's rpm.* properties and rebuilds the
+// repository's whole package index from its packages, reading each, as
+// Reindex does; with calculateYumMetadata on, a local or federated
+// repository then queues its repodata rebuild. Folders and other files
+// change nothing.
 func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
 	if it.Folder || !strings.HasSuffix(it.FullPath(), ".rpm") {
 		return nil
@@ -97,8 +128,14 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 	return reindex(ctx, env, c, autoCalculate(c))
 }
 
+// Deleting does nothing: Deleted rebuilds the package index, and queues
+// the repodata rebuild, once per delete, after the packages are gone.
 func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error { return nil }
 
+// Deleted rebuilds the repository's package index from its remaining
+// packages when a delete or move removed at least one package and, with
+// calculateYumMetadata on, queues a local or federated repository's
+// repodata rebuild. Removing only other files changes nothing.
 func (Handler) Deleted(
 	ctx context.Context,
 	env format.Env,
@@ -113,8 +150,12 @@ func (Handler) Deleted(
 	return nil
 }
 
+// WorkKinds returns KindIndex, the only work the format queues.
 func (Handler) WorkKinds() []string { return []string{KindIndex} }
 
+// Owed makes a read of a local or federated repository's generated
+// repodata wait for its pending rebuild, so a client never reads repodata
+// that lags a completed write. A remote's cache owes nothing.
 func (Handler) Owed(c repo.Config, cached bool, p string) []format.WorkRef {
 	if !cached && derives(c) && generated(p) {
 		return []format.WorkRef{{Kind: KindIndex, Key: c.Key}}
@@ -122,6 +163,9 @@ func (Handler) Owed(c repo.Config, cached bool, p string) []format.WorkRef {
 	return nil
 }
 
+// Classify classes generated repodata as derived, so replication and
+// federation skip it and each side generates its own, and every other path
+// as unique.
 func (Handler) Classify(_ repo.Config, p string) format.Class {
 	if generated(p) {
 		return format.ClassDerived
@@ -129,6 +173,14 @@ func (Handler) Classify(_ repo.Config, p string) format.Class {
 	return format.ClassUnique
 }
 
+// Reindex rebuilds repository c's package index from its packages (a
+// remote's from its cache): a package per name, created with its oldest
+// file, and a version per <version>-<release>.<architecture>, whose files
+// are its packages. It reads every package, failing on the first that is
+// missing or invalid, and restores the rpm.* properties. A local or
+// federated repository's repodata rebuild is then queued whether or not
+// calculateYumMetadata is on: the Yum calculation operation is how a
+// repository without automatic calculation gets its repodata.
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	return reindex(ctx, env, c, true)
 }
@@ -198,6 +250,18 @@ func reindex(ctx context.Context, env format.Env, c repo.Config, queue bool) err
 	return nil
 }
 
+// Work runs one KindIndex item: it regenerates the repodata of the local
+// or federated RPM repository the item names, and ignores any other kind
+// and a repository that is gone or no longer qualifies. Each metadata root
+// (the folder yumRootDepth levels down) gets a primary index and
+// repomd.xml from the packages below it, with digests from the stored
+// bytes, signed with the repository's primaryKeyPairRef when it names one
+// (repomd.xml.asc, with the public key as repomd.xml.key). repomd.xml is
+// written last, so a reader never sees a manifest whose primary index or
+// signature is missing. A root that still holds repodata but no packages
+// gets empty repodata, and generated files no longer produced are removed.
+// More than 100,000 packages fail the run. It reads the repository afresh,
+// so a repeated run gives the same result.
 func (Handler) Work(ctx context.Context, env format.Env, work types.WorkItem) error {
 	if work.Kind != KindIndex {
 		return nil
