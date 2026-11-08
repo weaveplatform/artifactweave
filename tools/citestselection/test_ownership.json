@@ -39,6 +39,7 @@
     "internal/server/terraformbackend": "terraformbackend",
     "internal/server/vagrant": "vagrant",
     "internal/server/vcs": "vcs",
+    "test/server/access": "shared",
     "test/server/agentpackages": "agentpackages",
     "test/server/agentplugins": "agentplugins",
     "test/server/docker": "docker",
@@ -50,7 +51,6 @@
     "test/server/npm": "npm",
     "test/server/nuget": "nuget",
     "test/server/pypi": "pypi",
-    "test/server/shared": "shared",
     "test/server/terraform": "terraform",
     "test/server/terraformbackend": "terraformbackend"
   },

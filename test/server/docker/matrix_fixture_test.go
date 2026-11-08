@@ -14,7 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
-	"github.com/weaveplatform/artifactweave/test/server/registryfixture"
+	"github.com/weaveplatform/artifactweave/test/server/support/registryfixture"
 )
 
 type matrixFixture struct {

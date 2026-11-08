@@ -10,8 +10,8 @@
 //
 // # Inputs
 //
-//   - The world of test/server/registryfixture and the registry fixtures of
-//     test/server/support.
+//   - The world of test/server/support/registryfixture and the registry
+//     fixtures of test/server/support.
 //
 // # Outputs
 //

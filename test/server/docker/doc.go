@@ -11,9 +11,9 @@
 //
 // # Inputs
 //
-//   - The world of test/server/registryfixture and the registry fixtures of
-//     test/server/support (PushImage, RegistryManifest, RegistryConfig and
-//     RegistryLayer).
+//   - The world of test/server/support/registryfixture and the registry
+//     fixtures of test/server/support (PushImage, RegistryManifest,
+//     RegistryConfig and RegistryLayer).
 //   - support.DockerRoutes, the route inventory.
 //
 // # Outputs
