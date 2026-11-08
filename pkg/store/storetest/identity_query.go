@@ -5,6 +5,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/storekit"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -14,7 +15,7 @@ func testIdentityPages(t *testing.T, s store.Store) {
 	for _, g := range []types.Group{
 		{Name: "admins", AdminPrivileges: true}, {Name: "readers"}, {Name: "ÉQUIPE_%"},
 	} {
-		must(t, s.Groups().Create(ctx, g))
+		storekit.Must(t, s.Groups().Create(ctx, g))
 	}
 	for _, u := range []types.User{
 		{Name: "alpha", Admin: true},
@@ -23,7 +24,7 @@ func testIdentityPages(t *testing.T, s store.Store) {
 		{Name: "delta"},
 		{Name: "ÉLODIE_%"},
 	} {
-		must(t, s.Users().Create(ctx, u))
+		storekit.Must(t, s.Users().Create(ctx, u))
 	}
 	p := types.Permission{Name: "read", Resources: map[types.ResourceType]types.Resource{
 		types.ResourceArtifact: {
@@ -34,7 +35,7 @@ func testIdentityPages(t *testing.T, s store.Store) {
 			Targets: map[string]types.Target{"repo": {}},
 		},
 	}}
-	must(t, s.Permissions().Create(ctx, p))
+	storekit.Must(t, s.Permissions().Create(ctx, p))
 	target := &store.IdentityResource{Type: types.ResourceArtifact, Name: "repo"}
 	for _, c := range []struct {
 		name   string
@@ -68,7 +69,7 @@ func testIdentityPages(t *testing.T, s store.Store) {
 					t.Fatal("pagination did not terminate")
 				}
 				rows, next, err := s.Users().ListSummaries(ctx, c.filter, page)
-				must(t, err)
+				storekit.Must(t, err)
 				if len(rows) > page.Limit {
 					t.Fatal("page limit exceeded")
 				}
@@ -97,7 +98,7 @@ func testIdentityPages(t *testing.T, s store.Store) {
 		{store.IdentityFilter{Resource: target}, []string{"readers"}},
 		{store.IdentityFilter{NameContains: "équipe_%"}, []string{"ÉQUIPE_%"}},
 	} {
-		got := pages(
+		got := storekit.Pages(
 			t,
 			1,
 			func(p store.Page) ([]string, string, error) { return s.Groups().ListNames(ctx, c.filter, p) },
@@ -108,34 +109,34 @@ func testIdentityPages(t *testing.T, s store.Store) {
 	}
 	// Continuation does not require the cursor row to still exist, and reads
 	// current authorization rather than freezing grants into the cursor.
-	must(t, s.Users().Delete(ctx, "alpha"))
+	storekit.Must(t, s.Users().Delete(ctx, "alpha"))
 	p.Resources[types.ResourceArtifact] = types.Resource{
 		Targets: map[string]types.Target{"repo": {}},
 	}
-	must(t, s.Permissions().Update(ctx, p))
+	storekit.Must(t, s.Permissions().Update(ctx, p))
 	rows, _, err := s.Users().
 		ListSummaries(ctx, store.UserFilter{IdentityFilter: store.IdentityFilter{Resource: target}},
 			store.Page{After: store.Cursor("alpha"), Limit: 1})
-	must(t, err)
+	storekit.Must(t, err)
 	if len(rows) != 0 {
 		t.Fatal("revoked grants remain visible")
 	}
 	rows, _, err = s.Users().
 		ListSummaries(ctx, store.UserFilter{}, store.Page{After: store.Cursor("alpha"), Limit: 1})
-	must(t, err)
+	storekit.Must(t, err)
 	if len(rows) != 1 || rows[0].Name != "bravo" {
 		t.Fatalf("deleted cursor continuation: %v", rows)
 	}
 	for _, cursor := range []string{"%%%", store.Cursor("a", "b")} {
 		_, _, err := s.Users().ListSummaries(ctx, store.UserFilter{}, store.Page{After: cursor})
-		wantErr(t, err, store.ErrInvalidCursor)
+		storekit.WantErr(t, err, store.ErrInvalidCursor)
 		_, _, err = s.Groups().ListNames(ctx, store.IdentityFilter{}, store.Page{After: cursor})
-		wantErr(t, err, store.ErrInvalidCursor)
+		storekit.WantErr(t, err, store.ErrInvalidCursor)
 	}
 	cancelled, cancel := context.WithCancel(ctx)
 	cancel()
 	_, _, err = s.Users().ListSummaries(cancelled, store.UserFilter{}, store.Page{})
-	wantErr(t, err, context.Canceled)
+	storekit.WantErr(t, err, context.Canceled)
 	_, _, err = s.Groups().ListNames(cancelled, store.IdentityFilter{}, store.Page{})
-	wantErr(t, err, context.Canceled)
+	storekit.WantErr(t, err, context.Canceled)
 }

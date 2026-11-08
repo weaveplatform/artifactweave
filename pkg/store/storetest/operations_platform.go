@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/storekit"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -20,9 +21,9 @@ func testSettings(t *testing.T, s store.Store) {
 	ctx := context.Background()
 	ss := s.Settings()
 	var lock types.UserLockPolicy
-	wantErr(t, ss.Get(ctx, types.SettingUserLockPolicy, &lock), store.ErrNotFound)
+	storekit.WantErr(t, ss.Get(ctx, types.SettingUserLockPolicy, &lock), store.ErrNotFound)
 
-	must(
+	storekit.Must(
 		t,
 		ss.Put(
 			ctx,
@@ -30,7 +31,7 @@ func testSettings(t *testing.T, s store.Store) {
 			types.UserLockPolicy{Enabled: true, LoginAttempts: 5},
 		),
 	)
-	must(
+	storekit.Must(
 		t,
 		ss.Put(
 			ctx,
@@ -38,14 +39,14 @@ func testSettings(t *testing.T, s store.Store) {
 			types.TrashcanSettings{Enabled: true, RetentionDays: 14},
 		),
 	)
-	must(t, ss.Put(ctx, types.SettingBasicAuthEnabled, true))
-	must(t, ss.Get(ctx, types.SettingUserLockPolicy, &lock))
-	same(t, "Get", types.UserLockPolicy{Enabled: true, LoginAttempts: 5}, lock)
+	storekit.Must(t, ss.Put(ctx, types.SettingBasicAuthEnabled, true))
+	storekit.Must(t, ss.Get(ctx, types.SettingUserLockPolicy, &lock))
+	storekit.Same(t, "Get", types.UserLockPolicy{Enabled: true, LoginAttempts: 5}, lock)
 
-	must(t, ss.Put(ctx, types.SettingTrashcan, types.TrashcanSettings{RetentionDays: 7}))
+	storekit.Must(t, ss.Put(ctx, types.SettingTrashcan, types.TrashcanSettings{RetentionDays: 7}))
 	var trash types.TrashcanSettings
-	must(t, ss.Get(ctx, types.SettingTrashcan, &trash))
-	same(t, "replaced", types.TrashcanSettings{RetentionDays: 7}, trash)
+	storekit.Must(t, ss.Get(ctx, types.SettingTrashcan, &trash))
+	storekit.Same(t, "replaced", types.TrashcanSettings{RetentionDays: 7}, trash)
 
 	if err := ss.Put(ctx, "bad", make(chan int)); err == nil {
 		t.Fatal("Put of a value JSON cannot encode succeeded")
@@ -54,21 +55,21 @@ func testSettings(t *testing.T, s store.Store) {
 	if err := ss.Get(ctx, types.SettingTrashcan, &n); err == nil {
 		t.Fatal("Get into a mismatched type succeeded")
 	}
-	same(
+	storekit.Same(
 		t,
 		"Keys",
 		[]string{types.SettingBasicAuthEnabled, types.SettingUserLockPolicy, types.SettingTrashcan},
-		get[[]string](t)(ss.Keys(ctx)),
+		storekit.Get[[]string](t)(ss.Keys(ctx)),
 	)
 
-	must(t, ss.Delete(ctx, types.SettingTrashcan))
-	wantErr(t, ss.Delete(ctx, types.SettingTrashcan), store.ErrNotFound)
-	wantErr(t, ss.Get(ctx, types.SettingTrashcan, &trash), store.ErrNotFound)
-	same(
+	storekit.Must(t, ss.Delete(ctx, types.SettingTrashcan))
+	storekit.WantErr(t, ss.Delete(ctx, types.SettingTrashcan), store.ErrNotFound)
+	storekit.WantErr(t, ss.Get(ctx, types.SettingTrashcan, &trash), store.ErrNotFound)
+	storekit.Same(
 		t,
 		"Keys after delete",
 		[]string{types.SettingBasicAuthEnabled, types.SettingUserLockPolicy},
-		get[[]string](t)(ss.Keys(ctx)),
+		storekit.Get[[]string](t)(ss.Keys(ctx)),
 	)
 }
 
@@ -77,59 +78,77 @@ func testLeases(t *testing.T, s store.Store) {
 	ls := s.Leases()
 	acquire := func(l types.Lease, now time.Time) bool {
 		t.Helper()
-		return get[bool](t)(ls.Acquire(ctx, l, now))
+		return storekit.Get[bool](t)(ls.Acquire(ctx, l, now))
 	}
-	_, err := ls.Acquire(ctx, types.Lease{Name: "gc", Expires: at(10)}, at(0))
-	wantErr(t, err, store.ErrInvalid)
-	_, err = ls.Acquire(ctx, types.Lease{Name: "gc", Holder: "n1"}, at(0))
-	wantErr(t, err, store.ErrInvalid)
+	_, err := ls.Acquire(ctx, types.Lease{Name: "gc", Expires: storekit.At(10)}, storekit.At(0))
+	storekit.WantErr(t, err, store.ErrInvalid)
+	_, err = ls.Acquire(ctx, types.Lease{Name: "gc", Holder: "n1"}, storekit.At(0))
+	storekit.WantErr(t, err, store.ErrInvalid)
 
 	n1 := types.Lease{
 		Name:     "gc",
 		Holder:   "n1",
 		Task:     "garbage collection",
-		Acquired: at(0),
-		Expires:  at(10),
+		Acquired: storekit.At(0),
+		Expires:  storekit.At(10),
 	}
-	if !acquire(n1, at(0)) {
+	if !acquire(n1, storekit.At(0)) {
 		t.Fatal("a free lease was not taken")
 	}
-	if acquire(types.Lease{Name: "gc", Holder: "n2", Acquired: at(5), Expires: at(15)}, at(5)) {
+	if acquire(
+		types.Lease{Name: "gc", Holder: "n2", Acquired: storekit.At(5), Expires: storekit.At(15)},
+		storekit.At(5),
+	) {
 		t.Fatal("a held lease was taken by another holder")
 	}
 	renewed := n1
-	renewed.Expires = at(20)
-	if !acquire(renewed, at(5)) {
+	renewed.Expires = storekit.At(20)
+	if !acquire(renewed, storekit.At(5)) {
 		t.Fatal("the holder could not renew")
 	}
-	other := types.Lease{Name: "cleanup", Holder: "n3", Acquired: at(1), Expires: at(30)}
-	if !acquire(other, at(1)) {
+	other := types.Lease{
+		Name:     "cleanup",
+		Holder:   "n3",
+		Acquired: storekit.At(1),
+		Expires:  storekit.At(30),
+	}
+	if !acquire(other, storekit.At(1)) {
 		t.Fatal("a second lease was not taken")
 	}
-	same(t, "List", []types.Lease{other, renewed}, get[[]types.Lease](t)(ls.List(ctx)))
+	storekit.Same(
+		t,
+		"List",
+		[]types.Lease{other, renewed},
+		storekit.Get[[]types.Lease](t)(ls.List(ctx)),
+	)
 
 	// A lease is free once now reaches its expiry.
-	n2 := types.Lease{Name: "gc", Holder: "n2", Acquired: at(20), Expires: at(40)}
-	if !acquire(n2, at(20)) {
+	n2 := types.Lease{Name: "gc", Holder: "n2", Acquired: storekit.At(20), Expires: storekit.At(40)}
+	if !acquire(n2, storekit.At(20)) {
 		t.Fatal("an expired lease was not taken over")
 	}
-	must(t, ls.Release(ctx, "gc", "n1"))
-	same(
+	storekit.Must(t, ls.Release(ctx, "gc", "n1"))
+	storekit.Same(
 		t,
 		"release by a non-holder",
 		[]types.Lease{other, n2},
-		get[[]types.Lease](t)(ls.List(ctx)),
+		storekit.Get[[]types.Lease](t)(ls.List(ctx)),
 	)
-	must(t, ls.Release(ctx, "gc", "n2"))
-	must(t, ls.Release(ctx, "gc", "n2"))
-	same(t, "after release", []types.Lease{other}, get[[]types.Lease](t)(ls.List(ctx)))
+	storekit.Must(t, ls.Release(ctx, "gc", "n2"))
+	storekit.Must(t, ls.Release(ctx, "gc", "n2"))
+	storekit.Same(
+		t,
+		"after release",
+		[]types.Lease{other},
+		storekit.Get[[]types.Lease](t)(ls.List(ctx)),
+	)
 }
 
 func testConfigs(t *testing.T, s store.Store) {
 	ctx := context.Background()
 	cs := s.Configs()
-	wantErr(t, cs.Put(ctx, types.ConfigDocument{Key: "x"}), store.ErrInvalid)
-	wantErr(t, cs.Put(ctx, types.ConfigDocument{Kind: types.ConfigOIDC}), store.ErrInvalid)
+	storekit.WantErr(t, cs.Put(ctx, types.ConfigDocument{Key: "x"}), store.ErrInvalid)
+	storekit.WantErr(t, cs.Put(ctx, types.ConfigDocument{Kind: types.ConfigOIDC}), store.ErrInvalid)
 
 	github := types.ConfigDocument{
 		Kind:    types.ConfigOIDC,
@@ -139,13 +158,13 @@ func testConfigs(t *testing.T, s store.Store) {
 			`{"issuer_url":"https://token.actions.githubusercontent.com","provider_type":"GitHub"}`,
 		),
 		Secrets: map[string]string{"client_secret": "cs", "unset": ""},
-		Updated: at(1),
+		Updated: storekit.At(1),
 	}
 	azure := types.ConfigDocument{
 		Kind:     types.ConfigOIDC,
 		Key:      "azure",
 		Document: []byte(`{}`),
-		Updated:  at(2),
+		Updated:  storekit.At(2),
 	}
 	corp := types.ConfigDocument{
 		Kind:     types.ConfigLDAP,
@@ -155,51 +174,62 @@ func testConfigs(t *testing.T, s store.Store) {
 		Secrets:  map[string]string{"manager_password": "mp"},
 	}
 	for _, d := range []types.ConfigDocument{github, azure, corp} {
-		must(t, cs.Put(ctx, d))
+		storekit.Must(t, cs.Put(ctx, d))
 	}
 	// An empty secret is not stored.
 	github.Secrets = map[string]string{"client_secret": "cs"}
-	same(t, "Get", github, get[types.ConfigDocument](t)(cs.Get(ctx, types.ConfigOIDC, "github")))
+	storekit.Same(
+		t,
+		"Get",
+		github,
+		storekit.Get[types.ConfigDocument](t)(cs.Get(ctx, types.ConfigOIDC, "github")),
+	)
 	_, err := cs.Get(ctx, types.ConfigLDAP, "github")
-	wantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, store.ErrNotFound)
 
-	same(t, "List oidc", []types.ConfigDocument{azure, github},
-		get[[]types.ConfigDocument](t)(cs.List(ctx, types.ConfigOIDC)))
-	same(
+	storekit.Same(t, "List oidc", []types.ConfigDocument{azure, github},
+		storekit.Get[[]types.ConfigDocument](t)(cs.List(ctx, types.ConfigOIDC)))
+	storekit.Same(
 		t,
 		"List ldap",
 		[]types.ConfigDocument{corp},
-		get[[]types.ConfigDocument](t)(cs.List(ctx, types.ConfigLDAP)),
+		storekit.Get[[]types.ConfigDocument](t)(cs.List(ctx, types.ConfigLDAP)),
 	)
-	if got := get[[]types.ConfigDocument](t)(cs.List(ctx, types.ConfigSAML)); len(got) != 0 {
+	if got := storekit.Get[[]types.ConfigDocument](
+		t,
+	)(
+		cs.List(ctx, types.ConfigSAML),
+	); len(
+		got,
+	) != 0 {
 		t.Fatalf("List saml = %v", got)
 	}
 
-	got := get[types.ConfigDocument](t)(cs.Get(ctx, types.ConfigOIDC, "github"))
+	got := storekit.Get[types.ConfigDocument](t)(cs.Get(ctx, types.ConfigOIDC, "github"))
 	got.Secrets["client_secret"] = "mutated"
 	got.Document[0] = '['
-	same(
+	storekit.Same(
 		t,
 		"Get is a copy",
 		github,
-		get[types.ConfigDocument](t)(cs.Get(ctx, types.ConfigOIDC, "github")),
+		storekit.Get[types.ConfigDocument](t)(cs.Get(ctx, types.ConfigOIDC, "github")),
 	)
 
 	github.Secrets, github.Enabled = nil, false
-	must(t, cs.Put(ctx, github))
-	same(
+	storekit.Must(t, cs.Put(ctx, github))
+	storekit.Same(
 		t,
 		"replaced",
 		github,
-		get[types.ConfigDocument](t)(cs.Get(ctx, types.ConfigOIDC, "github")),
+		storekit.Get[types.ConfigDocument](t)(cs.Get(ctx, types.ConfigOIDC, "github")),
 	)
 
-	must(t, cs.Delete(ctx, types.ConfigLDAP, "corp"))
-	wantErr(t, cs.Delete(ctx, types.ConfigLDAP, "corp"), store.ErrNotFound)
+	storekit.Must(t, cs.Delete(ctx, types.ConfigLDAP, "corp"))
+	storekit.WantErr(t, cs.Delete(ctx, types.ConfigLDAP, "corp"), store.ErrNotFound)
 	_, err = cs.Get(ctx, types.ConfigLDAP, "corp")
-	wantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, store.ErrNotFound)
 	// Re-creating the key starts without the deleted document's secrets.
-	must(t, cs.Put(ctx, types.ConfigDocument{Kind: types.ConfigLDAP, Key: "corp"}))
-	same(t, "re-created", types.ConfigDocument{Kind: types.ConfigLDAP, Key: "corp"},
-		get[types.ConfigDocument](t)(cs.Get(ctx, types.ConfigLDAP, "corp")))
+	storekit.Must(t, cs.Put(ctx, types.ConfigDocument{Kind: types.ConfigLDAP, Key: "corp"}))
+	storekit.Same(t, "re-created", types.ConfigDocument{Kind: types.ConfigLDAP, Key: "corp"},
+		storekit.Get[types.ConfigDocument](t)(cs.Get(ctx, types.ConfigLDAP, "corp")))
 }

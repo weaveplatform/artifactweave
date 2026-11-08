@@ -801,7 +801,7 @@ Two failures came from the runners rather than the code, and each needed a manua
 
 | Failure | Response |
 |---|---|
-| `create container: reaper: … wait for reaper …: context deadline exceeded` | `quality-gate.yml` sets `TESTCONTAINERS_RYUK_DISABLED=true`, so testcontainers-go never starts its reaper (Ryuk). Hosted runners are discarded after each job, so nothing is left behind. The emulators terminate at the end of each test through `testcontainers.CleanupContainer`. The PostgreSQL container that `internal/sqlstore/sqltest` shares across a test binary stays up until the runner goes. Local runs keep the reaper, which removes that container when the binary exits |
+| `create container: reaper: … wait for reaper …: context deadline exceeded` | `quality-gate.yml` sets `TESTCONTAINERS_RYUK_DISABLED=true`, so testcontainers-go never starts its reaper (Ryuk). Hosted runners are discarded after each job, so nothing is left behind. The emulators terminate at the end of each test through `testcontainers.CleanupContainer`. The PostgreSQL container that `migration/platform/sql/sqltest` shares across a test binary stays up until the runner goes. Local runs keep the reaper, which removes that container when the binary exits |
 | `read "https://proxy.golang.org/…": stream error: … INTERNAL_ERROR` | Every Go job runs `.github/actions/go-mod-download` straight after `actions/setup-go`. It runs `go mod download`, retrying twice with 15 s and 30 s pauses, so lint, tests, `go tool` and golangci-lint then read the module cache and never fetch. Only the download is retried: a failing test or lint step still fails |
 
 ## Real-cloud conformance (manual)

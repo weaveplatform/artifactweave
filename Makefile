@@ -69,15 +69,21 @@ test-names:
 # the flat directory that make cover and the coverage job read.
 # The growing server route matrices exceed Go's default 10-minute package
 # deadline on Windows with race and coverage enabled; keep a bounded 15 minutes.
+# The package lists reach the recipe through the environment, never its text:
+# on Windows the command make runs is cut at 8,191 characters, and the unit
+# list that CI passes was already about 4,000 when that broke the lane
+# (issue 1168).
+test: export UNIT_PKGS_LIST = $(strip $(UNIT_PKGS))
+test: export FUZZ_PKGS_LIST = $(strip $(FUZZ_PKGS))
 test: test-names
 	@rm -rf $(COVER_DIR)/unit && mkdir -p $(COVER_DIR)/unit/parts $(BIN_DIR)
 	$(GO) build -o $(BIN_DIR)/coverexec$(GOEXE) ./tools/coverexec
-	@test -n "$(strip $(UNIT_PKGS) $(FUZZ_PKGS))" || { echo "Go unit lane selected zero tests and fuzz seeds" >&2; exit 1; }
-	@if [ -n "$(strip $(UNIT_PKGS))" ]; then \
-		$(GO) test -timeout=15m -race -shuffle=on -count=1 -cover -coverpkg=$(COVERPKG) -run '$(UNIT_RUN)' -exec=$(CURDIR)/$(BIN_DIR)/coverexec$(GOEXE) $(UNIT_PKGS) -args -test.gocoverdir=$(CURDIR)/$(COVER_DIR)/unit/parts; \
+	@test -n "$$UNIT_PKGS_LIST$$FUZZ_PKGS_LIST" || { echo "Go unit lane selected zero tests and fuzz seeds" >&2; exit 1; }
+	@if [ -n "$$UNIT_PKGS_LIST" ]; then \
+		$(GO) test -timeout=15m -race -shuffle=on -count=1 -cover -coverpkg=$(COVERPKG) -run '$(UNIT_RUN)' -exec=$(CURDIR)/$(BIN_DIR)/coverexec$(GOEXE) $$UNIT_PKGS_LIST -args -test.gocoverdir=$(CURDIR)/$(COVER_DIR)/unit/parts; \
 	fi
-	@if [ -n "$(strip $(FUZZ_PKGS))" ]; then \
-		$(GO) test -timeout=15m -race -shuffle=on -count=1 -cover -coverpkg=$(COVERPKG) -run '^Fuzz' -exec=$(CURDIR)/$(BIN_DIR)/coverexec$(GOEXE) $(FUZZ_PKGS) -args -test.gocoverdir=$(CURDIR)/$(COVER_DIR)/unit/parts; \
+	@if [ -n "$$FUZZ_PKGS_LIST" ]; then \
+		$(GO) test -timeout=15m -race -shuffle=on -count=1 -cover -coverpkg=$(COVERPKG) -run '^Fuzz' -exec=$(CURDIR)/$(BIN_DIR)/coverexec$(GOEXE) $$FUZZ_PKGS_LIST -args -test.gocoverdir=$(CURDIR)/$(COVER_DIR)/unit/parts; \
 	fi
 	@parts=($(COVER_DIR)/unit/parts/*/); IFS=,; $(GO) tool covdata merge -i="$${parts[*]}" -o=$(COVER_DIR)/unit
 	@rm -rf $(COVER_DIR)/unit/parts

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/storekit"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -40,7 +41,7 @@ func user(i int, name string, groups ...string) types.User {
 		MFA:              types.MFANone,
 		Groups:           groups,
 		Roles:            types.RoleFlags{WatchManager: true, ManageWebhook: i%2 == 1},
-		Created:          at(i),
+		Created:          storekit.At(i),
 	}
 }
 
@@ -84,65 +85,86 @@ func testUsers(t *testing.T, s store.Store) {
 	if got, next, err := us.List(ctx, store.Page{}); err != nil || len(got) != 0 || next != "" {
 		t.Fatalf("List on an empty store = %v, %q, %v", got, next, err)
 	}
-	must(t, s.Groups().Create(ctx, group("g1", false)))
-	must(t, s.Groups().Create(ctx, group("g2", false)))
+	storekit.Must(t, s.Groups().Create(ctx, group("g1", false)))
+	storekit.Must(t, s.Groups().Create(ctx, group("g2", false)))
 
 	// A missing group fails the whole create.
-	wantErr(t, us.Create(ctx, user(1, "alice", "g1", "nope")), store.ErrNotFound)
+	storekit.WantErr(t, us.Create(ctx, user(1, "alice", "g1", "nope")), store.ErrNotFound)
 	_, err := us.Get(ctx, "alice")
-	wantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, store.ErrNotFound)
 
 	alice := user(1, "alice", "g2", "g1", "g2")
-	must(t, us.Create(ctx, alice))
+	storekit.Must(t, us.Create(ctx, alice))
 	wantAlice := alice
 	wantAlice.Groups = []string{"g1", "g2"}
-	got := get[types.User](t)(us.Get(ctx, "alice"))
-	same(t, "Get", wantAlice, got)
+	got := storekit.Get[types.User](t)(us.Get(ctx, "alice"))
+	storekit.Same(t, "Get", wantAlice, got)
 	if got.Created.Location() != time.UTC {
 		t.Fatalf("Created location = %v", got.Created.Location())
 	}
-	wantErr(t, us.Create(ctx, user(9, "alice")), store.ErrConflict)
+	storekit.WantErr(t, us.Create(ctx, user(9, "alice")), store.ErrConflict)
 
 	// Returned values are copies.
 	got.Groups[0] = "changed"
 	got.PasswordHash[0] = 'X'
-	same(t, "Get after mutating a result", wantAlice, get[types.User](t)(us.Get(ctx, "alice")))
+	storekit.Same(
+		t,
+		"Get after mutating a result",
+		wantAlice,
+		storekit.Get[types.User](t)(us.Get(ctx, "alice")),
+	)
 
 	// Update replaces fields and memberships; a missing group changes nothing.
 	alice.Email, alice.Groups, alice.Status = "a@example.org", []string{"g2"}, types.UserLocked
 	alice.PasswordHash = nil
-	alice.FailedLogins, alice.PasswordChanged, alice.PasswordExpired = 2, at(3), true
-	must(t, us.Update(ctx, alice))
-	same(t, "Update", alice, get[types.User](t)(us.Get(ctx, "alice")))
+	alice.FailedLogins, alice.PasswordChanged, alice.PasswordExpired = 2, storekit.At(3), true
+	storekit.Must(t, us.Update(ctx, alice))
+	storekit.Same(t, "Update", alice, storekit.Get[types.User](t)(us.Get(ctx, "alice")))
 	bad := alice
 	bad.Email, bad.Groups = "bad", []string{"nope"}
-	wantErr(t, us.Update(ctx, bad), store.ErrNotFound)
-	same(t, "failed Update", alice, get[types.User](t)(us.Get(ctx, "alice")))
-	wantErr(t, us.Update(ctx, user(1, "nobody")), store.ErrNotFound)
+	storekit.WantErr(t, us.Update(ctx, bad), store.ErrNotFound)
+	storekit.Same(t, "failed Update", alice, storekit.Get[types.User](t)(us.Get(ctx, "alice")))
+	storekit.WantErr(t, us.Update(ctx, user(1, "nobody")), store.ErrNotFound)
 
-	must(t, us.RecordLogin(ctx, "alice", at(5)))
-	alice.LastLoggedIn, alice.FailedLogins = at(5), 0
-	same(t, "RecordLogin", alice, get[types.User](t)(us.Get(ctx, "alice")))
-	wantErr(t, us.RecordLogin(ctx, "nobody", at(5)), store.ErrNotFound)
+	storekit.Must(t, us.RecordLogin(ctx, "alice", storekit.At(5)))
+	alice.LastLoggedIn, alice.FailedLogins = storekit.At(5), 0
+	storekit.Same(t, "RecordLogin", alice, storekit.Get[types.User](t)(us.Get(ctx, "alice")))
+	storekit.WantErr(t, us.RecordLogin(ctx, "nobody", storekit.At(5)), store.ErrNotFound)
 
 	for i, n := range []string{"erin", "bob", "dave", "carol"} {
-		must(t, us.Create(ctx, user(i+2, n, "g1")))
+		storekit.Must(t, us.Create(ctx, user(i+2, n, "g1")))
 	}
-	all := pages(t, 2, func(p store.Page) ([]types.User, string, error) { return us.List(ctx, p) })
-	same(t, "List order", []string{"alice", "bob", "carol", "dave", "erin"}, userNames(all))
-	same(t, "List memberships", []string{"g2"}, all[0].Groups)
-	same(t, "List memberships", []string{"g1"}, all[1].Groups)
-	same(t, "List record", alice, all[0])
+	all := storekit.Pages(
+		t,
+		2,
+		func(p store.Page) ([]types.User, string, error) { return us.List(ctx, p) },
+	)
+	storekit.Same(
+		t,
+		"List order",
+		[]string{"alice", "bob", "carol", "dave", "erin"},
+		userNames(all),
+	)
+	storekit.Same(t, "List memberships", []string{"g2"}, all[0].Groups)
+	storekit.Same(t, "List memberships", []string{"g1"}, all[1].Groups)
+	storekit.Same(t, "List record", alice, all[0])
 	for _, bad := range []string{"%%%", store.Cursor("a", "b")} {
 		_, _, err = us.List(ctx, store.Page{After: bad})
-		wantErr(t, err, store.ErrInvalidCursor)
+		storekit.WantErr(t, err, store.ErrInvalidCursor)
 	}
 
-	must(t, us.Delete(ctx, "bob"))
+	storekit.Must(t, us.Delete(ctx, "bob"))
 	_, err = us.Get(ctx, "bob")
-	wantErr(t, err, store.ErrNotFound)
-	wantErr(t, us.Delete(ctx, "bob"), store.ErrNotFound)
-	if m := get[types.Group](t)(s.Groups().Get(ctx, "g1")).Members; slices.Contains(m, "bob") {
+	storekit.WantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, us.Delete(ctx, "bob"), store.ErrNotFound)
+	if m := storekit.Get[types.Group](
+		t,
+	)(
+		s.Groups().Get(ctx, "g1"),
+	).Members; slices.Contains(
+		m,
+		"bob",
+	) {
 		t.Fatalf("deleted user still a member: %v", m)
 	}
 }
@@ -154,58 +176,77 @@ func testGroups(t *testing.T, s store.Store) {
 		t.Fatalf("List on an empty store = %v, %q, %v", got, next, err)
 	}
 	for i, n := range []string{"alice", "bob"} {
-		must(t, s.Users().Create(ctx, user(i, n)))
+		storekit.Must(t, s.Users().Create(ctx, user(i, n)))
 	}
-	wantErr(t, gs.Create(ctx, group("devs", false, "alice", "nobody")), store.ErrNotFound)
+	storekit.WantErr(t, gs.Create(ctx, group("devs", false, "alice", "nobody")), store.ErrNotFound)
 	_, err := gs.Get(ctx, "devs")
-	wantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, store.ErrNotFound)
 
 	devs := group("devs", true, "bob", "alice", "bob")
-	must(t, gs.Create(ctx, devs))
+	storekit.Must(t, gs.Create(ctx, devs))
 	wantDevs := devs
 	wantDevs.Members = []string{"alice", "bob"}
-	got := get[types.Group](t)(gs.Get(ctx, "devs"))
-	same(t, "Get", wantDevs, got)
+	got := storekit.Get[types.Group](t)(gs.Get(ctx, "devs"))
+	storekit.Same(t, "Get", wantDevs, got)
 	got.Members[0] = "changed"
-	same(t, "Get after mutating a result", wantDevs, get[types.Group](t)(gs.Get(ctx, "devs")))
-	wantErr(t, gs.Create(ctx, group("devs", false)), store.ErrConflict)
-	same(
+	storekit.Same(
+		t,
+		"Get after mutating a result",
+		wantDevs,
+		storekit.Get[types.Group](t)(gs.Get(ctx, "devs")),
+	)
+	storekit.WantErr(t, gs.Create(ctx, group("devs", false)), store.ErrConflict)
+	storekit.Same(
 		t,
 		"user sees the group",
 		[]string{"devs"},
-		get[types.User](t)(s.Users().Get(ctx, "alice")).Groups,
+		storekit.Get[types.User](t)(s.Users().Get(ctx, "alice")).Groups,
 	)
 
 	devs.Description, devs.Members = "changed", []string{"bob"}
-	must(t, gs.Update(ctx, devs))
-	same(t, "Update", devs, get[types.Group](t)(gs.Get(ctx, "devs")))
+	storekit.Must(t, gs.Update(ctx, devs))
+	storekit.Same(t, "Update", devs, storekit.Get[types.Group](t)(gs.Get(ctx, "devs")))
 	bad := devs
 	bad.Members = []string{"nobody"}
-	wantErr(t, gs.Update(ctx, bad), store.ErrNotFound)
-	same(t, "failed Update", devs, get[types.Group](t)(gs.Get(ctx, "devs")))
-	wantErr(t, gs.Update(ctx, group("nope", false)), store.ErrNotFound)
+	storekit.WantErr(t, gs.Update(ctx, bad), store.ErrNotFound)
+	storekit.Same(t, "failed Update", devs, storekit.Get[types.Group](t)(gs.Get(ctx, "devs")))
+	storekit.WantErr(t, gs.Update(ctx, group("nope", false)), store.ErrNotFound)
 
 	for _, g := range []types.Group{group("readers", true), group("admins", false), group("ops", false), group("zeta", true)} {
-		must(t, gs.Create(ctx, g))
+		storekit.Must(t, gs.Create(ctx, g))
 	}
-	all := pages(t, 2, func(p store.Page) ([]types.Group, string, error) { return gs.List(ctx, p) })
-	same(t, "List order", []string{"admins", "devs", "ops", "readers", "zeta"}, groupNames(all))
-	same(t, "List members", []string{"bob"}, all[1].Members)
-	same(t, "AutoJoin", []string{"devs", "readers", "zeta"}, get[[]string](t)(gs.AutoJoin(ctx)))
+	all := storekit.Pages(
+		t,
+		2,
+		func(p store.Page) ([]types.Group, string, error) { return gs.List(ctx, p) },
+	)
+	storekit.Same(
+		t,
+		"List order",
+		[]string{"admins", "devs", "ops", "readers", "zeta"},
+		groupNames(all),
+	)
+	storekit.Same(t, "List members", []string{"bob"}, all[1].Members)
+	storekit.Same(
+		t,
+		"AutoJoin",
+		[]string{"devs", "readers", "zeta"},
+		storekit.Get[[]string](t)(gs.AutoJoin(ctx)),
+	)
 	for _, bad := range []string{"%%%", store.Cursor("a", "b")} {
 		_, _, err = gs.List(ctx, store.Page{After: bad})
-		wantErr(t, err, store.ErrInvalidCursor)
+		storekit.WantErr(t, err, store.ErrInvalidCursor)
 	}
 
-	must(t, gs.Delete(ctx, "devs"))
+	storekit.Must(t, gs.Delete(ctx, "devs"))
 	_, err = gs.Get(ctx, "devs")
-	wantErr(t, err, store.ErrNotFound)
-	wantErr(t, gs.Delete(ctx, "devs"), store.ErrNotFound)
-	same(
+	storekit.WantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, gs.Delete(ctx, "devs"), store.ErrNotFound)
+	storekit.Same(
 		t,
 		"memberships removed",
 		[]string(nil),
-		get[types.User](t)(s.Users().Get(ctx, "bob")).Groups,
+		storekit.Get[types.User](t)(s.Users().Get(ctx, "bob")).Groups,
 	)
 }
 
@@ -213,51 +254,61 @@ func testMemberships(t *testing.T, s store.Store) {
 	ctx := context.Background()
 	gs := s.Groups()
 	for i, n := range []string{"alice", "bob", "carol"} {
-		must(t, s.Users().Create(ctx, user(i, n)))
+		storekit.Must(t, s.Users().Create(ctx, user(i, n)))
 	}
-	must(t, gs.Create(ctx, group("devs", false)))
-	must(t, gs.Create(ctx, group("ops", false)))
+	storekit.Must(t, gs.Create(ctx, group("devs", false)))
+	storekit.Must(t, gs.Create(ctx, group("ops", false)))
 
-	must(t, gs.AddMembers(ctx, "devs", "carol", "alice"))
-	must(t, gs.AddMembers(ctx, "devs", "alice")) // again: not an error
-	must(t, gs.AddMembers(ctx, "ops", "alice"))
-	same(t, "members", []string{"alice", "carol"}, get[types.Group](t)(gs.Get(ctx, "devs")).Members)
-	same(
+	storekit.Must(t, gs.AddMembers(ctx, "devs", "carol", "alice"))
+	storekit.Must(t, gs.AddMembers(ctx, "devs", "alice")) // again: not an error
+	storekit.Must(t, gs.AddMembers(ctx, "ops", "alice"))
+	storekit.Same(
+		t,
+		"members",
+		[]string{"alice", "carol"},
+		storekit.Get[types.Group](t)(gs.Get(ctx, "devs")).Members,
+	)
+	storekit.Same(
 		t,
 		"groups",
 		[]string{"devs", "ops"},
-		get[types.User](t)(s.Users().Get(ctx, "alice")).Groups,
+		storekit.Get[types.User](t)(s.Users().Get(ctx, "alice")).Groups,
 	)
 
-	wantErr(t, gs.AddMembers(ctx, "nope", "alice"), store.ErrNotFound)
-	wantErr(t, gs.AddMembers(ctx, "devs", "bob", "nobody"), store.ErrNotFound)
-	same(
+	storekit.WantErr(t, gs.AddMembers(ctx, "nope", "alice"), store.ErrNotFound)
+	storekit.WantErr(t, gs.AddMembers(ctx, "devs", "bob", "nobody"), store.ErrNotFound)
+	storekit.Same(
 		t,
 		"failed AddMembers",
 		[]string{"alice", "carol"},
-		get[types.Group](t)(gs.Get(ctx, "devs")).Members,
+		storekit.Get[types.Group](t)(gs.Get(ctx, "devs")).Members,
 	)
 
-	must(t, gs.RemoveMembers(ctx, "devs", "alice", "bob", "nobody"))
-	same(
+	storekit.Must(t, gs.RemoveMembers(ctx, "devs", "alice", "bob", "nobody"))
+	storekit.Same(
 		t,
 		"after RemoveMembers",
 		[]string{"carol"},
-		get[types.Group](t)(gs.Get(ctx, "devs")).Members,
+		storekit.Get[types.Group](t)(gs.Get(ctx, "devs")).Members,
 	)
-	wantErr(t, gs.RemoveMembers(ctx, "nope", "alice"), store.ErrNotFound)
+	storekit.WantErr(t, gs.RemoveMembers(ctx, "nope", "alice"), store.ErrNotFound)
 
 	// Replacing a user's groups through Update leaves other members alone.
-	carol := get[types.User](t)(s.Users().Get(ctx, "carol"))
+	carol := storekit.Get[types.User](t)(s.Users().Get(ctx, "carol"))
 	carol.Groups = []string{"ops"}
-	must(t, s.Users().Update(ctx, carol))
-	same(
+	storekit.Must(t, s.Users().Update(ctx, carol))
+	storekit.Same(
 		t,
 		"devs after carol left",
 		[]string(nil),
-		get[types.Group](t)(gs.Get(ctx, "devs")).Members,
+		storekit.Get[types.Group](t)(gs.Get(ctx, "devs")).Members,
 	)
-	same(t, "ops", []string{"alice", "carol"}, get[types.Group](t)(gs.Get(ctx, "ops")).Members)
+	storekit.Same(
+		t,
+		"ops",
+		[]string{"alice", "carol"},
+		storekit.Get[types.Group](t)(gs.Get(ctx, "ops")).Members,
+	)
 }
 
 func permission(
@@ -269,8 +320,8 @@ func permission(
 		Name:        name,
 		Description: "permission " + name,
 		Resources:   resources,
-		Created:     at(i),
-		Updated:     at(i + 1),
+		Created:     storekit.At(i),
+		Updated:     storekit.At(i + 1),
 	}
 }
 
@@ -302,15 +353,20 @@ func testPermissions(t *testing.T, s store.Store) {
 			Targets: map[string]types.Target{"libs-local": {}},
 		},
 	})
-	must(t, ps.Create(ctx, deploy))
-	must(t, ps.Create(ctx, empty))
-	got := get[types.Permission](t)(ps.Get(ctx, "deploy"))
-	same(t, "Get", deploy, got)
+	storekit.Must(t, ps.Create(ctx, deploy))
+	storekit.Must(t, ps.Create(ctx, empty))
+	got := storekit.Get[types.Permission](t)(ps.Get(ctx, "deploy"))
+	storekit.Same(t, "Get", deploy, got)
 	got.Resources[types.ResourceArtifact].Actions.Users["alice"] = types.ActionManage
-	same(t, "Get after mutating a result", deploy, get[types.Permission](t)(ps.Get(ctx, "deploy")))
-	wantErr(t, ps.Create(ctx, permission(3, "deploy", nil)), store.ErrConflict)
+	storekit.Same(
+		t,
+		"Get after mutating a result",
+		deploy,
+		storekit.Get[types.Permission](t)(ps.Get(ctx, "deploy")),
+	)
+	storekit.WantErr(t, ps.Create(ctx, permission(3, "deploy", nil)), store.ErrConflict)
 	_, err := ps.Get(ctx, "nope")
-	wantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, store.ErrNotFound)
 
 	for _, c := range []struct {
 		user   string
@@ -323,15 +379,27 @@ func testPermissions(t *testing.T, s store.Store) {
 		{"zed", []string{"ops", "devs"}, []string{"deploy"}},
 		{"zed", []string{"ops"}, nil},
 	} {
-		same(t, fmt.Sprintf("ForPrincipal(%s, %v)", c.user, c.groups), c.want,
-			permissionNames(get[[]types.Permission](t)(ps.ForPrincipal(ctx, c.user, c.groups))))
+		storekit.Same(
+			t,
+			fmt.Sprintf("ForPrincipal(%s, %v)", c.user, c.groups),
+			c.want,
+			permissionNames(
+				storekit.Get[[]types.Permission](t)(ps.ForPrincipal(ctx, c.user, c.groups)),
+			),
+		)
 	}
-	same(t, "WithTarget libs-local", []string{"deploy", "empty"},
-		permissionNames(get[[]types.Permission](t)(ps.WithTarget(ctx, "libs-local"))))
-	same(t, "WithTarget build", []string{"deploy"},
-		permissionNames(get[[]types.Permission](t)(ps.WithTarget(ctx, types.BuildInfoRepository))))
-	same(t, "WithTarget none", []string(nil),
-		permissionNames(get[[]types.Permission](t)(ps.WithTarget(ctx, "other"))))
+	storekit.Same(t, "WithTarget libs-local", []string{"deploy", "empty"},
+		permissionNames(storekit.Get[[]types.Permission](t)(ps.WithTarget(ctx, "libs-local"))))
+	storekit.Same(
+		t,
+		"WithTarget build",
+		[]string{"deploy"},
+		permissionNames(
+			storekit.Get[[]types.Permission](t)(ps.WithTarget(ctx, types.BuildInfoRepository)),
+		),
+	)
+	storekit.Same(t, "WithTarget none", []string(nil),
+		permissionNames(storekit.Get[[]types.Permission](t)(ps.WithTarget(ctx, "other"))))
 
 	// Update replaces the document and what the lookups see.
 	deploy.Resources = map[types.ResourceType]types.Resource{
@@ -340,44 +408,56 @@ func testPermissions(t *testing.T, s store.Store) {
 			Targets: map[string]types.Target{"other": {Include: []string{"**"}}},
 		},
 	}
-	deploy.Updated = at(9)
-	must(t, ps.Update(ctx, deploy))
-	same(t, "Update", deploy, get[types.Permission](t)(ps.Get(ctx, "deploy")))
-	same(t, "ForPrincipal after Update", []string(nil),
-		permissionNames(get[[]types.Permission](t)(ps.ForPrincipal(ctx, "alice", nil))))
-	same(t, "ForPrincipal ops after Update", []string{"deploy"},
-		permissionNames(get[[]types.Permission](t)(ps.ForPrincipal(ctx, "x", []string{"ops"}))))
-	same(t, "WithTarget after Update", []string{"empty"},
-		permissionNames(get[[]types.Permission](t)(ps.WithTarget(ctx, "libs-local"))))
-	wantErr(t, ps.Update(ctx, permission(1, "nope", nil)), store.ErrNotFound)
+	deploy.Updated = storekit.At(9)
+	storekit.Must(t, ps.Update(ctx, deploy))
+	storekit.Same(t, "Update", deploy, storekit.Get[types.Permission](t)(ps.Get(ctx, "deploy")))
+	storekit.Same(t, "ForPrincipal after Update", []string(nil),
+		permissionNames(storekit.Get[[]types.Permission](t)(ps.ForPrincipal(ctx, "alice", nil))))
+	storekit.Same(
+		t,
+		"ForPrincipal ops after Update",
+		[]string{"deploy"},
+		permissionNames(
+			storekit.Get[[]types.Permission](t)(ps.ForPrincipal(ctx, "x", []string{"ops"})),
+		),
+	)
+	storekit.Same(t, "WithTarget after Update", []string{"empty"},
+		permissionNames(storekit.Get[[]types.Permission](t)(ps.WithTarget(ctx, "libs-local"))))
+	storekit.WantErr(t, ps.Update(ctx, permission(1, "nope", nil)), store.ErrNotFound)
 
 	for i, n := range []string{"c", "a", "b"} {
-		must(t, ps.Create(ctx, permission(i, n, nil)))
+		storekit.Must(t, ps.Create(ctx, permission(i, n, nil)))
 	}
-	all := pages(
+	all := storekit.Pages(
 		t,
 		2,
 		func(p store.Page) ([]types.Permission, string, error) { return ps.List(ctx, p) },
 	)
-	same(t, "List order", []string{"a", "b", "c", "deploy", "empty"}, permissionNames(all))
-	same(t, "List record", deploy, all[3])
+	storekit.Same(t, "List order", []string{"a", "b", "c", "deploy", "empty"}, permissionNames(all))
+	storekit.Same(t, "List record", deploy, all[3])
 	for _, bad := range []string{"%%%", store.Cursor("a", "b")} {
 		_, _, err = ps.List(ctx, store.Page{After: bad})
-		wantErr(t, err, store.ErrInvalidCursor)
+		storekit.WantErr(t, err, store.ErrInvalidCursor)
 	}
 
-	must(t, ps.Delete(ctx, "deploy"))
+	storekit.Must(t, ps.Delete(ctx, "deploy"))
 	_, err = ps.Get(ctx, "deploy")
-	wantErr(t, err, store.ErrNotFound)
-	wantErr(t, ps.Delete(ctx, "deploy"), store.ErrNotFound)
-	same(t, "ForPrincipal after Delete", []string(nil),
-		permissionNames(get[[]types.Permission](t)(ps.ForPrincipal(ctx, "x", []string{"ops"}))))
+	storekit.WantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, ps.Delete(ctx, "deploy"), store.ErrNotFound)
+	storekit.Same(
+		t,
+		"ForPrincipal after Delete",
+		[]string(nil),
+		permissionNames(
+			storekit.Get[[]types.Permission](t)(ps.ForPrincipal(ctx, "x", []string{"ops"})),
+		),
+	)
 }
 
 func scope(t *testing.T, s string) types.Scope {
 	t.Helper()
 	sc, err := types.ParseScope(s)
-	must(t, err)
+	storekit.Must(t, err)
 	return sc
 }
 
@@ -410,22 +490,27 @@ func testTokens(t *testing.T, s store.Store) {
 	ctx := context.Background()
 	ts := s.Tokens()
 	sub := "jfac@01abc/users/alice"
-	t1 := token(t, "t1", sub, at(1))
-	must(t, ts.Create(ctx, t1))
-	got := get[types.Token](t)(ts.Get(ctx, "t1"))
-	same(t, "Get", t1, got)
+	t1 := token(t, "t1", sub, storekit.At(1))
+	storekit.Must(t, ts.Create(ctx, t1))
+	got := storekit.Get[types.Token](t)(ts.Get(ctx, "t1"))
+	storekit.Same(t, "Get", t1, got)
 	got.AccessDigest[0] = 'X'
-	same(t, "Get after mutating a result", t1, get[types.Token](t)(ts.Get(ctx, "t1")))
-	wantErr(t, ts.Create(ctx, token(t, "t1", sub, at(2))), store.ErrConflict)
+	storekit.Same(
+		t,
+		"Get after mutating a result",
+		t1,
+		storekit.Get[types.Token](t)(ts.Get(ctx, "t1")),
+	)
+	storekit.WantErr(t, ts.Create(ctx, token(t, "t1", sub, storekit.At(2))), store.ErrConflict)
 	_, err := ts.Get(ctx, "nope")
-	wantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, store.ErrNotFound)
 
 	// Every digest is unique; empty digests never collide.
-	dup := token(t, "t9", sub, at(2))
+	dup := token(t, "t9", sub, storekit.At(2))
 	dup.RefreshDigest = t1.RefreshDigest
-	wantErr(t, ts.Create(ctx, dup), store.ErrConflict)
+	storekit.WantErr(t, ts.Create(ctx, dup), store.ErrConflict)
 	_, err = ts.Get(ctx, "t9")
-	wantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, store.ErrNotFound)
 	// The identity of an OIDC exchange's token round-trips (research 21).
 	bare := []types.Token{
 		{
@@ -435,8 +520,8 @@ func testTokens(t *testing.T, s store.Store) {
 		{ID: "t00", Subject: "jfac@01abc/users/bob", Identity: types.IdentitySynthetic},
 	}
 	for _, b := range bare {
-		must(t, ts.Create(ctx, b))
-		same(t, "Get bare "+b.ID, b, get[types.Token](t)(ts.Get(ctx, b.ID)))
+		storekit.Must(t, ts.Create(ctx, b))
+		storekit.Same(t, "Get bare "+b.ID, b, storekit.Get[types.Token](t)(ts.Get(ctx, b.ID)))
 	}
 
 	for _, kind := range []store.DigestKind{store.DigestAccess, store.DigestRefresh, store.DigestReference} {
@@ -449,39 +534,39 @@ func testTokens(t *testing.T, s store.Store) {
 		default:
 			d = t1.ReferenceDigest
 		}
-		if got := get[types.Token](t)(ts.ByDigest(ctx, kind, d)); got.ID != "t1" {
+		if got := storekit.Get[types.Token](t)(ts.ByDigest(ctx, kind, d)); got.ID != "t1" {
 			t.Fatalf("ByDigest(%d) = %s", kind, got.ID)
 		}
 		_, err := ts.ByDigest(ctx, kind, []byte("unknown"))
-		wantErr(t, err, store.ErrNotFound)
+		storekit.WantErr(t, err, store.ErrNotFound)
 		_, err = ts.ByDigest(ctx, kind, nil)
-		wantErr(t, err, store.ErrNotFound)
+		storekit.WantErr(t, err, store.ErrNotFound)
 	}
 	// An access digest is not a refresh digest.
 	_, err = ts.ByDigest(ctx, store.DigestRefresh, t1.AccessDigest)
-	wantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, store.ErrNotFound)
 	_, err = ts.ByDigest(ctx, store.DigestKind(0), t1.AccessDigest)
-	wantErr(t, err, store.ErrInvalid)
+	storekit.WantErr(t, err, store.ErrInvalid)
 
 	// Ties on IssuedAt order by ID; unset IssuedAt sorts first.
 	for _, tk := range []types.Token{
-		token(t, "t4", sub, at(3)), token(t, "t3", sub, at(3)), token(t, "t2", "jfac@01abc/users/carol", at(2)),
+		token(t, "t4", sub, storekit.At(3)), token(t, "t3", sub, storekit.At(3)), token(t, "t2", "jfac@01abc/users/carol", storekit.At(2)),
 	} {
-		must(t, ts.Create(ctx, tk))
+		storekit.Must(t, ts.Create(ctx, tk))
 	}
-	all := pages(
+	all := storekit.Pages(
 		t,
 		2,
 		func(p store.Page) ([]types.Token, string, error) { return ts.List(ctx, store.TokenFilter{}, p) },
 	)
-	same(t, "List order", []string{"t0", "t00", "t1", "t2", "t3", "t4"}, tokenIDs(all))
-	mine := pages(t, 1, func(p store.Page) ([]types.Token, string, error) {
+	storekit.Same(t, "List order", []string{"t0", "t00", "t1", "t2", "t3", "t4"}, tokenIDs(all))
+	mine := storekit.Pages(t, 1, func(p store.Page) ([]types.Token, string, error) {
 		return ts.List(ctx, store.TokenFilter{Subject: sub}, p)
 	})
-	same(t, "List by subject", []string{"t1", "t3", "t4"}, tokenIDs(mine))
+	storekit.Same(t, "List by subject", []string{"t1", "t3", "t4"}, tokenIDs(mine))
 	for _, bad := range []string{"%%%", store.Cursor("x", "t1"), store.Cursor("t1")} {
 		_, _, err = ts.List(ctx, store.TokenFilter{}, store.Page{After: bad})
-		wantErr(t, err, store.ErrInvalidCursor)
+		storekit.WantErr(t, err, store.ErrInvalidCursor)
 	}
 
 	// A subject holds at most one token of a purpose, and its sealed secret
@@ -492,53 +577,53 @@ func testTokens(t *testing.T, s store.Store) {
 		Purpose: types.TokenPurposeEncryptedPassword,
 		Secret:  "ref-tp1",
 	}
-	must(t, ts.Create(ctx, pw))
-	same(t, "Get purposed", pw, get[types.Token](t)(ts.Get(ctx, "tp1")))
+	storekit.Must(t, ts.Create(ctx, pw))
+	storekit.Same(t, "Get purposed", pw, storekit.Get[types.Token](t)(ts.Get(ctx, "tp1")))
 	again := pw
 	again.ID, again.Secret = "tp2", "ref-tp2"
-	wantErr(t, ts.Create(ctx, again), store.ErrConflict)
+	storekit.WantErr(t, ts.Create(ctx, again), store.ErrConflict)
 	other := again
 	other.Subject = "jfac@01abc/users/erin"
-	must(t, ts.Create(ctx, other))
-	byPurpose := pages(t, 1, func(p store.Page) ([]types.Token, string, error) {
+	storekit.Must(t, ts.Create(ctx, other))
+	byPurpose := storekit.Pages(t, 1, func(p store.Page) ([]types.Token, string, error) {
 		return ts.List(ctx, store.TokenFilter{Purpose: types.TokenPurposeEncryptedPassword}, p)
 	})
-	same(t, "List by purpose", []string{"tp1", "tp2"}, tokenIDs(byPurpose))
+	storekit.Same(t, "List by purpose", []string{"tp1", "tp2"}, tokenIDs(byPurpose))
 	davePW, _, err := ts.List(
 		ctx,
 		store.TokenFilter{Subject: pw.Subject, Purpose: types.TokenPurposeEncryptedPassword},
 		store.Page{},
 	)
-	must(t, err)
-	same(t, "List by subject and purpose", []types.Token{pw}, davePW)
+	storekit.Must(t, err)
+	storekit.Same(t, "List by subject and purpose", []types.Token{pw}, davePW)
 	for _, id := range []string{"tp1", "tp2"} {
-		must(t, ts.Delete(ctx, id))
+		storekit.Must(t, ts.Delete(ctx, id))
 	}
 
-	must(t, ts.Touch(ctx, "t1", at(30)))
-	t1.LastUsed = at(30)
-	same(t, "Touch", t1, get[types.Token](t)(ts.Get(ctx, "t1")))
-	wantErr(t, ts.Touch(ctx, "nope", at(30)), store.ErrNotFound)
+	storekit.Must(t, ts.Touch(ctx, "t1", storekit.At(30)))
+	t1.LastUsed = storekit.At(30)
+	storekit.Same(t, "Touch", t1, storekit.Get[types.Token](t)(ts.Get(ctx, "t1")))
+	storekit.WantErr(t, ts.Touch(ctx, "nope", storekit.At(30)), store.ErrNotFound)
 
 	// t1, t2 and t3/t4 expire an hour after issue; t0 and t00 never expire.
-	n, err := ts.DeleteExpired(ctx, at(62).Add(time.Second))
-	must(t, err)
+	n, err := ts.DeleteExpired(ctx, storekit.At(62).Add(time.Second))
+	storekit.Must(t, err)
 	if n != 2 {
 		t.Fatalf("DeleteExpired removed %d, want 2", n)
 	}
-	rest := pages(
+	rest := storekit.Pages(
 		t,
 		10,
 		func(p store.Page) ([]types.Token, string, error) { return ts.List(ctx, store.TokenFilter{}, p) },
 	)
-	same(t, "after DeleteExpired", []string{"t0", "t00", "t3", "t4"}, tokenIDs(rest))
+	storekit.Same(t, "after DeleteExpired", []string{"t0", "t00", "t3", "t4"}, tokenIDs(rest))
 
-	must(t, ts.Delete(ctx, "t3"))
+	storekit.Must(t, ts.Delete(ctx, "t3"))
 	_, err = ts.Get(ctx, "t3")
-	wantErr(t, err, store.ErrNotFound)
-	wantErr(t, ts.Delete(ctx, "t3"), store.ErrNotFound)
+	storekit.WantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, ts.Delete(ctx, "t3"), store.ErrNotFound)
 	_, err = ts.ByDigest(ctx, store.DigestAccess, []byte("access-t3"))
-	wantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, store.ErrNotFound)
 }
 
 func keypair(name string) types.Keypair {
@@ -556,35 +641,45 @@ func testKeypairs(t *testing.T, s store.Store) {
 	ctx := context.Background()
 	ks := s.Keys()
 	for _, n := range []string{"rsa", "gpg"} {
-		must(t, ks.CreateKeypair(ctx, keypair(n)))
+		storekit.Must(t, ks.CreateKeypair(ctx, keypair(n)))
 	}
-	same(t, "Keypair", keypair("gpg"), get[types.Keypair](t)(ks.Keypair(ctx, "gpg")))
-	wantErr(t, ks.CreateKeypair(ctx, keypair("gpg")), store.ErrConflict)
+	storekit.Same(
+		t,
+		"Keypair",
+		keypair("gpg"),
+		storekit.Get[types.Keypair](t)(ks.Keypair(ctx, "gpg")),
+	)
+	storekit.WantErr(t, ks.CreateKeypair(ctx, keypair("gpg")), store.ErrConflict)
 	_, err := ks.Keypair(ctx, "nope")
-	wantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, store.ErrNotFound)
 	// No passphrase is stored as none.
 	plain := keypair("plain")
 	plain.Type, plain.Passphrase = types.KeypairRSA, ""
-	must(t, ks.CreateKeypair(ctx, plain))
-	same(t, "Keypair without passphrase", plain, get[types.Keypair](t)(ks.Keypair(ctx, "plain")))
+	storekit.Must(t, ks.CreateKeypair(ctx, plain))
+	storekit.Same(
+		t,
+		"Keypair without passphrase",
+		plain,
+		storekit.Get[types.Keypair](t)(ks.Keypair(ctx, "plain")),
+	)
 
-	same(
+	storekit.Same(
 		t,
 		"Keypairs",
 		[]types.Keypair{keypair("gpg"), plain, keypair("rsa")},
-		get[[]types.Keypair](t)(ks.Keypairs(ctx)),
+		storekit.Get[[]types.Keypair](t)(ks.Keypairs(ctx)),
 	)
 
 	upd := keypair("rsa")
 	upd.PrivateKey, upd.Passphrase, upd.Alias = "rotated", "new-pass", "new-alias"
-	must(t, ks.UpdateKeypair(ctx, upd))
-	same(t, "UpdateKeypair", upd, get[types.Keypair](t)(ks.Keypair(ctx, "rsa")))
-	wantErr(t, ks.UpdateKeypair(ctx, keypair("nope")), store.ErrNotFound)
+	storekit.Must(t, ks.UpdateKeypair(ctx, upd))
+	storekit.Same(t, "UpdateKeypair", upd, storekit.Get[types.Keypair](t)(ks.Keypair(ctx, "rsa")))
+	storekit.WantErr(t, ks.UpdateKeypair(ctx, keypair("nope")), store.ErrNotFound)
 
-	must(t, ks.DeleteKeypair(ctx, "rsa"))
+	storekit.Must(t, ks.DeleteKeypair(ctx, "rsa"))
 	_, err = ks.Keypair(ctx, "rsa")
-	wantErr(t, err, store.ErrNotFound)
-	wantErr(t, ks.DeleteKeypair(ctx, "rsa"), store.ErrNotFound)
+	storekit.WantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, ks.DeleteKeypair(ctx, "rsa"), store.ErrNotFound)
 }
 
 func certificate(i int, alias string) types.Certificate {
@@ -594,8 +689,8 @@ func certificate(i int, alias string) types.Certificate {
 		PrivateKey:  "-----BEGIN PRIVATE KEY-----\n" + alias,
 		IssuedTo:    "CN=" + alias,
 		IssuedBy:    "CN=Example CA",
-		IssuedOn:    at(i),
-		ValidUntil:  at(i).AddDate(1, 0, 0),
+		IssuedOn:    storekit.At(i),
+		ValidUntil:  storekit.At(i).AddDate(1, 0, 0),
 		Fingerprint: fmt.Sprintf("%064x", i),
 	}
 }
@@ -604,27 +699,32 @@ func testCertificates(t *testing.T, s store.Store) {
 	ctx := context.Background()
 	ks := s.Keys()
 	b, a := certificate(1, "b"), certificate(2, "a")
-	must(t, ks.PutCertificate(ctx, b))
-	must(t, ks.PutCertificate(ctx, a))
-	same(t, "Certificate", b, get[types.Certificate](t)(ks.Certificate(ctx, "b")))
-	b.PEM, b.IssuedOn = "replaced", at(7)
-	must(t, ks.PutCertificate(ctx, b))
-	same(t, "replaced Certificate", b, get[types.Certificate](t)(ks.Certificate(ctx, "b")))
-	same(
+	storekit.Must(t, ks.PutCertificate(ctx, b))
+	storekit.Must(t, ks.PutCertificate(ctx, a))
+	storekit.Same(t, "Certificate", b, storekit.Get[types.Certificate](t)(ks.Certificate(ctx, "b")))
+	b.PEM, b.IssuedOn = "replaced", storekit.At(7)
+	storekit.Must(t, ks.PutCertificate(ctx, b))
+	storekit.Same(
+		t,
+		"replaced Certificate",
+		b,
+		storekit.Get[types.Certificate](t)(ks.Certificate(ctx, "b")),
+	)
+	storekit.Same(
 		t,
 		"Certificates",
 		[]types.Certificate{a, b},
-		get[[]types.Certificate](t)(ks.Certificates(ctx)),
+		storekit.Get[[]types.Certificate](t)(ks.Certificates(ctx)),
 	)
 	_, err := ks.Certificate(ctx, "nope")
-	wantErr(t, err, store.ErrNotFound)
-	must(t, ks.DeleteCertificate(ctx, "a"))
-	wantErr(t, ks.DeleteCertificate(ctx, "a"), store.ErrNotFound)
-	same(
+	storekit.WantErr(t, err, store.ErrNotFound)
+	storekit.Must(t, ks.DeleteCertificate(ctx, "a"))
+	storekit.WantErr(t, ks.DeleteCertificate(ctx, "a"), store.ErrNotFound)
+	storekit.Same(
 		t,
 		"Certificates after delete",
 		[]types.Certificate{b},
-		get[[]types.Certificate](t)(ks.Certificates(ctx)),
+		storekit.Get[[]types.Certificate](t)(ks.Certificates(ctx)),
 	)
 }
 
@@ -634,9 +734,9 @@ func trustedKey(i int, kid, alias string) types.TrustedKey {
 		Alias:       alias,
 		PublicKey:   "-----BEGIN PGP PUBLIC KEY BLOCK-----\n" + kid,
 		Fingerprint: fmt.Sprintf("%040x", i),
-		IssuedOn:    at(i),
+		IssuedOn:    storekit.At(i),
 		IssuedBy:    "release@example.com",
-		ValidUntil:  at(i).AddDate(2, 0, 0),
+		ValidUntil:  storekit.At(i).AddDate(2, 0, 0),
 	}
 }
 
@@ -644,26 +744,26 @@ func testTrustedKeys(t *testing.T, s store.Store) {
 	ctx := context.Background()
 	ks := s.Keys()
 	k2, k1 := trustedKey(2, "k2", "edge"), trustedKey(1, "k1", "")
-	must(t, ks.CreateTrustedKey(ctx, k2))
-	must(t, ks.CreateTrustedKey(ctx, k1))
+	storekit.Must(t, ks.CreateTrustedKey(ctx, k2))
+	storekit.Must(t, ks.CreateTrustedKey(ctx, k1))
 	// Keys without an alias do not collide with each other.
 	k3 := trustedKey(3, "k3", "")
-	must(t, ks.CreateTrustedKey(ctx, k3))
-	same(t, "TrustedKey", k2, get[types.TrustedKey](t)(ks.TrustedKey(ctx, "k2")))
-	wantErr(t, ks.CreateTrustedKey(ctx, trustedKey(4, "k2", "other")), store.ErrConflict)
-	wantErr(t, ks.CreateTrustedKey(ctx, trustedKey(4, "k4", "edge")), store.ErrConflict)
+	storekit.Must(t, ks.CreateTrustedKey(ctx, k3))
+	storekit.Same(t, "TrustedKey", k2, storekit.Get[types.TrustedKey](t)(ks.TrustedKey(ctx, "k2")))
+	storekit.WantErr(t, ks.CreateTrustedKey(ctx, trustedKey(4, "k2", "other")), store.ErrConflict)
+	storekit.WantErr(t, ks.CreateTrustedKey(ctx, trustedKey(4, "k4", "edge")), store.ErrConflict)
 	_, err := ks.TrustedKey(ctx, "k4")
-	wantErr(t, err, store.ErrNotFound)
-	same(
+	storekit.WantErr(t, err, store.ErrNotFound)
+	storekit.Same(
 		t,
 		"TrustedKeys",
 		[]types.TrustedKey{k1, k2, k3},
-		get[[]types.TrustedKey](t)(ks.TrustedKeys(ctx)),
+		storekit.Get[[]types.TrustedKey](t)(ks.TrustedKeys(ctx)),
 	)
-	must(t, ks.DeleteTrustedKey(ctx, "k2"))
-	wantErr(t, ks.DeleteTrustedKey(ctx, "k2"), store.ErrNotFound)
+	storekit.Must(t, ks.DeleteTrustedKey(ctx, "k2"))
+	storekit.WantErr(t, ks.DeleteTrustedKey(ctx, "k2"), store.ErrNotFound)
 	// The alias is free again once its key is gone.
-	must(t, ks.CreateTrustedKey(ctx, trustedKey(5, "k5", "edge")))
+	storekit.Must(t, ks.CreateTrustedKey(ctx, trustedKey(5, "k5", "edge")))
 }
 
 func signingKey(alias string, isDefault bool) types.SigningKey {
@@ -680,57 +780,67 @@ func testSigningKeys(t *testing.T, s store.Store) {
 	ctx := context.Background()
 	ks := s.Keys()
 	_, err := ks.DefaultSigningKey(ctx)
-	wantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, store.ErrNotFound)
 
-	must(t, ks.PutSigningKey(ctx, signingKey("a", true)))
-	must(t, ks.PutSigningKey(ctx, signingKey("c", false)))
-	same(t, "SigningKey", signingKey("a", true), get[types.SigningKey](t)(ks.SigningKey(ctx, "a")))
-	same(
+	storekit.Must(t, ks.PutSigningKey(ctx, signingKey("a", true)))
+	storekit.Must(t, ks.PutSigningKey(ctx, signingKey("c", false)))
+	storekit.Same(
+		t,
+		"SigningKey",
+		signingKey("a", true),
+		storekit.Get[types.SigningKey](t)(ks.SigningKey(ctx, "a")),
+	)
+	storekit.Same(
 		t,
 		"DefaultSigningKey",
 		signingKey("a", true),
-		get[types.SigningKey](t)(ks.DefaultSigningKey(ctx)),
+		storekit.Get[types.SigningKey](t)(ks.DefaultSigningKey(ctx)),
 	)
 
 	// A new default clears the old one.
-	must(t, ks.PutSigningKey(ctx, signingKey("b", true)))
-	same(
+	storekit.Must(t, ks.PutSigningKey(ctx, signingKey("b", true)))
+	storekit.Same(
 		t,
 		"SigningKeys",
 		[]types.SigningKey{signingKey("a", false), signingKey("b", true), signingKey("c", false)},
-		get[[]types.SigningKey](t)(ks.SigningKeys(ctx)),
+		storekit.Get[[]types.SigningKey](t)(ks.SigningKeys(ctx)),
 	)
-	same(
+	storekit.Same(
 		t,
 		"new default",
 		signingKey("b", true),
-		get[types.SigningKey](t)(ks.DefaultSigningKey(ctx)),
+		storekit.Get[types.SigningKey](t)(ks.DefaultSigningKey(ctx)),
 	)
 
 	// Replacing the default key keeps it the default.
 	b := signingKey("b", true)
 	b.PrivateKey, b.Passphrase = "rotated", ""
-	must(t, ks.PutSigningKey(ctx, b))
-	same(t, "replaced", b, get[types.SigningKey](t)(ks.SigningKey(ctx, "b")))
-	same(t, "still default", b, get[types.SigningKey](t)(ks.DefaultSigningKey(ctx)))
+	storekit.Must(t, ks.PutSigningKey(ctx, b))
+	storekit.Same(t, "replaced", b, storekit.Get[types.SigningKey](t)(ks.SigningKey(ctx, "b")))
+	storekit.Same(
+		t,
+		"still default",
+		b,
+		storekit.Get[types.SigningKey](t)(ks.DefaultSigningKey(ctx)),
+	)
 
 	_, err = ks.SigningKey(ctx, "nope")
-	wantErr(t, err, store.ErrNotFound)
-	must(t, ks.DeleteSigningKey(ctx, "b"))
-	wantErr(t, ks.DeleteSigningKey(ctx, "b"), store.ErrNotFound)
+	storekit.WantErr(t, err, store.ErrNotFound)
+	storekit.Must(t, ks.DeleteSigningKey(ctx, "b"))
+	storekit.WantErr(t, ks.DeleteSigningKey(ctx, "b"), store.ErrNotFound)
 	_, err = ks.DefaultSigningKey(ctx)
-	wantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, store.ErrNotFound)
 }
 
 func testUserLockout(t *testing.T, s store.Store) {
 	ctx := context.Background()
 	us := s.Users()
 	for i, n := range []string{"ann", "ben", "cat", "dan"} {
-		must(t, us.Create(ctx, user(i, n)))
+		storekit.Must(t, us.Create(ctx, user(i, n)))
 	}
-	disabled := get[types.User](t)(us.Get(ctx, "dan"))
+	disabled := storekit.Get[types.User](t)(us.Get(ctx, "dan"))
 	disabled.Status = types.UserDisabled
-	must(t, us.Update(ctx, disabled))
+	storekit.Must(t, us.Update(ctx, disabled))
 
 	// Failed logins count up and lock at the limit; zero never locks.
 	for i, want := range []bool{false, false, true} {
@@ -749,39 +859,49 @@ func testUserLockout(t *testing.T, s store.Store) {
 	if _, err := us.RecordFailedLogin(ctx, "nobody", 1); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("an unknown user: %v", err)
 	}
-	ann := get[types.User](t)(us.Get(ctx, "ann"))
+	ann := storekit.Get[types.User](t)(us.Get(ctx, "ann"))
 	if ann.Status != types.UserLocked || ann.FailedLogins != 3 {
 		t.Fatalf("ann = %s with %d failures", ann.Status, ann.FailedLogins)
 	}
 	if _, err := us.RecordFailedLogin(ctx, "cat", 1); err != nil {
 		t.Fatal(err)
 	}
-	same(t, "Locked", []string{"ann", "cat"}, get[[]string](t)(us.Locked(ctx)))
+	storekit.Same(t, "Locked", []string{"ann", "cat"}, storekit.Get[[]string](t)(us.Locked(ctx)))
 
 	// Unlocking named users ignores unknown names and resets counters.
-	must(t, us.Unlock(ctx, "ann", "nobody"))
-	ann = get[types.User](t)(us.Get(ctx, "ann"))
+	storekit.Must(t, us.Unlock(ctx, "ann", "nobody"))
+	ann = storekit.Get[types.User](t)(us.Get(ctx, "ann"))
 	if ann.Status != types.UserEnabled || ann.FailedLogins != 0 {
 		t.Fatalf("unlocked ann = %s with %d failures", ann.Status, ann.FailedLogins)
 	}
-	same(t, "Locked after one unlock", []string{"cat"}, get[[]string](t)(us.Locked(ctx)))
+	storekit.Same(
+		t,
+		"Locked after one unlock",
+		[]string{"cat"},
+		storekit.Get[[]string](t)(us.Locked(ctx)),
+	)
 
 	// Unlocking everyone also clears counters of users below the limit and
 	// leaves disabled users disabled.
-	must(t, us.Unlock(ctx))
-	same(t, "Locked after unlocking all", []string{}, get[[]string](t)(us.Locked(ctx)))
-	if ben := get[types.User](t)(us.Get(ctx, "ben")); ben.FailedLogins != 0 {
+	storekit.Must(t, us.Unlock(ctx))
+	storekit.Same(
+		t,
+		"Locked after unlocking all",
+		[]string{},
+		storekit.Get[[]string](t)(us.Locked(ctx)),
+	)
+	if ben := storekit.Get[types.User](t)(us.Get(ctx, "ben")); ben.FailedLogins != 0 {
 		t.Fatalf("ben's failures were not cleared: %d", ben.FailedLogins)
 	}
-	if dan := get[types.User](t)(us.Get(ctx, "dan")); dan.Status != types.UserDisabled {
+	if dan := storekit.Get[types.User](t)(us.Get(ctx, "dan")); dan.Status != types.UserDisabled {
 		t.Fatalf("unlock changed a disabled user: %s", dan.Status)
 	}
 	// A successful login resets the counter.
 	if _, err := us.RecordFailedLogin(ctx, "ben", 5); err != nil {
 		t.Fatal(err)
 	}
-	must(t, us.RecordLogin(ctx, "ben", at(9)))
-	if ben := get[types.User](t)(us.Get(ctx, "ben")); ben.FailedLogins != 0 {
+	storekit.Must(t, us.RecordLogin(ctx, "ben", storekit.At(9)))
+	if ben := storekit.Get[types.User](t)(us.Get(ctx, "ben")); ben.FailedLogins != 0 {
 		t.Fatalf("a login did not reset ben's failures: %d", ben.FailedLogins)
 	}
 }

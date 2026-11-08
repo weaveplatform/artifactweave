@@ -12,6 +12,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/storekit"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -36,7 +37,7 @@ func runContent(t *testing.T, newStore Factory) {
 // repoOpts compares repository configurations. FlexBool keeps how it was
 // spelt on the wire in an unexported field that a stored copy need not
 // reproduce; its value is what matters.
-var repoOpts = cmp.Options{opts, cmpopts.IgnoreUnexported(repo.FlexBool{})}
+var repoOpts = cmp.Options{storekit.Opts, cmpopts.IgnoreUnexported(repo.FlexBool{})}
 
 func contentPtr[V any](v V) *V { return &v }
 
@@ -103,29 +104,29 @@ func testRepos(t *testing.T, r store.RepoStore) {
 		Repositories: []string{"maven-remote"},
 	}
 	for _, c := range []repo.Config{virtual, remote, all, local} {
-		must(t, r.Create(ctx, c))
+		storekit.Must(t, r.Create(ctx, c))
 	}
-	wantErr(t, r.Create(ctx, local), store.ErrConflict)
-	wantErr(t, r.Create(ctx, repo.Config{Class: repo.Local}), store.ErrInvalid)
+	storekit.WantErr(t, r.Create(ctx, local), store.ErrConflict)
+	storekit.WantErr(t, r.Create(ctx, repo.Config{Class: repo.Local}), store.ErrInvalid)
 
-	got := get[repo.Config](t)(r.Get(ctx, "maven-remote"))
+	got := storekit.Get[repo.Config](t)(r.Get(ctx, "maven-remote"))
 	sameRepo(t, "Get remote", remote, got)
-	sameRepo(t, "Get local", local, get[repo.Config](t)(r.Get(ctx, "libs-local")))
+	sameRepo(t, "Get local", local, storekit.Get[repo.Config](t)(r.Get(ctx, "libs-local")))
 	_, err := r.Get(ctx, "nope")
-	wantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, store.ErrNotFound)
 
 	// Returned values are copies.
-	v := get[repo.Config](t)(r.Get(ctx, "maven-virtual"))
+	v := storekit.Get[repo.Config](t)(r.Get(ctx, "maven-virtual"))
 	v.Repositories[0] = "changed"
 	sameRepo(
 		t,
 		"Get after mutating a copy",
 		virtual,
-		get[repo.Config](t)(r.Get(ctx, "maven-virtual")),
+		storekit.Get[repo.Config](t)(r.Get(ctx, "maven-virtual")),
 	)
 
-	list := get[[]repo.Config](t)(r.List(ctx, store.RepoFilter{}))
-	same(
+	list := storekit.Get[[]repo.Config](t)(r.List(ctx, store.RepoFilter{}))
+	storekit.Same(
 		t,
 		"List keys",
 		[]string{"all-virtual", "libs-local", "maven-remote", "maven-virtual"},
@@ -141,59 +142,83 @@ func testRepos(t *testing.T, r store.RepoStore) {
 		{store.RepoFilter{ProjectKey: "proj"}, []string{"maven-remote"}},
 		{store.RepoFilter{Class: repo.Local, PackageType: repo.Generic}, nil},
 	} {
-		same(
+		storekit.Same(
 			t,
 			fmt.Sprintf("List %+v", tc.f),
 			tc.want,
-			repoKeys(get[[]repo.Config](t)(r.List(ctx, tc.f))),
+			repoKeys(storekit.Get[[]repo.Config](t)(r.List(ctx, tc.f))),
 		)
 	}
 
-	keys := get[[]string](t)
-	same(
+	keys := storekit.Get[[]string](t)
+	storekit.Same(
 		t,
 		"Including maven-remote",
 		[]string{"all-virtual", "maven-virtual"},
 		keys(r.Including(ctx, "maven-remote")),
 	)
-	same(t, "Including libs-local", []string{"maven-virtual"}, keys(r.Including(ctx, "libs-local")))
-	same(t, "Including nothing", []string(nil), keys(r.Including(ctx, "nope")))
-	same(
+	storekit.Same(
+		t,
+		"Including libs-local",
+		[]string{"maven-virtual"},
+		keys(r.Including(ctx, "libs-local")),
+	)
+	storekit.Same(t, "Including nothing", []string(nil), keys(r.Including(ctx, "nope")))
+	storekit.Same(
 		t,
 		"UsingKeypair",
 		[]string{"libs-local", "maven-remote"},
 		keys(r.UsingKeypair(ctx, "kp1")),
 	)
-	same(t, "UsingKeypair empty name", []string(nil), keys(r.UsingKeypair(ctx, "")))
+	storekit.Same(t, "UsingKeypair empty name", []string(nil), keys(r.UsingKeypair(ctx, "")))
 
 	// Updates replace the document, the sealed password and the mirrors.
 	remote.Password, remote.URL, remote.SecondaryKeyPairRef = "", "https://repo2.example", ""
-	must(t, r.Update(ctx, remote))
-	sameRepo(t, "Get after update", remote, get[repo.Config](t)(r.Get(ctx, "maven-remote")))
+	storekit.Must(t, r.Update(ctx, remote))
+	sameRepo(
+		t,
+		"Get after update",
+		remote,
+		storekit.Get[repo.Config](t)(r.Get(ctx, "maven-remote")),
+	)
 	remote.Password = "rotated"
-	must(t, r.Update(ctx, remote))
+	storekit.Must(t, r.Update(ctx, remote))
 	sameRepo(
 		t,
 		"Get after password change",
 		remote,
-		get[repo.Config](t)(r.Get(ctx, "maven-remote")),
+		storekit.Get[repo.Config](t)(r.Get(ctx, "maven-remote")),
 	)
-	same(t, "UsingKeypair after update", []string{"libs-local"}, keys(r.UsingKeypair(ctx, "kp1")))
+	storekit.Same(
+		t,
+		"UsingKeypair after update",
+		[]string{"libs-local"},
+		keys(r.UsingKeypair(ctx, "kp1")),
+	)
 	virtual.Repositories = []string{"libs-local"}
-	must(t, r.Update(ctx, virtual))
-	same(
+	storekit.Must(t, r.Update(ctx, virtual))
+	storekit.Same(
 		t,
 		"Including after update",
 		[]string{"all-virtual"},
 		keys(r.Including(ctx, "maven-remote")),
 	)
-	wantErr(t, r.Update(ctx, repo.Config{Key: "nope", Class: repo.Local}), store.ErrNotFound)
+	storekit.WantErr(
+		t,
+		r.Update(ctx, repo.Config{Key: "nope", Class: repo.Local}),
+		store.ErrNotFound,
+	)
 
-	must(t, r.Delete(ctx, "all-virtual"))
-	wantErr(t, r.Delete(ctx, "all-virtual"), store.ErrNotFound)
+	storekit.Must(t, r.Delete(ctx, "all-virtual"))
+	storekit.WantErr(t, r.Delete(ctx, "all-virtual"), store.ErrNotFound)
 	_, err = r.Get(ctx, "all-virtual")
-	wantErr(t, err, store.ErrNotFound)
-	same(t, "Including after delete", []string(nil), keys(r.Including(ctx, "maven-remote")))
+	storekit.WantErr(t, err, store.ErrNotFound)
+	storekit.Same(
+		t,
+		"Including after delete",
+		[]string(nil),
+		keys(r.Including(ctx, "maven-remote")),
+	)
 }
 
 // file builds a file item from fixture content i; full is the path.
@@ -206,13 +231,13 @@ func fileItem(repoKey, full string, i int) types.Item {
 		Actual:   b.Checksums,
 		Original: types.Checksums{SHA512: b.Checksums.SHA512, SHA1: b.Checksums.SHA1},
 		MimeType: "application/java-archive",
-		Created: at(
+		Created: storekit.At(
 			i,
 		),
 		CreatedBy:  "alice",
-		Modified:   at(i + 1),
+		Modified:   storekit.At(i + 1),
 		ModifiedBy: "bob",
-		Updated:    at(i + 2),
+		Updated:    storekit.At(i + 2),
 		RemoteURL:  "https://origin.example/" + full,
 	}
 }
@@ -223,7 +248,7 @@ func folderItem(repoKey, full string) types.Item {
 		RepoKey:   repoKey,
 		Name:      full,
 		Folder:    true,
-		Created:   at(0),
+		Created:   storekit.At(0),
 		CreatedBy: "alice",
 	}
 }
@@ -250,11 +275,11 @@ func testItems(t *testing.T, s store.ItemStore) {
 	ctx := context.Background()
 	put := func(it types.Item) types.Item {
 		t.Helper()
-		got := get[types.Item](t)(s.Put(ctx, it))
+		got := storekit.Get[types.Item](t)(s.Put(ctx, it))
 		if got.ID == 0 {
 			t.Fatalf("Put(%s) assigned no ID", it.FullPath())
 		}
-		same(t, "Put "+it.FullPath(), stored(it, got.ID), got)
+		storekit.Same(t, "Put "+it.FullPath(), stored(it, got.ID), got)
 		return got
 	}
 	a := put(folderItem("r", "a"))
@@ -291,29 +316,29 @@ func testItems(t *testing.T, s store.ItemStore) {
 		{RepoKey: "r"},
 	} {
 		_, err := s.Put(ctx, bad)
-		wantErr(t, err, store.ErrInvalid)
+		storekit.WantErr(t, err, store.ErrInvalid)
 	}
 
-	got := get[types.Item](t)(s.Get(ctx, "r", false, "/a/b/c.jar"))
-	same(t, "Get", stored(again, cjar.ID), got)
-	same(t, "GetByID", got, get[types.Item](t)(s.GetByID(ctx, cjar.ID)))
+	got := storekit.Get[types.Item](t)(s.Get(ctx, "r", false, "/a/b/c.jar"))
+	storekit.Same(t, "Get", stored(again, cjar.ID), got)
+	storekit.Same(t, "GetByID", got, storekit.Get[types.Item](t)(s.GetByID(ctx, cjar.ID)))
 	for _, p := range []string{"", "a/b/none", "a/../b"} {
 		_, err := s.Get(ctx, "r", false, p)
-		wantErr(t, err, store.ErrNotFound)
+		storekit.WantErr(t, err, store.ErrNotFound)
 	}
 	_, err := s.GetByID(ctx, 1<<40)
-	wantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, store.ErrNotFound)
 	got.RemoteURL = "changed"
-	if get[types.Item](t)(s.GetByID(ctx, cjar.ID)).RemoteURL == "changed" {
+	if storekit.Get[types.Item](t)(s.GetByID(ctx, cjar.ID)).RemoteURL == "changed" {
 		t.Fatal("Get returned shared memory")
 	}
 
 	list := func(fn func(store.Page) ([]types.Item, string, error)) []string {
 		t.Helper()
-		return itemPaths(pages(t, 2, fn))
+		return itemPaths(storekit.Pages(t, 2, fn))
 	}
 	for _, root := range []string{"", ".", "/"} {
-		same(
+		storekit.Same(
 			t,
 			"Children of root",
 			[]string{"a", "ab", "z.txt"},
@@ -322,7 +347,7 @@ func testItems(t *testing.T, s store.ItemStore) {
 			),
 		)
 	}
-	same(
+	storekit.Same(
 		t,
 		"Children of a/b",
 		[]string{"a/b/c.jar", "a/b/d.jar"},
@@ -330,7 +355,7 @@ func testItems(t *testing.T, s store.ItemStore) {
 			func(p store.Page) ([]types.Item, string, error) { return s.Children(ctx, "r", false, "a/b/", p) },
 		),
 	)
-	same(
+	storekit.Same(
 		t,
 		"Children of the cache",
 		[]string{"a/b/c.jar"},
@@ -338,7 +363,7 @@ func testItems(t *testing.T, s store.ItemStore) {
 			func(p store.Page) ([]types.Item, string, error) { return s.Children(ctx, "r", true, "a/b", p) },
 		),
 	)
-	same(
+	storekit.Same(
 		t,
 		"Descendants of root",
 		[]string{"a", "ab", "z.txt", "a/b", "a/x.txt", "a/b/c.jar", "a/b/d.jar", "ab/q.txt"},
@@ -346,7 +371,7 @@ func testItems(t *testing.T, s store.ItemStore) {
 			func(p store.Page) ([]types.Item, string, error) { return s.Descendants(ctx, "r", false, "", p) },
 		),
 	)
-	same(
+	storekit.Same(
 		t,
 		"Descendants of a",
 		[]string{"a/b", "a/x.txt", "a/b/c.jar", "a/b/d.jar"},
@@ -355,43 +380,43 @@ func testItems(t *testing.T, s store.ItemStore) {
 		),
 	)
 	_, _, err = s.Children(ctx, "r", false, "", store.Page{After: store.Cursor("a", "b")})
-	wantErr(t, err, store.ErrInvalidCursor)
+	storekit.WantErr(t, err, store.ErrInvalidCursor)
 	_, _, err = s.Descendants(ctx, "r", false, "", store.Page{After: "%%%"})
-	wantErr(t, err, store.ErrInvalidCursor)
+	storekit.WantErr(t, err, store.ErrInvalidCursor)
 
 	// Checksum lookups return files only, ordered by ID.
 	byChecksum := func(c types.Checksums) []string {
 		t.Helper()
-		return itemPaths(pages(t, 1, func(p store.Page) ([]types.Item, string, error) {
+		return itemPaths(storekit.Pages(t, 1, func(p store.Page) ([]types.Item, string, error) {
 			return s.FindByChecksum(ctx, c, p)
 		}))
 	}
 	one := blob(1).Checksums
-	same(
+	storekit.Same(
 		t,
 		"FindByChecksum sha256",
 		[]string{"a/b/c.jar", "a/b/c.jar"},
 		byChecksum(types.Checksums{SHA256: one.SHA256}),
 	)
-	same(
+	storekit.Same(
 		t,
 		"FindByChecksum sha1",
 		[]string{"a/b/c.jar", "a/b/c.jar"},
 		byChecksum(types.Checksums{SHA1: one.SHA1}),
 	)
-	same(
+	storekit.Same(
 		t,
 		"FindByChecksum md5",
 		[]string{"z.txt"},
 		byChecksum(types.Checksums{MD5: blob(4).Checksums.MD5}),
 	)
-	same(
+	storekit.Same(
 		t,
 		"FindByChecksum none",
 		[]string(nil),
 		byChecksum(types.Checksums{SHA256: blob(9).Checksums.SHA256}),
 	)
-	hits := get[[]types.Item](t)(func() ([]types.Item, error) {
+	hits := storekit.Get[[]types.Item](t)(func() ([]types.Item, error) {
 		its, _, err := s.FindByChecksum(ctx, types.Checksums{SHA256: one.SHA256}, store.Page{})
 		return its, err
 	}())
@@ -399,31 +424,31 @@ func testItems(t *testing.T, s store.ItemStore) {
 		t.Fatalf("FindByChecksum order = %+v", hits)
 	}
 	_, _, err = s.FindByChecksum(ctx, types.Checksums{}, store.Page{})
-	wantErr(t, err, store.ErrInvalid)
+	storekit.WantErr(t, err, store.ErrInvalid)
 
-	usage := get[[]store.RepoUsage](t)(s.Usage(ctx))
-	same(t, "Usage", []store.RepoUsage{
+	usage := storekit.Get[[]store.RepoUsage](t)(s.Usage(ctx))
+	storekit.Same(t, "Usage", []store.RepoUsage{
 		{RepoKey: "other", Files: 1, Bytes: 100},
 		{RepoKey: "r", Files: 5, Folders: 3, Bytes: 600 + 200 + 300 + 400 + 500},
 		{RepoKey: "r", Cached: true, Files: 1, Bytes: 100},
 	}, usage)
 
 	// Deleting a file, a folder subtree, a cache and an empty root.
-	res := get[store.DeleteResult](t)(s.Delete(ctx, "r", false, "a/x.txt"))
-	same(t, "Delete file", store.DeleteResult{
+	res := storekit.Get[store.DeleteResult](t)(s.Delete(ctx, "r", false, "a/x.txt"))
+	storekit.Same(t, "Delete file", store.DeleteResult{
 		Files: 1, Bytes: 300,
 		BlobRefs: map[string]int64{blob(3).Checksums.SHA256: 1},
 	}, res)
 	_, err = s.Get(ctx, "r", false, "a/x.txt")
-	wantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, store.ErrNotFound)
 	_, err = s.Delete(ctx, "r", false, "a/x.txt")
-	wantErr(t, err, store.ErrNotFound)
-	res = get[store.DeleteResult](t)(s.Delete(ctx, "r", false, "a"))
-	same(t, "Delete folder", store.DeleteResult{
+	storekit.WantErr(t, err, store.ErrNotFound)
+	res = storekit.Get[store.DeleteResult](t)(s.Delete(ctx, "r", false, "a"))
+	storekit.Same(t, "Delete folder", store.DeleteResult{
 		Files: 2, Folders: 2, Bytes: 800,
 		BlobRefs: map[string]int64{blob(6).Checksums.SHA256: 1, blob(2).Checksums.SHA256: 1},
 	}, res)
-	same(
+	storekit.Same(
 		t,
 		"Descendants after delete",
 		[]string{"ab", "z.txt", "ab/q.txt"},
@@ -431,14 +456,14 @@ func testItems(t *testing.T, s store.ItemStore) {
 			func(p store.Page) ([]types.Item, string, error) { return s.Descendants(ctx, "r", false, ".", p) },
 		),
 	)
-	res = get[store.DeleteResult](t)(s.Delete(ctx, "r", true, ""))
-	same(t, "Delete cache", store.DeleteResult{
+	res = storekit.Get[store.DeleteResult](t)(s.Delete(ctx, "r", true, ""))
+	storekit.Same(t, "Delete cache", store.DeleteResult{
 		Files: 1, Bytes: 100,
 		BlobRefs: map[string]int64{one.SHA256: 1},
 	}, res)
-	same(t, "Delete empty root", store.DeleteResult{},
-		get[store.DeleteResult](t)(s.Delete(ctx, "r", true, ".")))
-	if got := get[types.Item](t)(s.Get(ctx, "r", false, "z.txt")); got.Name != "z.txt" {
+	storekit.Same(t, "Delete empty root", store.DeleteResult{},
+		storekit.Get[store.DeleteResult](t)(s.Delete(ctx, "r", true, ".")))
+	if got := storekit.Get[types.Item](t)(s.Get(ctx, "r", false, "z.txt")); got.Name != "z.txt" {
 		t.Fatalf("unrelated item lost: %+v", got)
 	}
 }
@@ -456,46 +481,46 @@ func testColonPaths(t *testing.T, s store.ItemStore) {
 		folderItem("r", "img/sha256__ab"),
 		fileItem("r", "img/sha256__ab/manifest.json", 2),
 	} {
-		got := get[types.Item](t)(s.Put(ctx, it))
-		same(t, fmt.Sprintf("Put %d", i), stored(it, got.ID), got)
+		got := storekit.Get[types.Item](t)(s.Put(ctx, it))
+		storekit.Same(t, fmt.Sprintf("Put %d", i), stored(it, got.ID), got)
 	}
-	got := get[types.Item](t)(s.Get(ctx, "r", false, "/img/sha256:ab/manifest.json"))
+	got := storekit.Get[types.Item](t)(s.Get(ctx, "r", false, "/img/sha256:ab/manifest.json"))
 	if got.Path != "img/sha256:ab" || got.Name != "manifest.json" || got.Depth != 3 {
 		t.Fatalf("Get = %q %q %d", got.Path, got.Name, got.Depth)
 	}
 	list := func(fn func(store.Page) ([]types.Item, string, error)) []string {
 		t.Helper()
-		return itemPaths(pages(t, 1, fn))
+		return itemPaths(storekit.Pages(t, 1, fn))
 	}
 	// Byte order puts ':' before '_'.
-	same(t, "Children of the image", []string{"img/sha256:ab", "img/sha256__ab"},
+	storekit.Same(t, "Children of the image", []string{"img/sha256:ab", "img/sha256__ab"},
 		list(func(p store.Page) ([]types.Item, string, error) {
 			return s.Children(ctx, "r", false, "img", p)
 		}))
-	same(t, "Descendants of the digest folder", []string{"img/sha256:ab/manifest.json"},
+	storekit.Same(t, "Descendants of the digest folder", []string{"img/sha256:ab/manifest.json"},
 		list(func(p store.Page) ([]types.Item, string, error) {
 			return s.Descendants(ctx, "r", false, "img/sha256:ab", p)
 		}))
 	search := func(query string) []string {
 		t.Helper()
 		q, err := aql.Parse(query)
-		must(t, err)
-		hits := get[[]aql.Hit](t)(s.Search(ctx, q, aql.Options{}))
+		storekit.Must(t, err)
+		hits := storekit.Get[[]aql.Hit](t)(s.Search(ctx, q, aql.Options{}))
 		out := make([]string, 0, len(hits))
 		for _, h := range hits {
 			out = append(out, h.Item.FullPath())
 		}
 		return out
 	}
-	same(t, "$eq on the path", []string{"img/sha256:ab/manifest.json"},
+	storekit.Same(t, "$eq on the path", []string{"img/sha256:ab/manifest.json"},
 		search(`items.find({"repo":"r","path":"img/sha256:ab"})`))
-	same(t, "$match on the path", []string{"img/sha256:ab/manifest.json"},
+	storekit.Same(t, "$match on the path", []string{"img/sha256:ab/manifest.json"},
 		search(`items.find({"repo":"r","path":{"$match":"img/sha256:*"}})`))
-	same(t, "$match across both folders",
+	storekit.Same(t, "$match across both folders",
 		[]string{"img/sha256:ab/manifest.json", "img/sha256__ab/manifest.json"},
 		search(`items.find({"repo":"r","path":{"$match":"img/sha256*"}}).sort({"$asc":["path"]})`))
-	res := get[store.DeleteResult](t)(s.Delete(ctx, "r", false, "img/sha256:ab"))
-	same(t, "Delete the digest folder", store.DeleteResult{
+	res := storekit.Get[store.DeleteResult](t)(s.Delete(ctx, "r", false, "img/sha256:ab"))
+	storekit.Same(t, "Delete the digest folder", store.DeleteResult{
 		Files: 1, Folders: 1, Bytes: blob(1).Size,
 		BlobRefs: map[string]int64{blob(1).Checksums.SHA256: 1},
 	}, res)
@@ -506,69 +531,94 @@ func testColonPaths(t *testing.T, s store.ItemStore) {
 
 func testItemProperties(t *testing.T, s store.ItemStore) {
 	ctx := context.Background()
-	it := get[types.Item](t)(s.Put(ctx, fileItem("r", "a/b.jar", 1)))
-	props := get[types.Properties](t)
-	same(t, "no properties", types.Properties{}, props(s.Properties(ctx, it.ID)))
+	it := storekit.Get[types.Item](t)(s.Put(ctx, fileItem("r", "a/b.jar", 1)))
+	props := storekit.Get[types.Properties](t)
+	storekit.Same(t, "no properties", types.Properties{}, props(s.Properties(ctx, it.ID)))
 	// stamped checks when the properties of the item with id last changed,
 	// zero for never or for none left.
 	stamped := func(what string, id int64, when time.Time) {
 		t.Helper()
-		same(t, what, when, get[types.Item](t)(s.GetByID(ctx, id)).PropertiesModified)
+		storekit.Same(
+			t,
+			what,
+			when,
+			storekit.Get[types.Item](t)(s.GetByID(ctx, id)).PropertiesModified,
+		)
 	}
 	stamped("a new item", it.ID, time.Time{})
 
-	must(
+	storekit.Must(
 		t,
 		s.SetProperties(
 			ctx,
 			it.ID,
 			types.Properties{"b": {"2", "1", "1"}, "a": {"x"}, "empty": nil},
-			at(10),
+			storekit.At(10),
 		),
 	)
-	same(
+	storekit.Same(
 		t,
 		"SetProperties",
 		types.Properties{"a": {"x"}, "b": {"1", "2"}},
 		props(s.Properties(ctx, it.ID)),
 	)
-	stamped("SetProperties", it.ID, at(10))
+	stamped("SetProperties", it.ID, storekit.At(10))
 	// The same properties again, spelt differently, change nothing.
-	must(t, s.SetProperties(ctx, it.ID, types.Properties{"b": {"1", "2", "2"}, "a": {"x"}}, at(11)))
-	stamped("SetProperties without a change", it.ID, at(10))
+	storekit.Must(
+		t,
+		s.SetProperties(
+			ctx,
+			it.ID,
+			types.Properties{"b": {"1", "2", "2"}, "a": {"x"}},
+			storekit.At(11),
+		),
+	)
+	stamped("SetProperties without a change", it.ID, storekit.At(10))
 
-	must(
+	storekit.Must(
 		t,
 		s.PatchProperties(
 			ctx,
 			it.ID,
 			types.Properties{"c": {"3"}, "a": {"z", "y"}},
 			[]string{"b", "absent"},
-			at(12),
+			storekit.At(12),
 		),
 	)
-	same(
+	storekit.Same(
 		t,
 		"PatchProperties",
 		types.Properties{"a": {"y", "z"}, "c": {"3"}},
 		props(s.Properties(ctx, it.ID)),
 	)
-	stamped("PatchProperties", it.ID, at(12))
-	must(t, s.PatchProperties(ctx, it.ID, types.Properties{"c": {"3"}}, []string{"absent"}, at(13)))
-	stamped("PatchProperties without a change", it.ID, at(12))
+	stamped("PatchProperties", it.ID, storekit.At(12))
+	storekit.Must(
+		t,
+		s.PatchProperties(
+			ctx,
+			it.ID,
+			types.Properties{"c": {"3"}},
+			[]string{"absent"},
+			storekit.At(13),
+		),
+	)
+	stamped("PatchProperties without a change", it.ID, storekit.At(12))
 	// A key both removed and set ends with the set values.
-	must(t, s.PatchProperties(ctx, it.ID, types.Properties{"c": {"4"}}, []string{"c"}, at(14)))
-	same(
+	storekit.Must(
+		t,
+		s.PatchProperties(ctx, it.ID, types.Properties{"c": {"4"}}, []string{"c"}, storekit.At(14)),
+	)
+	storekit.Same(
 		t,
 		"remove then set",
 		types.Properties{"a": {"y", "z"}, "c": {"4"}},
 		props(s.Properties(ctx, it.ID)),
 	)
-	stamped("remove then set", it.ID, at(14))
+	stamped("remove then set", it.ID, storekit.At(14))
 
 	got := props(s.Properties(ctx, it.ID))
 	got["a"][0] = "changed"
-	same(
+	storekit.Same(
 		t,
 		"copies",
 		types.Properties{"a": {"y", "z"}, "c": {"4"}},
@@ -578,19 +628,38 @@ func testItemProperties(t *testing.T, s store.ItemStore) {
 	// Only the property methods stamp: Put keeps the stored time over the
 	// one it is given, and a new item starts without one.
 	replace := fileItem("r", "a/b.jar", 3)
-	replace.PropertiesModified = at(90)
-	same(t, "Put over an item", at(14), get[types.Item](t)(s.Put(ctx, replace)).PropertiesModified)
+	replace.PropertiesModified = storekit.At(90)
+	storekit.Same(
+		t,
+		"Put over an item",
+		storekit.At(14),
+		storekit.Get[types.Item](t)(s.Put(ctx, replace)).PropertiesModified,
+	)
 	fresh := fileItem("r", "a/c.jar", 2)
-	fresh.PropertiesModified = at(91)
-	other := get[types.Item](t)(s.Put(ctx, fresh))
+	fresh.PropertiesModified = storekit.At(91)
+	other := storekit.Get[types.Item](t)(s.Put(ctx, fresh))
 	stamped("Put of a new item", other.ID, time.Time{})
 
-	must(t, s.SetProperties(ctx, it.ID, types.Properties{"d": {""}}, at(15)))
-	same(t, "SetProperties replaces", types.Properties{"d": {""}}, props(s.Properties(ctx, it.ID)))
-	stamped("SetProperties replaces", it.ID, at(15))
+	storekit.Must(t, s.SetProperties(ctx, it.ID, types.Properties{"d": {""}}, storekit.At(15)))
+	storekit.Same(
+		t,
+		"SetProperties replaces",
+		types.Properties{"d": {""}},
+		props(s.Properties(ctx, it.ID)),
+	)
+	stamped("SetProperties replaces", it.ID, storekit.At(15))
 
-	must(t, s.PatchProperties(ctx, other.ID, types.Properties{"k": {"v"}}, []string{"x"}, at(16)))
-	same(
+	storekit.Must(
+		t,
+		s.PatchProperties(
+			ctx,
+			other.ID,
+			types.Properties{"k": {"v"}},
+			[]string{"x"},
+			storekit.At(16),
+		),
+	)
+	storekit.Same(
 		t,
 		"PatchProperties on a bare item",
 		types.Properties{"k": {"v"}},
@@ -604,39 +673,58 @@ func testItemProperties(t *testing.T, s store.ItemStore) {
 		}
 		return out
 	}
-	same(t, "Children", []time.Time{at(15), at(16)}, when(pages(
+	storekit.Same(t, "Children", []time.Time{storekit.At(15), storekit.At(16)}, when(storekit.Pages(
 		t,
 		1,
 		func(p store.Page) ([]types.Item, string, error) { return s.Children(ctx, "r", false, "a", p) },
 	)))
-	same(t, "Descendants", []time.Time{at(15), at(16)}, when(pages(
+	storekit.Same(
 		t,
-		1,
-		func(p store.Page) ([]types.Item, string, error) { return s.Descendants(ctx, "r", false, "", p) },
-	)))
-	same(t, "Get", at(16), get[types.Item](t)(s.Get(ctx, "r", false, "a/c.jar")).PropertiesModified)
+		"Descendants",
+		[]time.Time{storekit.At(15), storekit.At(16)},
+		when(storekit.Pages(
+			t,
+			1,
+			func(p store.Page) ([]types.Item, string, error) { return s.Descendants(ctx, "r", false, "", p) },
+		)),
+	)
+	storekit.Same(
+		t,
+		"Get",
+		storekit.At(16),
+		storekit.Get[types.Item](t)(s.Get(ctx, "r", false, "a/c.jar")).PropertiesModified,
+	)
 
 	// Removing the last property clears the time, by either method.
-	must(t, s.SetProperties(ctx, it.ID, nil, at(17)))
+	storekit.Must(t, s.SetProperties(ctx, it.ID, nil, storekit.At(17)))
 	stamped("SetProperties of nothing", it.ID, time.Time{})
-	must(t, s.PatchProperties(ctx, other.ID, nil, []string{"k"}, at(18)))
+	storekit.Must(t, s.PatchProperties(ctx, other.ID, nil, []string{"k"}, storekit.At(18)))
 	stamped("PatchProperties removing the last key", other.ID, time.Time{})
 
 	missing := it.ID + 1000
 	_, err := s.Properties(ctx, missing)
-	wantErr(t, err, store.ErrNotFound)
-	wantErr(
+	storekit.WantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(
 		t,
-		s.SetProperties(ctx, missing, types.Properties{"a": {"1"}}, at(19)),
+		s.SetProperties(ctx, missing, types.Properties{"a": {"1"}}, storekit.At(19)),
 		store.ErrNotFound,
 	)
-	wantErr(t, s.PatchProperties(ctx, missing, nil, []string{"a"}, at(19)), store.ErrNotFound)
+	storekit.WantErr(
+		t,
+		s.PatchProperties(ctx, missing, nil, []string{"a"}, storekit.At(19)),
+		store.ErrNotFound,
+	)
 
 	// Properties, and their time, go with the item.
-	must(t, s.SetProperties(ctx, it.ID, types.Properties{"e": {"1"}}, at(20)))
-	get[store.DeleteResult](t)(s.Delete(ctx, "r", false, "a/b.jar"))
-	again := get[types.Item](t)(s.Put(ctx, fileItem("r", "a/b.jar", 1)))
-	same(t, "properties after re-deploy", types.Properties{}, props(s.Properties(ctx, again.ID)))
+	storekit.Must(t, s.SetProperties(ctx, it.ID, types.Properties{"e": {"1"}}, storekit.At(20)))
+	storekit.Get[store.DeleteResult](t)(s.Delete(ctx, "r", false, "a/b.jar"))
+	again := storekit.Get[types.Item](t)(s.Put(ctx, fileItem("r", "a/b.jar", 1)))
+	storekit.Same(
+		t,
+		"properties after re-deploy",
+		types.Properties{},
+		props(s.Properties(ctx, again.ID)),
+	)
 	stamped("re-deployed", again.ID, time.Time{})
 }
 
@@ -647,62 +735,72 @@ func testRepositoryRoot(t *testing.T, s store.ItemStore) {
 	ctx := context.Background()
 	for _, cached := range []bool{false, true} {
 		_, err := s.Root(ctx, "r", cached)
-		wantErr(t, err, store.ErrNotFound)
+		storekit.WantErr(t, err, store.ErrNotFound)
 	}
-	get[types.Item](t)(s.Put(ctx, folderItem("r", "a")))
-	get[types.Item](t)(s.Put(ctx, fileItem("r", "a/b.txt", 1)))
-	get[types.Item](t)(s.Put(ctx, fileItem("r", "z.txt", 2)))
+	storekit.Get[types.Item](t)(s.Put(ctx, folderItem("r", "a")))
+	storekit.Get[types.Item](t)(s.Put(ctx, fileItem("r", "a/b.txt", 1)))
+	storekit.Get[types.Item](t)(s.Put(ctx, fileItem("r", "z.txt", 2)))
 
-	item := get[types.Item](t)
+	item := storekit.Get[types.Item](t)
 	root := item(s.EnsureRoot(ctx, types.Item{
-		RepoKey: "r", Path: "ignored", Name: "ignored", Folder: false, Size: 9,
-		Created: at(1), CreatedBy: "alice", Modified: at(2), ModifiedBy: "bob", Updated: at(3),
+		RepoKey: "r",
+		Path:    "ignored",
+		Name:    "ignored",
+		Folder:  false,
+		Size:    9,
+		Created: storekit.At(
+			1,
+		),
+		CreatedBy:  "alice",
+		Modified:   storekit.At(2),
+		ModifiedBy: "bob",
+		Updated:    storekit.At(3),
 	}))
 	want := types.RootItem("r", false)
 	want.ID = root.ID
-	want.Created, want.CreatedBy = at(1), "alice"
-	want.Modified, want.ModifiedBy, want.Updated = at(2), "bob", at(3)
-	same(t, "EnsureRoot", want, root)
+	want.Created, want.CreatedBy = storekit.At(1), "alice"
+	want.Modified, want.ModifiedBy, want.Updated = storekit.At(2), "bob", storekit.At(3)
+	storekit.Same(t, "EnsureRoot", want, root)
 	if root.FullPath() != "" || root.Depth != 0 {
 		t.Fatalf("root full path %q depth %d", root.FullPath(), root.Depth)
 	}
-	same(t, "EnsureRoot again", want, item(s.EnsureRoot(ctx, types.Item{
-		RepoKey: "r", Created: at(9), CreatedBy: "carol",
+	storekit.Same(t, "EnsureRoot again", want, item(s.EnsureRoot(ctx, types.Item{
+		RepoKey: "r", Created: storekit.At(9), CreatedBy: "carol",
 	})))
-	same(t, "Root", want, item(s.Root(ctx, "r", false)))
-	same(t, "GetByID", want, item(s.GetByID(ctx, root.ID)))
+	storekit.Same(t, "Root", want, item(s.Root(ctx, "r", false)))
+	storekit.Same(t, "GetByID", want, item(s.GetByID(ctx, root.ID)))
 	cachedRoot := item(s.EnsureRoot(ctx, types.Item{RepoKey: "r", Cached: true}))
 	if cachedRoot.ID == root.ID || !cachedRoot.Cached {
 		t.Fatalf("the cache shares the repository's root: %+v", cachedRoot)
 	}
 	_, err := s.EnsureRoot(ctx, types.Item{})
-	wantErr(t, err, store.ErrInvalid)
+	storekit.WantErr(t, err, store.ErrInvalid)
 	for _, p := range []string{"", ".", "/"} {
 		_, err := s.Get(ctx, "r", false, p)
-		wantErr(t, err, store.ErrNotFound)
+		storekit.WantErr(t, err, store.ErrNotFound)
 	}
 
-	props := get[types.Properties](t)
-	must(
+	props := storekit.Get[types.Properties](t)
+	storekit.Must(
 		t,
 		s.PatchProperties(
 			ctx,
 			root.ID,
 			types.Properties{"k1": {"v2", "v1"}, "k2": {"x"}},
 			nil,
-			at(4),
+			storekit.At(4),
 		),
 	)
-	same(t, "root properties", types.Properties{"k1": {"v1", "v2"}, "k2": {"x"}},
+	storekit.Same(t, "root properties", types.Properties{"k1": {"v1", "v2"}, "k2": {"x"}},
 		props(s.Properties(ctx, root.ID)))
-	want.PropertiesModified = at(4)
-	same(t, "Root after its properties changed", want, item(s.Root(ctx, "r", false)))
+	want.PropertiesModified = storekit.At(4)
+	storekit.Same(t, "Root after its properties changed", want, item(s.Root(ctx, "r", false)))
 
 	list := func(fn func(store.Page) ([]types.Item, string, error)) []string {
 		t.Helper()
-		return itemPaths(pages(t, 1, fn))
+		return itemPaths(storekit.Pages(t, 1, fn))
 	}
-	same(
+	storekit.Same(
 		t,
 		"Children of root",
 		[]string{"a", "z.txt"},
@@ -710,7 +808,7 @@ func testRepositoryRoot(t *testing.T, s store.ItemStore) {
 			func(p store.Page) ([]types.Item, string, error) { return s.Children(ctx, "r", false, "", p) },
 		),
 	)
-	same(
+	storekit.Same(
 		t,
 		"Descendants of root",
 		[]string{"a", "z.txt", "a/b.txt"},
@@ -718,7 +816,7 @@ func testRepositoryRoot(t *testing.T, s store.ItemStore) {
 			func(p store.Page) ([]types.Item, string, error) { return s.Descendants(ctx, "r", false, ".", p) },
 		),
 	)
-	same(
+	storekit.Same(
 		t,
 		"Children of the empty cache",
 		[]string(nil),
@@ -726,23 +824,23 @@ func testRepositoryRoot(t *testing.T, s store.ItemStore) {
 			func(p store.Page) ([]types.Item, string, error) { return s.Children(ctx, "r", true, "", p) },
 		),
 	)
-	same(t, "Usage", []store.RepoUsage{{RepoKey: "r", Files: 2, Folders: 1, Bytes: 300}},
-		get[[]store.RepoUsage](t)(s.Usage(ctx)))
+	storekit.Same(t, "Usage", []store.RepoUsage{{RepoKey: "r", Files: 2, Folders: 1, Bytes: 300}},
+		storekit.Get[[]store.RepoUsage](t)(s.Usage(ctx)))
 
 	// AQL reports the root as Artifactory does: a folder whose path and name
 	// are both ".", found by its properties once folders are asked for.
 	find := func(query string) []aql.Hit {
 		t.Helper()
 		q, err := aql.Parse(query)
-		must(t, err)
-		return get[[]aql.Hit](t)(s.Search(ctx, q, aql.Options{}))
+		storekit.Must(t, err)
+		return storekit.Get[[]aql.Hit](t)(s.Search(ctx, q, aql.Options{}))
 	}
 	hits := find(`items.find({"repo":"r","type":"folder","@k1":"v1"}).include("*","property")`)
 	if len(hits) != 1 {
 		t.Fatalf("root by property: %+v", hits)
 	}
-	same(t, "root hit", want, hits[0].Item)
-	same(t, "root hit properties", types.Properties{"k1": {"v1", "v2"}, "k2": {"x"}},
+	storekit.Same(t, "root hit", want, hits[0].Item)
+	storekit.Same(t, "root hit properties", types.Properties{"k1": {"v1", "v2"}, "k2": {"x"}},
 		hits[0].Properties)
 	if hits := find(`items.find({"repo":"r","@k1":"v1"})`); len(hits) != 0 {
 		t.Fatalf("a files query found the root: %+v", hits)
@@ -752,59 +850,81 @@ func testRepositoryRoot(t *testing.T, s store.ItemStore) {
 		names = append(names, h.Item.Name)
 	}
 	slices.Sort(names)
-	same(t, "items at the root", []string{".", "a", "z.txt"}, names)
+	storekit.Same(t, "items at the root", []string{".", "a", "z.txt"}, names)
 
 	// Deleting the repository's content keeps the root and its properties,
 	// and does not count it.
-	res := get[store.DeleteResult](t)(s.Delete(ctx, "r", false, ""))
+	res := storekit.Get[store.DeleteResult](t)(s.Delete(ctx, "r", false, ""))
 	if res.Files != 2 || res.Folders != 1 {
 		t.Fatalf("Delete root = %+v", res)
 	}
-	same(t, "root after a content delete", want, item(s.Root(ctx, "r", false)))
-	same(t, "root properties after a content delete",
+	storekit.Same(t, "root after a content delete", want, item(s.Root(ctx, "r", false)))
+	storekit.Same(t, "root properties after a content delete",
 		types.Properties{"k1": {"v1", "v2"}, "k2": {"x"}}, props(s.Properties(ctx, root.ID)))
-	same(t, "Delete of an empty root", store.DeleteResult{},
-		get[store.DeleteResult](t)(s.Delete(ctx, "r", true, "")))
+	storekit.Same(t, "Delete of an empty root", store.DeleteResult{},
+		storekit.Get[store.DeleteResult](t)(s.Delete(ctx, "r", true, "")))
 
-	must(t, s.DeleteRoot(ctx, "r", false))
+	storekit.Must(t, s.DeleteRoot(ctx, "r", false))
 	_, err = s.Root(ctx, "r", false)
-	wantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, store.ErrNotFound)
 	_, err = s.Properties(ctx, root.ID)
-	wantErr(t, err, store.ErrNotFound)
-	must(t, s.DeleteRoot(ctx, "r", false))
-	same(t, "the cache's root stays", cachedRoot, item(s.Root(ctx, "r", true)))
+	storekit.WantErr(t, err, store.ErrNotFound)
+	storekit.Must(t, s.DeleteRoot(ctx, "r", false))
+	storekit.Same(t, "the cache's root stays", cachedRoot, item(s.Root(ctx, "r", true)))
 
 	// A new root after removal starts without properties.
 	again := item(s.EnsureRoot(ctx, types.Item{RepoKey: "r"}))
-	same(t, "properties of a new root", types.Properties{}, props(s.Properties(ctx, again.ID)))
+	storekit.Same(
+		t,
+		"properties of a new root",
+		types.Properties{},
+		props(s.Properties(ctx, again.ID)),
+	)
 }
 
 func testItemStats(t *testing.T, s store.ItemStore) {
 	ctx := context.Background()
-	it := get[types.Item](t)(s.Put(ctx, fileItem("r", "a.jar", 1)))
-	stats := get[types.ItemStats](t)
-	same(t, "no statistics", types.ItemStats{}, stats(s.Stats(ctx, it.ID)))
+	it := storekit.Get[types.Item](t)(s.Put(ctx, fileItem("r", "a.jar", 1)))
+	stats := storekit.Get[types.ItemStats](t)
+	storekit.Same(t, "no statistics", types.ItemStats{}, stats(s.Stats(ctx, it.ID)))
 
-	must(t, s.RecordDownload(ctx, it.ID, store.Download{By: "alice", At: at(1)}))
-	must(t, s.RecordDownload(ctx, it.ID, store.Download{By: "bob", At: at(2)}))
-	must(t, s.RecordDownload(ctx, it.ID, store.Download{
-		By: "edge", At: at(3), Remote: true, Origin: "https://edge.example", Path: "r/a.jar",
+	storekit.Must(t, s.RecordDownload(ctx, it.ID, store.Download{By: "alice", At: storekit.At(1)}))
+	storekit.Must(t, s.RecordDownload(ctx, it.ID, store.Download{By: "bob", At: storekit.At(2)}))
+	storekit.Must(t, s.RecordDownload(ctx, it.ID, store.Download{
+		By:     "edge",
+		At:     storekit.At(3),
+		Remote: true,
+		Origin: "https://edge.example",
+		Path:   "r/a.jar",
 	}))
-	same(t, "after downloads", types.ItemStats{
-		DownloadCount: 2, LastDownloaded: at(2), LastDownloadedBy: "bob",
-		RemoteDownloadCount: 1, RemoteLastDownloaded: at(3), RemoteLastDownloadedBy: "edge",
-		RemoteOrigin: "https://edge.example", RemotePath: "r/a.jar",
+	storekit.Same(t, "after downloads", types.ItemStats{
+		DownloadCount:          2,
+		LastDownloaded:         storekit.At(2),
+		LastDownloadedBy:       "bob",
+		RemoteDownloadCount:    1,
+		RemoteLastDownloaded:   storekit.At(3),
+		RemoteLastDownloadedBy: "edge",
+		RemoteOrigin:           "https://edge.example",
+		RemotePath:             "r/a.jar",
 	}, stats(s.Stats(ctx, it.ID)))
 
-	imported := types.ItemStats{DownloadCount: 42, LastDownloaded: at(9), LastDownloadedBy: "carol"}
-	must(t, s.PutStats(ctx, it.ID, imported))
-	same(t, "PutStats", imported, stats(s.Stats(ctx, it.ID)))
+	imported := types.ItemStats{
+		DownloadCount:    42,
+		LastDownloaded:   storekit.At(9),
+		LastDownloadedBy: "carol",
+	}
+	storekit.Must(t, s.PutStats(ctx, it.ID, imported))
+	storekit.Same(t, "PutStats", imported, stats(s.Stats(ctx, it.ID)))
 
 	missing := it.ID + 1000
 	_, err := s.Stats(ctx, missing)
-	wantErr(t, err, store.ErrNotFound)
-	wantErr(t, s.RecordDownload(ctx, missing, store.Download{At: at(1)}), store.ErrNotFound)
-	wantErr(t, s.PutStats(ctx, missing, imported), store.ErrNotFound)
+	storekit.WantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(
+		t,
+		s.RecordDownload(ctx, missing, store.Download{At: storekit.At(1)}),
+		store.ErrNotFound,
+	)
+	storekit.WantErr(t, s.PutStats(ctx, missing, imported), store.ErrNotFound)
 }
 
 func trashEntry(repoKey, full string, i int, deleted int) types.TrashEntry {
@@ -816,7 +936,7 @@ func trashEntry(repoKey, full string, i int, deleted int) types.TrashEntry {
 		DeletedBy: "alice",
 	}
 	if deleted != 0 {
-		e.DeletedAt = at(deleted)
+		e.DeletedAt = storekit.At(deleted)
 	}
 	return e
 }
@@ -836,11 +956,11 @@ func testTrash(t *testing.T, s store.TrashStore) {
 	ctx := context.Background()
 	add := func(e types.TrashEntry) types.TrashEntry {
 		t.Helper()
-		got := get[types.TrashEntry](t)(s.Add(ctx, e))
+		got := storekit.Get[types.TrashEntry](t)(s.Add(ctx, e))
 		want := e
 		want.ID = got.ID
 		want.Record.Item = stored(e.Record.Item, 0)
-		same(t, "Add", want, got)
+		storekit.Same(t, "Add", want, got)
 		return got
 	}
 	c1 := add(trashEntry("r1", "a/b/c.jar", 1, 3))
@@ -853,59 +973,76 @@ func testTrash(t *testing.T, s store.TrashStore) {
 		t.Fatalf("IDs %d and %d", c1.ID, c2.ID)
 	}
 	_, err := s.Add(ctx, trashEntry("r1", "a/../b", 1, 1))
-	wantErr(t, err, store.ErrInvalid)
+	storekit.WantErr(t, err, store.ErrInvalid)
 
-	got := get[types.TrashEntry](t)(s.Get(ctx, c1.ID))
-	same(t, "Get", c1, got)
+	got := storekit.Get[types.TrashEntry](t)(s.Get(ctx, c1.ID))
+	storekit.Same(t, "Get", c1, got)
 	got.Record.Properties["build.number"][0] = "changed"
-	same(t, "copies", c1, get[types.TrashEntry](t)(s.Get(ctx, c1.ID)))
+	storekit.Same(t, "copies", c1, storekit.Get[types.TrashEntry](t)(s.Get(ctx, c1.ID)))
 	_, err = s.Get(ctx, 1<<40)
-	wantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, store.ErrNotFound)
 
-	entries := get[[]types.TrashEntry](t)
-	same(
+	entries := storekit.Get[[]types.TrashEntry](t)
+	storekit.Same(
 		t,
 		"Find newest first",
 		trashPaths([]types.TrashEntry{c2, c1}),
 		trashPaths(entries(s.Find(ctx, "r1", "/a/b/c.jar"))),
 	)
-	same(t, "Find nothing", []string{}, trashPaths(entries(s.Find(ctx, "r1", "a/../c"))))
+	storekit.Same(t, "Find nothing", []string{}, trashPaths(entries(s.Find(ctx, "r1", "a/../c"))))
 	q2 := add(trashEntry("r1", "ab/q.txt", 7, 6))
-	same(t, "Find puts an undated entry last", trashPaths([]types.TrashEntry{q2, q}),
+	storekit.Same(t, "Find puts an undated entry last", trashPaths([]types.TrashEntry{q2, q}),
 		trashPaths(entries(s.Find(ctx, "r1", "ab/q.txt"))))
 
 	list := func(repoKey, prefix string) []string {
 		t.Helper()
-		return trashPaths(pages(t, 2, func(p store.Page) ([]types.TrashEntry, string, error) {
-			return s.List(ctx, repoKey, prefix, p)
-		}))
+		return trashPaths(
+			storekit.Pages(t, 2, func(p store.Page) ([]types.TrashEntry, string, error) {
+				return s.List(ctx, repoKey, prefix, p)
+			}),
+		)
 	}
-	same(t, "List all", trashPaths([]types.TrashEntry{z, c1, c2, d, q, q2, o}), list("", ""))
-	same(t, "List r1 under a", trashPaths([]types.TrashEntry{c1, c2, d}), list("r1", "/a/"))
-	same(t, "List an exact path", trashPaths([]types.TrashEntry{c1, c2}), list("r1", "a/b/c.jar"))
-	same(t, "List a root file", trashPaths([]types.TrashEntry{z}), list("r1", "z.txt"))
-	same(t, "List an invalid prefix", []string{}, list("r1", "a/.."))
+	storekit.Same(
+		t,
+		"List all",
+		trashPaths([]types.TrashEntry{z, c1, c2, d, q, q2, o}),
+		list("", ""),
+	)
+	storekit.Same(
+		t,
+		"List r1 under a",
+		trashPaths([]types.TrashEntry{c1, c2, d}),
+		list("r1", "/a/"),
+	)
+	storekit.Same(
+		t,
+		"List an exact path",
+		trashPaths([]types.TrashEntry{c1, c2}),
+		list("r1", "a/b/c.jar"),
+	)
+	storekit.Same(t, "List a root file", trashPaths([]types.TrashEntry{z}), list("r1", "z.txt"))
+	storekit.Same(t, "List an invalid prefix", []string{}, list("r1", "a/.."))
 	_, _, err = s.List(ctx, "", "", store.Page{After: store.Cursor("r1")})
-	wantErr(t, err, store.ErrInvalidCursor)
+	storekit.WantErr(t, err, store.ErrInvalidCursor)
 	_, _, err = s.List(ctx, "", "", store.Page{After: "%%%"})
-	wantErr(t, err, store.ErrInvalidCursor)
+	storekit.WantErr(t, err, store.ErrInvalidCursor)
 
-	same(
+	storekit.Same(
 		t,
 		"Expired",
 		trashPaths([]types.TrashEntry{d, z, c1}),
-		trashPaths(entries(s.Expired(ctx, at(4), 0))),
+		trashPaths(entries(s.Expired(ctx, storekit.At(4), 0))),
 	)
-	same(
+	storekit.Same(
 		t,
 		"Expired limited",
 		trashPaths([]types.TrashEntry{d}),
-		trashPaths(entries(s.Expired(ctx, at(4), 1))),
+		trashPaths(entries(s.Expired(ctx, storekit.At(4), 1))),
 	)
 
-	must(t, s.Delete(ctx, c1.ID))
-	wantErr(t, s.Delete(ctx, c1.ID), store.ErrNotFound)
-	same(
+	storekit.Must(t, s.Delete(ctx, c1.ID))
+	storekit.WantErr(t, s.Delete(ctx, c1.ID), store.ErrNotFound)
+	storekit.Same(
 		t,
 		"Find after delete",
 		trashPaths([]types.TrashEntry{c2}),
@@ -924,13 +1061,13 @@ func versionNames(vs []types.PackageVersion) []string {
 func testPackages(t *testing.T, st store.Store) {
 	ctx := context.Background()
 	s := st.Packages()
-	pkg := get[types.Package](t)(s.Ensure(ctx, types.Package{
-		RepoKey: "npm-local", Type: repo.NPM, Name: "left-pad", Created: at(1),
+	pkg := storekit.Get[types.Package](t)(s.Ensure(ctx, types.Package{
+		RepoKey: "npm-local", Type: repo.NPM, Name: "left-pad", Created: storekit.At(1),
 	}))
 	if pkg.ID == 0 {
 		t.Fatal("Ensure assigned no ID")
 	}
-	same(
+	storekit.Same(
 		t,
 		"Ensure",
 		types.Package{
@@ -938,53 +1075,67 @@ func testPackages(t *testing.T, st store.Store) {
 			RepoKey: "npm-local",
 			Type:    repo.NPM,
 			Name:    "left-pad",
-			Created: at(1),
+			Created: storekit.At(1),
 		},
 		pkg,
 	)
-	same(t, "Ensure existing", pkg, get[types.Package](t)(s.Ensure(ctx, types.Package{
-		RepoKey: "npm-local", Type: repo.NPM, Name: "left-pad", Created: at(9),
-	})))
+	storekit.Same(
+		t,
+		"Ensure existing",
+		pkg,
+		storekit.Get[types.Package](t)(s.Ensure(ctx, types.Package{
+			RepoKey: "npm-local", Type: repo.NPM, Name: "left-pad", Created: storekit.At(9),
+		})),
+	)
 	_, err := s.Ensure(ctx, types.Package{RepoKey: "npm-local"})
-	wantErr(t, err, store.ErrInvalid)
-	same(t, "Get", pkg, get[types.Package](t)(s.Get(ctx, pkg.ID)))
-	same(t, "Find", pkg, get[types.Package](t)(s.Find(ctx, "npm-local", "left-pad")))
+	storekit.WantErr(t, err, store.ErrInvalid)
+	storekit.Same(t, "Get", pkg, storekit.Get[types.Package](t)(s.Get(ctx, pkg.ID)))
+	storekit.Same(
+		t,
+		"Find",
+		pkg,
+		storekit.Get[types.Package](t)(s.Find(ctx, "npm-local", "left-pad")),
+	)
 	_, err = s.Get(ctx, pkg.ID+1000)
-	wantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, store.ErrNotFound)
 	_, err = s.Find(ctx, "npm-local", "nope")
-	wantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, store.ErrNotFound)
 
 	for _, name := range []string{"b-pkg", "a-pkg", "@scope/z"} {
-		get[types.Package](
+		storekit.Get[types.Package](
 			t,
 		)(
 			s.Ensure(ctx, types.Package{RepoKey: "npm-local", Type: repo.NPM, Name: name}),
 		)
 	}
-	get[types.Package](
+	storekit.Get[types.Package](
 		t,
 	)(
 		s.Ensure(ctx, types.Package{RepoKey: "npm-remote", Type: repo.NPM, Name: "left-pad"}),
 	)
 	var names []string
-	for _, p := range pages(t, 2, func(p store.Page) ([]types.Package, string, error) {
+	for _, p := range storekit.Pages(t, 2, func(p store.Page) ([]types.Package, string, error) {
 		return s.List(ctx, "npm-local", p)
 	}) {
 		names = append(names, p.Name)
 	}
-	same(t, "List", []string{"@scope/z", "a-pkg", "b-pkg", "left-pad"}, names)
+	storekit.Same(t, "List", []string{"@scope/z", "a-pkg", "b-pkg", "left-pad"}, names)
 	for _, bad := range []string{"%%%", store.Cursor("a", "b")} {
 		_, _, err = s.List(ctx, "npm-local", store.Page{After: bad})
-		wantErr(t, err, store.ErrInvalidCursor)
+		storekit.WantErr(t, err, store.ErrInvalidCursor)
 	}
 
 	put := func(version string, created int, meta string) types.PackageVersion {
 		t.Helper()
-		v := types.PackageVersion{PackageID: pkg.ID, Version: version, Created: at(created)}
+		v := types.PackageVersion{
+			PackageID: pkg.ID,
+			Version:   version,
+			Created:   storekit.At(created),
+		}
 		if meta != "" {
 			v.Metadata = []byte(meta)
 		}
-		return get[types.PackageVersion](t)(s.PutVersion(ctx, v))
+		return storekit.Get[types.PackageVersion](t)(s.PutVersion(ctx, v))
 	}
 	put("1.10.0", 1, `{"dist":"a"}`)
 	put("1.2.0", 2, "")
@@ -993,24 +1144,28 @@ func testPackages(t *testing.T, st store.Store) {
 	if top.OrderKey != 4 || top.ID == 0 {
 		t.Fatalf("PutVersion = %+v", top)
 	}
-	versions := get[[]types.PackageVersion](t)
-	same(t, "Versions in semver order", []string{"1.2.0#1", "1.9.0-beta#2", "1.10.0#3", "2.0.0#4"},
-		versionNames(versions(s.Versions(ctx, pkg.ID))))
+	versions := storekit.Get[[]types.PackageVersion](t)
+	storekit.Same(
+		t,
+		"Versions in semver order",
+		[]string{"1.2.0#1", "1.9.0-beta#2", "1.10.0#3", "2.0.0#4"},
+		versionNames(versions(s.Versions(ctx, pkg.ID))),
+	)
 	put("1.0.0", 5, "")
-	same(
+	storekit.Same(
 		t,
 		"Versions after an older one",
 		[]string{"1.0.0#1", "1.2.0#2", "1.9.0-beta#3", "1.10.0#4", "2.0.0#5"},
 		versionNames(versions(s.Versions(ctx, pkg.ID))),
 	)
 
-	v110 := get[types.PackageVersion](t)(s.Version(ctx, pkg.ID, "1.10.0"))
-	same(t, "Version", types.PackageVersion{
+	v110 := storekit.Get[types.PackageVersion](t)(s.Version(ctx, pkg.ID, "1.10.0"))
+	storekit.Same(t, "Version", types.PackageVersion{
 		ID:        v110.ID,
 		PackageID: pkg.ID,
 		Version:   "1.10.0",
 		OrderKey:  4,
-		Created:   at(1),
+		Created:   storekit.At(1),
 		Metadata:  []byte(`{"dist":"a"}`),
 	}, v110)
 	replaced := put("1.10.0", 7, `{"dist":"b"}`)
@@ -1020,75 +1175,93 @@ func testPackages(t *testing.T, st store.Store) {
 	}
 	replaced.Metadata[0] = 'X'
 	if string(
-		get[types.PackageVersion](t)(s.Version(ctx, pkg.ID, "1.10.0")).Metadata,
+		storekit.Get[types.PackageVersion](t)(s.Version(ctx, pkg.ID, "1.10.0")).Metadata,
 	) != `{"dist":"b"}` {
 		t.Fatal("Version returned shared memory")
 	}
 	_, err = s.Version(ctx, pkg.ID, "9.9.9")
-	wantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, store.ErrNotFound)
 	_, err = s.PutVersion(ctx, types.PackageVersion{PackageID: pkg.ID + 1000, Version: "1"})
-	wantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, store.ErrNotFound)
 	_, err = s.PutVersion(ctx, types.PackageVersion{PackageID: pkg.ID})
-	wantErr(t, err, store.ErrInvalid)
+	storekit.WantErr(t, err, store.ErrInvalid)
 
 	// File links, cascading from both sides.
 	itemsStore := st.Items()
-	jar := get[types.Item](
+	jar := storekit.Get[types.Item](
 		t,
 	)(
 		itemsStore.Put(ctx, fileItem("npm-local", "left-pad/-/left-pad-1.10.0.tgz", 1)),
 	)
-	pom := get[types.Item](
+	pom := storekit.Get[types.Item](
 		t,
 	)(
 		itemsStore.Put(ctx, fileItem("npm-local", "left-pad/package.json", 2)),
 	)
 	for _, f := range []types.VersionFile{{VersionID: v110.ID, ItemID: pom.ID}, {VersionID: v110.ID, ItemID: jar.ID}, {VersionID: v110.ID, ItemID: jar.ID}} {
-		must(t, s.LinkFile(ctx, f))
+		storekit.Must(t, s.LinkFile(ctx, f))
 	}
-	ids := get[[]int64](t)
-	same(t, "Files", []int64{min(jar.ID, pom.ID), max(jar.ID, pom.ID)}, ids(s.Files(ctx, v110.ID)))
-	same(t, "VersionOf", v110.ID, get[types.PackageVersion](t)(s.VersionOf(ctx, jar.ID)).ID)
-	wantErr(
+	ids := storekit.Get[[]int64](t)
+	storekit.Same(
+		t,
+		"Files",
+		[]int64{min(jar.ID, pom.ID), max(jar.ID, pom.ID)},
+		ids(s.Files(ctx, v110.ID)),
+	)
+	storekit.Same(
+		t,
+		"VersionOf",
+		v110.ID,
+		storekit.Get[types.PackageVersion](t)(s.VersionOf(ctx, jar.ID)).ID,
+	)
+	storekit.WantErr(
 		t,
 		s.LinkFile(ctx, types.VersionFile{VersionID: v110.ID + 1000, ItemID: jar.ID}),
 		store.ErrNotFound,
 	)
-	wantErr(
+	storekit.WantErr(
 		t,
 		s.LinkFile(ctx, types.VersionFile{VersionID: v110.ID, ItemID: jar.ID + 1000}),
 		store.ErrNotFound,
 	)
 	_, err = s.VersionOf(ctx, jar.ID+1000)
-	wantErr(t, err, store.ErrNotFound)
-	get[store.DeleteResult](t)(itemsStore.Delete(ctx, "npm-local", false, pom.FullPath()))
-	same(t, "Files after the item went", []int64{jar.ID}, ids(s.Files(ctx, v110.ID)))
+	storekit.WantErr(t, err, store.ErrNotFound)
+	storekit.Get[store.DeleteResult](t)(itemsStore.Delete(ctx, "npm-local", false, pom.FullPath()))
+	storekit.Same(t, "Files after the item went", []int64{jar.ID}, ids(s.Files(ctx, v110.ID)))
 
-	must(t, s.RecordVersionDownload(ctx, v110.ID, at(9)))
-	if got := get[types.PackageVersion](
+	storekit.Must(t, s.RecordVersionDownload(ctx, v110.ID, storekit.At(9)))
+	if got := storekit.Get[types.PackageVersion](
 		t,
 	)(
 		s.Version(ctx, pkg.ID, "1.10.0"),
 	); !got.LastDownloaded.Equal(
-		want(at(9)),
+		storekit.Want(storekit.At(9)),
 	) {
 		t.Fatalf("LastDownloaded = %v", got.LastDownloaded)
 	}
-	wantErr(t, s.RecordVersionDownload(ctx, v110.ID+1000, at(9)), store.ErrNotFound)
+	storekit.WantErr(
+		t,
+		s.RecordVersionDownload(ctx, v110.ID+1000, storekit.At(9)),
+		store.ErrNotFound,
+	)
 
-	must(t, s.DeleteVersion(ctx, v110.ID))
-	wantErr(t, s.DeleteVersion(ctx, v110.ID), store.ErrNotFound)
-	same(t, "Versions after delete", []string{"1.0.0#1", "1.2.0#2", "1.9.0-beta#3", "2.0.0#4"},
-		versionNames(versions(s.Versions(ctx, pkg.ID))))
-	same(t, "Files of a deleted version", []int64(nil), ids(s.Files(ctx, v110.ID)))
+	storekit.Must(t, s.DeleteVersion(ctx, v110.ID))
+	storekit.WantErr(t, s.DeleteVersion(ctx, v110.ID), store.ErrNotFound)
+	storekit.Same(
+		t,
+		"Versions after delete",
+		[]string{"1.0.0#1", "1.2.0#2", "1.9.0-beta#3", "2.0.0#4"},
+		versionNames(versions(s.Versions(ctx, pkg.ID))),
+	)
+	storekit.Same(t, "Files of a deleted version", []int64(nil), ids(s.Files(ctx, v110.ID)))
 	_, err = s.VersionOf(ctx, jar.ID)
-	wantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, store.ErrNotFound)
 
-	must(t, s.Delete(ctx, pkg.ID))
-	wantErr(t, s.Delete(ctx, pkg.ID), store.ErrNotFound)
+	storekit.Must(t, s.Delete(ctx, pkg.ID))
+	storekit.WantErr(t, s.Delete(ctx, pkg.ID), store.ErrNotFound)
 	_, err = s.Version(ctx, pkg.ID, "2.0.0")
-	wantErr(t, err, store.ErrNotFound)
-	same(
+	storekit.WantErr(t, err, store.ErrNotFound)
+	storekit.Same(
 		t,
 		"Versions of a deleted package",
 		[]string{},

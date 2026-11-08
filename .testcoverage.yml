@@ -20,12 +20,18 @@ exclude:
     - ^migration/platform/blob/blobtest/
     - ^pkg/store/storetest/
     - ^migration/artifacts/core/formattest/
+    # Assertions the store contract suites share: the same t.Fatal paths.
+    - ^migration/platform/testkit/storekit/
     # Per-module store contract suites (decision 0015); their remaining
     # branches are t.Fatal paths taken only when a backend breaks the contract.
     - ^migration/[a-z]+/adapters/storetest/
-    # Test harness that starts PostgreSQL for the contract runs; its branches
-    # are container start-up failures.
+    # The composite store's SQL contract suites; their remaining branches are
+    # t.Fatal paths taken only when a backend breaks the contract.
     - ^internal/sqlstore/sqltest/
+    # Module SQL harness: its remaining branches are t.Fatal paths of a
+    # container or database that fails to start, migrate or clean up, and the
+    # ARTIFACTWEAVE_TEST_POSTGRES_DSN branch, which CI does not set.
+    - ^migration/platform/sql/sqltest/
     # Server protocol test fixture: remaining branches abort on invalid setup
     # or simulate signing failures; production server coverage remains gated.
     - ^test/server/registryfixture/

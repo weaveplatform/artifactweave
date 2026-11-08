@@ -23,8 +23,8 @@ env:
   # testcontainers-go v0.44.0 reads this variable in internal/config/config.go
   # and then skips connectReaper (docker.go). The emulators still terminate
   # through testcontainers.CleanupContainer at the end of each test; the one
-  # PostgreSQL container per test binary (internal/sqlstore/sqltest) lives
-  # until the runner is discarded. Local runs keep the reaper.
+  # PostgreSQL container per test binary (migration/platform/sql/sqltest)
+  # lives until the runner is discarded. Local runs keep the reaper.
   TESTCONTAINERS_RYUK_DISABLED: 'true'
 
 jobs:
