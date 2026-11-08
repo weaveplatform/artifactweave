@@ -300,6 +300,10 @@ change that adds a name appends its row; the change column gives the ticket of t
 | `ErrChanged`, `MsgKeyExists`, `IsNull` | `artifacts/api` | The sentinel `Repositories.Remove` returns when the content changed under the delete, the message of a create whose key is taken, and the test for a null value in an update body or descriptor; declared in the api for the callers of `Repositories`, which its operations return and use, with their texts unchanged | ART-07 |
 | `NewRepositories` | `artifacts/core/repos` | Binds `Repositories` over the store and access's `Keys` and `Projects` | ART-07 |
 | `Checker` | `artifacts/core/layout` | The layout engine's implementation of `Layouts` | ART-07 |
+| `FetchCocoaPodsGit` | `artifacts/ecosystem/cocoapods` | The CocoaPods Git fetching that the remote policy reaches through `Policy.GitFetch`: a Git-sourced pod's revision and pinned submodules as one deterministic tar.gz upstream response; it was the policy's method `fetchCocoaPodsGit` | RMT-02 |
+| `Policy.GitFetch` | `artifacts/core/remote` | The hook through which the policy answers a CocoaPods Git checkout; nil answers `source.ErrUnsupported`, as a policy without a pool does | RMT-02 |
+| `ResponseError` | `artifacts/core/remote` | The typed `*source.HTTPError` of an upstream answer that is neither content nor an absence, which format rules in the slices return unwrapped; it was `responseError` | RMT-02 |
+| `Request.GitUploadPack` | `artifacts/adapters/upstream` | Marks the CocoaPods Git adapter's upload-pack POST, which `Client.Do` admits only when its whole guard holds; it was `gitUploadPack` | RMT-02 |
 
 ### Placeholders
 

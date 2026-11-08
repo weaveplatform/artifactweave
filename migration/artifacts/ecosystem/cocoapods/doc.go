@@ -12,7 +12,10 @@
 // through the format hooks (decision 0032), so every write and delete in a
 // CocoaPods repository reaches it whichever API carried it. The slice's
 // protocol package, cocoapods/http, serves the CDN with the names, paths
-// and podspecs checked here.
+// and podspecs checked here. Its Git fetching builds a Git-sourced pod's
+// archive for core remote's shared retrieval and cache policy, which this
+// package imports and which reaches it only through the Policy.GitFetch
+// hook (decision 0044).
 //
 // # Inputs
 //
@@ -20,11 +23,16 @@
 //     item service's hooks for CocoaPods repositories to Handler; the
 //     protocol package (cocoapods/http), which builds and parses CDN and
 //     archive paths and reads the podspec an archive was indexed with
-//     (Archive); and remote retrieval, which checks an HTTP-sourced pod's
-//     archive before caching it (ValidateSourceArchive) and bounds a
-//     Git-sourced one (MaxArchiveBytes).
+//     (Archive); and the remote policy (core remote), which checks an
+//     HTTP-sourced pod's archive before caching it (ValidateSourceArchive)
+//     and hands a Git-sourced pod's request, with its Git descriptor
+//     (source.CocoaPodsGitSource), to FetchCocoaPodsGit through
+//     Policy.GitFetch.
 //   - Driven: the format hooks' environment (format.Env), through which
-//     Handler opens stored archives and keeps the package index.
+//     Handler opens stored archives and keeps the package index; and the
+//     remote.Policy that FetchCocoaPodsGit is given: its pooled upstream
+//     client, its current-authority check (CheckCurrent) and the
+//     repository's allowed origins (externalDependenciesPatterns).
 //
 // # Outputs
 //
@@ -36,6 +44,8 @@
 //   - Handler: the hooks that inspect and admit a deployed archive, index
 //     its version with the Archive as metadata, and rebuild the index from
 //     the stored archives (Reindex).
+//   - FetchCocoaPodsGit: the deterministic tar.gz of a Git-sourced pod's
+//     revision and its pinned submodules, answered as an upstream response.
 //
 // # Invariants
 //
@@ -47,13 +57,20 @@
 //     outside the static grammar fails the upload.
 //   - CDN metadata under .pod/cdn/ is generated, so a deploy there is
 //     refused with 409.
+//   - FetchCocoaPodsGit never launches Git or writes a worktree: it reads
+//     objects in memory over smart HTTP(S), and validates object IDs, pack
+//     and delta expansion limits and archive members before the one
+//     archive it builds enters the cache. The repository's credentials are
+//     never sent to another Git origin, a submodule's included.
 //   - Refusal texts are answered to clients in the response body, so they
 //     stay byte-identical.
 //
 // # References
 //
 //   - Decision 0032: docs/research/decisions/0032-package-format-handlers.md
-//     (format hooks and optional interfaces).
+//     (format hooks and optional interfaces; CocoaPods Git sources, #771).
+//   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md,
+//     "Artifacts and remote" (the GitFetch hook).
 //   - docs/testing/cocoapods.md (the CDN client, Git sources and static
 //     Ruby podspecs).
 //   - JFrog CocoaPods repositories and the repository class table, as that
@@ -66,8 +83,9 @@
 //   - Plan: docs/implementation/plan.md#p31-native-build-and-plugin-repositories
 //     and #p9d-modular-monolith-migration, epic ECO
 //     (https://github.com/weaveplatform/artifactweave/issues/943).
-//   - https://github.com/weaveplatform/artifactweave/issues/771 and
-//     https://github.com/weaveplatform/artifactweave/issues/1016
+//   - https://github.com/weaveplatform/artifactweave/issues/771,
+//     https://github.com/weaveplatform/artifactweave/issues/1016 and
+//     https://github.com/weaveplatform/artifactweave/issues/1017
 //
 // # Status
 //
@@ -83,4 +101,11 @@
 //   - handler_test.go and handler_lifecycle_test.go: admission against the
 //     stored archive, a cached HTTP source outside the hosted grammar, and
 //     reindexing.
+//   - remote_git_test.go, remote_git_pack_test.go, remote_git_failure_test.go,
+//     remote_git_limits_test.go and remote_git_authority_test.go: revisions,
+//     tree and module safety, the pack reader, invalid object graphs,
+//     upstream failures, resource limits, credential isolation and
+//     revocation during a submodule fetch, against fake Git upstreams, some
+//     serving the packs in test/fixtures/cocoapods-git; remote_fixture_test.go
+//     holds the remote policy fixture they share with nothing else.
 package cocoapods

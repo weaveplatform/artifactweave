@@ -36,7 +36,13 @@ type Options struct {
 }
 
 type Request struct {
-	// GitUploadPack is set only by the closed CocoaPods Git-object adapter.
+	// GitUploadPack is set only by the closed CocoaPods Git-object adapter
+	// (cocoapods.FetchCocoaPodsGit), to mark its upload-pack POST. It is
+	// exported only so that the adapter, outside this package, can mark the
+	// request: Do still admits the POST only when the whole Git guard holds
+	// (a CocoaPods repository, a metadata request without cross-origin
+	// credentials, an external URL with no path or query, a body of 1 to
+	// 4096 bytes, the upload-pack Accept header and a destination check).
 	GitUploadPack bool
 	// ExternalURL is a metadata/token-realm URL, never combined with Path/Query.
 	// It requires a resolved destination policy.

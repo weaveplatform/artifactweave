@@ -52,9 +52,29 @@ type cocoaPodsCheckout struct {
 	archive          *tar.Writer
 }
 
-// fetchCocoaPodsGit keeps Git transport behind the same source policy as HTTP
-// archives. Only the final validated tar is published; no Git checkout or
-// attacker-controlled filesystem/configuration is ever executed.
+// FetchCocoaPodsGit answers a remote CocoaPods read whose pod source is Git
+// (q.Resource.CocoaPodsGit): it fetches the revision the descriptor names,
+// and with Submodules each pinned submodule, over smart HTTP(S) through p's
+// pooled client for q.Repo, and returns a 200 response whose body is the
+// deterministic tar.gz of that tree, which the policy validates and caches
+// as it does an HTTP source archive. The application installs it as
+// remote.Policy.GitFetch.
+//
+// It keeps Git transport behind the same source policy as HTTP archives:
+// every exchange passes p.CheckCurrent and the repository's allowed origins
+// first. Only the final validated tar is published; no Git checkout or
+// attacker-controlled filesystem/configuration is ever executed. The fetch
+// has a two-minute deadline and the pack, object, repository and archive
+// limits of docs/testing/cocoapods.md.
+//
+// It returns source.ErrUnsupported for a repository that is not a CocoaPods
+// one, a request without a Git descriptor, a policy without a pool or a
+// permit that allows no upstream network; source.ErrInvalidRequest for a
+// descriptor that fails Validate; source.ErrInvalidResult for refs, packs,
+// objects or trees outside those rules, and for a tree with no file; and
+// the policy's and the client's errors unwrapped (source.ErrDenied, a
+// *source.HTTPError), so the source service classifies them as it does for
+// any upstream read.
 func FetchCocoaPodsGit(
 	ctx context.Context,
 	p *remote.Policy,

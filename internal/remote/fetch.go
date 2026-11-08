@@ -506,6 +506,12 @@ func normalizeMissing(q source.Request, res *http.Response) {
 	}
 }
 
+// ResponseError is the error of an upstream answer that is neither content
+// nor a protocol-declared absence: a *source.HTTPError carrying 401, 403,
+// 429 (with the Retry-After it gives, read against now) or a 5xx status as
+// an HTTP failure, and any other status as a 502 protocol failure. Format
+// rules that make their own upstream exchanges return it unwrapped, so the
+// source service maps the failure as it does for the policy's own reads.
 func ResponseError(res *http.Response, now time.Time) error {
 	status := res.StatusCode
 	if status == 401 || status == 403 || status == 429 || status >= 500 && status <= 599 {
