@@ -16,10 +16,10 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
-	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
@@ -87,10 +87,10 @@ func smartFixture(t *testing.T) *smartWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resolver, err := remote.NewResolver(
+	resolver, err := upstream.NewResolver(
 		w.db,
 		nil,
-		remote.ResolverOptions{RevisionKey: []byte("smart-test-only-credential-revision-key")},
+		upstream.ResolverOptions{RevisionKey: []byte("smart-test-only-credential-revision-key")},
 	)
 	if err != nil {
 		t.Fatal(err)

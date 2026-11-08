@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -45,7 +46,7 @@ type fixture struct {
 	router   *chi.Mux
 	blobs    blob.Store
 	items    *item.Service
-	resolver *remote.Resolver
+	resolver *upstream.Resolver
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -82,13 +83,13 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	items := &item.Service{Store: db, Blobs: blobs, Now: clock.Now, Formats: ecosystem.For}
-	resolver, err := remote.NewResolver(db, nil, remote.ResolverOptions{
+	resolver, err := upstream.NewResolver(db, nil, upstream.ResolverOptions{
 		RevisionKey: []byte(strings.Repeat("k", 32)),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	pool := new(remote.Pool)
+	pool := new(upstream.Pool)
 	policy := &remote.Policy{
 		Store: db, Blobs: blobs, Items: items, Pool: pool,
 		Key: []byte(strings.Repeat("k", 32)), Now: clock.Now,
@@ -362,11 +363,11 @@ func TestAccNIMMetadataAndPairedDockerRegistryKeepSeparateAuthority(t *testing.T
 		Store: f.store, Blobs: f.blobs, Items: f.items,
 		Options: f.resolver.Options, Key: []byte(strings.Repeat("k", 32)),
 	}
-	pool := new(remote.RegistryPool)
+	pool := new(upstream.RegistryPool)
 	t.Cleanup(pool.Close)
 	content := &docker.RegistryContent{
 		Policy: registryPolicy,
-		Registries: &remote.RegistryClients{
+		Registries: &upstream.RegistryClients{
 			Pool: pool, Options: f.resolver.RegistryOptions,
 		},
 	}

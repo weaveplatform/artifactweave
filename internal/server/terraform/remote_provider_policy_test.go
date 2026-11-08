@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -36,7 +36,7 @@ func (f *remoteProviderFixture) configure(update func(*repo.Config)) {
 
 func (f *remoteProviderFixture) allowPrivate(origins ...string) {
 	f.t.Helper()
-	resolver, err := remote.NewResolver(f.db, nil, remote.ResolverOptions{
+	resolver, err := upstream.NewResolver(f.db, nil, upstream.ResolverOptions{
 		RevisionKey: []byte(strings.Repeat("k", 32)), AllowedPrivateOrigins: origins,
 	})
 	if err != nil {

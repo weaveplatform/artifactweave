@@ -13,8 +13,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
@@ -317,10 +317,10 @@ func TestAccBowerExternalRedirectsNeverBorrowOriginCredentials(t *testing.T) {
 	if err := f.db.Repos().Update(t.Context(), virtual); err != nil {
 		t.Fatal(err)
 	}
-	resolver, err := remote.NewResolver(
+	resolver, err := upstream.NewResolver(
 		f.db,
 		nil,
-		remote.ResolverOptions{
+		upstream.ResolverOptions{
 			RevisionKey:           []byte(strings.Repeat("k", 32)),
 			AllowedPrivateOrigins: []string{target.URL},
 		},

@@ -1,4 +1,4 @@
-package remote
+package upstream
 
 import (
 	"context"
@@ -19,6 +19,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -131,7 +132,7 @@ func registryGet(ctx context.Context, registry *Registry, image string) error {
 	res, err := registry.Do(
 		ctx,
 		image,
-		Request{Method: http.MethodGet, Path: "manifests/latest", Header: http.Header{
+		remote.Request{Method: http.MethodGet, Path: "manifests/latest", Header: http.Header{
 			"Authorization": {
 				"Bearer local-artifactweave-token",
 			},
@@ -203,7 +204,7 @@ func TestAccRegistryDeniedAndBoundedRetry(t *testing.T) {
 			"team/image",
 		); !errors.Is(
 			err,
-			ErrRegistryDenied,
+			remote.ErrRegistryDenied,
 		) {
 			t.Fatal(err)
 		}
@@ -228,7 +229,7 @@ func TestAccRegistryDeniedAndBoundedRetry(t *testing.T) {
 			"team/image",
 		); !errors.Is(
 			err,
-			ErrRegistryDenied,
+			remote.ErrRegistryDenied,
 		) {
 			t.Fatal(err)
 		}
@@ -251,7 +252,7 @@ func TestAccRegistryDeniedAndBoundedRetry(t *testing.T) {
 			if err == nil || strings.Contains(err.Error(), "secret") {
 				t.Fatal(err)
 			}
-			if tc.status < 429 && !errors.Is(err, ErrRegistryDenied) {
+			if tc.status < 429 && !errors.Is(err, remote.ErrRegistryDenied) {
 				t.Fatal(err)
 			}
 			if tc.status >= 429 {
@@ -332,7 +333,14 @@ func TestAccRegistryBasicAndDisabledBearer(t *testing.T) {
 		w.Header().Set("WWW-Authenticate", `Basic realm="registry"`)
 		w.WriteHeader(401)
 	}
-	if err := registryGet(t.Context(), f.registry, "image"); !errors.Is(err, ErrRegistryDenied) {
+	if err := registryGet(
+		t.Context(),
+		f.registry,
+		"image",
+	); !errors.Is(
+		err,
+		remote.ErrRegistryDenied,
+	) {
 		t.Fatal(err)
 	}
 	f.config.EnableTokenAuthentication = ptr(false)
@@ -413,7 +421,14 @@ func TestAccRegistryRealmAndRedirectIsolation(t *testing.T) {
 		t.Fatal("CDN not fetched")
 	}
 	f.pullHandler = func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, cdn.URL+"/challenge", 307) }
-	if err := registryGet(t.Context(), redirected, "image"); !errors.Is(err, ErrRegistryDenied) {
+	if err := registryGet(
+		t.Context(),
+		redirected,
+		"image",
+	); !errors.Is(
+		err,
+		remote.ErrRegistryDenied,
+	) {
 		t.Fatal(err)
 	}
 	if f.exchanges.Load() != 0 {
@@ -513,7 +528,7 @@ func TestAccRegistryPoolAndNaming(t *testing.T) {
 	}
 	pool.Close()
 	pool.Close()
-	if _, err := pool.Client(f.config, identity, f.options); !errors.Is(err, ErrClosed) {
+	if _, err := pool.Client(f.config, identity, f.options); !errors.Is(err, remote.ErrClosed) {
 		t.Fatal(err)
 	}
 	for _, name := range []string{"", "../secret", "Team/image", "team//image", "image:tag", "team/%2e%2e", "team/image?query", strings.Repeat("a", 256)} {
@@ -556,7 +571,7 @@ func TestUnitRegistryClientsOpenReturnsUntypedNil(t *testing.T) {
 	clients := &RegistryClients{
 		Pool: &pool,
 		Options: func(context.Context, repo.Config) (RegistryOptions, error) {
-			return RegistryOptions{Transport: Options{Revision: "current"}}, nil
+			return RegistryOptions{Transport: remote.Options{Revision: "current"}}, nil
 		},
 	}
 	c := repo.Config{Key: "docker-remote", Class: repo.Remote, PackageType: repo.Docker}
@@ -600,7 +615,7 @@ func TestAccRegistryPublicRealmDNSDenied(t *testing.T) {
 		"https://public.example/token",
 	); !errors.Is(
 		err,
-		ErrSecurity,
+		remote.ErrSecurity,
 	) {
 		t.Fatal(err)
 	}
@@ -681,28 +696,28 @@ func TestAccRegistryInvalidConfigurationAndRequests(t *testing.T) {
 	if _, err := f.registry.Do(
 		t.Context(),
 		"bad/name:tag",
-		Request{Method: "GET", Path: "manifests/latest"},
+		remote.Request{Method: "GET", Path: "manifests/latest"},
 	); err == nil {
 		t.Fatal("bad image")
 	}
 	if _, err := f.registry.Do(
 		t.Context(),
 		"image",
-		Request{Method: "GET", ExternalURL: f.server.URL},
+		remote.Request{Method: "GET", ExternalURL: f.server.URL},
 	); err == nil {
 		t.Fatal("absolute image path")
 	}
 	if _, err := f.registry.Do(
 		t.Context(),
 		"image",
-		Request{Method: "GET", Path: "/manifests/latest"},
+		remote.Request{Method: "GET", Path: "/manifests/latest"},
 	); err == nil {
 		t.Fatal("absolute image path")
 	}
 	if _, err := f.registry.Do(
 		t.Context(),
 		"image",
-		Request{Method: "POST", Path: "manifests/latest"},
+		remote.Request{Method: "POST", Path: "manifests/latest"},
 	); err == nil {
 		t.Fatal("write method")
 	}

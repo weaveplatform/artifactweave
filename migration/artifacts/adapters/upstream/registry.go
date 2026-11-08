@@ -1,4 +1,4 @@
-package remote
+package upstream
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -22,7 +23,7 @@ var ErrRegistryChallenge = errors.New("remote: invalid upstream registry authent
 // RegistryOptions comes from Resolver.RegistryOptions, never downstream headers.
 // Now is an optional clock for deterministic expiry tests.
 type RegistryOptions struct {
-	Transport             Options
+	Transport             remote.Options
 	Now                   func() time.Time
 	username, password    string
 	allowRealmCredentials bool
@@ -42,7 +43,7 @@ func (r *Resolver) RegistryOptions(ctx context.Context, c repo.Config) (Registry
 	// The second read cannot pair new credentials with an old source revision.
 	current, err := r.Options(ctx, stored)
 	if err != nil || opts.Revision != current.Revision {
-		return RegistryOptions{}, ErrConfiguration
+		return RegistryOptions{}, remote.ErrConfiguration
 	}
 	return RegistryOptions{
 		Transport: opts, username: stored.Username, password: stored.Password,
@@ -71,8 +72,8 @@ type Registry struct {
 	mu          sync.Mutex
 	challenges  map[string]registryChallenge
 	tokens      map[string]registryToken
-	flights     FlightGroup[registryToken]
-	capacity    Admission
+	flights     remote.FlightGroup[registryToken]
+	capacity    remote.Admission
 }
 
 func NewRegistry(c repo.Config, opts RegistryOptions) (*Registry, error) {
@@ -82,14 +83,15 @@ func NewRegistry(c repo.Config, opts RegistryOptions) (*Registry, error) {
 		opts.Transport.CheckURL == nil ||
 		opts.Transport.Revision == "" ||
 		c.DockerAPIVersion != "" && c.DockerAPIVersion != repo.DockerV2 {
-		return nil, ErrConfiguration
+		return nil, remote.ErrConfiguration
 	}
-	base, err := CheckedURL(c.URL)
+	base, err := remote.CheckedURL(c.URL)
 	if err != nil {
+		//nolint:wrapcheck // preserves upstream error identity
 		return nil, err
 	}
 	if c.DockerProjectID != "" && !registryName.MatchString(c.DockerProjectID) {
-		return nil, ErrConfiguration
+		return nil, remote.ErrConfiguration
 	}
 	registry := &Registry{
 		base:        base,
@@ -121,6 +123,7 @@ func NewRegistry(c repo.Config, opts RegistryOptions) (*Registry, error) {
 func (r *Registry) prepare(opts RegistryOptions) func(*http.Request) error {
 	return func(req *http.Request) error {
 		if err := opts.Transport.Prepare(req); err != nil {
+			//nolint:wrapcheck // preserves upstream error identity
 			return err
 		}
 		// This deletes configured ordinary-HTTP Bearer auth as well as any caller
@@ -128,11 +131,11 @@ func (r *Registry) prepare(opts RegistryOptions) func(*http.Request) error {
 		req.Header.Del("Authorization")
 		auth, _ := req.Context().Value(registryAuthorizationKey{}).(registryAuthorization)
 		if auth.realm != "" {
-			if Origin(req.URL) == auth.realm &&
+			if remote.Origin(req.URL) == auth.realm &&
 				r.realmCredentials(req.URL, opts.allowRealmCredentials) {
 				setRegistryBasic(req, opts)
 			}
-		} else if Origin(req.URL) == Origin(r.base) {
+		} else if remote.Origin(req.URL) == remote.Origin(r.base) {
 			if auth.token != "" {
 				prefix := strings.TrimRight(r.base.Path, "/") + "/v2/"
 				permitted := req.URL.Path == prefix
@@ -157,7 +160,7 @@ func setRegistryBasic(req *http.Request, opts RegistryOptions) {
 }
 
 func (r *Registry) realmCredentials(u *url.URL, allow bool) bool {
-	if Origin(u) == Origin(r.base) {
+	if remote.Origin(u) == remote.Origin(r.base) {
 		return true
 	}
 	if u.Scheme != "https" {
@@ -179,7 +182,7 @@ var registryName = regexp.MustCompile(
 // its protocol-defined library namespace; other registries retain the name.
 func (r *Registry) Image(name string) (string, error) {
 	if len(name) > 255 || !registryName.MatchString(name) {
-		return "", ErrRequest
+		return "", remote.ErrRequest
 	}
 	if r.project != "" {
 		name = r.project + "/" + name
@@ -188,33 +191,33 @@ func (r *Registry) Image(name string) (string, error) {
 		name = "library/" + name
 	}
 	if len(name) > 255 {
-		return "", ErrRequest
+		return "", remote.ErrRequest
 	}
 	return name, nil
 }
 
 // Probe performs /v2/ discovery through the same bounded challenge flow.
 func (r *Registry) Probe(ctx context.Context) (*http.Response, error) {
-	return r.do(ctx, "", Request{Method: http.MethodGet, Path: "v2/", Metadata: true})
+	return r.do(ctx, "", remote.Request{Method: http.MethodGet, Path: "v2/", Metadata: true})
 }
 
 // Do addresses a registry resource relative to an image, for example
 // Do(ctx, "team/image", Request{Method: "GET", Path: "manifests/latest"}).
 // A request retries authentication at most once. All returned bodies are owned
 // by the caller, including terminal non-authentication error statuses.
-func (r *Registry) Do(ctx context.Context, image string, q Request) (*http.Response, error) {
+func (r *Registry) Do(ctx context.Context, image string, q remote.Request) (*http.Response, error) {
 	image, err := r.Image(image)
 	if err != nil {
 		return nil, err
 	}
 	if q.ExternalURL != "" || strings.HasPrefix(q.Path, "/") {
-		return nil, ErrRequest
+		return nil, remote.ErrRequest
 	}
 	q.Path = "v2/" + image + "/" + q.Path
 	return r.do(ctx, image, q)
 }
 
-func (r *Registry) do(ctx context.Context, image string, q Request) (*http.Response, error) {
+func (r *Registry) do(ctx context.Context, image string, q remote.Request) (*http.Response, error) {
 	challenge, token := r.cached(image)
 	var err error
 	if challenge.scheme == "bearer" && token.value == "" {
@@ -228,11 +231,11 @@ func (r *Registry) do(ctx context.Context, image string, q Request) (*http.Respo
 		return res, err
 	}
 	// Never trust an authentication challenge served by a blob/CDN redirect.
-	sameOrigin := Origin(res.Request.URL) == Origin(r.base)
+	sameOrigin := remote.Origin(res.Request.URL) == remote.Origin(r.base)
 	header := res.Header.Values("WWW-Authenticate")
 	_ = res.Body.Close()
 	if !sameOrigin {
-		return nil, ErrRegistryDenied
+		return nil, remote.ErrRegistryDenied
 	}
 	next, err := parseRegistryChallenge(header, image, r.allowTokens)
 	if err != nil {
@@ -240,7 +243,7 @@ func (r *Registry) do(ctx context.Context, image string, q Request) (*http.Respo
 	}
 	// Basic was already attempted with the configured credentials.
 	if next.scheme == "basic" {
-		return nil, ErrRegistryDenied
+		return nil, remote.ErrRegistryDenied
 	}
 	if err = r.checkRealm(ctx, next.realm); err != nil {
 		return nil, err
@@ -269,7 +272,7 @@ func (r *Registry) do(ctx context.Context, image string, q Request) (*http.Respo
 			delete(r.tokens, next.key())
 		}
 		r.mu.Unlock()
-		return nil, ErrRegistryDenied
+		return nil, remote.ErrRegistryDenied
 	}
 	return res, nil
 }
@@ -277,7 +280,7 @@ func (r *Registry) do(ctx context.Context, image string, q Request) (*http.Respo
 func (r *Registry) request(
 	ctx context.Context,
 	image string,
-	q Request,
+	q remote.Request,
 	token string,
 ) (*http.Response, error) {
 	ctx = context.WithValue(
@@ -300,14 +303,14 @@ func (r *Registry) cached(image string) (registryChallenge, registryToken) {
 }
 
 func (r *Registry) checkRealm(ctx context.Context, raw string) error {
-	u, err := CheckedURL(raw)
+	u, err := remote.CheckedURL(raw)
 	if err != nil || (r.base.Scheme == "https" && u.Scheme != "https") {
-		return ErrSecurity
+		return remote.ErrSecurity
 	}
 	// HTTP is accepted only at the configured registry origin, never a second
 	// realm where the token or Basic credentials would travel in plaintext.
-	if u.Scheme != "https" && Origin(u) != Origin(r.base) {
-		return ErrSecurity
+	if u.Scheme != "https" && remote.Origin(u) != remote.Origin(r.base) {
+		return remote.ErrSecurity
 	}
 	if err = r.client.checkURL(ctx, u); err != nil {
 		return safeError(err)
@@ -344,17 +347,17 @@ func (p *RegistryPool) Client(
 ) (*Registry, error) {
 	if identity.Kind != types.ExternalHTTP || identity.Repository == "" ||
 		identity.Generation == "" {
-		return nil, ErrConfiguration
+		return nil, remote.ErrConfiguration
 	}
 	encoded, err := json.Marshal([]any{c, identity, opts.Transport.Revision})
 	if err != nil {
-		return nil, ErrConfiguration
+		return nil, remote.ErrConfiguration
 	}
 	fingerprint := sha256.Sum256(encoded)
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.isClosed {
-		return nil, ErrClosed
+		return nil, remote.ErrClosed
 	}
 	if old, ok := p.clients[c.Key]; ok && old.fingerprint == fingerprint {
 		return old.registry, nil
@@ -400,7 +403,7 @@ func (r *RegistryClients) Open(
 	c repo.Config,
 	id types.SourceIdentity,
 	revision string,
-) (RegistryClient, error) {
+) (remote.RegistryClient, error) {
 	creds, err := r.Options(ctx, c)
 	if err != nil {
 		return nil, err
@@ -425,8 +428,8 @@ func (r *RegistryClients) Open(
 func (r *RegistryClients) Foreign(
 	ctx context.Context,
 	c repo.Config,
-	opts Options,
-	q Request,
+	opts remote.Options,
+	q remote.Request,
 ) (*http.Response, error) {
 	client, err := NewClient(c, opts)
 	if err != nil {

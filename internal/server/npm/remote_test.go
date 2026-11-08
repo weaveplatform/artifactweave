@@ -20,6 +20,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/npm"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
@@ -57,16 +58,16 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 			t.Fatal(err)
 		}
 	}
-	resolver, err := remote.NewResolver(
+	resolver, err := upstream.NewResolver(
 		f.db,
 		nil,
-		remote.ResolverOptions{RevisionKey: []byte(strings.Repeat("k", 32))},
+		upstream.ResolverOptions{RevisionKey: []byte(strings.Repeat("k", 32))},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	clock := fakeupstream.NewClock(time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC))
-	pool := new(remote.Pool)
+	pool := new(upstream.Pool)
 	p := &remote.Policy{
 		Store:   f.db,
 		Blobs:   f.items.Blobs,
@@ -351,10 +352,10 @@ func TestAccRemoteExternalURLCredentialsAndDeniedDestinations(t *testing.T) {
 	if err := f.db.Repos().Update(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
-	resolver, err := remote.NewResolver(
+	resolver, err := upstream.NewResolver(
 		f.db,
 		nil,
-		remote.ResolverOptions{
+		upstream.ResolverOptions{
 			RevisionKey:           []byte(strings.Repeat("k", 32)),
 			AllowedPrivateOrigins: []string{target.URL},
 		},

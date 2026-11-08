@@ -18,7 +18,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/idtoken"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
-	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/agentpackages"
 	"github.com/weaveplatform/artifactweave/internal/server/aieditorextensions"
 	"github.com/weaveplatform/artifactweave/internal/server/ansible"
@@ -51,6 +50,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/source"
 	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
@@ -88,7 +88,7 @@ type Config struct {
 	RequestLimits *apilimit.Service
 	// RemoteHTTP owns repository-scoped connection pools. The application closes
 	// it after draining requests; source adapters resolve credentials per revision.
-	RemoteHTTP *remote.Pool
+	RemoteHTTP *upstream.Pool
 	// Keys derives the key for short-lived Terraform download URLs.
 	Keys *crypt.Keyring
 	// BaseURL is the operator-configured public base URL; empty means derive

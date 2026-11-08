@@ -1,4 +1,4 @@
-package remote
+package upstream
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
@@ -22,7 +23,7 @@ func TestAccOutboundHooksOnRequestsAndRedirects(t *testing.T) {
 		s := fakeupstream.New(t, fakeupstream.Options{})
 		s.Set("/first", fakeupstream.Resource{Redirect: s.URL + "/same"})
 		s.Set("/same", fakeupstream.Resource{Redirect: other.URL + "/item"})
-		return s, other, clientFor(t, repo.Config{URL: s.URL}, Options{})
+		return s, other, clientFor(t, repo.Config{URL: s.URL}, remote.Options{})
 	}
 
 	t.Run(
@@ -32,11 +33,14 @@ func TestAccOutboundHooksOnRequestsAndRedirects(t *testing.T) {
 			var seen []string
 			// The value is the request's own path: a redirect also carries a copy
 			// of the first request's headers, so only the hook writes "/same".
-			ctx := WithOutbound(t.Context(), Outbound{Header: func(req *http.Request) {
-				seen = append(seen, req.URL.String())
-				req.Header.Set("X-Outbound", req.URL.Path)
-			}})
-			res, err := c.Do(ctx, Request{Method: http.MethodGet, Path: "first"})
+			ctx := remote.WithOutbound(
+				t.Context(),
+				remote.Outbound{Header: func(req *http.Request) {
+					seen = append(seen, req.URL.String())
+					req.Header.Set("X-Outbound", req.URL.Path)
+				}},
+			)
+			res, err := c.Do(ctx, remote.Request{Method: http.MethodGet, Path: "first"})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -60,16 +64,16 @@ func TestAccOutboundHooksOnRequestsAndRedirects(t *testing.T) {
 	t.Run("allow refuses the first request and a redirect target", func(t *testing.T) {
 		s, other, c := chain(t)
 		var targets []string
-		ctx := WithOutbound(t.Context(), Outbound{Allow: func(target string) bool {
+		ctx := remote.WithOutbound(t.Context(), remote.Outbound{Allow: func(target string) bool {
 			targets = append(targets, target)
 			return target != s.URL+"/refused" && target != other.URL+"/item"
 		}})
-		_, err := c.Do(ctx, Request{Method: http.MethodGet, Path: "refused"})
-		if !errors.Is(err, ErrSecurity) || s.Count("", "") != 0 {
+		_, err := c.Do(ctx, remote.Request{Method: http.MethodGet, Path: "refused"})
+		if !errors.Is(err, remote.ErrSecurity) || s.Count("", "") != 0 {
 			t.Fatal(err, s.Requests())
 		}
-		_, err = c.Do(ctx, Request{Method: http.MethodGet, Path: "first"})
-		if !errors.Is(err, ErrSecurity) || s.Count("GET", "/same") != 1 ||
+		_, err = c.Do(ctx, remote.Request{Method: http.MethodGet, Path: "first"})
+		if !errors.Is(err, remote.ErrSecurity) || s.Count("GET", "/same") != 1 ||
 			other.Count("", "") != 0 {
 			t.Fatal(err, s.Requests(), other.Requests())
 		}
@@ -80,17 +84,17 @@ func TestAccOutboundHooksOnRequestsAndRedirects(t *testing.T) {
 	})
 
 	t.Run("a zero Outbound changes nothing", func(t *testing.T) {
-		if out := OutboundFrom(t.Context()); out.Header != nil || out.Allow != nil {
+		if out := remote.OutboundFrom(t.Context()); out.Header != nil || out.Allow != nil {
 			t.Fatal("hooks in a context without WithOutbound")
 		}
 		// Without hooks and with zero hooks alike, the caller's header reaches
 		// both hops on the first origin and is dropped at the other.
 		want := []string{"GET /first true", "GET /same true", "GET /item false"}
-		for _, ctx := range []context.Context{t.Context(), WithOutbound(t.Context(), Outbound{})} {
+		for _, ctx := range []context.Context{t.Context(), remote.WithOutbound(t.Context(), remote.Outbound{})} {
 			s, other, c := chain(t)
 			res, err := c.Do(
 				ctx,
-				Request{
+				remote.Request{
 					Method: http.MethodGet,
 					Path:   "first",
 					Header: http.Header{"X-Caller": {"v"}},

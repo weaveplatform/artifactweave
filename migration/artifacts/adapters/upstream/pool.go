@@ -1,4 +1,4 @@
-package remote
+package upstream
 
 import (
 	"crypto/sha256"
@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
@@ -24,7 +25,7 @@ type Pool struct {
 	isClosed bool
 }
 
-func (p *Pool) Client(c repo.Config, opts Options) (*Client, error) {
+func (p *Pool) Client(c repo.Config, opts remote.Options) (*Client, error) {
 	b, err := json.Marshal(c)
 	if err != nil {
 		return nil, fmt.Errorf("encode remote configuration: %w", err)
@@ -35,7 +36,7 @@ func (p *Pool) Client(c repo.Config, opts Options) (*Client, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.isClosed {
-		return nil, ErrClosed
+		return nil, remote.ErrClosed
 	}
 	if old, ok := p.clients[c.Key]; ok && old.fingerprint == fingerprint {
 		return old.client, nil
@@ -58,7 +59,7 @@ func (p *Pool) Client(c repo.Config, opts Options) (*Client, error) {
 // Client's errors, ErrClosed after Close among them. On error it returns a
 // literal nil, never a nil *Client inside the interface, which would compare
 // unequal to nil.
-func (p *Pool) Connection(c repo.Config, opts Options) (Connection, error) {
+func (p *Pool) Connection(c repo.Config, opts remote.Options) (remote.Connection, error) {
 	client, err := p.Client(c, opts)
 	if err != nil {
 		return nil, err

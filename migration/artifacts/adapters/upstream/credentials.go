@@ -1,4 +1,4 @@
-package remote
+package upstream
 
 import (
 	"bytes"
@@ -21,6 +21,7 @@ import (
 	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/publicsuffix"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
@@ -57,14 +58,14 @@ type Resolver struct {
 
 func NewResolver(st store.Store, keyring *crypt.Keyring, opts ResolverOptions) (*Resolver, error) {
 	if st == nil || keyring == nil && len(opts.RevisionKey) < 32 {
-		return nil, ErrConfiguration
+		return nil, remote.ErrConfiguration
 	}
 	key := bytes.Clone(opts.RevisionKey)
 	if keyring != nil {
 		key = keyring.Derive("remote-source-revision")
 	}
 	if bytes.Equal(key, make([]byte, len(key))) {
-		return nil, ErrConfiguration
+		return nil, remote.ErrConfiguration
 	}
 	opts.RevisionKey = nil
 	opts.RootCAsPEM = bytes.Clone(opts.RootCAsPEM)
@@ -78,15 +79,15 @@ func NewResolver(st store.Store, keyring *crypt.Keyring, opts ResolverOptions) (
 		var err error
 		roots, err = x509.SystemCertPool()
 		if err != nil {
-			return nil, ErrSecurity
+			return nil, remote.ErrSecurity
 		}
 		if !roots.AppendCertsFromPEM(opts.RootCAsPEM) {
-			return nil, ErrSecurity
+			return nil, remote.ErrSecurity
 		}
 	}
 	for _, raw := range opts.AllowedPrivateOrigins {
-		if _, err := CheckedURL(raw); err != nil {
-			return nil, ErrConfiguration
+		if _, err := remote.CheckedURL(raw); err != nil {
+			return nil, remote.ErrConfiguration
 		}
 	}
 	return &Resolver{
@@ -100,51 +101,52 @@ func NewResolver(st store.Store, keyring *crypt.Keyring, opts ResolverOptions) (
 // Options reloads sealed secrets through the store, rather than treating an API's
 // masked view as usable credentials. A stale non-secret configuration fails closed.
 // Revision is a stable HMAC of source-affecting settings, not cache/access policy.
-func (r *Resolver) Options(ctx context.Context, c repo.Config) (Options, error) {
+func (r *Resolver) Options(ctx context.Context, c repo.Config) (remote.Options, error) {
 	stored, err := r.store.Repos().Get(ctx, c.Key)
 	if err != nil {
-		return Options{}, configurationError(err)
+		return remote.Options{}, configurationError(err)
 	}
 	a, _ := json.Marshal(repo.Masked(c))
 	b, _ := json.Marshal(repo.Masked(stored))
 	if !bytes.Equal(a, b) || stored.Class != repo.Remote {
-		return Options{}, ErrConfiguration
+		return remote.Options{}, remote.ErrConfiguration
 	}
-	base, err := CheckedURL(stored.URL)
+	base, err := remote.CheckedURL(stored.URL)
 	if err != nil {
-		return Options{}, err
+		//nolint:wrapcheck // preserves upstream error identity
+		return remote.Options{}, err
 	}
 	if err := checkHeaders(stored.CustomHTTPHeaders); err != nil {
-		return Options{}, err
+		return remote.Options{}, err
 	}
 	proxy, proxyDoc, err := r.proxy(ctx, stored)
 	if err != nil {
-		return Options{}, err
+		return remote.Options{}, err
 	}
 	policy := &destinationPolicy{
-		private: map[string]bool{Origin(base): true},
+		private: map[string]bool{remote.Origin(base): true},
 		lookup:  r.options.LookupIP,
 	}
 	configuredOrigins := append(sourceEndpoints(stored), r.options.AllowedPrivateOrigins...)
 	for _, raw := range configuredOrigins {
-		u, parseErr := CheckedURL(raw)
+		u, parseErr := remote.CheckedURL(raw)
 		if parseErr != nil {
-			return Options{}, ErrConfiguration
+			return remote.Options{}, remote.ErrConfiguration
 		}
-		policy.private[Origin(u)] = true
+		policy.private[remote.Origin(u)] = true
 	}
 	if proxy != nil {
-		policy.private[Origin(proxy)] = true
+		policy.private[remote.Origin(proxy)] = true
 	}
 	identity, err := r.certificate(ctx, stored.ClientTLSCertificate)
 	if err != nil {
-		return Options{}, err
+		return remote.Options{}, err
 	}
 	var certificate tls.Certificate
 	if stored.ClientTLSCertificate != "" {
 		certificate, err = tls.X509KeyPair([]byte(identity.PEM), []byte(identity.PrivateKey))
 		if err != nil {
-			return Options{}, ErrSecurity
+			return remote.Options{}, remote.ErrSecurity
 		}
 	}
 	secure := &sourceSecurity{
@@ -169,7 +171,7 @@ func (r *Resolver) Options(ctx context.Context, c repo.Config) (Options, error) 
 	mac := hmac.New(sha256.New, r.key)
 	encoded, _ := json.Marshal(inputs)
 	_, _ = mac.Write(encoded)
-	opts := Options{
+	opts := remote.Options{
 		ProxyURL: proxy, Revision: hex.EncodeToString(mac.Sum(nil)),
 		TLSConfig: &tls.Config{MinVersion: tls.VersionTLS12, RootCAs: r.roots},
 		Prepare:   secure.prepare, CheckURL: secure.checkURL,
@@ -186,7 +188,7 @@ func configurationError(err error) error {
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return safeError(err)
 	}
-	return ErrConfiguration
+	return remote.ErrConfiguration
 }
 
 func (r *Resolver) certificate(ctx context.Context, alias string) (types.Certificate, error) {
@@ -222,11 +224,11 @@ func (r *Resolver) proxy(
 		for _, candidate := range docs {
 			var p wire.ProxyConfiguration
 			if json.Unmarshal(candidate.Document, &p) != nil {
-				return nil, doc, ErrConfiguration
+				return nil, doc, remote.ErrConfiguration
 			}
 			if candidate.Enabled && p.PlatformDefault && proxyService(p.Services) {
 				if doc.Key != "" {
-					return nil, doc, ErrConfiguration
+					return nil, doc, remote.ErrConfiguration
 				}
 				doc = candidate
 			}
@@ -240,15 +242,15 @@ func (r *Resolver) proxy(
 		p.Domain != "" ||
 		p.NTHost != "" ||
 		p.RedirectedToHosts != "" {
-		return nil, doc, ErrConfiguration
+		return nil, doc, remote.ErrConfiguration
 	}
 	host := p.Host
 	if !strings.Contains(host, "://") {
 		host = "http://" + host
 	}
-	u, err := CheckedURL(host)
+	u, err := remote.CheckedURL(host)
 	if err != nil || u.Path != "" && u.Path != "/" || u.RawQuery != "" || u.Port() != "" {
-		return nil, doc, ErrConfiguration
+		return nil, doc, remote.ErrConfiguration
 	}
 	u.Host = net.JoinHostPort(u.Hostname(), strconv.Itoa(p.Port))
 	u.Path = ""
@@ -274,7 +276,7 @@ func checkHeaders(headers []repo.CustomHTTPHeader) error {
 	for _, header := range headers {
 		name := http.CanonicalHeaderKey(header.Name)
 		if !httpguts.ValidHeaderFieldName(name) || !httpguts.ValidHeaderFieldValue(header.Value) {
-			return ErrConfiguration
+			return remote.ErrConfiguration
 		}
 		switch name {
 		case "Host",
@@ -288,7 +290,7 @@ func checkHeaders(headers []repo.CustomHTTPHeader) error {
 			"Te",
 			"Trailer",
 			"Upgrade":
-			return ErrConfiguration
+			return remote.ErrConfiguration
 		}
 	}
 	return nil

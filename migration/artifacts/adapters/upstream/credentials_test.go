@@ -1,4 +1,4 @@
-package remote
+package upstream
 
 import (
 	"bufio"
@@ -21,9 +21,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
-	"github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
@@ -43,7 +44,7 @@ func resolverFor(t *testing.T, st store.Store, opts ResolverOptions) *Resolver {
 	// Certificates, so bind the test store's, as the application binds its
 	// own; without it a remote that names one would panic.
 	if opts.Certificates == nil {
-		opts.Certificates = access.KeysOf(st)
+		opts.Certificates = accesstest.Over(t, st).API().Keys
 	}
 	r, err := NewResolver(st, key, opts)
 	if err != nil {
@@ -59,7 +60,7 @@ func saveRepo(t *testing.T, st store.Store, c repo.Config) {
 	}
 }
 
-func resolveFor(t *testing.T, r *Resolver, c repo.Config) Options {
+func resolveFor(t *testing.T, r *Resolver, c repo.Config) remote.Options {
 	t.Helper()
 	opts, err := r.Options(t.Context(), repo.Masked(c))
 	if err != nil {
@@ -70,14 +71,17 @@ func resolveFor(t *testing.T, r *Resolver, c repo.Config) Options {
 
 func getFor(t *testing.T, c *Client, path string) *http.Response {
 	t.Helper()
-	res, err := c.Do(t.Context(), Request{Method: http.MethodGet, Path: path, Header: http.Header{
-		"Authorization": {
-			"Bearer caller-secret",
-		},
-		"X-Jfrog-Art-Api":     {"caller-key"},
-		"Cookie":              {"caller=cookie"},
-		"Proxy-Authorization": {"caller-proxy"},
-	}})
+	res, err := c.Do(
+		t.Context(),
+		remote.Request{Method: http.MethodGet, Path: path, Header: http.Header{
+			"Authorization": {
+				"Bearer caller-secret",
+			},
+			"X-Jfrog-Art-Api":     {"caller-key"},
+			"Cookie":              {"caller=cookie"},
+			"Proxy-Authorization": {"caller-proxy"},
+		}},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -298,7 +302,10 @@ func TestAccResolverRedirectCredentialsAndMetadata(t *testing.T) {
 			}
 			res, err := client.Do(
 				t.Context(),
-				Request{Method: "GET", ExternalURL: target.URL + "/target?signature=signed-secret"},
+				remote.Request{
+					Method:      "GET",
+					ExternalURL: target.URL + "/target?signature=signed-secret",
+				},
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -313,12 +320,12 @@ func TestAccResolverRedirectCredentialsAndMetadata(t *testing.T) {
 	restricted := resolverFor(t, st, ResolverOptions{RootCAsPEM: rootsFor(source, target)})
 	client := clientFor(t, c, resolveFor(t, restricted, c))
 	before := target.Count("", "")
-	for _, request := range []Request{{Method: "GET", Path: "redirect"}, {Method: "GET", ExternalURL: target.URL + "/target?secret=secret"}, {Method: "GET", ExternalURL: "http://169.254.169.254/latest/api/token"}, {Method: "GET", ExternalURL: source.URL + "/target", Path: "mixed"}, {Method: "GET", ExternalURL: "https://user:secret@example.com"}} {
+	for _, request := range []remote.Request{{Method: "GET", Path: "redirect"}, {Method: "GET", ExternalURL: target.URL + "/target?secret=secret"}, {Method: "GET", ExternalURL: "http://169.254.169.254/latest/api/token"}, {Method: "GET", ExternalURL: source.URL + "/target", Path: "mixed"}, {Method: "GET", ExternalURL: "https://user:secret@example.com"}} {
 		res, err := client.Do(t.Context(), request)
 		if res != nil {
 			res.Body.Close()
 		}
-		if !errors.Is(err, ErrSecurity) || strings.Contains(err.Error(), "secret") {
+		if !errors.Is(err, remote.ErrSecurity) || strings.Contains(err.Error(), "secret") {
 			t.Fatalf("denial = %v", err)
 		}
 	}
@@ -329,10 +336,10 @@ func TestAccResolverRedirectCredentialsAndMetadata(t *testing.T) {
 	source.Set("/downgrade", fakeupstream.Resource{Redirect: plain.URL + "/target"})
 	if _, err := client.Do(
 		t.Context(),
-		Request{Method: "GET", Path: "downgrade"},
+		remote.Request{Method: "GET", Path: "downgrade"},
 	); !errors.Is(
 		err,
-		ErrRedirect,
+		remote.ErrRedirect,
 	) {
 		t.Fatal(err)
 	}
@@ -460,10 +467,10 @@ func TestAccResolverTLSClientIdentityAndRotation(t *testing.T) {
 	untrusted := clientFor(t, c, resolveFor(t, resolverFor(t, st, ResolverOptions{}), c))
 	if _, err := untrusted.Do(
 		t.Context(),
-		Request{Method: "GET", Path: "item"},
+		remote.Request{Method: "GET", Path: "item"},
 	); !errors.Is(
 		err,
-		ErrSecurity,
+		remote.ErrSecurity,
 	) {
 		t.Fatal(err)
 	}
@@ -474,7 +481,7 @@ func TestAccResolverTLSClientIdentityAndRotation(t *testing.T) {
 		t.Fatal("certificate rotation retained identity")
 	}
 	rejected := clientFor(t, c, rotated)
-	if _, err := rejected.Do(t.Context(), Request{Method: "GET", Path: "item"}); err == nil {
+	if _, err := rejected.Do(t.Context(), remote.Request{Method: "GET", Path: "item"}); err == nil {
 		t.Fatal("untrusted client identity accepted")
 	}
 	// A redirect destination requesting a client certificate cannot steal it by default.
@@ -606,12 +613,12 @@ func TestAccResolverConfigurationFailures(t *testing.T) {
 	r := resolverFor(t, st, ResolverOptions{})
 	missing := c
 	missing.Key = "missing"
-	if _, err := r.Options(t.Context(), missing); !errors.Is(err, ErrConfiguration) {
+	if _, err := r.Options(t.Context(), missing); !errors.Is(err, remote.ErrConfiguration) {
 		t.Fatal(err)
 	}
 	stale := c
 	stale.URL = "https://stale.example"
-	if _, err := r.Options(t.Context(), stale); !errors.Is(err, ErrConfiguration) {
+	if _, err := r.Options(t.Context(), stale); !errors.Is(err, remote.ErrConfiguration) {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {
@@ -619,20 +626,20 @@ func TestAccResolverConfigurationFailures(t *testing.T) {
 		change   func(*repo.Config)
 		expected error
 	}{
-		{"local", func(c *repo.Config) { c.Class = repo.Local }, ErrConfiguration},
-		{"bad-url", func(c *repo.Config) { c.URL = "https://secret:secret@example.com" }, ErrSecurity},
-		{"missing-cert", func(c *repo.Config) { c.ClientTLSCertificate = "missing" }, ErrConfiguration},
-		{"bad-cert", func(c *repo.Config) { c.ClientTLSCertificate = "broken" }, ErrSecurity},
-		{"missing-proxy", func(c *repo.Config) { c.Proxy = "missing" }, ErrConfiguration},
+		{"local", func(c *repo.Config) { c.Class = repo.Local }, remote.ErrConfiguration},
+		{"bad-url", func(c *repo.Config) { c.URL = "https://secret:secret@example.com" }, remote.ErrSecurity},
+		{"missing-cert", func(c *repo.Config) { c.ClientTLSCertificate = "missing" }, remote.ErrConfiguration},
+		{"bad-cert", func(c *repo.Config) { c.ClientTLSCertificate = "broken" }, remote.ErrSecurity},
+		{"missing-proxy", func(c *repo.Config) { c.Proxy = "missing" }, remote.ErrConfiguration},
 		{"bad-header-name", func(c *repo.Config) {
 			c.CustomHTTPHeaders = []repo.CustomHTTPHeader{{Name: "bad name", Value: "value"}}
-		}, ErrConfiguration},
+		}, remote.ErrConfiguration},
 		{"bad-header-value", func(c *repo.Config) {
 			c.CustomHTTPHeaders = []repo.CustomHTTPHeader{{Name: "X-Secret", Value: "secret\r\nInjected: true"}}
-		}, ErrConfiguration},
+		}, remote.ErrConfiguration},
 		{"reserved-header", func(c *repo.Config) {
 			c.CustomHTTPHeaders = []repo.CustomHTTPHeader{{Name: "Proxy-Authorization", Value: "secret"}}
-		}, ErrConfiguration},
+		}, remote.ErrConfiguration},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			st.Keys().
@@ -691,7 +698,7 @@ func TestAccResolverProxyConfiguration(t *testing.T) {
 				if err != nil || opts.ProxyURL == nil {
 					t.Fatalf("proxy = %v, %v", opts.ProxyURL, err)
 				}
-			} else if !errors.Is(err, ErrConfiguration) {
+			} else if !errors.Is(err, remote.ErrConfiguration) {
 				t.Fatal(err)
 			}
 		})
@@ -713,7 +720,7 @@ func TestAccResolverProxyConfiguration(t *testing.T) {
 	p.Services = nil
 	putProxy(t, st, "one", p, "")
 	putProxy(t, st, "two", p, "")
-	if _, err := r.Options(t.Context(), c); !errors.Is(err, ErrConfiguration) {
+	if _, err := r.Options(t.Context(), c); !errors.Is(err, remote.ErrConfiguration) {
 		t.Fatal(err)
 	}
 	c.DisableProxy = ptr(true)
@@ -850,10 +857,10 @@ func TestAccResolverHTTPSProxy(t *testing.T) {
 			untrusted := clientFor(t, c, resolveFor(t, resolverFor(t, st, resolverOptions), c))
 			if _, err := untrusted.Do(
 				t.Context(),
-				Request{Method: "GET", Path: "item"},
+				remote.Request{Method: "GET", Path: "item"},
 			); !errors.Is(
 				err,
-				ErrSecurity,
+				remote.ErrSecurity,
 			) {
 				t.Fatal(err)
 			}
@@ -876,7 +883,10 @@ func TestAccResolverConfiguredEndpointAndDowngrade(t *testing.T) {
 	saveRepo(t, st, c)
 	r := resolverFor(t, st, ResolverOptions{})
 	client := clientFor(t, c, resolveFor(t, r, c))
-	res, err := client.Do(t.Context(), Request{Method: "GET", ExternalURL: target.URL + "/item"})
+	res, err := client.Do(
+		t.Context(),
+		remote.Request{Method: "GET", ExternalURL: target.URL + "/item"},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -888,16 +898,16 @@ func TestAccResolverConfiguredEndpointAndDowngrade(t *testing.T) {
 	client = clientFor(t, c, resolveFor(t, r, c))
 	if _, err = client.Do(
 		t.Context(),
-		Request{Method: "GET", ExternalURL: target.URL + "/item"},
+		remote.Request{Method: "GET", ExternalURL: target.URL + "/item"},
 	); !errors.Is(
 		err,
-		ErrSecurity,
+		remote.ErrSecurity,
 	) {
 		t.Fatal(err)
 	}
 	c.PyPIRegistryURL = "http://user:secret@example.com"
 	st.Repos().Update(t.Context(), c)
-	if _, err = r.Options(t.Context(), c); !errors.Is(err, ErrConfiguration) {
+	if _, err = r.Options(t.Context(), c); !errors.Is(err, remote.ErrConfiguration) {
 		t.Fatal(err)
 	}
 }
@@ -927,10 +937,10 @@ func TestAccResolverProxyDenialAndCancellation(t *testing.T) {
 	client := clientFor(t, c, resolveFor(t, r, c))
 	if _, err := client.Do(
 		t.Context(),
-		Request{Method: "GET", Path: "item"},
+		remote.Request{Method: "GET", Path: "item"},
 	); !errors.Is(
 		err,
-		ErrSecurity,
+		remote.ErrSecurity,
 	) {
 		t.Fatal(err)
 	}
@@ -1035,10 +1045,10 @@ func TestAccResolverRejectsIntermediateTLSDowngrade(t *testing.T) {
 	client := clientFor(t, c, resolveFor(t, r, c))
 	if _, err := client.Do(
 		t.Context(),
-		Request{Method: "GET", Path: "start"},
+		remote.Request{Method: "GET", Path: "start"},
 	); !errors.Is(
 		err,
-		ErrRedirect,
+		remote.ErrRedirect,
 	) {
 		t.Fatal(err)
 	}

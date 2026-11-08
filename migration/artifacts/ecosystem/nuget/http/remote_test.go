@@ -20,6 +20,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -66,11 +67,11 @@ func newRemoteFixture(t *testing.T, options ...fakeupstream.Options) *remoteFixt
 			t.Fatal(err)
 		}
 	}
-	opts := remote.ResolverOptions{RevisionKey: []byte(strings.Repeat("k", 32))}
+	opts := upstream.ResolverOptions{RevisionKey: []byte(strings.Repeat("k", 32))}
 	if cert := up.Certificate(); cert != nil {
 		opts.RootCAsPEM = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
 	}
-	resolver, err := remote.NewResolver(
+	resolver, err := upstream.NewResolver(
 		f.db,
 		nil,
 		opts,
@@ -80,7 +81,7 @@ func newRemoteFixture(t *testing.T, options ...fakeupstream.Options) *remoteFixt
 	}
 	clock := fakeupstream.NewClock(time.Now())
 	f.items.Now = clock.Now
-	pool := new(remote.Pool)
+	pool := new(upstream.Pool)
 	policy := &remote.Policy{
 		Store:           f.db,
 		Blobs:           f.blobs,

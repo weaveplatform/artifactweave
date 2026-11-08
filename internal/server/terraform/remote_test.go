@@ -22,6 +22,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -59,17 +60,17 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 		Create(t.Context(), types.Permission{Name: "remote-read", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{"reader": types.ActionRead}}, Targets: map[string]types.Target{"remote": {Include: []string{"ns/name/aws/1.0.0.zip"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
-	resolver, err := remote.NewResolver(
+	resolver, err := upstream.NewResolver(
 		f.db,
 		nil,
-		remote.ResolverOptions{RevisionKey: []byte(strings.Repeat("k", 32))},
+		upstream.ResolverOptions{RevisionKey: []byte(strings.Repeat("k", 32))},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	clock := fakeupstream.NewClock(time.Now())
 	f.items.Now = clock.Now
-	pool := new(remote.Pool)
+	pool := new(upstream.Pool)
 	p := &remote.Policy{
 		Store:   f.db,
 		Blobs:   f.items.Blobs,
@@ -901,10 +902,10 @@ func TestAccRemoteModuleExternalOriginCredentialPolicy(t *testing.T) {
 	if len(other.Requests()) != 0 {
 		t.Fatal("allow pattern bypassed private address policy")
 	}
-	resolver, e := remote.NewResolver(
+	resolver, e := upstream.NewResolver(
 		f.db,
 		nil,
-		remote.ResolverOptions{
+		upstream.ResolverOptions{
 			RevisionKey:           []byte(strings.Repeat("k", 32)),
 			AllowedPrivateOrigins: []string{other.URL},
 		},
@@ -970,10 +971,10 @@ func TestAccRemoteModuleRejectsHostileRedirectBeforeContact(t *testing.T) {
 			other.Set("/target", fakeupstream.Resource{Body: archiveZip(t, "main.tf")})
 			// Allowing the private address in the transport must not authorize it in
 			// the adapter's metadata-selected destination policy.
-			resolver, err := remote.NewResolver(
+			resolver, err := upstream.NewResolver(
 				f.db,
 				nil,
-				remote.ResolverOptions{
+				upstream.ResolverOptions{
 					RevisionKey:           []byte(strings.Repeat("k", 32)),
 					AllowedPrivateOrigins: []string{other.URL},
 				},

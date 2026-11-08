@@ -1,4 +1,4 @@
-package remote
+package upstream
 
 import (
 	"bytes"
@@ -9,10 +9,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 )
 
 func (r *Registry) token(ctx context.Context, challenge registryChallenge) (registryToken, error) {
+	//nolint:wrapcheck // preserves upstream error identity
 	return r.flights.Do(ctx, challenge.key(), func(shared context.Context) (registryToken, error) {
 		r.mu.Lock()
 		cached := r.tokens[challenge.key()]
@@ -26,6 +28,7 @@ func (r *Registry) token(ctx context.Context, challenge registryChallenge) (regi
 		defer cancel()
 		release, err := r.capacity.Acquire(shared, "registry")
 		if err != nil {
+			//nolint:wrapcheck // preserves upstream error identity
 			return registryToken{}, err
 		}
 		defer release()
@@ -54,16 +57,16 @@ func (r *Registry) exchange(
 	if err != nil {
 		return registryToken{}, err
 	}
-	u, err := CheckedURL(target)
+	u, err := remote.CheckedURL(target)
 	if err != nil {
 		return registryToken{}, ErrRegistryChallenge
 	}
 	ctx = context.WithValue(
 		ctx,
 		registryAuthorizationKey{},
-		registryAuthorization{realm: Origin(u)},
+		registryAuthorization{realm: remote.Origin(u)},
 	)
-	res, err := r.client.Do(ctx, Request{
+	res, err := r.client.Do(ctx, remote.Request{
 		Method: http.MethodGet, ExternalURL: target,
 		Metadata: true, Header: http.Header{"Accept": {"application/json"}},
 	})
@@ -86,11 +89,11 @@ func (r *Registry) exchange(
 
 func registryTokenStatus(res *http.Response, now time.Time) error {
 	if res.StatusCode == http.StatusUnauthorized || res.StatusCode == http.StatusForbidden {
-		return ErrRegistryDenied
+		return remote.ErrRegistryDenied
 	}
 	failure := &source.HTTPError{Status: res.StatusCode, Kind: source.FailureKindHTTP}
 	if res.StatusCode == http.StatusTooManyRequests {
-		failure.RetryAfter = RetryAfter(res.Header.Get("Retry-After"), now)
+		failure.RetryAfter = remote.RetryAfter(res.Header.Get("Retry-After"), now)
 	}
 	return failure
 }
@@ -123,14 +126,14 @@ func decodeRegistryToken(data []byte, scope string, now time.Time) (registryToke
 		return registryToken{}, ErrRegistryChallenge
 	}
 	if wire.Scope != nil && *wire.Scope != scope {
-		return registryToken{}, ErrRegistryDenied
+		return registryToken{}, remote.ErrRegistryDenied
 	}
 	seconds := int64(60)
 	if wire.ExpiresIn != nil {
 		seconds = *wire.ExpiresIn
 	}
 	if seconds <= 0 {
-		return registryToken{}, ErrRegistryDenied
+		return registryToken{}, remote.ErrRegistryDenied
 	}
 	// Never retain a server-controlled token indefinitely or overflow Duration.
 	if seconds > 86400 {
@@ -148,7 +151,7 @@ func decodeRegistryToken(data []byte, scope string, now time.Time) (registryToke
 	skew := min(time.Duration(seconds)*time.Second/10, 5*time.Second)
 	expires = expires.Add(-skew)
 	if !expires.After(now) {
-		return registryToken{}, ErrRegistryDenied
+		return registryToken{}, remote.ErrRegistryDenied
 	}
 	return registryToken{value: wire.Token, expires: expires}, nil
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -118,7 +119,7 @@ func TestAccCacheMaintenancePermissionsAndAliases(t *testing.T) {
 func TestAccCacheMaintenanceHTTPNegativeRediscovery(t *testing.T) {
 	up := fakeupstream.New(t, fakeupstream.Options{})
 	w := newItemWorld(t, false, func(c *Config) {
-		pool := new(remote.Pool)
+		pool := new(upstream.Pool)
 		t.Cleanup(pool.Close)
 		policy := &remote.Policy{
 			Store: c.Store,

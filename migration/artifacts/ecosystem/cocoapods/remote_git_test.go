@@ -22,6 +22,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -344,7 +345,7 @@ func TestAccCocoaPodsGitDestinationAndTransport(t *testing.T) {
 		ExternalDependenciesEnabled:  &enabled,
 		ExternalDependenciesPatterns: []string{srv.URL + "/**"},
 	}
-	client, err := remote.NewClient(
+	client, err := upstream.NewClient(
 		c,
 		remote.Options{CheckURL: func(context.Context, *url.URL) error { return nil }},
 	)

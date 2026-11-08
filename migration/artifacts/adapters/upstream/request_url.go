@@ -1,10 +1,11 @@
-package remote
+package upstream
 
 import (
 	"fmt"
 	"net/url"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
@@ -12,15 +13,15 @@ import (
 // an authority, and preserves raw query order and escaping for signed URLs.
 func requestURL(c repo.Config, base *url.URL, escapedPath, query string) (*url.URL, error) {
 	if strings.HasPrefix(escapedPath, "/") || strings.ContainsAny(escapedPath, "?#\\\r\n") {
-		return nil, ErrURL
+		return nil, remote.ErrURL
 	}
 	decoded, err := url.PathUnescape(escapedPath)
 	if err != nil || strings.ContainsAny(decoded, "\\\x00\r\n") {
-		return nil, ErrURL
+		return nil, remote.ErrURL
 	}
 	for _, segment := range strings.Split(decoded, "/") {
 		if segment == "." || segment == ".." {
-			return nil, ErrURL
+			return nil, remote.ErrURL
 		}
 	}
 	basePath := base.EscapedPath()
@@ -47,7 +48,7 @@ func requestURL(c repo.Config, base *url.URL, escapedPath, query string) (*url.U
 	u := *base
 	u.Path, err = url.PathUnescape(path)
 	if err != nil {
-		return nil, fmt.Errorf("%w: invalid base path", ErrURL)
+		return nil, fmt.Errorf("%w: invalid base path", remote.ErrURL)
 	}
 	u.RawPath = path
 	u.RawQuery = appendQuery(u.RawQuery, c.QueryParams)
@@ -55,7 +56,7 @@ func requestURL(c repo.Config, base *url.URL, escapedPath, query string) (*url.U
 		u.RawQuery = appendQuery(u.RawQuery, query)
 	}
 	if strings.ContainsAny(u.RawQuery, "#\r\n") {
-		return nil, ErrURL
+		return nil, remote.ErrURL
 	}
 	return &u, nil
 }

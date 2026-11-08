@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -31,10 +31,10 @@ func TestAccGoPrivateCredentialsAndRepositoryIsolation(t *testing.T) {
 	if err := w.db.Repos().Update(t.Context(), w.c); err != nil {
 		t.Fatal(err)
 	}
-	resolver, err := remote.NewResolver(
+	resolver, err := upstream.NewResolver(
 		w.db,
 		nil,
-		remote.ResolverOptions{RevisionKey: []byte("go-test-only-credential-revision-key")},
+		upstream.ResolverOptions{RevisionKey: []byte("go-test-only-credential-revision-key")},
 	)
 	if err != nil {
 		t.Fatal(err)

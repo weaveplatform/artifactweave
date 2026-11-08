@@ -22,6 +22,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
@@ -200,14 +201,14 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 	roots := pem.EncodeToMemory(
 		&pem.Block{Type: "CERTIFICATE", Bytes: crossTarget.Certificate().Raw},
 	)
-	resolver, err := remote.NewResolver(db, nil, remote.ResolverOptions{
+	resolver, err := upstream.NewResolver(db, nil, upstream.ResolverOptions{
 		RevisionKey: []byte(strings.Repeat("k", 32)),
 		RootCAsPEM:  roots, AllowedPrivateOrigins: []string{crossTarget.URL},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	pool := new(remote.Pool)
+	pool := new(upstream.Pool)
 	policy := &remote.Policy{
 		Store:   db,
 		Blobs:   blobs,

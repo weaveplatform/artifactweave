@@ -1,4 +1,4 @@
-package remote
+package upstream
 
 import (
 	"bufio"
@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"sync"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
@@ -40,7 +41,7 @@ func transportHeaders(h http.Header) {
 }
 
 func (s *sourceSecurity) authorized(u *url.URL) bool {
-	return Origin(u) == Origin(s.base) ||
+	return remote.Origin(u) == remote.Origin(s.base) ||
 		(enabled(s.config.AllowAnyHostAuth) && u.Scheme == "https")
 }
 
@@ -51,13 +52,15 @@ func (s *sourceSecurity) prepare(req *http.Request) error {
 		req.Header.Del(h.Name)
 	}
 	transportHeaders(req.Header)
-	if _, err := CheckedURL(req.URL.String()); err != nil {
+	if _, err := remote.CheckedURL(req.URL.String()); err != nil {
+		//nolint:wrapcheck // preserves upstream error identity
 		return err
 	}
 	if s.base.Scheme == "https" && req.URL.Scheme != "https" {
-		return ErrSecurity
+		return remote.ErrSecurity
 	}
-	if req.Context().Value(noCrossOriginAuthKey{}) == true && Origin(req.URL) != Origin(s.base) {
+	if req.Context().Value(noCrossOriginAuthKey{}) == true &&
+		remote.Origin(req.URL) != remote.Origin(s.base) {
 		return nil
 	}
 	if s.authorized(req.URL) {
@@ -124,7 +127,7 @@ func (t *secureTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		physical.URL = &u
 		physical.Host = req.URL.Host
 		noAuth := req.Context().Value(noCrossOriginAuthKey{}) == true &&
-			Origin(req.URL) != Origin(t.source.base)
+			remote.Origin(req.URL) != remote.Origin(t.source.base)
 		tr := t.forAuthority(req.URL, proxy, noAuth)
 		res, roundErr := tr.RoundTrip(physical)
 		if roundErr == nil {
@@ -134,7 +137,7 @@ func (t *secureTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		err = safeError(roundErr)
 		// GET/HEAD have no request bodies. Only connection failures can try another
 		// approved DNS answer; security errors and responses are never retried.
-		if !errors.Is(err, ErrConnection) {
+		if !errors.Is(err, remote.ErrConnection) {
 			break
 		}
 	}
@@ -142,7 +145,7 @@ func (t *secureTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func (t *secureTransport) forAuthority(logical, proxy *url.URL, noAuth bool) *http.Transport {
-	key := Origin(logical)
+	key := remote.Origin(logical)
 	if noAuth {
 		key += "|no-auth"
 	}
@@ -241,7 +244,7 @@ func (t *secureTransport) tunnel(
 	}()
 	req, err := http.NewRequestWithContext(ctx, http.MethodConnect, "http://"+addr, nil)
 	if err != nil {
-		return nil, ErrSecurity
+		return nil, remote.ErrSecurity
 	}
 	if proxy.User != nil {
 		password, _ := proxy.User.Password()
@@ -264,9 +267,9 @@ func (t *secureTransport) tunnel(
 	if res.StatusCode != http.StatusOK {
 		if res.StatusCode == http.StatusProxyAuthRequired ||
 			res.StatusCode == http.StatusForbidden {
-			return nil, ErrSecurity
+			return nil, remote.ErrSecurity
 		}
-		return nil, ErrConnection
+		return nil, remote.ErrConnection
 	}
 	success = true
 	return &bufferedConn{Conn: conn, reader: io.MultiReader(reader, conn)}, nil

@@ -24,6 +24,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -63,16 +64,16 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 			t.Fatal(err)
 		}
 	}
-	resolver, err := remote.NewResolver(
+	resolver, err := upstream.NewResolver(
 		f.items.Store,
 		nil,
-		remote.ResolverOptions{RevisionKey: []byte(strings.Repeat("k", 32))},
+		upstream.ResolverOptions{RevisionKey: []byte(strings.Repeat("k", 32))},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	clock := fakeupstream.NewClock(time.Date(2026, 10, 22, 0, 0, 0, 0, time.UTC))
-	pool := new(remote.Pool)
+	pool := new(upstream.Pool)
 	policy := &remote.Policy{
 		Store:   f.items.Store,
 		Blobs:   f.items.Blobs,
@@ -495,10 +496,10 @@ func TestAccRemoteOriginCredentialsAndProxy(t *testing.T) {
 
 func (f *remoteFixture) allowPrivate(t *testing.T, origins ...string) {
 	t.Helper()
-	resolver, err := remote.NewResolver(
+	resolver, err := upstream.NewResolver(
 		f.items.Store,
 		nil,
-		remote.ResolverOptions{
+		upstream.ResolverOptions{
 			RevisionKey:           []byte(strings.Repeat("k", 32)),
 			AllowedPrivateOrigins: origins,
 		},

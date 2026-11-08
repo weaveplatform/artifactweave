@@ -1,4 +1,4 @@
-package remote
+package upstream
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
@@ -22,25 +23,25 @@ func TestAccDestinationPolicy(t *testing.T) {
 	}{
 		{"public", "https://registry.example/item", "8.8.8.8", false, nil},
 		{"public-v6", "https://registry.example/item", "2606:4700:4700::1111", false, nil},
-		{"private", "https://registry.example/item", "10.20.30.40", false, ErrSecurity},
+		{"private", "https://registry.example/item", "10.20.30.40", false, remote.ErrSecurity},
 		{"configured-private", "https://registry.example/item", "10.20.30.40", true, nil},
-		{"loopback", "http://127.0.0.1/item", "", false, ErrSecurity},
+		{"loopback", "http://127.0.0.1/item", "", false, remote.ErrSecurity},
 		{"configured-loopback", "http://127.0.0.1/item", "", true, nil},
-		{"mapped-loopback", "http://[::ffff:127.0.0.1]/item", "", false, ErrSecurity},
-		{"mapped-private", "http://[::ffff:10.0.0.1]/item", "", false, ErrSecurity},
-		{"metadata", "http://169.254.169.254/latest/api/token", "", true, ErrSecurity},
-		{"metadata-alibaba", "http://100.100.100.200/item", "", true, ErrSecurity},
-		{"metadata-azure", "http://168.63.129.16/item", "", true, ErrSecurity},
-		{"metadata-v6", "http://[fd00:ec2::254]/item", "", true, ErrSecurity},
-		{"metadata-host", "http://metadata.google.internal/item", "8.8.8.8", true, ErrSecurity},
-		{"multicast", "http://224.0.0.1/item", "", true, ErrSecurity},
-		{"unspecified", "http://0.0.0.0/item", "", true, ErrSecurity},
-		{"ula", "https://registry.example/item", "fd00::1", false, ErrSecurity},
-		{"cgnat", "https://registry.example/item", "100.64.0.1", false, ErrSecurity},
-		{"docs", "https://registry.example/item", "203.0.113.1", false, ErrSecurity},
-		{"nat64", "https://registry.example/item", "64:ff9b::a00:1", false, ErrSecurity},
-		{"six-to-four", "https://registry.example/item", "2002:a00:1::", false, ErrSecurity},
-		{"user-info", "https://user:secret@registry.example/item", "8.8.8.8", false, ErrSecurity},
+		{"mapped-loopback", "http://[::ffff:127.0.0.1]/item", "", false, remote.ErrSecurity},
+		{"mapped-private", "http://[::ffff:10.0.0.1]/item", "", false, remote.ErrSecurity},
+		{"metadata", "http://169.254.169.254/latest/api/token", "", true, remote.ErrSecurity},
+		{"metadata-alibaba", "http://100.100.100.200/item", "", true, remote.ErrSecurity},
+		{"metadata-azure", "http://168.63.129.16/item", "", true, remote.ErrSecurity},
+		{"metadata-v6", "http://[fd00:ec2::254]/item", "", true, remote.ErrSecurity},
+		{"metadata-host", "http://metadata.google.internal/item", "8.8.8.8", true, remote.ErrSecurity},
+		{"multicast", "http://224.0.0.1/item", "", true, remote.ErrSecurity},
+		{"unspecified", "http://0.0.0.0/item", "", true, remote.ErrSecurity},
+		{"ula", "https://registry.example/item", "fd00::1", false, remote.ErrSecurity},
+		{"cgnat", "https://registry.example/item", "100.64.0.1", false, remote.ErrSecurity},
+		{"docs", "https://registry.example/item", "203.0.113.1", false, remote.ErrSecurity},
+		{"nat64", "https://registry.example/item", "64:ff9b::a00:1", false, remote.ErrSecurity},
+		{"six-to-four", "https://registry.example/item", "2002:a00:1::", false, remote.ErrSecurity},
+		{"user-info", "https://user:secret@registry.example/item", "8.8.8.8", false, remote.ErrSecurity},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			u, err := url.Parse(tc.url)
@@ -48,7 +49,7 @@ func TestAccDestinationPolicy(t *testing.T) {
 				t.Fatal(err)
 			}
 			p := &destinationPolicy{
-				private: map[string]bool{Origin(u): tc.configured},
+				private: map[string]bool{remote.Origin(u): tc.configured},
 				lookup: func(context.Context, string) ([]net.IPAddr, error) {
 					return []net.IPAddr{{IP: net.ParseIP(tc.ip)}}, nil
 				},
@@ -63,7 +64,7 @@ func TestAccDestinationPolicy(t *testing.T) {
 		})
 	}
 	for _, raw := range []string{"ftp://example.com", "https://example.com:0", "https://example.com:65536", "https://example.com:nope", "https://example.com/a/../b", "https://example.com/%2e%2e/b", "https://example.com/a%5cb", "https://example.com/a%00b", "https://example.com/#fragment", "https://[fe80::1%25en0]/item", "https://user:pass@example.com"} {
-		if _, err := CheckedURL(raw); !errors.Is(err, ErrSecurity) {
+		if _, err := remote.CheckedURL(raw); !errors.Is(err, remote.ErrSecurity) {
 			t.Errorf("accepted %q: %v", raw, err)
 		}
 	}
@@ -76,11 +77,11 @@ func TestAccDestinationMixedDNSAndCancellation(t *testing.T) {
 		ips           []net.IPAddr
 		err, expected error
 	}{
-		{name: "mixed", ips: []net.IPAddr{{IP: net.ParseIP("8.8.8.8")}, {IP: net.ParseIP("127.0.0.1")}}, expected: ErrSecurity},
-		{name: "invalid", ips: []net.IPAddr{{IP: []byte{1, 2}}}, expected: ErrSecurity},
-		{name: "zone", ips: []net.IPAddr{{IP: net.ParseIP("2606:4700::1111"), Zone: "eth0"}}, expected: ErrSecurity},
-		{name: "empty", expected: ErrConnection},
-		{name: "dns-error", err: &net.DNSError{Err: "secret", Name: "secret.example"}, expected: ErrConnection},
+		{name: "mixed", ips: []net.IPAddr{{IP: net.ParseIP("8.8.8.8")}, {IP: net.ParseIP("127.0.0.1")}}, expected: remote.ErrSecurity},
+		{name: "invalid", ips: []net.IPAddr{{IP: []byte{1, 2}}}, expected: remote.ErrSecurity},
+		{name: "zone", ips: []net.IPAddr{{IP: net.ParseIP("2606:4700::1111"), Zone: "eth0"}}, expected: remote.ErrSecurity},
+		{name: "empty", expected: remote.ErrConnection},
+		{name: "dns-error", err: &net.DNSError{Err: "secret", Name: "secret.example"}, expected: remote.ErrConnection},
 		{name: "cancel", err: context.Canceled, expected: context.Canceled},
 		{name: "deadline", err: context.DeadlineExceeded, expected: context.DeadlineExceeded},
 	} {
@@ -103,7 +104,7 @@ func TestAccPinnedDNSRebindingAndRetry(t *testing.T) {
 	u.Host = net.JoinHostPort("registry.private", u.Port())
 	var calls atomic.Int32
 	policy := &destinationPolicy{
-		private: map[string]bool{Origin(u): true},
+		private: map[string]bool{remote.Origin(u): true},
 		lookup: func(context.Context, string) ([]net.IPAddr, error) {
 			if calls.Add(1) > 1 {
 				return []net.IPAddr{{IP: net.ParseIP("169.254.169.254")}}, nil
@@ -115,13 +116,17 @@ func TestAccPinnedDNSRebindingAndRetry(t *testing.T) {
 	client := clientFor(
 		t,
 		repo.Config{URL: u.String()},
-		Options{
+		remote.Options{
 			Prepare: security.prepare,
 			WrapTransport: func(base *http.Transport) (http.RoundTripper, func()) {
 				original := base.DialContext
 				base.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
 					if strings.HasPrefix(addr, "127.0.0.2:") {
-						return nil, &net.OpError{Op: "dial", Net: network, Err: ErrConnection}
+						return nil, &net.OpError{
+							Op:  "dial",
+							Net: network,
+							Err: remote.ErrConnection,
+						}
 					}
 					return original(ctx, network, addr)
 				}
@@ -138,10 +143,10 @@ func TestAccPinnedDNSRebindingAndRetry(t *testing.T) {
 	}
 	if _, err := client.Do(
 		t.Context(),
-		Request{Method: "GET", Path: "item"},
+		remote.Request{Method: "GET", Path: "item"},
 	); !errors.Is(
 		err,
-		ErrSecurity,
+		remote.ErrSecurity,
 	) {
 		t.Fatal(err)
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -49,7 +50,7 @@ func policyFixture(t *testing.T) *policyWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pool := new(remote.Pool)
+	pool := new(upstream.Pool)
 	p := &remote.Policy{
 		Store: db,
 		Blobs: blobs,
@@ -113,7 +114,7 @@ func (w *policyWorld) bytes(result source.Result) string {
 
 func ptr[T any](v T) *T { return &v }
 
-func resolverFor(t *testing.T, st store.Store, opts remote.ResolverOptions) *remote.Resolver {
+func resolverFor(t *testing.T, st store.Store, opts upstream.ResolverOptions) *upstream.Resolver {
 	t.Helper()
 	key, err := crypt.New([]byte("0123456789abcdef0123456789abcdef"))
 	if err != nil {
@@ -127,7 +128,7 @@ func resolverFor(t *testing.T, st store.Store, opts remote.ResolverOptions) *rem
 	if opts.Certificates == nil {
 		opts.Certificates = accesstest.Over(t, st).API().Keys
 	}
-	r, err := remote.NewResolver(st, key, opts)
+	r, err := upstream.NewResolver(st, key, opts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +142,7 @@ func saveRepo(t *testing.T, st store.Store, c repo.Config) {
 	}
 }
 
-func resolveFor(t *testing.T, r *remote.Resolver, c repo.Config) remote.Options {
+func resolveFor(t *testing.T, r *upstream.Resolver, c repo.Config) remote.Options {
 	t.Helper()
 	opts, err := r.Options(t.Context(), repo.Masked(c))
 	if err != nil {

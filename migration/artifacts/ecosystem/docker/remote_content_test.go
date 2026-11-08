@@ -15,6 +15,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -86,9 +87,9 @@ func TestAccRegistryListingPaginationAndBoundaries(t *testing.T) {
 			})
 			up := httptest.NewServer(router)
 			t.Cleanup(up.Close)
-			client, err := remote.NewRegistry(
+			client, err := upstream.NewRegistry(
 				repo.Config{URL: up.URL, Class: repo.Remote, PackageType: repo.Docker},
-				remote.RegistryOptions{
+				upstream.RegistryOptions{
 					Transport: remote.Options{
 						Revision: "test",
 						Prepare:  func(*http.Request) error { return nil },

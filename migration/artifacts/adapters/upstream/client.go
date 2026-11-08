@@ -1,4 +1,4 @@
-package remote
+package upstream
 
 import (
 	"bytes"
@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
@@ -31,15 +32,16 @@ type Client struct {
 
 type noCrossOriginAuthKey struct{}
 
-func NewClient(c repo.Config, opts Options) (*Client, error) {
+func NewClient(c repo.Config, opts remote.Options) (*Client, error) {
 	// Snapshot pointer-valued settings: a caller applying a new configuration
 	// must not mutate an active client's path or timeout policy.
 	c.DisableURLNormalization = copySetting(c.DisableURLNormalization)
 	c.PropagateQueryParams = copySetting(c.PropagateQueryParams)
 	c.BypassHeadRequests = copySetting(c.BypassHeadRequests)
 	c.MetadataRetrievalTimeoutSecs = copySetting(c.MetadataRetrievalTimeoutSecs)
-	base, err := BaseURL(c.URL)
+	base, err := remote.BaseURL(c.URL)
 	if err != nil {
+		//nolint:wrapcheck // preserves upstream error identity
 		return nil, err
 	}
 	idle := 15 * time.Second
@@ -47,13 +49,16 @@ func NewClient(c repo.Config, opts Options) (*Client, error) {
 		idle = time.Duration(*c.SocketTimeoutMillis) * time.Millisecond
 	}
 	if idle < 0 || (c.MetadataRetrievalTimeoutSecs != nil && *c.MetadataRetrievalTimeoutSecs < 0) {
-		return nil, ErrConfiguration
+		return nil, remote.ErrConfiguration
 	}
 	dialer := &net.Dialer{Timeout: idle, KeepAlive: 30 * time.Second}
 	if c.LocalAddress != "" {
 		ip := net.ParseIP(c.LocalAddress)
 		if ip == nil {
-			return nil, fmt.Errorf("%w: local address must be an ip address", ErrConfiguration)
+			return nil, fmt.Errorf(
+				"%w: local address must be an ip address",
+				remote.ErrConfiguration,
+			)
 		}
 		dialer.LocalAddr = &net.TCPAddr{IP: ip}
 	}
@@ -76,7 +81,7 @@ func NewClient(c repo.Config, opts Options) (*Client, error) {
 	if opts.ProxyURL != nil && !enabled(c.DisableProxy) {
 		p := *opts.ProxyURL
 		if p.Scheme != "http" && p.Scheme != "https" {
-			return nil, ErrConfiguration
+			return nil, remote.ErrConfiguration
 		}
 		tr.Proxy = http.ProxyURL(&p)
 	}
@@ -115,12 +120,12 @@ func copySetting[T any](p *T) *T {
 	return &v
 }
 
-func redirectPolicy(opts Options) func(*http.Request, []*http.Request) error {
+func redirectPolicy(opts remote.Options) func(*http.Request, []*http.Request) error {
 	return func(req *http.Request, via []*http.Request) error {
 		if len(via) >= 10 || req.URL.User != nil ||
 			(req.URL.Scheme != "http" && req.URL.Scheme != "https") ||
 			(via[len(via)-1].URL.Scheme == "https" && req.URL.Scheme != "https") {
-			return ErrRedirect
+			return remote.ErrRedirect
 		}
 		if req.URL.Scheme != via[0].URL.Scheme || req.URL.Host != via[0].URL.Host {
 			// Custom headers can contain secrets too. Only transport headers
@@ -140,6 +145,7 @@ func redirectPolicy(opts Options) func(*http.Request, []*http.Request) error {
 		}
 		if opts.CheckRedirect != nil {
 			if err := opts.CheckRedirect(req, via); err != nil {
+				//nolint:wrapcheck // preserves upstream error identity
 				return err
 			}
 		}
@@ -151,7 +157,7 @@ func redirectPolicy(opts Options) func(*http.Request, []*http.Request) error {
 }
 
 //nolint:gocyclo // Preserves transport guards while admitting closed protocol-specific POSTs.
-func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
+func (c *Client) Do(ctx context.Context, r remote.Request) (*http.Response, error) {
 	gitPOST := r.GitUploadPack && r.Method == http.MethodPost &&
 		c.config.PackageType == repo.CocoaPods && r.Metadata && r.NoCrossOriginAuth &&
 		r.ExternalURL != "" && r.Path == "" && r.Query == "" &&
@@ -173,12 +179,12 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 		r.Header.Get("Accept") == "application/vnd.git-lfs+json"
 	if !galleryPOST && !lfsPOST && !gitPOST &&
 		(r.Method != http.MethodGet && r.Method != http.MethodHead || len(r.Body) != 0) {
-		return nil, ErrRequest
+		return nil, remote.ErrRequest
 	}
 	if galleryPOST || lfsPOST || gitPOST {
 		for name := range r.Header {
 			if name != "Accept" {
-				return nil, ErrRequest
+				return nil, remote.ErrRequest
 			}
 		}
 	}
@@ -186,9 +192,9 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 	var err error
 	if r.ExternalURL != "" {
 		if c.checkURL == nil || r.Path != "" || r.Query != "" {
-			return nil, ErrSecurity
+			return nil, remote.ErrSecurity
 		}
-		u, err = CheckedURL(r.ExternalURL)
+		u, err = remote.CheckedURL(r.ExternalURL)
 	} else {
 		u, err = requestURL(c.config, c.base, r.Path, r.Query)
 	}
@@ -197,13 +203,13 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 	}
 	if gitPOST &&
 		(u.RawQuery != "" || u.Fragment != "" || !strings.HasSuffix(u.Path, "/git-upload-pack")) {
-		return nil, ErrRequest
+		return nil, remote.ErrRequest
 	}
 	if galleryPOST && (u.RawQuery != "" || u.Fragment != "" ||
 		u.EscapedPath() != strings.TrimRight(c.base.EscapedPath(), "/")+"/extensionquery") ||
 		lfsPOST && (u.RawQuery != "" || u.Fragment != "" ||
 			u.EscapedPath() != strings.TrimRight(c.base.EscapedPath(), "/")+"/objects/batch") {
-		return nil, ErrRequest
+		return nil, remote.ErrRequest
 	}
 	if r.CheckURL != nil {
 		if err = r.CheckURL(ctx, u); err != nil {
@@ -211,7 +217,7 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 		}
 	}
 	if !c.validGitLFSActionHeaders(u, r) {
-		return nil, ErrRequest
+		return nil, remote.ErrRequest
 	}
 	if r.NoCrossOriginAuth {
 		ctx = context.WithValue(ctx, noCrossOriginAuthKey{}, true)
@@ -231,7 +237,7 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, r.Method, u.String(), body)
 	if err != nil {
 		cancel()
-		return nil, ErrRequest
+		return nil, remote.ErrRequest
 	}
 	req.Header = r.Header.Clone()
 	if req.Header == nil {
@@ -270,13 +276,13 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 	for name, values := range r.GitLFSActionHeaders {
 		req.Header[name] = append([]string(nil), values...)
 	}
-	out := OutboundFrom(ctx)
+	out := remote.OutboundFrom(ctx)
 	if out.Header != nil {
 		out.Header(req)
 	}
 	if out.Allow != nil && !out.Allow(req.URL.String()) {
 		cancel()
-		return nil, ErrSecurity
+		return nil, remote.ErrSecurity
 	}
 	client := c.requestClient(ctx, r)
 
@@ -292,7 +298,7 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 // Fetch probes with HEAD unless bypassed. An unsupported HEAD falls back to GET;
 // a definitive error or conditional 304 is returned directly. GET is authoritative
 // when the resource changes between requests: no HEAD length/checksum is reused.
-func (c *Client) Fetch(ctx context.Context, r Request) (*http.Response, error) {
+func (c *Client) Fetch(ctx context.Context, r remote.Request) (*http.Response, error) {
 	if r.Method == http.MethodPost {
 		return c.Do(ctx, r)
 	}
@@ -307,7 +313,7 @@ func (c *Client) Fetch(ctx context.Context, r Request) (*http.Response, error) {
 	// its action headers on a separate HEAD preflight.
 	if len(r.GitLFSActionHeaders) > 0 {
 		if r.Method != http.MethodGet {
-			return nil, ErrRequest
+			return nil, remote.ErrRequest
 		}
 		return c.Do(ctx, r)
 	}
@@ -330,7 +336,7 @@ func (c *Client) Fetch(ctx context.Context, r Request) (*http.Response, error) {
 	return res, nil
 }
 
-func (c *Client) fetch(ctx context.Context, r Request) (*http.Response, error) {
+func (c *Client) fetch(ctx context.Context, r remote.Request) (*http.Response, error) {
 	if r.Method == http.MethodHead {
 		return c.Do(ctx, r)
 	}
@@ -364,28 +370,29 @@ func safeError(err error) error {
 		return safeError(requestError.Err)
 	}
 	if errors.Is(err, context.Canceled) {
-		return fmt.Errorf("%w: %w", ErrRequest, context.Canceled)
+		return fmt.Errorf("%w: %w", remote.ErrRequest, context.Canceled)
 	}
 	if errors.Is(err, context.DeadlineExceeded) {
-		return fmt.Errorf("%w: %w", ErrRequest, context.DeadlineExceeded)
+		return fmt.Errorf("%w: %w", remote.ErrRequest, context.DeadlineExceeded)
 	}
-	if errors.Is(err, ErrRedirect) {
-		return fmt.Errorf("%w: %w", ErrRequest, ErrRedirect)
+	if errors.Is(err, remote.ErrRedirect) {
+		return fmt.Errorf("%w: %w", remote.ErrRequest, remote.ErrRedirect)
 	}
 	var cert *tls.CertificateVerificationError
-	if errors.As(err, &cert) || errors.Is(err, ErrSecurity) {
-		return fmt.Errorf("%w: %w", ErrRequest, ErrSecurity)
+	if errors.As(err, &cert) || errors.Is(err, remote.ErrSecurity) {
+		return fmt.Errorf("%w: %w", remote.ErrRequest, remote.ErrSecurity)
 	}
 	var timeout net.Error
 	if errors.As(err, &timeout) && timeout.Timeout() {
-		return fmt.Errorf("%w: %w", ErrRequest, context.DeadlineExceeded)
+		return fmt.Errorf("%w: %w", remote.ErrRequest, context.DeadlineExceeded)
 	}
 	var connection *net.OpError
-	if errors.As(err, &connection) || errors.Is(err, ErrConnection) || errors.Is(err, io.EOF) ||
+	if errors.As(err, &connection) || errors.Is(err, remote.ErrConnection) ||
+		errors.Is(err, io.EOF) ||
 		errors.Is(err, io.ErrUnexpectedEOF) {
-		return fmt.Errorf("%w: %w", ErrRequest, ErrConnection)
+		return fmt.Errorf("%w: %w", remote.ErrRequest, remote.ErrConnection)
 	}
-	return ErrRequest
+	return remote.ErrRequest
 }
 
 type cancelBody struct {
@@ -438,32 +445,33 @@ func (c *idleConn) Write(p []byte) (int, error) {
 // Request restrictions share pooled connections but never another request's
 // authorization callback or outbound hooks. Every redirect intersects both
 // guards with the existing transport destination and credential policy.
-func (c *Client) requestClient(ctx context.Context, r Request) *http.Client {
+func (c *Client) requestClient(ctx context.Context, r remote.Request) *http.Client {
 	client := *c.http
 	if r.NoCrossOriginAuth {
 		client.Jar = nil
 	}
-	out := OutboundFrom(ctx)
+	out := remote.OutboundFrom(ctx)
 	redirect := client.CheckRedirect
 	client.CheckRedirect = func(next *http.Request, via []*http.Request) error {
 		if r.Method == http.MethodPost {
-			return ErrRedirect
+			return remote.ErrRedirect
 		}
 		for name := range r.GitLFSActionHeaders {
 			next.Header.Del(name)
 		}
 		if r.CheckURL != nil {
 			if err := r.CheckURL(ctx, next.URL); err != nil {
+				//nolint:wrapcheck // preserves upstream error identity
 				return err
 			}
 		}
 		if out.Allow != nil && !out.Allow(next.URL.String()) {
-			return ErrSecurity
+			return remote.ErrSecurity
 		}
 		if err := redirect(next, via); err != nil {
 			return err
 		}
-		if out.Header != nil && Origin(next.URL) == Origin(via[0].URL) {
+		if out.Header != nil && remote.Origin(next.URL) == remote.Origin(via[0].URL) {
 			out.Header(next)
 		}
 		return nil
@@ -479,7 +487,7 @@ func (c *Client) Guarded() bool { return c.checkURL != nil }
 // none, so that an unguarded client never vouches for a destination.
 func (c *Client) CheckURL(ctx context.Context, u *url.URL) error {
 	if c.checkURL == nil {
-		return ErrSecurity
+		return remote.ErrSecurity
 	}
 	return c.checkURL(ctx, u)
 }
@@ -501,17 +509,19 @@ func (c *Client) Prepare(req *http.Request) error {
 // classified, and a successful call transfers response-body ownership.
 func (c *Client) Send(req *http.Request) (*http.Response, error) {
 	transport := *c.http
-	transport.CheckRedirect = func(*http.Request, []*http.Request) error { return ErrRedirect }
-	//nolint:wrapcheck // preserves upstream error identity
+	transport.CheckRedirect = func(*http.Request, []*http.Request) error { return remote.ErrRedirect }
+	// gosec's taint analysis cannot see that the caller checks req's target
+	// with CheckURL before Send, as the contract above asks.
+	//nolint:wrapcheck,gosec // preserves upstream error identity; target checked by the caller
 	return transport.Do(req)
 }
 
-func (c *Client) validGitLFSActionHeaders(u *url.URL, r Request) bool {
+func (c *Client) validGitLFSActionHeaders(u *url.URL, r remote.Request) bool {
 	if len(r.GitLFSActionHeaders) == 0 {
 		return true
 	}
 	if c.config.PackageType != repo.GitLFS || r.Method != http.MethodGet ||
-		r.ExternalURL == "" || !r.NoCrossOriginAuth || Origin(u) != Origin(c.base) ||
+		r.ExternalURL == "" || !r.NoCrossOriginAuth || remote.Origin(u) != remote.Origin(c.base) ||
 		!source.ValidGitLFSActionHeaders(r.GitLFSActionHeaders) {
 		return false
 	}

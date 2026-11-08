@@ -1,4 +1,4 @@
-package remote
+package upstream
 
 import (
 	"context"
@@ -15,13 +15,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
 func ptr[T any](v T) *T { return &v }
 
-func clientFor(t *testing.T, c repo.Config, opts Options) *Client {
+func clientFor(t *testing.T, c repo.Config, opts remote.Options) *Client {
 	t.Helper()
 	c.Key = "remote"
 	client, err := NewClient(c, opts)
@@ -45,8 +46,8 @@ func body(t *testing.T, res *http.Response) string {
 func TestAccFetchAndValidators(t *testing.T) {
 	s := fakeupstream.New(t, fakeupstream.Options{})
 	s.Set("/root/item", fakeupstream.Resource{Body: []byte("package"), ETag: `"v1"`})
-	c := clientFor(t, repo.Config{URL: s.URL + "/root"}, Options{})
-	res, err := c.Fetch(t.Context(), Request{Path: "item"})
+	c := clientFor(t, repo.Config{URL: s.URL + "/root"}, remote.Options{})
+	res, err := c.Fetch(t.Context(), remote.Request{Path: "item"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +59,7 @@ func TestAccFetchAndValidators(t *testing.T) {
 	}
 	res, err = c.Fetch(
 		t.Context(),
-		Request{Path: "item", Header: http.Header{"If-None-Match": {`"v1"`}}},
+		remote.Request{Path: "item", Header: http.Header{"If-None-Match": {`"v1"`}}},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -66,7 +67,7 @@ func TestAccFetchAndValidators(t *testing.T) {
 	if res.StatusCode != 304 || body(t, res) != "" || s.Count("GET", "") != 1 {
 		t.Fatal("conditional HEAD must not fetch a body")
 	}
-	res, err = c.Fetch(t.Context(), Request{Path: "missing"})
+	res, err = c.Fetch(t.Context(), remote.Request{Path: "missing"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,9 +91,9 @@ func TestAccBypassCallerHEADAndFallback(t *testing.T) {
 					c := clientFor(
 						t,
 						repo.Config{URL: s.URL, BypassHeadRequests: ptr(bypass)},
-						Options{},
+						remote.Options{},
 					)
-					res, err := c.Fetch(t.Context(), Request{Method: method, Path: "item"})
+					res, err := c.Fetch(t.Context(), remote.Request{Method: method, Path: "item"})
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -115,8 +116,8 @@ func TestAccBypassCallerHEADAndFallback(t *testing.T) {
 	for _, status := range []int{405, 501, 403} {
 		s := fakeupstream.New(t, fakeupstream.Options{})
 		s.Set("/item", fakeupstream.Resource{Status: status})
-		c := clientFor(t, repo.Config{URL: s.URL}, Options{})
-		res, err := c.Fetch(t.Context(), Request{Path: "item"})
+		c := clientFor(t, repo.Config{URL: s.URL}, remote.Options{})
+		res, err := c.Fetch(t.Context(), remote.Request{Path: "item"})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -132,7 +133,7 @@ func TestAccBypassCallerHEADAndFallback(t *testing.T) {
 }
 
 func TestUnitURLPreservation(t *testing.T) {
-	base, _ := BaseURL("https://example.test/root?sig=a%2Fb+z&x=1")
+	base, _ := remote.BaseURL("https://example.test/root?sig=a%2Fb+z&x=1")
 	for _, tc := range []struct {
 		path, query, expected string
 		raw, propagate        bool
@@ -156,12 +157,12 @@ func TestUnitURLPreservation(t *testing.T) {
 		}
 	}
 	for _, path := range []string{"../x", "%2e%2e/x", "a%2f..%2fx", "/x", "//host", "a?x", "a#x", "a\\x", "%00", "%xx"} {
-		if _, err := requestURL(repo.Config{}, base, path, ""); !errors.Is(err, ErrURL) {
+		if _, err := requestURL(repo.Config{}, base, path, ""); !errors.Is(err, remote.ErrURL) {
 			t.Fatal(path, err)
 		}
 	}
 	for _, raw := range []string{"file:///tmp/x", "http://", "https://u:p@example.test", "https://example.test/#f", "://"} {
-		if _, err := BaseURL(raw); !errors.Is(err, ErrURL) {
+		if _, err := remote.BaseURL(raw); !errors.Is(err, remote.ErrURL) {
 			t.Fatal(raw, err)
 		}
 	}
@@ -178,7 +179,7 @@ func TestUnitP2MetadataFileBaseURLNormalizesOnlyP2(t *testing.T) {
 		{repo.P2, "https://eclipse.example/site/sub/content.xml", "https://eclipse.example/site/sub/p2.index"},
 		{repo.Generic, "https://eclipse.example/site/content.jar", "https://eclipse.example/site/content.jar/p2.index"},
 	} {
-		base, err := BaseURL(tc.base)
+		base, err := remote.BaseURL(tc.base)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -187,7 +188,7 @@ func TestUnitP2MetadataFileBaseURLNormalizesOnlyP2(t *testing.T) {
 			t.Errorf("%s %s: URL=%v, error=%v, want %s", tc.format, tc.base, u, err, tc.expected)
 		}
 	}
-	base, err := BaseURL("https://eclipse.example/site/content.jar")
+	base, err := remote.BaseURL("https://eclipse.example/site/content.jar")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -198,11 +199,11 @@ func TestUnitP2MetadataFileBaseURLNormalizesOnlyP2(t *testing.T) {
 		"",
 	); !errors.Is(
 		err,
-		ErrURL,
+		remote.ErrURL,
 	) {
 		t.Errorf("P2 base URL accepted a query fragment: %v", err)
 	}
-	signed, err := BaseURL("https://eclipse.example/site/content.jar?signature=a%2Fb")
+	signed, err := remote.BaseURL("https://eclipse.example/site/content.jar?signature=a%2Fb")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -230,9 +231,9 @@ func TestAccProxyTLSAndBind(t *testing.T) {
 			c := clientFor(
 				t,
 				repo.Config{URL: s.URL, DisableProxy: ptr(disable), LocalAddress: "127.0.0.1"},
-				Options{ProxyURL: proxyURL, TLSConfig: tc},
+				remote.Options{ProxyURL: proxyURL, TLSConfig: tc},
 			)
-			res, err := c.Do(t.Context(), Request{Method: "GET", Path: "item"})
+			res, err := c.Do(t.Context(), remote.Request{Method: "GET", Path: "item"})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -252,10 +253,10 @@ func TestAccRedirectIsolationAndLoops(t *testing.T) {
 	s := fakeupstream.New(t, fakeupstream.Options{})
 	s.Set("/redirect", fakeupstream.Resource{Redirect: dest.URL + "/item"})
 	s.Set("/loop", fakeupstream.Resource{Redirect: s.URL + "/loop"})
-	c := clientFor(t, repo.Config{URL: s.URL}, Options{})
+	c := clientFor(t, repo.Config{URL: s.URL}, remote.Options{})
 	res, err := c.Do(
 		t.Context(),
-		Request{
+		remote.Request{
 			Method: "GET",
 			Path:   "redirect",
 			Header: http.Header{
@@ -276,17 +277,19 @@ func TestAccRedirectIsolationAndLoops(t *testing.T) {
 		r.Header.Get("Range") == "" {
 		t.Fatal(r)
 	}
-	_, err = c.Do(t.Context(), Request{Method: "GET", Path: "loop"})
-	if !errors.Is(err, ErrRedirect) || s.Count("GET", "/loop") != 10 {
+	_, err = c.Do(t.Context(), remote.Request{Method: "GET", Path: "loop"})
+	if !errors.Is(err, remote.ErrRedirect) || s.Count("GET", "/loop") != 10 {
 		t.Fatal(err, s.Count("GET", "/loop"))
 	}
 	c = clientFor(
 		t,
 		repo.Config{URL: s.URL},
-		Options{CheckRedirect: func(*http.Request, []*http.Request) error { return ErrRedirect }},
+		remote.Options{
+			CheckRedirect: func(*http.Request, []*http.Request) error { return remote.ErrRedirect },
+		},
 	)
-	_, err = c.Do(t.Context(), Request{Method: "GET", Path: "redirect"})
-	if !errors.Is(err, ErrRedirect) {
+	_, err = c.Do(t.Context(), remote.Request{Method: "GET", Path: "redirect"})
+	if !errors.Is(err, remote.ErrRedirect) {
 		t.Fatal(err)
 	}
 }
@@ -305,21 +308,21 @@ func TestAccCancellationTimeoutAndShortBody(t *testing.T) {
 		"/short",
 		fakeupstream.Resource{Body: []byte("payload"), Fault: fakeupstream.Fault{LengthDelta: 10}},
 	)
-	c := clientFor(t, repo.Config{URL: s.URL, SocketTimeoutMillis: ptr(40)}, Options{})
-	_, err := c.Do(t.Context(), Request{Method: "GET", Path: "slow"})
+	c := clientFor(t, repo.Config{URL: s.URL, SocketTimeoutMillis: ptr(40)}, remote.Options{})
+	_, err := c.Do(t.Context(), remote.Request{Method: "GET", Path: "slow"})
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatal(err)
 	}
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	_, err = c.Do(ctx, Request{Method: "GET", Path: "slow"})
+	_, err = c.Do(ctx, remote.Request{Method: "GET", Path: "slow"})
 	if !errors.Is(err, context.Canceled) {
 		t.Fatal(err)
 	}
 	// Truncation is an independent failure mode. The deliberate 40 ms timeout
 	// above can expire before this response arrives on a busy race-test runner.
-	c = clientFor(t, repo.Config{URL: s.URL}, Options{})
-	res, err := c.Do(t.Context(), Request{Method: "GET", Path: "short"})
+	c = clientFor(t, repo.Config{URL: s.URL}, remote.Options{})
+	res, err := c.Do(t.Context(), remote.Request{Method: "GET", Path: "short"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -338,8 +341,12 @@ func TestAccMetadataDeadlineAndBodyClose(t *testing.T) {
 		"/item",
 		fakeupstream.Resource{Body: []byte("ok"), Fault: fakeupstream.Fault{BeforeBody: barrier}},
 	)
-	c := clientFor(t, repo.Config{URL: s.URL, MetadataRetrievalTimeoutSecs: ptr(1)}, Options{})
-	res, err := c.Fetch(t.Context(), Request{Method: "GET", Path: "item", Metadata: true})
+	c := clientFor(
+		t,
+		repo.Config{URL: s.URL, MetadataRetrievalTimeoutSecs: ptr(1)},
+		remote.Options{},
+	)
+	res, err := c.Fetch(t.Context(), remote.Request{Method: "GET", Path: "item", Metadata: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -356,32 +363,32 @@ func TestAccMetadataDeadlineAndBodyClose(t *testing.T) {
 func TestAccPoolChangesAndClose(t *testing.T) {
 	p := new(Pool)
 	c := repo.Config{Key: "r", URL: "https://example.test"}
-	a, err := p.Client(c, Options{Revision: "1"})
+	a, err := p.Client(c, remote.Options{Revision: "1"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := p.Client(c, Options{Revision: "1"})
+	b, err := p.Client(c, remote.Options{Revision: "1"})
 	if err != nil || a != b {
 		t.Fatal("not reused", err)
 	}
-	b, err = p.Client(c, Options{Revision: "2"})
+	b, err = p.Client(c, remote.Options{Revision: "2"})
 	if err != nil || a == b {
 		t.Fatal("revision not applied", err)
 	}
 	c.URL = "https://other.test"
-	d, err := p.Client(c, Options{Revision: "2"})
+	d, err := p.Client(c, remote.Options{Revision: "2"})
 	if err != nil || d == b {
 		t.Fatal("URL not applied", err)
 	}
 	p.Remove("r")
-	b, err = p.Client(c, Options{})
+	b, err = p.Client(c, remote.Options{})
 	if err != nil || d == b {
 		t.Fatal("deletion not applied", err)
 	}
 	p.Close()
 	p.Close()
 	p.Remove("r")
-	if _, err = p.Client(c, Options{}); !errors.Is(err, ErrClosed) {
+	if _, err = p.Client(c, remote.Options{}); !errors.Is(err, remote.ErrClosed) {
 		t.Fatal(err)
 	}
 }
@@ -389,13 +396,13 @@ func TestAccPoolChangesAndClose(t *testing.T) {
 func TestUnitConnectionContract(t *testing.T) {
 	p := new(Pool)
 	p.Close()
-	conn, err := p.Connection(repo.Config{Key: "r", URL: "https://example.test"}, Options{})
-	if !errors.Is(err, ErrClosed) || conn != nil {
+	conn, err := p.Connection(repo.Config{Key: "r", URL: "https://example.test"}, remote.Options{})
+	if !errors.Is(err, remote.ErrClosed) || conn != nil {
 		t.Fatalf("closed pool: connection %#v, error %v", conn, err)
 	}
-	var unguarded Connection = clientFor(t, repo.Config{URL: "https://example.test"}, Options{})
+	var unguarded remote.Connection = clientFor(t, repo.Config{URL: "https://example.test"}, remote.Options{})
 	u := &url.URL{Scheme: "https", Host: "example.test", Path: "/next"}
-	if unguarded.Guarded() || !errors.Is(unguarded.CheckURL(t.Context(), u), ErrSecurity) {
+	if unguarded.Guarded() || !errors.Is(unguarded.CheckURL(t.Context(), u), remote.ErrSecurity) {
 		t.Fatal("an unguarded client vouches for a destination")
 	}
 	req, err := http.NewRequestWithContext(
@@ -412,7 +419,7 @@ func TestUnitConnectionContract(t *testing.T) {
 		t.Fatal(err, req.Header, req.URL)
 	}
 	checked := 0
-	var guarded Connection = clientFor(t, repo.Config{URL: "https://example.test"}, Options{
+	var guarded remote.Connection = clientFor(t, repo.Config{URL: "https://example.test"}, remote.Options{
 		CheckURL: func(context.Context, *url.URL) error { checked++; return nil },
 	})
 	if !guarded.Guarded() || guarded.CheckURL(t.Context(), u) != nil || checked != 1 {
@@ -422,23 +429,23 @@ func TestUnitConnectionContract(t *testing.T) {
 
 func TestUnitInvalidSettingsAndSafeErrors(t *testing.T) {
 	for _, c := range []repo.Config{{URL: "bad"}, {URL: "https://example.test", LocalAddress: "bad"}, {URL: "https://example.test", SocketTimeoutMillis: ptr(-1)}, {URL: "https://example.test", MetadataRetrievalTimeoutSecs: ptr(-1)}} {
-		if _, err := NewClient(c, Options{}); err == nil {
+		if _, err := NewClient(c, remote.Options{}); err == nil {
 			t.Fatal("accepted invalid config")
 		}
 	}
 	proxy, _ := url.Parse("socks5://example.test")
 	if _, err := NewClient(
 		repo.Config{URL: "https://example.test"},
-		Options{ProxyURL: proxy},
+		remote.Options{ProxyURL: proxy},
 	); err == nil {
 		t.Fatal("bad proxy")
 	}
 	c := clientFor(
 		t,
 		repo.Config{URL: "https://example.test"},
-		Options{Prepare: func(*http.Request) error { return errors.New("signed-secret") }},
+		remote.Options{Prepare: func(*http.Request) error { return errors.New("signed-secret") }},
 	)
-	for _, r := range []Request{{Method: "POST"}, {Method: "GET", Path: "%"}, {Method: "GET", Path: "item"}} {
+	for _, r := range []remote.Request{{Method: "POST"}, {Method: "GET", Path: "%"}, {Method: "GET", Path: "item"}} {
 		_, err := c.Do(t.Context(), r)
 		if err == nil || strings.Contains(err.Error(), "signed-secret") {
 			t.Fatal(err)
@@ -452,9 +459,9 @@ func TestUnitInvalidSettingsAndSafeErrors(t *testing.T) {
 func TestAccUntrustedTLSAndHeaderBudget(t *testing.T) {
 	s := fakeupstream.New(t, fakeupstream.Options{TLS: &tls.Config{MinVersion: tls.VersionTLS12}})
 	s.Set("/item", fakeupstream.Resource{Body: []byte("ok")})
-	c := clientFor(t, repo.Config{URL: s.URL}, Options{})
-	_, err := c.Do(t.Context(), Request{Method: "GET", Path: "item"})
-	if !errors.Is(err, ErrSecurity) {
+	c := clientFor(t, repo.Config{URL: s.URL}, remote.Options{})
+	_, err := c.Do(t.Context(), remote.Request{Method: "GET", Path: "item"})
+	if !errors.Is(err, remote.ErrSecurity) {
 		t.Fatalf("untrusted TLS must be classified as security, got %v", err)
 	}
 	s = fakeupstream.New(t, fakeupstream.Options{})
@@ -465,14 +472,17 @@ func TestAccUntrustedTLSAndHeaderBudget(t *testing.T) {
 			Header: http.Header{"X-Large": {strings.Repeat("x", 4096)}},
 		},
 	)
-	c = clientFor(t, repo.Config{URL: s.URL}, Options{MaxResponseHeaderBytes: 256})
-	_, err = c.Fetch(t.Context(), Request{Path: "item", Metadata: true})
-	if !errors.Is(err, ErrRequest) {
+	c = clientFor(t, repo.Config{URL: s.URL}, remote.Options{MaxResponseHeaderBytes: 256})
+	_, err = c.Fetch(t.Context(), remote.Request{Path: "item", Metadata: true})
+	if !errors.Is(err, remote.ErrRequest) {
 		t.Fatalf("oversized headers: %v", err)
 	}
 	p := new(Pool)
 	defer p.Close()
-	if _, err = p.Client(repo.Config{Key: "bad", URL: "file:///tmp"}, Options{}); err == nil {
+	if _, err = p.Client(
+		repo.Config{Key: "bad", URL: "file:///tmp"},
+		remote.Options{},
+	); err == nil {
 		t.Fatal("invalid pooled client")
 	}
 }
@@ -485,12 +495,12 @@ func TestAccPrepareRedirectAndSettingsSnapshot(t *testing.T) {
 	c := clientFor(
 		t,
 		repo.Config{URL: s.URL, BypassHeadRequests: &bypass},
-		Options{
+		remote.Options{
 			Prepare: func(r *http.Request) error { r.Header.Set("X-Configured", "value"); return nil },
 		},
 	)
 	bypass = false
-	res, err := c.Fetch(t.Context(), Request{Path: "from", Metadata: true})
+	res, err := c.Fetch(t.Context(), remote.Request{Path: "from", Metadata: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -503,13 +513,13 @@ func TestAccPrepareRedirectAndSettingsSnapshot(t *testing.T) {
 		from, _ := http.NewRequestWithContext(t.Context(), "GET", "https://example.test", nil)
 		to := &http.Request{URL: u, Header: make(http.Header)}
 		if err := redirectPolicy(
-			Options{},
+			remote.Options{},
 		)(
 			to,
 			[]*http.Request{from},
 		); !errors.Is(
 			err,
-			ErrRedirect,
+			remote.ErrRedirect,
 		) {
 			t.Fatal(raw, err)
 		}
@@ -519,13 +529,13 @@ func TestAccPrepareRedirectAndSettingsSnapshot(t *testing.T) {
 func TestAccDroppedConnectionClassification(t *testing.T) {
 	upstream := fakeupstream.New(t, fakeupstream.Options{})
 	upstream.Set("/drop", fakeupstream.Resource{Fault: fakeupstream.Fault{DropConnection: true}})
-	client := clientFor(t, repo.Config{URL: upstream.URL}, Options{})
+	client := clientFor(t, repo.Config{URL: upstream.URL}, remote.Options{})
 	if _, err := client.Do(
 		t.Context(),
-		Request{Method: http.MethodGet, Path: "drop"},
+		remote.Request{Method: http.MethodGet, Path: "drop"},
 	); !errors.Is(
 		err,
-		ErrConnection,
+		remote.ErrConnection,
 	) {
 		t.Fatalf("dropped headers = %v", err)
 	}
@@ -537,7 +547,7 @@ func TestAccDroppedConnectionClassification(t *testing.T) {
 			safeError(
 				&url.Error{Op: "Get", URL: "https://upstream.invalid/?secret=token", Err: cause},
 			),
-			ErrConnection,
+			remote.ErrConnection,
 		) {
 			t.Fatal("EOF lost connection classification")
 		}
@@ -570,10 +580,10 @@ func TestUnitAIEditorGalleryPOSTTransportIsBoundedAndCannotRedirect(t *testing.T
 	c := clientFor(
 		t,
 		repo.Config{URL: srv.URL + "/_apis/public/gallery", PackageType: repo.AIEditorExtensions},
-		Options{},
+		remote.Options{},
 	)
-	valid := func() Request {
-		return Request{
+	valid := func() remote.Request {
+		return remote.Request{
 			Method: http.MethodPost, Path: "extensionquery",
 			Body: []byte(`{"filters":[]}`), Metadata: true,
 			Header: http.Header{"Accept": {"application/json;api-version=3.0-preview.1"}},
@@ -593,7 +603,7 @@ func TestUnitAIEditorGalleryPOSTTransportIsBoundedAndCannotRedirect(t *testing.T
 	configured := clientFor(
 		t,
 		repo.Config{URL: srv.URL + "/_apis/public/gallery", PackageType: repo.AIEditorExtensions},
-		Options{
+		remote.Options{
 			Prepare: func(r *http.Request) error {
 				r.Header.Set("Accept", "text/plain")
 				r.Header.Set("Content-Type", "text/plain")
@@ -614,31 +624,35 @@ func TestUnitAIEditorGalleryPOSTTransportIsBoundedAndCannotRedirect(t *testing.T
 	}
 	for _, tc := range []struct {
 		name   string
-		change func(*Request)
+		change func(*remote.Request)
 	}{
-		{"empty body", func(r *Request) { r.Body = nil }},
-		{"large body", func(r *Request) { r.Body = []byte(strings.Repeat("x", 64<<10+1)) }},
-		{"other path", func(r *Request) { r.Path = "admin/config" }},
-		{"query", func(r *Request) { r.Query = "token=secret" }},
-		{"external url", func(r *Request) { r.ExternalURL = "https://example.org/" }},
-		{"caller header", func(r *Request) { r.Header.Set("Authorization", "Bearer secret") }},
-		{"wrong accept", func(r *Request) { r.Header.Set("Accept", "*/*") }},
+		{"empty body", func(r *remote.Request) { r.Body = nil }},
+		{"large body", func(r *remote.Request) { r.Body = []byte(strings.Repeat("x", 64<<10+1)) }},
+		{"other path", func(r *remote.Request) { r.Path = "admin/config" }},
+		{"query", func(r *remote.Request) { r.Query = "token=secret" }},
+		{"external url", func(r *remote.Request) { r.ExternalURL = "https://example.org/" }},
+		{"caller header", func(r *remote.Request) { r.Header.Set("Authorization", "Bearer secret") }},
+		{"wrong accept", func(r *remote.Request) { r.Header.Set("Accept", "*/*") }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r := valid()
 			tc.change(&r)
-			if _, err := c.Fetch(t.Context(), r); !errors.Is(err, ErrRequest) {
+			if _, err := c.Fetch(t.Context(), r); !errors.Is(err, remote.ErrRequest) {
 				t.Fatalf("invalid gallery transport request admitted: %v", err)
 			}
 		})
 	}
-	other := clientFor(t, repo.Config{URL: srv.URL, PackageType: repo.NPM}, Options{})
-	if _, err := other.Fetch(t.Context(), valid()); !errors.Is(err, ErrRequest) {
+	other := clientFor(t, repo.Config{URL: srv.URL, PackageType: repo.NPM}, remote.Options{})
+	if _, err := other.Fetch(t.Context(), valid()); !errors.Is(err, remote.ErrRequest) {
 		t.Fatalf("other package type admitted POST: %v", err)
 	}
 	for _, base := range []string{srv.URL + "/_apis/public/gallery?secret=1"} {
-		c := clientFor(t, repo.Config{URL: base, PackageType: repo.AIEditorExtensions}, Options{})
-		if _, err := c.Fetch(t.Context(), valid()); !errors.Is(err, ErrRequest) {
+		c := clientFor(
+			t,
+			repo.Config{URL: base, PackageType: repo.AIEditorExtensions},
+			remote.Options{},
+		)
+		if _, err := c.Fetch(t.Context(), valid()); !errors.Is(err, remote.ErrRequest) {
 			t.Fatalf("gallery base with query or fragment was admitted: %s: %v", base, err)
 		}
 	}
@@ -664,7 +678,7 @@ func TestUnitAIEditorGalleryPOSTTransportIsBoundedAndCannotRedirect(t *testing.T
 			URL:         redirect.URL + "/_apis/public/gallery",
 			PackageType: repo.AIEditorExtensions,
 		},
-		Options{},
+		remote.Options{},
 	)
 	if _, err := redirectClient.Fetch(t.Context(), valid()); err == nil || redirected {
 		t.Fatalf("gallery POST followed redirect: err=%v redirected=%t", err, redirected)

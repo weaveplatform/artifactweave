@@ -1,4 +1,4 @@
-package remote
+package upstream
 
 import (
 	"net/url"
@@ -6,6 +6,8 @@ import (
 	"unicode"
 
 	"golang.org/x/net/http/httpguts"
+
+	"github.com/weaveplatform/artifactweave/internal/remote"
 )
 
 type registryChallenge struct{ scheme, realm, service, scope string }
@@ -128,7 +130,7 @@ func parseRegistryChallenge(values []string, image string, tokens bool) (registr
 		if parsed.scheme != "bearer" || !tokens {
 			continue
 		}
-		realm, err := CheckedURL(parsed.values["realm"])
+		realm, err := remote.CheckedURL(parsed.values["realm"])
 		if err != nil {
 			return registryChallenge{}, ErrRegistryChallenge
 		}
@@ -166,14 +168,14 @@ func registryScope(challenged, image string) (string, error) {
 	prefix, actions, found := strings.Cut(challenged, ":")
 	name, actions, second := strings.Cut(actions, ":")
 	if !found || !second || prefix != "repository" || image == "" || name != image {
-		return "", ErrRegistryDenied
+		return "", remote.ErrRegistryDenied
 	}
 	for _, action := range strings.Split(actions, ",") {
 		if action == "pull" {
 			return expected, nil
 		}
 	}
-	return "", ErrRegistryDenied
+	return "", remote.ErrRegistryDenied
 }
 
 func registryTokenURL(c registryChallenge) (string, error) {

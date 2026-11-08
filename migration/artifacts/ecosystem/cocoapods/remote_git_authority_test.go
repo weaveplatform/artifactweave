@@ -18,6 +18,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
@@ -63,7 +64,7 @@ func TestAccCocoaPodsGitTransportCredentialIsolation(t *testing.T) {
 	}
 	db := inmem.New()
 	saveRepo(t, db, c)
-	resolver := resolverFor(t, db, remote.ResolverOptions{
+	resolver := resolverFor(t, db, upstream.ResolverOptions{
 		RootCAsPEM: roots, AllowedPrivateOrigins: []string{child.URL},
 	})
 	opts := resolveFor(t, resolver, c)
@@ -72,7 +73,7 @@ func TestAccCocoaPodsGitTransportCredentialIsolation(t *testing.T) {
 		t.Fatal(err)
 	}
 	opts.Jar.SetCookies(childURL, []*http.Cookie{{Name: "session", Value: "source-cookie"}})
-	client, err := remote.NewClient(c, opts)
+	client, err := upstream.NewClient(c, opts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -244,7 +245,7 @@ func cocoaPodsAuthorityFixture(t *testing.T) (*policyWorld, source.Request) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	resolver := resolverFor(t, w.db, remote.ResolverOptions{})
+	resolver := resolverFor(t, w.db, upstream.ResolverOptions{})
 	w.p.Options = resolver.Options
 	// The policy passes CheckCurrent its own store, w.db, so the kit over
 	// w.db asks the same permissions, inside the policy's transaction

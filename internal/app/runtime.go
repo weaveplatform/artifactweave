@@ -18,12 +18,12 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/pypi"
 	"github.com/weaveplatform/artifactweave/internal/format/terraformbackend"
 	"github.com/weaveplatform/artifactweave/internal/reindexauth"
-	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/migration/access"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
@@ -69,9 +69,9 @@ type runtime struct {
 	mavenEager      *maven.MavenEager
 	smartRemote     *smart.Smart
 	smartRegistry   *smart.Smart
-	remoteHTTP      remote.Pool
+	remoteHTTP      upstream.Pool
 	remoteSources   *source.Service
-	registryHTTP    remote.RegistryPool
+	registryHTTP    upstream.RegistryPool
 	registrySources *source.Service
 	// registryPath is the registry path grammar both Smart Remote runtimes
 	// are given. Nil silently turns off property synchronisation for

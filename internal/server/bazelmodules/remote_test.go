@@ -12,6 +12,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -204,11 +205,15 @@ func TestAccYankedMetadataFollowsSelectedMember(t *testing.T) {
 func remoteService(t *testing.T, items *item.Service) *source.Service {
 	t.Helper()
 	key := []byte(strings.Repeat("k", 32))
-	resolver, err := remote.NewResolver(items.Store, nil, remote.ResolverOptions{RevisionKey: key})
+	resolver, err := upstream.NewResolver(
+		items.Store,
+		nil,
+		upstream.ResolverOptions{RevisionKey: key},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	pool := new(remote.Pool)
+	pool := new(upstream.Pool)
 	policy := &remote.Policy{
 		Store:   items.Store,
 		Blobs:   items.Blobs,

@@ -1,4 +1,4 @@
-package remote
+package upstream
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
@@ -39,7 +40,7 @@ func TestUnitP2ExternalChildNeverReceivesRepositoryCredentials(t *testing.T) {
 	}
 	u, _ := url.Parse(child.URL)
 	jar.SetCookies(u, []*http.Cookie{{Name: "token", Value: "private"}})
-	client, err := NewClient(c, Options{
+	client, err := NewClient(c, remote.Options{
 		Prepare:  security.prepare,
 		CheckURL: func(context.Context, *url.URL) error { return nil },
 		Jar:      jar,
@@ -48,7 +49,7 @@ func TestUnitP2ExternalChildNeverReceivesRepositoryCredentials(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer client.Close()
-	res, err := client.Do(t.Context(), Request{
+	res, err := client.Do(t.Context(), remote.Request{
 		Method:      http.MethodGet,
 		ExternalURL: child.URL, NoCrossOriginAuth: true,
 	})
@@ -82,7 +83,7 @@ func TestUnitP2SameOriginChildKeepsConfiguredAuthentication(t *testing.T) {
 	}
 	jar.SetCookies(base, []*http.Cookie{{Name: "session", Value: "needed"}})
 	security := &sourceSecurity{base: base, config: c}
-	client, err := NewClient(c, Options{
+	client, err := NewClient(c, remote.Options{
 		Prepare:  security.prepare,
 		CheckURL: func(context.Context, *url.URL) error { return nil },
 		Jar:      jar,
@@ -91,7 +92,7 @@ func TestUnitP2SameOriginChildKeepsConfiguredAuthentication(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer client.Close()
-	res, err := client.Do(t.Context(), Request{
+	res, err := client.Do(t.Context(), remote.Request{
 		Method:      http.MethodGet,
 		ExternalURL: site.URL + "/child", NoCrossOriginAuth: false,
 	})

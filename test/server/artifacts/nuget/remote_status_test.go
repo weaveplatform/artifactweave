@@ -8,6 +8,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -45,15 +46,15 @@ func TestAccStatusNuGetV3Remote(t *testing.T) {
 		if err := cfg.Store.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
 			t.Fatal(err)
 		}
-		resolver, err := remote.NewResolver(
+		resolver, err := upstream.NewResolver(
 			cfg.Store,
 			nil,
-			remote.ResolverOptions{RevisionKey: []byte(strings.Repeat("k", 32))},
+			upstream.ResolverOptions{RevisionKey: []byte(strings.Repeat("k", 32))},
 		)
 		if err != nil {
 			t.Fatal(err)
 		}
-		pool := new(remote.Pool)
+		pool := new(upstream.Pool)
 		policy := &remote.Policy{
 			Store: cfg.Store,
 			Blobs: cfg.Blobs,

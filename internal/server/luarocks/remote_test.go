@@ -12,6 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/luarocks"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -51,15 +52,15 @@ func newRemoteFixture(t *testing.T, tune ...func(*pkgroute.Options, *item.Servic
 			t.Fatal(err)
 		}
 		key := []byte(strings.Repeat("k", 32))
-		resolver, err := remote.NewResolver(
+		resolver, err := upstream.NewResolver(
 			items.Store,
 			nil,
-			remote.ResolverOptions{RevisionKey: key},
+			upstream.ResolverOptions{RevisionKey: key},
 		)
 		if err != nil {
 			t.Fatal(err)
 		}
-		pool := new(remote.Pool)
+		pool := new(upstream.Pool)
 		policy := &remote.Policy{
 			Store: items.Store, Blobs: items.Blobs, Items: items,
 			Pool: pool, Options: resolver.Options, Key: key, Now: clock.Now,

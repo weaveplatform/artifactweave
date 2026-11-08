@@ -12,6 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/smart"
@@ -38,7 +39,7 @@ func (rt *runtime) openRemoteSources(
 		return nil, err
 	}
 	accessAPI := rt.access.API()
-	resolver, err := remote.NewResolver(rt.store, rt.keys, remote.ResolverOptions{
+	resolver, err := upstream.NewResolver(rt.store, rt.keys, upstream.ResolverOptions{
 		RevisionKey: key, AllowedPrivateOrigins: allowedPrivateOrigins,
 		Certificates: accessAPI.Keys,
 	})
@@ -144,7 +145,7 @@ func (rt *runtime) openRemoteSources(
 	}
 	content := &docker.RegistryContent{
 		Policy: registryPolicy,
-		Registries: &remote.RegistryClients{
+		Registries: &upstream.RegistryClients{
 			Pool:    &rt.registryHTTP,
 			Options: resolver.RegistryOptions,
 		},

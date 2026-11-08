@@ -95,7 +95,7 @@ do not share a cookie jar.
 ## Evidence and remaining qualification
 
 `TestAccRegistryAuthenticationFeature` executes
-[`registry_auth.feature`](../../internal/remote/testdata/registry_auth.feature) against
+[`registry_auth.feature`](../../migration/artifacts/adapters/upstream/testdata/registry_auth.feature) against
 controlled registry and token endpoints. It proves anonymous/authenticated exchange,
 exact service/scope, expiry, reuse and image isolation using the real shared resolver
 and HTTP client. Race tests cover concurrent coalescing/cancellation, source and

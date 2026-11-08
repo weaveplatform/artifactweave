@@ -16,6 +16,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -33,7 +34,7 @@ type policyWorld struct {
 	clock  *fakeupstream.Clock
 	up     *fakeupstream.Server
 	p      *remote.Policy
-	pool   *remote.Pool
+	pool   *upstream.Pool
 	c      repo.Config
 	permit source.Permit
 }
@@ -57,7 +58,7 @@ func policyFixture(t *testing.T) *policyWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pool := new(remote.Pool)
+	pool := new(upstream.Pool)
 	p := &remote.Policy{
 		Store: db,
 		Blobs: blobs,

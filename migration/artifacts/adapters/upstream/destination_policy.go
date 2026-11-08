@@ -1,4 +1,4 @@
-package remote
+package upstream
 
 import (
 	"context"
@@ -7,6 +7,8 @@ import (
 	"net/netip"
 	"net/url"
 	"strings"
+
+	"github.com/weaveplatform/artifactweave/internal/remote"
 )
 
 // destinationPolicy grants private-network access only to authorities configured
@@ -18,13 +20,14 @@ type destinationPolicy struct {
 }
 
 func (p *destinationPolicy) addresses(ctx context.Context, u *url.URL) ([]string, error) {
-	if _, err := CheckedURL(u.String()); err != nil {
+	if _, err := remote.CheckedURL(u.String()); err != nil {
+		//nolint:wrapcheck // preserves upstream error identity
 		return nil, err
 	}
 	host := strings.TrimSuffix(strings.ToLower(u.Hostname()), ".")
 	switch host {
 	case "metadata.google.internal", "metadata.goog", "instance-data":
-		return nil, ErrSecurity
+		return nil, remote.ErrSecurity
 	}
 	var ips []net.IPAddr
 	if ip, err := netip.ParseAddr(host); err == nil {
@@ -36,23 +39,23 @@ func (p *destinationPolicy) addresses(ctx context.Context, u *url.URL) ([]string
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return nil, safeError(err)
 			}
-			return nil, ErrConnection
+			return nil, remote.ErrConnection
 		}
 	}
 	if len(ips) == 0 {
-		return nil, ErrConnection
+		return nil, remote.ErrConnection
 	}
 	addresses := make([]string, 0, len(ips))
 	for _, ip := range ips {
 		a, ok := netip.AddrFromSlice(ip.IP)
 		if !ok || ip.Zone != "" {
-			return nil, ErrSecurity
+			return nil, remote.ErrSecurity
 		}
 		a = a.Unmap()
-		if forbiddenAddress(a) || (!p.private[Origin(u)] && !publicAddress(a)) {
-			return nil, ErrSecurity
+		if forbiddenAddress(a) || (!p.private[remote.Origin(u)] && !publicAddress(a)) {
+			return nil, remote.ErrSecurity
 		}
-		addresses = append(addresses, net.JoinHostPort(a.String(), Port(u)))
+		addresses = append(addresses, net.JoinHostPort(a.String(), remote.Port(u)))
 	}
 	return addresses, nil
 }

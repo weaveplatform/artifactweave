@@ -19,6 +19,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -107,26 +108,26 @@ func TestUnitRemoteCacheAndOffline(t *testing.T) {
 	}
 }
 
-func remoteSetup(t *testing.T, upstream string, ttl int) func(*fixture) *source.Service {
+func remoteSetup(t *testing.T, upstreamURL string, ttl int) func(*fixture) *source.Service {
 	return func(f *fixture) *source.Service {
 		c, e := f.db.Repos().Get(t.Context(), "hf")
 		if e != nil {
 			t.Fatal(e)
 		}
-		c.URL = upstream
+		c.URL = upstreamURL
 		c.RetrievalCachePeriodSecs = &ttl
 		if e := f.db.Repos().Update(t.Context(), c); e != nil {
 			t.Fatal(e)
 		}
-		resolver, e := remote.NewResolver(
+		resolver, e := upstream.NewResolver(
 			f.db,
 			nil,
-			remote.ResolverOptions{RevisionKey: []byte(strings.Repeat("k", 32))},
+			upstream.ResolverOptions{RevisionKey: []byte(strings.Repeat("k", 32))},
 		)
 		if e != nil {
 			t.Fatal(e)
 		}
-		pool := new(remote.Pool)
+		pool := new(upstream.Pool)
 		policy := &remote.Policy{
 			Store:   f.db,
 			Blobs:   f.items.Blobs,
