@@ -11,8 +11,9 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
-	"github.com/weaveplatform/artifactweave/internal/service/build"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -93,7 +94,7 @@ func TestAccAppendIdempotencyRecheckDeadline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := artifactoryService{cfg: Config{Store: w.db, Blobs: w.blobs, Auth: badAuth}}
+	svc := artifactoryService{cfg: withAccess(Config{Store: w.db, Blobs: w.blobs, Auth: badAuth})}
 	err = svc.appendOnce(
 		t.Context(),
 		svc.builds(w.db),
@@ -124,16 +125,12 @@ func TestAccAppendIdempotencyReplayEvaluatesCurrentPermissions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p, decider, err := auth.Authorize(
-		t.Context(),
-		authz.Sources{Permissions: w.db.Permissions(), Groups: w.db.Groups()},
-		p,
-	)
+	p, decider, err := accesstest.Over(t, w.db).API().Authorizer.Authorize(t.Context(), p, false)
 	if err != nil || !decider.IsAdmin() {
 		t.Fatalf("request decider: %v", err)
 	}
-	ctx := auth.WithAuthorized(t.Context(), p, decider)
-	svc := artifactoryService{cfg: Config{Store: w.db, Blobs: w.blobs, Auth: a}}
+	ctx := accessapi.WithCaller(t.Context(), p, decider)
+	svc := artifactoryService{cfg: withAccess(Config{Store: w.db, Blobs: w.blobs, Auth: a})}
 	appendOnce := func() error {
 		return svc.appendOnce(
 			ctx,

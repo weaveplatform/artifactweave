@@ -59,7 +59,7 @@ var formats = map[string]formatImpact{
 		"@clients,@nimmodel",
 		[]string{"crane", "oras", "cosign", "helm", "jf"},
 	},
-	"golang": {"./internal/format/golang/...", "@goproxy,@go,@package_wiring", nil},
+	"golang": {"./migration/artifacts/ecosystem/golang/...", "@goproxy,@go,@package_wiring", nil},
 	"helm": {
 		"./internal/format/helm/...",
 		"@helm,@package_wiring",

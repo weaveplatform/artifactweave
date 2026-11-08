@@ -12,11 +12,11 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	"github.com/weaveplatform/artifactweave/internal/server/docker"
-	"github.com/weaveplatform/artifactweave/internal/service/item"
-	"github.com/weaveplatform/artifactweave/internal/service/multipart"
 	"github.com/weaveplatform/artifactweave/internal/service/oidc"
 	"github.com/weaveplatform/artifactweave/internal/service/roles"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -1648,9 +1648,11 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 	must(err)
 	cfg := Config{
 		CompatVersion: "7.155.0", Store: db, Blobs: blobs, Auth: a, PasswordHash: testHash,
-		Keys:                   support.TerraformBackendKeys(t),
-		Tokens:                 tokens,
-		Multipart:              &multipart.Service{Store: db, Blobs: blobs, Dir: t.TempDir()},
+		Keys:   support.TerraformBackendKeys(t),
+		Tokens: tokens,
+		Multipart: &multipart.Service{
+			Store: db, Blobs: blobs, Dir: t.TempDir(), Restrictions: restrictionsOver(t, db),
+		},
 		GlobalEnvironmentLimit: matrixEnvironmentLimit,
 	}
 	for _, p := range matrixParts {

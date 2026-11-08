@@ -16,14 +16,13 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/format/nuget"
 	"github.com/weaveplatform/artifactweave/internal/reindexauth"
-	"github.com/weaveplatform/artifactweave/internal/service/item"
-	"github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/formattest"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
@@ -480,34 +479,19 @@ func TestUnitRemoteReindexStoreFaults(t *testing.T) {
 
 func reindexCredential(t *testing.T, w *world) json.RawMessage {
 	t.Helper()
-	params := auth.HashParams{MemoryKiB: 8, Time: 1, Threads: 1}
 	if _, err := w.st.Users().Get(w.ctx, "tester"); errors.Is(err, store.ErrNotFound) {
-		hash, err := auth.HashPasswordWith(params, "pw")
-		if err != nil {
-			t.Fatal(err)
-		}
+		hash := accesstest.HashPassword(t, "pw")
 		if err = w.st.Users().
 			Create(w.ctx, types.User{Name: "tester", PasswordHash: hash, Admin: true}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	a, err := auth.NewAuthenticator(
-		w.st.Users(),
-		w.st.Settings(),
-		auth.Options{Hash: params, Now: func() time.Time { return w.now }},
-	)
+	api := accesstest.Over(t, w.st, accesstest.WithNow(func() time.Time { return w.now })).API()
+	p, err := api.Authenticator.Basic(w.ctx, "tester", "pw")
 	if err != nil {
 		t.Fatal(err)
 	}
-	p, err := a.Basic(w.ctx, "tester", "pw")
-	if err != nil {
-		t.Fatal(err)
-	}
-	module, err := access.New(access.Deps{Store: w.st, Authenticator: a})
-	if err != nil {
-		t.Fatal(err)
-	}
-	w.items.ReindexAuthorize = reindexauth.New(module.API().Authenticator, module.API().Authorizer)
+	w.items.ReindexAuthorize = reindexauth.New(api.Authenticator, api.Authorizer)
 	reference, err := json.Marshal(p.CredentialReference())
 	if err != nil {
 		t.Fatal(err)

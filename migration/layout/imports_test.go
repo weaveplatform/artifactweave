@@ -246,9 +246,17 @@ var rows = []rule{
 		},
 	},
 	{
-		text: "no module package imports a module root; only app wires modules",
+		// The named exception lets a module's test kit build the real module
+		// the way app does, which needs the module's own root. The kit is test
+		// support that no production package imports, so it forms no cycle
+		// (decision 0044, dependency rule 7). It covers the kit's own root
+		// only: a kit that imported another module's root would wire modules
+		// together, which only app does, so a test that needs two modules
+		// imports each one's kit.
+		text: "no module package imports a module root; only app wires modules " +
+			"(named exception: a module's test kit <m>/<m>test may import its own root <m>)",
 		decide: func(from, to string, _ bool) (bool, bool) {
-			return moduleOf(from) != "" && slices.Contains(modules, to), false
+			return moduleOf(from) != "" && slices.Contains(modules, to), from == to+"/"+to+"test"
 		},
 	},
 	{
@@ -443,6 +451,13 @@ func TestUnitImportRulesDetectViolations(t *testing.T) {
 		{10, "access/core/user", "access", code, 10, violation},
 		{10, "access", "artifacts", code, 10, violation},
 		{10, "artifacts/core/item", "access/api", code, 11, allow},
+		// The named exception, and the three ways it stays narrow: a package
+		// that is no kit, a *test package that is not <m>/<m>test, and a kit
+		// importing another module's root.
+		{10, "access/accesstest", "access", code, 10, allow},
+		{10, "access/core/authz", "access", code, 10, violation},
+		{10, "access/adapters/accesstest", "access", code, 10, violation},
+		{10, "access/accesstest", "artifacts", code, 10, violation},
 
 		{11, "artifacts/core/item", "access/api/sub", code, 11, allow},
 		{11, "artifacts/core/item", "access/core/token", code, 11, violation},

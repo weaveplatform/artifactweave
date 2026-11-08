@@ -24,7 +24,7 @@ token challenge, the protocol handlers and the error envelope, mounted before th
 servers (decision [0002](0002-spec-first-flat-crud-handwritten-item-paths.md)). The storage
 layout, manifest parsing and validation, the properties set on manifests and the
 package-index hooks are `internal/format/docker`, which never imports `internal/server`.
-Upload sessions and the items they finish are `internal/service/registry`: they store items
+Upload sessions and the items they finish are `migration/artifacts/core/registry`: they store items
 through the item service, which imports `migration/artifacts/core/format`, so a format package
 cannot hold them without an import cycle. One code path serves the `docker`, `oci` and `helmoci`
 package types.

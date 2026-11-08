@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	ml "github.com/weaveplatform/artifactweave/internal/format/machinelearning"
-	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 )
 
 func machineLearningPrivate(c repo.Config, p string) bool {

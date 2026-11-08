@@ -15,12 +15,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
-	"github.com/weaveplatform/artifactweave/internal/service/gc"
-	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
@@ -53,9 +53,9 @@ func (s artifactoryService) trashService(st store.Store) *trash.Service {
 // trashRefusalf refuses a trash operation. Artifactory reports a signed-in
 // caller without the right as 400, not 403, as the spec documents; an
 // anonymous caller is told to authenticate.
-func trashRefusalf(p auth.Principal, format string, a ...any) error {
+func trashRefusalf(p kernel.Principal, format string, a ...any) error {
 	if p.Anonymous {
-		return auth.ErrUnauthenticated
+		return kernel.ErrUnauthenticated
 	}
 	return badRequestf(format, a...)
 }
@@ -587,7 +587,7 @@ func (s artifactoryService) trashSight(
 	ctx context.Context,
 	st store.Store,
 	key, rest string,
-) (auth.Principal, func(types.Item) bool, error) {
+) (kernel.Principal, func(types.Item) bool, error) {
 	p, acc, err := s.itemCaller(ctx, st)
 	if err != nil || p.Admin {
 		return p, nil, err
@@ -694,7 +694,7 @@ func (s artifactoryService) collector() (*gc.Collector, error) {
 	if err != nil {
 		return nil, err
 	}
-	c, err := gc.New(st, s.cfg.Blobs, gc.Options{})
+	c, err := gc.New(st, s.cfg.Blobs, gc.Options{Tokens: s.cfg.Access.Tokens})
 	if err != nil {
 		return nil, fmt.Errorf("garbage collector: %w", err)
 	}

@@ -33,7 +33,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/docker"
 	"github.com/weaveplatform/artifactweave/internal/server/gems"
 	"github.com/weaveplatform/artifactweave/internal/server/gitlfs"
-	"github.com/weaveplatform/artifactweave/internal/server/golang"
 	"github.com/weaveplatform/artifactweave/internal/server/helm"
 	"github.com/weaveplatform/artifactweave/internal/server/hex"
 	"github.com/weaveplatform/artifactweave/internal/server/huggingface"
@@ -53,15 +52,17 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/terraform"
 	"github.com/weaveplatform/artifactweave/internal/server/terraformbackend"
 	"github.com/weaveplatform/artifactweave/internal/server/vagrant"
-	"github.com/weaveplatform/artifactweave/internal/service/gc"
-	"github.com/weaveplatform/artifactweave/internal/service/multipart"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	golanghttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang/http"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/mirror"
@@ -289,7 +290,7 @@ var protocols = []func(Config) pkgroute.Protocol{
 	func(cfg Config) pkgroute.Protocol {
 		return jetbrainsplugins.Protocol(cfg.RemoteSources)
 	},
-	func(Config) pkgroute.Protocol { return golang.Protocol() },
+	func(Config) pkgroute.Protocol { return golanghttp.Protocol() },
 	func(cfg Config) pkgroute.Protocol {
 		return npm.Protocol(npm.Options{
 			RemoteSources:  cfg.RemoteSources,
@@ -351,7 +352,7 @@ func newRegistry(cfg Config, artSvc artifactoryService) *docker.Registry {
 		// A layer downloads as any file does: redirected to a signed URL
 		// when the repository says so (decision 0029), and counted.
 		ServeBlob: func(w http.ResponseWriter, r *http.Request, c repo.Config, it types.Item) {
-			p, _ := auth.FromContext(r.Context())
+			p, _ := kernel.FromContext(r.Context())
 			artSvc.serveFile(w, r, cfg.Store, found{repo: c, item: it}, p)
 		},
 		// A manifest at or above the minimum size redirects too, as on 7.x

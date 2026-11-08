@@ -7,9 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/reindexauth"
-	"github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -26,21 +25,11 @@ func TestUnitQueuedTokenKeepsScopeAndCurrentAuthority(t *testing.T) {
 		t.Run(change, func(t *testing.T) {
 			st := inmem.New()
 			now := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
-			a, err := auth.NewAuthenticator(
-				st.Users(),
-				st.Settings(),
-				auth.Options{
-					Hash: auth.HashParams{MemoryKiB: 8, Time: 1, Threads: 1},
-					Now:  func() time.Time { return now },
-				},
-			)
-			if err != nil {
+			clock := func() time.Time { return now }
+			if err := st.Users().Create(t.Context(), types.User{Name: "manager"}); err != nil {
 				t.Fatal(err)
 			}
-			if err = st.Users().Create(t.Context(), types.User{Name: "manager"}); err != nil {
-				t.Fatal(err)
-			}
-			if err = st.Permissions().
+			if err := st.Permissions().
 				Create(t.Context(), types.Permission{Name: "manage", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{"manager": types.ActionManage}}, Targets: map[string]types.Target{"remote": {Include: []string{"**"}}}}}}); err != nil {
 				t.Fatal(err)
 			}
@@ -61,7 +50,7 @@ func TestUnitQueuedTokenKeepsScopeAndCurrentAuthority(t *testing.T) {
 			if err = st.Tokens().Create(t.Context(), tok); err != nil {
 				t.Fatal(err)
 			}
-			ref := auth.CredentialReference{Name: "manager", TokenID: tok.ID}
+			ref := kernel.CredentialReference{Name: "manager", TokenID: tok.ID}
 			by := "manager"
 			switch change {
 			case "expired":
@@ -80,12 +69,12 @@ func TestUnitQueuedTokenKeepsScopeAndCurrentAuthority(t *testing.T) {
 					t.Fatal(err)
 				}
 			case "anonymous off":
-				ref = auth.Anonymous.CredentialReference()
-				by = auth.AnonymousUser
+				ref = kernel.Anonymous.CredentialReference()
+				by = kernel.AnonymousUser
 			case "wrong name":
 				by = "other"
 			case "registry":
-				ref.Registry = &auth.RegistryReference{}
+				ref.Registry = &kernel.RegistryReference{}
 			}
 			raw, err := json.Marshal(ref)
 			if err != nil {
@@ -96,14 +85,15 @@ func TestUnitQueuedTokenKeepsScopeAndCurrentAuthority(t *testing.T) {
 			}
 			req := format.WorkRequest{By: by, Credential: raw}
 			c := repo.Config{Key: "remote", Class: repo.Remote, PackageType: repo.NuGet}
-			api := bind(t, st, a)
+			api := bind(t, st, clock)
 			check := reindexauth.New(api.Authenticator, api.Authorizer)
 			err = check(t.Context(), c, req)
 			if change == "allowed" {
 				if err != nil {
 					t.Fatal(err)
 				}
-				absent := bind(t, st, nil)
+				absent := bind(t, st, clock)
+				absent.Authenticator = nil
 				if err = reindexauth.New(
 					absent.Authenticator,
 					absent.Authorizer,
@@ -117,7 +107,7 @@ func TestUnitQueuedTokenKeepsScopeAndCurrentAuthority(t *testing.T) {
 				) {
 					t.Fatal("absent authenticator", err)
 				}
-				failing := bind(t, permissionFailure{st}, a)
+				failing := bind(t, permissionFailure{st}, clock)
 				if err = reindexauth.New(
 					failing.Authenticator,
 					failing.Authorizer,
@@ -129,7 +119,7 @@ func TestUnitQueuedTokenKeepsScopeAndCurrentAuthority(t *testing.T) {
 					errors.Is(err, work.ErrPermanent) {
 					t.Fatal("permission storage fault must retry", err)
 				}
-				failing = bind(t, tokenFailure{st}, a)
+				failing = bind(t, tokenFailure{st}, clock)
 				if err = reindexauth.New(
 					failing.Authenticator,
 					failing.Authorizer,
@@ -177,15 +167,13 @@ func TestUnitReindexRefusesCallerThatLostManage(t *testing.T) {
 	}
 }
 
-// bind binds the access module over st and a, as the application binds its
-// store and authenticator; a nil a leaves the API without an Authenticator.
-func bind(t *testing.T, st store.Store, a *auth.Authenticator) accessapi.API {
+// bind binds the access module over st on the clock now, as the application
+// binds its store and authenticator. The API reads everything from st, so a
+// store that fails permissions or tokens fails the Authorizer or the
+// credential check.
+func bind(t *testing.T, st store.Store, now func() time.Time) accessapi.API {
 	t.Helper()
-	m, err := access.New(access.Deps{Store: st, Authenticator: a})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return m.API()
+	return accesstest.Over(t, st, accesstest.WithNow(now)).API()
 }
 
 var errStore = errors.New("permission storage failure")

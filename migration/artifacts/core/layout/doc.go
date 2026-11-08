@@ -8,9 +8,10 @@
 //
 // artifacts module, core layer: the repository layout engine. The layout
 // searches, copy and move, the Maven format and remote discovery read and
-// build paths through it. It imports only the standard library, so it never
-// reaches the module's adapters or an ecosystem http package (decision 0044,
-// dependency rules).
+// build paths through it, and other modules check a layout definition
+// through artifacts/api.Layouts, which Checker implements. It imports only
+// the standard library and artifacts/api, so it never reaches the module's
+// adapters or an ecosystem http package (decision 0044, dependency rules).
 //
 // # Inputs
 //
@@ -45,6 +46,9 @@
 //   - Errors: ErrPattern, ErrNoMatch, ErrMissingValue and ErrUnbuildable say
 //     why a pattern does not compile, a path does not read, or values do not
 //     build a path.
+//   - Checker, implementing artifacts/api.Layouts: the check the
+//     configuration descriptor runs on a layout definition before it stores
+//     it, which answers Compile's error unchanged.
 //
 // # Invariants
 //
@@ -76,13 +80,13 @@
 //     "Dependency rules".
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     line 212 (core/layout), line 1053 (published through api.Layouts,
-//     which https://github.com/weaveplatform/artifactweave/issues/1009 adds)
-//     and rule 2 at lines 35 to 36.
+//     which Checker implements) and rule 2 at lines 35 to 36.
 //   - Plan: docs/implementation/plan.md#p0-foundations (task 3),
 //     #p5-full-aql-searches-build-info, #p7-npm-go-maven-locals,
 //     #p9-remote-repositories and #p9d-modular-monolith-migration, epic ART
 //     (https://github.com/weaveplatform/artifactweave/issues/941).
 //   - https://github.com/weaveplatform/artifactweave/issues/968
+//   - https://github.com/weaveplatform/artifactweave/issues/1009
 //
 // # Status
 //
@@ -91,7 +95,7 @@
 // Coordinates, Read and VersionTokens, the bundled layouts checked against
 // 7.x with Lookup dropping undocumented tokens, Translate and ErrUnbuildable
 // in P7; FolderPrefixes and RemotePath for remote discovery in P9. Staged in
-// P9d.
+// P9d, where Checker was added.
 //
 // # Testing
 //
@@ -110,4 +114,6 @@
 //     TestUnitTranslateWithSimpleDefault and TestUnitTranslateNeverMerges,
 //     which tries every ordered pair of bundled layouts: translations.
 //   - The TestUnitRemotePath* pair: remote paths.
+//   - TestUnitLayoutCheckerMatchesCompile: Checker answers as Compile does
+//     for every bundled layout and for valid and malformed definitions.
 package layout

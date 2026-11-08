@@ -15,10 +15,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/repos"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
@@ -52,7 +54,7 @@ const (
 // page shows the update confirmation, so its wording is our own, as are the
 // error messages not listed here.
 const (
-	msgKeyExists  = repos.MsgKeyExists
+	msgKeyExists  = artifactsapi.MsgKeyExists
 	msgProtected  = "Cannot delete repository: repository key is blank, trash or support bundle"
 	msgRemoved    = "Repository '%s' and all its content have been removed successfully."
 	msgNoConfig   = "Cannot delete repository: '%s', repository config does not exist"
@@ -167,10 +169,10 @@ func (s artifactoryService) log() *slog.Logger {
 	return s.cfg.Logger
 }
 
-// adminOnly refuses a caller who is not an administrator (auth.RequireAdmin).
+// adminOnly refuses a caller who is not an administrator (kernel.RequireAdmin).
 // The wrap keeps the typed error, so the response carries its status.
 func adminOnly(ctx context.Context) error {
-	if _, err := auth.RequireAdmin(ctx); err != nil {
+	if _, err := kernel.RequireAdmin(ctx); err != nil {
 		return fmt.Errorf("repositories: %w", err)
 	}
 	return nil
@@ -179,21 +181,21 @@ func adminOnly(ctx context.Context) error {
 // principal returns the caller of a read. The middleware lets a request
 // without one through only to public routes, so none here means a router
 // built without authentication, which is refused as unauthenticated.
-func principal(ctx context.Context) (auth.Principal, error) {
-	p, ok := auth.FromContext(ctx)
+func principal(ctx context.Context) (kernel.Principal, error) {
+	p, ok := kernel.FromContext(ctx)
 	if !ok {
-		return p, auth.ErrUnauthenticated
+		return p, kernel.ErrUnauthenticated
 	}
 	return p, nil
 }
 
 // denied refuses a read: anonymous is told to authenticate, a user that
 // they lack the right.
-func denied(p auth.Principal) error {
+func denied(p kernel.Principal) error {
 	if p.Anonymous {
-		return auth.ErrUnauthenticated
+		return kernel.ErrUnauthenticated
 	}
-	return auth.ErrForbidden
+	return kernel.ErrForbidden
 }
 
 func badRequestf(format string, a ...any) error {
@@ -208,12 +210,13 @@ func notFoundRepo(key string) error {
 func (s artifactoryService) readerFor(
 	ctx context.Context,
 	st store.Store,
-) (auth.Principal, func(repo.Config) bool, error) {
+) (kernel.Principal, func(repo.Config) bool, error) {
 	p, err := principal(ctx)
 	if err != nil {
 		return p, nil, err
 	}
-	acc, err := accessFor(ctx, st, p, auth.DeciderFrom(ctx))
+	d, _ := accessapi.DeciderFrom(ctx)
+	acc, err := accessFor(ctx, s.cfg.Access.Authorizer, p, d)
 	if err != nil {
 		return p, nil, s.internalError(ctx, "repository read rights", err)
 	}
@@ -222,7 +225,7 @@ func (s artifactoryService) readerFor(
 
 // view is the configuration a reader receives: everything but secrets for
 // an admin, the public subset for anyone else.
-func view(p auth.Principal, c repo.Config) repo.Config {
+func view(p kernel.Principal, c repo.Config) repo.Config {
 	if p.Admin {
 		return repo.Masked(c)
 	}
@@ -408,10 +411,10 @@ func (s artifactoryService) CheckIfRepositoryExists(
 func (s artifactoryService) readOne(
 	ctx context.Context,
 	key string,
-) (auth.Principal, repo.Config, error) {
+) (kernel.Principal, repo.Config, error) {
 	st, err := s.content()
 	if err != nil {
-		return auth.Principal{}, repo.Config{}, err
+		return kernel.Principal{}, repo.Config{}, err
 	}
 	p, can, err := s.readerFor(ctx, st)
 	if err != nil {
@@ -666,10 +669,10 @@ func (s artifactoryService) CreateRepository(
 	if err := repos.CheckMembers(c, existing); err != nil {
 		return nil, fmt.Errorf("repositories: %w", err)
 	}
-	if err := repos.CheckKeypairs(ctx, st.Keys(), c); err != nil {
+	if err := repos.CheckKeypairs(ctx, s.cfg.Access.Keys, c); err != nil {
 		return nil, fmt.Errorf("repositories: %w", err)
 	}
-	if err := repos.CheckEnvironments(ctx, st.Projects(), &c); err != nil {
+	if err := repos.CheckEnvironments(ctx, s.cfg.Access.Projects, &c); err != nil {
 		return nil, fmt.Errorf("repositories: %w", err)
 	}
 	switch err := st.Repos().Create(ctx, c); {
@@ -733,10 +736,10 @@ func (s artifactoryService) CreateMultipleRepositories(
 		if err := repos.CheckMembers(prepared[i], known); err != nil {
 			return nil, fmt.Errorf("repositories: %w", err)
 		}
-		if err := repos.CheckKeypairs(ctx, st.Keys(), prepared[i]); err != nil {
+		if err := repos.CheckKeypairs(ctx, s.cfg.Access.Keys, prepared[i]); err != nil {
 			return nil, fmt.Errorf("repositories: %w", err)
 		}
-		if err := repos.CheckEnvironments(ctx, st.Projects(), &prepared[i]); err != nil {
+		if err := repos.CheckEnvironments(ctx, s.cfg.Access.Projects, &prepared[i]); err != nil {
 			return nil, fmt.Errorf("repositories: %w", err)
 		}
 	}
@@ -874,10 +877,10 @@ func (s artifactoryService) checkReferences(
 	st store.Store,
 	c *repo.Config,
 ) error {
-	if err := repos.CheckKeypairs(ctx, st.Keys(), *c); err != nil {
+	if err := repos.CheckKeypairs(ctx, s.cfg.Access.Keys, *c); err != nil {
 		return fmt.Errorf("repositories: %w", err)
 	}
-	if err := repos.CheckEnvironments(ctx, st.Projects(), c); err != nil {
+	if err := repos.CheckEnvironments(ctx, s.cfg.Access.Projects, c); err != nil {
 		return fmt.Errorf("repositories: %w", err)
 	}
 	if c.Class != repo.Virtual {
@@ -1007,11 +1010,11 @@ func (s artifactoryService) DeleteRepository(
 	req artgen.DeleteRepositoryRequestObject,
 ) (artgen.DeleteRepositoryResponseObject, error) {
 	key := string(req.RepoKey)
-	admin, err := auth.RequireAdmin(ctx)
+	admin, err := kernel.RequireAdmin(ctx)
 	if err != nil {
 		// A user without the right gets the documented failure report;
 		// without credentials the ordinary 401.
-		if p, ok := auth.FromContext(ctx); ok && !p.Anonymous {
+		if p, ok := kernel.FromContext(ctx); ok && !p.Anonymous {
 			return artgen.DeleteRepository403JSONResponse(
 				failed(key, fmt.Sprintf(msgNoRight, key, p.Name, key)),
 			), nil
@@ -1048,9 +1051,9 @@ func (s artifactoryService) DeleteRepositories(
 	ctx context.Context,
 	req artgen.DeleteRepositoriesRequestObject,
 ) (artgen.DeleteRepositoriesResponseObject, error) {
-	admin, err := auth.RequireAdmin(ctx)
+	admin, err := kernel.RequireAdmin(ctx)
 	if err != nil {
-		if p, ok := auth.FromContext(ctx); ok && !p.Anonymous {
+		if p, ok := kernel.FromContext(ctx); ok && !p.Anonymous {
 			return failFast403(fmt.Sprintf(
 				"User: ('%s') has insufficient permission to delete repositories", p.Name)), nil
 		}

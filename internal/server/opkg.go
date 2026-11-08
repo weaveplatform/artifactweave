@@ -11,13 +11,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/format/opkg"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -44,7 +44,7 @@ type opkgCandidate struct {
 
 func (s artifactoryService) tryOpkgItem(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	cached bool, req itemRequest, p auth.Principal, acc access,
+	cached bool, req itemRequest, p kernel.Principal, acc access,
 ) bool {
 	if !opkg.Serves(c.PackageType) || req.isFolder {
 		return false
@@ -72,7 +72,7 @@ func (s artifactoryService) tryOpkgItem(
 
 func (s artifactoryService) serveOpkgIndex(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	cached bool, req itemRequest, p auth.Principal, acc access,
+	cached bool, req itemRequest, p kernel.Principal, acc access,
 ) {
 	ctx := r.Context()
 	feed, ok := opkg.FeedPath(req.path)
@@ -167,7 +167,7 @@ func opkgPackageReadable(
 
 func (s artifactoryService) opkgMemberIndex(
 	ctx context.Context, st store.Store, c repo.Config, cached bool, indexPath string,
-	p auth.Principal, acc access,
+	p kernel.Principal, acc access,
 ) (opkgIndexView, error) {
 	view := opkgIndexView{repo: c}
 	if c.Class == repo.Remote {
@@ -175,7 +175,7 @@ func (s artifactoryService) opkgMemberIndex(
 			return view, source.ErrUnavailable
 		}
 		query := source.Request{
-			Repo: c, Subject: auth.SubjectOf(p), Access: authz.AsAPI(acc.d), Project: c.ProjectKey,
+			Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.d, Project: c.ProjectKey,
 			CacheOnly: cached,
 			Resource:  source.Resource{Path: indexPath, Method: http.MethodGet},
 		}
@@ -246,7 +246,7 @@ func (s artifactoryService) readOpkgBlob(ctx context.Context, sha string) ([]byt
 
 func (s artifactoryService) opkgCandidates(
 	ctx context.Context, st store.Store, c repo.Config, indexPath string,
-	p auth.Principal, acc access, seen map[string]bool,
+	p kernel.Principal, acc access, seen map[string]bool,
 ) ([]opkgCandidate, error) {
 	if seen[c.Key] || len(seen) >= 8 {
 		return nil, errOpkgVirtualCycle
@@ -315,7 +315,7 @@ func (s artifactoryService) opkgCandidates(
 
 func (s artifactoryService) serveOpkgPackage(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	cached bool, req itemRequest, p auth.Principal, acc access,
+	cached bool, req itemRequest, p kernel.Principal, acc access,
 ) {
 	if len(req.props) != 0 || r.URL.RawQuery != "" || cached && c.Class != repo.Remote {
 		writeErr(w, r, itemNotFound())
@@ -372,10 +372,10 @@ func (s artifactoryService) serveOpkgPackage(
 
 func (s artifactoryService) serveRemoteOpkgPackage(
 	w http.ResponseWriter, r *http.Request, c repo.Config, cached bool,
-	req itemRequest, expected opkg.Package, p auth.Principal, acc access,
+	req itemRequest, expected opkg.Package, p kernel.Principal, acc access,
 ) {
 	query := source.Request{
-		Repo: c, Subject: auth.SubjectOf(p), Access: authz.AsAPI(acc.d), Project: c.ProjectKey,
+		Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.d, Project: c.ProjectKey,
 		CacheOnly: cached,
 		Resource: source.Resource{
 			Kind: source.ResourceKindArtifact, Path: req.path, Method: r.Method,

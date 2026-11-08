@@ -161,7 +161,7 @@ func TestAccRPMVirtualMemberGraphRejectsCyclesWrongTypesAndUnavailableSources(t 
 		}
 	}
 	p := auth.Principal{Name: "admin", Admin: true}
-	acc, err := accessFor(t.Context(), w.db, p, nil)
+	acc, err := accessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -261,6 +261,7 @@ func TestAccRPMVirtualSigningRejectsMissingAndInvalidKeys(t *testing.T) {
 		}
 	}
 	manifest, _, _ := rpmUpstreamFixture(t)
+	keys := withAccess(Config{Store: w.db}).Access.Keys
 	for _, tc := range []struct {
 		key      string
 		expected error
@@ -271,7 +272,7 @@ func TestAccRPMVirtualSigningRejectsMissingAndInvalidKeys(t *testing.T) {
 		{"rpm-invalid-gpg", nil},
 	} {
 		files := map[string][]byte{"repodata/repomd.xml": manifest}
-		err := signVirtualRPM(t.Context(), w.db, repo.Config{KeyPair: tc.key}, files)
+		err := signVirtualRPM(t.Context(), keys, repo.Config{KeyPair: tc.key}, files)
 		if tc.key == "rpm-invalid-gpg" {
 			if err == nil {
 				t.Error("invalid GPG private key signed virtual metadata")
@@ -287,7 +288,7 @@ func TestAccRPMVirtualSigningRejectsMissingAndInvalidKeys(t *testing.T) {
 func TestAccRPMVirtualRemoteMemberRejectsUntrustedMetadata(t *testing.T) {
 	w := newItemWorld(t, false)
 	p := auth.Principal{Name: "admin", Admin: true}
-	acc, err := accessFor(t.Context(), w.db, p, nil)
+	acc, err := accessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -420,7 +421,7 @@ func TestAccRPMRemoteMetadataClosesBodyWhenAuthorityIsRevoked(t *testing.T) {
 			func(t *testing.T) {
 				w := newItemWorld(t, false)
 				p := auth.Principal{Name: "admin", Admin: true}
-				acc, err := accessFor(t.Context(), w.db, p, nil)
+				acc, err := accessFor(t.Context(), authorizerOver(w.db), p, nil)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -482,7 +483,7 @@ func TestAccRPMVirtualRemotePackagePinsIndexedSHA(t *testing.T) {
 	correctSHA := fmt.Sprintf("%x", sha256.Sum256(body))
 	w := newItemWorld(t, false)
 	p := auth.Principal{Name: "admin", Admin: true}
-	acc, err := accessFor(t.Context(), w.db, p, nil)
+	acc, err := accessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -580,7 +581,7 @@ func TestAccRPMVirtualLocalMemberRejectsIncompleteAndDriftedContent(t *testing.T
 	manifest, primary, primaryPath := rpmUpstreamFixture(t)
 	seed("repodata/repomd.xml", manifest)
 	p := auth.Principal{Name: "admin", Admin: true}
-	acc, err := accessFor(t.Context(), w.db, p, nil)
+	acc, err := accessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

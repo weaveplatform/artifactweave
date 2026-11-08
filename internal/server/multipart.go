@@ -8,14 +8,14 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/service/multipart"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// Multipart upload routes (internal/service/multipart). create authenticates
+// Multipart upload routes (migration/artifacts/core/multipart). create authenticates
 // as any request; the others authenticate themselves (selfAuthenticated).
 const (
 	uploadsCreate   = "/artifactory/api/v1/uploads/create"
@@ -52,7 +52,7 @@ func (s artifactoryService) multipartError(r *http.Request, op string, err error
 	case errors.As(err, &api):
 		return api
 	case errors.Is(err, multipart.ErrBadToken):
-		return auth.ErrBadCredentials
+		return kernel.ErrBadCredentials
 	case errors.Is(err, multipart.ErrInvalid):
 		return badRequestf("%s", err.Error())
 	case errors.Is(err, multipart.ErrState):
@@ -148,7 +148,7 @@ func (s artifactoryService) putMultipartPart(w http.ResponseWriter, r *http.Requ
 	q := r.URL.Query()
 	part, err := strconv.Atoi(q.Get("partNumber"))
 	if err != nil {
-		writeErr(w, r, auth.ErrBadCredentials)
+		writeErr(w, r, kernel.ErrBadCredentials)
 		return
 	}
 	if err := mp.PutPart(

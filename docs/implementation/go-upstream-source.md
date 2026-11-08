@@ -44,7 +44,7 @@ cache policy against controlled HTTP upstreams. It covers escaped identities, ex
 bytes/digests, pseudo-versions, mutable metadata, immutable files, negative TTL,
 404/410 versus failure, private credentials, repository isolation, permission and
 credential fencing, cancellation, interrupted/invalid content and warm/offline reads.
-The existing `internal/server/golang` class-gate test continues to require 501 for a
+The existing `migration/artifacts/ecosystem/golang/http` class-gate test continues to require 501 for a
 direct native remote or virtual route. P9 source completion does not open those routes.
 
 P10 must wire this source into a Go virtual repository over local and remote members,

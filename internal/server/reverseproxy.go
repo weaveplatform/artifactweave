@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 )
@@ -23,7 +23,7 @@ func (s artifactoryService) GetReverseProxyConfiguration(
 	ctx context.Context,
 	_ artgen.GetReverseProxyConfigurationRequestObject,
 ) (artgen.GetReverseProxyConfigurationResponseObject, error) {
-	p, err := auth.RequireAuthenticated(ctx)
+	p, err := kernel.RequireAuthenticated(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("reverse proxy: %w", err)
 	}

@@ -17,12 +17,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format/p2"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -156,7 +156,7 @@ type p2ReadResult struct {
 
 //nolint:gocyclo // This bounded read handles cached, streamed, and archive-backed P2 resources.
 func (s artifactoryService) p2Read(r *http.Request, c repo.Config, cached bool,
-	pathName string, external *url.URL, archiveEntry string, p auth.Principal, acc access,
+	pathName string, external *url.URL, archiveEntry string, p kernel.Principal, acc access,
 	expected ...types.Checksums,
 ) (p2ReadResult, error) {
 	if s.cfg.RemoteSources == nil {
@@ -176,8 +176,8 @@ func (s artifactoryService) p2Read(r *http.Request, c repo.Config, cached bool,
 	}
 	q := source.Request{
 		Repo:      c,
-		Subject:   auth.SubjectOf(p),
-		Access:    authz.AsAPI(acc.d),
+		Subject:   accessapi.SubjectOf(p),
+		Access:    acc.d,
 		Project:   c.ProjectKey,
 		CacheOnly: cached,
 		Resource: source.Resource{
@@ -310,7 +310,7 @@ func p2CheckBytes(body []byte, want types.Checksums) error {
 }
 
 func (s artifactoryService) p2ArtifactChecksums(r *http.Request, c repo.Config,
-	cached bool, synthetic string, site *url.URL, resource string, p auth.Principal, acc access,
+	cached bool, synthetic string, site *url.URL, resource string, p kernel.Principal, acc access,
 ) (types.Checksums, error) {
 	parent := strings.TrimSuffix(synthetic, "/"+resource)
 	for _, candidate := range []string{"artifacts.xml.xz", "artifacts.jar", "artifacts.xml"} {
@@ -381,7 +381,7 @@ func p2ExternalParts(name string) ([]string, string, error) {
 }
 
 func (s artifactoryService) p2ResolveExternal(r *http.Request, c repo.Config, cached bool,
-	name string, p auth.Principal, acc access,
+	name string, p kernel.Principal, acc access,
 ) (*url.URL, error) {
 	tokens, resource, err := p2ExternalParts(name)
 	if err != nil {
@@ -457,7 +457,7 @@ func (s artifactoryService) p2ResolveExternal(r *http.Request, c repo.Config, ca
 }
 
 func (s artifactoryService) serveP2CompositeChild(w http.ResponseWriter, r *http.Request,
-	c repo.Config, cached bool, req itemRequest, p auth.Principal, acc access,
+	c repo.Config, cached bool, req itemRequest, p kernel.Principal, acc access,
 ) {
 	if !acc.file(c, req.path, types.ActionRead) {
 		writeErr(w, r, denied(p))

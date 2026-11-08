@@ -11,7 +11,7 @@ import (
 	"golang.org/x/mod/module"
 	modzip "golang.org/x/mod/zip"
 
-	goformat "github.com/weaveplatform/artifactweave/internal/format/golang"
+	goformat "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang"
 )
 
 var ErrGoResponse = errors.New("remote: invalid upstream go module response")

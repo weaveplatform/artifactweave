@@ -4,8 +4,8 @@ import (
 	"strings"
 
 	format "github.com/weaveplatform/artifactweave/internal/format/huggingface"
-	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 )
 
 // CAS containers can bundle files with different read grants. The native Xet

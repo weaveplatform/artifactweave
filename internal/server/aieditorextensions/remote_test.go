@@ -17,15 +17,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/aieditorextensions"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
-	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -88,7 +88,7 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	if err := db.Permissions().
-		Create(t.Context(), types.Permission{Name: "editor-read", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{"reader": types.ActionRead, auth.AnonymousUser: types.ActionRead}}, Targets: map[string]types.Target{"editor-remote": {Include: []string{"extensions/ms-vscode/hexeditor/**"}}}}}}); err != nil {
+		Create(t.Context(), types.Permission{Name: "editor-read", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{"reader": types.ActionRead, kernel.AnonymousUser: types.ActionRead}}, Targets: map[string]types.Target{"editor-remote": {Include: []string{"extensions/ms-vscode/hexeditor/**"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	items := &item.Service{Store: db, Blobs: blobs, Formats: ecosystem.For}
@@ -118,28 +118,13 @@ func newFixture(t *testing.T) *fixture {
 	}
 	router := chi.NewRouter()
 	router.Use(baseurl.Middleware(""))
-	router.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			name := r.Header.Get("X-User")
-			p := auth.Principal{Name: name}
-			if name == "anonymous" {
-				p = auth.Anonymous
-			}
-			p, decider, err := auth.Authorize(
-				r.Context(),
-				authz.Sources{
-					Permissions:      db.Permissions(),
-					Groups:           db.Groups(),
-					AnonymousEnabled: true,
-				},
-				p,
-			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
-		})
-	})
+	router.Use(accesstest.Over(t, db).Middleware(t, true, func(r *http.Request) kernel.Principal {
+		name := r.Header.Get("X-User")
+		if name == "anonymous" {
+			return kernel.Anonymous
+		}
+		return kernel.Principal{Name: name}
+	}))
 	pkgroute.Mount(
 		router,
 		pkgroute.Options{

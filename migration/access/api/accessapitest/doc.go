@@ -10,9 +10,8 @@
 // kernel and the standard library, as an api package does (decision 0044,
 // dependency rule 5), so a module's tests reach access through it without
 // importing access internals, which any test may (rule 1). A test that needs
-// access's real answers over a store builds the module with access.New
-// instead, or the access test kit once it exists
-// (https://github.com/weaveplatform/artifactweave/issues/1007).
+// access's real answers over a store builds the real module with the access
+// test kit, access/accesstest, instead.
 //
 // # Inputs
 //

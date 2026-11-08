@@ -14,11 +14,9 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/auth/token"
-	"github.com/weaveplatform/artifactweave/internal/authz"
-	"github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -29,12 +27,11 @@ import (
 // where reader reads docker-local's pub/ tree, writer deploys, deletes and
 // annotates in all of docker-local, and anonymous reads pub/.
 type tokenWorld struct {
-	t      *testing.T
-	db     store.Store
-	tokens *token.Service
-	// api is the access module bound over db and tokens, which the
-	// registry reaches the service through.
-	api accessapi.API
+	t  *testing.T
+	db store.Store
+	// kit is the access module over db, with the token service the registry
+	// reaches through kit.API().
+	kit *accesstest.Kit
 	h   http.Handler
 }
 
@@ -47,14 +44,10 @@ func newTokenWorld(t *testing.T) *tokenWorld {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	tokens, err := token.New(ctx, db, token.Options{KeyBits: 1024})
-	if err != nil {
-		t.Fatal(err)
-	}
 	for _, p := range []types.Permission{
 		{Name: "readers", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
 			Actions: types.Grants{Users: map[string]types.Actions{
-				"reader": types.ActionRead, auth.AnonymousUser: types.ActionRead,
+				"reader": types.ActionRead, kernel.AnonymousUser: types.ActionRead,
 			}},
 			Targets: map[string]types.Target{"docker-local": {Include: []string{"pub/**"}}},
 		}}},
@@ -76,38 +69,35 @@ func newTokenWorld(t *testing.T) *tokenWorld {
 	}
 	// The registry reaches the service and the users through the access
 	// module's binding, as the server wires them from app's module.
-	m, err := access.New(access.Deps{Store: db, Tokens: tokens})
-	if err != nil {
-		t.Fatal(err)
-	}
-	api := m.API()
+	kit := accesstest.Over(t, db, accesstest.WithTokens())
 	g := New(Options{
-		Store: db, Tokens: api.Tokens, Identity: api.Identity,
+		Store: db, Tokens: kit.API().Tokens, Identity: kit.API().Identity,
 		SubdomainMatch: true, BaseURL: "https://reg.example.com",
 	})
 	return &tokenWorld{
-		t:      t,
-		db:     db,
-		tokens: tokens,
-		api:    api,
-		h:      baseurl.Middleware("")(g.Challenge(router(g))),
+		t:   t,
+		db:  db,
+		kit: kit,
+		h:   baseurl.Middleware("")(g.Challenge(router(g))),
 	}
 }
 
 // as returns ctx carrying p, authorized as the server's middleware would.
-func (w *tokenWorld) as(ctx context.Context, p auth.Principal) context.Context {
+func (w *tokenWorld) as(ctx context.Context, p kernel.Principal) context.Context {
 	w.t.Helper()
-	p, decider, err := auth.Authorize(context.Background(), authz.Sources{
-		Permissions: w.db.Permissions(), Groups: w.db.Groups(), AnonymousEnabled: p.Anonymous,
-	}, p)
+	ctx, err := w.kit.Authorize(ctx, p, p.Anonymous)
 	if err != nil {
 		w.t.Fatal(err)
 	}
-	return auth.WithAuthorized(ctx, p, decider)
+	return ctx
 }
 
 // get makes a request as p, nil for none.
-func (w *tokenWorld) get(target string, p *auth.Principal, host string) *httptest.ResponseRecorder {
+func (w *tokenWorld) get(
+	target string,
+	p *kernel.Principal,
+	host string,
+) *httptest.ResponseRecorder {
 	w.t.Helper()
 	req := httptest.NewRequest(http.MethodGet, target, nil)
 	if host != "" {
@@ -122,7 +112,7 @@ func (w *tokenWorld) get(target string, p *auth.Principal, host string) *httptes
 }
 
 // grants requests a token and returns what it grants.
-func (w *tokenWorld) grants(target string, p auth.Principal, host string) *types.RegistryAccess {
+func (w *tokenWorld) grants(target string, p kernel.Principal, host string) *types.RegistryAccess {
 	w.t.Helper()
 	rec := w.get(target, &p, host)
 	if rec.Code != http.StatusOK {
@@ -135,7 +125,7 @@ func (w *tokenWorld) grants(target string, p auth.Principal, host string) *types
 	if body.Token == "" || body.Token != body.AccessToken || body.IssuedAt == "" {
 		w.t.Fatalf("%s: %s", target, rec.Body)
 	}
-	rec2, err := w.tokens.Verify(context.Background(), body.Token)
+	rec2, err := w.kit.Verify(context.Background(), body.Token)
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -144,14 +134,14 @@ func (w *tokenWorld) grants(target string, p auth.Principal, host string) *types
 
 func TestAccTokenGrants(t *testing.T) {
 	w := newTokenWorld(t)
-	reader := auth.Principal{Name: "reader"}
-	writer := auth.Principal{Name: "writer"}
+	reader := kernel.Principal{Name: "reader"}
+	writer := kernel.Principal{Name: "writer"}
 	repoGrant := func(name string, actions ...string) types.RegistryGrant {
 		return types.RegistryGrant{Type: scopeRepository, Name: name, Actions: actions}
 	}
 	cases := []struct {
 		name, target, host string
-		p                  auth.Principal
+		p                  kernel.Principal
 		expected           types.RegistryAccess
 	}{
 		{
@@ -222,7 +212,7 @@ func TestAccTokenGrants(t *testing.T) {
 			"anonymous",
 			"/v2/token?scope=repository:docker-local/pub/x:pull,push",
 			"",
-			auth.Anonymous,
+			kernel.Anonymous,
 			types.RegistryAccess{
 				Grants: []types.RegistryGrant{repoGrant("docker-local/pub/x", "pull")},
 			},
@@ -244,7 +234,7 @@ func TestAccTokenFromARegistryToken(t *testing.T) {
 		{Type: scopeRepository, Name: "docker-local/app", Actions: []string{"pull"}},
 		{Type: scopeRepository, Name: "docker-local/all", Actions: []string{"*"}},
 	}}
-	p := auth.Principal{
+	p := kernel.Principal{
 		Name: "writer", Registry: have, TokenExpires: time.Now().Add(10 * time.Minute),
 	}
 	got := w.grants("/v2/token?scope=repository:docker-local/app:pull,push"+
@@ -278,16 +268,16 @@ func TestAccTokenKeepsTheCallersIdentityAndScope(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, c := range map[string]struct {
-		p           auth.Principal
+		p           kernel.Principal
 		expectedScp string
 	}{
 		// reader holds Read on docker-local/pub/ but is not a stored user.
 		"transient": {
-			auth.Principal{Name: "reader", Identity: types.IdentityTransient},
+			kernel.Principal{Name: "reader", Identity: types.IdentityTransient},
 			"applied-permissions/user",
 		},
 		"synthetic": {
-			auth.Principal{Name: "oidc-github-ci", Identity: types.IdentitySynthetic, Scope: groups},
+			kernel.Principal{Name: "oidc-github-ci", Identity: types.IdentitySynthetic, Scope: groups},
 			"applied-permissions/groups:ci",
 		},
 	} {
@@ -296,7 +286,7 @@ func TestAccTokenKeepsTheCallersIdentityAndScope(t *testing.T) {
 		if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &body) != nil {
 			t.Fatalf("%s: %d %s", name, rec.Code, rec.Body)
 		}
-		got, err := w.tokens.Verify(context.Background(), body.Token)
+		got, err := w.kit.Verify(context.Background(), body.Token)
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
@@ -313,36 +303,40 @@ func TestAccTokenBindsToTheParentToken(t *testing.T) {
 	w := newTokenWorld(t)
 	ctx := context.Background()
 	hour := time.Hour
-	parent, err := w.tokens.Issue(ctx, token.Request{
+	issued, err := w.kit.API().Tokens.Issue(ctx, accessapi.TokenRequest{
 		Username: "writer", ExpiresIn: &hour, ByAdmin: true, ForceRevocable: true,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent, err := w.kit.Verify(ctx, issued.AccessToken)
 	if err != nil {
 		t.Fatal(err)
 	}
 	have := &types.RegistryAccess{Grants: []types.RegistryGrant{
 		{Type: scopeRepository, Name: "docker-local/app", Actions: []string{"pull"}},
 	}}
-	for name, p := range map[string]auth.Principal{
-		"token":          {Name: "writer", TokenID: parent.Record.ID},
-		"registry token": {Name: "writer", TokenID: "not-stored", Registry: have, TokenParent: parent.Record.ID},
+	for name, p := range map[string]kernel.Principal{
+		"token":          {Name: "writer", TokenID: parent.ID},
+		"registry token": {Name: "writer", TokenID: "not-stored", Registry: have, TokenParent: parent.ID},
 	} {
 		rec := w.get("/v2/token?scope=repository:docker-local/app:pull", &p, "")
 		var body tokenResponse
 		if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &body) != nil {
 			t.Fatalf("%s: %d %s", name, rec.Code, rec.Body)
 		}
-		got, err := w.tokens.Verify(ctx, body.Token)
-		if err != nil || got.Parent != parent.Record.ID {
+		got, err := w.kit.Verify(ctx, body.Token)
+		if err != nil || got.Parent != parent.ID {
 			t.Errorf("%s: parent %q, %v", name, got.Parent, err)
 		}
 	}
 	// A password caller's token has no parent.
-	rec := w.get("/v2/token", &auth.Principal{Name: "writer"}, "")
+	rec := w.get("/v2/token", &kernel.Principal{Name: "writer"}, "")
 	var body tokenResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if got, err := w.tokens.Verify(ctx, body.Token); err != nil || got.Parent != "" {
+	if got, err := w.kit.Verify(ctx, body.Token); err != nil || got.Parent != "" {
 		t.Errorf("password: parent %q, %v", got.Parent, err)
 	}
 }
@@ -358,7 +352,7 @@ func TestAccLifetime(t *testing.T) {
 		"sooner":       {now.Add(90*time.Second + 500*time.Millisecond), 90 * time.Second},
 		"at the brink": {now.Add(300 * time.Millisecond), time.Second},
 	} {
-		if got := lifetime(auth.Principal{TokenExpires: c.expires}, now); got != c.expected {
+		if got := lifetime(kernel.Principal{TokenExpires: c.expires}, now); got != c.expected {
 			t.Errorf("%s: %s, want %s", name, got, c.expected)
 		}
 	}
@@ -395,12 +389,12 @@ func TestAccTokenEndpointErrors(t *testing.T) {
 		"issuer": New(Options{Store: w.db, Tokens: failingIssuer{}, Fault: note}),
 		"store": New(Options{
 			Store:  faultyStore{w.db, faultyRepos{RepoStore: w.db.Repos(), get: true}},
-			Tokens: w.api.Tokens, Fault: note,
+			Tokens: w.kit.API().Tokens, Fault: note,
 		}),
 	} {
 		req := httptest.NewRequest(http.MethodGet,
 			"/v2/token?scope=repository:docker-local/app:pull", nil)
-		req = req.WithContext(w.as(req.Context(), auth.Principal{Name: "writer"}))
+		req = req.WithContext(w.as(req.Context(), kernel.Principal{Name: "writer"}))
 		rec := httptest.NewRecorder()
 		router(g).ServeHTTP(rec, req)
 		if rec.Code != http.StatusInternalServerError {
@@ -560,7 +554,7 @@ func TestAccChallengeLeavesOthers(t *testing.T) {
 			w.WriteHeader(http.StatusUnauthorized)
 		}, custom},
 		"not the registry": {"/artifactory/api/repositories", func(w http.ResponseWriter, _ *http.Request) {
-			apierror.Write(w, apierror.ProfileArtifactory, auth.ErrUnauthenticated)
+			apierror.Write(w, apierror.ProfileArtifactory, kernel.ErrUnauthenticated)
 		}, apierror.BasicChallenge},
 	} {
 		rec := httptest.NewRecorder()
@@ -701,7 +695,7 @@ func TestAccRequireRegistryToken(t *testing.T) {
 	}
 	for _, tc := range cases {
 		r := httptest.NewRequest(http.MethodPut, "/", nil)
-		r = r.WithContext(w.as(r.Context(), auth.Principal{Name: "writer", Registry: tc.have}))
+		r = r.WithContext(w.as(r.Context(), kernel.Principal{Name: "writer", Registry: tc.have}))
 		err := tc.q.Require(r, "app/v1/manifest.json", tc.expected)
 		var e *apierror.Error
 		switch {
@@ -717,7 +711,7 @@ func TestAccRequireRegistryToken(t *testing.T) {
 		r = r.WithContext(
 			w.as(
 				r.Context(),
-				auth.Principal{Name: "writer", Registry: grants("", types.RegistryGrant{
+				kernel.Principal{Name: "writer", Registry: grants("", types.RegistryGrant{
 					Type: scopeRepository, Name: "docker-local/app", Actions: []string{actions},
 				})},
 			),
@@ -732,7 +726,7 @@ func TestAccRequireRegistryToken(t *testing.T) {
 	r = r.WithContext(
 		w.as(
 			r.Context(),
-			auth.Principal{Name: "reader", Registry: grants("", pull("docker-local/priv"))},
+			kernel.Principal{Name: "reader", Registry: grants("", pull("docker-local/priv"))},
 		),
 	)
 	q := Request{RepoKey: "docker-local", Repo: c, Name: "priv", base: "/v2/docker-local"}
@@ -744,8 +738,8 @@ func TestAccRequireRegistryToken(t *testing.T) {
 
 func TestAccGrantsCatalog(t *testing.T) {
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
-	with := func(p auth.Principal) *http.Request {
-		return r.WithContext(auth.WithPrincipal(r.Context(), p))
+	with := func(p kernel.Principal) *http.Request {
+		return r.WithContext(kernel.WithPrincipal(r.Context(), p))
 	}
 	catalog := types.RegistryGrant{Type: scopeRegistry, Name: "catalog", Actions: []string{"*"}}
 	for name, c := range map[string]struct {
@@ -753,10 +747,10 @@ func TestAccGrantsCatalog(t *testing.T) {
 		expected bool
 	}{
 		"no principal":  {r, true},
-		"password":      {with(auth.Principal{Name: "a"}), true},
-		"granted":       {with(auth.Principal{Registry: &types.RegistryAccess{Grants: []types.RegistryGrant{catalog}}}), true},
-		"not granted":   {with(auth.Principal{Registry: &types.RegistryAccess{}}), false},
-		"empty actions": {with(auth.Principal{Registry: &types.RegistryAccess{Grants: []types.RegistryGrant{{Type: scopeRegistry, Name: "catalog"}}}}), false},
+		"password":      {with(kernel.Principal{Name: "a"}), true},
+		"granted":       {with(kernel.Principal{Registry: &types.RegistryAccess{Grants: []types.RegistryGrant{catalog}}}), true},
+		"not granted":   {with(kernel.Principal{Registry: &types.RegistryAccess{}}), false},
+		"empty actions": {with(kernel.Principal{Registry: &types.RegistryAccess{Grants: []types.RegistryGrant{{Type: scopeRegistry, Name: "catalog"}}}}), false},
 	} {
 		if got := GrantsCatalog(c.r); got != c.expected {
 			t.Errorf("%s: %v", name, got)
@@ -766,7 +760,7 @@ func TestAccGrantsCatalog(t *testing.T) {
 
 func TestAccAuthEndpoints(t *testing.T) {
 	w := newTokenWorld(t)
-	writer := auth.Principal{Name: "writer"}
+	writer := kernel.Principal{Name: "writer"}
 	// The entry is keyed by the registry's URL, as 7.x answers it for
 	// ~/.docker/config.json: here the base URL resolved from the request.
 	entry := func(user, secret, email string) string {
@@ -780,7 +774,7 @@ func TestAccAuthEndpoints(t *testing.T) {
 	} {
 		for name, c := range map[string]struct {
 			headers map[string]string
-			p       *auth.Principal
+			p       *kernel.Principal
 			status  int
 			body    string
 		}{
@@ -796,10 +790,10 @@ func TestAccAuthEndpoints(t *testing.T) {
 			},
 			"api key header": {
 				map[string]string{"X-JFrog-Art-Api": "ref"},
-				&auth.Principal{Name: "ghost"}, 200,
+				&kernel.Principal{Name: "ghost"}, 200,
 				entry("ghost", "ref", ""),
 			},
-			"anonymous": {nil, &auth.Anonymous, 401, ""},
+			"anonymous": {nil, &kernel.Anonymous, 401, ""},
 			"nobody":    {nil, nil, 401, ""},
 			"no secret": {nil, &writer, 401, ""},
 		} {
@@ -808,7 +802,7 @@ func TestAccAuthEndpoints(t *testing.T) {
 				req.Header.Set(k, v)
 			}
 			if c.p != nil {
-				req = req.WithContext(auth.WithPrincipal(req.Context(), *c.p))
+				req = req.WithContext(kernel.WithPrincipal(req.Context(), *c.p))
 			}
 			rec := httptest.NewRecorder()
 			w.h.ServeHTTP(rec, req)
@@ -830,7 +824,7 @@ func TestAccAuthEndpoints(t *testing.T) {
 		)
 		req.Header.Set("Authorization", "Bearer tok")
 		req.Header.Set(baseurl.OverrideHeader, base)
-		req = req.WithContext(auth.WithPrincipal(req.Context(), writer))
+		req = req.WithContext(kernel.WithPrincipal(req.Context(), writer))
 		rec := httptest.NewRecorder()
 		w.h.ServeHTTP(rec, req)
 		var got map[string]authEntry
@@ -853,7 +847,7 @@ func TestAccAuthEndpoints(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodGet, "/artifactory/api/docker/r/v1/auth", nil)
 	req.Header.Set("Authorization", "Bearer tok")
-	req = req.WithContext(auth.WithPrincipal(req.Context(), writer))
+	req = req.WithContext(kernel.WithPrincipal(req.Context(), writer))
 	rec := httptest.NewRecorder()
 	router(g).ServeHTTP(rec, req)
 	if rec.Code != http.StatusInternalServerError || noted == nil {

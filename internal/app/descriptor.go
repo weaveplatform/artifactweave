@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/config"
 	"github.com/weaveplatform/artifactweave/internal/descriptor"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
+	"github.com/weaveplatform/artifactweave/migration/access"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -53,12 +54,24 @@ func ApplyDescriptor(
 		return fmt.Errorf("config apply: %w", err)
 	}
 	defer func() { _ = st.Close() }()
-	res, err := descriptor.Apply(ctx, st, p, time.Now(), dryRun)
+	res, err := descriptor.Apply(ctx, st, storeAccess(st), p, time.Now(), dryRun)
 	if err != nil {
 		return fmt.Errorf("config apply: %w", err)
 	}
 	_, _ = io.WriteString(w, res.String())
 	return nil
+}
+
+// storeAccess binds the access a descriptor applies through over st alone:
+// config apply never builds the access module, and the bootstrap descriptor
+// is applied before openRuntime builds it. Bound over the store Apply
+// writes, the anonymous access setting is written in Apply's transaction.
+func storeAccess(st store.Store) descriptor.Access {
+	return descriptor.Access{
+		Keys:            access.KeysOf(st),
+		Projects:        access.ProjectsOf(st),
+		AnonymousAccess: access.AnonymousAccessOf(st),
+	}
 }
 
 func readDescriptor(file string) (*descriptor.Patch, error) {
@@ -117,7 +130,7 @@ func applyBootstrap(
 	var res descriptor.Result
 	err = st.Tx(ctx, func(ctx context.Context) error {
 		var err error
-		if res, err = descriptor.Apply(ctx, st, p, now, false); err != nil {
+		if res, err = descriptor.Apply(ctx, st, storeAccess(st), p, now, false); err != nil {
 			return err //nolint:wrapcheck // wrapped below
 		}
 		return st.Settings().

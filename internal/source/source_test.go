@@ -14,8 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -54,7 +55,7 @@ func request(t *testing.T, scope string) source.Request {
 		}}); err != nil {
 		t.Fatal(err)
 	}
-	subject := authz.Subject{Name: "reader"}
+	subject := accessapi.Subject{Name: "reader"}
 	if scope != "" {
 		sc, err := types.ParseScope(scope)
 		if err != nil {
@@ -62,18 +63,14 @@ func request(t *testing.T, scope string) source.Request {
 		}
 		subject.Scope = &sc
 	}
-	access, err := authz.New(
-		ctx,
-		authz.Sources{Permissions: st.Permissions(), Groups: st.Groups()},
-		subject,
-	)
+	access, err := accesstest.Over(t, st).Decide(ctx, subject, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return source.Request{
 		Repo:    repo.Config{Key: "up", Class: repo.Remote},
 		Subject: subject,
-		Access:  authz.AsAPI(access),
+		Access:  access,
 		Resource: source.Resource{
 			Kind:        source.ResourceKindArtifact,
 			Path:        "a.pkg",

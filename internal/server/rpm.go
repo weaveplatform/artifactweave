@@ -11,13 +11,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/format/rpm"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -38,7 +38,7 @@ type rpmCandidate struct {
 
 func (s artifactoryService) tryRPMItem(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	cached bool, req itemRequest, p auth.Principal, acc access,
+	cached bool, req itemRequest, p kernel.Principal, acc access,
 ) bool {
 	if c.PackageType != repo.RPM || c.Class != repo.Virtual || cached || req.isFolder {
 		return false
@@ -56,7 +56,7 @@ func (s artifactoryService) tryRPMItem(
 
 func (s artifactoryService) serveVirtualRPMMetadata(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	req itemRequest, p auth.Principal, acc access,
+	req itemRequest, p kernel.Principal, acc access,
 ) {
 	root, name, ok := strings.Cut(req.path, "repodata/")
 	if !ok || name == "" || strings.Contains(name, "/") || len(req.props) != 0 ||
@@ -83,7 +83,7 @@ func (s artifactoryService) serveVirtualRPMMetadata(
 		writeErr(w, r, s.internalError(r.Context(), "RPM virtual metadata", err))
 		return
 	}
-	if err := signVirtualRPM(r.Context(), st, c, meta.Files); err != nil {
+	if err := signVirtualRPM(r.Context(), s.cfg.Access.Keys, c, meta.Files); err != nil {
 		writeErr(w, r, s.internalError(r.Context(), "RPM virtual signature", err))
 		return
 	}
@@ -99,14 +99,14 @@ func (s artifactoryService) serveVirtualRPMMetadata(
 
 func signVirtualRPM(
 	ctx context.Context,
-	st store.Store,
+	keys accessapi.Keys,
 	c repo.Config,
 	files map[string][]byte,
 ) error {
 	if c.KeyPair == "" {
 		return nil
 	}
-	pair, err := st.Keys().Keypair(ctx, c.KeyPair)
+	pair, err := keys.Keypair(ctx, c.KeyPair)
 	if err != nil {
 		return fmt.Errorf("rpm: virtual signing key: %w", err)
 	}
@@ -124,7 +124,7 @@ func signVirtualRPM(
 
 func (s artifactoryService) serveVirtualRPMPackage(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	req itemRequest, p auth.Principal, acc access,
+	req itemRequest, p kernel.Principal, acc access,
 ) {
 	if len(req.props) != 0 || r.URL.RawQuery != "" {
 		writeErr(w, r, itemNotFound())
@@ -174,7 +174,7 @@ func (s artifactoryService) serveVirtualRPMPackage(
 
 func (s artifactoryService) serveVirtualRemoteRPMPackage(
 	w http.ResponseWriter, r *http.Request, c repo.Config, req itemRequest,
-	wantSHA string, p auth.Principal, acc access,
+	wantSHA string, p kernel.Principal, acc access,
 ) {
 	if s.cfg.RemoteSources == nil {
 		writeErr(w, r, itemNotFound())
@@ -182,8 +182,8 @@ func (s artifactoryService) serveVirtualRemoteRPMPackage(
 	}
 	q := source.Request{
 		Repo:    c,
-		Subject: auth.SubjectOf(p),
-		Access:  authz.AsAPI(acc.d),
+		Subject: accessapi.SubjectOf(p),
+		Access:  acc.d,
 		Project: c.ProjectKey,
 		Resource: source.Resource{
 			Kind:   source.ResourceKindArtifact,
@@ -237,7 +237,7 @@ func (s artifactoryService) serveVirtualRemoteRPMPackage(
 
 func (s artifactoryService) rpmCandidates(
 	ctx context.Context, st store.Store, c repo.Config, root string,
-	p auth.Principal, acc access, seen map[string]bool,
+	p kernel.Principal, acc access, seen map[string]bool,
 ) ([]rpmCandidate, error) {
 	if seen[c.Key] || len(seen) >= 8 {
 		return nil, errRPMVirtualCycle
@@ -295,7 +295,7 @@ func (s artifactoryService) rpmCandidates(
 
 func (s artifactoryService) rpmMemberPackages(
 	ctx context.Context, st store.Store, c repo.Config, root string,
-	p auth.Principal, acc access,
+	p kernel.Principal, acc access,
 ) ([]rpm.Package, error) {
 	manifest, err := s.rpmMemberBytes(ctx, st, c, root+"repodata/repomd.xml", p, acc)
 	if err != nil {
@@ -322,14 +322,14 @@ func (s artifactoryService) rpmMemberPackages(
 
 func (s artifactoryService) rpmMemberBytes(
 	ctx context.Context, st store.Store, c repo.Config, path string,
-	p auth.Principal, acc access,
+	p kernel.Principal, acc access,
 ) ([]byte, error) {
 	if c.Class == repo.Remote {
 		if s.cfg.RemoteSources == nil {
 			return nil, source.ErrUnavailable
 		}
 		q := source.Request{
-			Repo: c, Subject: auth.SubjectOf(p), Access: authz.AsAPI(acc.d), Project: c.ProjectKey,
+			Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.d, Project: c.ProjectKey,
 			Resource: source.Resource{Path: path, Method: http.MethodGet},
 		}
 		q, err := rpmSourceRequest(q)

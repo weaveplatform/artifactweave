@@ -12,9 +12,9 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/service/item"
-	"github.com/weaveplatform/artifactweave/internal/service/multipart"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -355,9 +355,11 @@ func newStatusFixture(
 	}
 	cfg := Config{
 		CompatVersion: "7.155.0", Store: db, Blobs: blobs, Auth: a, PasswordHash: testHash,
-		Keys:      support.TerraformBackendKeys(t),
-		Tokens:    tokens,
-		Multipart: &multipart.Service{Store: db, Blobs: blobs, Dir: t.TempDir()},
+		Keys:   support.TerraformBackendKeys(t),
+		Tokens: tokens,
+		Multipart: &multipart.Service{
+			Store: db, Blobs: blobs, Dir: t.TempDir(), Restrictions: restrictionsOver(t, db),
+		},
 	}
 	for _, p := range statusParts {
 		if p.tune != nil {

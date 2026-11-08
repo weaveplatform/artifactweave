@@ -9,12 +9,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/source"
-	"github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -117,38 +117,17 @@ func TestAccMavenDurableCompanionAuthorityAndRetries(t *testing.T) {
 				t.Fatal(err)
 			}
 			w.permit.Identity, _ = w.db.RemoteCache().Source(t.Context(), w.c.Key)
-			hash, err := auth.HashPasswordWith(
-				auth.HashParams{Time: 1, MemoryKiB: 8, Threads: 1},
-				"test-password",
-			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err = w.db.Users().
+			hash := accesstest.HashPassword(t, "test-password")
+			if err := w.db.Users().
 				Create(t.Context(), types.User{Name: "reader", PasswordHash: hash}); err != nil {
 				t.Fatal(err)
 			}
-			if err = w.db.Permissions().
+			if err := w.db.Permissions().
 				Create(t.Context(), types.Permission{Name: "read", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {Targets: map[string]types.Target{w.c.Key: {}}, Actions: types.Grants{Users: map[string]types.Actions{"reader": types.ActionRead}}}}}); err != nil {
 				t.Fatal(err)
 			}
-			a, err := auth.NewAuthenticator(
-				w.db.Users(),
-				w.db.Settings(),
-				auth.Options{
-					Hash: auth.HashParams{Time: 1, MemoryKiB: 8, Threads: 1},
-					Now:  w.clock.Now,
-				},
-			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			module, err := access.New(access.Deps{Store: w.db, Authenticator: a})
-			if err != nil {
-				t.Fatal(err)
-			}
-			api := module.API()
-			p, err := a.Basic(t.Context(), "reader", "test-password")
+			api := accesstest.Over(t, w.db, accesstest.WithNow(w.clock.Now)).API()
+			p, err := api.Authenticator.Basic(t.Context(), "reader", "test-password")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -161,10 +140,9 @@ func TestAccMavenDurableCompanionAuthorityAndRetries(t *testing.T) {
 					Create(t.Context(), types.Token{ID: "token", Subject: "jfac@test/users/reader", Scope: scope, ExpiresAt: w.clock.Now().Add(time.Hour)}); err != nil {
 					t.Fatal(err)
 				}
-				p, err = a.Current(
+				p, err = api.Authenticator.Current(
 					t.Context(),
-					auth.Principal{Name: "reader", TokenID: "token"},
-					w.db.Tokens(),
+					kernel.Principal{Name: "reader", TokenID: "token"},
 				)
 				if err != nil {
 					t.Fatal(err)
@@ -196,7 +174,7 @@ func TestAccMavenDurableCompanionAuthorityAndRetries(t *testing.T) {
 				t.Fatal(err)
 			}
 			request := w.request("org/acme/app/1.0/app-1.0.pom", source.ResourceKindArtifact)
-			ctx := auth.WithPrincipal(t.Context(), p)
+			ctx := kernel.WithPrincipal(t.Context(), p)
 			e.Queue(ctx, request, w.permit)
 			e.Queue(ctx, request, w.permit)
 			// The serialized row alone is sufficient for a fresh executor; the original
@@ -219,7 +197,7 @@ func TestAccMavenDurableCompanionAuthorityAndRetries(t *testing.T) {
 				Release(t.Context(), saved.Kind, saved.Key, saved.Generation, w.clock.Now()); err != nil {
 				t.Fatal(err)
 			}
-			p = auth.Principal{}
+			p = kernel.Principal{}
 			ctx = t.Context()
 			target := "/org/acme/app/1.0/app-1.0.jar"
 			w.up.Set(target, fakeupstream.Resource{Body: []byte("jar")})

@@ -6,10 +6,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // pathRequest is a read of a.pkg in the remote repository up whose
@@ -25,13 +25,17 @@ func pathRequest(access accessapi.Decider) Request {
 }
 
 // TestUnitAuthorizePathRefusesWithoutDecider: a request that carries no
-// decider is refused, whether Access was never set or holds what authz.AsAPI
-// gives for a nil evaluator. That must be a nil interface: one holding a nil
-// pointer would pass the check and fail on the first question.
+// decider is refused, whether Access was never set or holds what
+// accessapi.DeciderFrom gives for a caller stored with a nil evaluator. That
+// must be a nil interface: one holding a nil pointer would pass the check
+// and fail on the first question.
 func TestUnitAuthorizePathRefusesWithoutDecider(t *testing.T) {
+	var evaluator *accessapitest.Decider
+	caller := accessapi.WithCaller(t.Context(), kernel.Principal{Name: "reader"}, evaluator)
+	stored, _ := accessapi.DeciderFrom(caller)
 	for name, access := range map[string]accessapi.Decider{
 		"unset":         nil,
-		"nil evaluator": authz.AsAPI(nil),
+		"nil evaluator": stored,
 	} {
 		t.Run(name, func(t *testing.T) {
 			if err := authorizePath(pathRequest(access), "a.pkg"); !errors.Is(err, ErrDenied) {

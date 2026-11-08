@@ -20,9 +20,9 @@ as R26.
 
 ### Packages and routes
 
-The HTTP layer is `internal/server/golang`, mounted through the protocol router kit of
+The HTTP layer is `migration/artifacts/ecosystem/golang/http`, mounted through the protocol router kit of
 decision 0032 at `/artifactory/api/go/{repoKey}/`. Path decoding, validation, version
-selection and the package-index hooks are `internal/format/golang`, built on
+selection and the package-index hooks are `migration/artifacts/ecosystem/golang`, built on
 `golang.org/x/mod/module` and `golang.org/x/mod/semver`.
 
 After the repository key, a path is split at its last `/@v/` or `/@latest`. A module path
@@ -306,12 +306,12 @@ These assignments describe planned work, not current runtime support.
 
 ## Verification
 
-- `internal/format/golang` unit tests: path decoding with encoded, plain and invalid
+- `migration/artifacts/ecosystem/golang` unit tests: path decoding with encoded, plain and invalid
   spellings; each PUT check; visibility; `@v/list` and `@latest` over releases,
   pre-releases, pseudo-versions and `+incompatible`; the index after deploy, overwrite,
   delete, copy, move, restore and reindex, through the shared contract suite of decision
   0032 (#268).
-- `internal/server/golang` tests in the per-format status table and route × principal
+- `migration/artifacts/ecosystem/golang/http` tests in the per-format status table and route × principal
   matrix of decision 0032: every status in the table above, `text/plain` error bodies, the
   201's `X-Checksum-*` headers, the identical republish and the 409, replacing a `.info`
   with and without Delete, `sumdb/` answering 404 to an anonymous caller, 501 for a remote

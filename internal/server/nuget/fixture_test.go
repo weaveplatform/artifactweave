@@ -16,15 +16,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	nugetfmt "github.com/weaveplatform/artifactweave/internal/format/nuget"
 	"github.com/weaveplatform/artifactweave/internal/server/nuget"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
-	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -139,24 +139,21 @@ func newFixtureOn(t *testing.T, db store.Store, wrap ...func(store.Store) store.
 			f.faults = append(f.faults, err)
 		},
 	}
+	authorize := accesstest.Over(t, db).Middleware(t, true, func(r *http.Request) kernel.Principal {
+		name := r.Header.Get("X-Test-User")
+		if name == kernel.AnonymousUser {
+			return kernel.Anonymous
+		}
+		return kernel.Principal{Name: name, Admin: name == "admin"}
+	})
 	principal := func(next http.Handler) http.Handler {
+		authorized := authorize(next)
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			name := r.Header.Get("X-Test-User")
-			if name == "" {
+			if r.Header.Get("X-Test-User") == "" {
 				next.ServeHTTP(w, r)
 				return
 			}
-			p := auth.Principal{Name: name, Admin: name == "admin"}
-			if name == auth.AnonymousUser {
-				p = auth.Anonymous
-			}
-			p, decider, err := auth.Authorize(r.Context(), authz.Sources{
-				Permissions: db.Permissions(), Groups: db.Groups(), AnonymousEnabled: true,
-			}, p)
-			if err != nil {
-				t.Fatal(err)
-			}
-			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
+			authorized.ServeHTTP(w, r)
 		})
 	}
 	r := chi.NewRouter()

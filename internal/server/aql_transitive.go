@@ -9,11 +9,11 @@ import (
 	"slices"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -42,7 +42,7 @@ func (s artifactoryService) searchTransitiveAQL(
 	w http.ResponseWriter,
 	r *http.Request,
 	st store.Store,
-	p auth.Principal,
+	p kernel.Principal,
 	q *aql.Query,
 ) {
 	ctx, cancel := context.WithTimeout(r.Context(), time.Minute)
@@ -76,7 +76,7 @@ func (s artifactoryService) transitiveAQL(
 	ctx context.Context,
 	r *http.Request,
 	st store.Store,
-	p auth.Principal,
+	p kernel.Principal,
 	q *aql.Query,
 ) (transitiveSearch, error) {
 	key, err := q.TransitiveTarget()
@@ -133,11 +133,12 @@ func (s artifactoryService) transitiveAQL(
 		return transitiveSearch{}, fmt.Errorf("transitive aql: %w", err)
 	}
 	hits = append(hits, remoteHits...)
-	current, decider, err := s.transitivePrincipal(ctx, st, p)
+	current, decider, err := s.transitivePrincipal(ctx, p)
 	if err != nil {
 		return transitiveSearch{}, fmt.Errorf("transitive aql: %w", err)
 	}
-	hits = filterTransitiveHits(p, auth.DeciderFrom(ctx), members, hits)
+	d, _ := accessapi.DeciderFrom(ctx)
+	hits = filterTransitiveHits(p, d, members, hits)
 	hits = filterTransitiveHits(current, decider, members, hits)
 	hits = deduplicateTransitive(hits)
 	trimmed = trimmed || len(hits) > budget ||
@@ -165,21 +166,16 @@ func (s artifactoryService) transitiveAQL(
 
 func (s artifactoryService) transitivePrincipal(
 	ctx context.Context,
-	st store.Store,
-	p auth.Principal,
-) (auth.Principal, *authz.Decider, error) {
-	if s.cfg.Auth == nil {
-		return auth.Principal{}, nil, source.ErrDenied
+	p kernel.Principal,
+) (kernel.Principal, accessapi.Decider, error) {
+	if s.cfg.Access.Authenticator == nil {
+		return kernel.Principal{}, nil, source.ErrDenied
 	}
-	current, err := s.cfg.Auth.Current(ctx, p, st.Tokens())
+	current, err := s.cfg.Access.Authenticator.Current(ctx, p)
 	if err != nil {
 		return current, nil, source.ErrDenied
 	}
-	current, d, err := auth.Authorize(
-		ctx,
-		authz.Sources{Permissions: st.Permissions(), Groups: st.Groups()},
-		current,
-	)
+	current, d, err := s.cfg.Access.Authorizer.Authorize(ctx, current, false)
 	if err != nil {
 		return current, nil, source.ErrDenied
 	}
@@ -189,8 +185,8 @@ func (s artifactoryService) transitivePrincipal(
 // transitiveVisible reports whether p, whose permissions d evaluates, may
 // see it through m.
 func transitiveVisible(
-	p auth.Principal,
-	d *authz.Decider,
+	p kernel.Principal,
+	d accessapi.Decider,
 	m transitiveMember,
 	it types.Item,
 ) bool {
@@ -219,8 +215,8 @@ func transitiveVisible(
 }
 
 func filterTransitiveHits(
-	p auth.Principal,
-	d *authz.Decider,
+	p kernel.Principal,
+	d accessapi.Decider,
 	members []transitiveMember,
 	hits []aql.Hit,
 ) []aql.Hit {
@@ -323,14 +319,14 @@ func transitiveError(err error) error {
 func (s artifactoryService) transitiveCollect(
 	ctx context.Context,
 	st store.Store,
-	p auth.Principal,
+	p kernel.Principal,
 	members []transitiveMember,
 	original *aql.Query,
 	limit int,
 ) ([]aql.Hit, []transitiveResult, error) {
 	var fences []transitiveResult
 	var hits []aql.Hit
-	d := auth.DeciderFrom(ctx)
+	d, _ := accessapi.DeciderFrom(ctx)
 	for _, member := range members {
 		if member.config.Class != repo.Remote || !member.canSearch {
 			continue
@@ -383,7 +379,7 @@ func (s artifactoryService) transitiveCollect(
 func checkTransitivePaths(
 	ctx context.Context,
 	st store.Store,
-	p auth.Principal,
+	p kernel.Principal,
 	fence transitiveResult,
 ) error {
 	for _, it := range fence.paths {
@@ -404,7 +400,7 @@ func checkTransitivePaths(
 func (s artifactoryService) fenceTransitive(
 	ctx context.Context,
 	st store.Store,
-	p auth.Principal,
+	p kernel.Principal,
 	configs map[string]repo.Config,
 	members []transitiveMember,
 	fences []transitiveResult,
@@ -425,7 +421,7 @@ func (s artifactoryService) fenceTransitive(
 			return err
 		}
 	}
-	current, decider, err := s.transitivePrincipal(ctx, st, p)
+	current, decider, err := s.transitivePrincipal(ctx, p)
 	if err != nil {
 		return err
 	}

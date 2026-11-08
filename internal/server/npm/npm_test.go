@@ -21,14 +21,14 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	npmfmt "github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/server/npm"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
-	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -113,24 +113,21 @@ func newFixture(t *testing.T, wrap ...func(store.Store) store.Store) *fixture {
 		Fault:     func(_ *http.Request, err error) { f.faults = append(f.faults, err) },
 	}
 	f.opts = o
+	authorize := accesstest.Over(t, db).Middleware(t, true, func(r *http.Request) kernel.Principal {
+		name := r.Header.Get("X-Test-User")
+		if name == kernel.AnonymousUser {
+			return kernel.Anonymous
+		}
+		return kernel.Principal{Name: name, Admin: name == "admin"}
+	})
 	f.principal = func(next http.Handler) http.Handler {
+		authorized := authorize(next)
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			name := r.Header.Get("X-Test-User")
-			if name == "" {
+			if r.Header.Get("X-Test-User") == "" {
 				next.ServeHTTP(w, r)
 				return
 			}
-			p := auth.Principal{Name: name, Admin: name == "admin"}
-			if name == auth.AnonymousUser {
-				p = auth.Anonymous
-			}
-			p, decider, err := auth.Authorize(r.Context(), authz.Sources{
-				Permissions: db.Permissions(), Groups: db.Groups(), AnonymousEnabled: true,
-			}, p)
-			if err != nil {
-				t.Fatal(err)
-			}
-			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
+			authorized.ServeHTTP(w, r)
 		})
 	}
 	f.remount(t, npm.Options{})
@@ -663,7 +660,7 @@ func TestAccPackumentRefusals(t *testing.T) {
 	}{
 		{"rich", "nobody", http.StatusForbidden},
 		{"absent", "nobody", http.StatusForbidden},
-		{"rich", auth.AnonymousUser, http.StatusUnauthorized},
+		{"rich", kernel.AnonymousUser, http.StatusUnauthorized},
 		{"rich", "", http.StatusUnauthorized},
 		{"absent", "reader", http.StatusNotFound},
 		// partial sees the folder through mixed's 1.x pattern, and there is
@@ -703,7 +700,7 @@ func TestAccPathsNotServed(t *testing.T) {
 
 func TestAccPingAndWhoami(t *testing.T) {
 	f := newFixture(t)
-	for _, user := range []string{"reader", "nobody", auth.AnonymousUser} {
+	for _, user := range []string{"reader", "nobody", kernel.AnonymousUser} {
 		rec := f.do("GET", registry+"-/ping?write=true", user)
 		wantStatus(t, rec, http.StatusOK)
 		if strings.TrimSpace(rec.Body.String()) != "{}" {
@@ -715,7 +712,7 @@ func TestAccPingAndWhoami(t *testing.T) {
 	if diff := cmp.Diff(map[string]any{"username": "reader"}, decode(t, rec)); diff != "" {
 		t.Errorf("whoami (-want +got):\n%s", diff)
 	}
-	for _, user := range []string{auth.AnonymousUser, ""} {
+	for _, user := range []string{kernel.AnonymousUser, ""} {
 		rec := f.do("GET", registry+"-/whoami", user)
 		wantStatus(t, rec, http.StatusUnauthorized)
 		if decode(t, rec)["error"] == nil {

@@ -10,13 +10,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format/debian"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -30,7 +30,7 @@ var errDebianIndexTooLarge = errors.New("server: debian Packages index exceeds l
 // make that guarantee for a cached or virtual metadata file.
 func (s artifactoryService) tryDebianItem(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	cached bool, req itemRequest, p auth.Principal, acc access,
+	cached bool, req itemRequest, p kernel.Principal, acc access,
 ) bool {
 	if !debian.Serves(c.PackageType) || req.isFolder {
 		return false
@@ -59,7 +59,7 @@ func (s artifactoryService) tryDebianItem(
 
 func (s artifactoryService) serveDebianIndex(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	cached bool, req itemRequest, p auth.Principal, acc access,
+	cached bool, req itemRequest, p kernel.Principal, acc access,
 ) {
 	ctx := r.Context()
 	if len(req.props) != 0 || r.URL.RawQuery != "" {
@@ -96,7 +96,7 @@ func (s artifactoryService) serveDebianIndex(
 			break
 		}
 		query := source.Request{
-			Repo: c, Subject: auth.SubjectOf(p), Access: authz.AsAPI(acc.d), Project: c.ProjectKey,
+			Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.d, Project: c.ProjectKey,
 			CacheOnly: cached,
 			Resource:  source.Resource{Path: req.path, Method: r.Method},
 		}

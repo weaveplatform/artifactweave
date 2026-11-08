@@ -4,7 +4,7 @@
 // package index, in which a workspace is a package and each state a version
 // named by its epoch milliseconds, whose metadata answers the API without
 // reading the content. The content itself is written only through the
-// Terraform backend API (internal/service/terraformstate), which marks its
+// Terraform backend API (migration/artifacts/core/terraformstate), which marks its
 // writes with Writing: through the item routes a deploy, a folder create, a
 // copy or move into the repository, and a change to the lock's properties
 // are refused, so nothing passes the lock or the seal. Deletes are allowed,

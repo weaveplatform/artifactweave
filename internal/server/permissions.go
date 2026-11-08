@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/service/permission"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
@@ -62,7 +63,8 @@ func permissionCaller(ctx context.Context, cfg Config) (permCaller, error) {
 	// The middleware has already evaluated the request's permissions under
 	// its token scope; accessFor only evaluates them for a principal it did
 	// not see.
-	a, err := accessFor(ctx, st, p, auth.DeciderFrom(ctx))
+	d, _ := accessapi.DeciderFrom(ctx)
+	a, err := accessFor(ctx, cfg.Access.Authorizer, p, d)
 	if err != nil {
 		return permCaller{}, artifactoryService{
 			cfg: cfg,
@@ -72,7 +74,12 @@ func permissionCaller(ctx context.Context, cfg Config) (permCaller, error) {
 			err,
 		)
 	}
-	resources, err := a.d.ManagesResources(ctx, st.Users(), st.Groups())
+	// ManagesResources, Holds and the other questions about permission
+	// documents are the evaluator's alone (access/api's Decider leaves them
+	// out), so the permission APIs take the evaluator behind the decider,
+	// which the middleware and Authorizer.For always build.
+	dec, _ := authz.FromAPI(a.d)
+	resources, err := dec.ManagesResources(ctx, st.Users(), st.Groups())
 	if err != nil {
 		return permCaller{}, artifactoryService{
 			cfg: cfg,
@@ -84,7 +91,7 @@ func permissionCaller(ctx context.Context, cfg Config) (permCaller, error) {
 	}
 	return permCaller{
 		svc:                permission.Service{Store: st},
-		dec:                a.d,
+		dec:                dec,
 		canManageResources: resources,
 	}, nil
 }

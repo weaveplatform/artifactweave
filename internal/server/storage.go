@@ -14,12 +14,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
-	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -334,20 +333,20 @@ func (s artifactoryService) getStorage(w http.ResponseWriter, r *http.Request) {
 func (s artifactoryService) storageRequest(
 	r *http.Request,
 	prefix string,
-) (storageView, auth.Principal, url.Values, error) {
+) (storageView, kernel.Principal, url.Values, error) {
 	ctx := r.Context()
 	var v storageView
 	st, err := s.content()
 	if err != nil {
-		return v, auth.Principal{}, nil, err
+		return v, kernel.Principal{}, nil, err
 	}
 	req, err := parseEscapedItemPath(strings.TrimPrefix(r.URL.EscapedPath(), prefix))
 	if err != nil {
-		return v, auth.Principal{}, nil, err
+		return v, kernel.Principal{}, nil, err
 	}
 	q, err := rawQuery(r.URL.RawQuery)
 	if err != nil {
-		return v, auth.Principal{}, nil, err
+		return v, kernel.Principal{}, nil, err
 	}
 	p, acc, err := s.itemCaller(ctx, st)
 	if err != nil {
@@ -612,30 +611,14 @@ func (v storageView) permissions(ctx context.Context, f found) (string, any, err
 	case repo.Remote:
 		targets = append(targets, types.TargetAnyRemote)
 	}
-	users, groups := map[string]types.Actions{}, map[string]types.Actions{}
-	seen := map[string]bool{}
-	for _, t := range targets {
-		perms, err := v.st.Permissions().WithTarget(ctx, t)
-		if err != nil {
-			return "", nil, fmt.Errorf("permissions with target %s: %w", t, err)
-		}
-		for _, perm := range perms {
-			res, ok := perm.Resources[types.ResourceArtifact]
-			if seen[perm.Name] || !ok {
-				continue
-			}
-			tg, named := res.Targets[t]
-			if !named || !authz.TargetAllows(tg, f.item.FullPath(), f.item.Folder) {
-				continue
-			}
-			seen[perm.Name] = true
-			for u, a := range res.Actions.Users {
-				users[u] |= a
-			}
-			for g, a := range res.Actions.Groups {
-				groups[g] |= a
-			}
-		}
+	users, groups, err := v.s.cfg.Access.Grants.ItemGrants(
+		ctx,
+		targets,
+		f.item.FullPath(),
+		f.item.Folder,
+	)
+	if err != nil {
+		return "", nil, err //nolint:wrapcheck // ItemGrants names the target it was reading
 	}
 	letters := func(m map[string]types.Actions) map[string][]string {
 		out := map[string][]string{}
