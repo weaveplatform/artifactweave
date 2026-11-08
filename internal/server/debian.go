@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format/debian"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
@@ -95,7 +96,7 @@ func (s artifactoryService) serveDebianIndex(
 			break
 		}
 		query := source.Request{
-			Repo: c, Subject: auth.SubjectOf(p), Access: acc.d, Project: c.ProjectKey,
+			Repo: c, Subject: auth.SubjectOf(p), Access: authz.AsAPI(acc.d), Project: c.ProjectKey,
 			CacheOnly: cached,
 			Resource:  source.Resource{Path: req.path, Method: r.Method},
 		}

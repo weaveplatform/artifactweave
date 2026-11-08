@@ -13,6 +13,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -43,11 +44,12 @@ func (s Remote) Read(
 		return source.Result{}, apierror.ErrNotImplemented
 	}
 	p, _ := auth.FromContext(r.Context())
+	d, _ := accessapi.DeciderFrom(r.Context())
 	result, err := s.Service.Read(r.Context(), source.Request{
 		Repo:      c,
 		CacheOnly: RequestFrom(r).CacheOnly,
 		Subject:   auth.SubjectOf(p),
-		Access:    auth.DeciderFrom(r.Context()),
+		Access:    d,
 		Resource:  resource,
 		Project:   c.ProjectKey,
 	})

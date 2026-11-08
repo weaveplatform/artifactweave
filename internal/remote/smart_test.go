@@ -253,7 +253,7 @@ func (w *smartWorld) servePeer(rw http.ResponseWriter, r *http.Request) {
 func (w *smartWorld) smartRequest() source.Request {
 	p, _ := auth.FromContext(w.ctx)
 	q := w.request("file.bin", source.ResourceKindArtifact)
-	q.Subject, q.Access = auth.SubjectOf(p), auth.DeciderFrom(w.ctx)
+	q.Subject, q.Access = auth.SubjectOf(p), authz.AsAPI(auth.DeciderFrom(w.ctx))
 	return q
 }
 

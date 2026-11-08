@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format/alpine"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
@@ -173,7 +174,7 @@ func (s artifactoryService) alpineMemberIndex(
 			return view, source.ErrUnavailable
 		}
 		query := source.Request{
-			Repo: c, Subject: auth.SubjectOf(p), Access: acc.d, Project: c.ProjectKey,
+			Repo: c, Subject: auth.SubjectOf(p), Access: authz.AsAPI(acc.d), Project: c.ProjectKey,
 			CacheOnly: cached,
 			Resource:  source.Resource{Path: path, Method: http.MethodGet},
 		}
@@ -366,7 +367,7 @@ func (s artifactoryService) serveRemoteAlpinePackage(
 	query := source.Request{
 		Repo:    c,
 		Subject: auth.SubjectOf(p),
-		Access:  acc.d,
+		Access:  authz.AsAPI(acc.d),
 		Project: c.ProjectKey,
 		Resource: source.Resource{
 			Kind:   source.ResourceKindArtifact,

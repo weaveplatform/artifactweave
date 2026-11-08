@@ -16,6 +16,7 @@ import (
 	format "github.com/weaveplatform/artifactweave/internal/format/gitlfs"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	baseformat "github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -56,10 +57,11 @@ func (h handler) readSource(
 	if !ok {
 		return source.Result{}, source.ErrDenied
 	}
+	d, _ := accessapi.DeciderFrom(r.Context())
 	result, err := h.o.RemoteSources.Read(r.Context(), source.Request{
 		Repo:      c,
 		Subject:   auth.SubjectOf(p),
-		Access:    auth.DeciderFrom(r.Context()),
+		Access:    d,
 		Resource:  resource,
 		CacheOnly: cacheOnly,
 		Project:   c.ProjectKey,

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
@@ -59,7 +60,7 @@ func (u *upstreamSearch) request(key string) source.Request {
 	return source.Request{
 		Repo:    c,
 		Subject: auth.SubjectOf(u.r.p),
-		Access:  u.r.acc.d,
+		Access:  authz.AsAPI(u.r.acc.d),
 		Project: c.ProjectKey,
 	}
 }

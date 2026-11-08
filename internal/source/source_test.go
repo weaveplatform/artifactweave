@@ -73,7 +73,7 @@ func request(t *testing.T, scope string) source.Request {
 	return source.Request{
 		Repo:    repo.Config{Key: "up", Class: repo.Remote},
 		Subject: subject,
-		Access:  access,
+		Access:  authz.AsAPI(access),
 		Resource: source.Resource{
 			Kind:        source.ResourceKindArtifact,
 			Path:        "a.pkg",

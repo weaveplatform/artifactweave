@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -47,12 +48,13 @@ func (g *Registry) serveRemote(w http.ResponseWriter, r *http.Request, q Request
 		return
 	}
 	p, _ := auth.FromContext(r.Context())
+	d, _ := accessapi.DeciderFrom(r.Context())
 	result, err := g.sources.Read(
 		r.Context(),
 		source.Request{
 			Repo:     q.Repo,
 			Subject:  auth.SubjectOf(p),
-			Access:   auth.DeciderFrom(r.Context()),
+			Access:   d,
 			Resource: resource,
 			Project:  q.Repo.ProjectKey,
 		},

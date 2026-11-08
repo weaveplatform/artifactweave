@@ -19,8 +19,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -137,14 +137,19 @@ const (
 	RetrievalIntentMayFetch
 )
 
-// Request carries the resolved repository and caller's permission snapshot.
-// Adapters resolve repository existence before constructing it. Project and
-// Visited retain the original consumer context for P11 and future P10 sources;
-// neither is taken from caller-supplied headers.
+// Request carries the resolved repository and caller's permission snapshot:
+// Subject is who the caller acts as, and Access the decider that answers its
+// permission questions. A nil Access refuses every path with ErrDenied. A
+// caller without a decider leaves Access a nil interface, as
+// accessapi.DeciderFrom answers for an absent one, never an interface
+// holding a nil pointer, which would pass that check and fail on its first
+// question. Adapters resolve repository existence before constructing it.
+// Project and Visited retain the original consumer context for P11 and
+// future P10 sources; neither is taken from caller-supplied headers.
 type Request struct {
 	Repo      repo.Config
-	Subject   authz.Subject
-	Access    *authz.Decider
+	Subject   accessapi.Subject
+	Access    accessapi.Decider
 	Matrix    types.Matrix
 	Resource  Resource
 	CacheOnly bool
@@ -552,7 +557,8 @@ func authorizePath(q Request, checkedPath string) error {
 		allows = q.Access.AllowsFolder
 	}
 	if !allows(types.ResourceArtifact,
-		authz.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)}, checkedPath, types.ActionRead) {
+		accessapi.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)},
+		checkedPath, types.ActionRead) {
 		return ErrDenied
 	}
 	if err := generic.CheckDownload(

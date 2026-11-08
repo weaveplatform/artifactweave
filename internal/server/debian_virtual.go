@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format/debian"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
@@ -292,8 +293,8 @@ func (s artifactoryService) serveRemoteVirtualDebianPackage(
 		return true
 	}
 	q := source.Request{
-		Repo: member, Subject: auth.SubjectOf(p), Access: acc.d, Project: member.ProjectKey,
-		Resource: remoteResource(r, req.path),
+		Repo: member, Subject: auth.SubjectOf(p), Access: authz.AsAPI(acc.d),
+		Project: member.ProjectKey, Resource: remoteResource(r, req.path),
 	}
 	q, err := debianSourceRequest(q)
 	if err != nil {
@@ -345,7 +346,7 @@ func (s artifactoryService) debianMemberBytes(
 			return nil, nil, source.ErrUnavailable
 		}
 		q := source.Request{
-			Repo: member, Subject: auth.SubjectOf(p), Access: acc.d,
+			Repo: member, Subject: auth.SubjectOf(p), Access: authz.AsAPI(acc.d),
 			Project: member.ProjectKey,
 			Resource: source.Resource{
 				Path: path, EscapedPath: escapePath(path), Method: http.MethodGet,
