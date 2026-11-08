@@ -20,6 +20,7 @@ import (
 	bowerfmt "github.com/weaveplatform/artifactweave/internal/format/bower"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel/antpath"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -145,13 +146,14 @@ func (h handler) currentDependencyRead(
 		return source.ErrSuperseded
 	}
 	p, _ := auth.FromContext(ctx)
+	d, _ := accessapi.DeciderFrom(ctx)
 	resource := source.Resource{Path: path, PermissionPath: path, PermissionFolder: folder}
 	err := h.sources.Revalidate(
 		ctx,
 		source.Request{
 			Repo:     pkgroute.RequestFrom(r).Repo,
 			Subject:  auth.SubjectOf(p),
-			Access:   auth.DeciderFrom(ctx),
+			Access:   d,
 			Resource: resource,
 		},
 		source.Permit{Identity: id},
@@ -193,10 +195,11 @@ func (h handler) dependencyVersionRead(
 			return nil
 		}
 		p, _ := auth.FromContext(ctx)
+		d, _ := accessapi.DeciderFrom(ctx)
 		err := h.sources.Revalidate(ctx, source.Request{
 			Repo:    pkgroute.RequestFrom(member).Repo,
 			Subject: auth.SubjectOf(p),
-			Access:  auth.DeciderFrom(ctx),
+			Access:  d,
 			Resource: source.Resource{
 				Kind:   source.ResourceKindArtifact,
 				Path:   path,
@@ -578,11 +581,12 @@ func (h handler) rewrittenMember(
 		}
 		read.revalidate = func(ctx context.Context) error {
 			p, _ := auth.FromContext(ctx)
+			d, _ := accessapi.DeciderFrom(ctx)
 			for path := range files {
 				q := source.Request{
 					Repo:     pkgroute.RequestFrom(member).Repo,
 					Subject:  auth.SubjectOf(p),
-					Access:   auth.DeciderFrom(ctx),
+					Access:   d,
 					Resource: source.Resource{Path: name + "/" + version + "/" + path},
 				}
 				if err := h.sources.Revalidate(

@@ -99,7 +99,7 @@ func mappedRuntimeRequest(
 	), source.Request{
 		Repo:    w.c,
 		Subject: auth.SubjectOf(p),
-		Access:  decider,
+		Access:  authz.AsAPI(decider),
 	}, d
 }
 

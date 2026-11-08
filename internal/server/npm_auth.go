@@ -6,9 +6,9 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/server/npm"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
@@ -76,7 +76,7 @@ type npmCredentialKey struct{}
 // token a request authenticated with, which they write into .npmrc as it
 // came. Nothing else needs the raw token, so no other request carries it
 // further than the middleware.
-func keepNPMCredential(ctx context.Context, r *http.Request, p auth.Principal) context.Context {
+func keepNPMCredential(ctx context.Context, r *http.Request, p kernel.Principal) context.Context {
 	if p.TokenID == "" || !npmOperation(r.URL.Path) {
 		return ctx
 	}
@@ -99,24 +99,24 @@ func keepNPMCredential(ctx context.Context, r *http.Request, p auth.Principal) c
 // credential the caller already holds, so nothing new is handed out.
 // [I] What 7.x answers a token caller is undocumented (#216).
 func (s artifactoryService) npmCredential(ctx context.Context) (npm.Credential, error) {
-	p, err := auth.RequireAuthenticated(ctx)
+	p, err := kernel.RequireAuthenticated(ctx)
 	if err != nil {
 		return npm.Credential{}, err //nolint:wrapcheck // an apierror value
 	}
 	if p.TokenID != "" {
 		c, ok := ctx.Value(npmCredentialKey{}).(npm.Credential)
 		if !ok {
-			return npm.Credential{}, auth.ErrUnauthenticated
+			return npm.Credential{}, kernel.ErrUnauthenticated
 		}
 		return c, nil
 	}
 	if !p.Password {
-		return npm.Credential{}, auth.ErrUnauthenticated
+		return npm.Credential{}, kernel.ErrUnauthenticated
 	}
-	if s.cfg.Tokens == nil {
+	if s.cfg.Access.Tokens == nil {
 		return npm.Credential{}, apierror.ErrNotImplemented
 	}
-	secret, err := s.cfg.Tokens.EncryptedPassword(ctx, p.Name)
+	secret, err := s.cfg.Access.Tokens.EncryptedPassword(ctx, p.Name)
 	if err != nil {
 		return npm.Credential{}, s.internalError(ctx, "npm encrypted password", err)
 	}

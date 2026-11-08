@@ -284,7 +284,7 @@ func TestAccReferrersAndIndexesChallengeRegistryTokens(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	g := New(Options{Store: w.db, Tokens: w.tokens, Blobs: blobs, Formats: ecosystem.For})
+	g := New(Options{Store: w.db, Tokens: w.api.Tokens, Blobs: blobs, Formats: ecosystem.For})
 	h := baseurl.Middleware("")(g.Challenge(router(g)))
 	pull := func(name string) *types.RegistryAccess {
 		return &types.RegistryAccess{Grants: []types.RegistryGrant{

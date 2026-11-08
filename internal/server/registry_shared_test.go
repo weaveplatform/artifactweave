@@ -85,7 +85,8 @@ func TestAccRegistryRefusesWithoutDeciderBehindAuthentication(t *testing.T) {
 		"with an authenticator": {a, http.StatusUnauthorized},
 		"without one":           {nil, http.StatusNotFound},
 	} {
-		cfg := Config{Store: db, Auth: tc.auth}
+		// Bound as New binds it, since the registry reads the access module.
+		cfg := withAccess(Config{Store: db, Auth: tc.auth})
 		r := chi.NewRouter()
 		newRegistry(cfg, artifactoryService{cfg: cfg}).Register(r)
 		rec := do(t, r, http.MethodGet, "/v2/docker-local/app/tags/list", nil, "")

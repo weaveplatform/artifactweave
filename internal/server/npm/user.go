@@ -11,8 +11,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/auth/token"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -33,16 +33,19 @@ type Accounts struct {
 	TokenExpiry time.Duration
 }
 
-// Passwords verifies credentials as the server's middleware does
-// (*auth.Authenticator).
+// Passwords verifies a login's credentials as the server's middleware does.
+// Basic and Token are accessapi.Authenticator's, which satisfies it, with
+// that contract's answers and errors: login answers a refusal as it comes.
 type Passwords interface {
-	Basic(ctx context.Context, name, password string) (auth.Principal, error)
-	Token(ctx context.Context, raw, user string) (auth.Principal, error)
+	Basic(ctx context.Context, name, password string) (kernel.Principal, error)
+	Token(ctx context.Context, raw, user string) (kernel.Principal, error)
 }
 
-// Tokens issues and revokes access tokens (*token.Service).
+// Tokens issues a login's token and revokes the one a logout names. Issue
+// and RevokeValue are accessapi.Tokens', which satisfies it, with that
+// contract's errors: logout tests them with errors.Is.
 type Tokens interface {
-	Issue(ctx context.Context, r token.Request) (token.Issued, error)
+	Issue(ctx context.Context, r accessapi.TokenRequest) (accessapi.IssuedToken, error)
 	RevokeValue(ctx context.Context, raw string) error
 }
 
@@ -107,7 +110,7 @@ func (h handler) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	expiry := a.TokenExpiry
-	issued, err := a.Tokens.Issue(r.Context(), token.Request{
+	issued, err := a.Tokens.Issue(r.Context(), accessapi.TokenRequest{
 		Username: p.Name, ExpiresIn: &expiry, Description: "npm login",
 		// Logout must be able to end it, whatever the expiry: a token
 		// shorter than the revocable threshold would otherwise outlive
@@ -133,16 +136,16 @@ func (h handler) login(w http.ResponseWriter, r *http.Request) {
 // password that is a token is, and logs in only as the stored user it acts
 // as: a token narrowed to groups or resources, a registry token or a
 // transient user's would otherwise obtain a broader credential.
-func (a Accounts) verify(ctx context.Context, name, password string) (auth.Principal, error) {
-	if !auth.LooksLikeToken(password) {
+func (a Accounts) verify(ctx context.Context, name, password string) (kernel.Principal, error) {
+	if !accessapi.LooksLikeToken(password) {
 		return a.Passwords.Basic(ctx, name, password) //nolint:wrapcheck // apierror values
 	}
 	p, err := a.Passwords.Token(ctx, password, name)
 	if err != nil {
-		return auth.Principal{}, err //nolint:wrapcheck // apierror values
+		return kernel.Principal{}, err //nolint:wrapcheck // apierror values
 	}
 	if p.Registry != nil || p.Identity != types.IdentityStored || !wholeIdentity(p.Scope) {
-		return auth.Principal{}, auth.ErrBadCredentials
+		return kernel.Principal{}, kernel.ErrBadCredentials
 	}
 	return p, nil
 }
@@ -182,7 +185,9 @@ func (h handler) logout(w http.ResponseWriter, r *http.Request) {
 	if h.accounts.Tokens != nil {
 		err := h.accounts.Tokens.RevokeValue(r.Context(), raw)
 		switch {
-		case err == nil, errors.Is(err, store.ErrNotFound), errors.Is(err, token.ErrNotRevocable):
+		case err == nil,
+			errors.Is(err, store.ErrNotFound),
+			errors.Is(err, accessapi.ErrNotRevocable):
 		default:
 			h.k.Error(w, r, fmt.Errorf("npm: logout: %w", err))
 			return

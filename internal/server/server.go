@@ -232,7 +232,9 @@ var protocols = []func(Config) pkgroute.Protocol{
 	},
 	func(Config) pkgroute.Protocol { return agentpackages.Protocol() },
 	func(cfg Config) pkgroute.Protocol {
-		return conan.Protocol(conan.Options{RemoteSources: cfg.RemoteSources, Tokens: cfg.Tokens})
+		return conan.Protocol(conan.Options{
+			RemoteSources: cfg.RemoteSources, Tokens: cfg.Access.Tokens,
+		})
 	},
 	func(cfg Config) pkgroute.Protocol {
 		return cocoapods.Protocol(cocoapods.Options{RemoteSources: cfg.RemoteSources})
@@ -292,23 +294,24 @@ var protocols = []func(Config) pkgroute.Protocol{
 	},
 }
 
-// npmAccounts is what npm's login and logout need from cfg. A nil
-// authenticator or token service must stay a nil interface, which the npm
-// handlers answer 501, rather than one holding a nil pointer.
+// npmAccounts is what npm's login and logout need from cfg: the access
+// module's authenticator and token service. An absent one must stay a nil
+// interface, which the npm handlers answer 501. cfg.Access holds nil
+// interfaces, never typed nils, and a nil interface converts to a nil one,
+// so they are assigned as they are.
 func npmAccounts(cfg Config) npm.Accounts {
-	a := npm.Accounts{TokenExpiry: cfg.NPMLoginTokenExpiry}
-	if cfg.Auth != nil {
-		a.Passwords = cfg.Auth
+	return npm.Accounts{
+		Passwords:   cfg.Access.Authenticator,
+		Tokens:      cfg.Access.Tokens,
+		TokenExpiry: cfg.NPMLoginTokenExpiry,
 	}
-	if cfg.Tokens != nil {
-		a.Tokens = cfg.Tokens
-	}
-	return a
 }
 
-// newRegistry is the Docker registry for cfg. A nil token service must not
-// become a non-nil interface, which would leave the token endpoint
-// registered with nothing to sign.
+// newRegistry is the Docker registry for cfg, with the access module's token
+// service and user accounts. A nil token service must not become a non-nil
+// interface, which would leave the token endpoint registered with nothing to
+// sign: cfg.Access holds nil interfaces, never typed nils, and a nil
+// interface converts to a nil one, so they are assigned as they are.
 func newRegistry(cfg Config, artSvc artifactoryService) *docker.Registry {
 	o := docker.Options{
 		Sources:        cfg.RegistrySources,
@@ -317,8 +320,11 @@ func newRegistry(cfg Config, artSvc artifactoryService) *docker.Registry {
 		SubdomainMatch: cfg.DockerSubdomainMatch,
 		BaseURL:        cfg.BaseURL,
 		// The middleware authenticates every request whenever an
-		// authenticator is configured (authenticate).
-		Authenticated: cfg.Auth != nil,
+		// authenticator is configured (authenticate). cfg.Access holds one
+		// bound over that authenticator whenever there is a store; without
+		// one the registry serves no repository, so the setting decides
+		// nothing.
+		Authenticated: cfg.Access.Authenticator != nil,
 		Fault:         func(r *http.Request, err error) { noteCause(r.Context(), err) },
 		// The registry serves only docker, oci and helmoci repositories,
 		// whose format takes no settings.
@@ -336,9 +342,8 @@ func newRegistry(cfg Config, artSvc artifactoryService) *docker.Registry {
 		) bool {
 			return artSvc.redirectManifest(w, r, cfg.Store, found{repo: c, item: it}, mediaType)
 		},
-	}
-	if cfg.Tokens != nil {
-		o.Tokens = cfg.Tokens
+		Tokens:   cfg.Access.Tokens,
+		Identity: cfg.Access.Identity,
 	}
 	return docker.New(o)
 }

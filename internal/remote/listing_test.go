@@ -49,7 +49,7 @@ func listingFixture(t *testing.T) (*policyWorld, *source.Service, source.Request
 		},
 		HTTP: w.p, Cache: w.p,
 	}
-	return w, s, source.Request{Repo: w.c, Subject: subject, Access: access}
+	return w, s, source.Request{Repo: w.c, Subject: subject, Access: authz.AsAPI(access)}
 }
 
 func indexHTML(body string) fakeupstream.Resource {
@@ -131,8 +131,7 @@ func TestAccListingPermissionFilteringAndFinalRevocation(t *testing.T) {
 		t.Fatal(err)
 	}
 	q.Subject = authz.Subject{Name: "limited"}
-	var err error
-	q.Access, err = authz.New(
+	limited, err := authz.New(
 		t.Context(),
 		authz.Sources{Permissions: w.db.Permissions(), Groups: w.db.Groups()},
 		q.Subject,
@@ -140,6 +139,7 @@ func TestAccListingPermissionFilteringAndFinalRevocation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	q.Access = authz.AsAPI(limited)
 	revoked := false
 	s.Revalidate = func(_ context.Context, current source.Request, _ source.Permit) error {
 		if revoked && current.Resource.PermissionPath == "public" {

@@ -196,7 +196,7 @@ func (e *MavenEager) run(ctx context.Context, it types.WorkItem) error {
 		source.Request{
 			Repo:    c,
 			Subject: auth.SubjectOf(p),
-			Access:  d,
+			Access:  authz.AsAPI(d),
 			Project: c.ProjectKey,
 			Resource: source.Resource{
 				Kind:   source.ResourceKindArtifact,

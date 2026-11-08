@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
@@ -161,7 +162,7 @@ func (s artifactoryService) traceDownload(
 			result, readErr := s.cfg.RemoteSources.Read(ctx, source.Request{
 				Repo:     c,
 				Subject:  auth.SubjectOf(p),
-				Access:   acc.d,
+				Access:   authz.AsAPI(acc.d),
 				Resource: remoteResource(r, req.path),
 				Matrix:   req.matrix(),
 				Project:  c.ProjectKey,

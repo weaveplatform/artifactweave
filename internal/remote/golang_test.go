@@ -71,7 +71,8 @@ func goSourceFixture(t *testing.T) (*policyWorld, GoSource, source.Request) {
 		},
 		HTTP: w.p, Cache: w.p,
 	}
-	return w, GoSource{Source: s}, source.Request{Repo: w.c, Subject: subject, Access: access}
+	return w, GoSource{Source: s},
+		source.Request{Repo: w.c, Subject: subject, Access: authz.AsAPI(access)}
 }
 
 func readGo(

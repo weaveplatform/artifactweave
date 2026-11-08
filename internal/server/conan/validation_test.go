@@ -13,10 +13,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
@@ -44,7 +44,7 @@ func TestUnitConanCredentialExchangeBoundary(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r := httptest.NewRequest(tc.method, "/v1/users/"+tc.path, nil)
 			if tc.principal != "" {
-				r = r.WithContext(auth.WithPrincipal(r.Context(), auth.Principal{
+				r = r.WithContext(kernel.WithPrincipal(r.Context(), kernel.Principal{
 					Name: tc.principal, Password: tc.password,
 				}))
 			}
@@ -133,7 +133,7 @@ func TestUnitConanPermissionErrors(t *testing.T) {
 	if got := denied(r); got == nil || !strings.Contains(got.Error(), "Unauthorized") {
 		t.Fatalf("anonymous Conan denial: %v", got)
 	}
-	r = r.WithContext(auth.WithPrincipal(r.Context(), auth.Principal{Name: "reader"}))
+	r = r.WithContext(kernel.WithPrincipal(r.Context(), kernel.Principal{Name: "reader"}))
 	if got := denied(r); got == nil || !strings.Contains(got.Error(), "Forbidden") {
 		t.Fatalf("authenticated Conan denial: %v", got)
 	}

@@ -11,8 +11,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -258,7 +258,7 @@ func TestAccListingPermissions(t *testing.T) {
 	list(t, send(as("reader"), http.MethodGet, "/v2/docker-local/team/app/tags/list", "", nil))
 	expect(t, send(as("reader"), http.MethodGet, "/v2/docker-local/other/tags/list", "", nil),
 		http.StatusForbidden, CodeDenied)
-	expect(t, send(as(auth.AnonymousUser), http.MethodGet, "/v2/docker-local/other/tags/list",
+	expect(t, send(as(kernel.AnonymousUser), http.MethodGet, "/v2/docker-local/other/tags/list",
 		"", nil), http.StatusUnauthorized, CodeUnauthorized)
 }
 
@@ -345,7 +345,7 @@ func TestAccDeletePermissions(t *testing.T) {
 	as := func(name string) http.Handler { return principalAs(t, w.db, w.h, name) }
 	const v1 = "/v2/docker-local/app/manifests/v1"
 	expect(t, send(as("reader"), http.MethodDelete, v1, "", nil), http.StatusForbidden, CodeDenied)
-	expect(t, send(as(auth.AnonymousUser), http.MethodDelete, v1, "", nil),
+	expect(t, send(as(kernel.AnonymousUser), http.MethodDelete, v1, "", nil),
 		http.StatusUnauthorized, CodeUnauthorized)
 	// Unknown or not, a caller without Delete learns nothing.
 	expect(t, send(as("reader"), http.MethodDelete, "/v2/docker-local/app/manifests/v9", "", nil),
@@ -422,8 +422,8 @@ func TestAccCatalogNeedsTheCatalogGrant(t *testing.T) {
 	} {
 		for _, target := range []string{"/v2/_catalog", "/v2/docker-local/_catalog"} {
 			req := httptest.NewRequest(http.MethodGet, target, nil)
-			req = req.WithContext(auth.WithPrincipal(req.Context(),
-				auth.Principal{Registry: &types.RegistryAccess{Grants: c.grants}}))
+			req = req.WithContext(kernel.WithPrincipal(req.Context(),
+				kernel.Principal{Registry: &types.RegistryAccess{Grants: c.grants}}))
 			rec := httptest.NewRecorder()
 			w.h.ServeHTTP(rec, req)
 			if rec.Code != c.expected {

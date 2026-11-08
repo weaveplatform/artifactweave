@@ -88,7 +88,7 @@ func discoveryGrant(t *testing.T, w *policyWorld, q *source.Request, includes ..
 		t.Fatal(err)
 	}
 	q.Subject = authz.Subject{Name: "mapped"}
-	q.Access, err = authz.New(
+	mapped, err := authz.New(
 		t.Context(),
 		authz.Sources{Permissions: w.db.Permissions(), Groups: w.db.Groups()},
 		q.Subject,
@@ -96,6 +96,7 @@ func discoveryGrant(t *testing.T, w *policyWorld, q *source.Request, includes ..
 	if err != nil {
 		t.Fatal(err)
 	}
+	q.Access = authz.AsAPI(mapped)
 }
 
 func TestAccMappedListingCanonicalAuthorityCacheAndRevocation(t *testing.T) {

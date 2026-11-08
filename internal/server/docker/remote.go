@@ -9,11 +9,12 @@ import (
 	"slices"
 	"strconv"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -46,13 +47,14 @@ func (g *Registry) serveRemote(w http.ResponseWriter, r *http.Request, q Request
 		Write(w, Errorf(http.StatusBadRequest, CodeNameInvalid, "invalid registry reference"))
 		return
 	}
-	p, _ := auth.FromContext(r.Context())
+	p, _ := kernel.FromContext(r.Context())
+	d, _ := accessapi.DeciderFrom(r.Context())
 	result, err := g.sources.Read(
 		r.Context(),
 		source.Request{
 			Repo:     q.Repo,
-			Subject:  auth.SubjectOf(p),
-			Access:   auth.DeciderFrom(r.Context()),
+			Subject:  accessapi.SubjectOf(p),
+			Access:   d,
 			Resource: resource,
 			Project:  q.Repo.ProjectKey,
 		},
@@ -224,7 +226,7 @@ func (g *Registry) remoteError(w http.ResponseWriter, r *http.Request, q Request
 		}
 		return
 	}
-	p, _ := auth.FromContext(r.Context())
+	p, _ := kernel.FromContext(r.Context())
 	err = pkgroute.SourceError(err, p.Anonymous || p.Name == "")
 	var e *apierror.Error
 	if errors.As(err, &e) {

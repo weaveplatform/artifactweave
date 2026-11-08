@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -77,12 +78,13 @@ func (s artifactoryService) transitivePeer(
 			return e
 		},
 	}
+	d, _ := accessapi.DeciderFrom(ctx)
 	result, err := s.cfg.RemoteSources.Read(
 		ctx,
 		source.Request{
 			Repo:     c,
 			Subject:  auth.SubjectOf(p),
-			Access:   auth.DeciderFrom(ctx),
+			Access:   d,
 			Project:  c.ProjectKey,
 			Resource: resource,
 		},

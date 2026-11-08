@@ -207,7 +207,7 @@ func (s *Smart) restore(
 	q = source.Request{
 		Repo:    c,
 		Subject: auth.SubjectOf(p),
-		Access:  d,
+		Access:  authz.AsAPI(d),
 		Project: c.ProjectKey,
 		Resource: source.Resource{
 			Kind:         job.Kind,

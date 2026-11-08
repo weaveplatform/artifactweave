@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	conanfmt "github.com/weaveplatform/artifactweave/internal/format/conan"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -530,7 +530,7 @@ func (h handler) packageSearch(w http.ResponseWriter, r *http.Request, ref conan
 func denied(r *http.Request) error {
 	// The kit's Require uses the same status split, but metadata walkers need
 	// an error value before they can choose a member or return a representation.
-	if p, ok := auth.FromContext(r.Context()); ok && !p.Anonymous {
+	if p, ok := kernel.FromContext(r.Context()); ok && !p.Anonymous {
 		return apierror.New(http.StatusForbidden, "Forbidden")
 	}
 	return apierror.New(http.StatusUnauthorized, "Unauthorized")
