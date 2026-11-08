@@ -73,7 +73,7 @@ When a test file leaves a shared directory such as `internal/server`:
 | Dart pub | `internal/server/pub` |
 | RubyGems | `internal/server/gems`, `test/server/artifacts/gems` |
 | Skills | `internal/server/skills` |
-| Terraform registry | `internal/server/terraform`, `test/server/artifacts/terraform` |
+| Terraform registry | `migration/artifacts/ecosystem/terraform/http`, `test/server/artifacts/terraform` |
 | Terraform backend | `internal/server/terraformbackend`, `test/server/artifacts/terraformbackend` |
 | Shared | `internal/server`, `internal/server/pkgroute`, `test/server/access` |
 

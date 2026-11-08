@@ -19,8 +19,8 @@ import (
 	"github.com/cucumber/godog"
 
 	"github.com/weaveplatform/artifactweave/internal/format/debian"
-	"github.com/weaveplatform/artifactweave/internal/format/terraform/terraformtest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/terraformtest"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 

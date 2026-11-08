@@ -28,7 +28,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/rpm"
 	"github.com/weaveplatform/artifactweave/internal/format/skills"
 	"github.com/weaveplatform/artifactweave/internal/format/swift"
-	"github.com/weaveplatform/artifactweave/internal/format/terraform"
 	"github.com/weaveplatform/artifactweave/internal/format/terraformbackend"
 	"github.com/weaveplatform/artifactweave/internal/format/vagrant"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -42,6 +41,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform"
 )
 
 // Settings are the server-wide options of the formats that take any, from

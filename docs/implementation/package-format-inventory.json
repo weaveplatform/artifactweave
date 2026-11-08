@@ -497,7 +497,7 @@
       "owner_issue": 0,
       "evidence": "test/acceptance/features/terraform_registry.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
-      "route_file": "internal/server/terraform/terraform.go",
+      "route_file": "migration/artifacts/ecosystem/terraform/http/terraform.go",
       "p9c": false
     },
     {

@@ -24,7 +24,7 @@ func TestUnitAffectedPlanChoosesOnlyOwnedChanges(t *testing.T) {
 		{"npm implementation", []change{{status: "M", path: "migration/artifacts/ecosystem/npm/handler.go"}}, "format", "npm"},
 		{"npm implementation and docs", []change{{status: "M", path: "migration/artifacts/ecosystem/npm/handler.go"}, {status: "M", path: "docs/testing/ci.md"}}, "format", "npm"},
 		{"new npm implementation", []change{{status: "A", path: "migration/artifacts/ecosystem/npm/new.go"}}, "format", "npm"},
-		{"Terraform fixture", []change{{status: "M", path: "internal/format/terraform/terraformtest/fixture.go"}}, "format", "terraform"},
+		{"Terraform fixture", []change{{status: "M", path: "migration/artifacts/ecosystem/terraform/terraformtest/fixture.go"}}, "format", "terraform"},
 		{"agent packages server adapter", []change{{status: "M", path: "internal/server/agentpackages/handler.go"}}, "format", "agentpackages"},
 		{"Helm OCI test", []change{{status: "M", path: "test/server/artifacts/helmoci/push_test.go"}}, "format", "helmoci"},
 		{"deployment only", []change{{status: "M", path: "deploy/check.sh"}}, "deployment", ""},
