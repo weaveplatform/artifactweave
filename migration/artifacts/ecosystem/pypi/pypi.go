@@ -1,17 +1,3 @@
-// Package pypi is the format of PyPI repositories (decision 0037). It
-// reads each distribution's core metadata, a wheel's METADATA or an sdist's
-// or egg's PKG-INFO, indexes the file as a file of its project's version
-// wherever it is stored (decision 0018), with the per-file records the
-// simple index, the PEP 658 metadata files and the JSON API are built
-// from, and keeps the pypi.* properties. Every write reaches it through the
-// item service in the write's own transaction, so a file deployed by twine,
-// by a REST deploy or by jf rt u, or landed by a copy, a move or a restore,
-// can be installed as soon as the write answers.
-//
-// A file of a distribution type whose content yields no Name and Version
-// is indexed by its pypi.name and pypi.version properties when it carries
-// both, as JFrog requires of manual uploads it cannot read; any other file
-// is stored but not indexed.
 package pypi
 
 import (

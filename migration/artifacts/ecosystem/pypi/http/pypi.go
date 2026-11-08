@@ -1,12 +1,3 @@
-// Package pypihttp serves PyPI repositories at /artifactory/api/pypi/{repoKey}/
-// through the router kit (decisions 0032 and 0037): the simple repository
-// API that pip, uv and Poetry install from, in HTML (PEP 503) and, when
-// pypi.simple_json is on, JSON (PEP 691), with the wheels' core metadata
-// files (PEP 658) when pypi.core_metadata is on, and the files themselves
-// through the item routes' download, so redirects, Range and download
-// counts apply to them as to any file. The pages are built on each request
-// from what the PyPI format keeps in the package index; nothing is stored
-// for them.
 package pypihttp
 
 import (
