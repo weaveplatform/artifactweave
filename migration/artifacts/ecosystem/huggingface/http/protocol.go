@@ -1,5 +1,3 @@
-// Package huggingfacehttp serves the native Hugging Face Hub client protocol for
-// model and dataset repositories using Artifactory's current ML layout.
 package huggingfacehttp
 
 import (
@@ -61,6 +59,14 @@ func (virtualSource) Item(
 	return pkgroute.Found{}, source.ErrUnsupported
 }
 
+// Protocol returns the Hugging Face protocol for the router kit, for
+// repositories of package type huggingfaceml: the Hub API for models and
+// datasets, resolve downloads, Git LFS, the Xet CAS routes and the legacy
+// layout migration. Local and federated repositories serve their own
+// items; a virtual one serves a revision only from the member it selects;
+// a remote one is served through o.RemoteSources and its cache, and answers
+// 501 while that is nil. Its Signed answers true for the Xet CAS routes and
+// a signed LFS upload, whose own capability the handlers verify.
 func Protocol(o Options) pkgroute.Protocol {
 	sources := map[repo.Class]pkgroute.Source{
 		repo.Local:     pkgroute.Local{},

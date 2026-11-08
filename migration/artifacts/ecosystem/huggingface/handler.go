@@ -16,8 +16,13 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// Serves reports whether t is the package type this format handles,
+// huggingfaceml.
 func Serves(t repo.PackageType) bool { return t == repo.HuggingFaceML }
 
+// Handler is the Hugging Face format: the generic deploy policy, which it
+// embeds, with the hooks that keep the current layout and rebuild the
+// package index from the committed snapshots.
 type Handler struct{ generic.Handler }
 
 type deferredReindexKey struct{}
@@ -28,6 +33,13 @@ func DeferReindex(ctx context.Context) context.Context {
 	return context.WithValue(ctx, deferredReindexKey{}, true)
 }
 
+// Admit refuses a write outside the current layout before the repository's
+// policy is applied. A write into a .xet folder must be a deploy that the
+// protocol marked with XetWrite, at a valid record path, or it is refused
+// with 403; any other write but a checksum update or a remote cache write
+// must be a snapshot file or a named ref, or it is refused with 409. Then
+// the generic blackout and include and exclude checks refuse the write with
+// their own answers, unwrapped. The write is returned unchanged.
 func (Handler) Admit(
 	ctx context.Context,
 	_ format.Env,
@@ -54,6 +66,10 @@ func (Handler) Admit(
 	return w, nil
 }
 
+// Deployed rebuilds the repository's index (Reindex) after a snapshot file
+// is written, unless the context carries DeferReindex, whose caller rebuilds
+// it once in the same transaction. Folders, refs and Xet records leave the
+// index alone.
 func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
 	if it.Folder {
 		return nil
@@ -67,8 +83,12 @@ func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it
 	return h.Reindex(ctx, env, c)
 }
 
+// Deleting does nothing: the index is rebuilt once the files are gone, in
+// Deleted.
 func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error { return nil }
 
+// Deleted rebuilds the repository's index (Reindex) when a delete or a move
+// took at least one snapshot file, so no revision outlives its files.
 func (h Handler) Deleted(
 	ctx context.Context,
 	env format.Env,
@@ -167,6 +187,9 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 	return nil
 }
 
+// Classify reports a snapshot file as unique, since a revision's files never
+// change under their path, and every other path (a named ref, a Xet record)
+// as metadata.
 func (Handler) Classify(_ repo.Config, path string) format.Class {
 	if _, _, _, ok := ParseSnapshotPath(path); ok {
 		return format.ClassUnique

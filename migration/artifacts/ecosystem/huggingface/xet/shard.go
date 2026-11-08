@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 )
 
+// MaxShard is the largest shard, in bytes, that ParseShard accepts and an
+// upload reads (64 MiB).
 const MaxShard = 64 << 20
 
 var shardMagic = []byte{
@@ -42,6 +44,9 @@ var shardMagic = []byte{
 	169,
 }
 
+// Segment is one step of a file's reconstruction in a shard: the chunks
+// [Start, End) of the xorb named Xorb, whose uncompressed bytes total Size,
+// and, when the file is Verified, the segment's RangeHash.
 type Segment struct {
 	Xorb         Hash
 	Size         uint32
@@ -49,18 +54,32 @@ type Segment struct {
 	End          uint32
 	Verification Hash
 }
+
+// File is one file a shard describes: its Xet hash (FileHash of all its
+// chunks), its SHA-256 in the textual form Hash.String gives when the shard
+// carries one and empty otherwise, the segments that rebuild it in order,
+// and whether each segment carries a verification hash.
 type File struct {
 	Hash     Hash
 	SHA256   string
 	Segments []Segment
 	Verified bool
 }
+
+// ShardXorb is a xorb a shard claims: its hash, its uncompressed Size, its
+// EncodedSize as stored, and its chunks' hashes and sizes in order.
+// ParseShard checks that the chunks add up to Size and aggregate to Hash;
+// the upload then compares them with the stored xorb.
 type ShardXorb struct {
 	Hash        Hash
 	Size        uint32
 	EncodedSize uint32
 	Chunks      []HashPart
 }
+
+// Shard is a parsed version-2 shard: the files it maps to xorb segments
+// (1 to 256 of them) and the xorbs it claims, each list in wire order and
+// without duplicates.
 type Shard struct {
 	Files []File
 	Xorbs []ShardXorb

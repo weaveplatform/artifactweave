@@ -1,5 +1,3 @@
-// Package huggingface owns the current Machine Learning layout used by
-// Hugging Face model and dataset repositories.
 package huggingface
 
 import (
@@ -14,7 +12,14 @@ type Identity struct {
 	Kind, Owner, Name string
 }
 
+// RepoID is the identity's Hub repository ID, <owner>/<name>, as the client
+// sends it; the kind is not part of it.
 func (id Identity) RepoID() string { return id.Owner + "/" + id.Name }
+
+// Prefix is the identity's top-level folder in the current layout,
+// <kind>--<owner>--<name>, which holds its snapshots, refs and Xet records.
+// The kind is part of it, so a model and a dataset with one Hub ID never
+// share a folder.
 func (id Identity) Prefix() string {
 	return id.Kind + "--" + id.Owner + "--" + id.Name
 }
@@ -89,6 +94,10 @@ func RefName(s string) bool {
 	return true
 }
 
+// RefPath is the item path of id's named ref name, <prefix>/refs/<name>,
+// which holds the full revision the ref points at. ok is false for a name
+// outside the ref grammar (RefName) and for a full revision, which names a
+// commit rather than a ref.
 func RefPath(id Identity, name string) (string, bool) {
 	if !RefName(name) || Revision(name) {
 		return "", false
@@ -96,6 +105,9 @@ func RefPath(id Identity, name string) (string, bool) {
 	return id.Prefix() + "/refs/" + name, true
 }
 
+// ParseRefPath reads path as a named ref's item path, the inverse of
+// RefPath, and returns its identity and ref name. ok is false for any other
+// path, and for an identity or a name that ParseIdentity or RefPath refuses.
 func ParseRefPath(path string) (Identity, string, bool) {
 	parts := strings.Split(path, "/")
 	if len(parts) != 3 || parts[1] != "refs" {

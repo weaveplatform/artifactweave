@@ -10,15 +10,28 @@ import (
 	"github.com/pierrec/lz4/v4"
 )
 
+// The bounds a parse checks before it uses a length or a count, and that
+// the protocol applies before it reads a body.
 const (
-	MaxChunk       = 128 << 10
-	MaxXorb        = 64 << 20
+	// MaxChunk is the largest uncompressed chunk (128 KiB).
+	MaxChunk = 128 << 10
+	// MaxXorb is the largest uncompressed xorb (64 MiB).
+	MaxXorb = 64 << 20
+	// MaxEncodedXorb is the largest xorb as uploaded or stored, with its
+	// chunk headers, compression overhead and footer (80 MiB).
 	MaxEncodedXorb = 80 << 20
-	MaxChunks      = 8192
+	// MaxChunks is the most chunks in one xorb, and so the highest chunk
+	// index a segment may end at.
+	MaxChunks = 8192
 )
 
+// ErrInvalid is the error every refusal of the package wraps, followed by
+// its reason; callers match it with errors.Is.
 var ErrInvalid = errors.New("invalid Xet content")
 
+// Chunk is one decoded chunk of a xorb: its DataHash, its uncompressed
+// bytes, and the byte range [Start, End) of its record, header included, in
+// the encoded xorb.
 type Chunk struct {
 	Hash  Hash
 	Data  []byte
@@ -26,6 +39,8 @@ type Chunk struct {
 	End   int
 }
 
+// Xorb is a parsed xorb: the hash it is named by, which ParseXorb checked
+// against its chunks' Aggregate, and its chunks in order.
 type Xorb struct {
 	Hash   Hash
 	Chunks []Chunk
@@ -177,6 +192,8 @@ func regroup(data []byte) []byte {
 	return result
 }
 
+// Parts lists each chunk's hash and uncompressed size in order, the input
+// of Aggregate, FileHash and RangeHash.
 func Parts(chunks []Chunk) []HashPart {
 	parts := make([]HashPart, len(chunks))
 	for i, c := range chunks {

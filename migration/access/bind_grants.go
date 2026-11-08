@@ -14,8 +14,9 @@ var _ accessapi.Grants = grants{}
 
 // grants scans the stored permissions about content. The two scans are the
 // ones the storage permissions view (internal/server/storage.go) and the
-// Hugging Face repository migration (migration/artifacts/ecosystem/huggingface/http) ran
-// themselves, with their order and error texts.
+// Hugging Face repository migration
+// (migration/artifacts/ecosystem/huggingface/http) ran themselves, with their
+// order and error texts.
 type grants struct{ st store.Store }
 
 func (b grants) ItemGrants(

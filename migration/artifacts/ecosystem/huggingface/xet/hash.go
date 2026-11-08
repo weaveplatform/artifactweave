@@ -1,4 +1,3 @@
-// Package xet validates the public Hugging Face Xet chunk and shard wire formats.
 package xet
 
 import (
@@ -118,6 +117,9 @@ var (
 // Hash is the binary Merkle hash. Xet's textual form reverses each uint64 word.
 type Hash [32]byte
 
+// String is h's textual form, as Xet's paths and JSON carry it: each of the
+// four 8-byte words read as a little-endian uint64 and printed as 16
+// lowercase hex digits.
 func (h Hash) String() string {
 	return fmt.Sprintf(
 		"%016x%016x%016x%016x",
@@ -128,6 +130,9 @@ func (h Hash) String() string {
 	)
 }
 
+// ParseHash reads the textual form String writes. ok is false for anything
+// but 64 lowercase hex digits: an uppercase spelling is refused, so a record
+// named by a hash has one path.
 func ParseHash(s string) (Hash, bool) {
 	var h Hash
 	if len(s) != 64 || s != strings.ToLower(s) {
@@ -154,6 +159,8 @@ func keyed(key [32]byte, data []byte) Hash {
 	return out
 }
 
+// DataHash is a chunk's hash: BLAKE3 of its uncompressed bytes, keyed with
+// Xet's data key.
 func DataHash(data []byte) Hash { return keyed(dataKey, data) }
 
 // HashPart carries the chunk's uncompressed length, which is part of its parent hash.
@@ -162,6 +169,12 @@ type HashPart struct {
 	Size uint64
 }
 
+// Aggregate is the Merkle root Xet names a xorb by, over its chunks' hashes
+// and sizes in order. Each level groups consecutive parts into nodes of at
+// most nine, closing a node early after its third or a later part whose
+// hash's last word is a multiple of four, and hashes each node's
+// "<hash> : <size>" lines with BLAKE3 keyed with the node key, carrying the
+// summed size up. One part is its own root; no parts give the zero Hash.
 func Aggregate(parts []HashPart) Hash {
 	if len(parts) == 0 {
 		return Hash{}
@@ -191,6 +204,9 @@ func Aggregate(parts []HashPart) Hash {
 	return parts[0].Hash
 }
 
+// FileHash is the hash Xet names a file by: the Merkle root of all its
+// chunks in order (Aggregate), hashed again with BLAKE3 under an all-zero
+// key. No chunks give the zero Hash.
 func FileHash(parts []HashPart) Hash {
 	if len(parts) == 0 {
 		return Hash{}
@@ -199,6 +215,10 @@ func FileHash(parts []HashPart) Hash {
 	return keyed([32]byte{}, h[:])
 }
 
+// RangeHash is a file segment's verification hash: BLAKE3, keyed with
+// Xet's verification key, of the hashes of the segment's chunks
+// concatenated in order. A shard that marks a file verified carries one per
+// segment, which a reconstruction compares with the stored xorb's chunks.
 func RangeHash(parts []HashPart) Hash {
 	data := make([]byte, 0, len(parts)*32)
 	for _, p := range parts {
