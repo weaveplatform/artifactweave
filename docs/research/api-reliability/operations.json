@@ -5768,7 +5768,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/api/datasets/{owner}/{name}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.info-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.info-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -5787,7 +5787,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/api/datasets/{owner}/{name}/revision/{revision}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.info-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.info-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -5806,7 +5806,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/api/datasets/{owner}/{name}/tree/{revision}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.tree-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.tree-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -5825,7 +5825,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/api/datasets/{owner}/{name}/tree/{revision}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.tree-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.tree-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -5844,7 +5844,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/api/datasets/{owner}/{name}/xet-read-token/{revision}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.xetReadToken-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.xetReadToken-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -5863,7 +5863,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/api/datasets/{owner}/{name}/xet-write-token/{revision}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.xetWriteToken-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.xetWriteToken-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -5882,7 +5882,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/api/models/{owner}/{name}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.info-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.info-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -5901,7 +5901,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/api/models/{owner}/{name}/revision/{revision}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.info-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.info-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -5920,7 +5920,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/api/models/{owner}/{name}/tree/{revision}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.tree-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.tree-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -5939,7 +5939,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/api/models/{owner}/{name}/tree/{revision}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.tree-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.tree-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -5958,7 +5958,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/api/models/{owner}/{name}/xet-read-token/{revision}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.xetReadToken-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.xetReadToken-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -5977,7 +5977,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/api/models/{owner}/{name}/xet-write-token/{revision}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.xetWriteToken-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.xetWriteToken-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -5996,7 +5996,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/datasets/{owner}/{name}/resolve/{revision}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.resolve-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.resolve-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6015,7 +6015,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/xet/{kind}/{owner}/{name}/{revision}/data/{hash}/{segment}/{start}/{end}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.xetData-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.xetData-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6034,7 +6034,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/xet/{kind}/{owner}/{name}/{revision}/v1/chunks/{prefix}/{hash}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.xetDedup-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.xetDedup-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6053,7 +6053,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/xet/{kind}/{owner}/{name}/{revision}/v1/reconstructions/{hash}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.xetReconstruction-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.xetReconstruction-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6072,7 +6072,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/xet/{kind}/{owner}/{name}/{revision}/v2/reconstructions/{hash}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.xetReconstruction-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.xetReconstruction-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6091,7 +6091,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/{owner}/{name}/resolve/{revision}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.resolve-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.resolve-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12348,7 +12348,7 @@
   {
     "route": "HEAD /artifactory/api/huggingfaceml/{repoKey}/datasets/{owner}/{name}/resolve/{revision}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.resolve-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.resolve-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12367,7 +12367,7 @@
   {
     "route": "HEAD /artifactory/api/huggingfaceml/{repoKey}/xet/{kind}/{owner}/{name}/{revision}/v1/xorbs/default/{hash}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.xetXorbExists-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.xetXorbExists-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12386,7 +12386,7 @@
   {
     "route": "HEAD /artifactory/api/huggingfaceml/{repoKey}/{owner}/{name}/resolve/{revision}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.resolve-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.resolve-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -16202,7 +16202,7 @@
   {
     "route": "POST /artifactory/api/huggingfaceml/{repoKey}/api/artifactweave/migrations/legacy-layout",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.migrateLegacy-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.migrateLegacy-fm",
     "review_family": "native-huggingfaceml",
     "effects": "administrator-only bounded copy of one legacy revision; atomic item/index publication preserves source bytes/properties/access policy; quiesced writes/configuration required",
     "retry": "no key required; repeat the identical mapping with dry_run=true after ambiguous completion: ready permits apply, complete is a no-op; conflicting destinations return 409; reapply never rewinds an advanced ref",
@@ -16214,9 +16214,9 @@
       "internal/server/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "internal/sqlstore/sqlcommon/content_items.go",
-      "internal/server/huggingface/migration.go",
-      "internal/server/huggingface/migration_publish.go",
-      "internal/server/huggingface/migration_scope_test.go",
+      "migration/artifacts/ecosystem/huggingface/http/migration.go",
+      "migration/artifacts/ecosystem/huggingface/http/migration_publish.go",
+      "migration/artifacts/ecosystem/huggingface/http/migration_scope_test.go",
       "docs/operations/huggingface-migration.md",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
@@ -16225,7 +16225,7 @@
   {
     "route": "POST /artifactory/api/huggingfaceml/{repoKey}/api/datasets/{owner}/{name}/branch/{revision}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.createBranch-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.createBranch-fm",
     "review_family": "native-huggingfaceml",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16244,7 +16244,7 @@
   {
     "route": "POST /artifactory/api/huggingfaceml/{repoKey}/api/datasets/{owner}/{name}/commit/{revision}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.commit-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.commit-fm",
     "review_family": "native-huggingfaceml",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16263,7 +16263,7 @@
   {
     "route": "POST /artifactory/api/huggingfaceml/{repoKey}/api/datasets/{owner}/{name}/preupload/{revision}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.preupload-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.preupload-fm",
     "review_family": "native-huggingfaceml",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16282,7 +16282,7 @@
   {
     "route": "POST /artifactory/api/huggingfaceml/{repoKey}/api/models/{owner}/{name}/branch/{revision}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.createBranch-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.createBranch-fm",
     "review_family": "native-huggingfaceml",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16301,7 +16301,7 @@
   {
     "route": "POST /artifactory/api/huggingfaceml/{repoKey}/api/models/{owner}/{name}/commit/{revision}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.commit-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.commit-fm",
     "review_family": "native-huggingfaceml",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16320,7 +16320,7 @@
   {
     "route": "POST /artifactory/api/huggingfaceml/{repoKey}/api/models/{owner}/{name}/preupload/{revision}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.preupload-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.preupload-fm",
     "review_family": "native-huggingfaceml",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16339,7 +16339,7 @@
   {
     "route": "POST /artifactory/api/huggingfaceml/{repoKey}/api/repos/create",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.createRepo-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.createRepo-fm",
     "review_family": "native-huggingfaceml",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16358,7 +16358,7 @@
   {
     "route": "POST /artifactory/api/huggingfaceml/{repoKey}/datasets/{owner}/{name}.git/info/lfs/objects/batch",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.lfsBatch-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.lfsBatch-fm",
     "review_family": "native-huggingfaceml",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16377,7 +16377,7 @@
   {
     "route": "POST /artifactory/api/huggingfaceml/{repoKey}/xet/{kind}/{owner}/{name}/{revision}/v1/shards",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.xetUploadShard-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.xetUploadShard-fm",
     "review_family": "native-huggingfaceml",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16396,7 +16396,7 @@
   {
     "route": "POST /artifactory/api/huggingfaceml/{repoKey}/xet/{kind}/{owner}/{name}/{revision}/v1/xorbs/default/{hash}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.xetUploadXorb-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.xetUploadXorb-fm",
     "review_family": "native-huggingfaceml",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16415,7 +16415,7 @@
   {
     "route": "POST /artifactory/api/huggingfaceml/{repoKey}/xet/{kind}/{owner}/{name}/{revision}/v2/shards",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.xetUploadShard-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.xetUploadShard-fm",
     "review_family": "native-huggingfaceml",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16434,7 +16434,7 @@
   {
     "route": "POST /artifactory/api/huggingfaceml/{repoKey}/{owner}/{name}.git/info/lfs/objects/batch",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.lfsBatch-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.lfsBatch-fm",
     "review_family": "native-huggingfaceml",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -21050,7 +21050,7 @@
   {
     "route": "PUT /artifactory/api/huggingfaceml/{repoKey}/lfs/upload/{oid}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.lfsUpload-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.lfsUpload-fm",
     "review_family": "native-huggingfaceml",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",

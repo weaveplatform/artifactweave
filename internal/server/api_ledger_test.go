@@ -349,9 +349,9 @@ func apiReviewPolicy(e *apiReviewOperation) {
 		e.Pagination = "singular migration status; internal cursor scans capped at 1024 tree items and 1024 permission documents; payload verification capped at 16 GiB and streamed"
 		e.Evidence = append(
 			e.Evidence,
-			"internal/server/huggingface/migration.go",
-			"internal/server/huggingface/migration_publish.go",
-			"internal/server/huggingface/migration_scope_test.go",
+			"migration/artifacts/ecosystem/huggingface/http/migration.go",
+			"migration/artifacts/ecosystem/huggingface/http/migration_publish.go",
+			"migration/artifacts/ecosystem/huggingface/http/migration_scope_test.go",
 			"docs/operations/huggingface-migration.md",
 		)
 	}

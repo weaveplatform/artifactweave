@@ -76,7 +76,7 @@ var formats = map[string]formatImpact{
 		"@jetbrainsplugins",
 		[]string{"jetbrains"},
 	},
-	"huggingface": {"./internal/format/huggingface/...", "@huggingface", nil},
+	"huggingface": {"./migration/artifacts/ecosystem/huggingface/...", "@huggingface", nil},
 	"luarocks":    {"./internal/format/luarocks/...", "@luarocks", []string{"luarocks", "jf"}},
 	"composer":    {"./internal/format/composer/...", "@composer", []string{"composer"}},
 	"maven": {

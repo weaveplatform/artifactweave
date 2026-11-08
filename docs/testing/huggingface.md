@@ -48,7 +48,7 @@ credential metadata is refused at issuance with 400 rather than issuing an unusa
 Xorbs may bundle files, so signed transfer URLs return only a requested file's authorized
 chunk ranges. Parsers bound compressed and expanded sizes and validate keyed
 BLAKE3 roots, shard bounds, segment hashes, file lengths and SHA256 before publishing.
-The [codec fixtures](../../internal/format/huggingface/xet/testdata/) were captured
+The [codec fixtures](../../migration/artifacts/ecosystem/huggingface/xet/testdata/) were captured
 from hf_xet 1.7.0; both compressed repeated chunks and incompressible data are covered.
 
 For remotes, upstream metadata and file bytes travel through the existing P9 Hub

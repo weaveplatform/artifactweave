@@ -225,7 +225,7 @@
       "owner_issue": 779,
       "evidence": "test/acceptance/features/huggingface_xet.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/hugging-face-repositories",
-      "route_file": "internal/server/huggingface/protocol.go",
+      "route_file": "migration/artifacts/ecosystem/huggingface/http/protocol.go",
       "p9c": true
     },
     {
