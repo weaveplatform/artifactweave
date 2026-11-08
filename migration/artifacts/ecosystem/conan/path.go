@@ -1,4 +1,3 @@
-// Package conan owns Conan's on-disk revision layout and write policy.
 package conan
 
 import (
@@ -9,6 +8,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
+// Manifest is the file name of a revision's manifest, which the Conan
+// client uploads last and which commits the revision: until it is stored,
+// the revision's files are hidden from search, download and the index.
 const Manifest = "conanmanifest.txt"
 
 var componentPattern = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.+\-]{0,127}$`)
@@ -19,16 +21,25 @@ type Reference struct {
 	Name, Version, User, Channel, Revision string
 }
 
+// Root is the folder that holds every file of the recipe revision r,
+// user/name/version/channel/revision: the conan-default layout puts the
+// user first, unlike the reference's name/version@user/channel form.
 func (r Reference) Root() string {
 	return strings.Join([]string{r.User, r.Name, r.Version, r.Channel, r.Revision}, "/")
 }
 
+// RecipeRoot is the folder of the recipe revision's own files, the export
+// folder under Root.
 func (r Reference) RecipeRoot() string { return r.Root() + "/export" }
 
+// PackageRoot is the folder of binary package id at package revision
+// revision, built from the recipe revision r.
 func (r Reference) PackageRoot(id, revision string) string {
 	return r.Root() + "/package/" + id + "/" + revision
 }
 
+// IsValid reports whether every part of r, the revision included, is a
+// valid Component.
 func (r Reference) IsValid() bool {
 	return Component(r.Name) && Component(r.Version) && Component(r.User) &&
 		Component(r.Channel) && Component(r.Revision)
@@ -48,6 +59,9 @@ type FilePath struct {
 	File     string
 }
 
+// Root is the folder of the revision f belongs to: the package revision's
+// folder for a package file, and the recipe revision's export folder
+// otherwise.
 func (f FilePath) Root() string {
 	if f.Package {
 		return f.Ref.PackageRoot(f.ID, f.PRev)
@@ -55,6 +69,7 @@ func (f FilePath) Root() string {
 	return f.Ref.RecipeRoot()
 }
 
+// Path is f's item path: its File below Root.
 func (f FilePath) Path() string { return f.Root() + "/" + f.File }
 
 // SafeFile permits Conan's metadata subfolders but no empty, dot, encoded
@@ -100,6 +115,7 @@ func ParseStored(path string) (FilePath, bool) {
 	}
 }
 
+// Serves reports whether t is the Conan package type.
 func Serves(t repo.PackageType) bool { return t == repo.Conan }
 
 type nativeKey struct{}
@@ -112,4 +128,6 @@ func Native(
 	return context.WithValue(ctx, nativeKey{}, true)
 }
 
+// IsNative reports whether ctx carries the mark Native sets, which Admit
+// requires of every revision write that is not a remote's cached one.
 func IsNative(ctx context.Context) bool { return ctx.Value(nativeKey{}) == true }

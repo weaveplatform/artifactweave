@@ -24,6 +24,11 @@ type Handler struct{ generic.Handler }
 
 var errTooManyItems = errors.New("conan: revision listing exceeds limit")
 
+// Admit applies the generic deploy policy (black-out and include and
+// exclude patterns) first, keeping its refusal's status, then passes a
+// remote's cached write. Any other write must carry the Native mark, or a
+// generic item write could create a revision by choosing its path (409),
+// and its path must be in the stored layout (400).
 func (h Handler) Admit(
 	ctx context.Context, env format.Env, c repo.Config, w format.Write,
 ) (format.Write, error) {
@@ -46,6 +51,10 @@ func (h Handler) Admit(
 	return w, nil
 }
 
+// Deployed rebuilds the repository's index with Reindex once a hosted file
+// in the layout is stored, since that file may be the manifest that commits
+// its revision. Folders, a remote's cached files and paths outside the
+// layout change nothing.
 func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
 	if it.Folder || it.Cached {
 		return nil
@@ -56,8 +65,12 @@ func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it
 	return h.Reindex(ctx, env, c)
 }
 
+// Deleting does nothing: Deleted rebuilds the index once the items are gone.
 func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error { return nil }
 
+// Deleted rebuilds the repository's index with Reindex when any removed
+// item was a hosted file in the layout, so a deleted revision leaves the
+// index.
 func (h Handler) Deleted(
 	ctx context.Context, env format.Env, c repo.Config, removed []types.Item,
 ) error {
@@ -96,6 +109,12 @@ func Files(
 	}
 }
 
+// Reindex rebuilds repository c's package index from its files (a remote's
+// from its cache): a package per name@user/channel, a version per recipe
+// version, and as each version's files those of its committed recipe
+// revisions and of their committed package revisions. A version and a
+// package take their oldest file's creation time. It fails rather than
+// index part of a repository that holds more than 50,000 items.
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	items, err := Files(ctx, env.Store, c, "")
 	if err != nil {

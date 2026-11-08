@@ -1,4 +1,3 @@
-// Package conanhttp serves the Conan revision protocol at /artifactory/api/conan.
 package conanhttp
 
 import (
@@ -20,6 +19,8 @@ import (
 
 // Options configures the Conan protocol.
 type Options struct {
+	// RemoteSources serves remote repositories. Nil leaves the remote class
+	// without a source, so a remote repository answers 501.
 	RemoteSources *source.Service
 	// Tokens issues the token Conan's authenticate exchanges a password
 	// for. Nil answers that exchange 501; a caller that sent a token gets
@@ -27,6 +28,15 @@ type Options struct {
 	Tokens accessapi.Tokens
 }
 
+// Protocol returns the Conan protocol for the router kit. One dispatcher
+// serves every method of every path under /artifactory/api/conan/{repoKey}:
+// local and federated repositories from their own items, virtual ones from
+// their members, and remote ones through o.RemoteSources when it is set.
+// A repository with forceConanAuthentication answers an anonymous caller
+// 401 before it is routed. {repoKey}/reindex is reserved for the JFrog
+// reindex operation beside the protocol. The virtual class's source
+// supports no single-item lookup, because the protocol reads a virtual
+// repository's members itself.
 func Protocol(o Options) pkgroute.Protocol {
 	sources := map[repo.Class]pkgroute.Source{
 		repo.Local:     pkgroute.Local{},
