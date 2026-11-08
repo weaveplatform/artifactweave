@@ -1,9 +1,3 @@
-// Package golang is the format of Go module repositories (decision 0035).
-// It reads the GOPROXY paths a request names, checks the path of every
-// version file a client deploys, chooses what @v/list and @latest answer,
-// and keeps the package index. In the index a module is a package, and
-// each of its versions links whichever of the version's .zip, .mod and
-// .info are stored.
 package golang
 
 import (
@@ -70,6 +64,8 @@ var ErrNoOperation = errors.New("golang: no go module operation")
 // answers it 404, and a PUT 400 with the message.
 type InvalidPathError struct{ Message string }
 
+// Error returns Message, which says which check the path failed and which a
+// PUT answers in its 400 body, so it stays byte-identical.
 func (e *InvalidPathError) Error() string { return e.Message }
 
 // ParseRequest reads a GOPROXY request path. A module path or version that
@@ -212,7 +208,6 @@ func check(m, v string) error {
 	return nil
 }
 
-// checkPath applies module.CheckPath.
 func checkPath(m string) error {
 	if err := module.CheckPath(m); err != nil {
 		return &InvalidPathError{

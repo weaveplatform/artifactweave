@@ -1,8 +1,3 @@
-// Package golanghttp serves Go module repositories at
-// /artifactory/api/go/{repoKey}/ through the router kit (decisions 0032 and
-// 0035): the GOPROXY reads the go command makes, and the deploys of
-// jf go-publish. Paths, version selection and the package index are
-// migration/artifacts/ecosystem/golang's; this package answers HTTP with them.
 package golanghttp
 
 import (

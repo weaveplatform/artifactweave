@@ -74,7 +74,6 @@ func file(r *http.Request, p pkgroute.Path) (goformat.File, error) {
 	return req.File(), nil
 }
 
-// storeInfo checks a .info's body and stores it.
 func (p publisher) storeInfo(
 	r *http.Request,
 	f goformat.File,
