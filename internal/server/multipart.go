@@ -8,14 +8,14 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/service/multipart"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// Multipart upload routes (internal/service/multipart). create authenticates
+// Multipart upload routes (migration/artifacts/core/multipart). create authenticates
 // as any request; the others authenticate themselves (selfAuthenticated).
 const (
 	uploadsCreate   = "/artifactory/api/v1/uploads/create"

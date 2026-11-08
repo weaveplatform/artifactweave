@@ -1163,7 +1163,7 @@ func (s artifactoryService) deleteItem(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetUploadsConfig tells the JFrog CLI whether to upload large files in
-// parts (internal/service/multipart) or in one request (research 09).
+// parts (migration/artifacts/core/multipart) or in one request (research 09).
 func (s artifactoryService) GetUploadsConfig(
 	context.Context,
 	artgen.GetUploadsConfigRequestObject,

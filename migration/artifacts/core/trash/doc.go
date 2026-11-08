@@ -17,7 +17,7 @@
 //     POST /api/trash/restore/{repoKey}/{path}) and the storage API's views
 //     of auto-trashcan paths; the repository delete (internal/repos), which
 //     keeps a repository's content here (Keep); the garbage collector
-//     (internal/service/gc), which expires entries (PurgeExpired); and the
+//     (migration/artifacts/core/gc), which expires entries (PurgeExpired); and the
 //     format contract suite (artifacts/core/formattest), which restores.
 //   - Driven: the metadata store, for trash entries, items and their
 //     properties, blob references, the trash can settings and transactions;
