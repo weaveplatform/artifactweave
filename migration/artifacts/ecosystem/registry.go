@@ -26,7 +26,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/opkg"
 	"github.com/weaveplatform/artifactweave/internal/format/pub"
 	"github.com/weaveplatform/artifactweave/internal/format/puppet"
-	"github.com/weaveplatform/artifactweave/internal/format/pypi"
 	"github.com/weaveplatform/artifactweave/internal/format/rpm"
 	"github.com/weaveplatform/artifactweave/internal/format/skills"
 	"github.com/weaveplatform/artifactweave/internal/format/swift"
@@ -42,6 +41,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi"
 )
 
 // Settings are the server-wide options of the formats that take any, from

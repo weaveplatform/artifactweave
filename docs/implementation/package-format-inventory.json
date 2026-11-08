@@ -433,7 +433,7 @@
       "owner_issue": 0,
       "evidence": "test/acceptance/features/pypi_clients.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
-      "route_file": "internal/server/pypi/pypi.go",
+      "route_file": "migration/artifacts/ecosystem/pypi/http/pypi.go",
       "p9c": false
     },
     {

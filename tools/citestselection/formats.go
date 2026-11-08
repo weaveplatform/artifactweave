@@ -96,7 +96,7 @@ var formats = map[string]formatImpact{
 		[]string{"dotnet", "dotnet11", "jf"},
 	},
 	"pypi": {
-		"./internal/format/pypi/...",
+		"./migration/artifacts/ecosystem/pypi/...",
 		"@pypi,@package_wiring",
 		[]string{"python", "jf"},
 	},

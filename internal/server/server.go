@@ -40,7 +40,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/server/pub"
 	"github.com/weaveplatform/artifactweave/internal/server/puppet"
-	"github.com/weaveplatform/artifactweave/internal/server/pypi"
 	"github.com/weaveplatform/artifactweave/internal/server/skills"
 	"github.com/weaveplatform/artifactweave/internal/server/swift"
 	"github.com/weaveplatform/artifactweave/internal/server/terraform"
@@ -63,6 +62,7 @@ import (
 	nimmodelhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nimmodel/http"
 	npmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm/http"
 	nugethttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget/http"
+	pypihttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -250,8 +250,8 @@ var protocols = []func(Config) pkgroute.Protocol{
 		return cocoapodshttp.Protocol(cocoapodshttp.Options{RemoteSources: cfg.RemoteSources})
 	},
 	func(cfg Config) pkgroute.Protocol {
-		return pypi.Protocol(
-			pypi.Options{Format: cfg.FormatSettings.PyPI, RemoteSources: cfg.RemoteSources},
+		return pypihttp.Protocol(
+			pypihttp.Options{Format: cfg.FormatSettings.PyPI, RemoteSources: cfg.RemoteSources},
 		)
 	},
 	func(cfg Config) pkgroute.Protocol {

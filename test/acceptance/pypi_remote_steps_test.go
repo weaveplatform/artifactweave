@@ -12,8 +12,8 @@ import (
 
 	"github.com/cucumber/godog"
 
-	pypifmt "github.com/weaveplatform/artifactweave/internal/format/pypi"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
+	pypifmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi"
 )
 
 func (w *world) registerRemotePyPI(sc *godog.ScenarioContext) {
