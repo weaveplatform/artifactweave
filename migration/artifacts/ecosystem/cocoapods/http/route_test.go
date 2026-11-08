@@ -86,12 +86,13 @@ func newRouteFixture(t *testing.T) *routeFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
+	pool := new(remote.Pool)
 	policy := &remote.Policy{
 		Store: db, Blobs: blobs, Items: items,
-		Pool: new(remote.Pool), Options: resolver.Options, Key: key,
+		Pool: pool, Options: resolver.Options, Key: key,
 		GitFetch: podfmt.FetchCocoaPodsGit,
 	}
-	t.Cleanup(policy.Pool.Close)
+	t.Cleanup(pool.Close)
 	service := &source.Service{
 		HTTP: policy, Cache: policy,
 		Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {

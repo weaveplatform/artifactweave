@@ -23,9 +23,11 @@ func (p *Policy) fetchResponse(
 	if p.Fetch != nil {
 		return p.Fetch(ctx, q, permit, opts, request)
 	}
-	client, err := p.Pool.Client(q.Repo, opts)
+	conn, err := p.Pool.Connection(q.Repo, opts)
 	if err != nil {
+		//nolint:wrapcheck // preserves upstream error identity
 		return nil, err
 	}
-	return client.Fetch(ctx, request)
+	//nolint:wrapcheck // preserves upstream error identity
+	return conn.Fetch(ctx, request)
 }

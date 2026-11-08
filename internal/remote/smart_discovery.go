@@ -52,7 +52,7 @@ func (s *Smart) Discover(
 	if err = s.policy.cooldown(state); err != nil {
 		return SmartPeer{}, err
 	}
-	key := s.policy.flightKey(
+	key := s.policy.FlightKey(
 		types.RemoteCacheKey{
 			RepoKey:          q.Repo.Key,
 			SettingsRevision: opts.Revision,

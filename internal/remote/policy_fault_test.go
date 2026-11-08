@@ -334,7 +334,7 @@ func TestAccPolicyRecoveryHEADWaiterHonorsRenewedCooldown(t *testing.T) {
 	if err = w.db.RemoteCache().PutState(t.Context(), w.c.Key, state); err != nil {
 		t.Fatal(err)
 	}
-	w.p.Pool.Remove(w.c.Key)
+	w.pool.Remove(w.c.Key)
 	gate := new(fakeupstream.Barrier)
 	w.up.Set(
 		"/meta.txt",

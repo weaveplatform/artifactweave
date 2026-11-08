@@ -46,11 +46,12 @@ func policyFixture(t *testing.T) *policyWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
+	pool := new(remote.Pool)
 	p := &remote.Policy{
 		Store: db,
 		Blobs: blobs,
 		Items: &item.Service{Store: db, Blobs: blobs, Now: clock.Now},
-		Pool:  new(remote.Pool),
+		Pool:  pool,
 		Now:   clock.Now,
 		Key: []byte(
 			"test-only-query-identity",
@@ -59,7 +60,7 @@ func policyFixture(t *testing.T) *policyWorld {
 			return remote.Options{Revision: "credential-1"}, nil
 		},
 	}
-	t.Cleanup(p.Pool.Close)
+	t.Cleanup(pool.Close)
 	return &policyWorld{
 		t:     t,
 		db:    db,

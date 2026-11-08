@@ -195,6 +195,7 @@ func (s *Smart) restore(
 	}
 	ctx = accessapi.WithCaller(ctx, p, d)
 	ctx = context.WithValue(ctx, smartActiveKey{}, true)
+	ctx = WithOutbound(ctx, Outbound{Header: smartHeaders})
 	ctx = context.WithValue(ctx, smartTraceKey{}, job.Trace)
 	ctx, err = smartEnter(ctx, s.node+"/"+string(permit.Identity.Repository))
 	q = source.Request{

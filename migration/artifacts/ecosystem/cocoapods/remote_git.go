@@ -42,7 +42,7 @@ type cocoaPodsCheckout struct {
 	request          source.Request
 	permit           source.Permit
 	options          remote.Options
-	client           *remote.Client
+	client           remote.Connection
 	remainingBytes   int64
 	remainingObjects int
 	repositories     int
@@ -90,7 +90,7 @@ func FetchCocoaPodsGit(
 	if g.Validate() != nil {
 		return nil, source.ErrInvalidRequest
 	}
-	client, err := p.Pool.Client(q.Repo, opts)
+	client, err := p.Pool.Connection(q.Repo, opts)
 	if err != nil {
 		//nolint:wrapcheck // preserves upstream error identity
 		return nil, err

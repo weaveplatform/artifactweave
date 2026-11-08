@@ -392,7 +392,7 @@ func (p *Policy) probeKey(
 	permit source.Permit,
 	state types.RemoteSourceState,
 ) string {
-	return p.flightKey(
+	return p.FlightKey(
 		types.RemoteCacheKey{
 			RepoKey:          key.RepoKey,
 			SettingsRevision: key.SettingsRevision,

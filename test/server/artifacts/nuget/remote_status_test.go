@@ -53,6 +53,7 @@ func TestAccStatusNuGetV3Remote(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		pool := new(remote.Pool)
 		policy := &remote.Policy{
 			Store: cfg.Store,
 			Blobs: cfg.Blobs,
@@ -61,12 +62,12 @@ func TestAccStatusNuGetV3Remote(t *testing.T) {
 				Blobs:   cfg.Blobs,
 				Formats: ecosystem.For,
 			},
-			Pool:            new(remote.Pool),
+			Pool:            pool,
 			Options:         resolver.Options,
 			Key:             []byte(strings.Repeat("k", 32)),
 			ProjectResponse: nuget.ProjectEmptyFeed,
 		}
-		t.Cleanup(policy.Pool.Close)
+		t.Cleanup(pool.Close)
 		cfg.RemoteSources = &source.Service{
 			HTTP:  policy,
 			Cache: policy,

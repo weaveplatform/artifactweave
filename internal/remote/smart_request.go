@@ -51,8 +51,8 @@ func (s *Smart) request(
 	if err = s.policy.cooldown(state); err != nil {
 		return nil, err
 	}
-	client, err := s.pool.Client(q.Repo, opts)
-	if err != nil || client.checkURL == nil {
+	conn, err := s.pool.Connection(q.Repo, opts)
+	if err != nil || !conn.Guarded() {
 		return nil, source.ErrUnavailable
 	}
 	stateContext := ctx
@@ -62,7 +62,7 @@ func (s *Smart) request(
 	ctx, metadataCancel := metadataContext(ctx, metadata)
 	outerCancel := cancel
 	cancel = func() { metadataCancel(); outerCancel() }
-	if err = client.checkURL(ctx, u); err != nil {
+	if err = conn.CheckURL(ctx, u); err != nil {
 		cancel()
 		return nil, PolicyError(err)
 	}
@@ -77,11 +77,9 @@ func (s *Smart) request(
 		req.GetBody = nil
 	}
 	req.Header.Set("Accept", "application/json")
-	if client.prepare != nil {
-		if err = client.prepare(req); err != nil {
-			cancel()
-			return nil, PolicyError(err)
-		}
+	if err = conn.Prepare(req); err != nil {
+		cancel()
+		return nil, PolicyError(err)
 	}
 	if method == http.MethodPut {
 		req.Header.Set("Content-Type", "application/json")
@@ -91,9 +89,7 @@ func (s *Smart) request(
 		req.GetBody = nil
 	}
 	smartHeaders(req)
-	transport := *client.http
-	transport.CheckRedirect = func(*http.Request, []*http.Request) error { return ErrRedirect }
-	res, err := transport.Do(req)
+	res, err := conn.Send(req)
 	if err != nil {
 		cancel()
 		failure := PolicyError(err)

@@ -142,7 +142,7 @@ func (m *MavenBackend) PrepareUpload(
 		u.Declared != (types.Checksums{}) && q.Repo.RemoteRepoChecksumPolicyType != repo.PassThru {
 		return nil
 	}
-	client, err := m.Policy.Pool.Client(q.Repo, opts)
+	conn, err := m.Policy.Pool.Connection(q.Repo, opts)
 	if err != nil {
 		return remote.PolicyError(err)
 	}
@@ -159,7 +159,7 @@ func (m *MavenBackend) PrepareUpload(
 		}
 		checksumRequest := request
 		checksumRequest.Path += "." + string(alg)
-		res, err := client.Do(ctx, checksumRequest)
+		res, err := conn.Do(ctx, checksumRequest)
 		if err != nil {
 			return remote.PolicyError(err)
 		}

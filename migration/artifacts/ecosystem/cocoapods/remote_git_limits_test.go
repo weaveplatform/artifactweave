@@ -15,6 +15,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/storage/memory"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -29,7 +30,7 @@ func TestAccCocoaPodsGitFailureBoundaries(t *testing.T) {
 				q.Resource.CocoaPodsGit.Branch = "absent"
 				q.Resource.Variant = q.Resource.CocoaPodsGit.Variant()
 			case "pool shutdown":
-				w.p.Pool.Close()
+				w.p.Pool.(*remote.Pool).Close()
 			case "redirect":
 				w.up.Set(
 					"/main.git/info/refs",

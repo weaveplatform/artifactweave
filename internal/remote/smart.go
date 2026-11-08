@@ -23,9 +23,8 @@ import (
 type (
 	smartSessionKey struct{}
 	smartSession    struct {
-		peer              SmartPeer
-		opts              Options
-		isMetadataRequest bool
+		peer SmartPeer
+		opts Options
 	}
 )
 
@@ -33,7 +32,7 @@ type (
 // one shared policy. Registry and ordinary policies keep separate validators.
 type Smart struct {
 	policy       *Policy
-	pool         *Pool
+	pool         Upstream
 	authn        accessapi.Authenticator
 	authz        accessapi.Authorizer
 	registryPath func(string) (image, operation, reference string, err error)
@@ -54,7 +53,7 @@ type Smart struct {
 func NewSmart(
 	ctx context.Context,
 	p *Policy,
-	pool *Pool,
+	pool Upstream,
 	authn accessapi.Authenticator,
 	authz accessapi.Authorizer,
 	kind string,
@@ -155,6 +154,7 @@ func (s *Smart) Read(
 		return s.policy.Read(ctx, q, permit)
 	}
 	ctx = context.WithValue(ctx, smartActiveKey{}, true)
+	ctx = WithOutbound(ctx, Outbound{Header: smartHeaders})
 	ctx, err := smartEnter(ctx, s.node+"/"+string(permit.Identity.Repository))
 	if err != nil {
 		return source.Result{}, smartError("read", err)
@@ -176,11 +176,13 @@ func (s *Smart) Read(
 	if opts.Revision != peer.revision {
 		return source.Result{}, source.ErrSuperseded
 	}
-	ctx = context.WithValue(
-		ctx,
-		smartSessionKey{},
-		smartSession{peer: peer, opts: opts, isMetadataRequest: q.Resource.RequireSmart},
-	)
+	ctx = context.WithValue(ctx, smartSessionKey{}, smartSession{peer: peer, opts: opts})
+	if q.Resource.RequireSmart {
+		ctx = WithOutbound(ctx, Outbound{
+			Header: smartHeaders,
+			Allow:  func(target string) bool { return smartMetadataTarget(peer, target) },
+		})
+	}
 	out, err := s.policy.Read(ctx, q, permit)
 	if err != nil || out.Item == nil || q.Resource.Method != http.MethodGet ||
 		q.Resource.RequireSmart {

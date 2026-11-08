@@ -52,7 +52,7 @@ type Policy struct {
 	Store           store.Store
 	Blobs           blob.Store
 	Items           *item.Service
-	Pool            *Pool
+	Pool            Upstream
 	Options         func(context.Context, repo.Config) (Options, error)
 	CheckCurrent    func(context.Context, store.Store, source.Request, source.Permit, string) error
 	// Key is a stable keyring-derived HMAC key, never a logged cache identifier.
@@ -138,7 +138,7 @@ func (p *Policy) Read(
 		// never become the shared result of a persistent fill.
 		return p.direct(ctx, q, permit, opts, key, noStore)
 	}
-	flightKey := p.flightKey(key, permit.Identity)
+	flightKey := p.FlightKey(key, permit.Identity)
 	filled, err := p.flights.do(ctx, flightKey, func(shared context.Context) (fillResult, error) {
 		return p.fill(shared, q, permit, opts, key)
 	})
@@ -292,7 +292,7 @@ func (p *Policy) CacheKey(q source.Request, revision string) types.RemoteCacheKe
 	}
 }
 
-func (p *Policy) flightKey(key types.RemoteCacheKey, identity types.SourceIdentity) string {
+func (p *Policy) FlightKey(key types.RemoteCacheKey, identity types.SourceIdentity) string {
 	b, _ := json.Marshal([]any{key, identity})
 	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:])

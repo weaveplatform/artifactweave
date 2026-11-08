@@ -16,11 +16,6 @@ func (p *Policy) Kind(q source.Request) types.RemoteKind { return p.kind(q) }
 // Fresh reports whether the cache entry e still answers q without revalidation.
 func (p *Policy) Fresh(q source.Request, e types.RemoteCacheEntry) bool { return p.fresh(q, e) }
 
-// FlightKey is the key of the policy's shared fill for a cache key and source.
-func (p *Policy) FlightKey(key types.RemoteCacheKey, identity types.SourceIdentity) string {
-	return p.flightKey(key, identity)
-}
-
 // ProbeKey is the key of the policy's shared recovery probe.
 func (p *Policy) ProbeKey(
 	key types.RemoteCacheKey,

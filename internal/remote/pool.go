@@ -54,6 +54,14 @@ func (p *Pool) Client(c repo.Config, opts Options) (*Client, error) {
 	return client, nil
 }
 
+func (p *Pool) Connection(c repo.Config, opts Options) (Connection, error) {
+	client, err := p.Client(c, opts)
+	if err != nil {
+		return nil, err
+	}
+	return client, nil
+}
+
 func (p *Pool) Remove(key string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()

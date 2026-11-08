@@ -33,6 +33,7 @@ type policyWorld struct {
 	clock  *fakeupstream.Clock
 	up     *fakeupstream.Server
 	p      *remote.Policy
+	pool   *remote.Pool
 	c      repo.Config
 	permit source.Permit
 }
@@ -56,11 +57,12 @@ func policyFixture(t *testing.T) *policyWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
+	pool := new(remote.Pool)
 	p := &remote.Policy{
 		Store: db,
 		Blobs: blobs,
 		Items: &item.Service{Store: db, Blobs: blobs, Now: clock.Now},
-		Pool:  new(remote.Pool),
+		Pool:  pool,
 		Now:   clock.Now,
 		Key: []byte(
 			"test-only-query-identity",
@@ -69,7 +71,7 @@ func policyFixture(t *testing.T) *policyWorld {
 			return remote.Options{Revision: "credential-1"}, nil
 		},
 	}
-	t.Cleanup(p.Pool.Close)
+	t.Cleanup(pool.Close)
 	return &policyWorld{
 		t:     t,
 		db:    db,
@@ -77,6 +79,7 @@ func policyFixture(t *testing.T) *policyWorld {
 		clock: clock,
 		up:    up,
 		p:     p,
+		pool:  pool,
 		c:     c,
 		permit: source.Permit{
 			Identity:               identity,

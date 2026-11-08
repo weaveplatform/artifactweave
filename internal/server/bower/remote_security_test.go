@@ -44,11 +44,12 @@ func newRemoteFixture(t *testing.T, git bool) *remoteFixture {
 		t.Fatal(err)
 	}
 	clock := fakeupstream.NewClock(time.Date(2026, 10, 25, 0, 0, 0, 0, time.UTC))
+	pool := new(remote.Pool)
 	policy := &remote.Policy{
 		Store: f.db, Blobs: f.items.Blobs, Items: f.items,
-		Pool: new(remote.Pool), Options: resolver.Options, Key: key, Now: clock.Now,
+		Pool: pool, Options: resolver.Options, Key: key, Now: clock.Now,
 	}
-	t.Cleanup(policy.Pool.Close)
+	t.Cleanup(pool.Close)
 	f.mount(&source.Service{
 		HTTP: policy, Cache: policy,
 		Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
