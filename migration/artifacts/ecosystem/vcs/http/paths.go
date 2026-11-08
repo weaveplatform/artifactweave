@@ -9,6 +9,10 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
+// ErrInvalidPath is the error the address rules return for a project,
+// reference, file path, extension or remote URL they refuse, and the file
+// selectors return when the archive holds no such file, which the root
+// files answer 404.
 var ErrInvalidPath = errors.New("vcs: invalid vcs path")
 
 // ValidProject accepts the provider's owner path and repository name. GitLab
@@ -50,6 +54,11 @@ func ValidRef(name string) bool {
 	return ok && !strings.HasSuffix(name, "^{}")
 }
 
+// ValidFilePath reports whether path is a file a client may select from a
+// project: relative, at most 1,024 bytes, without a trailing slash or an
+// empty, "." or ".." segment, and with no backslash, "!", "%" or control
+// character. "!" separates a peer's reference from its file (PeerFileURL),
+// and "%" is refused so that no encoded form reaches the provider.
 func ValidFilePath(path string) bool {
 	if len(path) == 0 || len(path) > 1024 || strings.HasPrefix(path, "/") ||
 		strings.HasSuffix(path, "/") || strings.Contains(path, "\\") ||
@@ -69,6 +78,8 @@ func ValidFilePath(path string) bool {
 	return true
 }
 
+// ValidExtension reports whether ext is an archive format the protocol
+// serves: tar.gz or zip.
 func ValidExtension(ext string) bool { return ext == "tar.gz" || ext == "zip" }
 
 // GitRefsURL points at Git smart-HTTP discovery on the configured provider.

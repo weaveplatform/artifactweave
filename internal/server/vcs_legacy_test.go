@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	vcshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/vcs/http"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 )
 
 const vcsLegacyOID = "81305b86f97f1361e68f51397943eff6dd635520"
@@ -171,11 +172,11 @@ func testVCSLegacyProvider(t *testing.T, provider repo.VCSGitProvider) {
 					t.Fatal(err)
 				}
 			} else {
-				filename := "vcs/testdata/legacy-vcs-archive.tar.gz"
+				filename := "migration/artifacts/ecosystem/vcs/http/testdata/legacy-vcs-archive.tar.gz"
 				if q.Resource.Mutable {
-					filename = "vcs/testdata/legacy-vcs-readme.zip"
+					filename = "migration/artifacts/ecosystem/vcs/http/testdata/legacy-vcs-readme.zip"
 				}
-				data, err = os.ReadFile(filename)
+				data, err = os.ReadFile(repopath.Path(t, filename))
 				if err != nil {
 					t.Fatal(err)
 				}

@@ -1,4 +1,3 @@
-// Package vcshttp implements the remote-only Artifactory VCS archive protocol.
 package vcshttp
 
 import (
@@ -8,11 +7,19 @@ import (
 	"strings"
 )
 
+// MaxRefsBytes and MaxRefs bound a reference listing, a Git ref
+// advertisement or a peer's tags or branches JSON alike: 8 MiB of response
+// and 65,536 references. The root files read at most MaxRefsBytes of a
+// listing and refuse more than MaxRefs references across a project's
+// listings.
 const (
 	MaxRefsBytes = 8 << 20
 	MaxRefs      = 65536
 )
 
+// ErrInvalidRefs is the error ParseRefs and RefEndpoint.Parse return for a
+// reference listing they refuse; the root files answer it as an invalid
+// upstream result (502).
 var ErrInvalidRefs = errors.New("vcs: invalid vcs references")
 
 // Ref is a Git branch or tag and the object ID it resolves to. Annotated tags

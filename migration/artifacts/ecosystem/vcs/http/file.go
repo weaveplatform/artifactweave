@@ -12,8 +12,13 @@ import (
 	"strings"
 )
 
+// MaxSelectedFileBytes bounds a selected file, 64 MiB, whether it is taken
+// from an archive (FileZIP, WrappedFileZIP, CustomFileZIP) or arrives in a
+// peer's selected-file ZIP (ValidateFileZIP).
 const MaxSelectedFileBytes = 64 << 20
 
+// MaxFileZIPBytes bounds a peer's selected-file ZIP as fetched: the
+// selected file's bound plus 1 MiB for the ZIP's headers and directory.
 const MaxFileZIPBytes = MaxSelectedFileBytes + 1<<20
 
 // ValidateFileZIP admits only a bounded ZIP containing the exact selected file.

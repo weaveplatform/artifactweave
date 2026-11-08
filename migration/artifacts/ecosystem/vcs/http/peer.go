@@ -42,6 +42,10 @@ func RefEndpoints(c repo.Config, owner, name string) ([]RefEndpoint, error) {
 	return endpoints, nil
 }
 
+// Variant names the response format of the endpoint: a Git ref
+// advertisement, or a peer's tags or branches JSON. The remote cache key
+// includes it, so the formats never share a cached entry, and every cached
+// listing is stored under it, so the values never change.
 func (e RefEndpoint) Variant() string {
 	if !e.peer {
 		return "vcs-git-refs-v1"
@@ -52,6 +56,11 @@ func (e RefEndpoint) Variant() string {
 	return "vcs-peer-tags-v1"
 }
 
+// Parse reads data, the endpoint's response, into its references: a Git
+// ref advertisement through ParseRefs, or a peer's JSON array, in which
+// every entry gives a valid reference name, a commit ID and an isBranch
+// flag that matches the endpoint, each name once, within MaxRefsBytes and
+// MaxRefs. It fails with ErrInvalidRefs.
 func (e RefEndpoint) Parse(data []byte) ([]Ref, error) {
 	if !e.peer {
 		return ParseRefs(data)

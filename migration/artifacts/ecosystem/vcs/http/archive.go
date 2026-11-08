@@ -13,12 +13,19 @@ import (
 	"strings"
 )
 
+// MaxArchiveBytes, MaxExpandedBytes and MaxArchiveFiles bound a provider
+// archive: 256 MiB as fetched, 1 GiB expanded and 100,000 entries. The
+// root files read at most MaxArchiveBytes of an archive before selecting a
+// file from it.
 const (
 	MaxArchiveBytes  = 256 << 20
 	MaxExpandedBytes = 1 << 30
 	MaxArchiveFiles  = 100000
 )
 
+// ErrInvalidArchive is the error the archive and file checks return for an
+// archive or selected-file ZIP they refuse: over a bound, corrupt, holding
+// an unsafe entry, or marked with another commit.
 var ErrInvalidArchive = errors.New("vcs: invalid vcs archive")
 
 // ValidateArchive checks a complete provider archive before it is admitted to

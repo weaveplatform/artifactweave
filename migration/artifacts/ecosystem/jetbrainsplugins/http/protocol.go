@@ -1,6 +1,3 @@
-// Package jetbrainspluginshttp serves the JetBrains Marketplace host protocol for
-// remote JetBrains Plugins repositories. The IDE sends this protocol when
-// idea.plugins.host points at Artifactory's api/jetbrainsplugins route.
 package jetbrainspluginshttp
 
 import (
