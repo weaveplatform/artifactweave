@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"path"
 
-	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 )
 
 // The Enforce Layout refusals, 403 with 7.x's words for each
