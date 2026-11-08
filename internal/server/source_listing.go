@@ -9,23 +9,23 @@ import (
 	"path"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func (s artifactoryService) getRemoteFolder(w http.ResponseWriter, r *http.Request,
-	c repo.Config, cached bool, req itemRequest, p auth.Principal, acc access,
+	c repo.Config, cached bool, req itemRequest, p kernel.Principal, acc access,
 ) bool {
 	if c.Class != repo.Remote || cached || !c.ListRemoteFolderItems.Bool() ||
 		(req.path != "" && !req.isFolder) {
 		return false
 	}
 	listing, err := remote.ListFolder(r.Context(), s.cfg.RemoteSources, source.Request{
-		Repo: c, Subject: auth.SubjectOf(p), Access: authz.AsAPI(acc.d), Project: c.ProjectKey,
+		Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.d, Project: c.ProjectKey,
 	}, req.path, &remote.ListingBudget{})
 	if err != nil {
 		writeErr(w, r, pkgroute.SourceError(err, p.Anonymous))

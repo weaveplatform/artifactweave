@@ -20,10 +20,10 @@
 //
 // # Inputs
 //
-//   - Driving: the item service (internal/service/item) calls the hooks and
-//     the optional interfaces on every deploy, checksum upload, folder
-//     create, copy, move, delete, restore, property change and download,
-//     with the Env it builds for the operation. The build and registry
+//   - Driving: the item service (migration/artifacts/core/item) calls the
+//     hooks and the optional interfaces on every deploy, checksum upload,
+//     folder create, copy, move, delete, restore, property change and
+//     download, with the Env it builds for the operation. The build and registry
 //     services pass their Registry on to it, remote retrieval classifies
 //     items with ClassOf, and the reindex API and configuration apply queue
 //     the reindex kinds with a WorkRequest.

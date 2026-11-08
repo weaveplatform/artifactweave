@@ -9,8 +9,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
-	"github.com/weaveplatform/artifactweave/internal/service/multipart"
+	"github.com/weaveplatform/artifactweave/migration/access"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -95,10 +96,16 @@ func npmServer(
 	if err != nil {
 		t.Fatal(err)
 	}
+	m, err := access.New(access.Deps{Store: db})
+	if err != nil {
+		t.Fatal(err)
+	}
 	cfg := harness.Config{
 		BaseURL: "https://reg.example", CompatVersion: "7.155.0",
 		Store: db, Blobs: blobs, Auth: a, Tokens: tokens, PasswordHash: testHash,
-		Multipart: &multipart.Service{Store: db, Blobs: blobs, Dir: t.TempDir()},
+		Multipart: &multipart.Service{
+			Store: db, Blobs: blobs, Dir: t.TempDir(), Restrictions: m.API().Restrictions,
+		},
 	}
 	for _, f := range tune {
 		f(&cfg)

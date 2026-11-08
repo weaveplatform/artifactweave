@@ -15,11 +15,11 @@
 //     version (Link, Sync) or look its version up (VersionOf), their
 //     reindexers rebuild a repository's index from their reading of its tree
 //     (Reconcile), and both find the files through Stored. The item service
-//     (internal/service/item) reads the versions of the items a delete or
-//     move takes, and prunes after it (VersionOf, Prune). The Terraform
-//     state service and the PyPI and Hugging Face protocol handlers read or
-//     link versions directly, and the download path records a version's
-//     last download (RecordDownload).
+//     (migration/artifacts/core/item) reads the versions of the items a
+//     delete or move takes, and prunes after it (VersionOf, Prune). The
+//     Terraform state service and the PyPI and Hugging Face protocol handlers
+//     read or link versions directly, and the download path records a
+//     version's last download (RecordDownload).
 //   - Driven: the metadata store's package index (packages, versions and
 //     version files), through the whole store.
 //   - A Version (repository, package type, package and version), item IDs

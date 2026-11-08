@@ -9,8 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/service/build"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -84,7 +85,7 @@ func (s artifactoryService) limitPrincipal(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		p, authenticated := auth.FromContext(r.Context())
+		p, authenticated := kernel.FromContext(r.Context())
 		name := "anonymous"
 		if authenticated && !p.Anonymous {
 			name = p.Name
@@ -151,10 +152,10 @@ func expensiveRequest(r *http.Request) bool {
 // or exhaust another account's repository quota.
 func (s artifactoryService) budgetResources(
 	r *http.Request,
-	p auth.Principal,
+	p kernel.Principal,
 	scope *apilimit.Scope,
 ) error {
-	d := auth.DeciderFrom(r.Context())
+	d, _ := accessapi.DeciderFrom(r.Context())
 	if d == nil {
 		return nil
 	}
@@ -165,13 +166,13 @@ func (s artifactoryService) budgetResources(
 		project = build.ProjectKey(r.URL.Query().Get("project"))
 	}
 	if project != "" && len(project) <= 128 {
-		_, adminErr := auth.RequireAdmin(ctx)
-		_, memberErr := s.cfg.Store.Projects().Member(ctx, project, types.PrincipalUser, p.Name)
+		_, adminErr := kernel.RequireAdmin(ctx)
+		memberErr := s.cfg.Access.Projects.Member(ctx, project, p.Name)
 		if memberErr != nil && !errors.Is(memberErr, store.ErrNotFound) {
 			return fmt.Errorf("budget project membership: %w", memberErr)
 		}
 		if adminErr == nil || memberErr == nil {
-			if _, err := s.cfg.Store.Projects().Get(ctx, project); err == nil {
+			if err := s.cfg.Access.Projects.Exists(ctx, project); err == nil {
 				scope.Project = project
 			} else if !errors.Is(err, store.ErrNotFound) {
 				return fmt.Errorf("budget project: %w", err)

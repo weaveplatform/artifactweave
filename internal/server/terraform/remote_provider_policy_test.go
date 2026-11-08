@@ -289,11 +289,10 @@ func TestAccRemoteProviderSignedCredentialRevocation(t *testing.T) {
 	if err := f.db.Tokens().Create(t.Context(), token); err != nil {
 		t.Fatal(err)
 	}
-	principal, err := f.auth.RestoreDownload(
+	principal, err := f.kit.API().Authenticator.RestoreDownload(
 		t.Context(),
 		"reader",
 		kernel.DownloadCredential{Kind: "token", TokenID: token.ID},
-		f.db.Tokens(),
 	)
 	if err != nil {
 		t.Fatal(err)

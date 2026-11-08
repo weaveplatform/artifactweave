@@ -10,13 +10,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format/alpine"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -47,7 +47,7 @@ type alpineCandidate struct {
 
 func (s artifactoryService) tryAlpineItem(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	cached bool, req itemRequest, p auth.Principal, acc access,
+	cached bool, req itemRequest, p kernel.Principal, acc access,
 ) bool {
 	if !alpine.Serves(c.PackageType) || req.isFolder {
 		return false
@@ -71,7 +71,7 @@ func (s artifactoryService) tryAlpineItem(
 
 func (s artifactoryService) serveAlpineIndex(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	cached bool, req itemRequest, p auth.Principal, acc access,
+	cached bool, req itemRequest, p kernel.Principal, acc access,
 ) {
 	ctx := r.Context()
 	if _, _, _, ok := alpine.ParseIndexPath(req.path); !ok || len(req.props) != 0 ||
@@ -166,7 +166,7 @@ func alpinePackageReadable(
 
 func (s artifactoryService) alpineMemberIndex(
 	ctx context.Context, st store.Store, c repo.Config, cached bool, path string,
-	p auth.Principal, acc access,
+	p kernel.Principal, acc access,
 ) (alpineIndexView, error) {
 	view := alpineIndexView{repo: c}
 	if c.Class == repo.Remote {
@@ -174,7 +174,7 @@ func (s artifactoryService) alpineMemberIndex(
 			return view, source.ErrUnavailable
 		}
 		query := source.Request{
-			Repo: c, Subject: auth.SubjectOf(p), Access: authz.AsAPI(acc.d), Project: c.ProjectKey,
+			Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.d, Project: c.ProjectKey,
 			CacheOnly: cached,
 			Resource:  source.Resource{Path: path, Method: http.MethodGet},
 		}
@@ -249,7 +249,7 @@ func (s artifactoryService) readAlpineBlob(ctx context.Context, sha string) ([]b
 // the first readable member, which is the same member package GET must use.
 func (s artifactoryService) alpineCandidates(
 	ctx context.Context, st store.Store, c repo.Config, indexPath string,
-	p auth.Principal, acc access, seen map[string]bool,
+	p kernel.Principal, acc access, seen map[string]bool,
 ) ([]alpineCandidate, error) {
 	if seen[c.Key] || len(seen) >= 8 {
 		return nil, errAlpineVirtualCycle
@@ -318,7 +318,7 @@ func (s artifactoryService) alpineCandidates(
 
 func (s artifactoryService) serveVirtualAlpinePackage(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	req itemRequest, p auth.Principal, acc access,
+	req itemRequest, p kernel.Principal, acc access,
 ) {
 	if _, _, _, _, ok := alpine.ParsePath(req.path); !ok || len(req.props) != 0 ||
 		r.URL.RawQuery != "" {
@@ -362,12 +362,12 @@ func (s artifactoryService) serveVirtualAlpinePackage(
 
 func (s artifactoryService) serveRemoteAlpinePackage(
 	w http.ResponseWriter, r *http.Request, c repo.Config, req itemRequest,
-	p auth.Principal, acc access,
+	p kernel.Principal, acc access,
 ) {
 	query := source.Request{
 		Repo:    c,
-		Subject: auth.SubjectOf(p),
-		Access:  authz.AsAPI(acc.d),
+		Subject: accessapi.SubjectOf(p),
+		Access:  acc.d,
 		Project: c.ProjectKey,
 		Resource: source.Resource{
 			Kind:   source.ResourceKindArtifact,

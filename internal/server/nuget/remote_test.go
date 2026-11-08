@@ -16,15 +16,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/nuget"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
-	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -130,28 +130,13 @@ func (f *remoteFixture) mount(t *testing.T, public string) {
 	t.Helper()
 	r := chi.NewRouter()
 	r.Use(baseurl.Middleware(public))
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			name := r.Header.Get("X-Test-User")
-			p := auth.Principal{Name: name, Admin: name == "admin"}
-			if name == "" || name == "anonymous" {
-				p = auth.Anonymous
-			}
-			p, decider, err := auth.Authorize(
-				r.Context(),
-				authz.Sources{
-					Permissions:      f.db.Permissions(),
-					Groups:           f.db.Groups(),
-					AnonymousEnabled: true,
-				},
-				p,
-			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
-		})
-	})
+	r.Use(accesstest.Over(t, f.db).Middleware(t, true, func(r *http.Request) kernel.Principal {
+		name := r.Header.Get("X-Test-User")
+		if name == "" || name == "anonymous" {
+			return kernel.Anonymous
+		}
+		return kernel.Principal{Name: name, Admin: name == "admin"}
+	}))
 	pkgroute.Mount(r, f.opts, nuget.V3(f.svc))
 	pkgroute.Mount(r, f.opts, nuget.V2(f.svc))
 	f.h = r

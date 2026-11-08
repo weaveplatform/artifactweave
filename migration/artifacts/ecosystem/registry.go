@@ -20,7 +20,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/gems"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/format/gitlfs"
-	"github.com/weaveplatform/artifactweave/internal/format/golang"
 	"github.com/weaveplatform/artifactweave/internal/format/helm"
 	"github.com/weaveplatform/artifactweave/internal/format/hex"
 	"github.com/weaveplatform/artifactweave/internal/format/huggingface"
@@ -42,6 +41,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/vagrant"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang"
 )
 
 // Settings are the server-wide options of the formats that take any, from

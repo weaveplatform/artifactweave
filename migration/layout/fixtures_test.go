@@ -59,7 +59,7 @@ var traversalInputs = map[exemption]string{
 		"that climbs out of the archive, which the upload must reject",
 	{"internal/server/conda/shards_test.go", parentPrefix}: "a relative shard base URL that " +
 		"climbs out of the channel, which shardURLs must reject",
-	{"internal/service/registry/registry_test.go", parentPrefix}: "prefixes an id that Status " +
+	{"migration/artifacts/core/registry/registry_test.go", parentPrefix}: "prefixes an id that Status " +
 		"must not resolve",
 	{"migration/platform/blob/blob_test.go", parentPrefix}: "prefixes an upload id that " +
 		"ValidUploadID must reject",

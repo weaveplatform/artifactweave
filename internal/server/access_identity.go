@@ -12,6 +12,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/service/identity"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
@@ -71,7 +72,8 @@ func (s accessService) identityFor(ctx context.Context, self string) (*identity.
 	if self != "" && p.Name == self {
 		return svc, nil
 	}
-	a, err := accessFor(ctx, svc.Store, p, auth.DeciderFrom(ctx))
+	d, _ := accessapi.DeciderFrom(ctx)
+	a, err := accessFor(ctx, s.cfg.Access.Authorizer, p, d)
 	if err != nil {
 		return nil, s.identityErr(ctx, "evaluate permissions", "", err)
 	}

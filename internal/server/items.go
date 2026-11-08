@@ -16,7 +16,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/format/alpine"
 	"github.com/weaveplatform/artifactweave/internal/format/debian"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
@@ -24,11 +23,13 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/rpm"
 	"github.com/weaveplatform/artifactweave/internal/reindexauth"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
-	"github.com/weaveplatform/artifactweave/internal/service/build"
-	"github.com/weaveplatform/artifactweave/internal/service/item"
-	"github.com/weaveplatform/artifactweave/internal/service/registry"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -105,12 +106,13 @@ func parseEscapedItemPath(escaped string) (itemRequest, error) {
 func (s artifactoryService) itemCaller(
 	ctx context.Context,
 	st store.Store,
-) (auth.Principal, access, error) {
+) (kernel.Principal, access, error) {
 	p, err := principal(ctx)
 	if err != nil {
 		return p, access{}, err
 	}
-	a, err := accessFor(ctx, st, p, auth.DeciderFrom(ctx))
+	d, _ := accessapi.DeciderFrom(ctx)
+	a, err := accessFor(ctx, s.cfg.Access.Authorizer, p, d)
 	if err != nil {
 		return p, access{}, s.internalError(ctx, "item permissions", err)
 	}
@@ -182,7 +184,7 @@ func (s artifactoryService) itemError(ctx context.Context, op string, err error)
 // UploadServiceImpl.handleInvalidDeployPathError answers one: a client that
 // sends credentials only when challenged would otherwise never send them.
 func overwriteRefusal(ctx context.Context, e *item.OverwriteDeniedError) error {
-	if p, ok := auth.FromContext(ctx); ok && !p.Anonymous {
+	if p, ok := kernel.FromContext(ctx); ok && !p.Anonymous {
 		return apierror.New(http.StatusForbidden, e.Error())
 	}
 	return apierror.New(http.StatusUnauthorized, e.Error())
@@ -408,7 +410,7 @@ func (artifactoryService) deployRequest(
 	r *http.Request,
 	t item.Target,
 	req itemRequest,
-	p auth.Principal,
+	p kernel.Principal,
 ) item.Deploy {
 	return item.Deploy{
 		Target:     t,
@@ -426,7 +428,7 @@ func (s artifactoryService) fileDeploy(
 	r *http.Request,
 	t item.Target,
 	req itemRequest,
-	p auth.Principal,
+	p kernel.Principal,
 	acc access,
 ) item.Deploy {
 	d := s.deployRequest(r, t, req, p)
@@ -456,7 +458,7 @@ func (s artifactoryService) mayBeIdentical(byChecksum bool) bool {
 // multipart upload of the content, which no item holds until this deploy.
 func (s artifactoryService) reusable(
 	st store.Store,
-	p auth.Principal,
+	p kernel.Principal,
 	acc access,
 	token string,
 ) func(context.Context, types.Blob) (bool, error) {
@@ -848,7 +850,7 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 // precedence over generic item lookup while preserving their dispatch order.
 func (s artifactoryService) tryFormatItem(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	cached bool, req itemRequest, p auth.Principal, acc access,
+	cached bool, req itemRequest, p kernel.Principal, acc access,
 ) bool {
 	return s.tryAgentMarketplaceItem(w, r, st, c, cached, req, p, acc) ||
 		s.tryAlpineItem(w, r, st, c, cached, req, p, acc) ||
@@ -929,7 +931,7 @@ func (s artifactoryService) serveFile(
 	r *http.Request,
 	st store.Store,
 	f found,
-	p auth.Principal,
+	p kernel.Principal,
 ) {
 	ctx := r.Context()
 	it := f.item
@@ -1161,7 +1163,7 @@ func (s artifactoryService) deleteItem(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetUploadsConfig tells the JFrog CLI whether to upload large files in
-// parts (internal/service/multipart) or in one request (research 09).
+// parts (migration/artifacts/core/multipart) or in one request (research 09).
 func (s artifactoryService) GetUploadsConfig(
 	context.Context,
 	artgen.GetUploadsConfigRequestObject,

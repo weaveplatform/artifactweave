@@ -9,11 +9,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
-	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -33,16 +34,13 @@ func discoveryFixture(
 	if err != nil {
 		t.Fatal(err)
 	}
+	kit := accesstest.Over(t, w.db)
 	service.Revalidate = func(ctx context.Context, q source.Request, p source.Permit) error {
 		id, err := w.db.RemoteCache().Source(ctx, q.Repo.Key)
 		if err != nil || id != p.Identity {
 			return source.ErrSuperseded
 		}
-		access, err := authz.New(
-			ctx,
-			authz.Sources{Permissions: w.db.Permissions(), Groups: w.db.Groups()},
-			q.Subject,
-		)
+		access, err := kit.Decide(ctx, q.Subject, false)
 		if err != nil {
 			return source.ErrUnavailable
 		}
@@ -54,7 +52,7 @@ func discoveryFixture(
 		}
 		if !allows(
 			types.ResourceArtifact,
-			authz.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)},
+			accessapi.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)},
 			full,
 			types.ActionRead,
 		) {
@@ -87,16 +85,12 @@ func discoveryGrant(t *testing.T, w *policyWorld, q *source.Request, includes ..
 	if err != nil {
 		t.Fatal(err)
 	}
-	q.Subject = authz.Subject{Name: "mapped"}
-	mapped, err := authz.New(
-		t.Context(),
-		authz.Sources{Permissions: w.db.Permissions(), Groups: w.db.Groups()},
-		q.Subject,
-	)
+	q.Subject = accessapi.Subject{Name: "mapped"}
+	mapped, err := accesstest.Over(t, w.db).Decide(t.Context(), q.Subject, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	q.Access = authz.AsAPI(mapped)
+	q.Access = mapped
 }
 
 func TestAccMappedListingCanonicalAuthorityCacheAndRevocation(t *testing.T) {

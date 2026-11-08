@@ -10,9 +10,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format/p2"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -539,9 +540,8 @@ func TestAccP2VirtualFiltersMembersAndDeniesUnpermittedChild(t *testing.T) {
 
 func TestUnitP2VirtualFailsClosedWhenMemberStoreFails(t *testing.T) {
 	w := newItemWorld(t, false)
-	d, err := authz.New(t.Context(), authz.Sources{
-		Permissions: w.db.Permissions(), Groups: w.db.Groups(),
-	}, authz.Subject{Name: "admin", Admin: true})
+	admin := accessapi.Subject{Name: "admin", Admin: true}
+	d, err := accesstest.Over(t, w.db).Decide(t.Context(), admin, false)
 	if err != nil {
 		t.Fatal(err)
 	}

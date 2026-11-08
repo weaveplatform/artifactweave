@@ -13,10 +13,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/format/rpm"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
@@ -260,7 +261,8 @@ func (s artifactoryService) CalculateYumRepositoryMetadata(
 		if err != nil {
 			return nil, err
 		}
-		acc, err := accessFor(ctx, st, p, auth.DeciderFrom(ctx))
+		d, _ := accessapi.DeciderFrom(ctx)
+		acc, err := accessFor(ctx, s.cfg.Access.Authorizer, p, d)
 		if err != nil {
 			return nil, s.internalError(ctx, "RPM virtual rights", err)
 		}
@@ -276,7 +278,7 @@ func (s artifactoryService) CalculateYumRepositoryMetadata(
 		if err != nil {
 			return nil, s.internalError(ctx, "RPM virtual metadata", err)
 		}
-		if err := signVirtualRPM(ctx, st, c, meta.Files); err != nil {
+		if err := signVirtualRPM(ctx, s.cfg.Access.Keys, c, meta.Files); err != nil {
 			return nil, s.internalError(ctx, "RPM virtual metadata signing", err)
 		}
 		return artgen.CalculateYumRepositoryMetadata200TextResponse(
@@ -411,7 +413,8 @@ func (s artifactoryService) operationRepo(
 		return nil, c, "", denied(p)
 	}
 	if !op.isAdminOnly {
-		acc, err := accessFor(ctx, st, p, auth.DeciderFrom(ctx))
+		d, _ := accessapi.DeciderFrom(ctx)
+		acc, err := accessFor(ctx, s.cfg.Access.Authorizer, p, d)
 		if err != nil {
 			return nil, c, "", s.internalError(ctx, "operation rights", err)
 		}
@@ -494,14 +497,14 @@ func (s artifactoryService) queueRemoteReindex(
 			if err != nil {
 				return err
 			}
-			if s.cfg.Auth == nil {
+			if s.cfg.Access.Authenticator == nil {
 				return denied(p)
 			}
-			current, err := s.cfg.Auth.Current(ctx, p, st.Tokens())
+			current, err := s.cfg.Access.Authenticator.Current(ctx, p)
 			if err != nil {
 				return denied(p)
 			}
-			ctx = auth.WithPrincipal(ctx, current)
+			ctx = kernel.WithPrincipal(ctx, current)
 			_, latest, by, err := s.operationRepo(
 				ctx,
 				repo.NuGet,

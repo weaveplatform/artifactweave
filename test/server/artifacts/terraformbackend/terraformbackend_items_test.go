@@ -10,9 +10,9 @@ import (
 	"time"
 
 	tfbe "github.com/weaveplatform/artifactweave/internal/format/terraformbackend"
-	"github.com/weaveplatform/artifactweave/internal/service/item"
-	"github.com/weaveplatform/artifactweave/internal/service/terraformstate"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/terraformstate"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"

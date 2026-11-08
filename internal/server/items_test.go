@@ -575,7 +575,7 @@ func TestAccReadsContent(t *testing.T) {
 	for n := range store.MaxLimit {
 		put("gone", fmt.Sprintf("f%d.bin", n))
 	}
-	acc, err := accessFor(ctx, db, auth.Principal{Name: "admin", Admin: true}, nil)
+	acc, err := accessFor(ctx, authorizerOver(db), auth.Principal{Name: "admin", Admin: true}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

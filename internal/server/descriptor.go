@@ -42,7 +42,11 @@ func (s artifactoryService) patchConfiguration(w http.ResponseWriter, r *http.Re
 		fail(badRequestf("%s", err.Error()))
 		return
 	}
-	res, err := descriptor.Apply(ctx, st, p, time.Now(), false)
+	res, err := descriptor.Apply(ctx, st, descriptor.Access{
+		Keys:            s.cfg.Access.Keys,
+		Projects:        s.cfg.Access.Projects,
+		AnonymousAccess: s.cfg.Access.AnonymousAccess,
+	}, p, time.Now(), false)
 	switch {
 	case errors.Is(err, descriptor.ErrInvalid):
 		fail(badRequestf("%s", err.Error()))

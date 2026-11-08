@@ -22,14 +22,14 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/reindexauth"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server"
-	"github.com/weaveplatform/artifactweave/internal/service/gc"
-	"github.com/weaveplatform/artifactweave/internal/service/item"
-	"github.com/weaveplatform/artifactweave/internal/service/multipart"
-	"github.com/weaveplatform/artifactweave/internal/service/registry"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/migration/access"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -107,6 +107,7 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	if err != nil {
 		return nil, errors.Join(err, st.Close())
 	}
+	accessAPI := accessModule.API()
 	hotTier, coldTier := tiers(cfg, st)
 	hot, err := hotTier.open(ctx, st, log)
 	if err != nil {
@@ -122,6 +123,7 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	// sessions that go stale.
 	parts := &multipart.Service{
 		Store: st, Blobs: hot.store, Dir: filepath.Join(cfg.DataDir, "multipart"),
+		Restrictions: accessAPI.Restrictions,
 	}
 	if err := parts.Sweep(ctx); err != nil {
 		log.Warn("multipart upload staging sweep failed", "error", err)
@@ -140,6 +142,7 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 			registry.Backend:  uploads.Reap,
 		},
 		Expirers: []func(context.Context, time.Time) (int, error){uploads.ExpireUploads},
+		Tokens:   accessAPI.Tokens,
 	})
 	if err != nil {
 		return nil, errors.Join(err, st.Close())
@@ -158,7 +161,6 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	// before Run leases. The maxUniqueSnapshots cleanups wait for their timers,
 	// as 7.x's do.
 	fs := formatSettings(cfg, keys)
-	accessAPI := accessModule.API()
 	derived := &item.Service{
 		Store: st, Blobs: hot.store, Work: queue, Formats: fs.For,
 		Keys:             accessAPI.Keys,
@@ -204,7 +206,7 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 		return nil, errors.Join(err, st.Close())
 	}
 	if err := registerDebianSnapshotWork(queue, server.Config{
-		Store: st, Blobs: hot.store, Auth: authn, Access: accessModule.API(), Work: queue,
+		Store: st, Blobs: hot.store, Access: accessAPI, Work: queue,
 		RemoteSources: rt.remoteSources, FormatSettings: fs,
 	}); err != nil {
 		stop()

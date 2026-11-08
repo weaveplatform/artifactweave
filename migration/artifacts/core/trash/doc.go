@@ -1,6 +1,6 @@
 // Package trash restores, cleans and purges the trash can (decision 0010).
-// Deleting an item moves its record here (internal/service/item), as does
-// deleting a repository (Keep, internal/repos).
+// Deleting an item moves its record here (migration/artifacts/core/item), as
+// does deleting a repository (Keep, migration/artifacts/core/repos).
 //
 // # Role
 //
@@ -15,14 +15,15 @@
 //   - Driving: the trash can API (POST /api/trash/empty,
 //     DELETE /api/trash/clean/{repoKey}/{path} and
 //     POST /api/trash/restore/{repoKey}/{path}) and the storage API's views
-//     of auto-trashcan paths; the repository delete (internal/repos), which
-//     keeps a repository's content here (Keep); the garbage collector
-//     (internal/service/gc), which expires entries (PurgeExpired); and the
-//     format contract suite (artifacts/core/formattest), which restores.
+//     of auto-trashcan paths; the repository delete
+//     (migration/artifacts/core/repos), which keeps a repository's content
+//     here (Keep); the garbage collector (migration/artifacts/core/gc),
+//     which expires entries (PurgeExpired); and the format contract suite
+//     (artifacts/core/formattest), which restores.
 //   - Driven: the metadata store, for trash entries, items and their
 //     properties, blob references, the trash can settings and transactions;
-//     and the item service (internal/service/item), which recreates restored
-//     items and names the sidecars a file's format keeps with it
+//     and the item service (migration/artifacts/core/item), which recreates
+//     restored items and names the sidecars a file's format keeps with it
 //     (format.SidecarKeeper).
 //   - The trash can settings: whether it is on, and the retention period in
 //     days. Unset, it is on with Artifactory's 14 days.

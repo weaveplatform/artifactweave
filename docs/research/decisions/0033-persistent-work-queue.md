@@ -225,7 +225,7 @@ These assignments describe planned work, not current runtime support.
   `periodic_test.go`: periodic kinds, their timer and `RunDue`.
 - `internal/format/npm/work_test.go` and `internal/server/npm_operations_test.go`: npm's
   queued reindex and conversion, a conversion that fails and is parked, and its resume.
-- `internal/service/item/work_test.go`: the reindex kinds, through any format, of a whole
-  repository and of a path. `internal/server/reindex_test.go`: each P8 reindex operation's
+- `migration/artifacts/core/item/work_test.go`: the reindex kinds, through any format, of a
+  whole repository and of a path. `internal/server/reindex_test.go`: each P8 reindex operation's
   permission, classes, timing and answer through a test-only format, and its 501 without
   one; `status_reindex_test.go` and `matrix_reindex_test.go`: their rows.

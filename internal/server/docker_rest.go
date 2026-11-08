@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
 	"github.com/weaveplatform/artifactweave/internal/server/docker"
-	"github.com/weaveplatform/artifactweave/internal/service/registry"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -180,7 +180,7 @@ func (s artifactoryService) promotionTags(
 	pr registry.Promotion,
 	args promotion,
 	acc access,
-	p auth.Principal,
+	p kernel.Principal,
 ) ([]registry.Rename, error) {
 	tags, err := svc.PromotedTags(ctx, pr.From, args.tag)
 	switch {

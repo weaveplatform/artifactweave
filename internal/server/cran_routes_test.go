@@ -363,7 +363,7 @@ func TestUnitCRANReadAuthorityCallbacks(t *testing.T) {
 		{"upstream fault", admin, errors.New("upstream fault"), false, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			acc, err := accessFor(t.Context(), w.db, tc.who, nil)
+			acc, err := accessFor(t.Context(), authorizerOver(w.db), tc.who, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

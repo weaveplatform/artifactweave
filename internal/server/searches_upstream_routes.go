@@ -7,8 +7,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -164,18 +162,15 @@ func (u *upstreamSearch) checkDisclosures(ctx context.Context) error {
 	if len(u.disclosures) == 0 {
 		return nil
 	}
-	if u.r.s.cfg.Auth == nil {
+	api := u.r.s.cfg.Access
+	if api.Authenticator == nil {
 		return source.ErrDenied
 	}
-	current, err := u.r.s.cfg.Auth.Current(ctx, u.r.p, u.r.st.Tokens())
+	current, err := api.Authenticator.Current(ctx, u.r.p)
 	if err != nil {
 		return source.ErrDenied
 	}
-	_, d, err := auth.Authorize(
-		ctx,
-		authz.Sources{Permissions: u.r.st.Permissions(), Groups: u.r.st.Groups()},
-		current,
-	)
+	_, d, err := api.Authorizer.Authorize(ctx, current, false)
 	if err != nil {
 		return source.ErrDenied
 	}

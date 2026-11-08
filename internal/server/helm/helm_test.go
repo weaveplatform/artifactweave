@@ -15,15 +15,15 @@ import (
 	"github.com/go-chi/chi/v5"
 	"gopkg.in/yaml.v3"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	helmfmt "github.com/weaveplatform/artifactweave/internal/format/helm"
 	"github.com/weaveplatform/artifactweave/internal/server/helm"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
-	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
@@ -70,28 +70,16 @@ func newFixture(t *testing.T, relative bool) *fixture {
 		}
 	}
 	router := chi.NewRouter()
-	router.Use(baseurl.Middleware("https://proxy.example"), func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	router.Use(
+		baseurl.Middleware("https://proxy.example"),
+		accesstest.Over(t, db).Middleware(t, true, func(r *http.Request) kernel.Principal {
 			name := r.Header.Get("X-User")
-			p := auth.Principal{Name: name, Admin: name == "admin"}
 			if name == "anonymous" {
-				p = auth.Anonymous
+				return kernel.Anonymous
 			}
-			p, decider, err := auth.Authorize(
-				r.Context(),
-				authz.Sources{
-					Permissions:      db.Permissions(),
-					Groups:           db.Groups(),
-					AnonymousEnabled: true,
-				},
-				p,
-			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
-		})
-	})
+			return kernel.Principal{Name: name, Admin: name == "admin"}
+		}),
+	)
 	pkgroute.Mount(
 		router,
 		pkgroute.Options{

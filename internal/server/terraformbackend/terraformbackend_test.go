@@ -17,14 +17,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	tfbe "github.com/weaveplatform/artifactweave/internal/format/terraformbackend"
-	"github.com/weaveplatform/artifactweave/internal/service/item"
-	"github.com/weaveplatform/artifactweave/internal/service/terraformstate"
-	"github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/terraformstate"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
@@ -40,7 +39,7 @@ type fixture struct {
 	keys      *crypt.Keyring
 	now       time.Time
 	h         http.Handler
-	principal func(auth.Principal) auth.Principal
+	principal func(kernel.Principal) kernel.Principal
 	faults    []error
 }
 
@@ -83,19 +82,16 @@ func newFixture(t *testing.T) *fixture {
 		"**",
 	)
 	f.grant("scoped", map[string]types.Actions{"scoped": types.ActionRead}, "workspaces/visible/**")
-	m, err := access.New(access.Deps{Store: db})
-	if err != nil {
-		t.Fatal(err)
-	}
+	api := accesstest.Over(t, db).API()
 	f.h = f.router(
 		Options{
 			Items:        f.items,
 			Keys:         keys,
 			Now:          func() time.Time { return f.now },
 			Fault:        func(_ *http.Request, err error) { f.faults = append(f.faults, err) },
-			Authorizer:   m.API().Authorizer,
-			Identity:     m.API().Identity,
-			Restrictions: m.API().Restrictions,
+			Authorizer:   api.Authorizer,
+			Identity:     api.Identity,
+			Restrictions: api.Restrictions,
 		},
 	)
 	return f
@@ -111,36 +107,34 @@ func (f *fixture) grant(name string, users map[string]types.Actions, path string
 }
 
 func (f *fixture) router(o Options) http.Handler {
+	principalOf := func(r *http.Request) kernel.Principal {
+		name := r.Header.Get("X-User")
+		u, err := f.db.Users().Get(r.Context(), name)
+		if err != nil {
+			f.t.Fatal(err)
+		}
+		p := kernel.Principal{
+			Name:      name,
+			Admin:     u.Admin,
+			Groups:    u.Groups,
+			Anonymous: name == "anonymous",
+		}
+		if f.principal != nil {
+			p = f.principal(p)
+		}
+		return p
+	}
+	authorize := accesstest.Over(f.t, f.db).Middleware(f.t, false, principalOf)
 	r := chi.NewRouter()
 	r.Use(baseurl.Middleware("https://registry.test"))
 	r.Use(func(next http.Handler) http.Handler {
+		authorized := authorize(next)
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			name := r.Header.Get("X-User")
-			if name != "" {
-				u, err := f.db.Users().Get(r.Context(), name)
-				if err != nil {
-					f.t.Fatal(err)
-				}
-				p := auth.Principal{
-					Name:      name,
-					Admin:     u.Admin,
-					Groups:    u.Groups,
-					Anonymous: name == "anonymous",
-				}
-				if f.principal != nil {
-					p = f.principal(p)
-				}
-				p, decider, err := auth.Authorize(
-					r.Context(),
-					authz.Sources{Permissions: f.db.Permissions(), Groups: f.db.Groups()},
-					p,
-				)
-				if err != nil {
-					f.t.Fatal(err)
-				}
-				r = r.WithContext(auth.WithAuthorized(r.Context(), p, decider))
+			if r.Header.Get("X-User") == "" {
+				next.ServeHTTP(w, r)
+				return
 			}
-			next.ServeHTTP(w, r)
+			authorized.ServeHTTP(w, r)
 		})
 	})
 	Register(r, o)
@@ -559,18 +553,15 @@ type readFunc func([]byte) (int, error)
 func (f readFunc) Read(p []byte) (int, error) { return f(p) }
 
 func hWith(f *fixture) handler {
-	m, err := access.New(access.Deps{Store: f.db})
-	if err != nil {
-		f.t.Fatal(err)
-	}
+	api := accesstest.Over(f.t, f.db).API()
 	return handler{
 		o: Options{
 			Items:        f.items,
 			Keys:         f.keys,
 			Now:          func() time.Time { return f.now },
-			Authorizer:   m.API().Authorizer,
-			Identity:     m.API().Identity,
-			Restrictions: m.API().Restrictions,
+			Authorizer:   api.Authorizer,
+			Identity:     api.Identity,
+			Restrictions: api.Restrictions,
 		},
 		states: &terraformstate.Service{Items: f.items, Keys: f.keys},
 	}
@@ -723,31 +714,20 @@ func TestAccCapabilityPreservesTokenIdentityScopeAndExpiry(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			a, err := auth.NewAuthenticator(
-				f.db.Users(),
-				f.db.Settings(),
-				auth.Options{
-					Groups: f.db.Groups(),
-					Hash:   auth.HashParams{MemoryKiB: 64, Time: 1, Threads: 1},
-					Tokens: fixedToken{
-						types.Token{
-							ID:        "original-token",
-							Subject:   "jfac@fixture/users/" + name,
-							Scope:     parsed,
-							Identity:  identity,
-							ExpiresAt: f.now.Add(30 * time.Second),
-						},
-					},
+			authn := accesstest.Over(t, f.db, accesstest.WithTokenVerifier(fixedToken{
+				types.Token{
+					ID:        "original-token",
+					Subject:   "jfac@fixture/users/" + name,
+					Scope:     parsed,
+					Identity:  identity,
+					ExpiresAt: f.now.Add(30 * time.Second),
 				},
-			)
+			})).API().Authenticator
+			p, err := authn.Token(t.Context(), "token", "")
 			if err != nil {
 				t.Fatal(err)
 			}
-			p, err := a.Token(t.Context(), "token", "")
-			if err != nil {
-				t.Fatal(err)
-			}
-			f.principal = func(auth.Principal) auth.Principal { return p }
+			f.principal = func(kernel.Principal) kernel.Principal { return p }
 			id, upload := f.pending("alice", stateBody(1), 1)
 			u, _ := url.Parse(upload)
 			cl, valid := hWith(f).verify(u.Query().Get("token"), id)

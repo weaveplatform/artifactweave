@@ -9,6 +9,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -88,7 +89,7 @@ func TestUnitDebianSnapshotRequiresValidRepositoriesAndPermissions(t *testing.T)
 			if tc.user != "" {
 				p = auth.Principal{Name: tc.user}
 			}
-			acc, err := accessFor(ctx, st, p, nil)
+			acc, err := accessFor(ctx, authorizerOver(st), p, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -143,7 +144,7 @@ func TestUnitDebianSnapshotPreservesCompletedAndClaimedTags(t *testing.T) {
 				t.Fatal(err)
 			}
 			p := auth.Principal{Name: "admin", Admin: true}
-			acc, err := accessFor(ctx, st, p, nil)
+			acc, err := accessFor(ctx, authorizerOver(st), p, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -247,5 +248,35 @@ func TestUnitDebianSnapshotWorkUsesCurrentPermissions(t *testing.T) {
 	}
 	if err := run("other"); !errors.Is(err, auth.ErrForbidden) {
 		t.Fatalf("a caller without the grant: %v", err)
+	}
+}
+
+// Without an authenticator a queued snapshot cannot recheck its caller's
+// credential, so the job is refused for good rather than retried.
+func TestUnitDebianSnapshotWorkWithoutAuthenticator(t *testing.T) {
+	ctx := t.Context()
+	st := inmem.New()
+	q, err := work.New(st, work.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := RegisterDebianSnapshotWork(q, Config{Store: st}); err != nil {
+		t.Fatal(err)
+	}
+	payload, err := json.Marshal(debianSnapshotRequest{
+		Source: "deb-source", Target: "deb-target", Tag: "first", Distribution: "stable",
+		Credential: kernel.Principal{Name: "dev", Password: true}.CredentialReference(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	const key = "deb-target/first"
+	if err := q.Enqueue(ctx, debianSnapshotKind, key, payload); err != nil {
+		t.Fatal(err)
+	}
+	err = q.EnsureFresh(ctx, debianSnapshotKind, key)
+	if !errors.Is(err, work.ErrPermanent) ||
+		err.Error() != "work: permanent refusal: debian snapshot authentication unavailable" {
+		t.Fatalf("a snapshot without an authenticator: %v", err)
 	}
 }

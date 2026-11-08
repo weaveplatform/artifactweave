@@ -8,9 +8,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -24,7 +25,7 @@ func (s artifactoryService) GetStorageSummaryInfo(
 	ctx context.Context,
 	_ artgen.GetStorageSummaryInfoRequestObject,
 ) (artgen.GetStorageSummaryInfoResponseObject, error) {
-	p, err := auth.RequireAuthenticated(ctx)
+	p, err := kernel.RequireAuthenticated(ctx)
 	if err != nil {
 		return nil, err //nolint:wrapcheck // an apierror value
 	}
@@ -32,12 +33,13 @@ func (s artifactoryService) GetStorageSummaryInfo(
 	if err != nil {
 		return nil, err
 	}
-	a, err := accessFor(ctx, st, p, auth.DeciderFrom(ctx))
+	d, _ := accessapi.DeciderFrom(ctx)
+	a, err := accessFor(ctx, s.cfg.Access.Authorizer, p, d)
 	if err != nil {
 		return nil, s.internalError(ctx, "storage summary access", err)
 	}
 	if !a.d.System("info/storage", types.ScopeRead) {
-		return nil, auth.ErrForbidden
+		return nil, kernel.ErrForbidden
 	}
 	sum, err := usage.Summarize(ctx, st, s.cfg.BlobLocation)
 	if err != nil {

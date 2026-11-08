@@ -9,7 +9,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
-	"github.com/weaveplatform/artifactweave/internal/authz"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -87,12 +87,12 @@ func TestAccAuthenticateAttachesDecider(t *testing.T) {
 		reached bool
 		p       auth.Principal
 		stored  bool
-		d       *authz.Decider
+		d       accessapi.Decider
 	)
 	h := authenticate(a, db, skip)(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		reached = true
 		p, stored = auth.FromContext(r.Context())
-		d = auth.DeciderFrom(r.Context())
+		d, _ = accessapi.DeciderFrom(r.Context())
 	}))
 	check := func(name, path string, headers map[string]string, authorised bool) {
 		t.Helper()

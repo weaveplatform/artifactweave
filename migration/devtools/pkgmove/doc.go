@@ -33,11 +33,13 @@
 //   - move: git mv of the files each entry carries (the files directly in
 //     the directory, renamed by the entry, and asset subdirectories that hold
 //     no package), the package clause, every importer's import path with its
-//     qualifiers renamed or the old name kept as an import name, the paths in
-//     Go string literals and comments, the fixed configuration list and the
-//     living Markdown, the server test ownership inventory as JSON, then the
-//     regeneration steps and the stale check. An import that a merge repeats
-//     is removed. -dry-run prints the plan only.
+//     qualifiers renamed (and the new name as its import name when the
+//     directory is named otherwise, as http/ holds <type>http) or the old
+//     name kept as an import name, the paths in Go string literals and
+//     comments, the fixed configuration list and the living Markdown, the
+//     server test ownership inventory as JSON, then the regeneration steps
+//     and the stale check. An import that a merge repeats is removed.
+//     -dry-run prints the plan only.
 //   - move of file entries, after the package entries: git mv of each listed
 //     file, or each tracked file of an asset directory, to the entry's
 //     target; a moved Go file takes the target's package name, a test keeps

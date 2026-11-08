@@ -11,10 +11,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/kernel/antpath"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
@@ -125,7 +126,7 @@ func results(entries []map[string]any) map[string]any {
 type searchRun struct {
 	s       artifactoryService
 	st      store.Store
-	p       auth.Principal
+	p       kernel.Principal
 	acc     access
 	configs map[string]repo.Config
 	repos   aql.Repositories
@@ -141,12 +142,13 @@ func (s artifactoryService) newSearch(ctx context.Context, named bool) (*searchR
 	}
 	p, err := principal(ctx)
 	if named {
-		p, err = auth.RequireAuthenticated(ctx)
+		p, err = kernel.RequireAuthenticated(ctx)
 	}
 	if err != nil {
 		return nil, err //nolint:wrapcheck // apierror values, rendered by status
 	}
-	acc, err := accessFor(ctx, st, p, auth.DeciderFrom(ctx))
+	d, _ := accessapi.DeciderFrom(ctx)
+	acc, err := accessFor(ctx, s.cfg.Access.Authorizer, p, d)
 	if err != nil {
 		return nil, s.internalError(ctx, "search permissions", err)
 	}
@@ -205,7 +207,13 @@ func (r *searchRun) collect(
 		}
 		read := len(hits)
 		if !r.p.Admin {
-			if hits, err = readable(ctx, r.st, r.p, r.configs, hits); err != nil {
+			if hits, err = readable(
+				ctx,
+				r.s.cfg.Access.Authorizer,
+				r.p,
+				r.configs,
+				hits,
+			); err != nil {
 				return nil, r.s.internalError(ctx, "search permissions", err)
 			}
 		}

@@ -9,12 +9,12 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/server/vcs"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -22,7 +22,7 @@ import (
 
 type vcsAccess struct {
 	repo        repo.Config
-	principal   auth.Principal
+	principal   kernel.Principal
 	access      access
 	isCacheOnly bool
 }
@@ -84,8 +84,8 @@ func (s artifactoryService) vcsRead(
 	}
 	result, err := s.cfg.RemoteSources.Read(ctx, source.Request{
 		Repo:      a.repo,
-		Subject:   auth.SubjectOf(a.principal),
-		Access:    authz.AsAPI(a.access.d),
+		Subject:   accessapi.SubjectOf(a.principal),
+		Access:    a.access.d,
 		Resource:  resource,
 		Project:   a.repo.ProjectKey,
 		CacheOnly: a.isCacheOnly,

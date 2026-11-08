@@ -2,23 +2,22 @@ package server
 
 import (
 	"context"
-	"errors"
-	"fmt"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// access asks the request's permission evaluator (decision 0006) the
+// access asks the request's permission decider (decision 0006) the
 // questions handlers have about repositories and their items. Paths are
 // repository-relative, as permission target patterns are.
-type access struct{ d *authz.Decider }
+type access struct{ d accessapi.Decider }
 
 // target is the permission target a repository's configuration names.
-func target(c repo.Config) authz.Repo { return authz.Repo{Key: c.Key, Class: string(c.Class)} }
+func target(c repo.Config) accessapi.Repo {
+	return accessapi.Repo{Key: c.Key, Class: string(c.Class)}
+}
 
 // file reports whether the caller holds every action in want on a file.
 func (a access) file(c repo.Config, path string, want types.Actions) bool {
@@ -43,30 +42,25 @@ func (a access) item(c repo.Config, path string, isFolder bool, want types.Actio
 // read its configuration.
 func (a access) visible(c repo.Config) bool { return a.d.IsRepoVisible(target(c)) }
 
-// accessFor returns the evaluator of p's permissions: d, the decider
-// Authorize returned with p, or, when d is nil, a fresh evaluation of p.
-// The middleware authorises every request, so a handler passes the
-// request's decider for its principal (auth.DeciderFrom), and a principal
-// the middleware did not see, which has none, is evaluated here.
+// accessFor returns the decider of p's permissions: d, the decider that
+// Authorize returned with p, or, when d is nil, az's evaluation of p. The
+// middleware authorises every request, so a handler passes the request's
+// decider for its principal (accessapi.DeciderFrom), and a principal the
+// middleware did not see, which has none, is evaluated by Authorizer.For.
+// The error is For's, unwrapped: it already names the read that failed, and
+// callers wrap it with their own operation.
 func accessFor(
 	ctx context.Context,
-	st store.Store,
-	p auth.Principal,
-	d *authz.Decider,
+	az accessapi.Authorizer,
+	p kernel.Principal,
+	d accessapi.Decider,
 ) (access, error) {
 	if d != nil {
 		return access{d}, nil
 	}
-	var on bool
-	err := st.Settings().Get(ctx, types.SettingAnonymousAccess, &on)
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
-		return access{}, fmt.Errorf("anonymous access setting: %w", err)
-	}
-	d, err = authz.New(ctx, authz.Sources{
-		Permissions: st.Permissions(), Groups: st.Groups(), AnonymousEnabled: on,
-	}, auth.SubjectOf(p))
+	d, err := az.For(ctx, p)
 	if err != nil {
-		return access{}, fmt.Errorf("evaluate permissions: %w", err)
+		return access{}, err //nolint:wrapcheck // For names the read that failed
 	}
 	return access{d}, nil
 }

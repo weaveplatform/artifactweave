@@ -12,13 +12,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format/debian"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -40,7 +40,7 @@ type debianVirtualView struct {
 // and every advertised Filename resolves through the same member order.
 func (s artifactoryService) serveVirtualDebianMetadata(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	req itemRequest, p auth.Principal, acc access,
+	req itemRequest, p kernel.Principal, acc access,
 ) {
 	if len(req.props) != 0 || r.URL.RawQuery != "" ||
 		!acc.folder(c, req.path, types.ActionRead) ||
@@ -71,7 +71,7 @@ func (s artifactoryService) serveVirtualDebianMetadata(
 
 func (s artifactoryService) buildVirtualDebianView(
 	ctx context.Context, st store.Store, c repo.Config, distribution string,
-	p auth.Principal, acc access,
+	p kernel.Principal, acc access,
 ) (debianVirtualView, error) {
 	if len(c.Repositories) == 0 || len(c.Repositories) > 128 {
 		return debianVirtualView{}, store.ErrNotFound
@@ -145,7 +145,7 @@ func (s artifactoryService) buildVirtualDebianView(
 	base := "dists/" + distribution + "/"
 	files[base+"Release"] = release
 	if c.KeyPair != "" {
-		pair, err := st.Keys().Keypair(ctx, c.KeyPair)
+		pair, err := s.cfg.Access.Keys.Keypair(ctx, c.KeyPair)
 		if err != nil {
 			return debianVirtualView{}, fmt.Errorf("debian virtual signing key: %w", err)
 		}
@@ -172,7 +172,7 @@ func mapKeys(set map[string]bool) []string {
 
 func (s artifactoryService) addDebianMemberIndexes(
 	ctx context.Context, st store.Store, virtual, member repo.Config, distribution string,
-	p auth.Principal, acc access,
+	p kernel.Principal, acc access,
 	indexes map[string][]debian.PackageRecord, selected map[string]map[string]bool,
 ) error {
 	releasePath := "dists/" + distribution + "/Release"
@@ -231,7 +231,7 @@ func (s artifactoryService) addDebianMemberIndexes(
 
 func (s artifactoryService) serveVirtualDebianPackage(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	req itemRequest, p auth.Principal, acc access,
+	req itemRequest, p kernel.Principal, acc access,
 ) {
 	ctx := r.Context()
 	if len(req.props) != 0 || r.URL.RawQuery != "" ||
@@ -285,7 +285,7 @@ func (s artifactoryService) serveVirtualDebianPackage(
 // are terminal so the virtual path never disguises a failed selected member.
 func (s artifactoryService) serveRemoteVirtualDebianPackage(
 	w http.ResponseWriter, r *http.Request, member repo.Config, req itemRequest,
-	p auth.Principal, acc access,
+	p kernel.Principal, acc access,
 ) bool {
 	if s.cfg.RemoteSources == nil {
 		writeErr(w, r, s.itemError(r.Context(), "Debian virtual source",
@@ -293,7 +293,7 @@ func (s artifactoryService) serveRemoteVirtualDebianPackage(
 		return true
 	}
 	q := source.Request{
-		Repo: member, Subject: auth.SubjectOf(p), Access: authz.AsAPI(acc.d),
+		Repo: member, Subject: accessapi.SubjectOf(p), Access: acc.d,
 		Project: member.ProjectKey, Resource: remoteResource(r, req.path),
 	}
 	q, err := debianSourceRequest(q)
@@ -335,7 +335,7 @@ func (s artifactoryService) serveRemoteVirtualDebianPackage(
 // upstream freshness and redirect constraints.
 func (s artifactoryService) debianMemberBytes(
 	ctx context.Context, st store.Store, member repo.Config, path string,
-	p auth.Principal, acc access,
+	p kernel.Principal, acc access,
 ) ([]byte, func(context.Context, string) error, error) {
 	if !acc.file(member, path, types.ActionRead) ||
 		generic.CheckDownload(member, path, false) != nil {
@@ -346,7 +346,7 @@ func (s artifactoryService) debianMemberBytes(
 			return nil, nil, source.ErrUnavailable
 		}
 		q := source.Request{
-			Repo: member, Subject: auth.SubjectOf(p), Access: authz.AsAPI(acc.d),
+			Repo: member, Subject: accessapi.SubjectOf(p), Access: acc.d,
 			Project: member.ProjectKey,
 			Resource: source.Resource{
 				Path: path, EscapedPath: escapePath(path), Method: http.MethodGet,

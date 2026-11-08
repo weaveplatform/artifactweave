@@ -158,7 +158,7 @@ func TestUnitCRANVirtualRejectsCyclesAndWrongMembers(t *testing.T) {
 		}
 	}
 	p := auth.Principal{Name: "admin", Admin: true}
-	acc, err := accessFor(t.Context(), w.db, p, nil)
+	acc, err := accessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

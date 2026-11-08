@@ -11,9 +11,9 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -223,7 +223,7 @@ func TestAccReferrersPermissions(t *testing.T) {
 	target := "/v2/docker-local/app/referrers/" + digestOf("subject")
 	for who, want := range map[string]int{
 		"reader": http.StatusOK, "nobody": http.StatusForbidden,
-		auth.AnonymousUser: http.StatusUnauthorized,
+		kernel.AnonymousUser: http.StatusUnauthorized,
 	} {
 		if rec := send(
 			principalAs(t, w.db, w.h, who),
@@ -284,7 +284,7 @@ func TestAccReferrersAndIndexesChallengeRegistryTokens(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	g := New(Options{Store: w.db, Tokens: w.api.Tokens, Blobs: blobs, Formats: ecosystem.For})
+	g := New(Options{Store: w.db, Tokens: w.kit.API().Tokens, Blobs: blobs, Formats: ecosystem.For})
 	h := baseurl.Middleware("")(g.Challenge(router(g)))
 	pull := func(name string) *types.RegistryAccess {
 		return &types.RegistryAccess{Grants: []types.RegistryGrant{
@@ -299,7 +299,9 @@ func TestAccReferrersAndIndexesChallengeRegistryTokens(t *testing.T) {
 			strings.NewReader(index(layout.MediaTypeOCIIndex)),
 		)
 		req.Header.Set("Content-Type", layout.MediaTypeOCIIndex)
-		req = req.WithContext(w.as(req.Context(), auth.Principal{Name: "writer", Registry: grant}))
+		req = req.WithContext(
+			w.as(req.Context(), kernel.Principal{Name: "writer", Registry: grant}),
+		)
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, req)
 		return rec

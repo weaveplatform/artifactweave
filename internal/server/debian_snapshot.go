@@ -16,12 +16,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format/debian"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
-	"github.com/weaveplatform/artifactweave/internal/service/item"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
@@ -34,11 +34,11 @@ const debianSnapshotKind = "debian-snapshot"
 var debianSnapshotSegment = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
 
 type debianSnapshotRequest struct {
-	Source       string                   `json:"source"`
-	Target       string                   `json:"target"`
-	Tag          string                   `json:"tag"`
-	Distribution string                   `json:"distribution"`
-	Credential   auth.CredentialReference `json:"credential"`
+	Source       string                     `json:"source"`
+	Target       string                     `json:"target"`
+	Tag          string                     `json:"tag"`
+	Distribution string                     `json:"distribution"`
+	Credential   kernel.CredentialReference `json:"credential"`
 }
 
 // CreateDebianSnapshot captures metadata only. The persistent queue handles
@@ -60,7 +60,8 @@ func (s artifactoryService) CreateDebianSnapshot(
 	if err != nil {
 		return nil, err
 	}
-	acc, err := accessFor(ctx, st, p, auth.DeciderFrom(ctx))
+	d, _ := accessapi.DeciderFrom(ctx)
+	acc, err := accessFor(ctx, s.cfg.Access.Authorizer, p, d)
 	if err != nil {
 		return nil, s.internalError(ctx, "Debian snapshot access", err)
 	}
@@ -109,7 +110,7 @@ func (s artifactoryService) CreateDebianSnapshot(
 func snapshotRoot(job debianSnapshotRequest) string { return "snapshots/" + job.Tag }
 
 func claimDebianSnapshot(
-	ctx context.Context, st store.Store, job debianSnapshotRequest, p auth.Principal,
+	ctx context.Context, st store.Store, job debianSnapshotRequest, p kernel.Principal,
 ) error {
 	if err := st.Tx(ctx, func(ctx context.Context) error {
 		marker, err := st.Items().Get(ctx, job.Target, false, snapshotRoot(job))
@@ -152,7 +153,7 @@ func claimDebianSnapshot(
 
 func snapshotRepos(
 	ctx context.Context, st store.Store, job debianSnapshotRequest,
-	p auth.Principal, acc access,
+	p kernel.Principal, acc access,
 ) (repo.Config, repo.Config, error) {
 	sourceRepo, err := st.Repos().Get(ctx, job.Source)
 	if errors.Is(err, store.ErrNotFound) {
@@ -200,21 +201,18 @@ func RegisterDebianSnapshotWork(q *work.Queue, cfg Config) error {
 			job.Source == "" || job.Target == "" || job.Credential.Name == "" {
 			return fmt.Errorf("%w: invalid debian snapshot job", work.ErrPermanent)
 		}
-		if cfg.Auth == nil {
+		if cfg.Access.Authenticator == nil {
 			return fmt.Errorf("%w: debian snapshot authentication unavailable", work.ErrPermanent)
 		}
-		p, err := cfg.Auth.Current(ctx, job.Credential.Principal(), cfg.Store.Tokens())
+		p, err := cfg.Access.Authenticator.Current(ctx, job.Credential.Principal())
 		if err != nil {
 			return fmt.Errorf("%w: debian snapshot caller expired: %w", work.ErrPermanent, err)
 		}
-		p, d, err := auth.Authorize(ctx, authz.Sources{
-			Permissions: cfg.Store.Permissions(), Groups: cfg.Store.Groups(),
-			AnonymousEnabled: p.Anonymous,
-		}, p)
+		p, d, err := cfg.Access.Authorizer.Authorize(ctx, p, p.Anonymous)
 		if err != nil {
 			return fmt.Errorf("snapshot current permissions: %w", err)
 		}
-		acc, err := accessFor(ctx, cfg.Store, p, d)
+		acc, err := accessFor(ctx, cfg.Access.Authorizer, p, d)
 		if err != nil {
 			return fmt.Errorf("snapshot access: %w", err)
 		}
@@ -231,7 +229,7 @@ func RegisterDebianSnapshotWork(q *work.Queue, cfg Config) error {
 
 func (s artifactoryService) createDebianSnapshot(
 	ctx context.Context, st store.Store, job debianSnapshotRequest,
-	p auth.Principal, acc access,
+	p kernel.Principal, acc access,
 ) error {
 	sourceRepo, targetRepo, err := snapshotRepos(ctx, st, job, p, acc)
 	if err != nil {
@@ -301,7 +299,7 @@ func (s artifactoryService) createDebianSnapshot(
 
 func (s artifactoryService) debianSnapshotFiles(
 	ctx context.Context, st store.Store, c repo.Config, distribution string,
-	p auth.Principal, acc access,
+	p kernel.Principal, acc access,
 ) (map[string][]byte, error) {
 	if c.Class == repo.Virtual {
 		view, err := s.buildVirtualDebianView(ctx, st, c, distribution, p, acc)
@@ -451,7 +449,7 @@ func (s artifactoryService) getDebianSnapshot(w http.ResponseWriter, r *http.Req
 
 func (s artifactoryService) checkDebianSnapshotIndex(
 	ctx context.Context, rel string, it types.Item, sourceRepo repo.Config,
-	p auth.Principal, acc access,
+	p kernel.Principal, acc access,
 ) error {
 	_, byHash := debian.ByHashMetadataPath(rel)
 	if !debian.PackagesIndexPath(rel) && !debian.SourcesIndexPath(rel) && !byHash {
