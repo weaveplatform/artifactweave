@@ -129,7 +129,7 @@
       "owner_issue": 777,
       "evidence": "test/acceptance/features/conda.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/conda-repositories",
-      "route_file": "internal/server/conda/conda.go",
+      "route_file": "migration/artifacts/ecosystem/conda/http/conda.go",
       "p9c": true
     },
     {

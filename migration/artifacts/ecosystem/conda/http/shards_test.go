@@ -1,4 +1,4 @@
-package conda
+package condahttp
 
 import (
 	"errors"
@@ -8,7 +8,7 @@ import (
 	"testing"
 	"testing/iotest"
 
-	condafmt "github.com/weaveplatform/artifactweave/internal/format/conda"
+	condafmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conda"
 )
 
 func TestUnitCondaShardURLsRemainInsideConfiguredSource(t *testing.T) {

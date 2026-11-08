@@ -37,7 +37,7 @@ var formats = map[string]formatImpact{
 	"rpm":           {"./internal/format/rpm/...", "@rpm", []string{"fedora"}},
 	"opkg":          {"./internal/format/opkg/...", "@opkg", []string{"opkg"}},
 	"p2":            {"./internal/format/p2/...", "@p2", []string{"p2"}},
-	"conda":         {"./internal/format/conda/...", "@conda", []string{"conda"}},
+	"conda":         {"./migration/artifacts/ecosystem/conda/...", "@conda", []string{"conda"}},
 	"cran":          {"./internal/format/cran/...", "@cran", []string{"r"}},
 	"nix":           {"./migration/artifacts/ecosystem/nix/...", "@nix", []string{"nix"}},
 	"puppet":        {"./internal/format/puppet/...", "@puppet", []string{"puppet"}},

@@ -1,6 +1,6 @@
-// Package conda serves the native Conda channel protocol. Index responses are
+// Package condahttp serves the native Conda channel protocol. Index responses are
 // built from validated package records and filtered by the caller's rights.
-package conda
+package condahttp
 
 import (
 	"bytes"
@@ -16,10 +16,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	condafmt "github.com/weaveplatform/artifactweave/internal/format/conda"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	condafmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conda"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"

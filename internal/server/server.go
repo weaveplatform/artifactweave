@@ -26,7 +26,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/cargo"
 	"github.com/weaveplatform/artifactweave/internal/server/chef"
 	"github.com/weaveplatform/artifactweave/internal/server/composer"
-	"github.com/weaveplatform/artifactweave/internal/server/conda"
 	"github.com/weaveplatform/artifactweave/internal/server/gems"
 	"github.com/weaveplatform/artifactweave/internal/server/gitlfs"
 	"github.com/weaveplatform/artifactweave/internal/server/jetbrainsplugins"
@@ -51,6 +50,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	cocoapodshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods/http"
 	conanhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conan/http"
+	condahttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conda/http"
 	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
 	golanghttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang/http"
 	helmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm/http"
@@ -222,7 +222,9 @@ var protocols = []func(Config) pkgroute.Protocol{
 	func(cfg Config) pkgroute.Protocol {
 		return bower.Protocol(bower.Options{RemoteSources: cfg.RemoteSources})
 	},
-	func(cfg Config) pkgroute.Protocol { return conda.Protocol(cfg.RemoteSources, cfg.FormatSettings.Conda) },
+	func(cfg Config) pkgroute.Protocol {
+		return condahttp.Protocol(cfg.RemoteSources, cfg.FormatSettings.Conda)
+	},
 	func(cfg Config) pkgroute.Protocol { return ansible.Protocol(cfg.RemoteSources) },
 	func(Config) pkgroute.Protocol { return machinelearning.Protocol() },
 	func(cfg Config) pkgroute.Protocol { return chef.Protocol(cfg.RemoteSources) },

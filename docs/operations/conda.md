@@ -17,7 +17,7 @@ Deploy `.conda` or `.tar.bz2` archives with `PUT /artifactory/<repository>/<subd
 
 Hosted metadata is rebuilt after publish, delete and restore. `POST /artifactory/api/conda/<repository>/reindex` waits for a full rebuild; `?async=true` queues it and returns immediately. Remote metadata and archives use the source policy's cache, refresh, offline and redirect rules. A virtual channel combines allowed members in configured order; the first member providing a package filename wins.
 
-The [acceptance feature](../../test/acceptance/features/conda.feature) installs both archive types through the pinned client, including L/F/R/V, remote redirect and offline cache, and checks delete, restore, reindex and corrupt remote bytes. The controlled legacy fixture and current conda-forge `.conda` fixture are recorded in [testdata](../../internal/format/conda/testdata/README.md).
+The [acceptance feature](../../test/acceptance/features/conda.feature) installs both archive types through the pinned client, including L/F/R/V, remote redirect and offline cache, and checks delete, restore, reindex and corrupt remote bytes. The controlled legacy fixture and current conda-forge `.conda` fixture are recorded in [testdata](../../migration/artifacts/ecosystem/conda/testdata/README.md).
 
 ## CEP-16 sharded repodata
 

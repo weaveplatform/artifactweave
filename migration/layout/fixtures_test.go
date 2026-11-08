@@ -57,7 +57,7 @@ var traversalInputs = map[exemption]string{
 		"the metadata decoder must reject",
 	{"internal/server/bower/archive_fault_test.go", parentPrefix}: "a tar directory entry " +
 		"that climbs out of the archive, which the upload must reject",
-	{"internal/server/conda/shards_test.go", parentPrefix}: "a relative shard base URL that " +
+	{"migration/artifacts/ecosystem/conda/http/shards_test.go", parentPrefix}: "a relative shard base URL that " +
 		"climbs out of the channel, which shardURLs must reject",
 	{"migration/artifacts/core/registry/registry_test.go", parentPrefix}: "prefixes an id that Status " +
 		"must not resolve",
