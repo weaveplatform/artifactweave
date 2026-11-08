@@ -1,5 +1,5 @@
-// Package conan serves the Conan revision protocol at /artifactory/api/conan.
-package conan
+// Package conanhttp serves the Conan revision protocol at /artifactory/api/conan.
+package conanhttp
 
 import (
 	"encoding/json"
@@ -10,11 +10,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	conanfmt "github.com/weaveplatform/artifactweave/internal/format/conan"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	conanfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conan"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 

@@ -33,7 +33,7 @@ var formats = map[string]formatImpact{
 	"alpine":        {"./internal/format/alpine/...", "@alpine", []string{"alpine"}},
 	"bazelmodules":  {"./internal/format/bazelmodules/...", "@bazelmodules", []string{"bazel"}},
 	"cargo":         {"./internal/format/cargo/...", "@cargo", []string{"cargo"}},
-	"conan":         {"./internal/format/conan/...", "@conan", []string{"conan"}},
+	"conan":         {"./migration/artifacts/ecosystem/conan/...", "@conan", []string{"conan"}},
 	"rpm":           {"./internal/format/rpm/...", "@rpm", []string{"fedora"}},
 	"opkg":          {"./internal/format/opkg/...", "@opkg", []string{"opkg"}},
 	"p2":            {"./internal/format/p2/...", "@p2", []string{"p2"}},

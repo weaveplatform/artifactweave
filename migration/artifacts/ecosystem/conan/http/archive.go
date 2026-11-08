@@ -1,4 +1,4 @@
-package conan
+package conanhttp
 
 import (
 	"archive/tar"
@@ -10,7 +10,7 @@ import (
 	"path"
 	"strings"
 
-	conanfmt "github.com/weaveplatform/artifactweave/internal/format/conan"
+	conanfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conan"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 

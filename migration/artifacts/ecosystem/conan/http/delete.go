@@ -1,11 +1,11 @@
-package conan
+package conanhttp
 
 import (
 	"net/http"
 
-	conanfmt "github.com/weaveplatform/artifactweave/internal/format/conan"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	conanfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conan"
 )
 
 func (h handler) deleteRecipe(w http.ResponseWriter, r *http.Request, ref conanfmt.Reference) {

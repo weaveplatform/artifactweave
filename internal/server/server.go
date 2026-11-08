@@ -26,7 +26,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/cargo"
 	"github.com/weaveplatform/artifactweave/internal/server/chef"
 	"github.com/weaveplatform/artifactweave/internal/server/composer"
-	"github.com/weaveplatform/artifactweave/internal/server/conan"
 	"github.com/weaveplatform/artifactweave/internal/server/conda"
 	"github.com/weaveplatform/artifactweave/internal/server/gems"
 	"github.com/weaveplatform/artifactweave/internal/server/gitlfs"
@@ -51,6 +50,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	cocoapodshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods/http"
+	conanhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conan/http"
 	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
 	golanghttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang/http"
 	helmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm/http"
@@ -242,7 +242,7 @@ var protocols = []func(Config) pkgroute.Protocol{
 	},
 	func(Config) pkgroute.Protocol { return agentpackages.Protocol() },
 	func(cfg Config) pkgroute.Protocol {
-		return conan.Protocol(conan.Options{
+		return conanhttp.Protocol(conanhttp.Options{
 			RemoteSources: cfg.RemoteSources, Tokens: cfg.Access.Tokens,
 		})
 	},

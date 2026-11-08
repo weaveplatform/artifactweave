@@ -1,4 +1,4 @@
-package conan
+package conanhttp
 
 import (
 	"net/http"

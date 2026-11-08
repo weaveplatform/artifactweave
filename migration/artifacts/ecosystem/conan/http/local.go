@@ -1,4 +1,4 @@
-package conan
+package conanhttp
 
 import (
 	"bytes"
@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	conanfmt "github.com/weaveplatform/artifactweave/internal/format/conan"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	conanfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conan"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"

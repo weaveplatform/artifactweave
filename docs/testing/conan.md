@@ -52,7 +52,7 @@ recipe and binary package through a remote cache backed by the production
 source policy. Local and remote/virtual protocol, uncommitted revision and
 generic-upload boundary tests are in `internal/server/conan_test.go`. Unit
 tests for paths, manifests, metadata and archive safety live in
-`internal/format/conan` and `internal/server/conan`. The production source/cache
+`migration/artifacts/ecosystem/conan` and `migration/artifacts/ecosystem/conan/http`. The production source/cache
 test in `internal/app/conan_remote_test.go` covers remote fetch, cache-only reads,
 offline reads, integrity failures, cache exclusion and same-origin redirects.
 

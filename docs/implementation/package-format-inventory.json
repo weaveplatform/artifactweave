@@ -113,7 +113,7 @@
       "owner_issue": 770,
       "evidence": "docs/testing/conan.md",
       "source": "https://docs.jfrog.com/artifactory/docs/conan-repositories",
-      "route_file": "internal/server/conan/conan.go",
+      "route_file": "migration/artifacts/ecosystem/conan/http/conan.go",
       "p9c": true
     },
     {
