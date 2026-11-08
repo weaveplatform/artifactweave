@@ -59,9 +59,9 @@
 //     repo, Repositories and Layouts, and no Settings), "Dependency rules"
 //     and "Names the migration introduces".
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
-//     lines 174 to 185 (artifacts/api), line 1015 (migration/artifacts/core/repos published
-//     as api.Repositories) and line 1053 (the layout engine published
-//     through api.Layouts).
+//     lines 174 to 185 (artifacts/api), line 1015
+//     (migration/artifacts/core/repos published as api.Repositories) and
+//     line 1053 (the layout engine published through api.Layouts).
 //   - Decision 0003: docs/research/decisions/0003-repository-model.md
 //     (validation, defaults and protected keys stay in the module; the api
 //     only exposes them).
@@ -89,7 +89,8 @@
 //
 //   - TestUnitIsNull: null with and without surrounding white space, and
 //     values that are not null.
-//   - The implementations are tested where they live: migration/artifacts/core/repos's
-//     TestUnitRepositories* tests, one per Repositories method, and
-//     artifacts/core/layout's TestUnitLayoutCheckerMatchesCompile.
+//   - The implementations are tested where they live:
+//     migration/artifacts/core/repos's TestUnitRepositories* tests, one per
+//     Repositories method, and artifacts/core/layout's
+//     TestUnitLayoutCheckerMatchesCompile.
 package api

@@ -298,7 +298,7 @@ change that adds a name appends its row; the change column gives the ticket of t
 | `Layouts` | `artifacts/api` | `Check`, which compiles a layout definition as the layout engine does before configuration stores it, returning the engine's error unwrapped. The target document lists `Get` and `Put` for the descriptor and P12; the descriptor stores layouts as configuration documents itself | ART-07 |
 | `RepoFilter`, `LayoutDefinition` | `artifacts/api` | The api's own copies of the store's repository filter and the layout engine's `Definition`, field for field and in order, so the module converts them with plain conversions that stop compiling if either side changes | ART-07 |
 | `ErrChanged`, `MsgKeyExists`, `IsNull` | `artifacts/api` | The sentinel `Repositories.Remove` returns when the content changed under the delete, the message of a create whose key is taken, and the test for a null value in an update body or descriptor; declared in the api for the callers of `Repositories`, which its operations return and use, with their texts unchanged | ART-07 |
-| `NewRepositories` | `artifacts/core/repos` | Binds `Repositories` over the store and access's `Keys` and `Projects`; in `internal/repos` until ART-12 moves the package | ART-07 |
+| `NewRepositories` | `artifacts/core/repos` | Binds `Repositories` over the store and access's `Keys` and `Projects` | ART-07 |
 | `Checker` | `artifacts/core/layout` | The layout engine's implementation of `Layouts` | ART-07 |
 
 ### Placeholders

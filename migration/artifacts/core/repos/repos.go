@@ -1,8 +1,3 @@
-// Package repos holds the repository operations that more than one entry
-// point performs: the repositories API, the configuration descriptor
-// (PATCH /api/system/configuration, config apply and the bootstrap
-// descriptor). Its errors are apierror values, so every entry point answers
-// a bad configuration with the same status and message.
 package repos
 
 import (
@@ -35,6 +30,12 @@ func badRequestf(format string, a ...any) error {
 // delete page's example key JFrog-Support-Bundles is the odd one out.
 var protected = []string{"auto-trashcan", "jfrog-support-bundle", types.BuildInfoRepository}
 
+// Protected reports whether key names a repository that may not be deleted:
+// a blank key, or one of the protected keys in any case (auto-trashcan,
+// jfrog-support-bundle and the build-info repository). The first two are
+// Artifactory's own trash can and support bundle repositories, and the
+// repositories API could not create the build-info repository again,
+// because no allowed list holds its package type.
 func Protected(key string) bool {
 	return strings.TrimSpace(key) == "" ||
 		slices.ContainsFunc(
