@@ -10,9 +10,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -21,13 +21,33 @@ import (
 
 const prefix = "/artifactory/api/terraform/"
 
-// Options provides the shared master key for short-lived download URLs.
-// Now is a test clock; nil uses the wall clock.
+// Options provides the shared master key for short-lived download URLs and
+// the access contracts that re-evaluate a URL's subject each time it is used
+// (decision 0040). The contracts read through the request's context, so a
+// server binds them over the store the router kit serves. Now is a test
+// clock; nil uses the wall clock.
 type Options struct {
-	Auth          *auth.Authenticator
-	RemoteSources *source.Service
-	Keys          *crypt.Keyring
-	Now           func() time.Time
+	// Authenticator rechecks the credential that a remote module or
+	// provider download URL names. Nil, as on a server without
+	// authentication, refuses those URLs 403.
+	Authenticator accessapi.Authenticator
+	// Authorizer evaluates the permissions of the principal a download URL
+	// names. Serving any signed download requires it.
+	Authorizer accessapi.Authorizer
+	// KeyPairs reads the GPG key pairs a provider repository names as its
+	// signing keys, for a provider's download metadata. A repository that
+	// names a key pair requires it.
+	KeyPairs accessapi.Keys
+	// Restrictions, Identity and AnonymousAccess resolve the user a local
+	// download URL names: its API restriction, whether its account still
+	// exists and is enabled, and, for the anonymous user, whether anonymous
+	// access is on. Serving a local signed download requires all three.
+	Restrictions    accessapi.Restrictions
+	Identity        accessapi.Identity
+	AnonymousAccess accessapi.AnonymousAccess
+	RemoteSources   *source.Service
+	Keys            *crypt.Keyring
+	Now             func() time.Time
 }
 
 // Protocol mounts the registry and anonymous host-root discovery document.

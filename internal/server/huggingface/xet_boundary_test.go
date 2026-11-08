@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 )
 
@@ -66,7 +66,7 @@ func TestUnitXetCapabilitySupportsMaximumEscapedClaimFields(t *testing.T) {
 	for i := range revision {
 		revision[i] = 255
 	}
-	for _, credential := range []auth.DownloadCredential{
+	for _, credential := range []kernel.DownloadCredential{
 		{Kind: "password", PasswordRevision: revision},
 		{Kind: "token", TokenID: "11111111-1111-4111-8111-111111111111"},
 	} {

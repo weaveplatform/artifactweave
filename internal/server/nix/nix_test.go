@@ -23,6 +23,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/access"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
@@ -121,7 +122,16 @@ func (f *fixture) mount(remote *source.Service, tune ...func(*pkgroute.Protocol)
 			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
 		})
 	})
-	p := nix.Protocol(remote)
+	// Bound over f.st, the store the router kit serves, as a server binds it.
+	m, err := access.New(access.Deps{Store: f.st})
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	p := nix.Protocol(nix.Options{
+		RemoteSources: remote,
+		Authorizer:    m.API().Authorizer,
+		KeyPairs:      m.API().Keys,
+	})
 	for _, apply := range tune {
 		apply(&p)
 	}

@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	tfbe "github.com/weaveplatform/artifactweave/internal/format/terraformbackend"
 	"github.com/weaveplatform/artifactweave/internal/service/terraformstate"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -168,7 +168,7 @@ func (h handler) createState(w http.ResponseWriter, r *http.Request) (result, er
 		Ms:        ms,
 		Meta:      tfbe.Meta{Serial: *a.Serial},
 	}
-	p, _ := auth.FromContext(r.Context())
+	p, _ := kernel.FromContext(r.Context())
 	upload, err := h.uploadURL(r, st, ws, p, strings.ToLower(a.MD5))
 	return document(201, stateResource(r, st, upload)), err
 }

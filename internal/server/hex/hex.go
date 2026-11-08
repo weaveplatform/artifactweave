@@ -15,6 +15,7 @@ import (
 	hexfmt "github.com/weaveplatform/artifactweave/internal/format/hex"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/keymaterial"
@@ -22,7 +23,16 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-type Options struct{ RemoteSources *source.Service }
+// Options configures the Hex registry protocol. KeyPairs reads through the
+// request's context, so a server binds it over the store the router kit
+// serves.
+type Options struct {
+	RemoteSources *source.Service
+	// KeyPairs reads the RSA key pair a repository names, which signs its
+	// names, versions and package resources and whose public key it serves.
+	// A repository that names a key pair requires it.
+	KeyPairs accessapi.Keys
+}
 
 func Protocol(o Options) pkgroute.Protocol {
 	sources := map[repo.Class]pkgroute.Source{
@@ -35,7 +45,7 @@ func Protocol(o Options) pkgroute.Protocol {
 		Name: "hex", Types: []repo.PackageType{repo.Hex},
 		ErrorProfile: apierror.ProfileArtifactory, Sources: sources,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
-			h := handler{k}
+			h := handler{k: k, o: o}
 			r.Get("/*", h.read)
 			r.Head("/*", h.read)
 		},
@@ -53,7 +63,10 @@ func (virtualSource) Item(
 	return pkgroute.Found{}, source.ErrUnsupported
 }
 
-type handler struct{ k *pkgroute.Kit }
+type handler struct {
+	k *pkgroute.Kit
+	o Options
+}
 
 var errStoredPackageIdentity = errors.New("hex: stored package identity mismatch")
 
@@ -70,7 +83,7 @@ func (h handler) signingKey(r *http.Request) (*rsa.PrivateKey, error) {
 	if ref == "" {
 		return nil, apierror.New(http.StatusServiceUnavailable, "Hex signing key is not configured")
 	}
-	pair, err := h.k.DB().Keys().Keypair(r.Context(), ref)
+	pair, err := h.o.KeyPairs.Keypair(r.Context(), ref)
 	if err != nil || pair.Type != types.KeypairRSA {
 		return nil, apierror.New(
 			http.StatusServiceUnavailable,
