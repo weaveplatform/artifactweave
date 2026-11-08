@@ -1,12 +1,3 @@
-// Package registry runs the Docker registry's blob uploads (decision 0031).
-// A session spans requests and survives a restart: it is a row in the
-// uploads table under Backend, naming the blob store upload it appends to,
-// and its repository, image and user, which alone may continue it. A
-// finished upload, whether chunked, monolithic or mounted from another
-// image, becomes the item <image>/_uploads/sha256__<hex> through the item
-// service, where a manifest push finds it. The garbage collector hands
-// stale sessions to Reap and asks ExpireUploads for finished uploads no
-// manifest took in time.
 package registry
 
 import (

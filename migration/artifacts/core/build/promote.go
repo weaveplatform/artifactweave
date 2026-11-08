@@ -139,7 +139,6 @@ func (s *Service) promotionTarget(ctx context.Context, key string) (repo.Config,
 	return c, nil
 }
 
-// promoter carries one promotion's state.
 type promoter struct {
 	s      *Service
 	p      Promotion
@@ -263,7 +262,6 @@ func (pr *promoter) fromSource(it types.Item) bool {
 // dependency on another module's artifact is the same file.
 type claims map[int64]string
 
-// free reports whether the item id is unclaimed, or claimed by key.
 func (c claims) free(id int64, key string) bool {
 	owner, ok := c[id]
 	return !ok || owner == key

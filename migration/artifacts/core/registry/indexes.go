@@ -190,7 +190,6 @@ func (s *Service) stored(ctx context.Context, h aql.Hit) (layout.Manifest, error
 	return m, nil
 }
 
-// first is the first value of key in p, "" when it has none.
 func first(p types.Properties, key string) string {
 	if v := p[key]; len(v) > 0 {
 		return v[0]

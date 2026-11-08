@@ -34,7 +34,6 @@ func (s *Service) DeleteManifest(ctx context.Context, o Owner, hex string) error
 	return s.deleteFolders(ctx, o, folders)
 }
 
-// deleteFolders deletes folders of o's image in one transaction.
 func (s *Service) deleteFolders(ctx context.Context, o Owner, folders []string) error {
 	items := s.items()
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {

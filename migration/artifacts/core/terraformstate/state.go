@@ -332,7 +332,6 @@ func next(now time.Time, files []types.Item) int64 {
 	return ms
 }
 
-// stateFiles lists workspace name's state files.
 func (s *Service) stateFiles(
 	ctx context.Context,
 	c repo.Config,

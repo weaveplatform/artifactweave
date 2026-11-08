@@ -1,8 +1,3 @@
-// Package build implements the Builds API (decision 0014): publishing,
-// reading, appending to, renaming and deleting build-info runs, and finding
-// the items a run's artifacts are. A run is a store record and a document
-// item in its project's build-info repository. Every change writes both in
-// one transaction, so the Builds API, the storage API and AQL agree.
 package build
 
 import (
@@ -581,7 +576,6 @@ func (s *Service) Find(
 	return types.Build{}, fmt.Errorf("build: run %s/%s: %w", name, number, ErrNotFound)
 }
 
-// promotedTo reports whether run id's latest promotion has status.
 func (s *Service) promotedTo(ctx context.Context, id int64, status string) (bool, error) {
 	ps, err := s.Store.Builds().Promotions(ctx, id)
 	if err != nil {
@@ -664,7 +658,6 @@ func (s *Service) eachArtifactItem(
 	return nil
 }
 
-// repository returns a project's build-info repository.
 func (s *Service) repository(ctx context.Context, projectKey string) (repo.Config, error) {
 	key := types.BuildInfoRepo(projectKey)
 	c, err := s.Store.Repos().Get(ctx, key)
@@ -688,7 +681,6 @@ func (s *Service) runs(ctx context.Context, projectKey, name string) ([]types.Bu
 	return out, nil
 }
 
-// writeDocument writes run b's document as its item.
 func (s *Service) writeDocument(
 	ctx context.Context,
 	c repo.Config,
@@ -765,7 +757,6 @@ func documentPath(r types.BuildRun) string {
 	return path
 }
 
-// collect reads every page of a store listing.
 func collect[T any](size int, list func(store.Page) ([]T, string, error)) ([]T, error) {
 	var out []T
 	page := store.Page{Limit: store.MaxLimit}

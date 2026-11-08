@@ -1,14 +1,3 @@
-// Package terraformstate is the Terraform backend's storage (decision
-// 0041): the workspaces, state versions and locks of terraformbackend
-// repositories. They are items under workspaces/<ws>/, written through the
-// item service, so the format's hooks (internal/format/terraformbackend)
-// index them, a delete puts them in the trash can, and the storage API, AQL
-// and replication see them as any other item. A state is sealed under the
-// master key while the repository's encryptStates is on.
-//
-// The TFE-shaped API that Terraform's remote backend calls is built on it.
-// It checks no permission: the API does, on the paths terraformbackend
-// names (Folder, RecordPath, LatestPath), before each call.
 package terraformstate
 
 import (
@@ -57,6 +46,8 @@ type LockedError struct {
 	Workspace, Holder string
 }
 
+// Error returns the text go-tfe reads ("Workspace <name> is locked by User
+// <holder>"), so it stays byte-identical.
 func (e *LockedError) Error() string {
 	return fmt.Sprintf("Workspace %s is locked by User %s", e.Workspace, e.Holder)
 }
@@ -67,6 +58,8 @@ type NotLockedError struct {
 	Workspace string
 }
 
+// Error returns "Workspace <name> is not locked", the refusal the backend API
+// answers with.
 func (e *NotLockedError) Error() string {
 	return fmt.Sprintf("Workspace %s is not locked", e.Workspace)
 }
@@ -77,6 +70,8 @@ type InvalidStateError struct {
 	Message string
 }
 
+// Error returns Message, which says why the state was refused and which the
+// backend API answers with as it is.
 func (e *InvalidStateError) Error() string { return e.Message }
 
 // Service keeps the Terraform backend's workspaces and states.
@@ -166,7 +161,6 @@ func (s *Service) ResolveState(ctx context.Context, id string) (repo.Config, Sta
 	return c, st, err
 }
 
-// fileAt is the file at p in c, or nil when there is none.
 func (s *Service) fileAt(ctx context.Context, c repo.Config, p string) (*types.Item, error) {
 	it, err := s.store().Items().Get(ctx, c.Key, false, p)
 	switch {
@@ -178,5 +172,4 @@ func (s *Service) fileAt(ctx context.Context, c repo.Config, p string) (*types.I
 	return &it, nil
 }
 
-// target is the item service's target of path p in c.
 func target(c repo.Config, p string) item.Target { return item.Target{Repo: c, Path: p} }

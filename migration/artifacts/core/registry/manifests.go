@@ -20,6 +20,9 @@ type BlobsUnknownError struct {
 	Digests []string
 }
 
+// Error names every unknown digest, in the order the manifest lists them.
+// The Docker registry API answers with one MANIFEST_BLOB_UNKNOWN for each of
+// Digests rather than with this text.
 func (e *BlobsUnknownError) Error() string {
 	return "registry: manifest references unknown blobs: " + strings.Join(e.Digests, ", ")
 }
@@ -40,6 +43,9 @@ type SizeMismatch struct {
 	Stored   int64
 }
 
+// Error names every mismatched descriptor with its declared and stored
+// sizes, in the order the manifest lists them. The Docker registry API answers
+// with one MANIFEST_INVALID for each of Mismatches rather than with this text.
 func (e *SizeMismatchError) Error() string {
 	parts := make([]string, 0, len(e.Mismatches))
 	for _, m := range e.Mismatches {

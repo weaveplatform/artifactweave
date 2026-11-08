@@ -356,7 +356,6 @@ func (s *Service) holdFolder(ctx context.Context, c repo.Config, name string) (t
 	return folder, nil
 }
 
-// lockOf reads the lock on a workspace's folder; nil when it has none.
 func (s *Service) lockOf(ctx context.Context, folder types.Item) (*Lock, error) {
 	props, err := s.store().Items().Properties(ctx, folder.ID)
 	if err != nil {

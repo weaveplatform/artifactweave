@@ -122,7 +122,6 @@ func (s *Service) removeFolder(
 	return removeFolders(ctx, items, o, slices.Concat([]string{folder}, tags, orphans))
 }
 
-// setting is a repository's numeric setting, or def when unset.
 func setting(v *int, def int) int {
 	if v == nil {
 		return def
