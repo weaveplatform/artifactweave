@@ -15,11 +15,14 @@ var (
 	buildName   = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 )
 
+// PackagesName and PackagesGzipName are the file names of a feed's package
+// index, plain and gzip-compressed, as R reads them from a feed directory.
 const (
 	PackagesName     = "PACKAGES"
 	PackagesGzipName = "PACKAGES.gz"
 )
 
+// Serves reports whether t is the CRAN package type.
 func Serves(t repo.PackageType) bool { return t == repo.Cran }
 
 // Feed is a terminal R package directory, without a trailing slash.
@@ -43,6 +46,8 @@ func Feed(p string) (string, bool) {
 	return "", false
 }
 
+// IndexPath reports whether p is the PACKAGES or PACKAGES.gz of a feed
+// directory, and returns that feed and the file name.
 func IndexPath(p string) (feed, name string, ok bool) {
 	name = path.Base(p)
 	if name != PackagesName && name != PackagesGzipName {
@@ -101,8 +106,14 @@ func PackagePath(p string) (feed, name, version string, ok bool) {
 		versionName.MatchString(version)
 }
 
+// IsPackage reports whether p is a package path PackagePath admits.
 func IsPackage(p string) bool { _, _, _, ok := PackagePath(p); return ok }
 
+// ValidName reports whether name is a valid R package name: a letter, then
+// letters, digits and dots.
 func ValidName(name string) bool { return packageName.MatchString(name) }
 
+// ValidVersion reports whether version is a valid package version: digits,
+// then any number of letter and digit components, each after a dot or a
+// hyphen.
 func ValidVersion(version string) bool { return versionName.MatchString(version) }

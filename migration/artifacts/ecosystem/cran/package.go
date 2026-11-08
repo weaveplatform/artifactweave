@@ -21,8 +21,18 @@ const (
 	maxEntries     = 50000
 )
 
+// ErrPackage is the error the package, upload and index rules return for
+// content that fails their checks: an invalid archive, DESCRIPTION, path,
+// index or index record. Callers match it with errors.Is, as the root
+// upload handler does to answer 400.
 var ErrPackage = errors.New("cran: invalid cran package")
 
+// Package is one R package archive: its Name and Version (from the file
+// name, which the DESCRIPTION must match), its repository Path and the
+// Feed directory that path belongs to, and its DESCRIPTION Fields, or a
+// decoded index record's fields. Size, MD5 and SHA256 describe the stored
+// bytes where they are known: ReadPackage sets Size, Work sets all three
+// from the stored item, and DecodeIndex sets MD5 from the record's MD5sum.
 type Package struct {
 	Name, Version, Path, Feed string
 	Fields                    map[string]string

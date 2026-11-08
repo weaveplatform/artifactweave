@@ -81,6 +81,14 @@ func EncodeIndex(in []Package, feed string) (map[string][]byte, error) {
 	return map[string][]byte{PackagesName: plain, PackagesGzipName: compressed.Bytes()}, nil
 }
 
+// DecodeIndex reads a feed's PACKAGES or PACKAGES.gz body, named by
+// indexPath, into its package records, an empty body giving none. Every
+// record must give a valid Package and Version whose file (File, or
+// <Package>_<Version> with the feed's suffix, below an optional relative
+// Path) is a package path of the index's own feed, with at most one
+// record per package and an optional 32-digit hex MD5sum. The body is at
+// most 32 MiB, compressed and expanded, and 100,000 records. Anything else
+// fails with ErrPackage.
 func DecodeIndex(body []byte, indexPath string) ([]Package, error) {
 	feed, name, ok := IndexPath(indexPath)
 	if !ok || len(body) > maxIndexBytes {

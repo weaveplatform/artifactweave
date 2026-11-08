@@ -1,4 +1,3 @@
-// Package p2 validates Eclipse p2 update-site paths and bounded metadata.
 package p2
 
 import (
@@ -16,6 +15,12 @@ import (
 	"github.com/ulikunitz/xz"
 )
 
+// MaxMetadata, MaxArtifact, MaxChildren, MaxDepth and MaxChildURL bound
+// what an update site can make the server read: 36 MiB for a metadata file
+// and for its expanded content, 512 MiB for an artifact, a site archive and
+// for their expanded entries, 64 children per composite metadata file, five
+// composite hops and 2,048 bytes per child location. docs/testing/p2.md
+// publishes these limits, so it changes with them.
 const (
 	MaxMetadata = 36 << 20
 	MaxArtifact = 512 << 20
@@ -24,12 +29,20 @@ const (
 	MaxChildURL = 2048
 )
 
+// ErrInvalid is the one error the p2 checks return for what they refuse:
+// an invalid path, p2.index, metadata file, artifact, site archive or
+// child location. It carries no detail of the content.
 var ErrInvalid = errors.New("p2: invalid p2 repository content")
 
 // Kind classifies the small set of native p2 files. An update site may place
 // these under an archive suffix (site.zip!/content.jar) or a site directory.
 type Kind uint8
 
+// KindInvalid, the zero Kind, is any path the p2 protocol does not serve.
+// KindIndex is p2.index, which names the metadata files a client reads;
+// KindMetadata is a content or artifacts metadata file, plain or
+// composite, as .xml, .jar or .xml.xz; and KindArtifact is a plugin or
+// feature JAR or a binary artifact.
 const (
 	KindInvalid Kind = iota
 	KindIndex
@@ -37,6 +50,12 @@ const (
 	KindArtifact
 )
 
+// Classify returns the Kind of an update-site path relative to the site:
+// KindIndex for p2.index and KindMetadata for a metadata file, by base
+// name, and KindArtifact for a .jar in a plugins or features folder or any
+// file in a binary folder, at any depth. Any other file, and a path that
+// is empty or absolute, has an empty, "." or ".." segment, or contains a
+// backslash, NUL, CR, LF, "?" or "#", is KindInvalid.
 func Classify(name string) Kind {
 	if name == "" || strings.HasPrefix(name, "/") || strings.ContainsAny(name, "\\\x00\r\n?#") {
 		return KindInvalid

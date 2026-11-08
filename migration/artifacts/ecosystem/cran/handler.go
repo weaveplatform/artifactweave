@@ -18,6 +18,12 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// KindIndex is the work kind that rebuilds a local or federated
+// repository's PACKAGES and PACKAGES.gz (Work), keyed by the repository.
+// PropName, PropVersion and PropFeed are the item properties Deployed and
+// Reindex set on every package from its path, which its DESCRIPTION must
+// match. The work queue and the items keep these values, so they never
+// change.
 const (
 	KindIndex   = "cran.index"
 	PropName    = "cran.name"
@@ -25,6 +31,11 @@ const (
 	PropFeed    = "cran.feed"
 )
 
+// Handler is the CRAN format's hooks: it checks every R package archive
+// written to a CRAN repository against its path and DESCRIPTION, keeps the
+// package index and the cran.* properties in step with the packages, and
+// derives a local or federated repository's PACKAGES and PACKAGES.gz for
+// each feed as queued work (KindIndex).
 type Handler struct{ generic.Handler }
 
 type inspection struct {
@@ -32,6 +43,12 @@ type inspection struct {
 	pkg       Package
 }
 
+// Inspect reads and checks the stored content a write puts at a package
+// path, before the write's transaction, and returns the package with its
+// DESCRIPTION fields for Admit and Deployed, so an archive is read once
+// per write. A checksum deploy and any other path inspect nothing. A write
+// with no content digest, or whose archive is invalid or does not match
+// its path, is refused with 400.
 func (Handler) Inspect(
 	ctx context.Context,
 	env format.Env,
@@ -48,6 +65,14 @@ func (Handler) Inspect(
 	return inspection{sha: w.Checksums.SHA256, path: w.Path, pkg: pkg}, nil
 }
 
+// Admit applies the generic deploy policy, wrapping its refusal, and
+// passes a checksum deploy. A local or federated repository derives its
+// own PACKAGES and PACKAGES.gz, so a write of either to one of its feeds is
+// refused (409). A file with an R archive suffix (.tar.gz, .tar.bz2,
+// .tar.xz, .tgz or .zip) at a path that is not a package path is refused
+// (400), and a package must be a valid archive that matches its path
+// (400): Admit repeats Inspect's check unless Inspect already read the
+// same content at the same path. Any other file passes.
 func (Handler) Admit(
 	ctx context.Context,
 	env format.Env,
@@ -81,6 +106,12 @@ func (Handler) Admit(
 	return w, nil
 }
 
+// Deployed sets a stored package's cran.name, cran.version and cran.feed
+// properties, brings its version in the package index up to date and, for
+// a local or federated repository's own write, queues the index rebuild. A
+// version's files are every package in the repository with that name and
+// version, in any feed or folder, so Deployed reads them all rather than
+// trusting their paths. Folders and other files change nothing.
 func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
 	if it.Folder || !IsPackage(it.FullPath()) {
 		return nil
@@ -98,6 +129,9 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 	return queue(ctx, env, c, it.Cached)
 }
 
+// Deleting queues the index rebuild when a local or federated repository's
+// own package is about to be deleted, so the rebuild is asked for exactly
+// when the delete commits. Folders and other files change nothing.
 func (Handler) Deleting(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
 	if it.Folder || !IsPackage(it.FullPath()) {
 		return nil
@@ -105,6 +139,10 @@ func (Handler) Deleting(ctx context.Context, env format.Env, c repo.Config, it t
 	return queue(ctx, env, c, it.Cached)
 }
 
+// Deleted re-syncs each removed package's version in the package index,
+// once per name and version, from that version's remaining packages. A
+// version with none left is not its concern: the item service has already
+// pruned it.
 func (Handler) Deleted(
 	ctx context.Context,
 	env format.Env,
@@ -141,8 +179,12 @@ func queue(ctx context.Context, env format.Env, c repo.Config, cached bool) erro
 	return env.Enqueue(ctx, KindIndex, c.Key, nil) //nolint:wrapcheck
 }
 
+// WorkKinds returns KindIndex, the one kind Work runs.
 func (Handler) WorkKinds() []string { return []string{KindIndex} }
 
+// Owed makes a read of a local or federated repository's PACKAGES or
+// PACKAGES.gz wait for its pending rebuild, so a client never reads an
+// index that lags a completed write. A remote's cache owes nothing.
 func (Handler) Owed(c repo.Config, cached bool, p string) []format.WorkRef {
 	if _, _, ok := IndexPath(p); ok && !cached && derives(c) {
 		return []format.WorkRef{{Kind: KindIndex, Key: c.Key}}
@@ -150,6 +192,9 @@ func (Handler) Owed(c repo.Config, cached bool, p string) []format.WorkRef {
 	return nil
 }
 
+// Classify classes each feed's PACKAGES and PACKAGES.gz as derived, so
+// replication and federation skip them and each side generates its own,
+// and every other path as unique.
 func (Handler) Classify(_ repo.Config, p string) format.Class {
 	if _, _, ok := IndexPath(p); ok {
 		return format.ClassDerived
@@ -157,6 +202,13 @@ func (Handler) Classify(_ repo.Config, p string) format.Class {
 	return format.ClassUnique
 }
 
+// Reindex rebuilds repository c's package index from its packages (a
+// remote's from its cache): a package per name and a version per version,
+// whose files are its archives in every feed and whose creation time is
+// the oldest file's, versions in R's order (CompareVersion). It reads
+// every package, failing on the first that is missing or invalid, and
+// restores the cran.* properties unless env.SkipProperties is set. A
+// local or federated repository's index rebuild is then queued.
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	items, err := files(ctx, env.Store, c)
 	if err != nil {
@@ -206,6 +258,14 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 	return queue(ctx, env, c, pkgindex.Stored(c).Cached)
 }
 
+// Work runs KindIndex for the repository work.Key names: it derives each
+// feed's PACKAGES and PACKAGES.gz from the packages stored directly in
+// that feed, listing the newest version of each with its DESCRIPTION's
+// dependency and build fields and the MD5 sum of its stored bytes
+// (EncodeIndex), and removes the indexes of a feed left with no package.
+// It ignores other kinds, a repository that no longer exists and one that
+// is not a local or federated CRAN repository, and fails on the first
+// package it cannot read.
 func (Handler) Work(ctx context.Context, env format.Env, work types.WorkItem) error {
 	if work.Kind != KindIndex {
 		return nil
