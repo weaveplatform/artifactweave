@@ -625,7 +625,7 @@
       "owner_issue": 767,
       "evidence": "test/acceptance/features/hex.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/hex-repositories",
-      "route_file": "internal/server/hex/hex.go",
+      "route_file": "migration/artifacts/ecosystem/hex/http/hex.go",
       "p9c": true
     },
     {
@@ -641,7 +641,7 @@
       "owner_issue": 788,
       "evidence": "test/acceptance/features/nix.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/nix-repositories",
-      "route_file": "internal/server/nix/nix.go",
+      "route_file": "migration/artifacts/ecosystem/nix/http/nix.go",
       "p9c": true
     },
     {

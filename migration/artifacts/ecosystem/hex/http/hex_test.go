@@ -1,4 +1,4 @@
-package hex
+package hexhttp
 
 import (
 	"bytes"
@@ -9,9 +9,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	hexfmt "github.com/weaveplatform/artifactweave/internal/format/hex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	hexfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/hex"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
@@ -92,7 +92,7 @@ func TestUnitCompactAdvisoriesExcludesDeniedReleaseMetadata(t *testing.T) {
 }
 
 func TestUnitRemoteTarballBoundaryRejectsUnverifiedSourceStream(t *testing.T) {
-	fixture := repopath.Read(t, "internal/format/hex/testdata/decimal-2.0.0.tar")
+	fixture := repopath.Read(t, "migration/artifacts/ecosystem/hex/testdata/decimal-2.0.0.tar")
 	expected, err := hexfmt.InspectTarball(bytes.NewReader(fixture))
 	if err != nil {
 		t.Fatal(err)
@@ -160,7 +160,7 @@ func TestUnitRemoteTarballBoundaryRejectsUnverifiedSourceStream(t *testing.T) {
 }
 
 func TestUnitRemoteTarballSourceValidatorChecksIdentityAndBounds(t *testing.T) {
-	archive := repopath.Read(t, "internal/format/hex/testdata/decimal-2.0.0.tar")
+	archive := repopath.Read(t, "migration/artifacts/ecosystem/hex/testdata/decimal-2.0.0.tar")
 	expected, err := hexfmt.InspectTarball(bytes.NewReader(archive))
 	if err != nil {
 		t.Fatal(err)

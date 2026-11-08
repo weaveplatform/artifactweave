@@ -1,5 +1,5 @@
-// Package hex serves the signed Hex registry v2 protocol.
-package hex
+// Package hexhttp serves the signed Hex registry v2 protocol.
+package hexhttp
 
 import (
 	"context"
@@ -12,11 +12,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	hexfmt "github.com/weaveplatform/artifactweave/internal/format/hex"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	hexfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/hex"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/keymaterial"
 	"github.com/weaveplatform/artifactweave/pkg/store"

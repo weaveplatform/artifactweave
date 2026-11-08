@@ -1,4 +1,4 @@
-package nix_test
+package nixhttp_test
 
 import (
 	"bytes"
@@ -15,8 +15,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	nixfmt "github.com/weaveplatform/artifactweave/internal/format/nix"
-	"github.com/weaveplatform/artifactweave/internal/server/nix"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
@@ -27,6 +25,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	nixfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nix"
+	nixhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nix/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -65,12 +65,12 @@ func newFixture(t *testing.T) *fixture {
 	if err = db.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
-	meta := repopath.Read(t, "internal/format/nix/testdata/cache/"+infoPath)
+	meta := repopath.Read(t, "migration/artifacts/ecosystem/nix/testdata/cache/"+infoPath)
 	info, err := nixfmt.Parse(meta, infoPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	data := repopath.Read(t, "internal/format/nix/testdata/cache/"+info.URL)
+	data := repopath.Read(t, "migration/artifacts/ecosystem/nix/testdata/cache/"+info.URL)
 	public, private, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -114,7 +114,7 @@ func (f *fixture) mount(remote *source.Service, tune ...func(*pkgroute.Protocol)
 	router.Use(accesstest.Over(f.t, f.db).Middleware(f.t, false, principalOf))
 	// Bound over f.st, the store the router kit serves, as a server binds it.
 	api := accesstest.Over(f.t, f.st).API()
-	p := nix.Protocol(nix.Options{
+	p := nixhttp.Protocol(nixhttp.Options{
 		RemoteSources: remote,
 		Authorizer:    api.Authorizer,
 		KeyPairs:      api.Keys,

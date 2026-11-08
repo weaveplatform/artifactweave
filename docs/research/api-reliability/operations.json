@@ -1350,7 +1350,7 @@
   {
     "route": "DELETE /artifactory/api/nix/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/nix.handler.remove-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/nix/http.handler.remove-fm",
     "review_family": "native-nix",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -5749,7 +5749,7 @@
   {
     "route": "GET /artifactory/api/hex/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/hex.handler.read-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/hex/http.handler.read-fm",
     "review_family": "native-hex",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6298,7 +6298,7 @@
   {
     "route": "GET /artifactory/api/nix/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/nix.handler.read-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/nix/http.handler.read-fm",
     "review_family": "native-nix",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12329,7 +12329,7 @@
   {
     "route": "HEAD /artifactory/api/hex/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/hex.handler.read-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/hex/http.handler.read-fm",
     "review_family": "native-hex",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12481,7 +12481,7 @@
   {
     "route": "HEAD /artifactory/api/nix/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/nix.handler.read-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/nix/http.handler.read-fm",
     "review_family": "native-nix",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -16837,7 +16837,7 @@
   {
     "route": "POST /artifactory/api/nix/{repoKey}/reindex",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/nix.handler.reindex-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/nix/http.handler.reindex-fm",
     "review_family": "native-nix",
     "effects": "resource mutation/action; see served contract and handler calls; index rebuild/possibly queued work; queue coalescing is not a replay guarantee",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -21126,7 +21126,7 @@
   {
     "route": "PUT /artifactory/api/nix/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/nix.handler.put-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/nix/http.handler.put-fm",
     "review_family": "native-nix",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",

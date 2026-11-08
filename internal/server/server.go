@@ -30,11 +30,9 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/conda"
 	"github.com/weaveplatform/artifactweave/internal/server/gems"
 	"github.com/weaveplatform/artifactweave/internal/server/gitlfs"
-	"github.com/weaveplatform/artifactweave/internal/server/hex"
 	"github.com/weaveplatform/artifactweave/internal/server/jetbrainsplugins"
 	"github.com/weaveplatform/artifactweave/internal/server/luarocks"
 	"github.com/weaveplatform/artifactweave/internal/server/machinelearning"
-	"github.com/weaveplatform/artifactweave/internal/server/nix"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/server/pub"
 	"github.com/weaveplatform/artifactweave/internal/server/puppet"
@@ -56,8 +54,10 @@ import (
 	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
 	golanghttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang/http"
 	helmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm/http"
+	hexhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/hex/http"
 	huggingfacehttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface/http"
 	nimmodelhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nimmodel/http"
+	nixhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nix/http"
 	npmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm/http"
 	nugethttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget/http"
 	pypihttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi/http"
@@ -209,7 +209,7 @@ type Config struct {
 // constructor here.
 var protocols = []func(Config) pkgroute.Protocol{
 	func(cfg Config) pkgroute.Protocol {
-		return nix.Protocol(nix.Options{
+		return nixhttp.Protocol(nixhttp.Options{
 			RemoteSources: cfg.RemoteSources,
 			Authorizer:    cfg.Access.Authorizer,
 			KeyPairs:      cfg.Access.Keys,
@@ -272,8 +272,8 @@ var protocols = []func(Config) pkgroute.Protocol{
 		)
 	},
 	func(cfg Config) pkgroute.Protocol {
-		return hex.Protocol(
-			hex.Options{RemoteSources: cfg.RemoteSources, KeyPairs: cfg.Access.Keys},
+		return hexhttp.Protocol(
+			hexhttp.Options{RemoteSources: cfg.RemoteSources, KeyPairs: cfg.Access.Keys},
 		)
 	},
 	func(cfg Config) pkgroute.Protocol {

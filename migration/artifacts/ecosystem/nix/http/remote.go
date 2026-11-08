@@ -1,4 +1,4 @@
-package nix
+package nixhttp
 
 import (
 	"context"
@@ -9,10 +9,10 @@ import (
 	"path"
 	"strings"
 
-	nixfmt "github.com/weaveplatform/artifactweave/internal/format/nix"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	nixfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nix"
 	"github.com/weaveplatform/artifactweave/migration/platform/keymaterial"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )

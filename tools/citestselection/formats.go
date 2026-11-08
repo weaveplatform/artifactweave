@@ -39,7 +39,7 @@ var formats = map[string]formatImpact{
 	"p2":            {"./internal/format/p2/...", "@p2", []string{"p2"}},
 	"conda":         {"./internal/format/conda/...", "@conda", []string{"conda"}},
 	"cran":          {"./internal/format/cran/...", "@cran", []string{"r"}},
-	"nix":           {"./internal/format/nix/...", "@nix", []string{"nix"}},
+	"nix":           {"./migration/artifacts/ecosystem/nix/...", "@nix", []string{"nix"}},
 	"puppet":        {"./internal/format/puppet/...", "@puppet", []string{"puppet"}},
 	"pub":           {"./internal/format/pub/...", "@pub", []string{"dart"}},
 	"agentpackages": {"./internal/format/agentpackages/...", "@apm", []string{"apm"}},
@@ -70,7 +70,7 @@ var formats = map[string]formatImpact{
 		[]string{"helm", "jf"},
 	},
 	"helmoci": {"", "@clients&&@helm", []string{"helm", "jf"}},
-	"hex":     {"./internal/format/hex/...", "@hex", []string{"hex"}},
+	"hex":     {"./migration/artifacts/ecosystem/hex/...", "@hex", []string{"hex"}},
 	"jetbrainsplugins": {
 		"./internal/server/jetbrainsplugins/...",
 		"@jetbrainsplugins",

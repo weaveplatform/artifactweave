@@ -1,4 +1,4 @@
-package hex
+package hexhttp
 
 import (
 	"bytes"
@@ -10,9 +10,9 @@ import (
 	"net/http"
 	"strings"
 
-	hexfmt "github.com/weaveplatform/artifactweave/internal/format/hex"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	hexfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/hex"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
