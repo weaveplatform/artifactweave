@@ -14,6 +14,14 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// The remote cache cleanup's work on the persistent queue (decision 0033).
+// KindCacheCleanupSchedule is the scheduler, one item keyed "scan" that runs
+// every CacheCleanupInterval and queues a KindCacheCleanup item, keyed by the
+// repository, for each remote repository with a positive
+// unusedArtifactsCleanupPeriodHours. Each KindCacheCleanup run cleans one page
+// of at most CacheCleanupBatch cache entries or cached items and queues the
+// next page at once. The two kind strings are persisted in work items, so they
+// never change: an item queued under an old kind would never run again.
 const (
 	KindCacheCleanupSchedule = "remote.cache-cleanup-schedule"
 	KindCacheCleanup         = "remote.cache-cleanup"

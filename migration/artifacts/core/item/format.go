@@ -25,7 +25,6 @@ type Enqueuer interface {
 	Enqueue(ctx context.Context, kind, key string, payload []byte) error
 }
 
-// format returns the format of a package type.
 func (s *Service) format(t repo.PackageType) format.Handler {
 	if s.Formats != nil {
 		return s.Formats(t)
@@ -37,7 +36,6 @@ func (s *Service) format(t repo.PackageType) format.Handler {
 // such as Maven's calculateMetadata, which reads and queues as a hook does.
 func (s *Service) Env() format.Env { return s.env() }
 
-// env is the environment of one operation's hooks.
 func (s *Service) env() format.Env {
 	env := format.Env{
 		Store:    s.Store,

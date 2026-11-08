@@ -349,8 +349,9 @@ These assignments describe planned work, not current runtime support.
   The suite's own tests run a test format with each option and with both, and show that it
   catches a format that keys per-repository work by package, forgets it on a move, leaves a
   sidecar behind, or links one.
-- `migration/artifacts/core/item` and `migration/artifacts/core/trash` test `SidecarKeeper` through each
-  write, with store faults, and a sidecar that cannot land holding its owner back (#533).
+- `migration/artifacts/core/item` and `migration/artifacts/core/trash` test `SidecarKeeper`
+  through each write, with store faults, and a sidecar that cannot land holding its owner
+  back (#533).
 - Unit and fault tests for each optional interface, `Derive` and the `RejectionError` mapping
   (#267).
 - A test-only format exercises every part of the router kit (#269).

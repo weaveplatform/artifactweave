@@ -1,11 +1,3 @@
-// Package item writes and removes items: the deploy flow of decision 0004
-// (content into the blob store, then the item and its blob reference in one
-// transaction), checksum deploy, folders, client checksums and deletion into
-// the trash can (decision 0010). Every write calls the repository format's
-// hooks (migration/artifacts/core/format, decision 0032): Inspect once the
-// content is stored, then Admit and the hooks inside the write's transaction. A
-// format indexes what it deploys, and a delete prunes the package index for
-// every format.
 package item
 
 import (
@@ -777,8 +769,12 @@ type SidecarError struct {
 	Message string
 }
 
+// Error returns Message, Artifactory's text for the refusal, which the HTTP
+// layer answers with as it is.
 func (e *SidecarError) Error() string { return e.Message }
 
+// Unwrap returns Err, so errors.Is tells a missing file, a folder and a
+// refused checksum apart.
 func (e *SidecarError) Unwrap() error { return e.Err }
 
 // OwnsSidecars reports whether c's format takes every upload named as a

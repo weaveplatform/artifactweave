@@ -61,6 +61,9 @@ type OverwriteDeniedError struct {
 	User string
 }
 
+// Error returns Artifactory 7.x's text for the refusal, naming the
+// repository, the path and the user. Clients match it, so it stays
+// byte-identical.
 func (e *OverwriteDeniedError) Error() string {
 	return fmt.Sprintf(
 		"Not enough permissions to delete/overwrite artifact '%s:%s' (user: '%s' needs DELETE permission).",
@@ -70,6 +73,8 @@ func (e *OverwriteDeniedError) Error() string {
 	)
 }
 
+// Unwrap returns ErrOverwriteDenied, so errors.Is matches every overwrite
+// refusal whatever its repository, path and user.
 func (e *OverwriteDeniedError) Unwrap() error { return ErrOverwriteDenied }
 
 // errFound ends an archive walk once the wanted entry is served.
@@ -437,7 +442,6 @@ func (s *Service) ArchiveFiles(
 	return aw.close()
 }
 
-// archiveWriter writes one archive of any kind.
 type archiveWriter struct {
 	zw *zip.Writer
 	tw *tar.Writer

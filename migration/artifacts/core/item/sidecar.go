@@ -100,7 +100,6 @@ func (s *Service) sidecarsOf(
 	return out, nil
 }
 
-// sidecar returns the file at p, and false when there is none.
 func (s *Service) sidecar(
 	ctx context.Context,
 	c repo.Config,
