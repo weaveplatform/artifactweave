@@ -139,7 +139,6 @@ func archivesUnder(
 	return out, nil
 }
 
-// within reports whether p is under, or lies below it.
 func within(p, under string) bool {
 	return under == "" || p == under || strings.HasPrefix(p, under+"/")
 }
@@ -163,7 +162,6 @@ func readOnce(
 	return ch, nil
 }
 
-// versionKey names a version: a chart name and version.
 type versionKey struct{ name, version string }
 
 // grouped is the index charts give: a package per chart name, dated by its

@@ -1,18 +1,3 @@
-// Package helm is the format of classic Helm chart repositories (decision
-// 0039); Helm OCI repositories are the Docker format's. It reads each chart
-// archive's Chart.yaml, indexes every chart in the repository, in any
-// folder, as a version of the package its name gives (decision 0018), with
-// the per-version Metadata that index.yaml is built from, and sets the
-// chart.* properties. Every write reaches it through the item service, so a
-// chart deployed by a REST PUT, by checksum, from an archive, or landed by a
-// copy, a move or a restore is indexed the same way.
-//
-// A chart's provenance file, <chart>.prov, is a sidecar the format keeps
-// with its chart (format.SidecarKeeper): it follows the chart through a
-// delete, a copy, a move and a restore, and is never a version file.
-//
-// Each write that changes a repository's charts queues the repository's
-// index.yaml work, one item per repository (KindIndex).
 package helm
 
 import (

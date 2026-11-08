@@ -1,4 +1,3 @@
-// Package helmhttp serves classic Helm repositories under /api/helm/.
 package helmhttp
 
 import (
