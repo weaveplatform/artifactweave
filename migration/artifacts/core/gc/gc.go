@@ -1,16 +1,3 @@
-// Package gc reclaims storage (decision 0010). A pass purges trash entries
-// past their retention, reaps abandoned upload sessions, deletes blobs no
-// item or trash entry references, and deletes content in the blob store that
-// the index never recorded (a deploy whose transaction failed after its
-// content was written). Passes run on a schedule and on
-// POST /api/system/storage/gc, under a lease so two instances sharing a
-// database never collect at once.
-//
-// Every blob is removed in three steps: its index row is marked deleting,
-// its content is deleted, and the row becomes a tombstone. A deleting row
-// refuses references, and a deploy that revives a tombstone checks the
-// content is still there, so a deploy of the same content racing the removal
-// is refused and repeated rather than left referencing missing content.
 package gc
 
 import (
@@ -408,7 +395,6 @@ func (c *Collector) collectOrphans(ctx context.Context, rep *Report) error {
 	return nil
 }
 
-// prune forgets removals older than tombstoneRetention.
 func (c *Collector) prune(ctx context.Context, rep *Report) error {
 	n, err := c.store.Blobs().Prune(ctx, c.now().Add(-tombstoneRetention))
 	rep.Pruned += n

@@ -1,18 +1,3 @@
-// Package multipart serves the JFrog CLI's multipart upload protocol, as the
-// pinned jfrog-client-go drives it (artifactory/services/utils/
-// multipartupload.go): create a session, get a URL per part, PUT the parts
-// concurrently, complete with the file's SHA-1, poll the status, and abort on
-// failure. Once the status is FINISHED the CLI checksum-deploys the file, so a
-// session only has to store the content and index it; the item, its
-// properties and the package index come from that ordinary checksum deploy.
-//
-// Artifactory hands out presigned S3 URLs and the object store assembles the
-// parts. artifactweave serves the part URLs itself and keeps one blob.Store
-// upload session per multipart upload (decision 0004), so every backend,
-// mirror included, takes multipart uploads: parts are staged on local disk as
-// they arrive, in any order, and appended to the blob upload in order. Only
-// the parts that arrive ahead of a missing one wait on disk, a few times the
-// part size with the CLI's concurrency.
 package multipart
 
 import (
@@ -261,7 +246,6 @@ func (s *Service) authenticate(ctx context.Context, token string) (store.Upload,
 	return u, ss, nil
 }
 
-// mac signs msg with a session's key.
 func mac(key, msg string) string {
 	k, _ := hex.DecodeString(key)
 	m := hmac.New(sha256.New, k)

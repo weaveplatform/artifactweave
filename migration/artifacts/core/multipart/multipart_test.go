@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
@@ -45,13 +45,9 @@ func newWorld(t *testing.T) world {
 		t.Fatal(err)
 	}
 	db := inmem.New()
-	m, err := access.New(access.Deps{Store: db})
-	if err != nil {
-		t.Fatal(err)
-	}
 	return world{
 		db: db, blobs: b, dir: filepath.Join(t.TempDir(), "multipart"),
-		restrictions: m.API().Restrictions,
+		restrictions: accesstest.Over(t, db).API().Restrictions,
 	}
 }
 
