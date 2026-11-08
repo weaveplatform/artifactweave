@@ -9,30 +9,24 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	"github.com/weaveplatform/artifactweave/internal/server/npm"
-	"github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// cheap is a password hash cost that keeps the tests fast; every user of
-// the accounts fixture has password "pw".
-var cheap = auth.HashParams{MemoryKiB: 64, Time: 1, Threads: 1}
-
 // accounts is the npm fixture with login and logout served by a real
-// authenticator and token service, over users:
-//   - ann, enabled, password "pw";
+// authenticator and token service, over users whose password is "pw":
+//   - ann, enabled;
 //   - locked, whose account is locked;
 //   - expired, whose password an administrator expired;
 //   - external, whose internal password is disabled;
 //   - off, a disabled user.
 type accounts struct {
 	*fixture
-	auth   *auth.Authenticator
-	tokens *token.Service
+	kit *accesstest.Kit
 }
 
 // newAccounts builds the fixture; settings are stored first, so the
@@ -46,10 +40,7 @@ func newAccounts(t *testing.T, settings map[string]any, expiry time.Duration) *a
 			t.Fatal(err)
 		}
 	}
-	hash, err := auth.HashPasswordWith(cheap, "pw")
-	if err != nil {
-		t.Fatal(err)
-	}
+	hash := accesstest.HashPassword(t, "pw")
 	for _, u := range []types.User{
 		{Name: "ann", PasswordHash: hash},
 		{Name: "locked", PasswordHash: hash, Status: types.UserLocked},
@@ -66,26 +57,13 @@ func newAccounts(t *testing.T, settings map[string]any, expiry time.Duration) *a
 	}); err != nil {
 		t.Fatal(err)
 	}
-	tokens, err := token.New(ctx, f.db, token.Options{KeyBits: 1024})
-	if err != nil {
-		t.Fatal(err)
-	}
-	a, err := auth.NewAuthenticator(f.db.Users(), f.db.Settings(), auth.Options{
-		Hash: cheap, Tokens: tokens,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Login and logout reach the service through the access module's
-	// binding, as the server wires them from app's module.
-	m, err := access.New(access.Deps{Store: f.db, Authenticator: a, Tokens: tokens})
-	if err != nil {
-		t.Fatal(err)
-	}
+	// Login and logout reach the authenticator and the service through the
+	// access module's bindings, as the server wires them from app's module.
+	kit := accesstest.Over(t, f.db, accesstest.WithTokens())
 	f.remount(t, npm.Options{Accounts: npm.Accounts{
-		Passwords: a, Tokens: m.API().Tokens, TokenExpiry: expiry,
+		Passwords: kit.API().Authenticator, Tokens: kit.API().Tokens, TokenExpiry: expiry,
 	}})
-	return &accounts{fixture: f, auth: a, tokens: tokens}
+	return &accounts{fixture: f, kit: kit}
 }
 
 const loginPath = registry + "-/user/org.couchdb.user:"
@@ -125,7 +103,7 @@ func TestAccLogin(t *testing.T) {
 		if got["ok"] != true || got["id"] != "org.couchdb.user:ann" {
 			t.Errorf("answer %s", rec.Body)
 		}
-		rec2, err := f.tokens.Verify(context.Background(), tok)
+		rec2, err := f.kit.Verify(context.Background(), tok)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -134,7 +112,7 @@ func TestAccLogin(t *testing.T) {
 			rec2.ExpiresAt.Sub(rec2.IssuedAt) != c.expected {
 			t.Errorf("expiry %s: token %+v", c.expiry, rec2)
 		}
-		p, err := f.auth.Token(context.Background(), tok, "")
+		p, err := f.kit.API().Authenticator.Token(context.Background(), tok, "")
 		if err != nil || p.Name != "ann" || p.Admin {
 			t.Errorf("token authenticates as %+v, %v", p, err)
 		}
@@ -146,7 +124,7 @@ func TestAccLogin(t *testing.T) {
 func TestAccLoginNames(t *testing.T) {
 	f := newAccounts(t, nil, 0)
 	ctx := context.Background()
-	hash, _ := auth.HashPasswordWith(cheap, "pw")
+	hash := accesstest.HashPassword(t, "pw")
 	if err := f.db.Users().
 		Create(ctx, types.User{Name: "a@b.example", PasswordHash: hash}); err != nil {
 		t.Fatal(err)
@@ -219,13 +197,13 @@ func TestAccLoginCountsFailures(t *testing.T) {
 		wantError(t, f.login("ann", "wrong"), http.StatusUnauthorized, "Bad credentials")
 	}
 	wantError(t, f.login("ann", "pw"), http.StatusForbidden, "User is Locked")
-	if _, err := f.auth.Basic(
+	if _, err := f.kit.API().Authenticator.Basic(
 		context.Background(),
 		"ann",
 		"pw",
 	); !errors.Is(
 		err,
-		auth.ErrAccountLocked,
+		kernel.ErrAccountLocked,
 	) {
 		t.Errorf("Basic after the failed logins: %v", err)
 	}
@@ -242,8 +220,8 @@ func TestAccLoginSuspension(t *testing.T) {
 	}, 0)
 	wantError(t, f.login("ann", "wrong"), http.StatusUnauthorized, "Bad credentials")
 	wantError(t, f.login("ann", "pw"), http.StatusForbidden, "recurrent login failures")
-	_, err := f.auth.Basic(context.Background(), "ann", "pw")
-	if !errors.Is(err, auth.ErrLoginSuspended) {
+	_, err := f.kit.API().Authenticator.Basic(context.Background(), "ann", "pw")
+	if !errors.Is(err, accesstest.ErrLoginSuspended) {
 		t.Errorf("Basic during the suspension: %v", err)
 	}
 }
@@ -256,13 +234,13 @@ func TestAccLoginWithToken(t *testing.T) {
 	f := newAccounts(t, nil, 0)
 	ctx := context.Background()
 	hour := time.Hour
-	issue := func(user, scope string, id types.TokenIdentity) token.Issued {
+	issue := func(user, scope string, id types.TokenIdentity) accessapi.IssuedToken {
 		t.Helper()
 		s, err := types.ParseScope(scope)
 		if err != nil {
 			t.Fatal(err)
 		}
-		issued, err := f.tokens.Issue(ctx, token.Request{
+		issued, err := f.kit.API().Tokens.Issue(ctx, accessapi.TokenRequest{
 			Username: user, Scope: s, ExpiresIn: &hour, ByAdmin: true, Identity: id,
 		})
 		if err != nil {
@@ -272,12 +250,12 @@ func TestAccLoginWithToken(t *testing.T) {
 	}
 	whole := issue("ann", "applied-permissions/user", types.IdentityStored)
 	tokenOf(t, f.login("ann", whole.AccessToken))
-	encrypted, err := f.tokens.EncryptedPassword(ctx, "ann")
+	encrypted, err := f.kit.API().Tokens.EncryptedPassword(ctx, "ann")
 	if err != nil {
 		t.Fatal(err)
 	}
 	tokenOf(t, f.login("ann", encrypted))
-	registryToken, err := f.tokens.IssueRegistry(ctx, token.RegistryRequest{
+	registryToken, err := f.kit.API().Tokens.IssueRegistry(ctx, accessapi.RegistryTokenRequest{
 		Username: "ann", ExpiresIn: time.Minute,
 	})
 	if err != nil {
@@ -314,7 +292,7 @@ func TestAccLoginNotServed(t *testing.T) {
 func TestAccLoginIssueFailure(t *testing.T) {
 	f := newAccounts(t, nil, 0)
 	f.remount(t, npm.Options{Accounts: npm.Accounts{
-		Passwords: f.auth, Tokens: failingTokens{},
+		Passwords: f.kit.API().Authenticator, Tokens: failingTokens{},
 	}})
 	wantStatus(t, f.login("ann", "pw"), http.StatusInternalServerError)
 	if len(f.faults) != 1 || !errors.Is(f.faults[0], errTokens) {
@@ -328,24 +306,25 @@ func TestAccLoginIssueFailure(t *testing.T) {
 func TestAccLogout(t *testing.T) {
 	f := newAccounts(t, nil, 0)
 	ctx := context.Background()
+	authn := f.kit.API().Authenticator
 	tok := tokenOf(t, f.login("ann", "pw"))
 	rec := f.do("DELETE", registry+"-/user/token/"+tok, "")
 	wantStatus(t, rec, http.StatusOK)
 	if decode(t, rec)["ok"] != true {
 		t.Errorf("answer %s", rec.Body)
 	}
-	if _, err := f.auth.Token(ctx, tok, ""); !errors.Is(err, auth.ErrBadCredentials) {
+	if _, err := authn.Token(ctx, tok, ""); !errors.Is(err, kernel.ErrBadCredentials) {
 		t.Errorf("token after logout: %v", err)
 	}
 	// Gone already, never a token, and a reference token.
 	wantStatus(t, f.do("DELETE", registry+"-/user/token/"+tok, ""), http.StatusOK)
 	wantStatus(t, f.do("DELETE", registry+"-/user/token/not-a-token", ""), http.StatusOK)
-	ref, err := f.tokens.EncryptedPassword(ctx, "ann")
+	ref, err := f.kit.API().Tokens.EncryptedPassword(ctx, "ann")
 	if err != nil {
 		t.Fatal(err)
 	}
 	wantStatus(t, f.do("DELETE", registry+"-/user/token/"+ref, ""), http.StatusOK)
-	if _, err := f.auth.Token(ctx, ref, "ann"); !errors.Is(err, auth.ErrBadCredentials) {
+	if _, err := authn.Token(ctx, ref, "ann"); !errors.Is(err, kernel.ErrBadCredentials) {
 		t.Errorf("reference token after logout: %v", err)
 	}
 }
@@ -358,12 +337,15 @@ func TestAccLogoutOfIrrevocableToken(t *testing.T) {
 	f := newAccounts(t, nil, 0)
 	ctx := context.Background()
 	hour := time.Hour
-	issued, err := f.tokens.Issue(ctx, token.Request{Username: "ann", ExpiresIn: &hour})
+	issued, err := f.kit.API().Tokens.Issue(
+		ctx,
+		accessapi.TokenRequest{Username: "ann", ExpiresIn: &hour},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	wantStatus(t, f.do("DELETE", registry+"-/user/token/"+issued.AccessToken, ""), http.StatusOK)
-	if _, err := f.auth.Token(ctx, issued.AccessToken, ""); err != nil {
+	if _, err := f.kit.API().Authenticator.Token(ctx, issued.AccessToken, ""); err != nil {
 		t.Errorf("irrevocable token after logout: %v", err)
 	}
 }

@@ -13,12 +13,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
@@ -436,18 +437,17 @@ func TestAccMount(t *testing.T) {
 // authentication middleware would.
 func principalAs(t *testing.T, db store.Store, h http.Handler, name string) http.Handler {
 	t.Helper()
-	p := auth.Principal{Name: name}
-	if name == auth.AnonymousUser {
-		p = auth.Anonymous
+	p := kernel.Principal{Name: name}
+	if name == kernel.AnonymousUser {
+		p = kernel.Anonymous
 	}
-	p, decider, err := auth.Authorize(context.Background(), authz.Sources{
-		Permissions: db.Permissions(), Groups: db.Groups(), AnonymousEnabled: true,
-	}, p)
+	authorizer := accesstest.Over(t, db).API().Authorizer
+	p, decider, err := authorizer.Authorize(context.Background(), p, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		h.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
+		h.ServeHTTP(w, r.WithContext(accessapi.WithCaller(r.Context(), p, decider)))
 	})
 }
 
@@ -483,9 +483,9 @@ func TestAccPermissions(t *testing.T) {
 	}{
 		{"reader", "GET", blobPath, 200, ""},
 		{"nobody", "GET", blobPath, 403, CodeDenied},
-		{auth.AnonymousUser, "HEAD", blobPath, 401, ""},
+		{kernel.AnonymousUser, "HEAD", blobPath, 401, ""},
 		{"reader", "POST", uploads, 403, CodeDenied},
-		{auth.AnonymousUser, "POST", uploads, 401, CodeUnauthorized},
+		{kernel.AnonymousUser, "POST", uploads, 401, CodeUnauthorized},
 		{"writer", "POST", uploads, 202, ""},
 		// writer may not read oci-local, so the mount opens a session.
 		{"writer", "POST", uploads + "?mount=" + d + "&from=oci-local/base", 202, ""},
@@ -817,16 +817,15 @@ func TestAccMountWithRegistryTokens(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			p, decider, err := auth.Authorize(ctx, authz.Sources{
-				Permissions: w.db.Permissions(), Groups: w.db.Groups(),
-			}, auth.Principal{
+			authorizer := accesstest.Over(t, w.db).API().Authorizer
+			p, decider, err := authorizer.Authorize(ctx, kernel.Principal{
 				Name: "tw", Registry: &types.RegistryAccess{Realm: c.realm, Grants: c.grants},
-			})
+			}, false)
 			if err != nil {
 				t.Fatal(err)
 			}
 			h := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-				w.h.ServeHTTP(rw, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
+				w.h.ServeHTTP(rw, r.WithContext(accessapi.WithCaller(r.Context(), p, decider)))
 			})
 			rec := send(
 				h,

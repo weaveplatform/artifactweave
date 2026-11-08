@@ -13,10 +13,11 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -914,7 +915,7 @@ func TestAccRequire(t *testing.T) {
 		Name: "readers",
 		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
 			Actions: types.Grants{Users: map[string]types.Actions{
-				"reader": types.ActionRead, auth.AnonymousUser: types.ActionRead,
+				"reader": types.ActionRead, kernel.AnonymousUser: types.ActionRead,
 			}},
 			Targets: map[string]types.Target{"docker-local": {Include: []string{"pub/**"}}},
 		}},
@@ -926,20 +927,18 @@ func TestAccRequire(t *testing.T) {
 		t.Fatal(err)
 	}
 	q := Request{Repo: c, Name: "pub/app"}
-	as := func(p auth.Principal, anonymous bool) *http.Request {
-		p, decider, err := auth.Authorize(ctx, authz.Sources{
-			Permissions: db.Permissions(), Groups: db.Groups(), AnonymousEnabled: anonymous,
-		}, p)
+	kit := accesstest.Over(t, db)
+	as := func(p kernel.Principal, anonymous bool) *http.Request {
+		authorized, err := kit.Authorize(ctx, p, anonymous)
 		if err != nil {
 			t.Fatal(err)
 		}
-		return httptest.NewRequest(http.MethodGet, "/", nil).
-			WithContext(auth.WithAuthorized(ctx, p, decider))
+		return httptest.NewRequest(http.MethodGet, "/", nil).WithContext(authorized)
 	}
-	reader := as(auth.Principal{Name: "reader"}, false)
-	nobody := as(auth.Principal{Name: "nobody"}, false)
-	anonOn := as(auth.Anonymous, true)
-	anonOff := as(auth.Anonymous, false)
+	reader := as(kernel.Principal{Name: "reader"}, false)
+	nobody := as(kernel.Principal{Name: "nobody"}, false)
+	anonOn := as(kernel.Anonymous, true)
+	anonOff := as(kernel.Anonymous, false)
 	cases := []struct {
 		name     string
 		r        *http.Request
@@ -996,18 +995,18 @@ func TestAccAuthenticatedRegistryRefusesWithoutDecider(t *testing.T) {
 	})
 	authenticated := g.Challenge(router(g))
 	const manifest = "/v2/docker-local/team/app/manifests/v1"
-	stored := func(h http.Handler, p *auth.Principal) http.Handler {
+	stored := func(h http.Handler, p *kernel.Principal) http.Handler {
 		return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 			if p != nil {
-				r = r.WithContext(auth.WithPrincipal(r.Context(), *p))
+				r = r.WithContext(kernel.WithPrincipal(r.Context(), *p))
 			}
 			h.ServeHTTP(rw, r)
 		})
 	}
-	admin := auth.Principal{Name: "admin", Admin: true}
-	anonymous := auth.Anonymous
+	admin := kernel.Principal{Name: "admin", Admin: true}
+	anonymous := kernel.Anonymous
 	for name, c := range map[string]struct {
-		p      *auth.Principal
+		p      *kernel.Principal
 		status int
 		code   string
 	}{
@@ -1025,14 +1024,13 @@ func TestAccAuthenticatedRegistryRefusesWithoutDecider(t *testing.T) {
 			expect(t, send(stored(w.h, c.p), http.MethodGet, manifest, "", nil), http.StatusOK, "")
 		})
 	}
-	p, decider, err := auth.Authorize(t.Context(), authz.Sources{
-		Permissions: w.db.Permissions(), Groups: w.db.Groups(),
-	}, admin)
+	authorizer := accesstest.Over(t, w.db).API().Authorizer
+	p, decider, err := authorizer.Authorize(t.Context(), admin, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	authorized := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		authenticated.ServeHTTP(rw, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
+		authenticated.ServeHTTP(rw, r.WithContext(accessapi.WithCaller(r.Context(), p, decider)))
 	})
 	expect(t, send(authorized, http.MethodGet, manifest, "", nil), http.StatusOK, "")
 	catalog := list(t, send(authorized, http.MethodGet, "/v2/_catalog", "", nil))

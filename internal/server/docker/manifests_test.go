@@ -14,10 +14,11 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -487,9 +488,9 @@ func TestAccManifestPermissions(t *testing.T) {
 		{"writer", "PUT", v1, first, 201, ""},
 		{"reader", "GET", v1, "", 200, ""},
 		{"nobody", "GET", v1, "", 403, CodeDenied},
-		{auth.AnonymousUser, "GET", v1, "", 401, CodeUnauthorized},
+		{kernel.AnonymousUser, "GET", v1, "", 401, CodeUnauthorized},
 		{"reader", "PUT", "/v2/docker-local/app/manifests/v2", first, 403, CodeDenied},
-		{auth.AnonymousUser, "PUT", "/v2/docker-local/app/manifests/v2", first, 401, CodeUnauthorized},
+		{kernel.AnonymousUser, "PUT", "/v2/docker-local/app/manifests/v2", first, 401, CodeUnauthorized},
 		// Repeating the push changes nothing, so Deploy is enough.
 		{"writer", "PUT", v1, first, 201, ""},
 		{"writer", "PUT", v1, second, 403, CodeDenied},
@@ -615,17 +616,18 @@ func TestAccManifestPushWithRegistryTokens(t *testing.T) {
 		t.Fatal(err)
 	}
 	w.uploadBlobs("app", imageConfig, "one", "two")
+	authorizer := accesstest.Over(t, w.db).API().Authorizer
 	tokenAs := func(user string, actions ...string) http.Handler {
-		p, decider, err := auth.Authorize(ctx, authz.Sources{
-			Permissions: w.db.Permissions(), Groups: w.db.Groups(),
-		}, auth.Principal{Name: user, Registry: &types.RegistryAccess{Grants: []types.RegistryGrant{
-			{Type: scopeRepository, Name: "docker-local/app", Actions: actions},
-		}}})
+		p, decider, err := authorizer.Authorize(ctx, kernel.Principal{
+			Name: user, Registry: &types.RegistryAccess{Grants: []types.RegistryGrant{
+				{Type: scopeRepository, Name: "docker-local/app", Actions: actions},
+			}},
+		}, false)
 		if err != nil {
 			t.Fatal(err)
 		}
 		return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-			w.h.ServeHTTP(rw, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
+			w.h.ServeHTTP(rw, r.WithContext(accessapi.WithCaller(r.Context(), p, decider)))
 		})
 	}
 	const v1 = "/v2/docker-local/app/manifests/v1"
