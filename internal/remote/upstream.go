@@ -27,6 +27,13 @@ type Options struct {
 	MaxResponseHeaderBytes int64
 }
 
+// Request is one upstream exchange for Connection.Do and Connection.Fetch.
+// Path and Query resolve against the repository URL; ExternalURL instead names
+// an absolute destination, which only a guarded connection sends (ErrSecurity
+// otherwise). Only GET and HEAD without a body are sent, apart from the closed
+// format-owned POSTs marked below; anything else is ErrRequest. Metadata
+// bounds the whole exchange, body included, by the repository's metadata
+// retrieval timeout.
 type Request struct {
 	// GitUploadPack is set only by the closed CocoaPods Git-object adapter
 	// (cocoapods.FetchCocoaPodsGit), to mark its upload-pack POST. It is
@@ -55,19 +62,47 @@ type Request struct {
 	Body []byte
 }
 
-// Upstream opens pooled connections to remote origins.
+// Upstream opens pooled connections to remote origins. It is the port through
+// which the policy, Smart Remote and the format rules reach an upstream, so
+// that none of them holds the transport; *Pool implements it, and it is safe
+// for concurrent use. It sits beside Options, Request and the transport errors
+// that its callers share, not in a separate ports package (decision 0044,
+// "Artifacts and remote").
 type Upstream interface {
-	// Connection returns the connection for c configured by opts.
+	// Connection returns the connection for c configured by opts. A repository
+	// whose configuration or opts.Revision changed gets a new one. On error
+	// the Connection is a nil interface, never a nil pointer inside one, so
+	// that a caller can compare it with nil.
 	Connection(c repo.Config, opts Options) (Connection, error)
 }
 
-// Connection sends requests to one remote origin. Every successful call
-// transfers response-body ownership to the caller.
+// Connection sends requests to one remote origin. Every successful Fetch, Do
+// or Send transfers response-body ownership to the caller, including non-2xx
+// responses. It is safe for concurrent use.
 type Connection interface {
+	// Fetch reads r, probing with HEAD first unless the repository bypasses
+	// HEAD requests or r must be sent once as it is. A probe answered with 304
+	// or a definitive error status is the result; otherwise the GET is, and
+	// nothing of the probe's response is reused.
 	Fetch(ctx context.Context, r Request) (*http.Response, error)
+	// Do sends r once as it is. Both Fetch and Do keep the transport's
+	// destination, redirect and credential rules and apply the hooks that
+	// WithOutbound installed in ctx.
 	Do(ctx context.Context, r Request) (*http.Response, error)
+	// Guarded reports whether the connection checks absolute destinations
+	// that metadata names (Options.CheckURL). An unguarded connection sends
+	// no ExternalURL request.
 	Guarded() bool
+	// CheckURL applies that destination check to u, and returns ErrSecurity
+	// when the connection is unguarded.
 	CheckURL(ctx context.Context, u *url.URL) error
+	// Prepare applies the connection's request preparation (Options.Prepare),
+	// which adds the configured credentials, to a request its caller built;
+	// without one it leaves req as it is and returns nil.
 	Prepare(req *http.Request) error
+	// Send sends a request its caller built, checked and prepared, over the
+	// connection's transport, and refuses every redirect with ErrRedirect.
+	// None of Do's checks or hooks apply, and the error is the HTTP client's
+	// own, not one of this package's classifications.
 	Send(req *http.Request) (*http.Response, error)
 }

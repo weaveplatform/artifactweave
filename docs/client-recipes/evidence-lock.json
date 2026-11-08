@@ -15,7 +15,7 @@
   "internal/server/conan_client_test.go": "d290f52278366ff31b62b5eeb79d7a2cf4b34e768a6079e30cddb8fb9e873ab9",
   "internal/server/huggingface/migration_scope_test.go": "ffe510b40e58cca4fe1ba110ca822816990797e804280ad8e6fba660969ed862",
   "internal/server/huggingface/migration_test.go": "b548c034d8fbb5d4112ca23513f4d03dd608dd8f536d2b32b9450cf6e64ba288",
-  "internal/server/swift/remote_test.go": "13b4e85bb89513e730a7132268c76effda7927e44a406a052b5954033078d0b4",
+  "internal/server/swift/remote_test.go": "0cbfd2a520a935d1047a8c30770f8c451eb224a854090dd375fa4a7fb944d8df",
   "internal/server/swift/swift_test.go": "a400034188a684f93702ab95d72c8a063bf8f402bcdc84bd95c6ffeda1d0f6ab",
   "internal/server/vcs/archive_git_test.go": "639a747c6380fa0cd2b757ed2c6004ccaf23a3af6ddfbebf9b475ab28a728386",
   "internal/server/vcs/testdata/git-archives.json": "df28a545d0dbf8cac25008d086ccc71bdb0fc4bba01141128d93588abb219fa1",

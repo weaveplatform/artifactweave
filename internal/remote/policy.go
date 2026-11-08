@@ -52,9 +52,13 @@ type Policy struct {
 	Store           store.Store
 	Blobs           blob.Store
 	Items           *item.Service
-	Pool            Upstream
-	Options         func(context.Context, repo.Config) (Options, error)
-	CheckCurrent    func(context.Context, store.Store, source.Request, source.Permit, string) error
+	// Pool opens the upstream connections. Left nil, with Fetch nil too, every
+	// read that needs the network answers source.ErrUnavailable. Assign a
+	// *Pool only when it is not nil: a nil *Pool is a non-nil Upstream, which
+	// passes that check and the format rules' own.
+	Pool         Upstream
+	Options      func(context.Context, repo.Config) (Options, error)
+	CheckCurrent func(context.Context, store.Store, source.Request, source.Permit, string) error
 	// Key is a stable keyring-derived HMAC key, never a logged cache identifier.
 	Key           []byte
 	Now           func() time.Time
@@ -292,6 +296,10 @@ func (p *Policy) CacheKey(q source.Request, revision string) types.RemoteCacheKe
 	}
 }
 
+// FlightKey returns the key under which concurrent fills of key for one
+// source identity share a single upstream exchange: the hex SHA-256 of both,
+// so that callers with different credentials never share a response. Smart
+// Remote keys its discovery flights the same way.
 func (p *Policy) FlightKey(key types.RemoteCacheKey, identity types.SourceIdentity) string {
 	b, _ := json.Marshal([]any{key, identity})
 	sum := sha256.Sum256(b)

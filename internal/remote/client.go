@@ -471,8 +471,12 @@ func (c *Client) requestClient(ctx context.Context, r Request) *http.Client {
 	return &client
 }
 
+// Guarded reports whether c was built with Options.CheckURL, the check that
+// every absolute destination taken from metadata must pass.
 func (c *Client) Guarded() bool { return c.checkURL != nil }
 
+// CheckURL applies Options.CheckURL to u, and returns ErrSecurity when c has
+// none, so that an unguarded client never vouches for a destination.
 func (c *Client) CheckURL(ctx context.Context, u *url.URL) error {
 	if c.checkURL == nil {
 		return ErrSecurity
@@ -480,6 +484,8 @@ func (c *Client) CheckURL(ctx context.Context, u *url.URL) error {
 	return c.checkURL(ctx, u)
 }
 
+// Prepare applies Options.Prepare to req, a request its caller built rather
+// than Do; without one it does nothing and returns nil.
 func (c *Client) Prepare(req *http.Request) error {
 	if c.prepare == nil {
 		return nil
@@ -487,6 +493,12 @@ func (c *Client) Prepare(req *http.Request) error {
 	return c.prepare(req)
 }
 
+// Send sends req over c's transport, proxy, TLS settings and cookie jar
+// included, and refuses every redirect with ErrRedirect, because a request
+// built outside Do has none of the redirect checks Do installs. It applies
+// neither Do's checks nor the WithOutbound hooks; its caller checks and
+// prepares req first. The error is the HTTP client's own, unwrapped and not
+// classified, and a successful call transfers response-body ownership.
 func (c *Client) Send(req *http.Request) (*http.Response, error) {
 	transport := *c.http
 	transport.CheckRedirect = func(*http.Request, []*http.Request) error { return ErrRedirect }
