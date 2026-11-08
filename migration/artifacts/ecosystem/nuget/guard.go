@@ -38,7 +38,7 @@ func (Handler) GuardWrite(
 	// row/unique-index locks until commit or rollback, even after deletion.
 	// An already-expired timestamp ensures no wall-clock expiry or node clock
 	// skew can change exclusivity, and no lease survives a successful write.
-	took, err := env.Store.Leases().Acquire(ctx, types.Lease{
+	took, err := env.Leases.Acquire(ctx, types.Lease{
 		Name: name, Holder: holder, Task: "nuget write", Acquired: now,
 		Expires: time.Unix(1, 0),
 	}, now)
@@ -52,7 +52,7 @@ func (Handler) GuardWrite(
 			errWriteLock,
 		)
 	}
-	if err := env.Store.Leases().Release(ctx, name, holder); err != nil {
+	if err := env.Leases.Release(ctx, name, holder); err != nil {
 		return fmt.Errorf("nuget: release %s: %w", name, err)
 	}
 	return checkPackage(ctx, env, c, w)

@@ -11,6 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -38,11 +39,19 @@ type Handler interface {
 type Registry func(t repo.PackageType) Handler
 
 // Env is what a hook runs with. The item service builds one per operation;
-// inside a hook, ctx carries the operation's transaction, which Store, Keys,
-// Derive and Enqueue join.
+// inside a hook, ctx carries the operation's transaction, which Store,
+// Leases, WorkQueue, Keys, Derive and Enqueue join.
 type Env struct {
 	// Store is the metadata store.
 	Store store.Store
+	// Leases is the store's lease table. A format takes a write lock through
+	// it inside the operation's transaction: Acquire and Release join the
+	// transaction in ctx, so it must be the same store as Store.
+	Leases work.LeaseStore
+	// WorkQueue reads queued work, such as whether an index rebuild is
+	// pending. A format asks for new work only through Enqueue, which waits
+	// for the commit.
+	WorkQueue work.WorkQueue
 	// Keys reads the key pairs a format signs its metadata with, named by a
 	// repository's primaryKeyPairRef or keyPair. Their private keys come
 	// back unsealed, so a format never logs them (decision 0017). Like Store

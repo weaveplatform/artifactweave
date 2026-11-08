@@ -52,6 +52,10 @@ func (s *Service) env() format.Env {
 	if s.Blobs != nil {
 		env.Blobs = s.Blobs
 	}
+	// A service built without a store leaves both nil rather than panicking.
+	if s.Store != nil {
+		env.Leases, env.WorkQueue = s.Store.Leases(), s.Store.WorkQueue()
+	}
 	return env
 }
 

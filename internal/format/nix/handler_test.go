@@ -105,8 +105,10 @@ func handlerFixture(t *testing.T) (format.Env, repo.Config, types.Item, types.It
 		return it
 	}
 	return format.Env{
-			Store: db,
-			Blobs: blobs,
+			Store:     db,
+			Leases:    db.Leases(),
+			WorkQueue: db.WorkQueue(),
+			Blobs:     blobs,
 		}, c, put(
 			fixturePath,
 			info.Encode(info.URL),
@@ -299,13 +301,6 @@ func TestUnitNixStorageFailuresRemainFailures(t *testing.T) {
 	}
 }
 
-type leaseDB struct {
-	store.Store
-	leases store.LeaseStore
-}
-
-func (s leaseDB) Leases() store.LeaseStore { return s.leases }
-
 type failedLease struct {
 	store.LeaseStore
 	mode string
@@ -323,10 +318,7 @@ func TestUnitNixPublicationLockFailures(t *testing.T) {
 	for _, mode := range []string{"acquire", "busy", "release"} {
 		t.Run(mode, func(t *testing.T) {
 			env, c, meta, _, _ := handlerFixture(t)
-			env.Store = leaseDB{
-				Store:  env.Store,
-				leases: failedLease{LeaseStore: env.Store.Leases(), mode: mode},
-			}
+			env.Leases = failedLease{LeaseStore: env.Leases, mode: mode}
 			if err := (Handler{}).GuardWrite(
 				t.Context(),
 				env,

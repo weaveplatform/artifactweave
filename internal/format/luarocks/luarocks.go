@@ -198,7 +198,7 @@ func (Handler) Resolve(
 	if !errors.Is(err, store.ErrNotFound) {
 		return "", fmt.Errorf("luarocks: manifest: %w", err)
 	}
-	_, err = env.Store.WorkQueue().Get(ctx, KindManifest, c.Key)
+	_, err = env.WorkQueue.Get(ctx, KindManifest, c.Key)
 	if err == nil {
 		return d.Path, nil
 	}

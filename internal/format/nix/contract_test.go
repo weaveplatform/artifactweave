@@ -113,7 +113,12 @@ func TestAccNixFormatLifecycle(t *testing.T) {
 			}
 			restored, err := nixfmt.ReadInfo(
 				t.Context(),
-				format.Env{Store: db, Blobs: blobs},
+				format.Env{
+					Store:     db,
+					Leases:    db.Leases(),
+					WorkQueue: db.WorkQueue(),
+					Blobs:     blobs,
+				},
 				current,
 			)
 			if err != nil || restored.StorePath != info.StorePath {
@@ -267,7 +272,12 @@ func TestAccNixConcurrentFirstPublicationKeepsOneIdentity(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			winner, err := nixfmt.ReadInfo(t.Context(), format.Env{Store: db, Blobs: blobs}, it)
+			winner, err := nixfmt.ReadInfo(t.Context(), format.Env{
+				Store:     db,
+				Leases:    db.Leases(),
+				WorkQueue: db.WorkQueue(),
+				Blobs:     blobs,
+			}, it)
 			if err != nil {
 				t.Fatal(err)
 			}

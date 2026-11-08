@@ -72,7 +72,13 @@ func identity(r *http.Request, autoVersion bool) (ml.Identity, error) {
 }
 
 func (h handler) env() format.Env {
-	return format.Env{Store: h.k.DB(), Blobs: h.k.Blobs(), Now: time.Now}
+	db := h.k.DB()
+	env := format.Env{Store: db, Blobs: h.k.Blobs(), Now: time.Now}
+	// A router built without a store leaves both nil rather than panicking.
+	if db != nil {
+		env.Leases, env.WorkQueue = db.Leases(), db.WorkQueue()
+	}
+	return env
 }
 func badRequest(message string) error { return apierror.New(http.StatusBadRequest, message) }
 

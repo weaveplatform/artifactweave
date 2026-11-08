@@ -186,7 +186,7 @@ func (Handler) Resolve(
 	case !errors.Is(err, store.ErrNotFound):
 		return "", fmt.Errorf("helm: read index: %w", err)
 	}
-	_, err = env.Store.WorkQueue().Get(ctx, KindIndex, c.Key)
+	_, err = env.WorkQueue.Get(ctx, KindIndex, c.Key)
 	switch {
 	case err == nil:
 		return d.Path, nil
