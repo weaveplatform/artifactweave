@@ -3,8 +3,8 @@ package ecosystem
 import (
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/format/helm"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm"
 )
 
 // Classic Helm repositories have the Helm format; Helm OCI ones keep the

@@ -1369,7 +1369,7 @@
   {
     "route": "DELETE /artifactory/api/npm/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/npm.handler.unpublish-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/npm/http.handler.unpublish-fm",
     "review_family": "native-npm",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -1388,7 +1388,7 @@
   {
     "route": "DELETE /artifactory/api/npm/{repoKey}/-/package/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/npm.handler.removeTag-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/npm/http.handler.removeTag-fm",
     "review_family": "native-npm",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -1407,7 +1407,7 @@
   {
     "route": "DELETE /artifactory/api/npm/{repoKey}/-/user/token/{token}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/npm.handler.logout-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/npm/http.handler.logout-fm",
     "review_family": "native-npm",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -5711,7 +5711,7 @@
   {
     "route": "GET /artifactory/api/helm/{repoKey}/",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/helm.handler.read-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/helm/http.handler.read-fm",
     "review_family": "native-helm",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -5730,7 +5730,7 @@
   {
     "route": "GET /artifactory/api/helm/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/helm.handler.read-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/helm/http.handler.read-fm",
     "review_family": "native-helm",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6323,7 +6323,7 @@
     "handler": "internal/server/npm_auth.go: artifactoryService.GetNpmAuth",
     "direct_calls": [
       "artgen.GetNpmAuth200TextResponse",
-      "npm.AuthLines",
+      "npmhttp.AuthLines",
       "s.npmCredential"
     ],
     "review_family": "native-npm",
@@ -6344,7 +6344,7 @@
   {
     "route": "GET /artifactory/api/npm/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/npm.handler.read-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/npm/http.handler.read-fm",
     "review_family": "native-npm",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6363,7 +6363,7 @@
   {
     "route": "GET /artifactory/api/npm/{repoKey}/-/package/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/npm.handler.listTags-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/npm/http.handler.listTags-fm",
     "review_family": "native-npm",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6382,7 +6382,7 @@
   {
     "route": "GET /artifactory/api/npm/{repoKey}/-/ping",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/npm.handler.ping-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/npm/http.handler.ping-fm",
     "review_family": "native-npm",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6401,7 +6401,7 @@
   {
     "route": "GET /artifactory/api/npm/{repoKey}/-/v1/search",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/npm.handler.search-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/npm/http.handler.search-fm",
     "review_family": "native-npm",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6420,7 +6420,7 @@
   {
     "route": "GET /artifactory/api/npm/{repoKey}/-/whoami",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/npm.handler.whoami-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/npm/http.handler.whoami-fm",
     "review_family": "native-npm",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6446,8 +6446,8 @@
     "direct_calls": [
       "artgen.GetNpmScopeAuth200TextResponse",
       "baseurl.From",
-      "npm.ScopeAuthLines",
-      "npm.ValidScope",
+      "npmhttp.ScopeAuthLines",
+      "npmhttp.ValidScope",
       "s.content",
       "s.itemError",
       "s.npmCredential",
@@ -6927,7 +6927,7 @@
   {
     "route": "GET /artifactory/api/pypi/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/pypi.handler.read-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/pypi/http.handler.read-fm",
     "review_family": "native-pypi",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12291,7 +12291,7 @@
   {
     "route": "HEAD /artifactory/api/helm/{repoKey}/",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/helm.handler.read-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/helm/http.handler.read-fm",
     "review_family": "native-helm",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12310,7 +12310,7 @@
   {
     "route": "HEAD /artifactory/api/helm/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/helm.handler.read-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/helm/http.handler.read-fm",
     "review_family": "native-helm",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12500,7 +12500,7 @@
   {
     "route": "HEAD /artifactory/api/npm/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/npm.handler.read-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/npm/http.handler.read-fm",
     "review_family": "native-npm",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12823,7 +12823,7 @@
   {
     "route": "HEAD /artifactory/api/pypi/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/pypi.handler.read-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/pypi/http.handler.read-fm",
     "review_family": "native-pypi",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -16990,7 +16990,7 @@
   {
     "route": "POST /artifactory/api/pypi/{repoKey}/",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/pypi.handler.upload-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/pypi/http.handler.upload-fm",
     "review_family": "native-pypi",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -17009,7 +17009,7 @@
   {
     "route": "POST /artifactory/api/pypi/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/pypi.handler.upload-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/pypi/http.handler.upload-fm",
     "review_family": "native-pypi",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -21145,7 +21145,7 @@
   {
     "route": "PUT /artifactory/api/npm/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/npm.handler.write-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/npm/http.handler.write-fm",
     "review_family": "native-npm",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -21164,7 +21164,7 @@
   {
     "route": "PUT /artifactory/api/npm/{repoKey}/-/package/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/npm.handler.addTag-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/npm/http.handler.addTag-fm",
     "review_family": "native-npm",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -21183,7 +21183,7 @@
   {
     "route": "PUT /artifactory/api/npm/{repoKey}/-/user/org.couchdb.user:{user}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/npm.handler.login-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/npm/http.handler.login-fm",
     "review_family": "native-npm",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -21278,7 +21278,7 @@
   {
     "route": "PUT /artifactory/api/pypi/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/pypi.handler.put-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/pypi/http.handler.put-fm",
     "review_family": "native-pypi",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",

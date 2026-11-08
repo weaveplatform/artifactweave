@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -51,6 +51,10 @@ func (s *Service) env() format.Env {
 	// A nil blob.Store must not become a non-nil format.Blobs.
 	if s.Blobs != nil {
 		env.Blobs = s.Blobs
+	}
+	// A service built without a store leaves both nil rather than panicking.
+	if s.Store != nil {
+		env.Leases, env.WorkQueue = s.Store.Leases(), s.Store.WorkQueue()
 	}
 	return env
 }

@@ -1,0 +1,185 @@
+package remote
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"sync"
+)
+
+// ErrBusy reports that upstream capacity is exhausted: Admission.Acquire,
+// and so Policy.Acquire, returns it when a repository already has its
+// maximum of callers queued, and Smart Remote when its work queue is full.
+// PolicyError answers it with a 503.
+var ErrBusy = errors.New("remote: remote retrieval capacity exhausted")
+
+type flight[T any] struct {
+	done    chan struct{}
+	cancel  context.CancelFunc
+	waiters int
+	result  T
+	err     error
+}
+
+// FlightGroup lets concurrent callers with one key share one run of an
+// operation; its zero value is ready to use, and it must not be copied after
+// first use. The shared operation gets its own context. A departing waiter
+// cannot cancel its peers; the last departure cancels otherwise abandoned I/O.
+// Only persisted results may be shared: an owned stream is never multicast.
+type FlightGroup[T any] struct {
+	mu     sync.Mutex
+	active map[string]*flight[T]
+}
+
+// Do runs work for key, or joins the run already in flight for it, and
+// returns that run's result to every caller still waiting. work runs on a
+// context that keeps the values of the caller who started the run but none
+// of its cancellation, and that ends when the last waiter leaves. A caller
+// whose ctx ends first leaves at once with the context's error, wrapped, and
+// the run goes on for the others.
+func (g *FlightGroup[T]) Do(
+	ctx context.Context,
+	key string,
+	work func(context.Context) (T, error),
+) (T, error) {
+	var zero T
+	if err := ctx.Err(); err != nil {
+		return zero, fmt.Errorf("join remote retrieval: %w", err)
+	}
+	g.mu.Lock()
+	if g.active == nil {
+		g.active = make(map[string]*flight[T])
+	}
+	f := g.active[key]
+	if f == nil {
+		shared, cancel := context.WithCancel(context.WithoutCancel(ctx))
+		f = &flight[T]{done: make(chan struct{}), cancel: cancel}
+		g.active[key] = f
+		go func() {
+			result, err := work(shared)
+			g.mu.Lock()
+			f.result, f.err = result, err
+			if g.active[key] == f {
+				delete(g.active, key)
+			}
+			close(f.done)
+			g.mu.Unlock()
+			cancel()
+		}()
+	}
+	f.waiters++
+	g.mu.Unlock()
+	select {
+	case <-ctx.Done():
+		g.mu.Lock()
+		f.waiters--
+		if f.waiters == 0 {
+			f.cancel()
+			if g.active[key] == f {
+				delete(g.active, key)
+			}
+		}
+		g.mu.Unlock()
+		return zero, fmt.Errorf("wait for remote retrieval: %w", ctx.Err())
+	case <-f.done:
+		return f.result, f.err
+	}
+}
+
+// Pending reports how many callers wait on the group's active flights.
+// Tests poll it to know every caller has joined before the shared work ends.
+func (g *FlightGroup[T]) Pending() int {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	n := 0
+	for _, f := range g.active {
+		n += f.waiters
+	}
+	return n
+}
+
+type admissionState struct{ active, queued int }
+
+// Admission bounds active work and queued callers without creating a goroutine
+// for each blocked request. A single notification wakes contenders to recheck
+// under the mutex; no repository reserves a global slot while it is full. Its
+// zero value is ready to use, with at most 8 active callers per key, 64 in
+// all and 256 queued per key; it must not be copied after first use.
+type Admission struct {
+	mu                     sync.Mutex
+	changed                chan struct{}
+	repos                  map[string]*admissionState
+	active                 int
+	perRepo, global, queue int
+}
+
+// Acquire waits for a slot for repoKey and returns its release, which is
+// safe to call more than once. It answers ErrBusy at once when repoKey's
+// queue is full, and the context's error, wrapped, when ctx ends first.
+func (a *Admission) Acquire(ctx context.Context, repoKey string) (func(), error) {
+	a.mu.Lock()
+	if a.changed == nil {
+		a.changed = make(chan struct{})
+		a.repos = make(map[string]*admissionState)
+		if a.perRepo <= 0 {
+			a.perRepo = 8
+		}
+		if a.global <= 0 {
+			a.global = 64
+		}
+		if a.queue <= 0 {
+			a.queue = 256
+		}
+	}
+	r := a.repos[repoKey]
+	if r == nil {
+		r = new(admissionState)
+		a.repos[repoKey] = r
+	}
+	if r.queued >= a.queue {
+		a.mu.Unlock()
+		return nil, ErrBusy
+	}
+	r.queued++
+	for {
+		if err := ctx.Err(); err != nil {
+			a.dequeue(repoKey, r)
+			a.mu.Unlock()
+			return nil, fmt.Errorf("wait for remote capacity: %w", err)
+		}
+		if a.active < a.global && r.active < a.perRepo {
+			r.queued--
+			r.active++
+			a.active++
+			a.mu.Unlock()
+			var once sync.Once
+			return func() { once.Do(func() { a.release(repoKey, r) }) }, nil
+		}
+		changed := a.changed
+		a.mu.Unlock()
+		select {
+		case <-ctx.Done():
+		case <-changed:
+		}
+		a.mu.Lock()
+	}
+}
+
+func (a *Admission) dequeue(key string, r *admissionState) {
+	r.queued--
+	if r.queued == 0 && r.active == 0 {
+		delete(a.repos, key)
+	}
+}
+
+func (a *Admission) release(key string, r *admissionState) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.active--
+	r.active--
+	if r.queued == 0 && r.active == 0 {
+		delete(a.repos, key)
+	}
+	close(a.changed)
+	a.changed = make(chan struct{})
+}

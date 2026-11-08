@@ -13,25 +13,26 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	"github.com/weaveplatform/artifactweave/internal/config"
 	"github.com/weaveplatform/artifactweave/internal/format/conda"
-	"github.com/weaveplatform/artifactweave/internal/format/helm"
-	"github.com/weaveplatform/artifactweave/internal/format/npm"
-	"github.com/weaveplatform/artifactweave/internal/format/pypi"
 	"github.com/weaveplatform/artifactweave/internal/format/terraformbackend"
-	"github.com/weaveplatform/artifactweave/internal/reindexauth"
-	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server"
-	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/migration/access"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/reindexauth"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/smart"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/mirror"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
@@ -66,11 +67,11 @@ type runtime struct {
 	// work runs derived work after the changes that need it (decision 0033).
 	work            *work.Queue
 	mavenEager      *maven.MavenEager
-	smartRemote     *remote.Smart
-	smartRegistry   *remote.Smart
-	remoteHTTP      remote.Pool
+	smartRemote     *smart.Smart
+	smartRegistry   *smart.Smart
+	remoteHTTP      upstream.Pool
 	remoteSources   *source.Service
-	registryHTTP    remote.RegistryPool
+	registryHTTP    upstream.RegistryPool
 	registrySources *source.Service
 	// registryPath is the registry path grammar both Smart Remote runtimes
 	// are given. Nil silently turns off property synchronisation for

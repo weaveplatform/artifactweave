@@ -6,7 +6,7 @@ import (
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 
-	"github.com/weaveplatform/artifactweave/internal/format/terraform/terraformtest"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/terraformtest"
 )
 
 func TestUnitSignRepomdBindsMetadata(t *testing.T) {

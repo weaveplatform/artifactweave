@@ -3,9 +3,9 @@ package aieditorextensions
 import (
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 )
 
 // Handler keeps the shared deployment policy and classifies gallery metadata.

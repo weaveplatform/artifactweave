@@ -43,6 +43,10 @@ exclude:
     # abort on fixture setup failures or malformed test responses; the
     # production handlers remain in the per-package gate.
     - ^test/server/support/agentcommon/
+    # Upstream transport test fixture: its remaining branches are t.Fatal
+    # paths on invalid setup, while the transport itself
+    # (migration/artifacts/adapters/upstream) stays in the per-package gate.
+    - ^migration/artifacts/adapters/upstream/upstreamtest/
     # Skips container tests where Docker cannot run Linux containers; its
     # branches are the skip paths of other platforms.
     - ^pkg/containertest/

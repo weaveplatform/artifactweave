@@ -16,9 +16,9 @@ import (
 
 	"github.com/cucumber/godog"
 
-	tf "github.com/weaveplatform/artifactweave/internal/format/terraform"
-	"github.com/weaveplatform/artifactweave/internal/format/terraform/terraformtest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
+	tf "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/terraformtest"
 )
 
 func (w *world) registerTerraformProviderRemote(sc *godog.ScenarioContext) {

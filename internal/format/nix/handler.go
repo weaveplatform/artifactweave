@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -177,15 +177,17 @@ func (Handler) GuardWrite(
 	holder, now := rand.Text(), time.Now()
 	// Acquire and Release join the item transaction. PostgreSQL keeps the
 	// unique-index lock until commit even though no lease row survives it.
-	took, err := env.Store.Leases().
-		Acquire(ctx, types.Lease{Name: name, Holder: holder, Task: "Nix publication", Acquired: now, Expires: time.Unix(1, 0)}, now)
+	took, err := env.Leases.Acquire(ctx, types.Lease{
+		Name: name, Holder: holder, Task: "Nix publication", Acquired: now,
+		Expires: time.Unix(1, 0),
+	}, now)
 	if err != nil {
 		return fmt.Errorf("nix: publication lock: %w", err)
 	}
 	if !took {
 		return format.Rejectf(409, "Nix publication is already locked")
 	}
-	if err = env.Store.Leases().Release(ctx, name, holder); err != nil {
+	if err = env.Leases.Release(ctx, name, holder); err != nil {
 		return fmt.Errorf("nix: publication unlock: %w", err)
 	}
 	return checkExisting(ctx, env, c, w, in)

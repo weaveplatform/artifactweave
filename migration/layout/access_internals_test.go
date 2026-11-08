@@ -187,7 +187,7 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 				To:     "access/core/identity",
 			},
 			{
-				From:   "internal/server/npm",
+				From:   "internal/server/xyz",
 				Action: ledger.ActionMove,
 				To:     "artifacts/ecosystem/npm/http",
 			},
@@ -217,7 +217,7 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 		"internal/authz/authz_test.go":               file(authenticator),
 		"internal/service/identity/identity_test.go": file(evaluator, tokens),
 		// The published contracts and access test support, staged and legacy.
-		"internal/server/npm/npm_test.go": file(
+		"internal/server/xyz/npm_test.go": file(
 			root+"/access",
 			root+"/access/api",
 			root+"/access/accesstest",
@@ -227,13 +227,13 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 		),
 		// Production code is the import tiers' to judge, as are the files
 		// of skipped directories.
-		"internal/server/npm/npm.go":                  file(evaluator),
-		"internal/server/npm/testdata/x_test.go":      file(evaluator),
+		"internal/server/xyz/npm.go":                  file(evaluator),
+		"internal/server/xyz/testdata/x_test.go":      file(evaluator),
 		".worktrees/copy/internal/server/x/x_test.go": file(evaluator),
 		"internal/nested/go.mod":                      "module example.com/nested\n",
 		"internal/nested/n_test.go":                   file(evaluator),
 	}
-	const protocol = "internal/server/npm/x_test.go"
+	const protocol = "internal/server/xyz/x_test.go"
 
 	for _, tc := range []struct {
 		name  string
@@ -290,8 +290,8 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 			// The entry names npm_test.go, which imports only what is open
 			// to every test.
 			name:  "stale allowlist entry",
-			extra: "internal/server/npm/*_test.go",
-			want: "allowlist entry internal/server/npm/*_test.go (ECO-06) matches no file " +
+			extra: "internal/server/xyz/*_test.go",
+			want: "allowlist entry internal/server/xyz/*_test.go (ECO-06) matches no file " +
 				"that imports " + strings.Join(allowlistedInternals, ", ") + "; remove it",
 		},
 	} {

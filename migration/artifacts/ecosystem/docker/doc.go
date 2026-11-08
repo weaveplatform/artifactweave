@@ -34,7 +34,7 @@
 //     uploads RegistryContent serves once installed, and whose reads it
 //     checks; the registry protocol's remote reads, which name their
 //     resources with RegistryResource; and Smart Remote, which the
-//     application gives ParseRegistryPath (remote.NewSmart).
+//     application gives ParseRegistryPath (smart.NewSmart).
 //   - Driven: the format hooks' environment (format.Env), through which
 //     Handler reads stored manifests and chart configs and keeps the
 //     package index (artifacts/core/pkgindex); the item store's AQL search

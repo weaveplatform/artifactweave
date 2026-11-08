@@ -14,13 +14,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	nixfmt "github.com/weaveplatform/artifactweave/internal/format/nix"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
-	"github.com/weaveplatform/artifactweave/internal/source"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/keymaterial"
@@ -91,7 +91,13 @@ func (h handler) fail(w http.ResponseWriter, r *http.Request, err error) {
 }
 
 func (h handler) env() format.Env {
-	return format.Env{Store: h.k.DB(), Blobs: h.k.Blobs(), Now: time.Now}
+	db := h.k.DB()
+	env := format.Env{Store: db, Blobs: h.k.Blobs(), Now: time.Now}
+	// A router built without a store leaves both nil rather than panicking.
+	if db != nil {
+		env.Leases, env.WorkQueue = db.Leases(), db.WorkQueue()
+	}
+	return env
 }
 
 func requestPath(r *http.Request) (string, error) {

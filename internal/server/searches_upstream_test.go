@@ -11,14 +11,15 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/format/generic"
-	"github.com/weaveplatform/artifactweave/internal/remote"
-	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -46,7 +47,7 @@ func searchUpstreamWorld(t *testing.T) *upstreamSearchWorld {
 	)
 	u.itemWorld = newItemWorld(t, false, func(c *Config) {
 		authorizer := accesstest.Over(t, c.Store).API().Authorizer
-		pool := new(remote.Pool)
+		pool := new(upstream.Pool)
 		policy := &remote.Policy{
 			Store: c.Store, Blobs: c.Blobs, Items: &item.Service{
 				Store: c.Store, Blobs: c.Blobs, Formats: ecosystem.For,

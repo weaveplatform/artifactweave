@@ -52,11 +52,13 @@
 //     with an import (named when its name is taken) or bare in that package,
 //     and an import whose every use moved goes; -external FILE... converts
 //     test files to the external test package. What fix cannot rewrite is
-//     printed as file:line: message, with exit status 1: an unexported or
-//     test-only declaration across the new boundary, a method set split from
-//     its type, an import cycle, a test that reads its package's source, a
-//     //go:embed pattern that matches nothing, a generated file and a file no
-//     load compiles. -report-only prints the plan only.
+//     printed as file:line: message, with exit status 1: an unexported
+//     declaration across the new boundary, a test-only one used anywhere but
+//     in the external tests of the directory it moved to (which see it, as
+//     they see an export_test.go), a method set split from its type, an
+//     import cycle, a test that reads its package's source, a //go:embed
+//     pattern that matches nothing, a generated file and a file no load
+//     compiles. -report-only prints the plan only.
 //   - fix -bridges: each use of a declaration in a bridge file of a legacy
 //     package is pointed at the declaration it aliases; uses that would
 //     change meaning, such as an embedded field's name or an assignment to a

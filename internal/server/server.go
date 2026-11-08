@@ -18,7 +18,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/idtoken"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
-	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/agentpackages"
 	"github.com/weaveplatform/artifactweave/internal/server/aieditorextensions"
 	"github.com/weaveplatform/artifactweave/internal/server/ansible"
@@ -31,37 +30,39 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/conda"
 	"github.com/weaveplatform/artifactweave/internal/server/gems"
 	"github.com/weaveplatform/artifactweave/internal/server/gitlfs"
-	"github.com/weaveplatform/artifactweave/internal/server/helm"
 	"github.com/weaveplatform/artifactweave/internal/server/hex"
 	"github.com/weaveplatform/artifactweave/internal/server/huggingface"
 	"github.com/weaveplatform/artifactweave/internal/server/jetbrainsplugins"
 	"github.com/weaveplatform/artifactweave/internal/server/luarocks"
 	"github.com/weaveplatform/artifactweave/internal/server/machinelearning"
 	"github.com/weaveplatform/artifactweave/internal/server/nix"
-	"github.com/weaveplatform/artifactweave/internal/server/npm"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/server/pub"
 	"github.com/weaveplatform/artifactweave/internal/server/puppet"
-	"github.com/weaveplatform/artifactweave/internal/server/pypi"
 	"github.com/weaveplatform/artifactweave/internal/server/skills"
 	"github.com/weaveplatform/artifactweave/internal/server/swift"
-	"github.com/weaveplatform/artifactweave/internal/server/terraform"
 	"github.com/weaveplatform/artifactweave/internal/server/terraformbackend"
 	"github.com/weaveplatform/artifactweave/internal/server/vagrant"
-	"github.com/weaveplatform/artifactweave/internal/source"
 	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/smart"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	cocoapodshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods/http"
 	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
 	golanghttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang/http"
+	helmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm/http"
 	nimmodelhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nimmodel/http"
+	npmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm/http"
 	nugethttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget/http"
+	pypihttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi/http"
+	terraformhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -87,7 +88,7 @@ type Config struct {
 	RequestLimits *apilimit.Service
 	// RemoteHTTP owns repository-scoped connection pools. The application closes
 	// it after draining requests; source adapters resolve credentials per revision.
-	RemoteHTTP *remote.Pool
+	RemoteHTTP *upstream.Pool
 	// Keys derives the key for short-lived Terraform download URLs.
 	Keys *crypt.Keyring
 	// BaseURL is the operator-configured public base URL; empty means derive
@@ -126,7 +127,7 @@ type Config struct {
 	// Mirrors administers the blob mirrors; nil when no tier is a mirror.
 	Mirrors Mirrors
 	// RemoteStatus serves artifactweave-only, administrator-only diagnostics.
-	RemoteStatus func(context.Context, string, string) (remote.SmartStatus, error)
+	RemoteStatus func(context.Context, string, string) (smart.SmartStatus, error)
 	// Multipart serves the JFrog CLI's multipart upload protocol; nil
 	// reports it unsupported, so the CLI uploads in one request.
 	Multipart *multipart.Service
@@ -249,12 +250,12 @@ var protocols = []func(Config) pkgroute.Protocol{
 		return cocoapodshttp.Protocol(cocoapodshttp.Options{RemoteSources: cfg.RemoteSources})
 	},
 	func(cfg Config) pkgroute.Protocol {
-		return pypi.Protocol(
-			pypi.Options{Format: cfg.FormatSettings.PyPI, RemoteSources: cfg.RemoteSources},
+		return pypihttp.Protocol(
+			pypihttp.Options{Format: cfg.FormatSettings.PyPI, RemoteSources: cfg.RemoteSources},
 		)
 	},
 	func(cfg Config) pkgroute.Protocol {
-		return terraform.Protocol(terraform.Options{
+		return terraformhttp.Protocol(terraformhttp.Options{
 			Authenticator:   cfg.Access.Authenticator,
 			Authorizer:      cfg.Access.Authorizer,
 			KeyPairs:        cfg.Access.Keys,
@@ -266,8 +267,8 @@ var protocols = []func(Config) pkgroute.Protocol{
 		})
 	},
 	func(cfg Config) pkgroute.Protocol {
-		return helm.Protocol(
-			helm.Options{Format: cfg.FormatSettings.Helm, RemoteSources: cfg.RemoteSources},
+		return helmhttp.Protocol(
+			helmhttp.Options{Format: cfg.FormatSettings.Helm, RemoteSources: cfg.RemoteSources},
 		)
 	},
 	func(cfg Config) pkgroute.Protocol {
@@ -292,7 +293,7 @@ var protocols = []func(Config) pkgroute.Protocol{
 	},
 	func(Config) pkgroute.Protocol { return golanghttp.Protocol() },
 	func(cfg Config) pkgroute.Protocol {
-		return npm.Protocol(npm.Options{
+		return npmhttp.Protocol(npmhttp.Options{
 			RemoteSources:  cfg.RemoteSources,
 			Accounts:       npmAccounts(cfg),
 			MaxPublishSize: cfg.NPMMaxPublishSize,
@@ -319,8 +320,8 @@ var protocols = []func(Config) pkgroute.Protocol{
 // interface, which the npm handlers answer 501. cfg.Access holds nil
 // interfaces, never typed nils, and a nil interface converts to a nil one,
 // so they are assigned as they are.
-func npmAccounts(cfg Config) npm.Accounts {
-	return npm.Accounts{
+func npmAccounts(cfg Config) npmhttp.Accounts {
+	return npmhttp.Accounts{
 		Passwords:   cfg.Access.Authenticator,
 		Tokens:      cfg.Access.Tokens,
 		TokenExpiry: cfg.NPMLoginTokenExpiry,
@@ -446,7 +447,7 @@ func New(cfg Config) http.Handler {
 		recoverPanic(logger),
 		accessLog(logger),
 		baseurl.Middleware(cfg.BaseURL),
-		remote.SmartTrace,
+		smart.SmartTrace,
 		dockerhttp.APIVersion,
 		registry.Challenge,
 		normalizeContentType,

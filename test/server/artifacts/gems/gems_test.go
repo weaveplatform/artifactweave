@@ -18,11 +18,12 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	gemfmt "github.com/weaveplatform/artifactweave/internal/format/gems"
-	"github.com/weaveplatform/artifactweave/internal/remote"
-	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
@@ -729,15 +730,15 @@ func newRemoteWorld(t *testing.T, up *fakeupstream.Server) *world {
 		if err := cfg.Store.Repos().Create(t.Context(), *repo.Defaults(&v)); err != nil {
 			t.Fatal(err)
 		}
-		resolver, err := remote.NewResolver(
+		resolver, err := upstream.NewResolver(
 			cfg.Store,
 			nil,
-			remote.ResolverOptions{RevisionKey: []byte(strings.Repeat("k", 32))},
+			upstream.ResolverOptions{RevisionKey: []byte(strings.Repeat("k", 32))},
 		)
 		if err != nil {
 			t.Fatal(err)
 		}
-		pool := new(remote.Pool)
+		pool := new(upstream.Pool)
 		policy := &remote.Policy{
 			Store:   cfg.Store,
 			Blobs:   cfg.Blobs,

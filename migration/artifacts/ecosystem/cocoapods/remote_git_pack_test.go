@@ -13,7 +13,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	githash "github.com/go-git/go-git/v5/plumbing/hash"
 
-	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 )
 
 func TestUnitCocoaPodsPackDecodesObjectsAndDeltas(t *testing.T) {

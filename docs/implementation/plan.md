@@ -926,7 +926,7 @@ JFrog search/download are covered; precise current-vendor wire mapping remains
 [I]/#216. Configurable member limits stay P12 and package virtual delivery stays P10.
 
 **Tasks**
-1. `internal/remote` fetcher with the full remote field set, the retrieval decision table, negative caching, offline and hard-fail modes, assumed-offline tripping, HEAD-before-GET, singleflight, client TLS, custom headers, Docker Hub token auth.
+1. `migration/artifacts/core/remote` fetcher with the full remote field set, the retrieval decision table, negative caching, offline and hard-fail modes, assumed-offline tripping, HEAD-before-GET, singleflight, client TLS, custom headers, Docker Hub token auth.
 2. Implemented by #621/#622: cache-only `-cache` reads, metadata-only `zap`, deletion
    and persistent unused-cache cleanup; generation checks prevent stale in-flight
    publication. Native adapters must reuse these operations and prove their format rules.

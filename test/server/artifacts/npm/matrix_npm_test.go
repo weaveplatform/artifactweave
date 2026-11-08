@@ -3,7 +3,7 @@ package npm_test
 import (
 	"testing"
 
-	npmfmt "github.com/weaveplatform/artifactweave/internal/format/npm"
+	npmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 

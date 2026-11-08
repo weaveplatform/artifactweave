@@ -14,8 +14,8 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/server/vcs"
-	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 )
 
 const vcsLegacyOID = "81305b86f97f1361e68f51397943eff6dd635520"

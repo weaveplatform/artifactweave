@@ -32,7 +32,8 @@
 //     WriteGuard, FolderAdmitter, AnnotationAdmitter, Resolver, Annotator,
 //     Reindexer, PathReindexer, Worker, Classifier, SidecarOwner and
 //     SidecarKeeper. The persistent work queue runs a Worker's items.
-//   - Env: the metadata store, the signing key pairs (Keys, access/api),
+//   - Env: the metadata store, its lease table and work queue (Leases and
+//     WorkQueue, platform/work), the signing key pairs (Keys, access/api),
 //     the read half of the blob store (Blobs), the clock, the repository
 //     layouts (artifacts/core/layout), and the item service's Derive,
 //     Underive, Remove, Move and Enqueue, with the inspection of the file
@@ -131,11 +132,11 @@
 // Opkg's reindex that leaves item properties alone (writeProps=0) and
 // Write.By.
 // Staged in P9d, which added the injected Registry
-// (https://github.com/weaveplatform/artifactweave/issues/970) and Env.Keys
-// (https://github.com/weaveplatform/artifactweave/issues/1004). Roadmap:
-// Env's lease and work-queue stores
-// (https://github.com/weaveplatform/artifactweave/issues/1029) and a narrow
-// format.Store in place of the whole store
+// (https://github.com/weaveplatform/artifactweave/issues/970), Env.Keys
+// (https://github.com/weaveplatform/artifactweave/issues/1004) and Env's
+// lease and work-queue stores
+// (https://github.com/weaveplatform/artifactweave/issues/1029). Roadmap: a
+// narrow format.Store in place of the whole store
 // (https://github.com/weaveplatform/artifactweave/issues/1087).
 //
 // # Testing

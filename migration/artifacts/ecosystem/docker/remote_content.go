@@ -15,9 +15,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/weaveplatform/artifactweave/internal/remote"
-	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -40,7 +40,7 @@ type RegistryContent struct {
 
 // Install makes c the policy's upstream fetch and its check of every cache
 // upload, replacing both hooks. Call it before anything wraps the policy's
-// PrepareUpload, as remote.NewSmart does, and before the policy serves a
+// PrepareUpload, as smart.NewSmart does, and before the policy serves a
 // request.
 func (c *RegistryContent) Install() {
 	c.Policy.Fetch = c.fetch
@@ -118,7 +118,7 @@ var registryName = regexp.MustCompile(
 // grammar the transport sends; the operation must be manifests with a tag or
 // a sha256 digest, blobs or referrers with a sha256 digest, or tags with
 // list. Anything else is remote.ErrRequest. Smart Remote is given it as its
-// registry path parser (remote.NewSmart), so that core remote never imports
+// registry path parser (smart.NewSmart), so that core remote never imports
 // this package. It reads neither store nor network.
 func ParseRegistryPath(path string) (image, operation, reference string, err error) {
 	parts := strings.Split(path, "/")

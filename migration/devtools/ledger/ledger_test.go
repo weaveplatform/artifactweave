@@ -21,7 +21,7 @@ func sample() *Ledger {
 		Packages: []Package{
 			{From: "internal/server", Action: ActionSplit, Ticket: "WEB-22"},
 			{
-				From: "internal/server/npm", Action: ActionMove, To: "artifacts/ecosystem/npm/http",
+				From: "internal/server/xyz", Action: ActionMove, To: "artifacts/ecosystem/npm/http",
 				Name: "npmhttp", Ticket: "ECO-06",
 			},
 			{
@@ -126,7 +126,7 @@ func TestUnitTranslate(t *testing.T) {
 		importPath, target, action string
 		ok                         bool
 	}{
-		{module + "/internal/server/npm", module + "/migration/artifacts/ecosystem/npm/http", ActionMove, true},
+		{module + "/internal/server/xyz", module + "/migration/artifacts/ecosystem/npm/http", ActionMove, true},
 		{module + "/internal/formatregistry", module + "/migration/artifacts/ecosystem", ActionMove, true},
 		{module + "/internal/a", module + "/migration/platform/ab", ActionMerge, true},
 		{module + "/internal/fakeserver", module + "/test/server/support/fake", ActionMove, true},
@@ -134,7 +134,7 @@ func TestUnitTranslate(t *testing.T) {
 		{module + "/internal/layout", "", ActionDelete, true},
 		{module + "/internal/nothing", "", "", false},
 		{module + "/migration/artifacts/ecosystem", "", "", false},
-		{"internal/server/npm", "", "", false},
+		{"internal/server/xyz", "", "", false},
 		{"net/http", "", "", false},
 	} {
 		target, action, ok := l.Translate(tc.importPath)
