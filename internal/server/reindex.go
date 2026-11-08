@@ -13,11 +13,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/format/rpm"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
@@ -497,14 +497,14 @@ func (s artifactoryService) queueRemoteReindex(
 			if err != nil {
 				return err
 			}
-			if s.cfg.Auth == nil {
+			if s.cfg.Access.Authenticator == nil {
 				return denied(p)
 			}
-			current, err := s.cfg.Auth.Current(ctx, p, st.Tokens())
+			current, err := s.cfg.Access.Authenticator.Current(ctx, p)
 			if err != nil {
 				return denied(p)
 			}
-			ctx = auth.WithPrincipal(ctx, current)
+			ctx = kernel.WithPrincipal(ctx, current)
 			_, latest, by, err := s.operationRepo(
 				ctx,
 				repo.NuGet,

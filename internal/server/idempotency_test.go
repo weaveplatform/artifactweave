@@ -93,7 +93,7 @@ func TestAccAppendIdempotencyRecheckDeadline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := artifactoryService{cfg: Config{Store: w.db, Blobs: w.blobs, Auth: badAuth}}
+	svc := artifactoryService{cfg: withAccess(Config{Store: w.db, Blobs: w.blobs, Auth: badAuth})}
 	err = svc.appendOnce(
 		t.Context(),
 		svc.builds(w.db),

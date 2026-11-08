@@ -206,7 +206,7 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 		return nil, errors.Join(err, st.Close())
 	}
 	if err := registerDebianSnapshotWork(queue, server.Config{
-		Store: st, Blobs: hot.store, Auth: authn, Access: accessModule.API(), Work: queue,
+		Store: st, Blobs: hot.store, Access: accessAPI, Work: queue,
 		RemoteSources: rt.remoteSources, FormatSettings: fs,
 	}); err != nil {
 		stop()

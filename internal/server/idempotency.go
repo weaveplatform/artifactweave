@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/service/build"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
@@ -67,7 +67,7 @@ func digestReplay(value []byte) string { return fmt.Sprintf("%x", sha256.Sum256(
 
 func appendReplayRequest(
 	raw string,
-	p auth.Principal,
+	p kernel.Principal,
 	ap build.Append,
 ) (store.ReplayRequest, error) {
 	var request store.ReplayRequest
@@ -79,12 +79,12 @@ func appendReplayRequest(
 		return request, denied(p)
 	}
 	scope, err := json.Marshal(struct {
-		Credential auth.CredentialReference `json:"credential"`
-		Operation  string                   `json:"operation"`
-		Project    string                   `json:"project"`
-		Name       string                   `json:"name"`
-		Number     string                   `json:"number"`
-		Started    time.Time                `json:"started"`
+		Credential kernel.CredentialReference `json:"credential"`
+		Operation  string                     `json:"operation"`
+		Project    string                     `json:"project"`
+		Name       string                     `json:"name"`
+		Number     string                     `json:"number"`
+		Started    time.Time                  `json:"started"`
 	}{p.CredentialReference(), "appendBuild", build.ProjectKey(ap.ProjectKey), ap.Name, ap.Number, store.Normalise(ap.Started)})
 	if err != nil {
 		return request, fmt.Errorf("append replay scope: %w", err)
@@ -99,7 +99,7 @@ func appendReplayRequest(
 func (s artifactoryService) appendOnce(
 	ctx context.Context,
 	svc *build.Service,
-	p auth.Principal,
+	p kernel.Principal,
 	ap build.Append,
 	key string,
 ) error {
@@ -110,13 +110,15 @@ func (s artifactoryService) appendOnce(
 	ctx, cancel := context.WithTimeout(ctx, replayWait)
 	defer cancel()
 	_, err = svc.AppendOnce(ctx, ap, r, func(ctx context.Context) (build.Access, error) {
-		if s.cfg.Auth == nil {
+		if s.cfg.Access.Authenticator == nil {
 			return nil, build.ErrForbidden
 		}
-		current, err := s.cfg.Auth.Current(ctx, p, svc.Store.Tokens())
+		current, err := s.cfg.Access.Authenticator.Current(ctx, p)
 		if err != nil {
-			if errors.Is(err, auth.ErrBadCredentials) || errors.Is(err, auth.ErrPasswordExpired) ||
-				errors.Is(err, auth.ErrAccountLocked) || errors.Is(err, store.ErrNotFound) {
+			if errors.Is(err, kernel.ErrBadCredentials) ||
+				errors.Is(err, kernel.ErrPasswordExpired) ||
+				errors.Is(err, kernel.ErrAccountLocked) ||
+				errors.Is(err, store.ErrNotFound) {
 				return nil, build.ErrForbidden
 			}
 			return nil, fmt.Errorf("recheck append credential: %w", err)
