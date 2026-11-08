@@ -141,7 +141,8 @@ func faulty(t *testing.T) (*multipart.Service, *faults) {
 	at := time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)
 	return &multipart.Service{
 		Store: faultStore{w.db, f}, Blobs: faultBlobs{w.blobs, f}, Dir: w.dir,
-		Now: func() time.Time { return at },
+		Restrictions: w.restrictions,
+		Now:          func() time.Time { return at },
 	}, f
 }
 

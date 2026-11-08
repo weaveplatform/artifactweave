@@ -694,7 +694,7 @@ func (s artifactoryService) collector() (*gc.Collector, error) {
 	if err != nil {
 		return nil, err
 	}
-	c, err := gc.New(st, s.cfg.Blobs, gc.Options{})
+	c, err := gc.New(st, s.cfg.Blobs, gc.Options{Tokens: s.cfg.Access.Tokens})
 	if err != nil {
 		return nil, fmt.Errorf("garbage collector: %w", err)
 	}

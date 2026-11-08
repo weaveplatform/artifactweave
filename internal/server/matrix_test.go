@@ -1648,9 +1648,11 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 	must(err)
 	cfg := Config{
 		CompatVersion: "7.155.0", Store: db, Blobs: blobs, Auth: a, PasswordHash: testHash,
-		Keys:                   support.TerraformBackendKeys(t),
-		Tokens:                 tokens,
-		Multipart:              &multipart.Service{Store: db, Blobs: blobs, Dir: t.TempDir()},
+		Keys:   support.TerraformBackendKeys(t),
+		Tokens: tokens,
+		Multipart: &multipart.Service{
+			Store: db, Blobs: blobs, Dir: t.TempDir(), Restrictions: restrictionsOver(t, db),
+		},
 		GlobalEnvironmentLimit: matrixEnvironmentLimit,
 	}
 	for _, p := range matrixParts {

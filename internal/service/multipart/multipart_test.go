@@ -15,8 +15,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/service/multipart"
+	"github.com/weaveplatform/artifactweave/migration/access"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -30,6 +33,9 @@ type world struct {
 	db    *inmem.Store
 	blobs blob.Store
 	dir   string
+	// restrictions is the access module's check over db, as the runtime
+	// binds it over the store the service uses.
+	restrictions accessapi.Restrictions
 }
 
 func newWorld(t *testing.T) world {
@@ -38,11 +44,21 @@ func newWorld(t *testing.T) world {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return world{db: inmem.New(), blobs: b, dir: filepath.Join(t.TempDir(), "multipart")}
+	db := inmem.New()
+	m, err := access.New(access.Deps{Store: db})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return world{
+		db: db, blobs: b, dir: filepath.Join(t.TempDir(), "multipart"),
+		restrictions: m.API().Restrictions,
+	}
 }
 
 func (w world) service() *multipart.Service {
-	return &multipart.Service{Store: w.db, Blobs: w.blobs, Dir: w.dir}
+	return &multipart.Service{
+		Store: w.db, Blobs: w.blobs, Dir: w.dir, Restrictions: w.restrictions,
+	}
 }
 
 // put uploads part through the URL PartURL returns, as the CLI does.
@@ -228,7 +244,7 @@ func TestUnitAPIRestrictionFencesExistingUpload(t *testing.T) {
 			return s.PutPart(ctx, u.Query().Get("upload"), 1, u.Query().Get("signature"), strings.NewReader("x"))
 		},
 	} {
-		if err := call(); !errors.Is(err, auth.ErrAPIRestricted) {
+		if err := call(); !errors.Is(err, kernel.ErrAPIRestricted) {
 			t.Fatalf("%s: %v", name, err)
 		}
 	}
@@ -241,6 +257,73 @@ func TestUnitAPIRestrictionFencesExistingUpload(t *testing.T) {
 	}
 	if err := s.Abort(ctx, token); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestUnitRestrictionsRefuseTokenAndPartPaths: a request that opens the
+// session by its token and a signed part both ask Restrictions about the
+// session's user at the service's clock, and refuse with their own wrap
+// while it answers restricted, or fails to answer.
+func TestUnitRestrictionsRefuseTokenAndPartPaths(t *testing.T) {
+	ctx := t.Context()
+	w := newWorld(t)
+	at := time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)
+	var answer error
+	var asked []string
+	s := &multipart.Service{
+		Store: w.db, Blobs: w.blobs, Dir: w.dir, Now: func() time.Time { return at },
+		Restrictions: &accessapitest.Restrictions{CheckFunc: func(
+			_ context.Context,
+			user string,
+			now time.Time,
+		) error {
+			asked = append(asked, user+" at "+now.Format(time.RFC3339))
+			return answer
+		}},
+	}
+	token, err := s.Create(ctx, "libs", "f", 1, "alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ref, err := s.PartURL(ctx, token, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, err := url.Parse(ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+	paths := map[string]func() error{
+		"multipart: restricted upload: ": func() error {
+			_, err := s.Status(ctx, token)
+			return err
+		},
+		"multipart: restricted part: ": func() error {
+			return s.PutPart(
+				ctx,
+				u.Query().Get("upload"),
+				1,
+				u.Query().Get("signature"),
+				strings.NewReader("x"),
+			)
+		},
+	}
+	for _, refusal := range []error{kernel.ErrAPIRestricted, errBoom} {
+		answer = refusal
+		for wrap, call := range paths {
+			if err := call(); !errors.Is(err, refusal) || err.Error() != wrap+refusal.Error() {
+				t.Errorf("%s answering %q: %v", wrap, refusal, err)
+			}
+		}
+	}
+	// PartURL asked once, then each path once for each refusal.
+	if len(asked) != 5 {
+		t.Fatalf("asked %d times: %q", len(asked), asked)
+	}
+	for _, a := range asked {
+		if a != "alice at 2026-10-13T12:00:00Z" {
+			t.Errorf("asked about %s", a)
+		}
 	}
 }
 

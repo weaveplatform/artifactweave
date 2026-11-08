@@ -10,6 +10,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -50,9 +51,15 @@ func (w *world) now() time.Time          { return *w.clock.Load() }
 func (w *world) set(t time.Time)         { w.clock.Store(&t) }
 func (w *world) advance(d time.Duration) { w.set(w.now().Add(d)) }
 
+// collector builds a collector over st whose Tokens removes expired records
+// from st's token table, as the access module's binding does, so a test that
+// fails that table through st still fails the step.
 func (w *world) collector(t *testing.T, st store.Store) *gc.Collector {
 	t.Helper()
-	c, err := gc.New(st, w.blobs, gc.Options{Now: w.now})
+	c, err := gc.New(st, w.blobs, gc.Options{
+		Now:    w.now,
+		Tokens: &accessapitest.Tokens{DeleteExpiredFunc: st.Tokens().DeleteExpired},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

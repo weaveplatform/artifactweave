@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -86,6 +87,11 @@ type Options struct {
 	// 0031). Each removes what was last written before the cutoff it is
 	// given, the upload expiry ago, and returns how many it removed.
 	Expirers []func(ctx context.Context, before time.Time) (int, error)
+	// Tokens removes, on each pass, the records of access tokens whose
+	// refresh grace (types.DefaultRefreshGrace) has run out, which
+	// Report.TokensExpired counts (decision 0005). Nil skips that step, for a
+	// collector built without a token service, as some tests build one.
+	Tokens accessapi.Tokens
 	// Now supplies the time; nil means time.Now.
 	Now func() time.Time
 }
@@ -100,6 +106,7 @@ type Collector struct {
 	uploadExpiry time.Duration
 	reapers      map[string]func(context.Context, store.Upload) error
 	expirers     []func(context.Context, time.Time) (int, error)
+	tokens       accessapi.Tokens
 	now          func() time.Time
 	holder       string
 
@@ -126,6 +133,7 @@ func New(st store.Store, blobs blob.Store, o Options) (*Collector, error) {
 		uploadExpiry: cmp.Or(o.UploadExpiry, DefaultUploadExpiry),
 		reapers:      o.Reapers,
 		expirers:     o.Expirers,
+		tokens:       o.Tokens,
 		now:          o.Now, holder: "storage-gc-" + id,
 		orphans: map[string]time.Time{},
 	}, nil
@@ -176,7 +184,10 @@ func (c *Collector) renew(ctx context.Context) (bool, error) {
 // used: a refresh is accepted for types.DefaultRefreshGrace after the token
 // expires, so the record is kept that long.
 func (c *Collector) expireTokens(ctx context.Context, rep *Report) error {
-	n, err := c.store.Tokens().DeleteExpired(ctx, c.now().Add(-types.DefaultRefreshGrace))
+	if c.tokens == nil {
+		return nil
+	}
+	n, err := c.tokens.DeleteExpired(ctx, c.now().Add(-types.DefaultRefreshGrace))
 	rep.TokensExpired += n
 	if err != nil {
 		return fmt.Errorf("gc: expired tokens: %w", err)

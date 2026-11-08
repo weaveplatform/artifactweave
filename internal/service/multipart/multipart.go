@@ -35,7 +35,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -113,6 +113,13 @@ type Service struct {
 	Store store.Store
 	Blobs blob.Store
 	Dir   string
+	// Restrictions is asked about the session's user, at Now, on every
+	// request that opens a session by its token and on every part: a
+	// session outlives the request that created it, and the CLI sends parts
+	// without credentials, so a user restricted mid-upload is refused here
+	// (decision 0043). It is required: a Service without it panics on those
+	// requests rather than skip the check.
+	Restrictions accessapi.Restrictions
 	// Now supplies the time; nil means time.Now.
 	Now func() time.Time
 
@@ -248,7 +255,7 @@ func (s *Service) authenticate(ctx context.Context, token string) (store.Upload,
 	if subtle.ConstantTimeCompare([]byte(hash(secret)), []byte(ss.Verifier)) != 1 {
 		return u, ss, ErrBadToken
 	}
-	if err := auth.CheckAPIRestriction(ctx, s.Store.APIRestrictions(), ss.By, s.now()); err != nil {
+	if err := s.Restrictions.Check(ctx, ss.By, s.now()); err != nil {
 		return u, ss, fmt.Errorf("multipart: restricted upload: %w", err)
 	}
 	return u, ss, nil
@@ -306,7 +313,7 @@ func (s *Service) PutPart(
 		subtle.ConstantTimeCompare([]byte(sig), []byte(signature(ss.PartKey, id, part))) != 1 {
 		return ErrBadToken
 	}
-	if err := auth.CheckAPIRestriction(ctx, s.Store.APIRestrictions(), ss.By, s.now()); err != nil {
+	if err := s.Restrictions.Check(ctx, ss.By, s.now()); err != nil {
 		return fmt.Errorf("multipart: restricted part: %w", err)
 	}
 	if ss.Status != StatusParts {

@@ -107,6 +107,7 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	if err != nil {
 		return nil, errors.Join(err, st.Close())
 	}
+	accessAPI := accessModule.API()
 	hotTier, coldTier := tiers(cfg, st)
 	hot, err := hotTier.open(ctx, st, log)
 	if err != nil {
@@ -122,6 +123,7 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	// sessions that go stale.
 	parts := &multipart.Service{
 		Store: st, Blobs: hot.store, Dir: filepath.Join(cfg.DataDir, "multipart"),
+		Restrictions: accessAPI.Restrictions,
 	}
 	if err := parts.Sweep(ctx); err != nil {
 		log.Warn("multipart upload staging sweep failed", "error", err)
@@ -140,6 +142,7 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 			registry.Backend:  uploads.Reap,
 		},
 		Expirers: []func(context.Context, time.Time) (int, error){uploads.ExpireUploads},
+		Tokens:   accessAPI.Tokens,
 	})
 	if err != nil {
 		return nil, errors.Join(err, st.Close())
@@ -158,7 +161,6 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	// before Run leases. The maxUniqueSnapshots cleanups wait for their timers,
 	// as 7.x's do.
 	fs := formatSettings(cfg, keys)
-	accessAPI := accessModule.API()
 	derived := &item.Service{
 		Store: st, Blobs: hot.store, Work: queue, Formats: fs.For,
 		Keys:             accessAPI.Keys,

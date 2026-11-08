@@ -13,8 +13,23 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/service/multipart"
+	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
+
+// restrictionsOver is the access module's API restriction check over st, the
+// store a test's multipart service shares with its server, as the runtime
+// binds it.
+func restrictionsOver(t *testing.T, st store.Store) accessapi.Restrictions {
+	t.Helper()
+	m, err := accessmodule.New(accessmodule.Deps{Store: st})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return m.API().Restrictions
+}
 
 // TestAccMultipartUploadProtocol drives the JFrog CLI's multipart upload as
 // jfrog-client-go does: create with the caller's credentials, a URL per part
@@ -255,7 +270,10 @@ func uploadInParts(t *testing.T, w *itemWorld, as, path, data string) string {
 // through instead, for the uploader and that content only.
 func TestAccMultipartChecksumToken(t *testing.T) {
 	w := newItemWorld(t, false, func(c *Config) {
-		c.Multipart = &multipart.Service{Store: c.Store, Blobs: c.Blobs, Dir: t.TempDir()}
+		c.Multipart = &multipart.Service{
+			Store: c.Store, Blobs: c.Blobs, Dir: t.TempDir(),
+			Restrictions: restrictionsOver(t, c.Store),
+		}
 	})
 	// user may deploy to libs-local, but read nothing.
 	if err := w.db.Permissions().Create(context.Background(), types.Permission{

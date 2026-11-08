@@ -66,7 +66,10 @@ func artifactoryMessage(t *testing.T, rec *httptest.ResponseRecorder) string {
 // was.
 func TestAccOverwriteRefusalText(t *testing.T) {
 	w := newItemWorld(t, false, func(c *Config) {
-		c.Multipart = &multipart.Service{Store: c.Store, Blobs: c.Blobs, Dir: t.TempDir()}
+		c.Multipart = &multipart.Service{
+			Store: c.Store, Blobs: c.Blobs, Dir: t.TempDir(),
+			Restrictions: restrictionsOver(t, c.Store),
+		}
 	})
 	for p, body := range map[string]string{
 		"taken.txt": "taken", "other.txt": "other", "ex/inner.txt": "inner", "big/data.bin": "old",
