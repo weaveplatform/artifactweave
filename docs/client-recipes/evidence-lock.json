@@ -13,7 +13,7 @@
   "internal/server/auth.go": "b1d2504f932d612ea82521a483d0f843352593965d7a0449453808686668d5fc",
   "internal/server/bazelmodules/bazelmodules_test.go": "72a8a85bdea0490f40bcf576d434dd4deb547f27c53795edd8457d2b5b8a4a62",
   "internal/server/conan_client_test.go": "d290f52278366ff31b62b5eeb79d7a2cf4b34e768a6079e30cddb8fb9e873ab9",
-  "internal/server/huggingface/migration_scope_test.go": "ac04f19c0cc34bfec20e230ac9c6e900a303ad02deb222ee887d2257dc7a5936",
+  "internal/server/huggingface/migration_scope_test.go": "3d111b86b8dfb16fd9bf9067dc36654638dcd0763ef94d70d7eb6ad134edc396",
   "internal/server/huggingface/migration_test.go": "b548c034d8fbb5d4112ca23513f4d03dd608dd8f536d2b32b9450cf6e64ba288",
   "internal/server/swift/remote_test.go": "ddfe54f01da8a9d93008aed7a789efe3e6be9594be0fef4209ee449382d4fdd0",
   "internal/server/swift/swift_test.go": "e82ba16c7aa3d3bbb7f36340a80b39a60409ec0ad441af9ab75096178c3d9759",
