@@ -16,13 +16,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/format/maven"
-	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -462,7 +461,7 @@ func TestAccMavenCompanionSurvivesRuntimeRestart(t *testing.T) {
 	}
 	found := false
 	for _, stat := range stats {
-		if stat.Kind == remote.MavenCompanionKind && stat.Pending == 1 {
+		if stat.Kind == maven.MavenCompanionKind && stat.Pending == 1 {
 			found = true
 		}
 	}
@@ -592,7 +591,7 @@ func TestAccMavenUpstreamNoStoreDoesNotScheduleCompanion(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, stat := range stats {
-		if stat.Kind == remote.MavenCompanionKind && stat.Pending+stat.Leased+stat.Parked > 0 {
+		if stat.Kind == maven.MavenCompanionKind && stat.Pending+stat.Leased+stat.Parked > 0 {
 			t.Fatal("no-store response scheduled companion", stat)
 		}
 	}

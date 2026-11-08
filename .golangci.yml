@@ -123,6 +123,12 @@ linters:
       # did while the code was its own, and the store opener adds
       # "open store: "; wrapping them again would change those texts. STO-19
       # moves the same call into app.
+      #
+      # The remote policy's typed errors: remote.ResponseError turns an
+      # upstream answer into its *source.HTTPError, and remote.PolicyError
+      # classifies a transport failure as one. Format rules in the ecosystem
+      # slices return them as core remote does; a wrap would change the text
+      # and hide the source.HTTPError a caller inspects.
       extra-ignore-sigs:
         - apierror.New(
         - format.Rejectf(
@@ -137,6 +143,8 @@ linters:
         - dialect.Reseal(
         - sqlite.OpenDB(
         - postgres.OpenDB(
+        - remote.PolicyError(
+        - remote.ResponseError(
 
   # 4) Issue-filtering (not disabling analysis, just silencing reports)
   exclusions:

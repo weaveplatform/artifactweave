@@ -32,16 +32,33 @@ type Policy struct {
 	// Fetch overrides only the protocol exchange. Authentication adapters retain
 	// the source identity and credential revision used by this cache operation.
 	Fetch func(context.Context, source.Request, source.Permit, Options, Request) (*http.Response, error)
+	// GitFetch answers a request for a CocoaPods Git checkout (q.Resource.CocoaPodsGit
+	// set). The application installs cocoapods.FetchCocoaPodsGit; nil answers
+	// source.ErrUnsupported, as a policy without a pool does.
+	GitFetch func(ctx context.Context, p *Policy, q source.Request, permit source.Permit, opts Options) (*http.Response, error)
 	// PrepareUpload performs bounded adapter work outside SQL, after the main
 	// response succeeds and before validation/publication. It uses the same
 	// transport security and cannot replace the final CheckCurrent fence.
 	PrepareUpload func(context.Context, source.Request, source.Permit, Options, *item.CacheUpload) error
-	Store         store.Store
-	Blobs         blob.Store
-	Items         *item.Service
-	Pool          *Pool
-	Options       func(context.Context, repo.Config) (Options, error)
-	CheckCurrent  func(context.Context, store.Store, source.Request, source.Permit, string) error
+	// ProjectResponse may rewrite an upstream response before admission, for a
+	// format whose protocol gives a status a meaning of its own (NuGet v2 reads a
+	// bodyless 204 as an empty feed). It runs after the module-location projection
+	// and before missing-status normalisation; nil leaves every response as sent.
+	// The application installs nuget.ProjectEmptyFeed. A hook that replaces
+	// res.Body closes the body it replaces; the policy closes whichever body res
+	// holds when the fetch ends. An error it returns ends the fetch as it is, with
+	// no fallback to a cached copy, so it is one of the source service's errors.
+	ProjectResponse func(q source.Request, res *http.Response) error
+	Store           store.Store
+	Blobs           blob.Store
+	Items           *item.Service
+	// Pool opens the upstream connections. Left nil, with Fetch nil too, every
+	// read that needs the network answers source.ErrUnavailable. Assign a
+	// *Pool only when it is not nil: a nil *Pool is a non-nil Upstream, which
+	// passes that check and the format rules' own.
+	Pool         Upstream
+	Options      func(context.Context, repo.Config) (Options, error)
+	CheckCurrent func(context.Context, store.Store, source.Request, source.Permit, string) error
 	// Key is a stable keyring-derived HMAC key, never a logged cache identifier.
 	Key           []byte
 	Now           func() time.Time
@@ -76,7 +93,7 @@ func (p *Policy) Read(
 	var revision string
 	defer func() {
 		if retErr == nil && revision != "" {
-			out.Revalidate = func(current context.Context) error { return p.check(current, q, permit, revision) }
+			out.Revalidate = func(current context.Context) error { return p.Check(current, q, permit, revision) }
 		}
 	}()
 	if permit.Intent == source.RetrievalIntentCacheOnly || !permit.UpstreamNetworkAllowed ||
@@ -91,13 +108,13 @@ func (p *Policy) Read(
 	}
 	opts, err := p.Options(ctx, q.Repo)
 	if err != nil {
-		return source.Result{}, policyError(err)
+		return source.Result{}, PolicyError(err)
 	}
 	if !mavenCompanionRevision(ctx, opts.Revision) {
 		return source.Result{}, source.ErrSuperseded
 	}
 	revision = opts.Revision
-	key := p.cacheKey(q, opts.Revision)
+	key := p.CacheKey(q, opts.Revision)
 	noStore := transientResource(q)
 	if !noStore {
 		entry, readErr := p.readEntry(ctx, key, permit)
@@ -117,7 +134,7 @@ func (p *Policy) Read(
 	defer cancel()
 	release, err := p.capacity.acquire(ctx, q.Repo.Key)
 	if err != nil {
-		return source.Result{}, policyError(err)
+		return source.Result{}, PolicyError(err)
 	}
 	defer release()
 	if noStore || q.Resource.Method == http.MethodHead {
@@ -125,15 +142,15 @@ func (p *Policy) Read(
 		// never become the shared result of a persistent fill.
 		return p.direct(ctx, q, permit, opts, key, noStore)
 	}
-	flightKey := p.flightKey(key, permit.Identity)
+	flightKey := p.FlightKey(key, permit.Identity)
 	filled, err := p.flights.do(ctx, flightKey, func(shared context.Context) (fillResult, error) {
 		return p.fill(shared, q, permit, opts, key)
 	})
 	if err != nil {
 		return source.Result{}, err
 	}
-	if err = p.check(ctx, q, permit, opts.Revision); err != nil {
-		return source.Result{}, policyError(err)
+	if err = p.Check(ctx, q, permit, opts.Revision); err != nil {
+		return source.Result{}, PolicyError(err)
 	}
 	if filled.isTransient {
 		// A previously unknown no-store/Vary response cannot be handed to
@@ -173,7 +190,7 @@ func (p *Policy) cachedOnly(ctx context.Context, q source.Request) (source.Resul
 	if p.kind(q) == types.RemoteMetadata {
 		// Cache-only reads deliberately do not resolve credentials or DNS. Retained
 		// raw metadata is separate from locally generated package indexes.
-		variant := p.cacheKey(q, "").Variant
+		variant := p.CacheKey(q, "").Variant
 		var newest types.RemoteCacheEntry
 		page := store.Page{Limit: 128}
 		for {
@@ -202,7 +219,7 @@ func (p *Policy) cachedOnly(ctx context.Context, q source.Request) (source.Resul
 	if q.Resource.Checksums != (types.Checksums{}) {
 		want, parseErr := item.ParseChecksums(q.Resource.Checksums)
 		if parseErr != nil {
-			return source.Result{}, policyError(parseErr)
+			return source.Result{}, PolicyError(parseErr)
 		}
 		if verifyErr := blob.Verify(
 			blob.Digests{SHA256: want.SHA256, SHA512: want.SHA512, SHA1: want.SHA1, MD5: want.MD5},
@@ -213,13 +230,26 @@ func (p *Policy) cachedOnly(ctx context.Context, q source.Request) (source.Resul
 				MD5:    it.Actual.MD5,
 			},
 		); verifyErr != nil {
-			return source.Result{}, policyError(verifyErr)
+			return source.Result{}, PolicyError(verifyErr)
 		}
 	}
 	return source.Result{Item: &it}, nil
 }
 
-func (p *Policy) cacheKey(q source.Request, revision string) types.RemoteCacheKey {
+// CacheKey is the remote cache key of q under the credential revision: the
+// repository key and resource path, revision as SettingsRevision, and as
+// Variant a keyed HMAC-SHA256 (Key) of every term that changes the
+// representation. The terms are the resource's kind, mutability, escaped
+// path, variant and Accept, its query when the repository propagates query
+// parameters, its upstream path, external URL (not for a Git LFS object, which
+// its SHA-256 names), checksums and expected content type when any is set, and
+// each opt-in rule set on it, the NuGet empty feed ("nuget-empty-feed-v1") and
+// the accepted media types among them. The keyed fingerprint keeps sensitive
+// query values out of an observable key. Cached entries are stored under the
+// key, so each term's encoding must stay as it is, and a new opt-in term is
+// added only when its option is set, which leaves every existing key unchanged.
+// It reads neither the store nor the network.
+func (p *Policy) CacheKey(q source.Request, revision string) types.RemoteCacheKey {
 	query := ""
 	if enabled(q.Repo.PropagateQueryParams) {
 		query = q.Resource.Query
@@ -266,7 +296,11 @@ func (p *Policy) cacheKey(q source.Request, revision string) types.RemoteCacheKe
 	}
 }
 
-func (p *Policy) flightKey(key types.RemoteCacheKey, identity types.SourceIdentity) string {
+// FlightKey returns the key under which concurrent fills of key for one
+// source identity share a single upstream exchange: the hex SHA-256 of both,
+// so that callers with different credentials never share a response. Smart
+// Remote keys its discovery flights the same way.
+func (p *Policy) FlightKey(key types.RemoteCacheKey, identity types.SourceIdentity) string {
 	b, _ := json.Marshal([]any{key, identity})
 	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:])
@@ -400,7 +434,15 @@ func (p *Policy) used(token types.RemoteCacheToken) func(context.Context) error 
 	}
 }
 
-func transportRequest(q source.Request, e types.RemoteCacheEntry) Request {
+// TransportRequest is the upstream request for q: the resource's escaped
+// path, or the path mapped to the upstream's layout, or its external URL,
+// with its query, Accept header and body. Given e, the cached complete
+// representation of the same resource, it adds e's validator
+// (If-None-Match, else If-Modified-Since) so that the upstream can answer
+// 304; the caller's own validators never reach the upstream. Format rules
+// build their extra exchanges, such as Maven's checksum sidecars, from it
+// so that they go out as the policy's own requests do.
+func TransportRequest(q source.Request, e types.RemoteCacheEntry) Request {
 	path := q.Resource.EscapedPath
 	if path == "" {
 		path = (&url.URL{Path: q.Resource.Path}).EscapedPath()
@@ -443,7 +485,16 @@ func transportRequest(q source.Request, e types.RemoteCacheEntry) Request {
 	}
 }
 
-func policyError(err error) error {
+// PolicyError classifies a failure of the policy's own work for the source
+// service: an error that already carries a *source.HTTPError keeps it; the
+// sentinels a caller tests (source.ErrDenied, source.ErrSuperseded,
+// store.ErrNotFound and context.Canceled) pass through, a store conflict
+// reading as superseded; a timeout becomes a 504, a busy pool a 503, a
+// security, connection or integrity failure a 502 of that kind, and
+// anything else a 502 protocol failure. Format rules in the ecosystem
+// slices return it unwrapped, as the policy does, so that the source
+// service maps their failures as it maps the policy's own.
+func PolicyError(err error) error {
 	var typed *source.HTTPError
 	if errors.As(err, &typed) {
 		return typed

@@ -9,7 +9,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/format/nuget"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
 )
 
 // The last response is the .snupkg produced and pushed by the real SDK.

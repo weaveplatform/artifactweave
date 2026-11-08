@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	registryroute "github.com/weaveplatform/artifactweave/internal/server/docker"
+	registryroute "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )

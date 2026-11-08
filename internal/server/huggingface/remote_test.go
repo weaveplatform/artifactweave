@@ -126,16 +126,17 @@ func remoteSetup(t *testing.T, upstream string, ttl int) func(*fixture) *source.
 		if e != nil {
 			t.Fatal(e)
 		}
+		pool := new(remote.Pool)
 		policy := &remote.Policy{
 			Store:   f.db,
 			Blobs:   f.items.Blobs,
 			Items:   f.items,
-			Pool:    new(remote.Pool),
+			Pool:    pool,
 			Options: resolver.Options,
 			Key:     []byte(strings.Repeat("k", 32)),
 			Now:     time.Now,
 		}
-		t.Cleanup(policy.Pool.Close)
+		t.Cleanup(pool.Close)
 		return &source.Service{
 			HTTP:  policy,
 			Cache: policy,

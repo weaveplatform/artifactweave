@@ -15,8 +15,8 @@ import (
 
 	"github.com/cucumber/godog"
 
-	podfmt "github.com/weaveplatform/artifactweave/internal/format/cocoapods"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
+	podfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods"
 )
 
 func (w *world) registerCocoaPods(sc *godog.ScenarioContext) {

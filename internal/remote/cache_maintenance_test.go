@@ -1,4 +1,4 @@
-package remote
+package remote_test
 
 import (
 	"errors"
@@ -85,7 +85,7 @@ func TestAccCacheMaintenanceZapRefreshAndStalePolicy(t *testing.T) {
 				t.Fatal("temporary source failure lost stale metadata", err)
 			}
 			entry, err := w.db.RemoteCache().
-				Read(t.Context(), w.p.cacheKey(metadata, "credential-1"))
+				Read(t.Context(), w.p.CacheKey(metadata, "credential-1"))
 			if err != nil || !entry.ValidatedAt.IsZero() {
 				t.Fatal("failed refresh changed validation", entry, err)
 			}
@@ -173,7 +173,7 @@ func TestAccCacheMaintenanceFencesBlockedPublication(t *testing.T) {
 			if err = <-done; !errors.Is(err, source.ErrSuperseded) {
 				t.Fatal("late publication not fenced", err)
 			}
-			entry, err := w.db.RemoteCache().Read(t.Context(), w.p.cacheKey(q, "credential-1"))
+			entry, err := w.db.RemoteCache().Read(t.Context(), w.p.CacheKey(q, "credential-1"))
 			if operation == "zap-refresh" {
 				if err != nil || !entry.ValidatedAt.IsZero() {
 					t.Fatal("zap lost usable expired metadata", err)
@@ -191,7 +191,7 @@ func TestAccCacheMaintenanceRestoreFencesBlockedRefresh(t *testing.T) {
 	q := w.request("snapshot.bin", source.ResourceKindArtifact)
 	q.Resource.Mutable = true
 	original := w.mustRead(q, "retained snapshot")
-	entry, err := w.db.RemoteCache().Read(t.Context(), w.p.cacheKey(q, "credential-1"))
+	entry, err := w.db.RemoteCache().Read(t.Context(), w.p.CacheKey(q, "credential-1"))
 	if err != nil {
 		t.Fatal(err)
 	}

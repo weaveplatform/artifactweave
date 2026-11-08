@@ -1,4 +1,4 @@
-package remote
+package remote_test
 
 import (
 	"context"
@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -31,7 +32,8 @@ type policyWorld struct {
 	blobs  blob.Store
 	clock  *fakeupstream.Clock
 	up     *fakeupstream.Server
-	p      *Policy
+	p      *remote.Policy
+	pool   *remote.Pool
 	c      repo.Config
 	permit source.Permit
 }
@@ -55,18 +57,21 @@ func policyFixture(t *testing.T) *policyWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := &Policy{
+	pool := new(remote.Pool)
+	p := &remote.Policy{
 		Store: db,
 		Blobs: blobs,
 		Items: &item.Service{Store: db, Blobs: blobs, Now: clock.Now},
-		Pool:  new(Pool),
+		Pool:  pool,
 		Now:   clock.Now,
 		Key: []byte(
 			"test-only-query-identity",
 		),
-		Options: func(context.Context, repo.Config) (Options, error) { return Options{Revision: "credential-1"}, nil },
+		Options: func(context.Context, repo.Config) (remote.Options, error) {
+			return remote.Options{Revision: "credential-1"}, nil
+		},
 	}
-	t.Cleanup(p.Pool.Close)
+	t.Cleanup(pool.Close)
 	return &policyWorld{
 		t:     t,
 		db:    db,
@@ -74,6 +79,7 @@ func policyFixture(t *testing.T) *policyWorld {
 		clock: clock,
 		up:    up,
 		p:     p,
+		pool:  pool,
 		c:     c,
 		permit: source.Permit{
 			Identity:               identity,
@@ -264,7 +270,7 @@ func TestAccPolicyFailureClassesPreserveGoodMetadata(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			entry, err := w.db.RemoteCache().Read(t.Context(), w.p.cacheKey(q, "credential-1"))
+			entry, err := w.db.RemoteCache().Read(t.Context(), w.p.CacheKey(q, "credential-1"))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -292,12 +298,8 @@ func TestAccPolicyConcurrentMissCancellationAndIsolation(t *testing.T) {
 	<-barrier.Reached()
 	second := make(chan error, 1)
 	go func() { _, err := w.read(q); second <- err }()
-	key := w.p.flightKey(w.p.cacheKey(q, "credential-1"), w.permit.Identity)
-	waitFor(t, func() bool {
-		w.p.flights.mu.Lock()
-		defer w.p.flights.mu.Unlock()
-		return w.p.flights.active[key] != nil && w.p.flights.active[key].waiters == 2
-	})
+	key := w.p.FlightKey(w.p.CacheKey(q, "credential-1"), w.permit.Identity)
+	waitFor(t, func() bool { return w.p.FlightWaiters(key) == 2 })
 	cancel()
 	if err := <-first; !errors.Is(err, context.Canceled) {
 		t.Fatal(err)
@@ -309,7 +311,9 @@ func TestAccPolicyConcurrentMissCancellationAndIsolation(t *testing.T) {
 	if w.up.Count("HEAD", "") != 1 || w.up.Count("GET", "") != 1 {
 		t.Fatal(w.up.Requests())
 	} // R14
-	w.p.Options = func(context.Context, repo.Config) (Options, error) { return Options{Revision: "credential-2"}, nil }
+	w.p.Options = func(context.Context, repo.Config) (remote.Options, error) {
+		return remote.Options{Revision: "credential-2"}, nil
+	}
 	w.up.Set("/file.txt", fakeupstream.Resource{Body: []byte("new credential content")})
 	w.mustRead(q, "new credential content")
 	if w.up.Count("GET", "") != 2 {
@@ -353,7 +357,7 @@ func TestAccPolicyNoStoreLeavesNoEntriesAndHTTPNoStoreIsNotShared(t *testing.T) 
 		t.Fatal(err)
 	}
 	if _, err := w.db.RemoteCache().
-		Read(t.Context(), w.p.cacheKey(q, "credential-1")); !errors.Is(
+		Read(t.Context(), w.p.CacheKey(q, "credential-1")); !errors.Is(
 		err,
 		store.ErrNotFound,
 	) {
@@ -377,7 +381,7 @@ func TestAccPolicyAdapterTargetsAndPreparation(t *testing.T) {
 	q := w.request("canonical/file.txt", source.ResourceKindArtifact)
 	q.Resource.UpstreamPath = "actual/file.txt"
 	prepared := 0
-	w.p.PrepareUpload = func(ctx context.Context, got source.Request, _ source.Permit, _ Options, u *item.CacheUpload) error {
+	w.p.PrepareUpload = func(ctx context.Context, got source.Request, _ source.Permit, _ remote.Options, u *item.CacheUpload) error {
 		prepared++
 		outside := false
 		w.db.AfterCommit(ctx, func() { outside = true })
@@ -400,9 +404,9 @@ func TestAccPolicyAdapterTargetsAndPreparation(t *testing.T) {
 	if prepared != 2 {
 		t.Fatal("target identity reused previous bytes")
 	}
-	oldKey := w.p.cacheKey(q, "credential-1")
+	oldKey := w.p.CacheKey(q, "credential-1")
 	q.Resource.Checksums.SHA256 = strings.Repeat("0", 64)
-	if w.p.cacheKey(q, "credential-1") == oldKey {
+	if w.p.CacheKey(q, "credential-1") == oldKey {
 		t.Fatal("pin absent from identity")
 	}
 	if _, err := w.read(q); err == nil {
@@ -424,10 +428,10 @@ func TestAccPolicyAdapterTargetsAndPreparation(t *testing.T) {
 	w.mustRead(q, "second")
 	q.Resource.ExternalURL = w.up.URL + "/other"
 	q.Resource.UpstreamPath = ""
-	if w.p.cacheKey(q, "credential-1") == oldKey {
+	if w.p.CacheKey(q, "credential-1") == oldKey {
 		t.Fatal("URL absent from identity")
 	}
-	r := transportRequest(q, types.RemoteCacheEntry{})
+	r := remote.TransportRequest(q, types.RemoteCacheEntry{})
 	if r.ExternalURL != q.Resource.ExternalURL || r.Path != "" || r.Query != "" {
 		t.Fatal(r)
 	}
@@ -437,7 +441,7 @@ func TestAccPolicyAdapterPreparationFailureAndFence(t *testing.T) {
 	w := policyFixture(t)
 	w.up.Set("/file.txt", fakeupstream.Resource{Body: []byte("body")})
 	q := w.request("file.txt", source.ResourceKindArtifact)
-	w.p.PrepareUpload = func(context.Context, source.Request, source.Permit, Options, *item.CacheUpload) error {
+	w.p.PrepareUpload = func(context.Context, source.Request, source.Permit, remote.Options, *item.CacheUpload) error {
 		return item.ErrBadChecksum
 	}
 	if _, err := w.read(q); err == nil {
@@ -450,7 +454,7 @@ func TestAccPolicyAdapterPreparationFailureAndFence(t *testing.T) {
 	) {
 		t.Fatal("failure published", err)
 	}
-	w.p.PrepareUpload = func(context.Context, source.Request, source.Permit, Options, *item.CacheUpload) error {
+	w.p.PrepareUpload = func(context.Context, source.Request, source.Permit, remote.Options, *item.CacheUpload) error {
 		w.p.CheckCurrent = func(context.Context, store.Store, source.Request, source.Permit, string) error {
 			return source.ErrDenied
 		}
@@ -480,7 +484,7 @@ func TestUnitPolicyDefaultCacheIdentityIsStable(t *testing.T) {
 	}
 	mac := hmac.New(sha256.New, w.p.Key)
 	_, _ = mac.Write(old)
-	if w.p.cacheKey(q, "credential").Variant != hex.EncodeToString(mac.Sum(nil)) {
+	if w.p.CacheKey(q, "credential").Variant != hex.EncodeToString(mac.Sum(nil)) {
 		t.Fatal("existing generic identity changed")
 	}
 }
@@ -488,14 +492,14 @@ func TestUnitPolicyDefaultCacheIdentityIsStable(t *testing.T) {
 func TestUnitPolicyMIMEAlternativesParticipateInIdentity(t *testing.T) {
 	w := policyFixture(t)
 	q := w.request("index", source.ResourceKindMetadata)
-	before := w.p.cacheKey(q, "revision")
+	before := w.p.CacheKey(q, "revision")
 	q.Resource.ExpectedContentTypes = []string{"text/html", "application/json"}
-	after := w.p.cacheKey(q, "revision")
+	after := w.p.CacheKey(q, "revision")
 	if before == after {
 		t.Fatal("MIME contract omitted from identity")
 	}
 	q.Resource.ExpectedContentTypes = []string{"text/html"}
-	if w.p.cacheKey(q, "revision") == after {
+	if w.p.CacheKey(q, "revision") == after {
 		t.Fatal("MIME alternatives not pinned")
 	}
 }

@@ -69,16 +69,17 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 	}
 	clock := fakeupstream.NewClock(time.Now())
 	f.items.Now = clock.Now
+	pool := new(remote.Pool)
 	p := &remote.Policy{
 		Store:   f.db,
 		Blobs:   f.items.Blobs,
 		Items:   f.items,
-		Pool:    new(remote.Pool),
+		Pool:    pool,
 		Options: resolver.Options,
 		Key:     []byte(strings.Repeat("k", 32)),
 		Now:     clock.Now,
 	}
-	t.Cleanup(p.Pool.Close)
+	t.Cleanup(pool.Close)
 	svc := &source.Service{
 		HTTP:  p,
 		Cache: p,

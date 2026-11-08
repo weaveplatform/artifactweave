@@ -12,6 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
@@ -52,15 +53,21 @@ func TestAccStatusNuGetV3Remote(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		pool := new(remote.Pool)
 		policy := &remote.Policy{
-			Store:   cfg.Store,
-			Blobs:   cfg.Blobs,
-			Items:   &item.Service{Store: cfg.Store, Blobs: cfg.Blobs, Formats: ecosystem.For},
-			Pool:    new(remote.Pool),
-			Options: resolver.Options,
-			Key:     []byte(strings.Repeat("k", 32)),
+			Store: cfg.Store,
+			Blobs: cfg.Blobs,
+			Items: &item.Service{
+				Store:   cfg.Store,
+				Blobs:   cfg.Blobs,
+				Formats: ecosystem.For,
+			},
+			Pool:            pool,
+			Options:         resolver.Options,
+			Key:             []byte(strings.Repeat("k", 32)),
+			ProjectResponse: nuget.ProjectEmptyFeed,
 		}
-		t.Cleanup(policy.Pool.Close)
+		t.Cleanup(pool.Close)
 		cfg.RemoteSources = &source.Service{
 			HTTP:  policy,
 			Cache: policy,

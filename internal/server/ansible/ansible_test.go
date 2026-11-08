@@ -268,12 +268,13 @@ func remoteFixture(t *testing.T) (*fixture, *fakeupstream.Server, repo.Config, s
 	if err != nil {
 		t.Fatal(err)
 	}
+	pool := new(remote.Pool)
 	policy := &remote.Policy{
 		Store: f.db, Blobs: f.items.Blobs, Items: f.items,
-		Pool: new(remote.Pool), Options: resolver.Options,
+		Pool: pool, Options: resolver.Options,
 		Key: []byte(strings.Repeat("k", 32)),
 	}
-	t.Cleanup(policy.Pool.Close)
+	t.Cleanup(pool.Close)
 	svc := &source.Service{
 		HTTP: policy, Cache: policy,
 		Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {

@@ -43,8 +43,8 @@
 //     an ordinary file that may arrive before its owner. A format that
 //     records its sidecars in a version's metadata has that compared after
 //     a reindex from empty too.
-//   - Format.NoRemoteCache marks a format that does not index a remote
-//     repository's cache yet; the cache scenario passes it unchecked.
+//   - Format.NoRemoteCache marks a format whose index does not cover a
+//     remote repository's cache; the cache scenario passes it unchecked.
 //
 // # Outputs
 //

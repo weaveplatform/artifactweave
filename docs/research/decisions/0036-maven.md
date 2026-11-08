@@ -364,8 +364,9 @@ These assignments describe planned work, not current runtime support.
   upstream is offline. Runtime tests cover raw metadata/index separation, policies,
   layout/permission denials, durable companion restart/revocation and cached retention.
 
-- Index, deploy-rule and metadata tests in `internal/format/maven` against the
-  `formattest` contract on every store (#276, #278, #279), with golden XML for each level.
+- Index, deploy-rule and metadata tests in `migration/artifacts/ecosystem/maven` against
+  the `formattest` contract on every store (#276, #278, #279), with golden XML for each
+  level.
 - Snapshot naming with Maven's and the JFrog extractor's upload orders: two snapshot deploys
   give `buildNumber` 2 and correct `snapshotVersions` (#280).
 - Token resolution tables and download scenarios (#281); `calculateMetadata` and

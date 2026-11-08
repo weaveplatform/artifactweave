@@ -737,15 +737,16 @@ func newRemoteWorld(t *testing.T, up *fakeupstream.Server) *world {
 		if err != nil {
 			t.Fatal(err)
 		}
+		pool := new(remote.Pool)
 		policy := &remote.Policy{
 			Store:   cfg.Store,
 			Blobs:   cfg.Blobs,
 			Items:   &item.Service{Store: cfg.Store, Blobs: cfg.Blobs, Formats: ecosystem.For},
-			Pool:    new(remote.Pool),
+			Pool:    pool,
 			Options: resolver.Options,
 			Key:     []byte(strings.Repeat("k", 32)),
 		}
-		t.Cleanup(policy.Pool.Close)
+		t.Cleanup(pool.Close)
 		cfg.RemoteSources = &source.Service{
 			HTTP:  policy,
 			Cache: policy,

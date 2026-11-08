@@ -48,7 +48,7 @@ func TestAccDestinationPolicy(t *testing.T) {
 				t.Fatal(err)
 			}
 			p := &destinationPolicy{
-				private: map[string]bool{origin(u): tc.configured},
+				private: map[string]bool{Origin(u): tc.configured},
 				lookup: func(context.Context, string) ([]net.IPAddr, error) {
 					return []net.IPAddr{{IP: net.ParseIP(tc.ip)}}, nil
 				},
@@ -63,7 +63,7 @@ func TestAccDestinationPolicy(t *testing.T) {
 		})
 	}
 	for _, raw := range []string{"ftp://example.com", "https://example.com:0", "https://example.com:65536", "https://example.com:nope", "https://example.com/a/../b", "https://example.com/%2e%2e/b", "https://example.com/a%5cb", "https://example.com/a%00b", "https://example.com/#fragment", "https://[fe80::1%25en0]/item", "https://user:pass@example.com"} {
-		if _, err := checkedURL(raw); !errors.Is(err, ErrSecurity) {
+		if _, err := CheckedURL(raw); !errors.Is(err, ErrSecurity) {
 			t.Errorf("accepted %q: %v", raw, err)
 		}
 	}
@@ -103,7 +103,7 @@ func TestAccPinnedDNSRebindingAndRetry(t *testing.T) {
 	u.Host = net.JoinHostPort("registry.private", u.Port())
 	var calls atomic.Int32
 	policy := &destinationPolicy{
-		private: map[string]bool{origin(u): true},
+		private: map[string]bool{Origin(u): true},
 		lookup: func(context.Context, string) ([]net.IPAddr, error) {
 			if calls.Add(1) > 1 {
 				return []net.IPAddr{{IP: net.ParseIP("169.254.169.254")}}, nil

@@ -14,7 +14,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestAccSmartDiscoveryRejectsProtocolFailures(t *testing.T) {
@@ -245,38 +244,6 @@ func TestAccSmartLoopBoundAndCapabilityLimits(t *testing.T) {
 	for _, version := range []string{"4.1.0", "4.3.2"} {
 		if err := smartCapabilities(c, SmartPeer{Version: version, Class: repo.Local}); err == nil {
 			t.Fatal("unsupported capability", version)
-		}
-	}
-}
-
-func TestAccSmartRegistryGrantAndPropertyPath(t *testing.T) {
-	for _, realm := range []string{"", "remote", "other"} {
-		name := "image"
-		if realm == "" {
-			name = "remote/image"
-		}
-		access := &types.RegistryAccess{
-			Realm: realm,
-			Grants: []types.RegistryGrant{
-				{Type: "repository", Name: name, Actions: []string{"pull"}},
-			},
-		}
-		if smartRegistryGrant(access, "remote", "image/manifests/tag") != (realm != "other") {
-			t.Fatal("realm grant", realm)
-		}
-		if smartRegistryGrant(access, "remote", "bad") ||
-			smartRegistryGrant(access, "remote", "private/manifests/tag") {
-			t.Fatal("scope widened")
-		}
-	}
-	for _, ref := range []string{"tag", "sha256:" + strings.Repeat("a", 64)} {
-		resource, err := RegistryResource("image", "manifests", ref)
-		if err != nil {
-			t.Fatal(err)
-		}
-		q := source.Request{Repo: repo.Config{PackageType: repo.OCI}, Resource: resource}
-		if smartPropertyPath(q) != (ref == "tag") || smartStoragePath(q) != q.Resource.Path {
-			t.Fatal("digest pull synchronized tag properties")
 		}
 	}
 }

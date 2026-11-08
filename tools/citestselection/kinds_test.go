@@ -129,7 +129,7 @@ func TestUnitAcceptanceOnlyOwnersKeepNarrowSelection(t *testing.T) {
 	}
 	for _, path := range []string{
 		"test/server/artifacts/helmoci/helmoci_test.go",
-		"internal/server/nimmodel/nimmodel.go",
+		"migration/artifacts/ecosystem/nimmodel/http/nimmodel.go",
 	} {
 		candidate := proposeAffected([]change{{status: "M", path: path}})
 		if candidate.profile != "format" {
@@ -186,7 +186,9 @@ func TestUnitTerraformPathsSelectOnlyTheirAffectedLane(t *testing.T) {
 }
 
 func TestUnitAffectedFormatSelectsOwnedMixedPackageEntries(t *testing.T) {
-	candidate := proposeAffected([]change{{status: "M", path: "internal/format/maven/maven.go"}})
+	candidate := proposeAffected(
+		[]change{{status: "M", path: "migration/artifacts/ecosystem/maven/maven.go"}},
+	)
 	if candidate.profile != "format" || candidate.owner != "maven" {
 		t.Fatalf("Maven impact: %+v", candidate)
 	}

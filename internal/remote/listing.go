@@ -145,7 +145,7 @@ func listingTarget(q source.Request, folder string) (string, error) {
 		}
 		return peer.StorageURL(folder, nil)
 	}
-	u, err := checkedURL(q.Repo.URL)
+	u, err := CheckedURL(q.Repo.URL)
 	if err != nil {
 		return "", source.ErrInvalidRequest
 	}
@@ -238,7 +238,7 @@ func listingSmart(q source.Request) bool {
 func listingError() error { return &source.HTTPError{Status: 502, Kind: source.FailureKindIntegrity} }
 
 func listingBase(raw string) (*url.URL, error) {
-	u, err := checkedURL(raw)
+	u, err := CheckedURL(raw)
 	if err != nil {
 		return nil, listingError()
 	}

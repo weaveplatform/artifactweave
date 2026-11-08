@@ -13,6 +13,10 @@
 // hooks (decision 0032), so every write and delete in a Go repository
 // reaches it whichever API carried it. The slice's protocol package,
 // golang/http, answers HTTP with the paths, versions and index kept here.
+// Its upstream rules classify and validate what a remote Go repository
+// fetches over core remote's shared retrieval and cache policy (decision
+// 0007), which this package imports and which never imports it back
+// (decision 0044).
 //
 // # Inputs
 //
@@ -20,11 +24,13 @@
 //     item service's hooks for Go repositories to Handler; the protocol
 //     package (golang/http), which parses request paths (ParseRequest,
 //     ParseFile), checks a .info (CheckInfo) and chooses versions (Listed,
-//     Latest); and the Go upstream rules of remote repositories
-//     (docs/implementation/go-upstream-source.md), which read the same
-//     paths and version files.
+//     Latest); and the P10 virtual resolver, which will read remote Go
+//     repositories through GoSource (no caller yet).
 //   - Driven: the format hooks' environment (format.Env), through which
-//     Handler reads items and their properties and keeps the package index.
+//     Handler reads items and their properties and keeps the package index;
+//     and the application's authority-fenced source service
+//     (internal/source), through which GoSource reads a remote repository
+//     over the shared remote cache policy, never a raw transport.
 //
 // # Outputs
 //
@@ -36,6 +42,11 @@
 //   - Handler: the hooks that admit, index, classify and reindex Go
 //     version files, and the refusal of different content over a stored
 //     version file (Republished).
+//   - The Go upstream rules of remote repositories
+//     (docs/implementation/go-upstream-source.md): GoSource, the GOPROXY
+//     reader of a remote Go repository, and GoResource, the trusted
+//     resource for a GOPROXY path, whose Validate refuses an incomplete or
+//     invalid body before it is cached (ErrGoResponse).
 //
 // # Invariants
 //
@@ -54,17 +65,23 @@
 //   - Decision 0032: docs/research/decisions/0032-package-format-handlers.md
 //     (format hooks and optional interfaces).
 //   - docs/implementation/go-upstream-source.md (the Go upstream rules of
-//     remote repositories).
+//     remote repositories) and
+//     https://github.com/weaveplatform/artifactweave/issues/633, which added
+//     them.
+//   - Decision 0007: docs/research/decisions/0007-remote-repositories.md
+//     (format rules classify and validate; core remote owns transport and
+//     cache policy).
 //   - Research 26: docs/research/26-go-modules.md.
 //   - JFrog Go registry documentation, as decision 0035 cites it:
 //     https://docs.jfrog.com/artifactory/docs/go-modules.
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
-//     line 230 (ecosystem/golang), line 380 (why golang) and line 1002 (the
-//     mapping row).
+//     line 230 (ecosystem/golang), line 380 (why golang), line 654 (the
+//     upstream rules) and lines 1002 and 1014 (the mapping rows).
 //   - Plan: docs/implementation/plan.md#p7-npm-go-maven-locals,
 //     #p9-remote-repositories and #p9d-modular-monolith-migration, epic ECO
 //     (https://github.com/weaveplatform/artifactweave/issues/943).
-//   - https://github.com/weaveplatform/artifactweave/issues/1014
+//   - https://github.com/weaveplatform/artifactweave/issues/1014 and
+//     https://github.com/weaveplatform/artifactweave/issues/1015
 //
 // # Status
 //
@@ -81,4 +98,11 @@
 //     republishing, the package index, .info times, classification, store
 //     failures, and a remote repository's cache indexed alone.
 //   - contract_test.go: the format contract suite (artifacts/core/formattest).
+//   - remote_test.go and remote_fault_test.go: GoSource through the real
+//     source service and remote cache policy against a fake upstream
+//     (escaped identities, exact bytes, metadata refresh, immutable files,
+//     negative caching, offline reads, credentials, repository isolation,
+//     delivery fences, invalid and interrupted bodies) and the body
+//     validation; remote_fixture_test.go holds the policy fixture they
+//     share with nothing else.
 package golang

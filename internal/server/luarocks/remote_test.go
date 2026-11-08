@@ -59,11 +59,12 @@ func newRemoteFixture(t *testing.T, tune ...func(*pkgroute.Options, *item.Servic
 		if err != nil {
 			t.Fatal(err)
 		}
+		pool := new(remote.Pool)
 		policy := &remote.Policy{
 			Store: items.Store, Blobs: items.Blobs, Items: items,
-			Pool: new(remote.Pool), Options: resolver.Options, Key: key, Now: clock.Now,
+			Pool: pool, Options: resolver.Options, Key: key, Now: clock.Now,
 		}
-		t.Cleanup(policy.Pool.Close)
+		t.Cleanup(pool.Close)
 		svc := &source.Service{
 			HTTP: policy, Cache: policy,
 			Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {

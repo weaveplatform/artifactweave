@@ -351,7 +351,9 @@ func TestUnitSharedFilesFollowRootTestMoves(t *testing.T) {
 	}; !slices.Equal(names, want) {
 		t.Fatalf("npm selection after the move = %q, want %q", names, want)
 	}
-	docker := proposeAffected([]change{{status: "M", path: "internal/format/docker/handler.go"}})
+	docker := proposeAffected(
+		[]change{{status: "M", path: "migration/artifacts/ecosystem/docker/handler.go"}},
+	)
 	selection, err = scanKinds(root, plan{profile: "format", candidate: docker})
 	if err != nil {
 		t.Fatal(err)

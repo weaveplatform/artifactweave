@@ -1,4 +1,4 @@
-package remote
+package remote_test
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
@@ -23,14 +24,14 @@ import (
 func discoveryFixture(
 	t *testing.T,
 	canonical, upstream string,
-) (*policyWorld, *source.Service, source.Request, *Discovery) {
+) (*policyWorld, *source.Service, source.Request, *remote.Discovery) {
 	t.Helper()
 	w, service, q := listingFixture(t)
 	q.Repo.RepoLayoutRef, q.Repo.RemoteRepoLayoutRef = canonical, upstream
 	if err := w.db.Repos().Update(t.Context(), q.Repo); err != nil {
 		t.Fatal(err)
 	}
-	d, err := NewDiscovery(t.Context(), &item.Service{Store: w.db}, q.Repo)
+	d, err := remote.NewDiscovery(t.Context(), &item.Service{Store: w.db}, q.Repo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +103,7 @@ func TestAccMappedListingCanonicalAuthorityCacheAndRevocation(t *testing.T) {
 		),
 	)
 	scope := d.Scopes(layout.Values{layout.TokenOrg: "org.acme", layout.TokenModule: "lib"})[0]
-	if scope != (DiscoveryScope{Path: "org.acme/lib"}) {
+	if scope != (remote.DiscoveryScope{Path: "org.acme/lib"}) {
 		t.Fatal("wrong canonical query scope", scope)
 	}
 	for _, file := range []string{"lib-1.0.jar", "lib-1.0-sources.jar", "lib-1.0.pom"} {
@@ -110,16 +111,16 @@ func TestAccMappedListingCanonicalAuthorityCacheAndRevocation(t *testing.T) {
 			t.Fatal("lossless fixture refused", file, err)
 		}
 	}
-	all, err := ListMappedFolder(
+	all, err := remote.ListMappedFolder(
 		t.Context(),
 		service,
 		q,
 		d,
 		scope,
 		"org/acme/lib/1.0",
-		&ListingBudget{},
+		&remote.ListingBudget{},
 	)
-	if err != nil || !reflect.DeepEqual(all.Files, []ListingEntry{
+	if err != nil || !reflect.DeepEqual(all.Files, []remote.ListingEntry{
 		{Path: "org.acme/lib/1.0/lib-1.0-sources.jar"},
 		{Path: "org.acme/lib/1.0/lib-1.0.jar"},
 		{Path: "org.acme/lib/ivy-1.0.xml"},
@@ -131,17 +132,20 @@ func TestAccMappedListingCanonicalAuthorityCacheAndRevocation(t *testing.T) {
 	}
 	discoveryGrant(t, w, &q, "org.acme/lib/1.0/lib-1.0.jar")
 	q.Repo.ExcludesPattern = ptr("org/acme/**")
-	got, err := ListMappedFolder(
+	got, err := remote.ListMappedFolder(
 		t.Context(),
 		service,
 		q,
 		d,
 		scope,
 		"org/acme/lib/1.0",
-		&ListingBudget{},
+		&remote.ListingBudget{},
 	)
 	if err != nil ||
-		!reflect.DeepEqual(got.Files, []ListingEntry{{Path: "org.acme/lib/1.0/lib-1.0.jar"}}) {
+		!reflect.DeepEqual(
+			got.Files,
+			[]remote.ListingEntry{{Path: "org.acme/lib/1.0/lib-1.0.jar"}},
+		) {
 		t.Fatal("upstream lexical exclusion replaced canonical authority", got, err)
 	}
 	encoded, err := json.Marshal(got)
@@ -156,14 +160,14 @@ func TestAccMappedListingCanonicalAuthorityCacheAndRevocation(t *testing.T) {
 	}
 	q.CacheOnly = true
 	before := len(w.up.Requests())
-	again, err := ListMappedFolder(
+	again, err := remote.ListMappedFolder(
 		t.Context(),
 		service,
 		q,
 		d,
 		scope,
 		"org/acme/lib/1.0",
-		&ListingBudget{},
+		&remote.ListingBudget{},
 	)
 	if err != nil || !reflect.DeepEqual(got.Files, again.Files) || len(w.up.Requests()) != before {
 		t.Fatal("mapped cache-only lookup fetched", again, err)
@@ -173,14 +177,14 @@ func TestAccMappedListingCanonicalAuthorityCacheAndRevocation(t *testing.T) {
 		t.Fatal("revoked canonical grant survived via upstream grant", err)
 	}
 	q.CacheOnly = false
-	if _, err = ListMappedFolder(
+	if _, err = remote.ListMappedFolder(
 		t.Context(),
 		service,
 		q,
 		d,
 		scope,
 		"org/acme/lib/1.0",
-		&ListingBudget{},
+		&remote.ListingBudget{},
 	); !errors.Is(err, source.ErrDenied) ||
 		len(w.up.Requests()) != before {
 		t.Fatal("upstream-only grant initiated mapped read", err)
@@ -203,37 +207,37 @@ func TestAccMappedListingRootScopeAndLossyAdmission(t *testing.T) {
 	if err := w.db.Repos().Update(t.Context(), q.Repo); err != nil {
 		t.Fatal(err)
 	}
-	d, err := NewDiscovery(t.Context(), &item.Service{Store: w.db}, q.Repo)
+	d, err := remote.NewDiscovery(t.Context(), &item.Service{Store: w.db}, q.Repo)
 	if err != nil {
 		t.Fatal(err)
 	}
 	scope := d.Scopes(layout.Values{layout.TokenOrg: "org.acme", layout.TokenModule: "lib"})[0]
-	if scope != (DiscoveryScope{Root: true}) {
+	if scope != (remote.DiscoveryScope{Root: true}) {
 		t.Fatal("filename module borrowed a folder", scope)
 	}
 	discoveryGrant(t, w, &q, "org.acme/unrelated-1.0.jar")
-	if _, err = ListMappedFolder(
+	if _, err = remote.ListMappedFolder(
 		t.Context(),
 		service,
 		q,
 		d,
 		scope,
 		"org/acme/lib/1.0",
-		&ListingBudget{},
+		&remote.ListingBudget{},
 	); !errors.Is(err, source.ErrDenied) ||
 		len(w.up.Requests()) != 0 {
 		t.Fatal("unrelated partial grant authorized root discovery", err)
 	}
 	discoveryGrant(t, w, &q, "**")
 	w.up.Set("/org/acme/lib/1.0/", indexHTML(`<a href="lib-1.0.jar">jar</a>`))
-	got, err := ListMappedFolder(
+	got, err := remote.ListMappedFolder(
 		t.Context(),
 		service,
 		q,
 		d,
 		scope,
 		"org/acme/lib/1.0",
-		&ListingBudget{},
+		&remote.ListingBudget{},
 	)
 	if err != nil || len(got.Files) != 1 || got.Files[0].Path != "org.acme/lib-1.0.jar" {
 		t.Fatal("authorized root mapping failed", got, err)
@@ -251,14 +255,14 @@ func TestAccMappedListingRootScopeAndLossyAdmission(t *testing.T) {
 			q.Repo.StoreArtifactsLocally = ptr(!noStore)
 			w.up.Set("/org/acme/lib/1.0/", indexHTML(`<a href="lib-1.0-sources.jar">sources</a>`))
 			scope := d.Scopes(layout.Values{layout.TokenOrg: "org.acme", layout.TokenModule: "lib"})[0]
-			_, err := ListMappedFolder(
+			_, err := remote.ListMappedFolder(
 				t.Context(),
 				service,
 				q,
 				d,
 				scope,
 				"org/acme/lib/1.0",
-				&ListingBudget{},
+				&remote.ListingBudget{},
 			)
 			var failure *source.HTTPError
 			if !errors.As(err, &failure) || failure.Status != 501 {
@@ -290,14 +294,14 @@ func TestAccMappedLayoutEditFencesBeforeReadAndPublication(t *testing.T) {
 			scope := d.Scopes(layout.Values{layout.TokenOrg: "org.acme", layout.TokenModule: "lib"})[0]
 			done := make(chan error, 1)
 			go func() {
-				_, err := ListMappedFolder(
+				_, err := remote.ListMappedFolder(
 					t.Context(),
 					service,
 					q,
 					d,
 					scope,
 					"org/acme/lib/1.0",
-					&ListingBudget{},
+					&remote.ListingBudget{},
 				)
 				done <- err
 			}()
@@ -317,14 +321,14 @@ func TestAccMappedLayoutEditFencesBeforeReadAndPublication(t *testing.T) {
 				t.Fatal("layout edit did not fence publication", err)
 			}
 			before := len(w.up.Requests())
-			if _, err = ListMappedFolder(
+			if _, err = remote.ListMappedFolder(
 				t.Context(),
 				service,
 				q,
 				d,
 				scope,
 				"org/acme/lib/1.0",
-				&ListingBudget{},
+				&remote.ListingBudget{},
 			); !errors.Is(err, source.ErrSuperseded) ||
 				len(w.up.Requests()) != before {
 				t.Fatal("old mapping acquired new source generation", err)

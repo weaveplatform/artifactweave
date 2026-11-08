@@ -48,10 +48,12 @@ NuGet ([0038](0038-nuget.md)), Helm ([0039](0039-helm.md)) and Terraform
 ([0040](0040-terraform.md)). The shared rules are:
 - **A remote repository's index** covers its cache, which alone holds a remote's items
   (`pkgindex.Stored`, #361). The hooks and a reindex both read only there, and the
-  contract suite's cache scenario holds every format to it. Docker's cache follows with
-  its remote repositories in P9. Terraform also defers remote-cache indexing: remote
-  repositories have no local `terraformType`, so the current handler indexes no remote
-  module or provider files.
+  contract suite's cache scenario holds every format to it. Docker's hooks index what a
+  remote caches, but its reindex still reads only the repository's own items, so a
+  reindex of a remote Docker repository drops the cached images and the cache scenario
+  runs without Docker. Terraform also defers remote-cache indexing: remote repositories
+  have no local `terraformType`, so the current handler indexes no remote module or
+  provider files.
 - **Per-version metadata** (`PackageVersion.Metadata`, such as an npm packument fragment,
   or the time a Go version's `.info` gives, which `@v/list` answers, #417) is a cache of
   what the version's items, content and properties say. A reindex rebuilds

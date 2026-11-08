@@ -1,4 +1,4 @@
-package remote
+package remote_test
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
@@ -24,12 +25,12 @@ import (
 func listingFixture(t *testing.T) (*policyWorld, *source.Service, source.Request) {
 	t.Helper()
 	w := policyFixture(t)
-	w.p.Options = func(context.Context, repo.Config) (Options, error) {
-		return Options{
+	w.p.Options = func(context.Context, repo.Config) (remote.Options, error) {
+		return remote.Options{
 			Revision: "credential-1",
 			CheckURL: func(_ context.Context, u *url.URL) error {
 				if !strings.HasPrefix(u.String(), w.up.URL+"/") {
-					return ErrSecurity
+					return remote.ErrSecurity
 				}
 				return nil
 			},
@@ -65,11 +66,14 @@ func TestAccListingHTMLUsesFinalBaseFiltersPathsAndCachesOnlyMetadata(t *testing
 <a href="../parent">parent</a><a href="%2e%2e/out">encoded</a><a href="/elsewhere/private">outside</a>
 <a href="https://foreign.invalid/a">foreign</a><a href="%5cprivate">backslash</a><a href="a%20b.txt">duplicate</a>`),
 	)
-	got, err := ListFolder(t.Context(), s, q, "nested", &ListingBudget{})
+	got, err := remote.ListFolder(t.Context(), s, q, "nested", &remote.ListingBudget{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []ListingEntry{{"nested/a b.txt", false}, {"nested/next", true}}
+	want := []remote.ListingEntry{
+		{Path: "nested/a b.txt", Folder: false},
+		{Path: "nested/next", Folder: true},
+	}
 	if !reflect.DeepEqual(got.Entries, want) {
 		t.Fatalf("entries %+v", got.Entries)
 	}
@@ -87,16 +91,16 @@ func TestAccListingHTMLUsesFinalBaseFiltersPathsAndCachesOnlyMetadata(t *testing
 	q.CacheOnly = true
 	w.clock.Advance(time.Hour)
 	w.up.Delete("/actual/")
-	again, err := ListFolder(t.Context(), s, q, "nested", &ListingBudget{})
+	again, err := remote.ListFolder(t.Context(), s, q, "nested", &remote.ListingBudget{})
 	if err != nil || !reflect.DeepEqual(again.Entries, want) || len(w.up.Requests()) != before {
 		t.Fatalf("cache-only %+v %v calls=%d", again.Entries, err, len(w.up.Requests()))
 	}
-	if _, err = ListFolder(
+	if _, err = remote.ListFolder(
 		t.Context(),
 		s,
 		q,
 		"absent",
-		&ListingBudget{},
+		&remote.ListingBudget{},
 	); !errors.Is(
 		err,
 		store.ErrNotFound,
@@ -140,8 +144,9 @@ func TestAccListingPermissionFilteringAndFinalRevocation(t *testing.T) {
 		}
 		return nil
 	}
-	got, err := ListFolder(t.Context(), s, q, "", &ListingBudget{})
-	if err != nil || !reflect.DeepEqual(got.Entries, []ListingEntry{{"public", true}}) {
+	got, err := remote.ListFolder(t.Context(), s, q, "", &remote.ListingBudget{})
+	if err != nil ||
+		!reflect.DeepEqual(got.Entries, []remote.ListingEntry{{Path: "public", Folder: true}}) {
 		t.Fatalf("narrow folder %+v %v", got.Entries, err)
 	}
 	revoked = true
@@ -149,7 +154,7 @@ func TestAccListingPermissionFilteringAndFinalRevocation(t *testing.T) {
 		t.Fatal("revoked folder disclosed", err)
 	}
 	q.Repo.ExcludesPattern = ptr("public/**")
-	got, err = ListFolder(t.Context(), s, q, "", &ListingBudget{})
+	got, err = remote.ListFolder(t.Context(), s, q, "", &remote.ListingBudget{})
 	if err != nil || len(got.Entries) != 0 {
 		t.Fatalf("pattern filtering %+v %v", got.Entries, err)
 	}
@@ -171,7 +176,7 @@ func TestAccListingNoStoreFailuresAndSourceFence(t *testing.T) {
 			w, s, q := listingFixture(t)
 			q.Repo.StoreArtifactsLocally = ptr(false)
 			w.up.Set("/", tc.response)
-			got, err := ListFolder(t.Context(), s, q, "", &ListingBudget{})
+			got, err := remote.ListFolder(t.Context(), s, q, "", &remote.ListingBudget{})
 			if tc.expected == nil {
 				if err != nil || len(got.Entries) != 0 {
 					t.Fatal(err)
@@ -187,7 +192,7 @@ func TestAccListingNoStoreFailuresAndSourceFence(t *testing.T) {
 	}
 	w, s, q := listingFixture(t)
 	w.up.Set("/", indexHTML(`<a href="file.txt">file</a>`))
-	got, err := ListFolder(t.Context(), s, q, "", &ListingBudget{})
+	got, err := remote.ListFolder(t.Context(), s, q, "", &remote.ListingBudget{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,57 +204,6 @@ func TestAccListingNoStoreFailuresAndSourceFence(t *testing.T) {
 		t.Fatal("changed source disclosed", err)
 	}
 }
-
-func TestAccListingParserBoundsAndUnsupportedDocuments(t *testing.T) {
-	for _, tc := range []struct {
-		name, body, base string
-		bad              bool
-	}{
-		{"empty", "<h1>Index of /</h1>", "https://up.example/f/", false},
-		{"unsupported", "<form>login</form>", "https://up.example/f/", true},
-		{"invalid-base", "<h1>Index of /</h1>", "file:///tmp/", true},
-		{"too-many", strings.Repeat(`<a href="a">a</a>`, 10001), "https://up.example/f/", true},
-		{"too-large", "<h1>Index of /</h1>" + strings.Repeat(" ", listingBytes), "https://up.example/f/", true},
-		{"next-path", `<a href="child/" rel="next">next</a>`, "https://up.example/f/", true},
-		{"next-foreign", `<a href="https://foreign.example/f/?page=2" rel="next">next</a>`, "https://up.example/f/", true},
-		{"next-credentials", `<a href="https://secret@up.example/f/?page=2" rel="next">next</a>`, "https://up.example/f/", true},
-		{"next-traversal", `<a href="../f/?page=2" rel="next">next</a>`, "https://up.example/f/", true},
-		{"conflicting-next", `<link rel="next" href="?page=2"><link rel="next" href="?page=3">`, "https://up.example/f/", true},
-		{"relative-next", `<h1>Index of /</h1><link rel="next" href="?page=2">`, "https://up.example/f/", false},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			_, err := parseHTMLListing(t.Context(), strings.NewReader(tc.body), tc.base, "f")
-			if (err != nil) != tc.bad {
-				t.Fatal(err)
-			}
-		})
-	}
-	ctx, cancel := context.WithCancel(t.Context())
-	cancel()
-	if _, err := parseHTMLListing(
-		ctx,
-		strings.NewReader(""),
-		"https://up.example/",
-		"",
-	); !errors.Is(
-		err,
-		context.Canceled,
-	) {
-		t.Fatal(err)
-	}
-	if _, err := parseHTMLListing(
-		t.Context(),
-		failingListingReader{},
-		"https://up.example/",
-		"",
-	); err == nil {
-		t.Fatal("read error hidden")
-	}
-}
-
-type failingListingReader struct{}
-
-func (failingListingReader) Read([]byte) (int, error) { return 0, io.ErrUnexpectedEOF }
 
 type listingBackend func(context.Context, source.Request, source.Permit) (source.Result, error)
 
@@ -281,34 +235,34 @@ func TestAccListingPaginationIsBoundedAcrossFolders(t *testing.T) {
 			}, nil
 		},
 	)
-	if got, err := ListFolder(
+	if got, err := remote.ListFolder(
 		t.Context(),
 		s,
 		q,
 		"",
-		&ListingBudget{},
+		&remote.ListingBudget{},
 	); err == nil || calls != 100 ||
 		len(got.Entries) != 0 {
 		t.Fatalf("unbounded or partial pages %d %+v %v", calls, got, err)
 	}
 	calls = 0
-	if _, err := ListFolder(
+	if _, err := remote.ListFolder(
 		t.Context(),
 		s,
 		q,
 		"",
-		&ListingBudget{pages: 100},
+		new(remote.ListingBudget).SetPages(100),
 	); err == nil ||
 		calls != 0 {
 		t.Fatal("shared budget bypassed", err)
 	}
 	for _, folder := range []string{"../x", "/x", "x/", "a//b"} {
-		if _, err := ListFolder(
+		if _, err := remote.ListFolder(
 			t.Context(),
 			s,
 			q,
 			folder,
-			&ListingBudget{},
+			&remote.ListingBudget{},
 		); !errors.Is(
 			err,
 			source.ErrInvalidRequest,
@@ -343,7 +297,7 @@ func TestAccListingPaginationCompletesOrFailsWithoutPartialResults(t *testing.T)
 					}, nil
 				},
 			)
-			got, err := ListFolder(t.Context(), s, q, "", &ListingBudget{})
+			got, err := remote.ListFolder(t.Context(), s, q, "", &remote.ListingBudget{})
 			if calls != 2 || (err != nil) != cycle {
 				t.Fatalf("calls=%d result=%+v error=%v", calls, got, err)
 			}
@@ -353,7 +307,10 @@ func TestAccListingPaginationCompletesOrFailsWithoutPartialResults(t *testing.T)
 			if !cycle &&
 				!reflect.DeepEqual(
 					got.Entries,
-					[]ListingEntry{{"first.txt", false}, {"second.txt", false}},
+					[]remote.ListingEntry{
+						{Path: "first.txt", Folder: false},
+						{Path: "second.txt", Folder: false},
+					},
 				) {
 				t.Fatal(got.Entries)
 			}
@@ -361,7 +318,7 @@ func TestAccListingPaginationCompletesOrFailsWithoutPartialResults(t *testing.T)
 	}
 	w, s, q := listingFixture(t)
 	w.up.Set("/", indexHTML(`<a href="a">a</a><a href="b">b</a>`))
-	got, err := ListFolder(t.Context(), s, q, "", &ListingBudget{entries: 9999})
+	got, err := remote.ListFolder(t.Context(), s, q, "", new(remote.ListingBudget).SetEntries(9999))
 	if err == nil || len(got.Entries) != 0 {
 		t.Fatal("aggregate entry budget bypassed", got, err)
 	}

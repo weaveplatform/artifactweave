@@ -110,7 +110,7 @@ identity, signed delivery, cache visibility and revocation before publication.
 ## Go source consumer
 
 [#633](https://github.com/weaveplatform/artifactweave/issues/633) implements
-`remote.GoSource` as a consumer of this service. Its [P10 handoff](go-upstream-source.md)
+`golang.GoSource` as a consumer of this service. Its [P10 handoff](go-upstream-source.md)
 records escaped identities, endpoint classifications, delivery hooks and native exits.
 The trusted metadata adapter chooses its own upstream path and validation callback;
 `GoneIsMissing` adds GOPROXY's 410-as-absence semantics to its cache identity without

@@ -14,9 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/config"
 	"github.com/weaveplatform/artifactweave/internal/format/conda"
 	"github.com/weaveplatform/artifactweave/internal/format/helm"
-	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/format/npm"
-	"github.com/weaveplatform/artifactweave/internal/format/nuget"
 	"github.com/weaveplatform/artifactweave/internal/format/pypi"
 	"github.com/weaveplatform/artifactweave/internal/format/terraformbackend"
 	"github.com/weaveplatform/artifactweave/internal/reindexauth"
@@ -32,6 +30,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/mirror"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
@@ -65,13 +65,18 @@ type runtime struct {
 	multipart        *multipart.Service
 	// work runs derived work after the changes that need it (decision 0033).
 	work            *work.Queue
-	mavenEager      *remote.MavenEager
+	mavenEager      *maven.MavenEager
 	smartRemote     *remote.Smart
 	smartRegistry   *remote.Smart
 	remoteHTTP      remote.Pool
 	remoteSources   *source.Service
 	registryHTTP    remote.RegistryPool
 	registrySources *source.Service
+	// registryPath is the registry path grammar both Smart Remote runtimes
+	// are given. Nil silently turns off property synchronisation for
+	// registry requests and refuses every side effect a registry token
+	// queued, with no error anywhere.
+	registryPath func(string) (image, operation, reference string, err error)
 	// formats are the formats' options, which the server and the work
 	// queue's item service share.
 	formats   ecosystem.Settings

@@ -41,7 +41,7 @@ func TestUnitAffectedPlanChoosesOnlyOwnedChanges(t *testing.T) {
 		{"unknown format", []change{{status: "M", path: "migration/artifacts/ecosystem/newformat/handler.go"}}, "full", ""},
 		{"shared format code", []change{{status: "M", path: "migration/artifacts/ecosystem/registry.go"}}, "full", ""},
 		{"format and deployment", []change{{status: "M", path: "internal/format/npm/handler.go"}, {status: "M", path: "deploy/check.sh"}}, "full", ""},
-		{"two formats", []change{{status: "M", path: "internal/format/npm/handler.go"}, {status: "M", path: "internal/format/maven/handler.go"}}, "full", ""},
+		{"two formats", []change{{status: "M", path: "internal/format/npm/handler.go"}, {status: "M", path: "migration/artifacts/ecosystem/maven/handler.go"}}, "full", ""},
 		{"deleted source", []change{{status: "D", path: "internal/format/npm/handler.go"}}, "full", ""},
 		{"renamed source", []change{{status: "R100", old: "internal/format/npm/old.go", path: "internal/format/npm/new.go"}}, "full", ""},
 		{"acceptance feature", []change{{status: "M", path: "test/acceptance/features/npm.feature"}}, "full", ""},
@@ -75,8 +75,10 @@ func TestUnitAffectedPlanChoosesOnlyOwnedChanges(t *testing.T) {
 			t.Errorf("Conan plan did not instrument %s", pkg)
 		}
 	}
-	docker := proposeAffected([]change{{status: "M", path: "internal/format/docker/handler.go"}})
-	for _, pkg := range []string{"./test/server/artifacts/docker", "./test/server/artifacts/helmoci", "./internal/server/nimmodel"} {
+	docker := proposeAffected(
+		[]change{{status: "M", path: "migration/artifacts/ecosystem/docker/handler.go"}},
+	)
+	for _, pkg := range []string{"./test/server/artifacts/docker", "./test/server/artifacts/helmoci", "./migration/artifacts/ecosystem/nimmodel/http"} {
 		if !slices.Contains(docker.units, pkg) {
 			t.Errorf("Docker plan omitted dependent package %s", pkg)
 		}

@@ -14,8 +14,13 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func smartDue(q source.Request, state *types.RemoteSmartState, now time.Time) bool {
-	properties := smartProperties(q.Repo) && smartPropertyPath(q)
+func smartDue(
+	registryPath func(string) (image, operation, reference string, err error),
+	q source.Request,
+	state *types.RemoteSmartState,
+	now time.Time,
+) bool {
+	properties := smartProperties(q.Repo) && smartPropertyPath(registryPath, q)
 	absence := smartAbsence(q.Repo)
 	if !properties && !absence {
 		return false

@@ -40,7 +40,7 @@ func projectModuleLocation(q source.Request, res *http.Response) error {
 	}
 	body, _ := json.Marshal(map[string]string{"source": values[0]})
 	if err := res.Body.Close(); err != nil {
-		return policyError(err)
+		return PolicyError(err)
 	}
 	res.Body = io.NopCloser(bytes.NewReader(body))
 	res.StatusCode = http.StatusOK

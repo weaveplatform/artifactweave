@@ -19,6 +19,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -45,11 +46,12 @@ func searchUpstreamWorld(t *testing.T) *upstreamSearchWorld {
 	)
 	u.itemWorld = newItemWorld(t, false, func(c *Config) {
 		authorizer := accesstest.Over(t, c.Store).API().Authorizer
+		pool := new(remote.Pool)
 		policy := &remote.Policy{
 			Store: c.Store, Blobs: c.Blobs, Items: &item.Service{
 				Store: c.Store, Blobs: c.Blobs, Formats: ecosystem.For,
 			},
-			Pool: new(remote.Pool), Key: []byte("search-test-key"), Now: u.clock.Now,
+			Pool: pool, Key: []byte("search-test-key"), Now: u.clock.Now,
 			Options: func(context.Context, repo.Config) (remote.Options, error) {
 				return remote.Options{
 					Revision: "test-credentials",
@@ -66,8 +68,8 @@ func searchUpstreamWorld(t *testing.T) *upstreamSearchWorld {
 				}, nil
 			},
 		}
-		t.Cleanup(policy.Pool.Close)
-		backend := &remote.MavenBackend{Policy: policy}
+		t.Cleanup(pool.Close)
+		backend := &maven.MavenBackend{Policy: policy}
 		u.svc = &source.Service{
 			Resolve: func(ctx context.Context, r repo.Config) (types.SourceIdentity, error) {
 				return c.Store.RemoteCache().Source(ctx, r.Key)

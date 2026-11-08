@@ -54,14 +54,14 @@ func (r *Registry) exchange(
 	if err != nil {
 		return registryToken{}, err
 	}
-	u, err := checkedURL(target)
+	u, err := CheckedURL(target)
 	if err != nil {
 		return registryToken{}, ErrRegistryChallenge
 	}
 	ctx = context.WithValue(
 		ctx,
 		registryAuthorizationKey{},
-		registryAuthorization{realm: origin(u)},
+		registryAuthorization{realm: Origin(u)},
 	)
 	res, err := r.client.Do(ctx, Request{
 		Method: http.MethodGet, ExternalURL: target,

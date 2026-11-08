@@ -54,6 +54,18 @@ func (p *Pool) Client(c repo.Config, opts Options) (*Client, error) {
 	return client, nil
 }
 
+// Connection returns Client(c, opts) as the Upstream port's Connection, with
+// Client's errors, ErrClosed after Close among them. On error it returns a
+// literal nil, never a nil *Client inside the interface, which would compare
+// unequal to nil.
+func (p *Pool) Connection(c repo.Config, opts Options) (Connection, error) {
+	client, err := p.Client(c, opts)
+	if err != nil {
+		return nil, err
+	}
+	return client, nil
+}
+
 func (p *Pool) Remove(key string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()

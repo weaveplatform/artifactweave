@@ -11,13 +11,13 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
-	"github.com/weaveplatform/artifactweave/internal/server/docker"
 	"github.com/weaveplatform/artifactweave/internal/service/oidc"
 	"github.com/weaveplatform/artifactweave/internal/service/roles"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -518,7 +518,7 @@ func published(name string) seeder {
 // delete's 405, still does.
 func (r matrixRow) want(p matrixPrincipal) int {
 	path, _, _ := strings.Cut(r.path, "?")
-	if !r.open && (p.bad || p.registry && !docker.IsRegistryPath(path)) {
+	if !r.open && (p.bad || p.registry && !dockerhttp.IsRegistryPath(path)) {
 		return http.StatusUnauthorized
 	}
 	s := r.who(p)

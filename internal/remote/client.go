@@ -17,46 +17,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
-// Options contains resolved connection settings. Revision must change whenever
-// externally resolved settings (proxy, trust, credentials) change. Prepare runs
-// for initial requests and redirects, after the transport removes credentials
-// from requests crossing origins. It must not forward downstream credentials.
-type Options struct {
-	ProxyURL  *url.URL
-	TLSConfig *tls.Config
-	Revision  string
-	Jar       http.CookieJar
-	// CheckURL authorizes metadata-provided absolute destinations.
-	CheckURL      func(context.Context, *url.URL) error
-	WrapTransport func(*http.Transport) (http.RoundTripper, func())
-	Prepare       func(*http.Request) error
-	CheckRedirect func(*http.Request, []*http.Request) error
-	// MaxResponseHeaderBytes defaults to 1 MiB; tests can lower it.
-	MaxResponseHeaderBytes int64
-}
-
-type Request struct {
-	// gitUploadPack is set only by the closed CocoaPods Git-object adapter.
-	gitUploadPack bool
-	// ExternalURL is a metadata/token-realm URL, never combined with Path/Query.
-	// It requires a resolved destination policy.
-	ExternalURL string
-	// CheckURL is a request-scoped restriction, never retained by the pooled client.
-	// It applies before the initial request and each redirected request is sent.
-	CheckURL          func(context.Context, *url.URL) error
-	NoCrossOriginAuth bool
-	// GitLFSActionHeaders belong only to the exact, validated download action.
-	// They are never copied to a redirected request.
-	GitLFSActionHeaders http.Header
-	Method              string
-	Path                string
-	Query               string
-	Header              http.Header
-	Metadata            bool
-	// Body is admitted only for closed format-owned metadata POST contracts.
-	Body []byte
-}
-
 // Client is immutable and safe for concurrent use. Every successful Do or Fetch
 // transfers response-body ownership to the caller, including non-2xx responses.
 type Client struct {
@@ -192,7 +152,7 @@ func redirectPolicy(opts Options) func(*http.Request, []*http.Request) error {
 
 //nolint:gocyclo // Preserves transport guards while admitting closed protocol-specific POSTs.
 func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
-	gitPOST := r.gitUploadPack && r.Method == http.MethodPost &&
+	gitPOST := r.GitUploadPack && r.Method == http.MethodPost &&
 		c.config.PackageType == repo.CocoaPods && r.Metadata && r.NoCrossOriginAuth &&
 		r.ExternalURL != "" && r.Path == "" && r.Query == "" &&
 		len(r.Body) > 0 && len(r.Body) <= 4096 &&
@@ -228,7 +188,7 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 		if c.checkURL == nil || r.Path != "" || r.Query != "" {
 			return nil, ErrSecurity
 		}
-		u, err = checkedURL(r.ExternalURL)
+		u, err = CheckedURL(r.ExternalURL)
 	} else {
 		u, err = requestURL(c.config, c.base, r.Path, r.Query)
 	}
@@ -310,10 +270,11 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 	for name, values := range r.GitLFSActionHeaders {
 		req.Header[name] = append([]string(nil), values...)
 	}
-	smartHeaders(req)
-	if session, ok := ctx.Value(smartSessionKey{}).(smartSession); ok &&
-		session.isMetadataRequest &&
-		!smartMetadataTarget(session.peer, req.URL.String()) {
+	out := OutboundFrom(ctx)
+	if out.Header != nil {
+		out.Header(req)
+	}
+	if out.Allow != nil && !out.Allow(req.URL.String()) {
 		cancel()
 		return nil, ErrSecurity
 	}
@@ -475,13 +436,14 @@ func (c *idleConn) Write(p []byte) (int, error) {
 }
 
 // Request restrictions share pooled connections but never another request's
-// authorization callback or Smart peer. Every redirect intersects both guards
-// with the existing transport destination and credential policy.
+// authorization callback or outbound hooks. Every redirect intersects both
+// guards with the existing transport destination and credential policy.
 func (c *Client) requestClient(ctx context.Context, r Request) *http.Client {
 	client := *c.http
 	if r.NoCrossOriginAuth {
 		client.Jar = nil
 	}
+	out := OutboundFrom(ctx)
 	redirect := client.CheckRedirect
 	client.CheckRedirect = func(next *http.Request, via []*http.Request) error {
 		if r.Method == http.MethodPost {
@@ -495,20 +457,53 @@ func (c *Client) requestClient(ctx context.Context, r Request) *http.Client {
 				return err
 			}
 		}
-		if session, ok := ctx.Value(smartSessionKey{}).(smartSession); ok &&
-			session.isMetadataRequest &&
-			!smartMetadataTarget(session.peer, next.URL.String()) {
+		if out.Allow != nil && !out.Allow(next.URL.String()) {
 			return ErrSecurity
 		}
 		if err := redirect(next, via); err != nil {
 			return err
 		}
-		if origin(next.URL) == origin(via[0].URL) {
-			smartHeaders(next)
+		if out.Header != nil && Origin(next.URL) == Origin(via[0].URL) {
+			out.Header(next)
 		}
 		return nil
 	}
 	return &client
+}
+
+// Guarded reports whether c was built with Options.CheckURL, the check that
+// every absolute destination taken from metadata must pass.
+func (c *Client) Guarded() bool { return c.checkURL != nil }
+
+// CheckURL applies Options.CheckURL to u, and returns ErrSecurity when c has
+// none, so that an unguarded client never vouches for a destination.
+func (c *Client) CheckURL(ctx context.Context, u *url.URL) error {
+	if c.checkURL == nil {
+		return ErrSecurity
+	}
+	return c.checkURL(ctx, u)
+}
+
+// Prepare applies Options.Prepare to req, a request its caller built rather
+// than Do; without one it does nothing and returns nil.
+func (c *Client) Prepare(req *http.Request) error {
+	if c.prepare == nil {
+		return nil
+	}
+	return c.prepare(req)
+}
+
+// Send sends req over c's transport, proxy, TLS settings and cookie jar
+// included, and refuses every redirect with ErrRedirect, because a request
+// built outside Do has none of the redirect checks Do installs. It applies
+// neither Do's checks nor the WithOutbound hooks; its caller checks and
+// prepares req first. The error is the HTTP client's own, unwrapped and not
+// classified, and a successful call transfers response-body ownership.
+func (c *Client) Send(req *http.Request) (*http.Response, error) {
+	transport := *c.http
+	transport.CheckRedirect = func(*http.Request, []*http.Request) error { return ErrRedirect }
+	//nolint:wrapcheck // preserves upstream error identity
+	return transport.Do(req)
 }
 
 func (c *Client) validGitLFSActionHeaders(u *url.URL, r Request) bool {
@@ -516,7 +511,7 @@ func (c *Client) validGitLFSActionHeaders(u *url.URL, r Request) bool {
 		return true
 	}
 	if c.config.PackageType != repo.GitLFS || r.Method != http.MethodGet ||
-		r.ExternalURL == "" || !r.NoCrossOriginAuth || origin(u) != origin(c.base) ||
+		r.ExternalURL == "" || !r.NoCrossOriginAuth || Origin(u) != Origin(c.base) ||
 		!source.ValidGitLFSActionHeaders(r.GitLFSActionHeaders) {
 		return false
 	}

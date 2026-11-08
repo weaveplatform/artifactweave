@@ -386,6 +386,40 @@ func TestAccPoolChangesAndClose(t *testing.T) {
 	}
 }
 
+func TestUnitConnectionContract(t *testing.T) {
+	p := new(Pool)
+	p.Close()
+	conn, err := p.Connection(repo.Config{Key: "r", URL: "https://example.test"}, Options{})
+	if !errors.Is(err, ErrClosed) || conn != nil {
+		t.Fatalf("closed pool: connection %#v, error %v", conn, err)
+	}
+	var unguarded Connection = clientFor(t, repo.Config{URL: "https://example.test"}, Options{})
+	u := &url.URL{Scheme: "https", Host: "example.test", Path: "/next"}
+	if unguarded.Guarded() || !errors.Is(unguarded.CheckURL(t.Context(), u), ErrSecurity) {
+		t.Fatal("an unguarded client vouches for a destination")
+	}
+	req, err := http.NewRequestWithContext(
+		t.Context(),
+		http.MethodGet,
+		"https://example.test/item",
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = unguarded.Prepare(req); err != nil || len(req.Header) != 0 ||
+		req.URL.String() != "https://example.test/item" {
+		t.Fatal(err, req.Header, req.URL)
+	}
+	checked := 0
+	var guarded Connection = clientFor(t, repo.Config{URL: "https://example.test"}, Options{
+		CheckURL: func(context.Context, *url.URL) error { checked++; return nil },
+	})
+	if !guarded.Guarded() || guarded.CheckURL(t.Context(), u) != nil || checked != 1 {
+		t.Fatal("a guarded client does not check through Options.CheckURL", checked)
+	}
+}
+
 func TestUnitInvalidSettingsAndSafeErrors(t *testing.T) {
 	for _, c := range []repo.Config{{URL: "bad"}, {URL: "https://example.test", LocalAddress: "bad"}, {URL: "https://example.test", SocketTimeoutMillis: ptr(-1)}, {URL: "https://example.test", MetadataRetrievalTimeoutSecs: ptr(-1)}} {
 		if _, err := NewClient(c, Options{}); err == nil {
