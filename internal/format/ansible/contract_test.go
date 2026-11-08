@@ -77,7 +77,11 @@ func collectionEntries(t *testing.T, ns, name, version string, n int) []entry {
 
 func TestAccFormatContract(t *testing.T) {
 	formattest.Run(t, formattest.Format{
-		Type: repo.Ansible, NoRemoteCache: true,
+		Type: repo.Ansible,
+		// A remote repository answers discovery from the upstream Galaxy
+		// metadata in the shared source cache (docs/operations/ansible.md),
+		// so the hooks leave the archives it caches out of the index.
+		NoRemoteCache: true,
 		Version: func(name, version string, n int) formattest.Version {
 			version += ".0"
 			return formattest.Version{

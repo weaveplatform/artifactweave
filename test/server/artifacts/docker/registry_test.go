@@ -26,10 +26,11 @@ import (
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
-// The registry's own routing is tested in migration/artifacts/ecosystem/docker/http; these
-// rows and tests cover what the server adds: authentication in front of
-// it, the version header on the middleware's answers, the mounting under
-// both prefixes and the reverse proxy read (#220).
+// The registry's own routing is tested in
+// migration/artifacts/ecosystem/docker/http; these rows and tests cover
+// what the server adds: authentication in front of it, the version header
+// on the middleware's answers, the mounting under both prefixes and the
+// reverse proxy read (#220).
 
 const (
 	registryProbe = "GET /v2/"
@@ -41,7 +42,8 @@ const (
 )
 
 // The blob routes (#222), on the repository path; the router tests in
-// migration/artifacts/ecosystem/docker/http cover the other addressing forms.
+// migration/artifacts/ecosystem/docker/http cover the other addressing
+// forms.
 const (
 	blobRoute    = "/v2/{repo}/{name}/blobs/{digest}"
 	uploadsRoute = "/v2/{repo}/{name}/blobs/uploads/"

@@ -19,15 +19,16 @@ holds the facts, and its section numbers are cited below as R23.
 
 ### Packages and protocol version
 
-The registry's HTTP layer is `migration/artifacts/ecosystem/docker/http`: the routes of decision 0003, the
-token challenge, the protocol handlers and the error envelope, mounted before the generated
-servers (decision [0002](0002-spec-first-flat-crud-handwritten-item-paths.md)). The storage
-layout, manifest parsing and validation, the properties set on manifests and the
-package-index hooks are `migration/artifacts/ecosystem/docker`, which never imports `internal/server`.
-Upload sessions and the items they finish are `migration/artifacts/core/registry`: they store items
-through the item service, which imports `migration/artifacts/core/format`, so a format package
-cannot hold them without an import cycle. One code path serves the `docker`, `oci` and `helmoci`
-package types.
+The registry's HTTP layer is `migration/artifacts/ecosystem/docker/http`: the routes of
+decision 0003, the token challenge, the protocol handlers and the error envelope, mounted
+before the generated servers (decision
+[0002](0002-spec-first-flat-crud-handwritten-item-paths.md)). The storage layout, manifest
+parsing and validation, the properties set on manifests and the package-index hooks are
+`migration/artifacts/ecosystem/docker`, which never imports `internal/server`. Upload
+sessions and the items they finish are `migration/artifacts/core/registry`: they store
+items through the item service, which imports `migration/artifacts/core/format`, so a
+format package cannot hold them without an import cycle. One code path serves the `docker`,
+`oci` and `helmoci` package types.
 
 The target is OCI Distribution Specification **v1.1.1**, the latest release, and its
 conformance suite at the same tag. `end-4c`, `end-7b` and `end-14`, which exist only on the

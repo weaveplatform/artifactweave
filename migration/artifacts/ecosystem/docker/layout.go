@@ -1,11 +1,3 @@
-// Package docker is the storage layout of Docker and OCI images in a
-// repository's item tree (decision 0031), which the JFrog CLI reads with AQL
-// and the storage API: an image is a folder, each tag a folder of its own
-// below it and each manifest pushed by digest a folder named sha256:<hex>,
-// and every blob a file named sha256__<hex> in the folders of the images
-// that use it. Finished uploads wait in the image's _uploads folder until a
-// manifest links them. A format package never imports internal/server, nor
-// the item service, which calls the format hooks.
 package docker
 
 import (

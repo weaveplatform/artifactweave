@@ -1,6 +1,3 @@
-// Package nimmodelhttp serves the documented NGC metadata and model-resource URLs
-// through a remote NIM repository. Container layers use the separate Docker
-// remote and its own credentials and permissions.
 package nimmodelhttp
 
 import (

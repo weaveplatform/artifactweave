@@ -17,7 +17,10 @@ import (
 func TestUnitContract(t *testing.T) {
 	formattest.Run(t, formattest.Format{
 		Type: repo.Docker,
-		// Docker's remote repositories, and the cache they fill, come in P9.
+		// The hooks index what a remote repository caches, but the reindex
+		// reads only a repository's own items, not pkgindex.Stored, so a
+		// reindex of a remote drops every cached image and the cache
+		// scenario fails.
 		NoRemoteCache: true,
 		Version: func(p, v string, n int) formattest.Version {
 			layer := []byte("layer of " + p + ":" + v)

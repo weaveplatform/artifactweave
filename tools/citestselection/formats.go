@@ -261,7 +261,10 @@ func ownerCoverPackages(owner string, conf formatImpact, inventory testOwnership
 	}
 	if len(coverPackages) == 0 {
 		// Test-only owners still need a stable instrumented package set.
-		coverPackages = append(coverPackages, modulePath+"/internal/server/docker/...")
+		coverPackages = append(
+			coverPackages,
+			modulePath+"/migration/artifacts/ecosystem/docker/http/...",
+		)
 	}
 	slices.Sort(coverPackages)
 	return slices.Compact(coverPackages)

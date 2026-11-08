@@ -143,7 +143,6 @@ func paginateHeaders(header http.Header, r *http.Request, names []string) []stri
 	return page
 }
 
-// writeJSON writes body with 200.
 func writeJSON(w http.ResponseWriter, body any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

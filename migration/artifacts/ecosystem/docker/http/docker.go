@@ -1,18 +1,3 @@
-// Package dockerhttp serves the registry protocol, the OCI Distribution
-// Specification v1.1 with Docker's extensions, for docker, oci and helmoci
-// repositories (decisions 0003 and 0031). It answers three addressing forms:
-//
-//   - the repository path, /v2/<repo>/<image>/..., the native default, which
-//     needs no reverse proxy;
-//   - Artifactory's own prefix, /artifactory/api/docker/<repo>/v2/<image>/...;
-//   - the subdomain, <repo>.<base_url host>/v2/<image>/..., when
-//     docker.subdomain_match is on.
-//
-// The router is hand-written and mounted before the generated servers
-// (decision 0002). It parses each path into a Request and hands it to the
-// endpoint a feature registered for its kind and method; an operation the
-// specification defines that no feature has registered yet answers 405
-// UNSUPPORTED. This package never imports internal/server.
 package dockerhttp
 
 import (

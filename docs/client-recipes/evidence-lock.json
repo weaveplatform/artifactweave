@@ -10,7 +10,7 @@
   "internal/app/conan_client_test.go": "7a6f63d1fb25ee2b4678e00baae4ebd0d4a5592557cf94f634d65f60eec28ae6",
   "internal/auth/token.go": "8891a917496c993366f0370a211851d0e10ad0aea10207302a455fb85d2b79a6",
   "internal/auth/token_test.go": "ddd6c53bc49ea905132dfffb093ae1b79d30cad3794d1e93316cf58549df5204",
-  "internal/server/auth.go": "b1d2504f932d612ea82521a483d0f843352593965d7a0449453808686668d5fc",
+  "internal/server/auth.go": "ffccbf1019250bd9514d002f7d2772470e067d05b9f6b5ad56420a4f8442afed",
   "internal/server/bazelmodules/bazelmodules_test.go": "ab3d3b6150a9629c0f6548a618f740aa8a00d5117663a05616a64ee721a5b5a6",
   "internal/server/conan_client_test.go": "d290f52278366ff31b62b5eeb79d7a2cf4b34e768a6079e30cddb8fb9e873ab9",
   "internal/server/huggingface/migration_scope_test.go": "ffe510b40e58cca4fe1ba110ca822816990797e804280ad8e6fba660969ed862",

@@ -243,7 +243,6 @@ func ParseManifest(contentType string, body []byte, hex string) (Manifest, error
 	return m, nil
 }
 
-// descriptors are every descriptor in the manifest.
 func (m Manifest) descriptors() []Descriptor {
 	var out []Descriptor
 	if m.Config != nil {
