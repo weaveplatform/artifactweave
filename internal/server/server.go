@@ -206,7 +206,13 @@ type Config struct {
 // through the router kit (decision 0032). A format with a protocol adds its
 // constructor here.
 var protocols = []func(Config) pkgroute.Protocol{
-	func(cfg Config) pkgroute.Protocol { return nix.Protocol(cfg.RemoteSources) },
+	func(cfg Config) pkgroute.Protocol {
+		return nix.Protocol(nix.Options{
+			RemoteSources: cfg.RemoteSources,
+			Authorizer:    cfg.Access.Authorizer,
+			KeyPairs:      cfg.Access.Keys,
+		})
+	},
 	func(cfg Config) pkgroute.Protocol {
 		return puppet.Protocol(puppet.Options{Blobs: cfg.Blobs, RemoteSources: cfg.RemoteSources})
 	},
@@ -263,7 +269,11 @@ var protocols = []func(Config) pkgroute.Protocol{
 			helm.Options{Format: cfg.FormatSettings.Helm, RemoteSources: cfg.RemoteSources},
 		)
 	},
-	func(cfg Config) pkgroute.Protocol { return hex.Protocol(hex.Options{RemoteSources: cfg.RemoteSources}) },
+	func(cfg Config) pkgroute.Protocol {
+		return hex.Protocol(
+			hex.Options{RemoteSources: cfg.RemoteSources, KeyPairs: cfg.Access.Keys},
+		)
+	},
 	func(cfg Config) pkgroute.Protocol {
 		return luarocks.Protocol(luarocks.Options{RemoteSources: cfg.RemoteSources})
 	},

@@ -26,7 +26,7 @@ func (h handler) verifyRemote(r *http.Request, info nixfmt.Info) error {
 			continue
 		}
 		configured = true
-		pair, err := h.k.DB().Keys().Keypair(r.Context(), ref)
+		pair, err := h.o.KeyPairs.Keypair(r.Context(), ref)
 		if err != nil || pair.Type != types.KeypairEd25519 {
 			continue
 		}
