@@ -15,8 +15,15 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// Serves reports whether t is the CocoaPods package type.
 func Serves(t repo.PackageType) bool { return t == repo.CocoaPods }
 
+// Handler is the format of CocoaPods repositories, which the item service
+// calls on every write and delete in them, whichever API carried it. It
+// admits a hosted pod archive only once it has read it whole, and keeps
+// the package index: a pod is a package, and each archive's version is a
+// version with the Archive as its metadata. The embedded generic format
+// applies every package type's deploy policy.
 type Handler struct{ generic.Handler }
 
 type inspection struct {
@@ -25,6 +32,11 @@ type inspection struct {
 	err     error
 }
 
+// Inspect reads a deployed hosted archive before the write's transaction,
+// so Admit decides without parsing under the write lock. It answers nil
+// for a write that is not to a hosted archive path or has no SHA-256, and
+// an error only when the stored content cannot be opened; an archive that
+// fails ReadArchive is handed to Admit to refuse.
 func (Handler) Inspect(
 	ctx context.Context,
 	env format.Env,
@@ -44,6 +56,12 @@ func (Handler) Inspect(
 	return &inspection{sha: w.Checksums.SHA256, archive: a, err: err}, nil
 }
 
+// Admit applies the generic deploy policy, then refuses a write under the
+// generated CDN metadata (.pod/cdn/, 409), a .tar.gz outside the hosted
+// path grammar (400) and an archive that does not read as the pod and
+// version of its path (400). Checksum uploads and remote cache writes pass
+// after the generic checks: an HTTP source archive has its own validator
+// and is not a hosted archive.
 func (Handler) Admit(
 	ctx context.Context,
 	env format.Env,
@@ -87,6 +105,9 @@ func (Handler) Admit(
 	return w, nil
 }
 
+// Deployed indexes a stored hosted archive's version under its pod, with
+// the Archive and the archive's SHA-256 as the version's metadata. Folders,
+// cached items and other paths are not indexed.
 func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
 	name, version, ok := ParsePath(it.FullPath())
 	if !ok || it.Folder || it.Cached {
@@ -113,7 +134,12 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 	return err //nolint:wrapcheck // pkgindex reports the version
 }
 
-func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error  { return nil }
+// Deleting does nothing: the item service drops a removed archive's version
+// link with it.
+func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error { return nil }
+
+// Deleted does nothing: a version is one archive, so the item service's
+// pruning of versions left without files is all a delete needs.
 func (Handler) Deleted(context.Context, format.Env, repo.Config, []types.Item) error { return nil }
 
 func archiveOf(ctx context.Context, env format.Env, sha, name, version string) (Archive, error) {
@@ -129,6 +155,10 @@ func archiveOf(ctx context.Context, env format.Env, sha, name, version string) (
 	return a, nil
 }
 
+// Reindex rebuilds the package index of repository c from its stored
+// hosted archives, reading each one again, and reconciles the index to
+// them. An archive that no longer reads as its path's pod and version
+// fails the reindex rather than being left out.
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	var want []pkgindex.Indexed
 	byName := map[string]int{}

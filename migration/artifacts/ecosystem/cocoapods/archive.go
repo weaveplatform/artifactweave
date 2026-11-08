@@ -16,6 +16,9 @@ import (
 )
 
 const (
+	// MaxArchiveBytes bounds every pod archive at 64 MiB of compressed
+	// bytes: a hosted archive, an HTTP source archive and the archive a Git
+	// source is fetched into. A larger one is refused before it is read.
 	MaxArchiveBytes  = 64 << 20
 	maxExpandedBytes = 256 << 20
 	maxSpecBytes     = 2 << 20
@@ -24,6 +27,11 @@ const (
 
 var podVersion = regexp.MustCompile(`^[0-9][A-Za-z0-9.+-]*$`)
 
+// Archive is what ReadArchive learns from a valid hosted pod archive: the
+// pod's name and version and its root podspec as JSON (a static Ruby
+// podspec is converted). Handler adds the stored archive's SHA-256 and
+// keeps it as the version's metadata in the package index, from which the
+// protocol builds the CDN podspec, so its JSON field names are persisted.
 type Archive struct {
 	Name    string          `json:"name"`
 	Version string          `json:"version"`
@@ -31,9 +39,12 @@ type Archive struct {
 	SHA256  string          `json:"sha256"`
 }
 
-// CocoaPods' public CDN includes names with punctuation, spaces and Unicode.
-// The protocol treats a pod name as one path segment, so reject only separators
-// and control characters rather than imposing a narrower invented grammar.
+// ValidName reports whether v can be a pod name: at most 128 bytes of
+// valid UTF-8 with no leading or trailing space, neither . nor .., and no
+// slash, backslash, ?, # or control character. CocoaPods' public CDN
+// includes names with punctuation, spaces and Unicode, and the protocol
+// treats a pod name as one path segment, so only what would break that
+// segment is refused rather than a narrower invented grammar.
 func ValidName(v string) bool {
 	if v == "" || len(v) > 128 || !utf8.ValidString(v) || v != strings.TrimSpace(v) ||
 		v == "." || v == ".." || strings.ContainsAny(v, `/\\?#`) {
@@ -47,12 +58,20 @@ func ValidName(v string) bool {
 	return true
 }
 
+// ValidVersion reports whether v can be a pod version: at most 128 bytes
+// that start with a digit and hold only letters, digits, '.', '+' and '-'.
 func ValidVersion(v string) bool { return len(v) <= 128 && podVersion.MatchString(v) }
 
+// Path is the repository path of a hosted pod archive,
+// <name>/<version>/<name>-<version>.tar.gz: the only path a deployed
+// archive may take, and the one ParsePath accepts.
 func Path(name, version string) string {
 	return name + "/" + version + "/" + name + "-" + version + ".tar.gz"
 }
 
+// ParsePath returns the pod name and version of a hosted archive path; ok
+// is false unless p is exactly Path(name, version) for a valid name and
+// version.
 func ParsePath(p string) (name, version string, ok bool) {
 	parts := strings.Split(p, "/")
 	if len(parts) != 3 || !ValidName(parts[0]) || !ValidVersion(parts[1]) ||
@@ -62,16 +81,25 @@ func ParsePath(p string) (name, version string, ok bool) {
 	return parts[0], parts[1], true
 }
 
+// Shard is the CDN shard of a pod name, a/b/c for the first three hex
+// digits of the MD5 of the name, which is how the CocoaPods CDN spreads
+// specs and version lists (prefix lengths 1, 1 and 1 in
+// CocoaPods-version.yml). MD5 only selects a path here; it proves nothing
+// about content.
 func Shard(name string) string {
 	sum := md5.Sum([]byte(name)) //nolint:gosec // CDN path selection only.
 	h := hex.EncodeToString(sum[:])
 	return h[0:1] + "/" + h[1:2] + "/" + h[2:3]
 }
 
+// ShardFile is the name of the CDN version list that holds the pod name:
+// all_pods_versions_a_b_c.txt for the shard a/b/c.
 func ShardFile(name string) string {
 	return "all_pods_versions_" + strings.ReplaceAll(Shard(name), "/", "_") + ".txt"
 }
 
+// SpecPath is the CDN path of a pod version's podspec:
+// Specs/<shard>/<name>/<version>/<name>.podspec.json.
 func SpecPath(name, version string) string {
 	return "Specs/" + Shard(name) + "/" + name + "/" + version + "/" + name + ".podspec.json"
 }

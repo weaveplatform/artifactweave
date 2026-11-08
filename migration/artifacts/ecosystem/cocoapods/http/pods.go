@@ -1,6 +1,3 @@
-// Package cocoapodshttp serves the current CocoaPods CDN protocol through
-// /artifactory/api/pods/{repoKey}. The retired Git specs plugin is not a
-// second protocol surface.
 package cocoapodshttp
 
 import (
@@ -28,8 +25,18 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// Options configures Protocol. RemoteSources is the source service that
+// fetches a remote repository's upstream CDN metadata and pod source
+// archives into the remote cache; when it is nil, a remote repository is
+// not served and answers 501, as any class without a source does.
 type Options struct{ RemoteSources *source.Service }
 
+// Protocol returns the CocoaPods CDN protocol for the router kit: GET and
+// HEAD of every path below /artifactory/api/pods/{repoKey} for repositories
+// of package type cocoapods, with the Artifactory error profile. Local and
+// federated repositories answer from their package index, a remote one
+// through o.RemoteSources, and a virtual one from its members in priority
+// order.
 func Protocol(o Options) pkgroute.Protocol {
 	sources := map[repo.Class]pkgroute.Source{
 		repo.Local: pkgroute.Local{}, repo.Federated: pkgroute.Local{},
