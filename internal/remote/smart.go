@@ -177,7 +177,7 @@ func (s *Smart) Read(
 		q.Resource.RequireSmart {
 		return out, smartError("status", err)
 	}
-	key := s.policy.cacheKey(q, opts.Revision)
+	key := s.policy.CacheKey(q, opts.Revision)
 	entry, err := s.policy.readEntry(ctx, key, permit)
 	if err != nil {
 		return source.Result{}, smartError("read", err)

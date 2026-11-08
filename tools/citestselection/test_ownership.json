@@ -73,6 +73,7 @@
       "registry_remote_fault_test.go",
       "registry_remote_test.go",
       "remote_test.go",
+      "remote_wiring_test.go",
       "runtime_test.go",
       "seed_test.go",
       "serverlog_test.go",

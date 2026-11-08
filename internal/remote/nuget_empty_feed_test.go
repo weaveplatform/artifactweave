@@ -41,6 +41,7 @@ func TestAccNuGetEmptyFeedCacheRefreshOfflineAndNoStore(t *testing.T) {
 	for _, mode := range []string{"stored", "response-no-store", "repository-no-store"} {
 		t.Run(mode, func(t *testing.T) {
 			w := policyFixture(t)
+			w.p.ProjectResponse = ProjectNuGetEmptyFeed
 			q := nugetEmptyRequest(w)
 			if mode == "repository-no-store" {
 				q.Repo.StoreArtifactsLocally = ptr(false)
@@ -104,6 +105,7 @@ func TestAccNuGetEmptyFeedCacheRefreshOfflineAndNoStore(t *testing.T) {
 func TestAccNuGetEmptyFeedValidationAndPublicationFence(t *testing.T) {
 	for _, persist := range []bool{true, false} {
 		w := policyFixture(t)
+		w.p.ProjectResponse = ProjectNuGetEmptyFeed
 		q := nugetEmptyRequest(w)
 		q.Repo.StoreArtifactsLocally = &persist
 		w.up.Set("/v2/feed", fakeupstream.Resource{Redirect: "/redirected/feed"})
@@ -138,10 +140,11 @@ func TestAccNuGetEmptyFeedValidationAndPublicationFence(t *testing.T) {
 
 func TestAccNuGetEmptyFeedIdentityAndGenericStatus(t *testing.T) {
 	w := policyFixture(t)
+	w.p.ProjectResponse = ProjectNuGetEmptyFeed
 	q := nugetEmptyRequest(w)
-	key := w.p.cacheKey(q, "revision")
+	key := w.p.CacheKey(q, "revision")
 	q.Resource.NuGetEmptyFeed = false
-	if key == w.p.cacheKey(q, "revision") {
+	if key == w.p.CacheKey(q, "revision") {
 		t.Fatal("projection not included in identity")
 	}
 	w.up.Set("/v2/feed", fakeupstream.Resource{Status: 204})
@@ -155,13 +158,13 @@ func TestAccNuGetEmptyFeedIdentityAndGenericStatus(t *testing.T) {
 		{StatusCode: 204, Header: http.Header{"Content-Encoding": {"gzip"}}, Body: http.NoBody},
 		{StatusCode: 204, Header: http.Header{"Content-Type": {"malformed type"}}, Body: http.NoBody},
 	} {
-		if projectNuGetEmptyFeed(q, res) == nil {
+		if ProjectNuGetEmptyFeed(q, res) == nil {
 			t.Fatal("deceptive204 accepted")
 		}
 	}
 	for _, status := range []int{200, 304, 401, 404, 500} {
 		res := &http.Response{StatusCode: status, Body: http.NoBody}
-		if err := projectNuGetEmptyFeed(q, res); err != nil || res.StatusCode != status {
+		if err := ProjectNuGetEmptyFeed(q, res); err != nil || res.StatusCode != status {
 			t.Fatal("non204 changed", status, err)
 		}
 	}
@@ -173,6 +176,7 @@ func TestAccNuGetEmptyFeedClosesTransportBodyOnce(t *testing.T) {
 	for _, status := range []int{200, 204} {
 		for _, persist := range []bool{true, false} {
 			w := policyFixture(t)
+			w.p.ProjectResponse = ProjectNuGetEmptyFeed
 			q := nugetEmptyRequest(w)
 			q.Repo.StoreArtifactsLocally = &persist
 			q.Repo.BypassHeadRequests = ptr(true)

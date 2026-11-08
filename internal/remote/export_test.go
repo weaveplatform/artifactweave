@@ -43,8 +43,3 @@ func (w *policyWorld) MustRead(q source.Request, want string) source.Result {
 
 // Kind is the retrieval class the policy gives q.
 func (p *Policy) Kind(q source.Request) types.RemoteKind { return p.kind(q) }
-
-// CacheKey is the remote cache key of q under the credential revision.
-func (p *Policy) CacheKey(q source.Request, revision string) types.RemoteCacheKey {
-	return p.cacheKey(q, revision)
-}

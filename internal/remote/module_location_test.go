@@ -153,9 +153,9 @@ func TestAccModuleLocationRejectRetryAndPublicationFence(t *testing.T) {
 func TestAccModuleLocationProjectionBoundsAndIdentity(t *testing.T) {
 	w := policyFixture(t)
 	q := moduleLocationRequest(w)
-	key := w.p.cacheKey(q, "revision")
+	key := w.p.CacheKey(q, "revision")
 	q.Resource.ModuleDownloadLocation = false
-	if w.p.cacheKey(q, "revision") == key {
+	if w.p.CacheKey(q, "revision") == key {
 		t.Fatal("projection not part of identity")
 	}
 	q.Resource.ModuleDownloadLocation = true

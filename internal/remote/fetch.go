@@ -100,8 +100,10 @@ func (p *Policy) fetch(
 	if err = projectModuleLocation(q, res); err != nil {
 		return out, err
 	}
-	if err = projectNuGetEmptyFeed(q, res); err != nil {
-		return out, err
+	if p.ProjectResponse != nil {
+		if err = p.ProjectResponse(q, res); err != nil {
+			return out, err
+		}
 	}
 	normalizeMissing(q, res)
 	if res.StatusCode != http.StatusOK {
@@ -262,8 +264,10 @@ func (p *Policy) directOnce(
 	if err = projectModuleLocation(q, res); err != nil {
 		return source.Result{}, err
 	}
-	if err = projectNuGetEmptyFeed(q, res); err != nil {
-		return source.Result{}, err
+	if p.ProjectResponse != nil {
+		if err = p.ProjectResponse(q, res); err != nil {
+			return source.Result{}, err
+		}
 	}
 	normalizeMissing(q, res)
 	if res.StatusCode != http.StatusOK || q.Resource.Method == http.MethodHead {

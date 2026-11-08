@@ -40,12 +40,17 @@ type Policy struct {
 	// response succeeds and before validation/publication. It uses the same
 	// transport security and cannot replace the final CheckCurrent fence.
 	PrepareUpload func(context.Context, source.Request, source.Permit, Options, *item.CacheUpload) error
-	Store         store.Store
-	Blobs         blob.Store
-	Items         *item.Service
-	Pool          *Pool
-	Options       func(context.Context, repo.Config) (Options, error)
-	CheckCurrent  func(context.Context, store.Store, source.Request, source.Permit, string) error
+	// ProjectResponse may rewrite an upstream response before admission, for a
+	// format whose protocol gives a status a meaning of its own (NuGet v2 reads a
+	// bodyless 204 as an empty feed). It runs after the module-location projection
+	// and before missing-status normalisation; nil leaves every response as sent.
+	ProjectResponse func(q source.Request, res *http.Response) error
+	Store           store.Store
+	Blobs           blob.Store
+	Items           *item.Service
+	Pool            *Pool
+	Options         func(context.Context, repo.Config) (Options, error)
+	CheckCurrent    func(context.Context, store.Store, source.Request, source.Permit, string) error
 	// Key is a stable keyring-derived HMAC key, never a logged cache identifier.
 	Key           []byte
 	Now           func() time.Time
@@ -101,7 +106,7 @@ func (p *Policy) Read(
 		return source.Result{}, source.ErrSuperseded
 	}
 	revision = opts.Revision
-	key := p.cacheKey(q, opts.Revision)
+	key := p.CacheKey(q, opts.Revision)
 	noStore := transientResource(q)
 	if !noStore {
 		entry, readErr := p.readEntry(ctx, key, permit)
@@ -177,7 +182,7 @@ func (p *Policy) cachedOnly(ctx context.Context, q source.Request) (source.Resul
 	if p.kind(q) == types.RemoteMetadata {
 		// Cache-only reads deliberately do not resolve credentials or DNS. Retained
 		// raw metadata is separate from locally generated package indexes.
-		variant := p.cacheKey(q, "").Variant
+		variant := p.CacheKey(q, "").Variant
 		var newest types.RemoteCacheEntry
 		page := store.Page{Limit: 128}
 		for {
@@ -223,7 +228,7 @@ func (p *Policy) cachedOnly(ctx context.Context, q source.Request) (source.Resul
 	return source.Result{Item: &it}, nil
 }
 
-func (p *Policy) cacheKey(q source.Request, revision string) types.RemoteCacheKey {
+func (p *Policy) CacheKey(q source.Request, revision string) types.RemoteCacheKey {
 	query := ""
 	if enabled(q.Repo.PropagateQueryParams) {
 		query = q.Resource.Query

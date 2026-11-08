@@ -80,13 +80,14 @@ func newRemoteFixture(t *testing.T, options ...fakeupstream.Options) *remoteFixt
 	clock := fakeupstream.NewClock(time.Now())
 	f.items.Now = clock.Now
 	policy := &remote.Policy{
-		Store:   f.db,
-		Blobs:   f.blobs,
-		Items:   f.items,
-		Pool:    new(remote.Pool),
-		Options: resolver.Options,
-		Key:     []byte(strings.Repeat("k", 32)),
-		Now:     clock.Now,
+		Store:           f.db,
+		Blobs:           f.blobs,
+		Items:           f.items,
+		Pool:            new(remote.Pool),
+		Options:         resolver.Options,
+		Key:             []byte(strings.Repeat("k", 32)),
+		Now:             clock.Now,
+		ProjectResponse: remote.ProjectNuGetEmptyFeed,
 	}
 	t.Cleanup(policy.Pool.Close)
 	svc := &source.Service{

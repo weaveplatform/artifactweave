@@ -253,7 +253,7 @@ func (w *smartWorld) smartEntry() types.RemoteCacheEntry {
 	if err != nil {
 		w.t.Fatal(err)
 	}
-	entry, err := w.db.RemoteCache().Read(w.ctx, w.p.cacheKey(w.smartRequest(), opts.Revision))
+	entry, err := w.db.RemoteCache().Read(w.ctx, w.p.CacheKey(w.smartRequest(), opts.Revision))
 	if err != nil {
 		w.t.Fatal(err)
 	}

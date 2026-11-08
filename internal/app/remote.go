@@ -124,19 +124,20 @@ func (rt *runtime) openRemoteSources(
 		}
 	}
 	policy := &remote.Policy{
-		Store:        rt.store,
-		Blobs:        rt.blobs,
-		Items:        items,
-		Pool:         &rt.remoteHTTP,
-		Options:      resolver.Options,
-		Key:          key,
-		CheckCurrent: checkCurrent(revalidate),
-		GitFetch:     cocoapods.FetchCocoaPodsGit,
+		Store:           rt.store,
+		Blobs:           rt.blobs,
+		Items:           items,
+		Pool:            &rt.remoteHTTP,
+		Options:         resolver.Options,
+		Key:             key,
+		CheckCurrent:    checkCurrent(revalidate),
+		GitFetch:        cocoapods.FetchCocoaPodsGit,
+		ProjectResponse: remote.ProjectNuGetEmptyFeed,
 	}
 	registryPolicy := &remote.Policy{
 		Store: rt.store, Blobs: rt.blobs, Items: items,
 		Options: resolver.Options, CheckCurrent: checkCurrent(registryRevalidate), Key: key,
-		GitFetch: cocoapods.FetchCocoaPodsGit,
+		GitFetch: cocoapods.FetchCocoaPodsGit, ProjectResponse: remote.ProjectNuGetEmptyFeed,
 	}
 	content := &remote.RegistryContent{
 		Policy:  registryPolicy,

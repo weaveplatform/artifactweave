@@ -28,7 +28,7 @@ func TestAccPolicyHEADRevalidatesWithoutGETAndPreservesStale(t *testing.T) {
 	if w.up.Count("GET", "") != 1 || w.up.Count("HEAD", "") != 2 {
 		t.Fatal(w.up.Requests())
 	}
-	e, err := w.db.RemoteCache().Read(t.Context(), w.p.cacheKey(q, "credential-1"))
+	e, err := w.db.RemoteCache().Read(t.Context(), w.p.CacheKey(q, "credential-1"))
 	if err != nil || !e.ValidatedAt.Equal(w.clock.Now()) {
 		t.Fatal(e, err)
 	}
@@ -69,7 +69,7 @@ func TestAccPolicyRawMetadataOfflineUsesNoResolverAndTracksUsage(t *testing.T) {
 	if r.Used == nil {
 		t.Fatal("missing successful-use hook")
 	}
-	key := w.p.cacheKey(q, "credential-1")
+	key := w.p.CacheKey(q, "credential-1")
 	e, err := w.db.RemoteCache().Read(t.Context(), key)
 	if err != nil || !e.LastUsed.Equal(w.clock.Now()) {
 		t.Fatal(e, err)
@@ -140,7 +140,7 @@ func TestAccPolicyInvalidationAndSourceChangeFencePendingFetch(t *testing.T) {
 			if err = <-done; !errors.Is(err, source.ErrSuperseded) {
 				t.Fatal(err)
 			}
-			e, err := w.db.RemoteCache().Read(t.Context(), w.p.cacheKey(q, "credential-1"))
+			e, err := w.db.RemoteCache().Read(t.Context(), w.p.CacheKey(q, "credential-1"))
 			if err == nil && e.Blob.Checksums.SHA256 != "" {
 				t.Fatal("stale publication became visible")
 			}
@@ -237,7 +237,7 @@ func TestAccPolicyTruncationCircuitAndRecoveryAfterRestart(t *testing.T) {
 	secondQ.Resource.Path = "second.txt"
 	second := make(chan error, 1)
 	go func() { _, err := w.read(secondQ); second <- err }()
-	probeKey := w.p.probeKey(w.p.cacheKey(q, "credential-1"), w.permit, state)
+	probeKey := w.p.probeKey(w.p.CacheKey(q, "credential-1"), w.permit, state)
 	waitFor(t, func() bool {
 		w.p.probes.mu.Lock()
 		defer w.p.probes.mu.Unlock()
@@ -295,7 +295,7 @@ func TestAccPolicyNoStoreFailureCooldownAndHEAD(t *testing.T) {
 	q.Resource.Method = http.MethodGet
 	w.mustRead(q, "complete")
 	if _, err = w.db.RemoteCache().
-		Read(t.Context(), w.p.cacheKey(q, "credential-1")); !errors.Is(
+		Read(t.Context(), w.p.CacheKey(q, "credential-1")); !errors.Is(
 		err,
 		store.ErrNotFound,
 	) {
@@ -363,7 +363,7 @@ func TestAccPolicyRecoveryHEADWaiterHonorsRenewedCooldown(t *testing.T) {
 		}
 		second <- e
 	}()
-	key := w.p.probeKey(w.p.cacheKey(q, "credential-1"), w.permit, state)
+	key := w.p.probeKey(w.p.CacheKey(q, "credential-1"), w.permit, state)
 	waitFor(t, func() bool {
 		w.p.probes.mu.Lock()
 		defer w.p.probes.mu.Unlock()
@@ -519,7 +519,7 @@ func TestAccPolicySharedFallbackHonorsEachCallersHardFail(t *testing.T) {
 	strict.Repo.HardFail = ptr(true)
 	second := make(chan error, 1)
 	go func() { _, e := w.read(strict); second <- e }()
-	key := w.p.flightKey(w.p.cacheKey(q, "credential-1"), w.permit.Identity)
+	key := w.p.flightKey(w.p.CacheKey(q, "credential-1"), w.permit.Identity)
 	waitFor(t, func() bool {
 		w.p.flights.mu.Lock()
 		defer w.p.flights.mu.Unlock()
@@ -550,7 +550,7 @@ func TestAccPolicyNegativeTTLChangeAndConfirmedDeletionRecheck(t *testing.T) {
 	w.mustRead(q, "available")
 	// An expired 404 attached to a former positive must revalidate, even though
 	// the positive was originally an immutable artifact.
-	key := w.p.cacheKey(q, "credential-1")
+	key := w.p.CacheKey(q, "credential-1")
 	token, err := w.db.RemoteCache().Begin(t.Context(), key)
 	if err != nil {
 		t.Fatal(err)
@@ -597,7 +597,7 @@ func TestAccPolicy304ChecksValidatorsAndUpdatesCacheRules(t *testing.T) {
 			if err != nil || w.bytes(r) != "good" {
 				t.Fatal(err)
 			}
-			e, err := w.db.RemoteCache().Read(t.Context(), w.p.cacheKey(q, "credential-1"))
+			e, err := w.db.RemoteCache().Read(t.Context(), w.p.CacheKey(q, "credential-1"))
 			if err != nil || w.p.fresh(q, e) {
 				t.Fatal("304 lost restrictive cache rules", e, err)
 			}

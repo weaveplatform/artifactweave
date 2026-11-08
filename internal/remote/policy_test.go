@@ -264,7 +264,7 @@ func TestAccPolicyFailureClassesPreserveGoodMetadata(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			entry, err := w.db.RemoteCache().Read(t.Context(), w.p.cacheKey(q, "credential-1"))
+			entry, err := w.db.RemoteCache().Read(t.Context(), w.p.CacheKey(q, "credential-1"))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -292,7 +292,7 @@ func TestAccPolicyConcurrentMissCancellationAndIsolation(t *testing.T) {
 	<-barrier.Reached()
 	second := make(chan error, 1)
 	go func() { _, err := w.read(q); second <- err }()
-	key := w.p.flightKey(w.p.cacheKey(q, "credential-1"), w.permit.Identity)
+	key := w.p.flightKey(w.p.CacheKey(q, "credential-1"), w.permit.Identity)
 	waitFor(t, func() bool {
 		w.p.flights.mu.Lock()
 		defer w.p.flights.mu.Unlock()
@@ -353,7 +353,7 @@ func TestAccPolicyNoStoreLeavesNoEntriesAndHTTPNoStoreIsNotShared(t *testing.T) 
 		t.Fatal(err)
 	}
 	if _, err := w.db.RemoteCache().
-		Read(t.Context(), w.p.cacheKey(q, "credential-1")); !errors.Is(
+		Read(t.Context(), w.p.CacheKey(q, "credential-1")); !errors.Is(
 		err,
 		store.ErrNotFound,
 	) {
@@ -400,9 +400,9 @@ func TestAccPolicyAdapterTargetsAndPreparation(t *testing.T) {
 	if prepared != 2 {
 		t.Fatal("target identity reused previous bytes")
 	}
-	oldKey := w.p.cacheKey(q, "credential-1")
+	oldKey := w.p.CacheKey(q, "credential-1")
 	q.Resource.Checksums.SHA256 = strings.Repeat("0", 64)
-	if w.p.cacheKey(q, "credential-1") == oldKey {
+	if w.p.CacheKey(q, "credential-1") == oldKey {
 		t.Fatal("pin absent from identity")
 	}
 	if _, err := w.read(q); err == nil {
@@ -424,7 +424,7 @@ func TestAccPolicyAdapterTargetsAndPreparation(t *testing.T) {
 	w.mustRead(q, "second")
 	q.Resource.ExternalURL = w.up.URL + "/other"
 	q.Resource.UpstreamPath = ""
-	if w.p.cacheKey(q, "credential-1") == oldKey {
+	if w.p.CacheKey(q, "credential-1") == oldKey {
 		t.Fatal("URL absent from identity")
 	}
 	r := TransportRequest(q, types.RemoteCacheEntry{})
@@ -480,7 +480,7 @@ func TestUnitPolicyDefaultCacheIdentityIsStable(t *testing.T) {
 	}
 	mac := hmac.New(sha256.New, w.p.Key)
 	_, _ = mac.Write(old)
-	if w.p.cacheKey(q, "credential").Variant != hex.EncodeToString(mac.Sum(nil)) {
+	if w.p.CacheKey(q, "credential").Variant != hex.EncodeToString(mac.Sum(nil)) {
 		t.Fatal("existing generic identity changed")
 	}
 }
@@ -488,14 +488,14 @@ func TestUnitPolicyDefaultCacheIdentityIsStable(t *testing.T) {
 func TestUnitPolicyMIMEAlternativesParticipateInIdentity(t *testing.T) {
 	w := policyFixture(t)
 	q := w.request("index", source.ResourceKindMetadata)
-	before := w.p.cacheKey(q, "revision")
+	before := w.p.CacheKey(q, "revision")
 	q.Resource.ExpectedContentTypes = []string{"text/html", "application/json"}
-	after := w.p.cacheKey(q, "revision")
+	after := w.p.CacheKey(q, "revision")
 	if before == after {
 		t.Fatal("MIME contract omitted from identity")
 	}
 	q.Resource.ExpectedContentTypes = []string{"text/html"}
-	if w.p.cacheKey(q, "revision") == after {
+	if w.p.CacheKey(q, "revision") == after {
 		t.Fatal("MIME alternatives not pinned")
 	}
 }

@@ -53,12 +53,17 @@ func TestAccStatusNuGetV3Remote(t *testing.T) {
 			t.Fatal(err)
 		}
 		policy := &remote.Policy{
-			Store:   cfg.Store,
-			Blobs:   cfg.Blobs,
-			Items:   &item.Service{Store: cfg.Store, Blobs: cfg.Blobs, Formats: ecosystem.For},
-			Pool:    new(remote.Pool),
-			Options: resolver.Options,
-			Key:     []byte(strings.Repeat("k", 32)),
+			Store: cfg.Store,
+			Blobs: cfg.Blobs,
+			Items: &item.Service{
+				Store:   cfg.Store,
+				Blobs:   cfg.Blobs,
+				Formats: ecosystem.For,
+			},
+			Pool:            new(remote.Pool),
+			Options:         resolver.Options,
+			Key:             []byte(strings.Repeat("k", 32)),
+			ProjectResponse: remote.ProjectNuGetEmptyFeed,
 		}
 		t.Cleanup(policy.Pool.Close)
 		cfg.RemoteSources = &source.Service{

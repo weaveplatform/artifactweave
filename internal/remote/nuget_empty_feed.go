@@ -15,7 +15,7 @@ const emptyNuGetFeed = `<feed xmlns="http://www.w3.org/2005/Atom"/>`
 // NuGet v2 recognizes a bodyless 204 as an empty feed. Give it the one fixed
 // Atom representation so ordinary bounded schema admission and cache/delivery
 // fences apply. This is not a general successful-status override.
-func projectNuGetEmptyFeed(q source.Request, res *http.Response) error {
+func ProjectNuGetEmptyFeed(q source.Request, res *http.Response) error {
 	if !q.Resource.NuGetEmptyFeed || res.StatusCode != http.StatusNoContent {
 		return nil
 	}
