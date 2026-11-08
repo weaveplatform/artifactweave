@@ -17,7 +17,7 @@ import (
 )
 
 func TestUnitCRANSourceValidatesPublishedBytes(t *testing.T) {
-	base := repopath.Path(t, "internal/format/cran/testdata")
+	base := repopath.Path(t, "migration/artifacts/ecosystem/cran/testdata")
 	index, err := os.ReadFile(filepath.Join(base, "assertthat-PACKAGES"))
 	if err != nil {
 		t.Fatal(err)
@@ -105,7 +105,7 @@ func TestUnitCRANVirtualIndexFiltersUnreadablePackage(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	body := repopath.Read(t, "internal/format/cran/testdata/assertthat_0.2.1.tar.gz")
+	body := repopath.Read(t, "migration/artifacts/ecosystem/cran/testdata/assertthat_0.2.1.tar.gz")
 	wantStatus(t, w.do("POST", "/artifactory/api/cran/cran-member/sources", "admin", string(body)),
 		http.StatusCreated)
 	if err := w.db.Permissions().Create(t.Context(), types.Permission{
@@ -194,7 +194,7 @@ func TestUnitCRANNativePOSTAndReindex(t *testing.T) {
 	if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
 		t.Fatal(err)
 	}
-	base := repopath.Path(t, "internal/format/cran/testdata")
+	base := repopath.Path(t, "migration/artifacts/ecosystem/cran/testdata")
 	for _, tc := range []struct {
 		file, endpoint, path, index string
 	}{
