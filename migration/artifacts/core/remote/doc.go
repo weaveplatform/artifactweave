@@ -72,8 +72,7 @@
 //
 // # Status
 //
-// Implemented P9. Being staged in P9d: RMT-09 moves this package to
-// artifacts/core/remote.
+// Implemented P9. Staged in P9d.
 //
 // # Testing
 //

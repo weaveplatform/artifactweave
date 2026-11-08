@@ -37,6 +37,10 @@ type FolderListing struct {
 	checks  []func(context.Context) error
 }
 
+// Revalidate reruns, in order, the checks the listing gathered: each page's
+// source revalidation and each listed child's current read authority. It
+// returns the first failure as the check reported it, so a caller discloses
+// nothing once a source changed or a grant was revoked.
 func (l FolderListing) Revalidate(ctx context.Context) error {
 	for _, check := range l.checks {
 		if err := check(ctx); err != nil {

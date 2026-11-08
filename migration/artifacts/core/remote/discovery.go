@@ -42,6 +42,14 @@ type DiscoveryScope struct {
 	Root bool
 }
 
+// NewDiscovery prepares upstream discovery for remote repository c. In one
+// transaction it pins the repository's source identity and loads the
+// canonical layout and the upstream one (RemoteRepoLayoutRef, or
+// RepoLayoutRef when that is empty). Its errors match
+// source.ErrInvalidRequest when items has no store, c is not a remote or a
+// layout cannot be read, and source.ErrSuperseded when the stored
+// repository is gone or its remote policy changed since c was read; a
+// failed read of the source identity is wrapped.
 func NewDiscovery(ctx context.Context, items *item.Service, c repo.Config) (*Discovery, error) {
 	if items == nil || items.Store == nil || c.Class != repo.Remote {
 		return nil, source.ErrInvalidRequest
@@ -88,8 +96,14 @@ func NewDiscovery(ctx context.Context, items *item.Service, c repo.Config) (*Dis
 	return d, nil
 }
 
+// Canonical returns the repository's own layout, in which discovery reports
+// paths and checks authority.
 func (d *Discovery) Canonical() *layout.Layout { return d.canonical }
-func (d *Discovery) Upstream() *layout.Layout  { return d.upstream }
+
+// Upstream returns the layout of the remote origin, which discovery
+// traverses; it is the canonical layout when the repository names no remote
+// layout.
+func (d *Discovery) Upstream() *layout.Layout { return d.upstream }
 
 // Scopes derives authority from complete canonical directory components. A
 // constraint present only in a filename cannot borrow a sibling file's grant.
@@ -133,6 +147,11 @@ func (d *Discovery) VersionScope(group, module, version string) (DiscoveryScope,
 	return DiscoveryScope{Path: prefix.Path}, prefix.Path != ""
 }
 
+// Allows reports whether q's caller may scan the scope: it must be well
+// formed, the repository's include and exclude patterns must admit its
+// folder, and the caller must hold Read on it. A folder scope counts a grant
+// on a path below it; a Root scope needs Read on the repository root
+// itself. A request without an access decision is refused.
 func (s DiscoveryScope) Allows(q source.Request) bool {
 	if q.Access == nil || !s.valid() {
 		return false
@@ -184,6 +203,10 @@ func discoveryMappingError() error {
 	return &source.HTTPError{Status: http.StatusNotImplemented, Kind: source.FailureKindProtocol}
 }
 
+// Revalidate reports whether the source identity NewDiscovery pinned is
+// still the repository's, so a caller discloses nothing discovered under a
+// replaced source. It answers source.ErrSuperseded when the identity changed
+// or cannot be read.
 func (d *Discovery) Revalidate(ctx context.Context) error {
 	current, err := d.store.RemoteCache().Source(ctx, d.repository.Key)
 	if err != nil || current != d.identity {

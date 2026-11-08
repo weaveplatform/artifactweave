@@ -95,6 +95,18 @@ func (p *Policy) Acquire(ctx context.Context, repoKey string) (func(), error) {
 	return p.capacity.Acquire(ctx, repoKey)
 }
 
+// Read is the source.Backend that the source service's HTTP kind calls once
+// it has authorised q. It serves a fresh cached entry, otherwise revalidates
+// or fetches from the upstream (one shared fill per cache key and source
+// identity, within Acquire's capacity), and falls back to a stale entry on
+// the failures decision 0007 allows. A cache-only intent, a permit without
+// upstream network access, an offline repository and a derived resource
+// read the cache alone. With an Interceptor installed, a read that WithSmart
+// has not marked goes to it first. Errors: source.ErrUnavailable when the
+// hooks a fetch needs are not installed, store.ErrNotFound for a fresh
+// negative entry, source.ErrSuperseded when the credential revision moved
+// on, and PolicyError's mapping of upstream and capacity failures. A
+// successful result's Revalidate repeats Check before disclosure.
 func (p *Policy) Read(
 	ctx context.Context,
 	q source.Request,

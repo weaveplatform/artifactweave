@@ -7,6 +7,10 @@ import (
 	"sync"
 )
 
+// ErrBusy reports that upstream capacity is exhausted: Admission.Acquire,
+// and so Policy.Acquire, returns it when a repository already has its
+// maximum of callers queued, and Smart Remote when its work queue is full.
+// PolicyError answers it with a 503.
 var ErrBusy = errors.New("remote: remote retrieval capacity exhausted")
 
 type flight[T any] struct {

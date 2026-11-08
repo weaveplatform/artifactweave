@@ -23,7 +23,8 @@ normative implementation table, field/ticket allocation and capture list. The or
 7.161.32 research date and this ADR's Proposed status are unchanged. Current public
 sources were rechecked; they are not live observations of that target.
 
-`migration/artifacts/core/remote` owns external HTTP transport and cache policy. The source boundary
+`migration/artifacts/core/remote` owns the cache policy and
+`migration/artifacts/adapters/upstream` the external HTTP transport. The source boundary
 also accommodates internal project repositories without URL-only identity or admin
 loopback ([#614](https://github.com/weaveplatform/artifactweave/issues/614)). Format
 adapters classify content; they do not each invent their own retry/cache policy.

@@ -24,6 +24,10 @@ type MappedFolderListing struct {
 	checks    []func(context.Context) error
 }
 
+// Revalidate reruns, in order, the checks the listing gathered: each page's
+// source revalidation and each listed file's current read authority at its
+// canonical path; Folders and Documents carry none. It returns the first
+// failure as the check reported it.
 func (l MappedFolderListing) Revalidate(ctx context.Context) error {
 	for _, check := range l.checks {
 		if err := check(ctx); err != nil {
