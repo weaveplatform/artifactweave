@@ -1,7 +1,3 @@
-// Package generic is the format of generic repositories: files without
-// package metadata, so nothing is indexed. Every other format embeds its
-// Handler for the deploy policy that applies to every package type
-// (decision 0032).
 package generic
 
 import (
