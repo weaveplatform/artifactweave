@@ -4,8 +4,8 @@
 //
 // # Role
 //
-// Test support, outside the modules, for test/server/docker and
-// test/server/helmoci.
+// Test support, outside the modules, for test/server/artifacts/docker and
+// test/server/artifacts/helmoci.
 //
 // # Inputs
 //

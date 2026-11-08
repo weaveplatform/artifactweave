@@ -1,8 +1,8 @@
 package support
 
 // GoRoutes is the implemented Go module protocol route inventory. The root
-// package retains registration guards while test/server/golang runs status
-// and principal assertions independently.
+// package retains registration guards while test/server/artifacts/golang runs
+// status and principal assertions independently.
 func GoRoutes() map[string]bool {
 	const base = "/artifactory/api/go/{repoKey}/{module}/"
 	return map[string]bool{

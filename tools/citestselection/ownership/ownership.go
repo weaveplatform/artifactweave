@@ -11,10 +11,10 @@ import (
 // target tree under migration/ and then renames it to internal/ (decision
 // 0044), so each staged pattern accepts both roots; internal/app is the
 // internal form of <root>/app. A directory that is not in clean form, such as
-// "test/server/npm/", is never owned.
+// "test/server/artifacts/npm/", is never owned.
 func OwnedTestDir(dir string) bool {
-	// An unclean inventory key such as "test/server/npm/" could never equal
-	// a test file's directory, so its tests would stay unmapped.
+	// An unclean inventory key such as "test/server/artifacts/npm/" could
+	// never equal a test file's directory, so its tests would stay unmapped.
 	if dir != path.Clean(dir) {
 		return false
 	}

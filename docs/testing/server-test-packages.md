@@ -1,9 +1,10 @@
 # Server route test packages
 
 Server-assembly tests exercise the production router with the protocol routes,
-authentication, repositories, and storage wired together. Protocol suites should
-live in separate Go packages under `test/server/<family>`. This makes the test
-package, rather than a test-name regular expression, the unit that CI can select.
+authentication, repositories, and storage wired together. Each ecosystem's
+suites live in a separate Go package under `test/server/artifacts/<type>`, and
+each module's suites under `test/server/<module>`. This makes the test package,
+rather than a test-name regular expression, the unit that CI can select.
 A package builds the router through `test/server/support/harness`, with
 `harness.Router` and a `harness.Config`, and does not import `internal/server`
 itself; fixtures used by that package live with it.
@@ -36,45 +37,55 @@ Agent Packages and Agent Plugins. Like the harness, they build the router, so
 
 `test/server/access` is the access module's suite and contains the full-router
 authentication assertion.
-`test/server/nuget` contains the NuGet v2/v3 status table, route × principal
-matrix, API-key and force-authentication cases, symbols lifecycle, remote
-status cases, and generated reindex method check. `test/server/npm` contains
-the npm status table, route × principal matrix, authentication, reindex and
-strict-layout migration assertions. `test/server/golang` contains the Go module
-status table and route × principal matrix, including publish and permission
-checks. `test/server/maven` contains Maven status and principal matrices,
-metadata, snapshot, REST and version-resolution cases. `test/server/pypi`
-contains PyPI upload, simple index, JSON metadata, reindex, status and
-principal-matrix assertions. `test/server/helm` contains classic Helm index,
-chart, provenance, layout, status and principal assertions. `test/server/docker`
-contains Docker/OCI blob, manifest, tag, registry token, OIDC, reverse proxy,
-status and principal-matrix assertions. `test/server/helmoci` preserves the
-Helm OCI registry push, AQL, properties and build-info sequence from
-`jf helm push`. `test/server/terraform` owns the module and provider
-registry status and principal matrices, signed downloads, network mirror, and
-real Terraform/JF publish and install routes. `test/server/terraformbackend`
-owns backend workspace, state, locking, encryption, item-route, status and
-principal assertions. `test/server/agentpackages` owns APM package publish,
-discovery, search, permissions, lifecycle and reindex through a shared agent
-format router fixture. `test/server/agentplugins` owns plugin marketplace,
-permission, lifecycle and reindex routes using the same fixture. Run each
-independently with:
+`test/server/artifacts/nuget` contains the NuGet v2/v3 status table, route ×
+principal matrix, API-key and force-authentication cases, symbols lifecycle,
+remote status cases, and generated reindex method check.
+`test/server/artifacts/npm` contains the npm status table, route × principal
+matrix, authentication, reindex and strict-layout migration assertions.
+`test/server/artifacts/golang` contains the Go module status table and route ×
+principal matrix, including publish and permission checks.
+`test/server/artifacts/maven` contains Maven status and principal matrices,
+metadata, snapshot, REST and version-resolution cases.
+`test/server/artifacts/pypi` contains PyPI upload, simple index, JSON metadata,
+reindex, status and principal-matrix assertions. `test/server/artifacts/helm`
+contains classic Helm index, chart, provenance, layout, status and principal
+assertions. `test/server/artifacts/docker` contains Docker/OCI blob, manifest,
+tag, registry token, OIDC, reverse proxy, status and principal-matrix
+assertions. `test/server/artifacts/helmoci` preserves the Helm OCI registry
+push, AQL, properties and build-info sequence from `jf helm push`.
+`test/server/artifacts/terraform` owns the module and provider registry status
+and principal matrices, signed downloads, network mirror, and real
+Terraform/JF publish and install routes.
+`test/server/artifacts/terraformbackend` owns backend workspace, state,
+locking, encryption, item-route, status and principal assertions.
+`test/server/artifacts/agentpackages` owns APM package publish, discovery,
+search, permissions, lifecycle and reindex through a shared agent format router
+fixture. `test/server/artifacts/agentplugins` owns plugin marketplace,
+permission, lifecycle and reindex routes using the same fixture.
+`test/server/artifacts/gems` owns RubyGems and Bundler push, permissions,
+metadata, yanks, token authentication, remote caching, virtual members, and
+indexes that fail closed when a stored archive is missing or corrupt; it runs
+the gem and Bundler clients when they are installed. Run each independently
+with:
 
 ```sh
 go test ./test/server/access
-go test ./test/server/nuget
-go test ./test/server/npm
-go test ./test/server/golang
-go test ./test/server/maven
-go test ./test/server/pypi
-go test ./test/server/helm
-go test ./test/server/docker
-go test ./test/server/helmoci
-go test ./test/server/terraform
-go test ./test/server/terraformbackend
-go test ./test/server/agentpackages
-go test ./test/server/agentplugins
+go test ./test/server/artifacts/nuget
+go test ./test/server/artifacts/npm
+go test ./test/server/artifacts/golang
+go test ./test/server/artifacts/maven
+go test ./test/server/artifacts/pypi
+go test ./test/server/artifacts/helm
+go test ./test/server/artifacts/docker
+go test ./test/server/artifacts/helmoci
+go test ./test/server/artifacts/terraform
+go test ./test/server/artifacts/terraformbackend
+go test ./test/server/artifacts/agentpackages
+go test ./test/server/artifacts/agentplugins
+go test ./test/server/artifacts/gems
 ```
+
+`go test ./test/server/artifacts/...` runs every ecosystem suite at once.
 
 The root `internal/server` package still contains shared cross-format and
 private server helper tests. NuGet-only, npm-only, Go-only, Maven-only, PyPI-only,
@@ -97,11 +108,11 @@ An impact planner must run the root package whenever a change could affect a
 shared assertion. NuGet-only, npm-only,
 Go-only, Maven-only, PyPI-only, classic Helm-only, Docker-only, Helm OCI-only,
 Terraform registry-only, Terraform backend-only, Agent Packages-only or Agent
-Plugins-only changes can select their respective `test/server/<family>` package
-plus any recorded root dependency once #673 activates the impact map. Shared server,
-authentication, routing, store, and registration changes require all server
-packages. A full qualification runs `go test ./...` and retains the original
-coverage floors.
+Plugins-only changes can select their respective `test/server/artifacts/<type>`
+package plus any recorded root dependency once #673 activates the impact map.
+Shared server, authentication, routing, store, and registration changes require
+all server packages. A full qualification runs `go test ./...` and retains the
+original coverage floors.
 
 The [server test ownership inventory](server-test-ownership.md) records every
 remaining root test file, each server test package's format owner, and the

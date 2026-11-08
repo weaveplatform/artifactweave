@@ -86,10 +86,10 @@ func TestUnitServerTestChangesFailClosed(t *testing.T) {
 		reason string
 	}{
 		{"new root test", change{status: "A", path: "internal/server/new_test.go"}, "New, removed or moved"},
-		{"new format test", change{status: "A", path: "test/server/npm/new_test.go"}, "New, removed or moved"},
+		{"new format test", change{status: "A", path: "test/server/artifacts/npm/new_test.go"}, "New, removed or moved"},
 		{"unknown root test", change{status: "M", path: "internal/server/unknown_test.go"}, "Unmapped"},
 		{"unknown package", change{status: "M", path: "test/server/newformat/routes_test.go"}, "Unmapped"},
-		{"moved test", change{status: "R100", old: "internal/server/status_test.go", path: "test/server/npm/status_test.go"}, "New, removed or moved"},
+		{"moved test", change{status: "R100", old: "internal/server/status_test.go", path: "test/server/artifacts/npm/status_test.go"}, "New, removed or moved"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got := classify([]change{tc.change})
@@ -99,7 +99,7 @@ func TestUnitServerTestChangesFailClosed(t *testing.T) {
 		})
 	}
 	if owner, ok := serverTestOwner(
-		"test/server/agentpackages/agentpackages_test.go",
+		"test/server/artifacts/agentpackages/agentpackages_test.go",
 	); !ok ||
 		owner != "agentpackages" {
 		t.Fatalf("agent package ownership = %q, %v", owner, ok)
@@ -162,10 +162,10 @@ func TestUnitOwnershipV2RejectsInvalidInventories(t *testing.T) {
 			o.Packages["migration/app/apptest"] = "shared"
 		}, "invalid test package owner"},
 		{"unclean package key", func(o *testOwnership) {
-			o.Packages["test/server/npm/"] = "npm"
+			o.Packages["test/server/artifacts/npm/"] = "npm"
 		}, "invalid test package owner"},
 		{"empty owner", func(o *testOwnership) {
-			o.Packages["test/server/npm"] = ""
+			o.Packages["test/server/artifacts/npm"] = ""
 		}, "invalid test package owner"},
 		{"shared files without a package", func(o *testOwnership) {
 			o.SharedFiles["internal/app"] = []string{"app_test.go"}

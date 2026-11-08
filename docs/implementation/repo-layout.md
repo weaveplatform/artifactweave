@@ -145,8 +145,10 @@ are narrowed.
 ## Tests and fixtures
 
 Keep package tests beside the code in `_test.go` files and package-specific fixtures
-in `testdata/`. Server-assembly suites belong in `test/server/<family>`; shared
-fixtures and their import constraints are described in the
+in `testdata/`. Ecosystem server-assembly suites belong in
+`test/server/artifacts/<type>` and module suites in `test/server/<module>`,
+starting with the access module's `test/server/access`; shared fixtures and
+their import constraints are described in the
 [server test package guide](../testing/server-test-packages.md). Native-client
 features and steps live in `test/acceptance`, and real-cloud scenarios in
 `test/platform`.

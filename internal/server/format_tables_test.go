@@ -14,7 +14,7 @@ import (
 // Formats still hosted in the root server test package keep their status and
 // route × principal rows in status_<fmt>_test.go and matrix_<fmt>_test.go
 // (decision 0032). NuGet, npm, Go and Maven now run their rows in
-// test/server/<format>.
+// test/server/artifacts/<format>.
 // Every field may be left empty.
 
 // statusPart is a format's share of the status table.
@@ -95,21 +95,21 @@ func partMatrixRows() []matrixRow {
 }
 
 // Shared root fixtures still include Go repositories while their protocol
-// route assertions run in test/server/golang.
+// route assertions run in test/server/artifacts/golang.
 var goRepos = fixtureRepos("go", repo.Go)
 
 // Shared root fixtures retain Helm repositories for cross-format assertions;
-// classic Helm route assertions run in test/server/helm.
+// classic Helm route assertions run in test/server/artifacts/helm.
 var helmRepos = fixtureRepos("helm", repo.Helm)
 
 // Shared root fixtures still include Maven repositories while their route
-// assertions run in test/server/maven.
+// assertions run in test/server/artifacts/maven.
 var mavenRepos = append(fixtureRepos("maven", repo.Maven), repo.Config{
 	Key: "maven-releases", Class: repo.Local, PackageType: repo.Maven, HandleSnapshots: new(bool),
 })
 
 // Shared root fixtures retain PyPI repositories for cross-format assertions;
-// PyPI route assertions run in test/server/pypi.
+// PyPI route assertions run in test/server/artifacts/pypi.
 var pypiRepos = fixtureRepos("pypi", repo.PyPI)
 
 // formatRepos are the fixture repositories of the formats P7 and P8 add,

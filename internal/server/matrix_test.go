@@ -1608,7 +1608,7 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 		}
 	}
 	// The charter principal remains in the shared matrix even though its Helm
-	// route rows now live in test/server/helm.
+	// route rows now live in test/server/artifacts/helm.
 	grantCharter(t, db)
 	k := testKeys()
 	// Every principal has a global environment of its own, more than the
