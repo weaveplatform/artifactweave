@@ -48,7 +48,7 @@ var formats = map[string]formatImpact{
 	"pub":           {"./internal/format/pub/...", "@pub", []string{"dart"}},
 	"agentpackages": {"./internal/format/agentpackages/...", "@apm", []string{"apm"}},
 	"bower":         {"./migration/artifacts/ecosystem/bower/...", "@bower", []string{"bower"}},
-	"debian":        {"./internal/format/debian/...", "@debian", []string{"debian"}},
+	"debian":        {"./migration/artifacts/ecosystem/debian/...", "@debian", []string{"debian"}},
 	"gems":          {"./internal/format/gems/...", "@gems", []string{"ruby"}},
 	"gitlfs":        {"./internal/format/gitlfs/...", "@gitlfs", []string{"gitlfs"}},
 	"cocoapods": {

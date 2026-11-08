@@ -9,7 +9,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/chef"
 	"github.com/weaveplatform/artifactweave/internal/format/composer"
 	"github.com/weaveplatform/artifactweave/internal/format/cran"
-	"github.com/weaveplatform/artifactweave/internal/format/debian"
 	"github.com/weaveplatform/artifactweave/internal/format/gems"
 	"github.com/weaveplatform/artifactweave/internal/format/gitlfs"
 	"github.com/weaveplatform/artifactweave/internal/format/luarocks"
@@ -27,6 +26,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conan"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conda"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang"
@@ -72,7 +72,9 @@ var handlers = []struct {
 }{
 	{
 		aieditorextensions.Serves,
-		func(Settings) format.Handler { return aieditorextensions.Handler{} },
+		func(Settings) format.Handler {
+			return aieditorextensions.Handler{}
+		},
 	},
 	{alpine.Serves, func(Settings) format.Handler { return alpine.Handler{} }},
 	{chef.Serves, func(Settings) format.Handler { return chef.Handler{} }},

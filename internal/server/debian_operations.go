@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/weaveplatform/artifactweave/internal/format/debian"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 )
 

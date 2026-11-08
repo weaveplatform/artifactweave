@@ -5,9 +5,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/format/debian"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/formattest"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian"
 )
 
 func TestUnitFormatContract(t *testing.T) {

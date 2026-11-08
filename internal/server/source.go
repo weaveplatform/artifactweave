@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/format/cran"
-	"github.com/weaveplatform/artifactweave/internal/format/debian"
 	"github.com/weaveplatform/artifactweave/internal/format/p2"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
@@ -23,6 +22,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/alpine"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/opkg"
