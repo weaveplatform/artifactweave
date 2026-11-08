@@ -1,27 +1,31 @@
-package opkg_test
+package rpm_test
 
 import (
 	"fmt"
 	"os"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/format/opkg"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/formattest"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/rpm"
 )
 
 func TestUnitFormatContract(t *testing.T) {
 	formattest.Run(t, formattest.Format{
-		Type: repo.Opkg, RepoWork: []string{opkg.KindIndex},
+		Type: repo.RPM, RepoWork: []string{rpm.KindIndex},
+		Local: func(c *repo.Config) {
+			yes := true
+			c.CalculateYumMetadata = &yes
+		},
 		Version: func(name, version string, n int) formattest.Version {
-			body, err := os.ReadFile(fmt.Sprintf("testdata/%s_%s_%d.ipk", name, version, n))
+			body, err := os.ReadFile(fmt.Sprintf("testdata/%s_%s_%d.rpm", name, version, n))
 			if err != nil {
 				t.Fatal(err)
 			}
 			return formattest.Version{
-				Package: name, Version: version,
+				Package: name, Version: version + "-1.fc42.noarch",
 				Files: []formattest.File{{
-					Path: fmt.Sprintf("feed/%s_%s_all.ipk", name, version),
+					Path: fmt.Sprintf("pool/%s-%s-1.fc42.noarch.rpm", name, version),
 					Body: body,
 				}},
 			}

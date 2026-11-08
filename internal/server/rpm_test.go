@@ -17,9 +17,9 @@ import (
 	"github.com/ProtonMail/go-crypto/openpgp"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/format/rpm"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/rpm"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/terraformtest"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
@@ -115,7 +115,7 @@ func TestAccRPMSourceValidationUsesIndependentUpstreamMetadata(t *testing.T) {
 
 	body := repopath.Read(
 		t,
-		"internal/format/rpm/testdata/artifactweave-alpha-1.0-1.fc42.noarch.rpm",
+		"migration/artifacts/ecosystem/rpm/testdata/artifactweave-alpha-1.0-1.fc42.noarch.rpm",
 	)
 	q, err := rpmSourceRequest(source.Request{Resource: source.Resource{
 		Path: "pool/artifactweave-alpha-1.0-1.fc42.noarch.rpm", Method: http.MethodGet,
@@ -477,7 +477,7 @@ func TestAccRPMRemoteMetadataClosesBodyWhenAuthorityIsRevoked(t *testing.T) {
 func TestAccRPMVirtualRemotePackagePinsIndexedSHA(t *testing.T) {
 	body := repopath.Read(
 		t,
-		"internal/format/rpm/testdata/artifactweave-alpha-1.0-1.fc42.noarch.rpm",
+		"migration/artifacts/ecosystem/rpm/testdata/artifactweave-alpha-1.0-1.fc42.noarch.rpm",
 	)
 	path := "pool/artifactweave-alpha-1.0-1.fc42.noarch.rpm"
 	correctSHA := fmt.Sprintf("%x", sha256.Sum256(body))
@@ -609,7 +609,10 @@ func TestAccRPMVirtualLocalMemberRejectsIncompleteAndDriftedContent(t *testing.T
 	if res := w.do(http.MethodGet, virtualURL, "admin", ""); res.Code != http.StatusNotFound {
 		t.Errorf("index entry without package returned %d", res.Code)
 	}
-	packageBody := repopath.Read(t, "internal/format/rpm/testdata/"+filepath.Base(pkgPath))
+	packageBody := repopath.Read(
+		t,
+		"migration/artifacts/ecosystem/rpm/testdata/"+filepath.Base(pkgPath),
+	)
 	corrupt := bytes.Clone(packageBody)
 	corrupt[len(corrupt)-1] ^= 0xff
 	seed(pkgPath, corrupt)

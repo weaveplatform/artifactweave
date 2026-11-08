@@ -17,9 +17,9 @@ import (
 	"github.com/ProtonMail/go-crypto/openpgp"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/format/opkg"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/opkg"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/terraformtest"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
@@ -31,8 +31,8 @@ import (
 // index encoder and archive fixture builder. See docs/testing/opkg.md.
 func opkgUpstreamFixture(t *testing.T) (index, ipk []byte) {
 	t.Helper()
-	index = repopath.Read(t, "internal/format/opkg/testdata/openwrt-Packages")
-	ipk = repopath.Read(t, "internal/format/opkg/testdata/464xlat_13_x86_64.ipk")
+	index = repopath.Read(t, "migration/artifacts/ecosystem/opkg/testdata/openwrt-Packages")
+	ipk = repopath.Read(t, "migration/artifacts/ecosystem/opkg/testdata/464xlat_13_x86_64.ipk")
 	return index, ipk
 }
 
