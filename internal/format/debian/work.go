@@ -133,7 +133,7 @@ func buildIndex(ctx context.Context, env format.Env, c repo.Config) error {
 		base := "dists/" + distribution + "/"
 		generated[base+"Release"] = body
 		if c.PrimaryKeyPairRef != "" {
-			pair, err := env.Store.Keys().Keypair(ctx, c.PrimaryKeyPairRef)
+			pair, err := env.Keys.Keypair(ctx, c.PrimaryKeyPairRef)
 			if err != nil {
 				return fmt.Errorf("debian: signing key: %w", err)
 			}

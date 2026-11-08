@@ -21,6 +21,7 @@ import (
 	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/publicsuffix"
 
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
@@ -39,6 +40,12 @@ type ResolverOptions struct {
 	RootCAsPEM            []byte
 	AllowedPrivateOrigins []string
 	LookupIP              func(context.Context, string) ([]net.IPAddr, error)
+	// Certificates reads the client TLS certificate, private key unsealed,
+	// that a remote names in clientTlsCertificate. The resolver reads it only
+	// for such a remote, so it must be set wherever a remote can name one.
+	// Any error it returns fails that remote's options with ErrConfiguration,
+	// except an ended context, which fails them as a request error.
+	Certificates accessapi.Keys
 }
 
 type Resolver struct {
@@ -186,7 +193,7 @@ func (r *Resolver) certificate(ctx context.Context, alias string) (types.Certifi
 	if alias == "" {
 		return types.Certificate{}, nil
 	}
-	cert, err := r.store.Keys().Certificate(ctx, alias)
+	cert, err := r.options.Certificates.Certificate(ctx, alias)
 	if err != nil {
 		return types.Certificate{}, configurationError(err)
 	}

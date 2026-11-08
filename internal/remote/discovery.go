@@ -13,9 +13,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -142,7 +142,7 @@ func (s DiscoveryScope) Allows(q source.Request) bool {
 		allows = q.Access.Allows
 	}
 	return repo.PatternsOf(q.Repo).Accepts(s.Path, true) && allows(types.ResourceArtifact,
-		authz.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)}, s.Path, types.ActionRead)
+		accessapi.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)}, s.Path, types.ActionRead)
 }
 
 func (s DiscoveryScope) valid() bool {

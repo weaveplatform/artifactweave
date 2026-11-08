@@ -11,8 +11,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -90,7 +90,7 @@ func ListFolder(ctx context.Context, service *source.Service, q source.Request,
 			if !repo.PatternsOf(q.Repo).Accepts(entry.Path, entry.Folder) ||
 				!allows(
 					types.ResourceArtifact,
-					authz.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)},
+					accessapi.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)},
 					entry.Path,
 					types.ActionRead,
 				) {

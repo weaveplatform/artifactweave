@@ -8,6 +8,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/reindexauth"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/migration/access"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
@@ -22,9 +23,14 @@ func newPypiReindexWorld(t *testing.T) *itemWorld {
 		if err != nil {
 			t.Fatal(err)
 		}
+		module, err := access.New(access.Deps{Store: cfg.Store, Authenticator: cfg.Auth})
+		if err != nil {
+			t.Fatal(err)
+		}
+		api := module.API()
 		derived := &item.Service{
-			Store: cfg.Store, Blobs: cfg.Blobs, Work: queue,
-			Formats: ecosystem.For, ReindexAuthorize: reindexauth.New(cfg.Store, cfg.Auth),
+			Store: cfg.Store, Blobs: cfg.Blobs, Work: queue, Formats: ecosystem.For,
+			ReindexAuthorize: reindexauth.New(api.Authenticator, api.Authorizer),
 		}
 		if err := derived.RegisterWork(queue); err != nil {
 			t.Fatal(err)

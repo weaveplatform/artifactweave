@@ -32,11 +32,12 @@
 //     WriteGuard, FolderAdmitter, AnnotationAdmitter, Resolver, Annotator,
 //     Reindexer, PathReindexer, Worker, Classifier, SidecarOwner and
 //     SidecarKeeper. The persistent work queue runs a Worker's items.
-//   - Env: the metadata store, the read half of the blob store (Blobs), the
-//     clock, the repository layouts (artifacts/core/layout), and the item
-//     service's Derive, Underive, Remove, Move and Enqueue, with the
-//     inspection of the file being written and the reindex options
-//     (ReindexSource, CheckReindex and SkipProperties).
+//   - Env: the metadata store, the signing key pairs (Keys, access/api),
+//     the read half of the blob store (Blobs), the clock, the repository
+//     layouts (artifacts/core/layout), and the item service's Derive,
+//     Underive, Remove, Move and Enqueue, with the inspection of the file
+//     being written and the reindex options (ReindexSource, CheckReindex and
+//     SkipProperties).
 //
 // # Outputs
 //
@@ -90,6 +91,8 @@
 //     (RejectionError, and formats never import the HTTP layer), with its
 //     amendments on source transfer restrictions, writes taken without
 //     being made and sidecars a format keeps.
+//   - Decision 0017: docs/research/decisions/0017-sealed-columns-and-master-key.md
+//     (Keys returns private keys unsealed).
 //   - Decision 0018: docs/research/decisions/0018-package-index.md.
 //   - Decision 0033: docs/research/decisions/0033-persistent-work-queue.md
 //     (Enqueue, Worker and the reindex kinds).
@@ -128,7 +131,8 @@
 // Opkg's reindex that leaves item properties alone (writeProps=0) and
 // Write.By.
 // Staged in P9d, which added the injected Registry
-// (https://github.com/weaveplatform/artifactweave/issues/970). Roadmap:
+// (https://github.com/weaveplatform/artifactweave/issues/970) and Env.Keys
+// (https://github.com/weaveplatform/artifactweave/issues/1004). Roadmap:
 // Env's lease and work-queue stores
 // (https://github.com/weaveplatform/artifactweave/issues/1029) and a narrow
 // format.Store in place of the whole store

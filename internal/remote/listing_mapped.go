@@ -7,8 +7,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -132,6 +132,10 @@ func ListMappedFolder(ctx context.Context, service *source.Service, q source.Req
 
 func mappedFileAllowed(q source.Request, canonical string) bool {
 	return repo.PatternsOf(q.Repo).Accepts(canonical, false) &&
-		q.Access.Allows(types.ResourceArtifact,
-			authz.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)}, canonical, types.ActionRead)
+		q.Access.Allows(
+			types.ResourceArtifact,
+			accessapi.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)},
+			canonical,
+			types.ActionRead,
+		)
 }

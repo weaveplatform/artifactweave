@@ -20,6 +20,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/nuget"
 	"github.com/weaveplatform/artifactweave/internal/reindexauth"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/migration/access"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/formattest"
@@ -502,7 +503,11 @@ func reindexCredential(t *testing.T, w *world) json.RawMessage {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.items.ReindexAuthorize = reindexauth.New(w.st, a)
+	module, err := access.New(access.Deps{Store: w.st, Authenticator: a})
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.items.ReindexAuthorize = reindexauth.New(module.API().Authenticator, module.API().Authorizer)
 	reference, err := json.Marshal(p.CredentialReference())
 	if err != nil {
 		t.Fatal(err)

@@ -19,6 +19,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/access"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
@@ -150,11 +151,16 @@ func smartFixture(t *testing.T) *smartWorld {
 		}
 		return generic.CheckDownload(q.Repo, q.Resource.Path, false)
 	}
+	module, err := access.New(access.Deps{Store: w.db, Authenticator: a})
+	if err != nil {
+		t.Fatal(err)
+	}
 	w.s, err = NewSmart(
 		t.Context(),
 		w.p,
 		w.p.Pool,
-		a,
+		module.API().Authenticator,
+		module.API().Authorizer,
 		"remote.smart",
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
 	)

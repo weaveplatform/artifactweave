@@ -7,6 +7,7 @@ import (
 	"io"
 	"time"
 
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -37,11 +38,18 @@ type Handler interface {
 type Registry func(t repo.PackageType) Handler
 
 // Env is what a hook runs with. The item service builds one per operation;
-// inside a hook, ctx carries the operation's transaction, which Store,
+// inside a hook, ctx carries the operation's transaction, which Store, Keys,
 // Derive and Enqueue join.
 type Env struct {
 	// Store is the metadata store.
 	Store store.Store
+	// Keys reads the key pairs a format signs its metadata with, named by a
+	// repository's primaryKeyPairRef or keyPair. Their private keys come
+	// back unsealed, so a format never logs them (decision 0017). Like Store
+	// it joins the transaction ctx carries. It is nil when the item service
+	// has none, so a service that runs the derived work of a repository that
+	// names a key pair must set it.
+	Keys accessapi.Keys
 	// Blobs reads stored content, such as the file a hook indexes. Formats
 	// write content only through Derive and remove it only through
 	// Underive.

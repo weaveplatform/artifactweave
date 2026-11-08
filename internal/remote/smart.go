@@ -11,9 +11,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -34,7 +34,8 @@ type (
 type Smart struct {
 	policy    *Policy
 	pool      *Pool
-	auth      *auth.Authenticator
+	authn     accessapi.Authenticator
+	authz     accessapi.Authorizer
 	queue     *work.Queue
 	kind      string
 	node      string
@@ -43,11 +44,18 @@ type Smart struct {
 	workers   sync.WaitGroup
 }
 
+// NewSmart attaches smart remote discovery and side effects to p, with pool
+// for peer requests, and starts the workers that run the side effects queued
+// as kind. A side effect runs as the principal whose request queued it,
+// rechecked when it runs: authn's CurrentRegistry for a registry token, or
+// Current for any other credential, must still accept it, and authz must
+// still grant it, or the side effect fails permanently with source.ErrDenied.
 func NewSmart(
 	ctx context.Context,
 	p *Policy,
 	pool *Pool,
-	a *auth.Authenticator,
+	authn accessapi.Authenticator,
+	authz accessapi.Authorizer,
 	kind string,
 	log *slog.Logger,
 ) (*Smart, error) {
@@ -59,7 +67,8 @@ func NewSmart(
 	s := &Smart{
 		policy: p,
 		pool:   pool,
-		auth:   a,
+		authn:  authn,
+		authz:  authz,
 		queue:  queue,
 		kind:   kind,
 		node:   hex.EncodeToString(digest[:12]),

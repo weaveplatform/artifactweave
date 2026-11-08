@@ -11,6 +11,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/access"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
@@ -142,6 +143,11 @@ func TestAccMavenDurableCompanionAuthorityAndRetries(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			module, err := access.New(access.Deps{Store: w.db, Authenticator: a})
+			if err != nil {
+				t.Fatal(err)
+			}
+			api := module.API()
 			p, err := a.Basic(t.Context(), "reader", "test-password")
 			if err != nil {
 				t.Fatal(err)
@@ -182,7 +188,10 @@ func TestAccMavenDurableCompanionAuthorityAndRetries(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			e := &MavenEager{policy: w.p, service: service, auth: a, queue: q}
+			e := &MavenEager{
+				policy: w.p, service: service,
+				authn: api.Authenticator, authz: api.Authorizer, queue: q,
+			}
 			if err = q.Handle(MavenCompanionKind, e.run); err != nil {
 				t.Fatal(err)
 			}
@@ -260,7 +269,10 @@ func TestAccMavenDurableCompanionAuthorityAndRetries(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			restored := &MavenEager{policy: w.p, service: service, auth: a, queue: resumed}
+			restored := &MavenEager{
+				policy: w.p, service: service,
+				authn: api.Authenticator, authz: api.Authorizer, queue: resumed,
+			}
 			if err = resumed.Handle(MavenCompanionKind, restored.run); err != nil {
 				t.Fatal(err)
 			}

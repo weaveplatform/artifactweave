@@ -102,7 +102,7 @@ func (s artifactoryService) serveOpkgIndex(
 		}
 		files, err := opkg.EncodeIndex(packages, feed)
 		if err == nil {
-			err = opkg.SignFeed(ctx, st, c, files)
+			err = opkg.SignFeed(ctx, s.cfg.Access.Keys, c, files)
 		}
 		if err != nil {
 			writeErr(w, r, s.internalError(ctx, "Opkg virtual feed", err))
