@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	accessgen "github.com/weaveplatform/artifactweave/internal/server/gen/access"
 	"github.com/weaveplatform/artifactweave/internal/service/roles"
+	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 

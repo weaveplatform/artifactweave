@@ -27,7 +27,7 @@ service, bundled from `api/src/<service>/`: `api/artifactory.openapi.yaml`,
 `api/access.openapi.yaml` and `api/event.openapi.yaml`, and since P1b
 `api/distribution.openapi.yaml`, `api/pfed.openapi.yaml`, `api/grid.openapi.yaml` and
 `api/worker.openapi.yaml`. Each generates an oapi-codegen v2.8 strict chi server into
-`internal/server/gen/<service>` and a Go client into `pkg/client/<service>`. The strict servers cover the
+`migration/platform/gen/<service>` and a Go client into `pkg/client/<service>`. The strict servers cover the
 families whose operations have single-segment parameters and one response shape:
 repositories, the legacy security shims, Access v2 users, groups and permissions, tokens,
 roles, environments, projects, webhooks, cleanup policies and system.

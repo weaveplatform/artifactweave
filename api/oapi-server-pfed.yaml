@@ -3,7 +3,7 @@
 # here so the generated mux never claims a path a hand-written handler serves
 # (decision 0002).
 package: pfed
-output: internal/server/gen/pfed/server.gen.go
+output: migration/platform/gen/pfed/server.gen.go
 generate:
   models: true
   chi-server: true

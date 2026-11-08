@@ -75,7 +75,7 @@
 //     with its own entry is never matched through its parent, and a
 //     directory prefix or a P/... pattern is rewritten only when everything
 //     below P moves alike. A directory above moved packages that has no entry
-//     and no file of its own, such as internal/server/gen, maps too once its
+//     and no file of its own, such as migration/platform/gen, maps too once its
 //     packages all move alike, because the Makefile and the coverage
 //     configuration name it; a legacy root never maps.
 //   - The history set (CHANGELOG.md, research, evidence, decision 0044, the

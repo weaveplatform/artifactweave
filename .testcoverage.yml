@@ -11,7 +11,7 @@ exclude:
     # Binary entry points: thin shims over internal/.
     - ^cmd/
     # oapi-codegen output (decision 0002): regenerated, never hand-edited.
-    - ^internal/server/gen/
+    - ^migration/platform/gen/
     - ^pkg/client/
     # Developer tools: thin main packages over migration/devtools/ (specoracle).
     - ^tools/

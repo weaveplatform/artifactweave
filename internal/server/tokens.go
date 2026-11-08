@@ -14,8 +14,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
-	accessgen "github.com/weaveplatform/artifactweave/internal/server/gen/access"
-	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
+	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
+	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"

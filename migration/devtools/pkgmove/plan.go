@@ -429,7 +429,7 @@ func (t *tree) packageBelow(dir string) bool {
 
 // parentMappings returns a mapping for each directory above the mappings
 // that is no package entry itself, holds no file of its own and whose
-// entries all move alike, such as internal/server/gen above the generated
+// entries all move alike, such as migration/platform/gen above the generated
 // servers: the Makefile and the coverage configuration name that directory,
 // and those names must move with its packages. A legacy root never maps:
 // "internal" is also a word, and every package below it would have to move

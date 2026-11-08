@@ -14,14 +14,14 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/api"
-	accessgen "github.com/weaveplatform/artifactweave/internal/server/gen/access"
-	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
-	distributiongen "github.com/weaveplatform/artifactweave/internal/server/gen/distribution"
-	eventgen "github.com/weaveplatform/artifactweave/internal/server/gen/event"
-	gridgen "github.com/weaveplatform/artifactweave/internal/server/gen/grid"
-	pfedgen "github.com/weaveplatform/artifactweave/internal/server/gen/pfed"
-	workergen "github.com/weaveplatform/artifactweave/internal/server/gen/worker"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
+	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
+	distributiongen "github.com/weaveplatform/artifactweave/migration/platform/gen/distribution"
+	eventgen "github.com/weaveplatform/artifactweave/migration/platform/gen/event"
+	gridgen "github.com/weaveplatform/artifactweave/migration/platform/gen/grid"
+	pfedgen "github.com/weaveplatform/artifactweave/migration/platform/gen/pfed"
+	workergen "github.com/weaveplatform/artifactweave/migration/platform/gen/worker"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 )
 
