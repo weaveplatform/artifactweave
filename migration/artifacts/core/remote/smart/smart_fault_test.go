@@ -1,4 +1,4 @@
-package remote
+package smart
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -143,7 +144,7 @@ func TestAccSmartMetadataTargetAndRedirectFence(t *testing.T) {
 	for _, redirect := range []string{"", "/artifactory/api/storage/other/private", "/artifactory/api/storage/source/file.bin/../private", "/artifactory/api/storage/source/private"} {
 		t.Run(redirect, func(t *testing.T) {
 			w := smartFixture(t)
-			peer, err := ParseSmartPeer(w.c)
+			peer, err := remote.ParseSmartPeer(w.c)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -193,7 +194,7 @@ func TestAccSmartMetadataTargetAndRedirectFence(t *testing.T) {
 			}
 		})
 	}
-	if smartMetadataTarget(SmartPeer{}, "bad") {
+	if smartMetadataTarget(remote.SmartPeer{}, "bad") {
 		t.Fatal("invalid peer accepted")
 	}
 }
@@ -228,7 +229,7 @@ func TestAccSmartLoopBoundAndCapabilityLimits(t *testing.T) {
 		{"4.1.0", repo.Generic, repo.Local, true}, {"4.2.0", repo.Generic, repo.Local, true}, {"4.3.2", repo.Maven, repo.Local, true}, {"4.3.3", repo.Maven, repo.Local, true}, {"7.133.8", repo.Go, repo.Virtual, true}, {"7.133.8", repo.Go, repo.Local, false}, {"7.133.8", repo.Generic, repo.Virtual, false}, {"7.x.0", repo.Generic, repo.Local, false}, {"7.1", repo.Generic, repo.Local, false}, {"-1.2.0", repo.Generic, repo.Local, false},
 	} {
 		c := repo.Config{PackageType: tc.kind}
-		err := smartCapabilities(c, SmartPeer{Version: tc.version, Class: tc.class})
+		err := smartCapabilities(c, remote.SmartPeer{Version: tc.version, Class: tc.class})
 		if (err == nil) != tc.ok {
 			t.Fatal(tc, err)
 		}
@@ -242,7 +243,10 @@ func TestAccSmartLoopBoundAndCapabilityLimits(t *testing.T) {
 		},
 	}
 	for _, version := range []string{"4.1.0", "4.3.2"} {
-		if err := smartCapabilities(c, SmartPeer{Version: version, Class: repo.Local}); err == nil {
+		if err := smartCapabilities(
+			c,
+			remote.SmartPeer{Version: version, Class: repo.Local},
+		); err == nil {
 			t.Fatal("unsupported capability", version)
 		}
 	}

@@ -1,4 +1,4 @@
-package remote
+package smart
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -25,32 +26,35 @@ func (s *Smart) Discover(
 	ctx context.Context,
 	q source.Request,
 	permit source.Permit,
-) (SmartPeer, error) {
-	peer, err := ParseSmartPeer(q.Repo)
+) (remote.SmartPeer, error) {
+	peer, err := remote.ParseSmartPeer(q.Repo)
 	if err != nil || permit.Intent != source.RetrievalIntentMayFetch ||
 		!permit.UpstreamNetworkAllowed ||
 		enabled(q.Repo.Offline) {
-		return SmartPeer{}, source.ErrDenied
+		return remote.SmartPeer{}, source.ErrDenied
 	}
 	opts, err := s.policy.Options(ctx, q.Repo)
 	if err != nil {
-		return SmartPeer{}, PolicyError(err)
+		return remote.SmartPeer{}, remote.PolicyError(err)
 	}
 	if err = s.policy.Check(ctx, q, permit, opts.Revision); err != nil {
-		return SmartPeer{}, err
+		//nolint:wrapcheck // preserves upstream error identity
+		return remote.SmartPeer{}, err
 	}
 	peer = peer.WithRevision(opts.Revision)
 	state, err := s.policy.State(ctx, q, opts.Revision)
 	if err != nil {
-		return SmartPeer{}, err
+		//nolint:wrapcheck // preserves upstream error identity
+		return remote.SmartPeer{}, err
 	}
 	if cached := state.Smart; cached != nil && cached.BaseURL == peer.BaseURL &&
-		cached.Repository == peer.Repository && s.policy.now().Before(cached.CheckedAt.Add(smartTTL(q.Repo))) {
+		cached.Repository == peer.Repository && policyNow(s.policy).Before(cached.CheckedAt.Add(smartTTL(q.Repo))) {
 		peer.Class, peer.Version = repo.Class(cached.Class), cached.Version
 		return peer, smartCapabilities(q.Repo, peer)
 	}
 	if err = s.policy.Cooldown(state); err != nil {
-		return SmartPeer{}, err
+		//nolint:wrapcheck // preserves upstream error identity
+		return remote.SmartPeer{}, err
 	}
 	key := s.policy.FlightKey(
 		types.RemoteCacheKey{
@@ -60,7 +64,7 @@ func (s *Smart) Discover(
 		},
 		permit.Identity,
 	)
-	peer, err = s.discovery.Do(ctx, key, func(shared context.Context) (SmartPeer, error) {
+	peer, err = s.discovery.Do(ctx, key, func(shared context.Context) (remote.SmartPeer, error) {
 		return s.discover(shared, q, permit, opts, peer)
 	})
 	if err == nil {
@@ -80,19 +84,19 @@ func (s *Smart) discover(
 	ctx context.Context,
 	q source.Request,
 	permit source.Permit,
-	opts Options,
-	peer SmartPeer,
-) (SmartPeer, error) {
+	opts remote.Options,
+	peer remote.SmartPeer,
+) (remote.SmartPeer, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 	release, err := s.policy.Acquire(ctx, q.Repo.Key)
 	if err != nil {
-		return SmartPeer{}, PolicyError(err)
+		return remote.SmartPeer{}, remote.PolicyError(err)
 	}
 	defer release()
 	version, noStore, err := s.document(ctx, q, permit, opts, peer.BaseURL+"/api/system/version")
 	if err != nil {
-		return SmartPeer{}, err
+		return remote.SmartPeer{}, err
 	}
 	_ = json.Unmarshal(version["version"], &peer.Version)
 	endpoint := peer.BaseURL + "/api/repositories/" + url.PathEscape(peer.Repository)
@@ -102,14 +106,14 @@ func (s *Smart) discover(
 		config, private, err = s.document(ctx, q, permit, opts, endpoint+"/configuration")
 	}
 	if err != nil {
-		return SmartPeer{}, err
+		return remote.SmartPeer{}, err
 	}
 	_ = json.Unmarshal(config["rclass"], &peer.Class)
 	if peer.Class == "" {
 		_ = json.Unmarshal(config["type"], &peer.Class)
 	}
 	if err = smartCapabilities(q.Repo, peer); err != nil {
-		return SmartPeer{}, err
+		return remote.SmartPeer{}, err
 	}
 	if !noStore && !private &&
 		(q.Repo.StoreArtifactsLocally == nil || *q.Repo.StoreArtifactsLocally) {
@@ -123,7 +127,7 @@ func (s *Smart) discover(
 			}
 			state.Smart = &types.RemoteSmartPeer{
 				BaseURL: peer.BaseURL, Repository: peer.Repository,
-				Class: string(peer.Class), Version: peer.Version, CheckedAt: s.policy.now(),
+				Class: string(peer.Class), Version: peer.Version, CheckedAt: policyNow(s.policy),
 			}
 			return s.policy.Store.RemoteCache().PutState(tx, q.Repo.Key, state)
 		})
@@ -131,7 +135,7 @@ func (s *Smart) discover(
 	return peer, smartError("discovery", err)
 }
 
-func smartCapabilities(c repo.Config, peer SmartPeer) error {
+func smartCapabilities(c repo.Config, peer remote.SmartPeer) error {
 	parts := strings.Split(peer.Version, ".")
 	if len(parts) != 3 {
 		return source.ErrUnsupported
@@ -172,7 +176,7 @@ func (s *Smart) document(
 	ctx context.Context,
 	q source.Request,
 	permit source.Permit,
-	opts Options,
+	opts remote.Options,
 	target string,
 ) (map[string]json.RawMessage, bool, error) {
 	res, err := s.request(ctx, q, permit, opts, http.MethodGet, target, nil)
@@ -182,7 +186,7 @@ func (s *Smart) document(
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
 		if res.StatusCode == http.StatusTooManyRequests {
-			return nil, false, ResponseError(res, s.policy.now())
+			return nil, false, remote.ResponseError(res, policyNow(s.policy))
 		}
 		return nil, false, smartStatus(res.StatusCode)
 	}
@@ -197,9 +201,10 @@ func (s *Smart) document(
 		return nil, false, source.ErrInvalidResult
 	}
 	if err = s.policy.Check(ctx, q, permit, opts.Revision); err != nil {
+		//nolint:wrapcheck // preserves upstream error identity
 		return nil, false, err
 	}
-	return doc, MustNotStore(res.Header), nil
+	return doc, remote.MustNotStore(res.Header), nil
 }
 
 func smartStatus(status int) error {

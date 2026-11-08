@@ -1,4 +1,4 @@
-package remote
+package smart
 
 import (
 	"context"
@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -94,8 +95,9 @@ func (s *Smart) enqueue(
 				return source.ErrUnavailable
 			}
 			entry.Smart.Downloads++
-			entry.Smart.LastDownload, entry.Smart.LastDownloadBy = s.policy.now(), principal.Name
-			entry.LastUsed = s.policy.now()
+			entry.Smart.LastDownload = policyNow(s.policy)
+			entry.Smart.LastDownloadBy = principal.Name
+			entry.LastUsed = policyNow(s.policy)
 			if _, err = s.policy.Store.RemoteCache().Put(tx, entry.Token, entry); err != nil {
 				return smartError("operation", err)
 			}
@@ -112,7 +114,7 @@ func (s *Smart) enqueue(
 // Admission is serialized across SQL processes and counts parked work too.
 // Existing keys can coalesce without allowing a stream of new paths to grow it.
 func (s *Smart) admit(ctx context.Context, key string) error {
-	holder, now := rand.Text(), s.policy.now()
+	holder, now := rand.Text(), policyNow(s.policy)
 	held, err := s.policy.Store.Leases().
 		Acquire(ctx, types.Lease{Name: s.kind, Holder: holder, Acquired: now, Expires: now.Add(time.Minute)}, now)
 	if err != nil || !held {
@@ -130,7 +132,7 @@ func (s *Smart) admit(ctx context.Context, key string) error {
 	}
 	for _, stat := range stats {
 		if stat.Kind == s.kind && stat.Pending+stat.Leased+stat.Parked >= 256 {
-			return ErrBusy
+			return remote.ErrBusy
 		}
 	}
 	return nil
@@ -143,6 +145,7 @@ func (s *Smart) currentEntry(
 	key types.RemoteCacheKey,
 ) (types.RemoteCacheEntry, error) {
 	if err := s.policy.Check(ctx, q, permit, key.SettingsRevision); err != nil {
+		//nolint:wrapcheck // preserves upstream error identity
 		return types.RemoteCacheEntry{}, err
 	}
 	// Begin takes the source lifetime lock before reading mutable state. The
@@ -160,7 +163,7 @@ func (s *Smart) currentEntry(
 func (s *Smart) restore(
 	ctx context.Context,
 	job smartJob,
-) (context.Context, source.Request, source.Permit, Options, error) {
+) (context.Context, source.Request, source.Permit, remote.Options, error) {
 	var q source.Request
 	permit := source.Permit{
 		Identity:               job.Identity,
@@ -170,7 +173,7 @@ func (s *Smart) restore(
 	c, err := s.policy.Store.Repos().Get(ctx, job.Key.RepoKey)
 	if err != nil || c.Class != repo.Remote || enabled(c.Offline) || enabled(c.BlackedOut) ||
 		c.StoreArtifactsLocally != nil && !*c.StoreArtifactsLocally {
-		return ctx, q, permit, Options{}, source.ErrDenied
+		return ctx, q, permit, remote.Options{}, source.ErrDenied
 	}
 	opts, err := s.policy.Options(ctx, c)
 	if err != nil || opts.Revision != job.Key.SettingsRevision {
@@ -194,8 +197,8 @@ func (s *Smart) restore(
 		return ctx, q, permit, opts, source.ErrDenied
 	}
 	ctx = accessapi.WithCaller(ctx, p, d)
-	ctx = WithSmart(ctx, true)
-	ctx = WithOutbound(ctx, Outbound{Header: smartHeaders})
+	ctx = remote.WithSmart(ctx, true)
+	ctx = remote.WithOutbound(ctx, remote.Outbound{Header: smartHeaders})
 	ctx = context.WithValue(ctx, smartTraceKey{}, job.Trace)
 	ctx, err = smartEnter(ctx, s.node+"/"+string(permit.Identity.Repository))
 	q = source.Request{
@@ -213,6 +216,7 @@ func (s *Smart) restore(
 	if err == nil {
 		err = s.policy.Check(ctx, q, permit, opts.Revision)
 	}
+	//nolint:wrapcheck // preserves upstream error identity
 	return ctx, q, permit, opts, err
 }
 
@@ -271,7 +275,7 @@ func (s *Smart) run(ctx context.Context, workItem types.WorkItem) error {
 	if err == nil {
 		release, e := s.policy.Acquire(ctx, q.Repo.Key)
 		if e != nil {
-			return PolicyError(e)
+			return remote.PolicyError(e)
 		}
 		defer release()
 		if job.Statistics {
@@ -319,11 +323,11 @@ func (s *Smart) refresh(
 	ctx context.Context,
 	q source.Request,
 	permit source.Permit,
-	opts Options,
-	peer SmartPeer,
+	opts remote.Options,
+	peer remote.SmartPeer,
 	job smartJob,
 ) error {
-	started := s.policy.now()
+	started := policyNow(s.policy)
 	properties := smartProperties(q.Repo) && smartPropertyPath(s.registryPath, q)
 	var incoming types.Properties
 	var present bool
@@ -357,7 +361,7 @@ func (s *Smart) refresh(
 					current,
 					entry.Smart,
 					incoming,
-					s.policy.now(),
+					policyNow(s.policy),
 				)
 				var remove []string
 				for key := range current {
@@ -378,10 +382,10 @@ func (s *Smart) refresh(
 				}
 			}
 			if smartAbsence(q.Repo) {
-				entry.Smart.OriginAt, entry.Smart.OriginAbsent = s.policy.now(), !present
+				entry.Smart.OriginAt, entry.Smart.OriginAbsent = policyNow(s.policy), !present
 			}
 			if properties && !present {
-				entry.Smart.PropertiesAt = s.policy.now()
+				entry.Smart.PropertiesAt = policyNow(s.policy)
 			}
 			return nil
 		},

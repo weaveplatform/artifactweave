@@ -55,6 +55,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/smart"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	cocoapodshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods/http"
@@ -126,7 +127,7 @@ type Config struct {
 	// Mirrors administers the blob mirrors; nil when no tier is a mirror.
 	Mirrors Mirrors
 	// RemoteStatus serves artifactweave-only, administrator-only diagnostics.
-	RemoteStatus func(context.Context, string, string) (remote.SmartStatus, error)
+	RemoteStatus func(context.Context, string, string) (smart.SmartStatus, error)
 	// Multipart serves the JFrog CLI's multipart upload protocol; nil
 	// reports it unsupported, so the CLI uploads in one request.
 	Multipart *multipart.Service
@@ -446,7 +447,7 @@ func New(cfg Config) http.Handler {
 		recoverPanic(logger),
 		accessLog(logger),
 		baseurl.Middleware(cfg.BaseURL),
-		remote.SmartTrace,
+		smart.SmartTrace,
 		dockerhttp.APIVersion,
 		registry.Challenge,
 		normalizeContentType,

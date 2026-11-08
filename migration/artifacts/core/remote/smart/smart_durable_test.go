@@ -1,4 +1,4 @@
-package remote
+package smart
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -86,7 +87,7 @@ func TestAccSmartDurableCapacityAndCorruptPayload(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := w.s.admit(w.ctx, "another"); !errors.Is(err, ErrBusy) {
+	if err := w.s.admit(w.ctx, "another"); !errors.Is(err, remote.ErrBusy) {
 		t.Fatal("unbounded admission", err)
 	}
 	if err := w.s.admit(w.ctx, "pending-1"); err != nil {

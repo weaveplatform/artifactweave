@@ -1,4 +1,4 @@
-package remote
+package smart
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
@@ -20,8 +21,8 @@ func (s *Smart) statistics(
 	ctx context.Context,
 	q source.Request,
 	permit source.Permit,
-	opts Options,
-	peer SmartPeer,
+	opts remote.Options,
+	peer remote.SmartPeer,
 	job smartJob,
 ) error {
 	var snapshot types.RemoteSmartState
@@ -83,7 +84,7 @@ func (s *Smart) statistics(
 	)
 }
 
-func statisticsURL(p SmartPeer) string {
+func statisticsURL(p remote.SmartPeer) string {
 	key := p.Repository
 	if p.Class == repo.Remote {
 		key += types.CacheSuffix

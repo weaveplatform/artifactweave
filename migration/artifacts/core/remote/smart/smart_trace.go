@@ -1,4 +1,4 @@
-package remote
+package smart
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 )
 
@@ -51,7 +52,7 @@ func smartEnter(ctx context.Context, identity string) (context.Context, error) {
 
 func smartHeaders(req *http.Request) {
 	trace, _ := req.Context().Value(smartTraceKey{}).([]string)
-	if !SmartActive(req.Context()) {
+	if !remote.SmartActive(req.Context()) {
 		return
 	}
 	req.Header.Del(SmartOriginHeader)

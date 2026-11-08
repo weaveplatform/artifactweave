@@ -28,6 +28,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/smart"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
@@ -66,8 +67,8 @@ type runtime struct {
 	// work runs derived work after the changes that need it (decision 0033).
 	work            *work.Queue
 	mavenEager      *maven.MavenEager
-	smartRemote     *remote.Smart
-	smartRegistry   *remote.Smart
+	smartRemote     *smart.Smart
+	smartRegistry   *smart.Smart
 	remoteHTTP      remote.Pool
 	remoteSources   *source.Service
 	registryHTTP    remote.RegistryPool

@@ -1,4 +1,4 @@
-package remote
+package smart
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -18,7 +19,8 @@ import (
 // The Smart tests stay in this package, since they reach Smart's unexported
 // state, while the policy tests are an external test package. This copies
 // what the Smart tests use of that package's policy fixture
-// (policy_test.go): policyWorld, policyFixture, request and bytes.
+// (policy_test.go): policyWorld, policyFixture, request and bytes, and the
+// ptr helper of core's in-package tests (client_test.go).
 
 type policyWorld struct {
 	t      *testing.T
@@ -26,7 +28,7 @@ type policyWorld struct {
 	blobs  blob.Store
 	clock  *fakeupstream.Clock
 	up     *fakeupstream.Server
-	p      *Policy
+	p      *remote.Policy
 	c      repo.Config
 	permit source.Permit
 }
@@ -50,8 +52,8 @@ func policyFixture(t *testing.T) *policyWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pool := new(Pool)
-	p := &Policy{
+	pool := new(remote.Pool)
+	p := &remote.Policy{
 		Store: db,
 		Blobs: blobs,
 		Items: &item.Service{Store: db, Blobs: blobs, Now: clock.Now},
@@ -60,7 +62,9 @@ func policyFixture(t *testing.T) *policyWorld {
 		Key: []byte(
 			"test-only-query-identity",
 		),
-		Options: func(context.Context, repo.Config) (Options, error) { return Options{Revision: "credential-1"}, nil },
+		Options: func(context.Context, repo.Config) (remote.Options, error) {
+			return remote.Options{Revision: "credential-1"}, nil
+		},
 	}
 	t.Cleanup(pool.Close)
 	return &policyWorld{
@@ -78,6 +82,8 @@ func policyFixture(t *testing.T) *policyWorld {
 		},
 	}
 }
+
+func ptr[T any](v T) *T { return &v }
 
 func (w *policyWorld) request(path string, kind source.ResourceKind) source.Request {
 	return source.Request{

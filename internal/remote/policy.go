@@ -92,6 +92,7 @@ func (p *Policy) Read(
 	permit source.Permit,
 ) (out source.Result, retErr error) {
 	if p.Smart != nil && ctx.Value(smartKey{}) == nil {
+		//nolint:wrapcheck // preserves upstream error identity
 		return p.Smart.Read(ctx, q, permit)
 	}
 	var revision string

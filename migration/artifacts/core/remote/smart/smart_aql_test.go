@@ -1,4 +1,4 @@
-package remote
+package smart
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
@@ -16,7 +17,7 @@ const smartQueryResponse = `{"results":[],"range":{"start_pos":0,"end_pos":0,"to
 
 func smartQueryRequest(w *smartWorld) source.Request {
 	q := w.smartRequest()
-	peer, _ := ParseSmartPeer(q.Repo)
+	peer, _ := remote.ParseSmartPeer(q.Repo)
 	q.Resource = source.Resource{
 		Kind:                source.ResourceKindMetadata,
 		Path:                ".artifactweave-aql-query",
@@ -201,7 +202,7 @@ func TestAccSmartAQLExactPOSTBoundary(t *testing.T) {
 			[]byte(q.Resource.SmartAQL),
 		); !errors.Is(
 			err,
-			ErrRequest,
+			remote.ErrRequest,
 		) {
 			t.Fatal(err)
 		}
@@ -217,7 +218,7 @@ func TestAccSmartAQLExactPOSTBoundary(t *testing.T) {
 		[]byte("{}"),
 	); !errors.Is(
 		err,
-		ErrRequest,
+		remote.ErrRequest,
 	) {
 		t.Fatal(err)
 	}
@@ -231,7 +232,7 @@ func TestAccSmartAQLExactPOSTBoundary(t *testing.T) {
 		nil,
 	); !errors.Is(
 		err,
-		ErrRequest,
+		remote.ErrRequest,
 	) {
 		t.Fatal(err)
 	}

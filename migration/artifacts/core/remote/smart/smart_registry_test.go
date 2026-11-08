@@ -1,12 +1,12 @@
-package remote_test
+package smart_test
 
 import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/smart"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -23,13 +23,13 @@ func TestAccSmartRegistryGrantAndPropertyPath(t *testing.T) {
 				{Type: "repository", Name: name, Actions: []string{"pull"}},
 			},
 		}
-		if remote.SmartRegistryGrant(
+		if smart.SmartRegistryGrant(
 			docker.ParseRegistryPath, access, "remote", "image/manifests/tag",
 		) != (realm != "other") {
 			t.Fatal("realm grant", realm)
 		}
-		if remote.SmartRegistryGrant(docker.ParseRegistryPath, access, "remote", "bad") ||
-			remote.SmartRegistryGrant(
+		if smart.SmartRegistryGrant(docker.ParseRegistryPath, access, "remote", "bad") ||
+			smart.SmartRegistryGrant(
 				docker.ParseRegistryPath, access, "remote", "private/manifests/tag",
 			) {
 			t.Fatal("scope widened")
@@ -41,8 +41,8 @@ func TestAccSmartRegistryGrantAndPropertyPath(t *testing.T) {
 			t.Fatal(err)
 		}
 		q := source.Request{Repo: repo.Config{PackageType: repo.OCI}, Resource: resource}
-		if remote.SmartPropertyPath(docker.ParseRegistryPath, q) != (ref == "tag") ||
-			remote.SmartStoragePath(q) != q.Resource.Path {
+		if smart.SmartPropertyPath(docker.ParseRegistryPath, q) != (ref == "tag") ||
+			smart.SmartStoragePath(q) != q.Resource.Path {
 			t.Fatal("digest pull synchronized tag properties")
 		}
 	}
@@ -57,7 +57,7 @@ func TestUnitSmartRegistryPathNilParserFailsClosed(t *testing.T) {
 		t.Fatal(err)
 	}
 	q := source.Request{Repo: repo.Config{PackageType: repo.OCI}, Resource: resource}
-	if remote.SmartPropertyPath(nil, q) {
+	if smart.SmartPropertyPath(nil, q) {
 		t.Fatal("a nil parser gave a registry request a property path")
 	}
 	access := &types.RegistryAccess{
@@ -66,7 +66,7 @@ func TestUnitSmartRegistryPathNilParserFailsClosed(t *testing.T) {
 			{Type: "repository", Name: "image", Actions: []string{"pull"}},
 		},
 	}
-	if remote.SmartRegistryGrant(nil, access, "remote", "image/manifests/tag") {
+	if smart.SmartRegistryGrant(nil, access, "remote", "image/manifests/tag") {
 		t.Fatal("a nil parser matched a registry grant")
 	}
 }

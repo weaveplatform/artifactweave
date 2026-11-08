@@ -1,4 +1,4 @@
-package remote
+package smart
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
@@ -39,18 +40,18 @@ func TestAccMappedSmartListingKeepsCanonicalAuthority(t *testing.T) {
 		return true
 	}
 	q := w.smartRequest()
-	d, err := NewDiscovery(w.ctx, w.p.Items, w.c)
+	d, err := remote.NewDiscovery(w.ctx, w.p.Items, w.c)
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := ListMappedFolder(
+	got, err := remote.ListMappedFolder(
 		w.ctx,
 		w.service,
 		q,
 		d,
-		DiscoveryScope{Path: "org.acme/lib"},
+		remote.DiscoveryScope{Path: "org.acme/lib"},
 		"org/acme/lib/1.0",
-		&ListingBudget{},
+		&remote.ListingBudget{},
 	)
 	if err != nil || len(got.Files) != 2 {
 		t.Fatal(got, err)
@@ -61,14 +62,14 @@ func TestAccMappedSmartListingKeepsCanonicalAuthority(t *testing.T) {
 		}
 	}
 	q.CacheOnly = true
-	if _, err = ListMappedFolder(
+	if _, err = remote.ListMappedFolder(
 		w.ctx,
 		w.service,
 		q,
 		d,
-		DiscoveryScope{Path: "org.acme/lib"},
+		remote.DiscoveryScope{Path: "org.acme/lib"},
 		"org/acme/lib/1.0",
-		&ListingBudget{},
+		&remote.ListingBudget{},
 	); err != nil {
 		t.Fatal("Smart mapped cache miss", err)
 	}
@@ -106,11 +107,11 @@ func TestAccSmartListingUsesRealDiscoveryTransportAndCacheFences(t *testing.T) {
 		return false
 	}
 	q := w.smartRequest()
-	got, err := ListFolder(w.ctx, w.service, q, "nested", &ListingBudget{})
+	got, err := remote.ListFolder(w.ctx, w.service, q, "nested", &remote.ListingBudget{})
 	if err != nil ||
 		!reflect.DeepEqual(
 			got.Entries,
-			[]ListingEntry{
+			[]remote.ListingEntry{
 				{Path: "nested/child.bin", Folder: false},
 				{Path: "nested/sub", Folder: true},
 			},
@@ -136,7 +137,7 @@ func TestAccSmartListingUsesRealDiscoveryTransportAndCacheFences(t *testing.T) {
 		t.Fatal("listing created items", items, err)
 	}
 	q.CacheOnly = true
-	got, err = ListFolder(w.ctx, w.service, q, "nested", &ListingBudget{})
+	got, err = remote.ListFolder(w.ctx, w.service, q, "nested", &remote.ListingBudget{})
 	if err != nil || len(got.Entries) != 2 {
 		t.Fatal(got, err)
 	}

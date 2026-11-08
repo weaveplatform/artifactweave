@@ -1,4 +1,4 @@
-package remote
+package smart
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -50,11 +51,12 @@ func (s *Smart) properties(
 	ctx context.Context,
 	q source.Request,
 	permit source.Permit,
-	opts Options,
-	peer SmartPeer,
+	opts remote.Options,
+	peer remote.SmartPeer,
 ) (types.Properties, bool, error) {
 	target, err := peer.StorageURL(smartStoragePath(q), url.Values{"properties": {""}})
 	if err != nil {
+		//nolint:wrapcheck // preserves upstream error identity
 		return nil, false, err
 	}
 	doc, noStore, err := s.document(ctx, q, permit, opts, target)
@@ -102,11 +104,12 @@ func (s *Smart) present(
 	ctx context.Context,
 	q source.Request,
 	permit source.Permit,
-	opts Options,
-	peer SmartPeer,
+	opts remote.Options,
+	peer remote.SmartPeer,
 ) (bool, error) {
 	target, err := peer.StorageURL(smartStoragePath(q), nil)
 	if err != nil {
+		//nolint:wrapcheck // preserves upstream error identity
 		return false, err
 	}
 	doc, noStore, err := s.document(ctx, q, permit, opts, target)

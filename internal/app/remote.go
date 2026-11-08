@@ -14,6 +14,7 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/smart"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
@@ -185,7 +186,7 @@ func (rt *runtime) openRemoteSources(
 		return nil, fmt.Errorf("remote maven companions: %w", err)
 	}
 	mavenBackend.Eager = rt.mavenEager.Queue
-	rt.smartRemote, err = remote.NewSmart(
+	rt.smartRemote, err = smart.NewSmart(
 		ctx,
 		policy,
 		&rt.remoteHTTP,
@@ -198,7 +199,7 @@ func (rt *runtime) openRemoteSources(
 	if err != nil {
 		return nil, fmt.Errorf("remote smart runtime: %w", err)
 	}
-	rt.smartRegistry, err = remote.NewSmart(
+	rt.smartRegistry, err = smart.NewSmart(
 		ctx,
 		registryPolicy,
 		&rt.remoteHTTP,

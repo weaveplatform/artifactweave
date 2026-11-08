@@ -1,4 +1,4 @@
-package remote
+package smart
 
 import (
 	"bytes"
@@ -7,6 +7,7 @@ import (
 	"mime"
 	"net/http"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
@@ -18,7 +19,7 @@ func (s *Smart) query(
 	ctx context.Context,
 	q source.Request,
 	permit source.Permit,
-	peer SmartPeer,
+	peer remote.SmartPeer,
 ) (source.Result, error) {
 	text := q.Resource.SmartAQL
 	parsed, err := aql.Parse(text)
@@ -37,7 +38,7 @@ func (s *Smart) query(
 	}
 	release, err := s.policy.Acquire(ctx, q.Repo.Key)
 	if err != nil {
-		return source.Result{}, PolicyError(err)
+		return source.Result{}, remote.PolicyError(err)
 	}
 	defer release()
 	res, err := s.request(
@@ -54,7 +55,7 @@ func (s *Smart) query(
 	}
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
-		return source.Result{}, ResponseError(res, s.policy.now())
+		return source.Result{}, remote.ResponseError(res, policyNow(s.policy))
 	}
 	media, _, err := mime.ParseMediaType(res.Header.Get("Content-Type"))
 	if err != nil || media != "application/json" {
@@ -74,6 +75,7 @@ func (s *Smart) query(
 		return source.Result{}, source.ErrInvalidResult
 	}
 	if err = s.policy.Check(ctx, q, permit, opts.Revision); err != nil {
+		//nolint:wrapcheck // preserves upstream error identity
 		return source.Result{}, err
 	}
 	return source.Result{

@@ -1,4 +1,4 @@
-package remote
+package smart
 
 import (
 	"context"
@@ -16,10 +16,13 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
@@ -84,10 +87,10 @@ func smartFixture(t *testing.T) *smartWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resolver, err := NewResolver(
+	resolver, err := remote.NewResolver(
 		w.db,
 		nil,
-		ResolverOptions{RevisionKey: []byte("smart-test-only-credential-revision-key")},
+		remote.ResolverOptions{RevisionKey: []byte("smart-test-only-credential-revision-key")},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -366,10 +369,22 @@ func (w *smartWorld) saveConfig() {
 	}
 }
 
+// mavenFormats gives a Maven repository the Maven slice's handler, so a test
+// that reads one runs that slice's indexing hooks; policyFixture's nil
+// registry would write it through the generic handler. Every other type
+// stays generic.
+func mavenFormats(t repo.PackageType) format.Handler {
+	if t == repo.Maven {
+		return maven.Handler{}
+	}
+	return generic.Handler{}
+}
+
 func TestAccSmartOriginAbsenceAndOutage(t *testing.T) {
 	for _, kind := range []repo.PackageType{repo.Generic, repo.Maven} {
 		t.Run(string(kind), func(t *testing.T) {
 			w := smartFixture(t)
+			w.p.Items.Formats = mavenFormats
 			w.c.PackageType = kind
 			w.c.ContentSynchronisation.Source = &repo.ContentSyncSource{
 				OriginAbsenceDetection: true,
@@ -596,6 +611,7 @@ func TestAccSmartStatusIsCurrentBoundedAndOffline(t *testing.T) {
 
 func TestAccSmartStatusOriginObservationsRemainPerRepresentation(t *testing.T) {
 	w := smartFixture(t)
+	w.p.Items.Formats = mavenFormats
 	w.c.PackageType = repo.Maven
 	w.c.ContentSynchronisation.Source = &repo.ContentSyncSource{OriginAbsenceDetection: true}
 	w.saveConfig()
