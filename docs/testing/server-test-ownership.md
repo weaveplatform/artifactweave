@@ -61,7 +61,7 @@ When a test file leaves a shared directory such as `internal/server`:
 | Agent Packages | `test/server/artifacts/agentpackages` |
 | Agent Plugins | `test/server/artifacts/agentplugins` |
 | Docker/OCI | `internal/server/docker`, `test/server/artifacts/docker` |
-| Go modules | `internal/server/golang`, `test/server/artifacts/golang` |
+| Go modules | `migration/artifacts/ecosystem/golang/http`, `test/server/artifacts/golang` |
 | Helm | `internal/server/helm`, `test/server/artifacts/helm` |
 | Helm OCI | `test/server/artifacts/helmoci` |
 | LuaRocks | `internal/server/luarocks` |

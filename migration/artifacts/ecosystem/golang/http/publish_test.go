@@ -1,4 +1,4 @@
-package golang_test
+package golanghttp_test
 
 import (
 	"context"
@@ -12,13 +12,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/server/golang"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	golanghttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -106,7 +106,7 @@ func newPubFixture(t *testing.T) *pubFixture {
 			_, _ = io.WriteString(w, it.FullPath())
 		},
 		Fault: func(_ *http.Request, err error) { f.faults = append(f.faults, err) },
-	}, golang.Protocol())
+	}, golanghttp.Protocol())
 	f.h = r
 	return f
 }

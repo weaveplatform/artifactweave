@@ -1,4 +1,4 @@
-package golang_test
+package golanghttp_test
 
 import (
 	"context"
@@ -12,12 +12,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/server/golang"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	golanghttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -162,7 +162,7 @@ func newFixtureOn(t *testing.T, seed *inmem.Store, serve store.Store) *fixture {
 			authorized.ServeHTTP(w, r)
 		})
 	})
-	pkgroute.Mount(r, o, golang.Protocol())
+	pkgroute.Mount(r, o, golanghttp.Protocol())
 	f.h = r
 	return f
 }
@@ -558,7 +558,7 @@ func TestAccRepositoriesAndPaths(t *testing.T) {
 }
 
 func TestAccIsAbsent(t *testing.T) {
-	p := golang.Protocol()
+	p := golanghttp.Protocol()
 	for path, want := range map[string]bool{
 		base + local + "/sumdb/sum.golang.org/supported": true,
 		base + local + "/sumdb":                          true,

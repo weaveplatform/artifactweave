@@ -1,9 +1,9 @@
-// Package golang serves Go module repositories at
+// Package golanghttp serves Go module repositories at
 // /artifactory/api/go/{repoKey}/ through the router kit (decisions 0032 and
 // 0035): the GOPROXY reads the go command makes, and the deploys of
 // jf go-publish. Paths, version selection and the package index are
-// internal/format/golang's; this package answers HTTP with them.
-package golang
+// migration/artifacts/ecosystem/golang's; this package answers HTTP with them.
+package golanghttp
 
 import (
 	"errors"
@@ -12,9 +12,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	goformat "github.com/weaveplatform/artifactweave/internal/format/golang"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	goformat "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 

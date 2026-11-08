@@ -1,4 +1,4 @@
-package golang
+package golanghttp
 
 import (
 	"bytes"
@@ -7,8 +7,8 @@ import (
 	"io"
 	"net/http"
 
-	goformat "github.com/weaveplatform/artifactweave/internal/format/golang"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	goformat "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )

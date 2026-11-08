@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/format/golang"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang"
 )
 
 // A .info deployed through the Go API must be one the go command can read:

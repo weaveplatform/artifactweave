@@ -7,7 +7,7 @@ import (
 
 	"golang.org/x/mod/module"
 
-	"github.com/weaveplatform/artifactweave/internal/format/golang"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang"
 )
 
 // The go command sends module paths and versions case-encoded and jf sends

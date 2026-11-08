@@ -5675,7 +5675,7 @@
   {
     "route": "GET /artifactory/api/go/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/golang.reads.serve-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/golang/http.reads.serve-fm",
     "review_family": "native-go",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12272,7 +12272,7 @@
   {
     "route": "HEAD /artifactory/api/go/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/golang.reads.serve-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/golang/http.reads.serve-fm",
     "review_family": "native-go",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -20980,7 +20980,7 @@
   {
     "route": "PUT /artifactory/api/go/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/golang.publisher.publish-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/golang/http.publisher.publish-fm",
     "review_family": "native-go",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
