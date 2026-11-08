@@ -469,7 +469,9 @@ func (r *fixRun) undefined(pkg *packages.Package) {
 
 // qualified plans the repair of old.X, where X left the old directory for
 // another: the qualifier names the new package, or goes in a file of that
-// package.
+// package. An X that an in-package test file took along is in sight only of
+// the external tests in its new directory, as an export_test.go is written
+// for; anywhere else no import reaches it.
 func (r *fixRun) qualified(rel string, tf *typedFile, sel *ast.SelectorExpr) {
 	// The type checker reports "undefined: q.X" only where q names an
 	// import.
@@ -483,7 +485,7 @@ func (r *fixRun) qualified(rel string, tf *typedFile, sel *ast.SelectorExpr) {
 	md, ok := r.sc.moved[old][sel.Sel.Name]
 	switch {
 	case !ok || md.external:
-	case md.test:
+	case md.test && (md.dir != path.Dir(rel) || !strings.HasSuffix(tf.file.Name.Name, "_test")):
 		r.plan.report(
 			rel,
 			tf.line(sel.Pos()),

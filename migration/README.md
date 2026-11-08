@@ -385,8 +385,11 @@ A split package's files go to several targets, so `move` takes them file by file
    it, whether it is in a moved file, in a file of the package it left or in an importer's
    `old.X`: exported, it gets that package's qualifier and import (with an explicit name
    where the package's own name means something else in the file), or no qualifier in
-   that package's own files; an import whose every use moved goes. A moved file's uses of
-   its old package's bridges, bare or qualified, are pointed at the bridges' targets.
+   that package's own files; an import whose every use moved goes. A name that an
+   in-package test file took along, as an `export_test.go` does, is in sight of the
+   external tests of its new directory only, so it is pointed at there and reported
+   anywhere else. A moved file's uses of its old package's bridges, bare or qualified,
+   are pointed at the bridges' targets.
 5. Resolve the report by hand. Each line is `file:line: message`, for an unexported or
    test-only declaration that now lies across a package boundary, a method whose receiver
    type went elsewhere, an import that closes a cycle, a test that reads its package's own
