@@ -509,9 +509,12 @@ func New(cfg Config) http.Handler {
 	terraformbackend.Register(
 		r,
 		terraformbackend.Options{
-			Items: artSvc.items(cfg.Store),
-			Keys:  cfg.Keys,
-			Fault: func(r *http.Request, err error) { noteCause(r.Context(), err) },
+			Items:        artSvc.items(cfg.Store),
+			Keys:         cfg.Keys,
+			Fault:        func(r *http.Request, err error) { noteCause(r.Context(), err) },
+			Authorizer:   cfg.Access.Authorizer,
+			Identity:     cfg.Access.Identity,
+			Restrictions: cfg.Access.Restrictions,
 		},
 	)
 	for _, p := range mounted {

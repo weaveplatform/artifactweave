@@ -14,12 +14,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	tfbe "github.com/weaveplatform/artifactweave/internal/format/terraformbackend"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/terraformstate"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -33,13 +33,25 @@ const (
 	bodyLimit = 64 << 20
 )
 
-// Options supplies the shared item service, keyring and fault recorder.
-// Now is a test clock; nil uses the wall clock.
+// Options supplies the shared item service, keyring and fault recorder, and
+// the access contracts that re-evaluate a state upload capability's user
+// when the capability is used (decision 0041). The contracts read through
+// the request's context, so a server binds them over the store Items
+// serves. Now is a test clock; nil uses the wall clock.
 type Options struct {
 	Items *item.Service
 	Keys  *crypt.Keyring
 	Now   func() time.Time
 	Fault func(*http.Request, error)
+	// Authorizer evaluates the permissions of the user a state upload
+	// capability names, within the token scope the capability keeps.
+	Authorizer accessapi.Authorizer
+	// Identity reads the account a state upload capability names, and the
+	// auto-join groups of a transient user that has none.
+	Identity accessapi.Identity
+	// Restrictions checks the API restriction of the user a state upload
+	// capability names, at upload time.
+	Restrictions accessapi.Restrictions
 }
 
 type (
@@ -114,7 +126,7 @@ func Register(r chi.Router, o Options) {
 func (h handler) wrap(f endpoint) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !SkipsAuthentication(r) {
-			if _, err := auth.RequireAuthenticated(r.Context()); err != nil {
+			if _, err := kernel.RequireAuthenticated(r.Context()); err != nil {
 				h.error(w, r, err)
 				return
 			}
@@ -197,12 +209,12 @@ func parameter(r *http.Request, name string) string {
 }
 
 func can(r *http.Request, c repo.Config, path string, action types.Actions, folder bool) bool {
-	p, ok := auth.FromContext(r.Context())
-	d := auth.DeciderFrom(r.Context())
+	p, ok := kernel.FromContext(r.Context())
+	d, _ := accessapi.DeciderFrom(r.Context())
 	if !ok || p.Anonymous || d == nil {
 		return false
 	}
-	target := authz.Repo{Key: c.Key, Class: string(c.Class)}
+	target := accessapi.Repo{Key: c.Key, Class: string(c.Class)}
 	if folder {
 		return d.AllowsFolder(types.ResourceArtifact, target, path, action)
 	}
@@ -211,11 +223,11 @@ func can(r *http.Request, c repo.Config, path string, action types.Actions, fold
 
 func require(r *http.Request, c repo.Config, path string, action types.Actions, folder bool) error {
 	if !can(r, c, path, action, folder) {
-		return auth.ErrForbidden
+		return kernel.ErrForbidden
 	}
 	return nil
 }
-func caller(r *http.Request) string { p, _ := auth.FromContext(r.Context()); return p.Name }
+func caller(r *http.Request) string { p, _ := kernel.FromContext(r.Context()); return p.Name }
 func (h handler) repository(r *http.Request) (repo.Config, error) {
 	c, err := h.states.Repository(r.Context(), parameter(r, "repo"))
 	if err != nil {

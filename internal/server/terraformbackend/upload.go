@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	tfbe "github.com/weaveplatform/artifactweave/internal/format/terraformbackend"
 	"github.com/weaveplatform/artifactweave/internal/service/terraformstate"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -52,7 +52,7 @@ func (h handler) uploadURL(
 	r *http.Request,
 	st terraformstate.State,
 	ws terraformstate.Workspace,
-	p auth.Principal,
+	p kernel.Principal,
 	md5 string,
 ) (string, error) {
 	identity, err := h.capabilityIdentity(r, p)
@@ -144,12 +144,12 @@ func (h handler) upload(_ http.ResponseWriter, r *http.Request) (result, error) 
 }
 
 func (h handler) authorizeUpload(r *http.Request, c repo.Config, name string, cl claims) error {
-	db, ctx := h.o.Items.Store, r.Context()
+	ctx := r.Context()
 	u, err := h.uploadUser(r, cl)
 	if err != nil {
 		return err
 	}
-	if err := auth.CheckAPIRestriction(ctx, db.APIRestrictions(), u.Name, h.o.Now()); err != nil {
+	if err := h.o.Restrictions.Check(ctx, u.Name, h.o.Now()); err != nil {
 		return fmt.Errorf("terraformbackend: restricted upload: %w", err)
 	}
 
@@ -161,9 +161,9 @@ func (h handler) authorizeUpload(r *http.Request, c repo.Config, name string, cl
 		}
 		scope = &parsed
 	}
-	subject := authz.Subject{Name: u.Name, Admin: u.Admin, Groups: u.Groups, Scope: scope}
+	subject := accessapi.Subject{Name: u.Name, Admin: u.Admin, Groups: u.Groups, Scope: scope}
 	// Named-group tokens act through their named groups even when the user
-	// is not a member, as auth.Principal.Subject does for bearer requests.
+	// is not a member, as accessapi.SubjectOf does for bearer requests.
 	if scope != nil {
 		for _, entry := range scope.Entries {
 			if entry.Kind == types.ScopeGroups {
@@ -171,17 +171,13 @@ func (h handler) authorizeUpload(r *http.Request, c repo.Config, name string, cl
 			}
 		}
 	}
-	access, err := authz.New(
-		ctx,
-		authz.Sources{Permissions: db.Permissions(), Groups: db.Groups()},
-		subject,
-	)
+	access, err := h.o.Authorizer.Decide(ctx, subject, false)
 	if err != nil {
 		return fmt.Errorf("terraformbackend: upload permissions: %w", err)
 	}
 	if !access.Allows(
 		types.ResourceArtifact,
-		authz.Repo{Key: c.Key, Class: string(c.Class)},
+		accessapi.Repo{Key: c.Key, Class: string(c.Class)},
 		tfbe.LatestPath(name),
 		types.ActionWrite,
 	) {
@@ -190,8 +186,8 @@ func (h handler) authorizeUpload(r *http.Request, c repo.Config, name string, cl
 	return nil
 }
 
-func scopeText(p auth.Principal) *string {
-	if scope := auth.SubjectOf(p).Scope; scope != nil {
+func scopeText(p kernel.Principal) *string {
+	if scope := accessapi.SubjectOf(p).Scope; scope != nil {
 		text := scope.String()
 		return &text
 	}
@@ -201,21 +197,20 @@ func scopeText(p auth.Principal) *string {
 // Capability identities follow the same resolution as access tokens: a
 // synthetic identity never becomes a same-named stored account; a transient
 // one uses the current auto-join groups only while no stored account exists.
-func (h handler) uploadUser(r *http.Request, cl claims) (types.User, error) {
+func (h handler) uploadUser(r *http.Request, cl claims) (accessapi.UserInfo, error) {
 	if cl.Identity == types.IdentitySynthetic {
-		return types.User{Name: cl.Subject}, nil
+		return accessapi.UserInfo{Name: cl.Subject}, nil
 	}
-	db, ctx := h.o.Items.Store, r.Context()
-	u, err := db.Users().Get(ctx, cl.Subject)
+	ctx := r.Context()
+	u, err := h.o.Identity.User(ctx, cl.Subject)
 	if errors.Is(err, store.ErrNotFound) && cl.Identity == types.IdentityTransient {
-		groups, err := db.Groups().AutoJoin(ctx)
+		groups, err := h.o.Identity.AutoJoinGroups(ctx)
 		if err != nil {
 			return u, fmt.Errorf("terraformbackend: upload auto-join groups: %w", err)
 		}
-		return types.User{Name: cl.Subject, Groups: groups}, nil
+		return accessapi.UserInfo{Name: cl.Subject, Groups: groups}, nil
 	}
-	if errors.Is(err, store.ErrNotFound) ||
-		err == nil && u.Status != "" && u.Status != types.UserEnabled {
+	if errors.Is(err, store.ErrNotFound) || err == nil && !u.Enabled() {
 		return u, forbidden
 	}
 	if err != nil {
@@ -226,12 +221,12 @@ func (h handler) uploadUser(r *http.Request, cl claims) (types.User, error) {
 
 func (h handler) capabilityIdentity(
 	r *http.Request,
-	p auth.Principal,
+	p kernel.Principal,
 ) (types.TokenIdentity, error) {
 	if p.Identity != types.IdentityTransient {
 		return p.Identity, nil
 	}
-	_, err := h.o.Items.Store.Users().Get(r.Context(), p.Name)
+	_, err := h.o.Identity.User(r.Context(), p.Name)
 	if errors.Is(err, store.ErrNotFound) {
 		return types.IdentityTransient, nil
 	}

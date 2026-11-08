@@ -22,6 +22,7 @@ import (
 	tfbe "github.com/weaveplatform/artifactweave/internal/format/terraformbackend"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/terraformstate"
+	"github.com/weaveplatform/artifactweave/migration/access"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
@@ -82,12 +83,19 @@ func newFixture(t *testing.T) *fixture {
 		"**",
 	)
 	f.grant("scoped", map[string]types.Actions{"scoped": types.ActionRead}, "workspaces/visible/**")
+	m, err := access.New(access.Deps{Store: db})
+	if err != nil {
+		t.Fatal(err)
+	}
 	f.h = f.router(
 		Options{
-			Items: f.items,
-			Keys:  keys,
-			Now:   func() time.Time { return f.now },
-			Fault: func(_ *http.Request, err error) { f.faults = append(f.faults, err) },
+			Items:        f.items,
+			Keys:         keys,
+			Now:          func() time.Time { return f.now },
+			Fault:        func(_ *http.Request, err error) { f.faults = append(f.faults, err) },
+			Authorizer:   m.API().Authorizer,
+			Identity:     m.API().Identity,
+			Restrictions: m.API().Restrictions,
 		},
 	)
 	return f
@@ -551,8 +559,19 @@ type readFunc func([]byte) (int, error)
 func (f readFunc) Read(p []byte) (int, error) { return f(p) }
 
 func hWith(f *fixture) handler {
+	m, err := access.New(access.Deps{Store: f.db})
+	if err != nil {
+		f.t.Fatal(err)
+	}
 	return handler{
-		o:      Options{Items: f.items, Keys: f.keys, Now: func() time.Time { return f.now }},
+		o: Options{
+			Items:        f.items,
+			Keys:         f.keys,
+			Now:          func() time.Time { return f.now },
+			Authorizer:   m.API().Authorizer,
+			Identity:     m.API().Identity,
+			Restrictions: m.API().Restrictions,
+		},
 		states: &terraformstate.Service{Items: f.items, Keys: f.keys},
 	}
 }
