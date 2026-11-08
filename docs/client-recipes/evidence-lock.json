@@ -65,7 +65,7 @@
   "test/acceptance/clients/vscode.Dockerfile": "5ac4a6880a0b12450ac4130801f4298e85aefe97cf28418e781ea3a21ccb7ee4",
   "test/acceptance/cocoapods_steps_test.go": "bc7751159421745b19cb045db8cf9386f3dfc05b9d0282beb742f5b30164703d",
   "test/acceptance/composer_steps_test.go": "cb9be899dc3166d23ef39cf6e7e2ee757de27a45c5b92e9896a848a47dd12fe6",
-  "test/acceptance/conda_steps_test.go": "280b47ab0fc43616dc540fbc995f268f685de97b5c19e3e6a8ec4aed5d165153",
+  "test/acceptance/conda_steps_test.go": "dcbef4a5b19c617c7d9aa89c425637e98eabd66f3ff0fdd35aa4177fb1a27887",
   "test/acceptance/cran_steps_test.go": "fb0ca6ae7f0920720821eaae61218743c16cb7c8516635e715ecd606a6bf85a5",
   "test/acceptance/debian_steps_test.go": "43beac3923d9d29678e217b1e29dd2b56f1d9383b31407dbb1274659af84dde7",
   "test/acceptance/docker_steps_test.go": "0efcfcbd0fb61f17a19c08db17117cc0f5ba524748c591bb3ef9e539508eea73",

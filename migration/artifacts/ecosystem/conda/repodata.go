@@ -20,6 +20,10 @@ const (
 	maxRepodataItems = 200000
 )
 
+// ErrInvalidRepodata is returned or wrapped for every repodata document,
+// shard index or shard that fails a bound or a check: its size, its
+// compression or structure, a record's identity or digests, or a removed
+// entry.
 var ErrInvalidRepodata = errors.New("conda: invalid repodata")
 
 // Repodata is the Conda channel index for one platform subdirectory.
@@ -33,6 +37,9 @@ type Repodata struct {
 	RepodataVersion int               `json:"repodata_version"`
 }
 
+// EmptyRepodata returns the repodata version 1 index of subdir with no
+// packages. Its maps and removed list are empty rather than nil, so they
+// encode as {} and [], which Conda clients expect.
 func EmptyRepodata(subdir string) Repodata {
 	index := Repodata{
 		Packages: map[string]Record{}, PackagesConda: map[string]Record{},
@@ -142,6 +149,12 @@ func DecodeRepodata(body []byte, path MetadataPath) (Repodata, error) {
 	return index, nil
 }
 
+// EncodeRepodata checks every record of index against its file name,
+// channel and subdir, then returns the documents a subdir serves, by file
+// name: repodata.json, current_repodata.json and their .zst forms.
+// current_repodata.json is the whole index, not a latest-versions subset.
+// It fails with ErrInvalidRepodata when a record is invalid or the index is
+// too large.
 func EncodeRepodata(index Repodata, channel, subdir string) (map[string][]byte, error) {
 	if index.Info.Subdir != subdir ||
 		len(index.Packages)+len(index.PackagesConda) > maxRepodataItems {

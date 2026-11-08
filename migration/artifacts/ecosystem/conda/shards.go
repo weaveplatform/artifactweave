@@ -8,8 +8,13 @@ import (
 	"fmt"
 )
 
+// ShardIndexFilename is the file name of a subdir's CEP-16 shard index.
 const ShardIndexFilename = "repodata_shards.msgpack.zst"
 
+// Settings is the Conda format's server configuration. ShardsEnabled, off
+// by default, makes hosted repositories generate CEP-16 shards and the
+// protocol serve them and prefer a remote's; with it off, a shard request
+// answers 404.
 type Settings struct{ ShardsEnabled bool }
 
 // ShardIndex is CEP-16 version 1. Hashes are MessagePack binary values, not
@@ -19,6 +24,10 @@ type ShardIndex struct {
 	Shards                 map[string][]byte
 }
 
+// DecodeShardIndex reads a zstd-compressed CEP-16 shard index of version 1
+// within the MessagePack bounds: its two base URLs, of at most 4096 bytes
+// each, and a SHA-256 per package name. Anything else fails with
+// ErrInvalidRepodata. The caller confines the base URLs.
 func DecodeShardIndex(body []byte) (ShardIndex, error) {
 	value, err := decodeMessagePack(body)
 	if err != nil {
@@ -107,6 +116,13 @@ func DecodeShard(body []byte, id MetadataPath, name, digest string) (Repodata, e
 	return index, nil
 }
 
+// EncodeShards checks every record of index as EncodeRepodata does, then
+// returns, by file name, a shard per package name, named by the SHA-256 of
+// its compressed bytes, and the shard index that maps each name to that
+// hash, with baseURL as its base_url and ./ as its shards_base_url.
+// Digests are MessagePack binary, as CEP-16 requires, and map keys are
+// sorted, so the same records always give the same shard names. It fails
+// with ErrInvalidRepodata.
 func EncodeShards(index Repodata, channel, subdir, baseURL string) (map[string][]byte, error) {
 	if index.Info.Subdir != subdir {
 		return nil, ErrInvalidRepodata

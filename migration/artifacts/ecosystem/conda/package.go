@@ -23,6 +23,9 @@ const (
 	maxTarEntries        = 100000
 )
 
+// ErrInvalidPackage is wrapped by every refusal of ReadPackage: an archive
+// whose envelope or entries are unsafe or too large, or whose
+// info/index.json is missing, malformed or disagrees with the package path.
 var ErrInvalidPackage = errors.New("conda: invalid package")
 
 // Record is the subset of info/index.json retained in the channel index.

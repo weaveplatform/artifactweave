@@ -1,5 +1,3 @@
-// Package condahttp serves the native Conda channel protocol. Index responses are
-// built from validated package records and filtered by the caller's rights.
 package condahttp
 
 import (
@@ -38,6 +36,13 @@ func (virtualSource) Item(
 	return pkgroute.Found{}, source.ErrUnsupported
 }
 
+// Protocol returns the Conda channel protocol for the router kit: GET and
+// HEAD of every path under /artifactory/api/conda/{repoKey}, for local and
+// federated repositories from their own items, virtual ones from their
+// members, and remote ones through remote when it is not nil; a class
+// without a source answers 501. settings.ShardsEnabled turns on the CEP-16
+// shard documents. The virtual class's source supports no single-item
+// lookup, because the protocol reads a virtual repository's members itself.
 func Protocol(remote *source.Service, settings condafmt.Settings) pkgroute.Protocol {
 	sources := map[repo.Class]pkgroute.Source{
 		repo.Local: pkgroute.Local{}, repo.Federated: pkgroute.Local{},

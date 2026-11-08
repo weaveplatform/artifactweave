@@ -83,11 +83,18 @@ func ParsePackagePath(p string) (PackagePath, bool) {
 	}, true
 }
 
+// IsMetadata reports whether p is a channel metadata path, as
+// ParseMetadataPath reads one.
 func IsMetadata(p string) bool {
 	_, ok := ParseMetadataPath(p)
 	return ok
 }
 
+// ParseMetadataPath reads p as a channel metadata path: a subdir and a
+// file name below an optional subchannel prefix, the file being
+// repodata.json or its .zst or .bz2 form, current_repodata.json or its .zst
+// form, notices.json, the shard index or a shard. It reports false for any
+// other file, a malformed segment and an unknown subdir.
 func ParseMetadataPath(p string) (MetadataPath, bool) {
 	channel, subdir, filename, ok := splitPath(p)
 	if !ok {
@@ -104,6 +111,8 @@ func ParseMetadataPath(p string) (MetadataPath, bool) {
 	return MetadataPath{Path: p, Channel: channel, Subdir: subdir, Filename: filename}, true
 }
 
+// IndexPath joins a channel-relative path: channel, unless it is empty,
+// then subdir and filename.
 func IndexPath(channel, subdir, filename string) string {
 	if channel == "" {
 		return subdir + "/" + filename
@@ -111,6 +120,8 @@ func IndexPath(channel, subdir, filename string) string {
 	return channel + "/" + subdir + "/" + filename
 }
 
+// IsShardFilename reports whether filename names a CEP-16 shard: the
+// lowercase hex SHA-256 of its compressed bytes, then .msgpack.zst.
 func IsShardFilename(filename string) bool {
 	return strings.HasSuffix(filename, ".msgpack.zst") &&
 		validHexDigest(strings.TrimSuffix(filename, ".msgpack.zst"), 32)
