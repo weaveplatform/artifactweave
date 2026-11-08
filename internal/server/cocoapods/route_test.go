@@ -16,16 +16,16 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	podfmt "github.com/weaveplatform/artifactweave/internal/format/cocoapods"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
@@ -99,21 +99,13 @@ func newRouteFixture(t *testing.T) *routeFixture {
 	}
 	r := chi.NewRouter()
 	r.Use(baseurl.Middleware(""))
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			name := r.Header.Get("X-User")
-			if name == "" {
-				name = "admin"
-			}
-			principal, decider, err := auth.Authorize(r.Context(), authz.Sources{
-				Permissions: db.Permissions(), Groups: db.Groups(), AnonymousEnabled: true,
-			}, auth.Principal{Name: name, Admin: name == "admin"})
-			if err != nil {
-				t.Fatal(err)
-			}
-			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), principal, decider)))
-		})
-	})
+	r.Use(accesstest.Over(t, db).Middleware(t, true, func(r *http.Request) kernel.Principal {
+		name := r.Header.Get("X-User")
+		if name == "" {
+			name = "admin"
+		}
+		return kernel.Principal{Name: name, Admin: name == "admin"}
+	}))
 	k := pkgroute.Mount(r, pkgroute.Options{
 		Store: db, Items: func() *item.Service { return items },
 		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it types.Item) {

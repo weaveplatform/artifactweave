@@ -14,13 +14,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/server/gitlfs"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -78,19 +78,9 @@ func newFixture(t *testing.T, class repo.Class) *fixture {
 	}
 	r := chi.NewRouter()
 	r.Use(baseurl.Middleware(""))
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			p, decider, e := auth.Authorize(r.Context(), authz.Sources{
-				Permissions: db.Permissions(), Groups: db.Groups(), AnonymousEnabled: true,
-			}, auth.Principal{Name: r.Header.Get("X-User"), Admin: r.Header.Get("X-User") == ""})
-			if e != nil {
-				t.Error(e)
-				http.Error(w, e.Error(), http.StatusInternalServerError)
-				return
-			}
-			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
-		})
-	})
+	r.Use(accesstest.Over(t, db).Middleware(t, true, func(r *http.Request) kernel.Principal {
+		return kernel.Principal{Name: r.Header.Get("X-User"), Admin: r.Header.Get("X-User") == ""}
+	}))
 	pkgroute.Mount(r, pkgroute.Options{
 		Store: db, Items: func() *item.Service { return items },
 		ItemError: func(_ context.Context, _ string, e error) error { return e },

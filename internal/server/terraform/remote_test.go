@@ -17,15 +17,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
-	"github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -39,7 +39,7 @@ type remoteFixture struct {
 	policy *remote.Policy
 	svc    *source.Service
 	clock  *fakeupstream.Clock
-	auth   *auth.Authenticator
+	kit    *accesstest.Kit
 }
 
 func newRemoteFixture(t *testing.T) *remoteFixture {
@@ -86,48 +86,24 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 			return f.db.RemoteCache().Source(ctx, c.Key)
 		},
 	}
-	a, e := auth.NewAuthenticator(
-		f.db.Users(),
-		f.db.Settings(),
-		auth.Options{
-			Hash: auth.HashParams{Time: 1, MemoryKiB: 8, Threads: 1},
-			Now:  func() time.Time { return f.now },
-		},
-	)
-	if e != nil {
-		t.Fatal(e)
-	}
+	kit := accesstest.Over(t, f.db, accesstest.WithNow(func() time.Time { return f.now }))
 	for _, name := range []string{"reader", "admin"} {
 		u, _ := f.db.Users().Get(t.Context(), name)
-		u.PasswordHash, e = auth.HashPasswordWith(
-			auth.HashParams{Time: 1, MemoryKiB: 8, Threads: 1},
-			"fixture-password",
-		)
-		if e != nil {
-			t.Fatal(e)
-		}
-		if e = f.db.Users().Update(t.Context(), u); e != nil {
+		u.PasswordHash = accesstest.HashPassword(t, "fixture-password")
+		if e := f.db.Users().Update(t.Context(), u); e != nil {
 			t.Fatal(e)
 		}
 	}
 	svc.Revalidate = func(ctx context.Context, q source.Request, _ source.Permit) error {
-		p, ok := auth.FromContext(ctx)
+		p, ok := kernel.FromContext(ctx)
 		if !ok {
 			return source.ErrDenied
 		}
-		fresh, e := a.Current(ctx, p, f.db.Tokens())
+		fresh, e := kit.API().Authenticator.Current(ctx, p)
 		if e != nil {
 			return source.ErrDenied
 		}
-		_, decider, e := auth.Authorize(
-			ctx,
-			authz.Sources{
-				Permissions:      f.db.Permissions(),
-				Groups:           f.db.Groups(),
-				AnonymousEnabled: fresh.Anonymous,
-			},
-			fresh,
-		)
+		_, decider, e := kit.API().Authorizer.Authorize(ctx, fresh, fresh.Anonymous)
 		if e != nil {
 			return e
 		}
@@ -139,7 +115,7 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 		}
 		if !allows(
 			types.ResourceArtifact,
-			authz.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)},
+			accessapi.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)},
 			path,
 			types.ActionRead,
 		) {
@@ -150,40 +126,29 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 	p.CheckCurrent = func(ctx context.Context, _ store.Store, q source.Request, permit source.Permit, _ string) error {
 		return svc.Revalidate(ctx, q, permit)
 	}
-	out := &remoteFixture{fixture: f, up: up, policy: p, svc: svc, clock: clock, auth: a}
+	out := &remoteFixture{fixture: f, up: up, policy: p, svc: svc, clock: clock, kit: kit}
 	out.mount()
 	out.json("/.well-known/terraform.json", map[string]string{"modules.v1": "/registry/modules/"})
 	return out
 }
 
 func (f *remoteFixture) mount() {
-	m, err := access.New(access.Deps{Store: f.db, Authenticator: f.auth})
-	if err != nil {
-		f.t.Fatal(err)
-	}
+	api := f.kit.API()
 	r := chi.NewRouter()
 	r.Use(baseurl.Middleware("https://registry.test"))
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			user := r.Header.Get("X-User")
 			if user != "" {
-				authenticated, e := f.auth.Basic(r.Context(), user, "fixture-password")
+				authenticated, e := api.Authenticator.Basic(r.Context(), user, "fixture-password")
 				if e != nil {
 					f.t.Fatal(e)
 				}
-				p, decider, err := auth.Authorize(
-					r.Context(),
-					authz.Sources{
-						Permissions:      f.db.Permissions(),
-						Groups:           f.db.Groups(),
-						AnonymousEnabled: true,
-					},
-					authenticated,
-				)
+				ctx, err := f.kit.Authorize(r.Context(), authenticated, true)
 				if err != nil {
 					f.t.Fatal(err)
 				}
-				r = r.WithContext(auth.WithAuthorized(r.Context(), p, decider))
+				r = r.WithContext(ctx)
 			}
 			next.ServeHTTP(w, r)
 		})
@@ -212,12 +177,12 @@ func (f *remoteFixture) mount() {
 				Keys:            f.keys,
 				Now:             func() time.Time { return f.now },
 				RemoteSources:   f.svc,
-				Authenticator:   m.API().Authenticator,
-				Authorizer:      m.API().Authorizer,
-				KeyPairs:        m.API().Keys,
-				Restrictions:    m.API().Restrictions,
-				Identity:        m.API().Identity,
-				AnonymousAccess: m.API().AnonymousAccess,
+				Authenticator:   api.Authenticator,
+				Authorizer:      api.Authorizer,
+				KeyPairs:        api.Keys,
+				Restrictions:    api.Restrictions,
+				Identity:        api.Identity,
+				AnonymousAccess: api.AnonymousAccess,
 			},
 		),
 	)
@@ -516,8 +481,8 @@ func TestUnitRemoteModuleDeliveryRejectsUnreadableAndRevokedSources(t *testing.T
 	if err := used(t.Context()); !errors.Is(err, denied) {
 		t.Fatalf("failed source usage was lost: %v", err)
 	}
-	badPrincipal := auth.Principal{Name: "reader"} // identity without a revalidatable credential
-	r = r.WithContext(auth.WithPrincipal(r.Context(), badPrincipal))
+	badPrincipal := kernel.Principal{Name: "reader"} // identity without a revalidatable credential
+	r = r.WithContext(kernel.WithPrincipal(r.Context(), badPrincipal))
 	h = handler{o: Options{Now: time.Now}}
 	if target, err := h.remoteDownloadURL(
 		r,
@@ -526,11 +491,11 @@ func TestUnitRemoteModuleDeliveryRejectsUnreadableAndRevokedSources(t *testing.T
 		types.SourceIdentity{},
 		"",
 		"zip",
-	); target != "" || !errors.Is(err, auth.ErrBadCredentials) {
+	); target != "" || !errors.Is(err, kernel.ErrBadCredentials) {
 		t.Fatalf("module signed URL issued without credential: %q, %v", target, err)
 	}
 	if target, err := h.remoteProviderURL(r, providerBundle{}, 0); target != "" ||
-		!errors.Is(err, auth.ErrBadCredentials) {
+		!errors.Is(err, kernel.ErrBadCredentials) {
 		t.Fatalf("provider signed URL issued without credential: %q, %v", target, err)
 	}
 }
@@ -649,23 +614,15 @@ func TestAccRemoteModuleSubdirectory(t *testing.T) {
 
 func (f *remoteFixture) doPrincipal(
 	method, path string,
-	principal auth.Principal,
+	principal kernel.Principal,
 ) *httptest.ResponseRecorder {
 	f.t.Helper()
-	p, decider, e := auth.Authorize(
-		f.t.Context(),
-		authz.Sources{
-			Permissions:      f.db.Permissions(),
-			Groups:           f.db.Groups(),
-			AnonymousEnabled: principal.Anonymous,
-		},
-		principal,
-	)
+	r := httptest.NewRequest(method, path, nil)
+	ctx, e := f.kit.Authorize(r.Context(), principal, principal.Anonymous)
 	if e != nil {
 		f.t.Fatal(e)
 	}
-	r := httptest.NewRequest(method, path, nil)
-	r = r.WithContext(auth.WithAuthorized(r.Context(), p, decider))
+	r = r.WithContext(ctx)
 	w := httptest.NewRecorder()
 	f.h.ServeHTTP(w, r)
 	return w
@@ -696,11 +653,10 @@ func TestAccRemoteModuleCredentialChangesAfterIssuance(t *testing.T) {
 			if e := f.db.Tokens().Create(t.Context(), tok); e != nil {
 				t.Fatal(e)
 			}
-			p, e := f.auth.RestoreDownload(
+			p, e := f.kit.API().Authenticator.RestoreDownload(
 				t.Context(),
 				"reader",
-				auth.DownloadCredential{Kind: "token", TokenID: tok.ID},
-				f.db.Tokens(),
+				kernel.DownloadCredential{Kind: "token", TokenID: tok.ID},
 			)
 			if e != nil {
 				t.Fatal(e)
@@ -734,12 +690,12 @@ func TestAccRemoteModuleCredentialChangesAfterIssuance(t *testing.T) {
 		}
 		p, _ := f.db.Permissions().Get(t.Context(), "remote-read")
 		r := p.Resources[types.ResourceArtifact]
-		r.Actions.Users[auth.AnonymousUser] = types.ActionRead
+		r.Actions.Users[kernel.AnonymousUser] = types.ActionRead
 		p.Resources[types.ResourceArtifact] = r
 		if e := f.db.Permissions().Update(t.Context(), p); e != nil {
 			t.Fatal(e)
 		}
-		w := f.doPrincipal("GET", remoteModuleBase+"1.0.0/download", auth.Anonymous)
+		w := f.doPrincipal("GET", remoteModuleBase+"1.0.0/download", kernel.Anonymous)
 		expect(t, w, 204)
 		location := w.Header().Get("X-Terraform-Get")
 		expect(t, f.do("GET", location, ""), 200)

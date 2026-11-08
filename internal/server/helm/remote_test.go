@@ -18,16 +18,16 @@ import (
 	"github.com/go-chi/chi/v5"
 	"gopkg.in/yaml.v3"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	helmfmt "github.com/weaveplatform/artifactweave/internal/format/helm"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/helm"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -96,29 +96,16 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 
 func (f *remoteFixture) mount(t *testing.T, public string, relative bool) {
 	t.Helper()
+	principalOf := func(r *http.Request) kernel.Principal {
+		name := r.Header.Get("X-User")
+		if name == "anonymous" {
+			return kernel.Anonymous
+		}
+		return kernel.Principal{Name: name, Admin: name == "admin"}
+	}
+	authorize := accesstest.Over(t, f.items.Store).Middleware(t, true, principalOf)
 	r := chi.NewRouter()
-	r.Use(baseurl.Middleware(public), func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			name := r.Header.Get("X-User")
-			p := auth.Principal{Name: name, Admin: name == "admin"}
-			if name == "anonymous" {
-				p = auth.Anonymous
-			}
-			p, decider, err := auth.Authorize(
-				r.Context(),
-				authz.Sources{
-					Permissions:      f.items.Store.Permissions(),
-					Groups:           f.items.Store.Groups(),
-					AnonymousEnabled: true,
-				},
-				p,
-			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
-		})
-	})
+	r.Use(baseurl.Middleware(public), authorize)
 	pkgroute.Mount(
 		r,
 		pkgroute.Options{

@@ -19,15 +19,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/server/puppet"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/blobtest"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -91,18 +91,10 @@ func newFixtureStore(
 	}
 	r := chi.NewRouter()
 	r.Use(baseurl.Middleware(""))
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			name := r.Header.Get("X-User")
-			p, decider, err := auth.Authorize(r.Context(), authz.Sources{
-				Permissions: db.Permissions(), Groups: db.Groups(), AnonymousEnabled: true,
-			}, auth.Principal{Name: name, Admin: name == "admin", Anonymous: name == ""})
-			if err != nil {
-				t.Fatal(err)
-			}
-			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
-		})
-	})
+	r.Use(accesstest.Over(t, db).Middleware(t, true, func(r *http.Request) kernel.Principal {
+		name := r.Header.Get("X-User")
+		return kernel.Principal{Name: name, Admin: name == "admin", Anonymous: name == ""}
+	}))
 	p := puppet.Protocol(puppet.Options{Blobs: blobs})
 	if tune != nil {
 		tune(&p)

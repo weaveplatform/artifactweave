@@ -20,14 +20,14 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	pypifmt "github.com/weaveplatform/artifactweave/internal/format/pypi"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/server/pypi"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -140,25 +140,21 @@ func newFixture(
 // principal authorises the user X-Test-User names, as the server's
 // middleware does.
 func principal(t *testing.T, db *inmem.Store) func(http.Handler) http.Handler {
+	authorize := accesstest.Over(t, db).Middleware(t, true, func(r *http.Request) kernel.Principal {
+		name := r.Header.Get("X-Test-User")
+		if name == kernel.AnonymousUser {
+			return kernel.Anonymous
+		}
+		return kernel.Principal{Name: name, Admin: name == "admin"}
+	})
 	return func(next http.Handler) http.Handler {
+		authorized := authorize(next)
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			name := r.Header.Get("X-Test-User")
-			if name == "" {
+			if r.Header.Get("X-Test-User") == "" {
 				next.ServeHTTP(w, r)
 				return
 			}
-			p := auth.Principal{Name: name, Admin: name == "admin"}
-			if name == auth.AnonymousUser {
-				p = auth.Anonymous
-			}
-			p, decider, err := auth.Authorize(r.Context(), authz.Sources{
-				Permissions: db.Permissions(), Groups: db.Groups(), AnonymousEnabled: true,
-			}, p)
-			if err != nil {
-				t.Error(err)
-				return
-			}
-			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
+			authorized.ServeHTTP(w, r)
 		})
 	}
 }

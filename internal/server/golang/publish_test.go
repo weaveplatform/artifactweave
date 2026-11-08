@@ -12,14 +12,14 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/server/golang"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -78,21 +78,12 @@ func newPubFixture(t *testing.T) *pubFixture {
 	f := &pubFixture{db: db}
 	items := &item.Service{Store: db, Blobs: blobs, Formats: ecosystem.For}
 	r := chi.NewRouter()
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			pr := auth.Anonymous
-			if name := r.Header.Get("X-Test-User"); name != "" {
-				pr = auth.Principal{Name: name}
-			}
-			pr, decider, err := auth.Authorize(r.Context(), authz.Sources{
-				Permissions: db.Permissions(), Groups: db.Groups(),
-			}, pr)
-			if err != nil {
-				t.Fatal(err)
-			}
-			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), pr, decider)))
-		})
-	})
+	r.Use(accesstest.Over(t, db).Middleware(t, false, func(r *http.Request) kernel.Principal {
+		if name := r.Header.Get("X-Test-User"); name != "" {
+			return kernel.Principal{Name: name}
+		}
+		return kernel.Anonymous
+	}))
 	pkgroute.Mount(r, pkgroute.Options{
 		Store: db,
 		Items: func() *item.Service { return items },

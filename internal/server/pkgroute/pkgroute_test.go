@@ -12,12 +12,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -175,29 +175,27 @@ func newKitFixture(t *testing.T, sources map[repo.Class]pkgroute.Source) *kitFix
 // X-Test-User put where the server's middleware puts it.
 func (f *kitFixture) router(t *testing.T, o pkgroute.Options, p pkgroute.Protocol) http.Handler {
 	t.Helper()
+	principalOf := func(r *http.Request) kernel.Principal {
+		name := r.Header.Get("X-Test-User")
+		if name == kernel.AnonymousUser {
+			return kernel.Anonymous
+		}
+		return kernel.Principal{Name: name}
+	}
+	authorize := accesstest.Over(t, f.db).Middleware(t, true, principalOf)
 	r := chi.NewRouter()
 	r.Use(func(next http.Handler) http.Handler {
+		authorized := authorize(next)
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			name := r.Header.Get("X-Test-User")
-			if name == "" {
+			switch {
+			case r.Header.Get("X-Test-User") == "":
 				next.ServeHTTP(w, r)
-				return
+			case r.Header.Get("X-Test-Unevaluated") != "":
+				ctx := kernel.WithPrincipal(r.Context(), principalOf(r))
+				next.ServeHTTP(w, r.WithContext(ctx))
+			default:
+				authorized.ServeHTTP(w, r)
 			}
-			pr := auth.Principal{Name: name}
-			if name == auth.AnonymousUser {
-				pr = auth.Anonymous
-			}
-			var decider *authz.Decider
-			if r.Header.Get("X-Test-Unevaluated") == "" {
-				var err error
-				pr, decider, err = auth.Authorize(r.Context(), authz.Sources{
-					Permissions: f.db.Permissions(), Groups: f.db.Groups(), AnonymousEnabled: true,
-				}, pr)
-				if err != nil {
-					t.Fatal(err)
-				}
-			}
-			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), pr, decider)))
 		})
 	})
 	pkgroute.Mount(r, o, p)
@@ -377,7 +375,7 @@ func TestAccRequire(t *testing.T) {
 		{"reader", false, http.StatusNoContent},
 		{"writer", false, http.StatusForbidden},
 		{"nobody", false, http.StatusForbidden},
-		{auth.AnonymousUser, false, http.StatusUnauthorized},
+		{kernel.AnonymousUser, false, http.StatusUnauthorized},
 		{"", false, http.StatusUnauthorized},
 		// Permissions the middleware never evaluated grant nothing.
 		{"reader", true, http.StatusForbidden},
@@ -521,7 +519,7 @@ func TestAccDeploy(t *testing.T) {
 		// Outside writer's grant.
 		{"/files/a/new.txt", "writer", nil, http.StatusForbidden},
 		{"/files/a/new.txt", "", nil, http.StatusUnauthorized},
-		{"/files/a/new.txt", auth.AnonymousUser, nil, http.StatusUnauthorized},
+		{"/files/a/new.txt", kernel.AnonymousUser, nil, http.StatusUnauthorized},
 		// Replacing a file needs Delete, which updater lacks.
 		{"/files/a/b.txt", "updater", nil, http.StatusForbidden},
 		{"/files/a/fresh.txt", "updater", nil, http.StatusCreated},

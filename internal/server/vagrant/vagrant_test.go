@@ -17,12 +17,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -44,6 +44,7 @@ type catalog struct {
 type fixture struct {
 	t      *testing.T
 	db     *inmem.Store
+	kit    *accesstest.Kit
 	faults *faultStore
 	items  *item.Service
 	c      repo.Config
@@ -73,6 +74,7 @@ func newFixture(t *testing.T, class repo.Class) *fixture {
 	return &fixture{
 		t:      t,
 		db:     db,
+		kit:    accesstest.Over(t, db),
 		faults: faults,
 		c:      c,
 		items:  &item.Service{Store: db, Blobs: blobs, Formats: ecosystem.For},
@@ -83,23 +85,15 @@ func newFixture(t *testing.T, class repo.Class) *fixture {
 func (f *fixture) do(method, path, user string, body []byte) *httptest.ResponseRecorder {
 	f.t.Helper()
 	r := httptest.NewRequest(method, path, bytes.NewReader(body))
-	p := auth.Principal{Name: user, Admin: user == "admin"}
+	p := kernel.Principal{Name: user, Admin: user == "admin"}
 	if user == "" {
-		p = auth.Anonymous
+		p = kernel.Anonymous
 	}
-	p, decider, err := auth.Authorize(
-		r.Context(),
-		authz.Sources{
-			Permissions:      f.db.Permissions(),
-			Groups:           f.db.Groups(),
-			AnonymousEnabled: true,
-		},
-		p,
-	)
+	ctx, err := f.kit.Authorize(r.Context(), p, true)
 	if err != nil {
 		f.t.Fatal(err)
 	}
-	r = r.WithContext(auth.WithAuthorized(r.Context(), p, decider))
+	r = r.WithContext(ctx)
 	w := httptest.NewRecorder()
 	f.router.ServeHTTP(w, r)
 	return w

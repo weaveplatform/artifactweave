@@ -13,13 +13,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	ml "github.com/weaveplatform/artifactweave/internal/format/machinelearning"
 	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -55,26 +55,14 @@ func newFixture(t *testing.T, class repo.Class, configure ...func(*server.Config
 		apply(&config)
 	}
 	h := server.New(config)
-	f.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	authorize := accesstest.Over(t, db).Middleware(t, true, func(r *http.Request) kernel.Principal {
 		name := r.Header.Get("X-User")
 		if name == "" {
 			name = "admin"
 		}
-		p, decider, err := auth.Authorize(
-			r.Context(),
-			authz.Sources{
-				Permissions:      db.Permissions(),
-				Groups:           db.Groups(),
-				AnonymousEnabled: true,
-			},
-			auth.Principal{Name: name, Admin: name == "admin", Anonymous: name == "anonymous"},
-		)
-		if err != nil {
-			http.Error(w, "authorization failed", 500)
-			return
-		}
-		h.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
-	}))
+		return kernel.Principal{Name: name, Admin: name == "admin", Anonymous: name == "anonymous"}
+	})
+	f.server = httptest.NewServer(authorize(h))
 	t.Cleanup(f.server.Close)
 	return f
 }

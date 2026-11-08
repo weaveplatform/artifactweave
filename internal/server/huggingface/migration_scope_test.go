@@ -12,12 +12,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/server/huggingface"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
-	"github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -64,15 +62,12 @@ func migrationScopeFixture(t *testing.T) (*fixture, *migrationReadCounter, http.
 	}
 	f := &fixture{t: t, db: db, items: items}
 	f.legacyRevision("models", "1700000000", sha, false)
-	m, err := access.New(access.Deps{Store: db})
-	if err != nil {
-		t.Fatal(err)
-	}
+	grants := accesstest.Over(t, db).API().Grants
 	router := chi.NewRouter()
 	pkgroute.Mount(router, pkgroute.Options{
 		Store: db, Items: func() *item.Service { return items },
 		ItemError: func(_ context.Context, _ string, err error) error { return err },
-	}, huggingface.Protocol(huggingface.Options{Grants: m.API().Grants}))
+	}, huggingface.Protocol(huggingface.Options{Grants: grants}))
 	return f, blobs, router
 }
 
@@ -88,24 +83,10 @@ func migrationWithScope(
 	if err != nil {
 		t.Fatal(err)
 	}
-	authenticator, err := auth.NewAuthenticator(f.db.Users(), f.db.Settings(), auth.Options{
-		Hash: auth.HashParams{MemoryKiB: 64, Time: 1, Threads: 1},
-		Tokens: migrationTokenVerifier{
-			token: types.Token{ID: "scoped", Subject: "jfac@fixture/users/admin", Scope: parsed},
-		},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	principal, err := authenticator.Token(t.Context(), "scoped", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	principal, decider, err := auth.Authorize(
-		t.Context(),
-		authz.Sources{Permissions: f.db.Permissions(), Groups: f.db.Groups()},
-		principal,
-	)
+	kit := accesstest.Over(t, f.db, accesstest.WithTokenVerifier(migrationTokenVerifier{
+		token: types.Token{ID: "scoped", Subject: "jfac@fixture/users/admin", Scope: parsed},
+	}))
+	principal, err := kit.API().Authenticator.Token(t.Context(), "scoped", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +96,11 @@ func migrationWithScope(
 		bytes.NewReader(migrationBody("models", "1700000000", sha, "main", dry)),
 	)
 	r.Header.Set("Content-Type", "application/json")
-	r = r.WithContext(auth.WithAuthorized(r.Context(), principal, decider))
+	ctx, err := kit.Authorize(r.Context(), principal, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r = r.WithContext(ctx)
 	out := httptest.NewRecorder()
 	router.ServeHTTP(out, r)
 	return out

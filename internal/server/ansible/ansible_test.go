@@ -16,18 +16,18 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	ansiblefmt "github.com/weaveplatform/artifactweave/internal/format/ansible"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/ansible"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
@@ -75,24 +75,16 @@ func (f *fixture) mount(remote *source.Service) {
 	items := f.items
 	router := chi.NewRouter()
 	router.Use(baseurl.Middleware(""))
-	router.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			p := auth.Principal{Name: "admin", Admin: true}
-			if user := r.Header.Get("X-User"); user != "" && user != "denied" {
-				p = auth.Principal{Name: user}
-			}
-			if r.Header.Get("X-User") == "denied" {
-				p = auth.Anonymous
-			}
-			p, decider, err := auth.Authorize(r.Context(), authz.Sources{
-				Permissions: db.Permissions(), Groups: db.Groups(),
-			}, p)
-			if err != nil {
-				t.Fatal(err)
-			}
-			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
-		})
-	})
+	router.Use(accesstest.Over(t, db).Middleware(t, false, func(r *http.Request) kernel.Principal {
+		p := kernel.Principal{Name: "admin", Admin: true}
+		if user := r.Header.Get("X-User"); user != "" && user != "denied" {
+			p = kernel.Principal{Name: user}
+		}
+		if r.Header.Get("X-User") == "denied" {
+			p = kernel.Anonymous
+		}
+		return p
+	}))
 	st := f.store
 	if st == nil {
 		st = db

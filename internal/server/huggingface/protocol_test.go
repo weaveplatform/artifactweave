@@ -22,15 +22,14 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/server/huggingface"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
-	"github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
@@ -66,23 +65,15 @@ func newFixture(t *testing.T, class repo.Class, setup ...func(*fixture) *source.
 	if err != nil {
 		t.Fatal(err)
 	}
-	params := auth.HashParams{MemoryKiB: 64, Time: 1, Threads: 1}
-	password, err := auth.HashPasswordWith(params, "pw")
-	if err != nil {
-		t.Fatal(err)
-	}
+	password := accesstest.HashPassword(t, "pw")
 	if err = db.Users().
 		Create(t.Context(), types.User{Name: "admin", Admin: true, PasswordHash: password}); err != nil {
 		t.Fatal(err)
 	}
-	authenticator, err := auth.NewAuthenticator(
-		db.Users(),
-		db.Settings(),
-		auth.Options{Hash: params},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// The middleware's kit reads db, not the store a setup swaps in, so a
+	// failing store fails the protocol's access reads and never the caller's
+	// authentication.
+	callers := accesstest.Over(t, db)
 	f := &fixture{t: t, db: db, items: items}
 	var remoteSources *source.Service
 	if len(setup) != 0 {
@@ -90,10 +81,7 @@ func newFixture(t *testing.T, class repo.Class, setup ...func(*fixture) *source.
 	}
 	// Bound over f.db after setup, as the router kit's store is, so a setup
 	// that swaps in a failing store fails the access reads too.
-	m, err := access.New(access.Deps{Store: f.db, Authenticator: authenticator})
-	if err != nil {
-		t.Fatal(err)
-	}
+	api := accesstest.Over(t, f.db).API()
 	r := chi.NewRouter()
 	r.Use(baseurl.Middleware(""))
 	r.Use(func(next http.Handler) http.Handler {
@@ -102,31 +90,23 @@ func newFixture(t *testing.T, class repo.Class, setup ...func(*fixture) *source.
 			if name == "" {
 				name = "admin"
 			}
-			principal := auth.Principal{Name: name, Admin: name == "admin"}
+			principal := kernel.Principal{Name: name, Admin: name == "admin"}
 			if name == "admin" {
 				var e error
-				principal, e = authenticator.Basic(r.Context(), name, "pw")
+				principal, e = callers.API().Authenticator.Basic(r.Context(), name, "pw")
 				if e != nil {
 					t.Error(e)
 					http.Error(w, "auth", 500)
 					return
 				}
 			}
-			p, decider, err := auth.Authorize(
-				r.Context(),
-				authz.Sources{
-					Permissions:      db.Permissions(),
-					Groups:           db.Groups(),
-					AnonymousEnabled: true,
-				},
-				principal,
-			)
+			ctx, err := callers.Authorize(r.Context(), principal, true)
 			if err != nil {
 				t.Error(err)
 				http.Error(w, err.Error(), 500)
 				return
 			}
-			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
+			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	})
 	pkgroute.Mount(r, pkgroute.Options{
@@ -151,9 +131,9 @@ func newFixture(t *testing.T, class repo.Class, setup ...func(*fixture) *source.
 		XetEnabled:    f.xetEnabled,
 		Keys:          keys,
 		RemoteSources: remoteSources,
-		Authenticator: m.API().Authenticator,
-		Authorizer:    m.API().Authorizer,
-		Grants:        m.API().Grants,
+		Authenticator: api.Authenticator,
+		Authorizer:    api.Authorizer,
+		Grants:        api.Grants,
 	}))
 	f.server = httptest.NewServer(r)
 	t.Cleanup(f.server.Close)

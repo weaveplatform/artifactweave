@@ -22,14 +22,14 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/server/swift"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
@@ -78,35 +78,31 @@ func newFixture(
 	r := chi.NewRouter()
 	counts := map[string]int{}
 	countsMu := new(sync.Mutex)
+	userOf := func(r *http.Request) string {
+		name := r.Header.Get("X-User")
+		if name == "" {
+			name, _, _ = r.BasicAuth()
+		}
+		return name
+	}
+	authorize := accesstest.Over(t, db).Middleware(t, true, func(r *http.Request) kernel.Principal {
+		name := userOf(r)
+		if name == "" {
+			return kernel.Anonymous
+		}
+		return kernel.Principal{Name: name, Admin: name == "admin"}
+	})
 	r.Use(func(next http.Handler) http.Handler {
+		authorized := authorize(next)
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			countsMu.Lock()
 			counts[r.Method+" "+r.URL.Path]++
 			countsMu.Unlock()
-			name := r.Header.Get("X-User")
-			if name == "" {
-				name, _, _ = r.BasicAuth()
-			}
 			if os.Getenv("ARTIFACTWEAVE_SWIFT_CLIENT_LOCAL") == "1" {
-				t.Logf("client request %s %s authenticated=%t", r.Method, r.URL.Path, name != "")
+				authenticated := userOf(r) != ""
+				t.Logf("client request %s %s authenticated=%t", r.Method, r.URL.Path, authenticated)
 			}
-			principal := auth.Principal{Name: name, Admin: name == "admin"}
-			if name == "" {
-				principal = auth.Anonymous
-			}
-			p, decider, authErr := auth.Authorize(
-				r.Context(),
-				authz.Sources{
-					Permissions:      db.Permissions(),
-					Groups:           db.Groups(),
-					AnonymousEnabled: true,
-				},
-				principal,
-			)
-			if authErr != nil {
-				t.Fatal(authErr)
-			}
-			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
+			authorized.ServeHTTP(w, r)
 		})
 	})
 	var protocol swift.Options
@@ -620,23 +616,12 @@ let package = Package(name: "Consumer", dependencies: [.package(id: "acme.Widget
 // netrc credentials cannot pass by inheriting anonymous access.
 func swiftCredentialHandler(t *testing.T, f *fixture, user string) http.Handler {
 	t.Helper()
-	params := auth.HashParams{MemoryKiB: 64, Time: 1, Threads: 1}
-	hash, err := auth.HashPasswordWith(params, "swift-client-password")
-	if err != nil {
-		t.Fatal(err)
-	}
+	hash := accesstest.HashPassword(t, "swift-client-password")
 	if err := f.db.Users().
 		Create(t.Context(), types.User{Name: user, PasswordHash: hash}); err != nil {
 		t.Fatal(err)
 	}
-	verifier, err := auth.NewAuthenticator(
-		f.db.Users(),
-		f.db.Settings(),
-		auth.Options{Hash: params},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	verifier := accesstest.Over(t, f.db).API().Authenticator
 	r := chi.NewRouter()
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

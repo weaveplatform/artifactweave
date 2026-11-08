@@ -11,13 +11,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
-	"github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
@@ -99,36 +98,22 @@ func (f *fixture) router(keys *crypt.Keyring) http.Handler {
 	f.t.Helper()
 	// Bound over f.read, the store the router kit serves, so a test that
 	// swaps in a failing store fails the access reads too.
-	m, err := access.New(access.Deps{Store: f.read})
-	if err != nil {
-		f.t.Fatal(err)
+	api := accesstest.Over(f.t, f.read).API()
+	principalOf := func(r *http.Request) kernel.Principal {
+		user := r.Header.Get("X-User")
+		return kernel.Principal{Name: user, Admin: user == "admin", Anonymous: user == "anonymous"}
 	}
+	authorize := accesstest.Over(f.t, f.db).Middleware(f.t, true, principalOf)
 	r := chi.NewRouter()
 	r.Use(baseurl.Middleware("https://registry.test"))
 	r.Use(func(next http.Handler) http.Handler {
+		authorized := authorize(next)
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			user := r.Header.Get("X-User")
-			if user != "" {
-				p := auth.Principal{
-					Name:      user,
-					Admin:     user == "admin",
-					Anonymous: user == "anonymous",
-				}
-				p, decider, err := auth.Authorize(
-					r.Context(),
-					authz.Sources{
-						Permissions:      f.db.Permissions(),
-						Groups:           f.db.Groups(),
-						AnonymousEnabled: true,
-					},
-					p,
-				)
-				if err != nil {
-					f.t.Fatal(err)
-				}
-				r = r.WithContext(auth.WithAuthorized(r.Context(), p, decider))
+			if r.Header.Get("X-User") == "" {
+				next.ServeHTTP(w, r)
+				return
 			}
-			next.ServeHTTP(w, r)
+			authorized.ServeHTTP(w, r)
 		})
 	})
 	pkgroute.Mount(
@@ -144,11 +129,11 @@ func (f *fixture) router(keys *crypt.Keyring) http.Handler {
 			},
 		},
 		Protocol(Options{
-			Authorizer:      m.API().Authorizer,
-			KeyPairs:        m.API().Keys,
-			Restrictions:    m.API().Restrictions,
-			Identity:        m.API().Identity,
-			AnonymousAccess: m.API().AnonymousAccess,
+			Authorizer:      api.Authorizer,
+			KeyPairs:        api.Keys,
+			Restrictions:    api.Restrictions,
+			Identity:        api.Identity,
+			AnonymousAccess: api.AnonymousAccess,
 			Keys:            keys,
 			Now:             func() time.Time { return f.now },
 		}),

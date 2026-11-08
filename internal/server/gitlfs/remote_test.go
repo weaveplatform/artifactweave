@@ -17,15 +17,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/gitlfs"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -225,25 +225,9 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 	}
 	router := chi.NewRouter()
 	router.Use(baseurl.Middleware(""))
-	router.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			p, decider, e := auth.Authorize(
-				r.Context(),
-				authz.Sources{
-					Permissions:      db.Permissions(),
-					Groups:           db.Groups(),
-					AnonymousEnabled: true,
-				},
-				auth.Principal{Name: "admin", Admin: true},
-			)
-			if e != nil {
-				t.Error(e)
-				http.Error(w, e.Error(), 500)
-				return
-			}
-			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
-		})
-	})
+	router.Use(accesstest.Over(t, db).Middleware(t, true, func(*http.Request) kernel.Principal {
+		return kernel.Principal{Name: "admin", Admin: true}
+	}))
 	pkgroute.Mount(
 		router,
 		pkgroute.Options{

@@ -15,15 +15,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	skillsfmt "github.com/weaveplatform/artifactweave/internal/format/skills"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/server/skills"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -63,22 +63,13 @@ func newFixture(t *testing.T) *fixture {
 	}
 	items := &item.Service{Store: db, Blobs: blobs, Formats: ecosystem.For}
 	router := chi.NewRouter()
-	router.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			name := r.Header.Get("X-User")
-			p := auth.Principal{Name: name, Admin: name == "admin"}
-			if name == "" {
-				p = auth.Anonymous
-			}
-			p, decider, err := auth.Authorize(r.Context(), authz.Sources{
-				Permissions: db.Permissions(), Groups: db.Groups(),
-			}, p)
-			if err != nil {
-				t.Fatal(err)
-			}
-			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
-		})
-	})
+	router.Use(accesstest.Over(t, db).Middleware(t, false, func(r *http.Request) kernel.Principal {
+		name := r.Header.Get("X-User")
+		if name == "" {
+			return kernel.Anonymous
+		}
+		return kernel.Principal{Name: name, Admin: name == "admin"}
+	}))
 	pkgroute.Mount(router, pkgroute.Options{
 		Store: db, Items: func() *item.Service { return items },
 		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it types.Item) {

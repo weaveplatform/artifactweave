@@ -12,9 +12,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	baseformat "github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -243,9 +243,9 @@ func TestUnitBatchErrorStatusPreservesClientMeaning(t *testing.T) {
 	}{
 		{name: "protocol error", err: apierror.New(http.StatusBadRequest, "invalid"), expected: http.StatusBadRequest},
 		{name: "format rejection", err: baseformat.Rejectf(http.StatusUnprocessableEntity, "invalid"), expected: http.StatusUnprocessableEntity},
-		{name: "permission denied", err: auth.ErrForbidden, expected: http.StatusForbidden},
+		{name: "permission denied", err: kernel.ErrForbidden, expected: http.StatusForbidden},
 		{name: "source denied", err: source.ErrDenied, expected: http.StatusForbidden},
-		{name: "authentication required", err: auth.ErrUnauthenticated, expected: http.StatusUnauthorized},
+		{name: "authentication required", err: kernel.ErrUnauthenticated, expected: http.StatusUnauthorized},
 		{name: "missing object", err: store.ErrNotFound, expected: http.StatusNotFound},
 		{name: "conflicting object", err: store.ErrConflict, expected: http.StatusConflict},
 		{name: "upstream fault", err: errors.New("upstream fault"), expected: http.StatusBadGateway},

@@ -12,13 +12,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/server/golang"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -143,25 +143,23 @@ func newFixtureOn(t *testing.T, seed *inmem.Store, serve store.Store) *fixture {
 		},
 		Fault: func(_ *http.Request, err error) { f.faults = append(f.faults, err) },
 	}
+	principalOf := func(r *http.Request) kernel.Principal {
+		name := r.Header.Get("X-Test-User")
+		if name == kernel.AnonymousUser {
+			return kernel.Anonymous
+		}
+		return kernel.Principal{Name: name}
+	}
+	authorize := accesstest.Over(t, seed).Middleware(t, true, principalOf)
 	r := chi.NewRouter()
 	r.Use(func(next http.Handler) http.Handler {
+		authorized := authorize(next)
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			name := r.Header.Get("X-Test-User")
-			if name == "" {
+			if r.Header.Get("X-Test-User") == "" {
 				next.ServeHTTP(w, r)
 				return
 			}
-			pr := auth.Principal{Name: name}
-			if name == auth.AnonymousUser {
-				pr = auth.Anonymous
-			}
-			p, decider, err := auth.Authorize(r.Context(), authz.Sources{
-				Permissions: seed.Permissions(), Groups: seed.Groups(), AnonymousEnabled: true,
-			}, pr)
-			if err != nil {
-				t.Fatal(err)
-			}
-			next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(r.Context(), p, decider)))
+			authorized.ServeHTTP(w, r)
 		})
 	})
 	pkgroute.Mount(r, o, golang.Protocol())
@@ -364,7 +362,7 @@ func TestAccInfo(t *testing.T) {
 		{"stored, readable .info only", "", v + "v1.1.0.info", "infos", 200, "served"},
 		{"synthesised, readable .info only", "", v + "v1.0.0.info", "infos", 403, ""},
 		{"no read", "", v + "v1.0.0.info", "zips", 403, ""},
-		{"anonymous", "", v + "v1.0.0.info", auth.AnonymousUser, 401, ""},
+		{"anonymous", "", v + "v1.0.0.info", kernel.AnonymousUser, 401, ""},
 		{
 			"invisible",
 			"",
