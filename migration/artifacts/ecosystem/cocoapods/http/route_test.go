@@ -1,4 +1,4 @@
-package cocoapods
+package cocoapodshttp
 
 import (
 	"archive/tar"
@@ -16,7 +16,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	podfmt "github.com/weaveplatform/artifactweave/internal/format/cocoapods"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
@@ -25,6 +24,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	podfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"

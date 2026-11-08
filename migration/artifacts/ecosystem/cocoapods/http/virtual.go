@@ -1,4 +1,4 @@
-package cocoapods
+package cocoapodshttp
 
 import (
 	"errors"
@@ -8,10 +8,10 @@ import (
 	"slices"
 	"strings"
 
-	podfmt "github.com/weaveplatform/artifactweave/internal/format/cocoapods"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	podfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/store"

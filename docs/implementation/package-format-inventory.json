@@ -97,7 +97,7 @@
       "owner_issue": 771,
       "evidence": "test/acceptance/features/cocoapods.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/cocoapods-repositories",
-      "route_file": "internal/server/cocoapods/pods.go",
+      "route_file": "migration/artifacts/ecosystem/cocoapods/http/pods.go",
       "p9c": true
     },
     {

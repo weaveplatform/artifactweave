@@ -47,8 +47,12 @@ var formats = map[string]formatImpact{
 	"debian":        {"./internal/format/debian/...", "@debian", []string{"debian"}},
 	"gems":          {"./internal/format/gems/...", "@gems", []string{"ruby"}},
 	"gitlfs":        {"./internal/format/gitlfs/...", "@gitlfs", []string{"gitlfs"}},
-	"cocoapods":     {"./internal/format/cocoapods/...", "@cocoapods", []string{"cocoapods"}},
-	"vagrant":       {"./internal/format/vagrant/...", "@vagrant", []string{"vagrant"}},
+	"cocoapods": {
+		"./migration/artifacts/ecosystem/cocoapods/...",
+		"@cocoapods",
+		[]string{"cocoapods"},
+	},
+	"vagrant": {"./internal/format/vagrant/...", "@vagrant", []string{"vagrant"}},
 	"agentplugins": {
 		"./internal/format/agentplugins/...",
 		"@agentplugins,@agentplugins_clients",

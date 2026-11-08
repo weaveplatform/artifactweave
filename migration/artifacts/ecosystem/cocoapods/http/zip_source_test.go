@@ -1,4 +1,4 @@
-package cocoapods
+package cocoapodshttp
 
 import (
 	"archive/zip"
@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"testing"
 
-	podfmt "github.com/weaveplatform/artifactweave/internal/format/cocoapods"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
+	podfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods"
 )
 
 func TestAccSourceZIPRejectsLocalTraversalWithoutCaching(t *testing.T) {

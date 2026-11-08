@@ -1,7 +1,7 @@
-// Package cocoapods serves the current CocoaPods CDN protocol through
+// Package cocoapodshttp serves the current CocoaPods CDN protocol through
 // /artifactory/api/pods/{repoKey}. The retired Git specs plugin is not a
 // second protocol surface.
-package cocoapods
+package cocoapodshttp
 
 import (
 	"bytes"
@@ -18,10 +18,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	podfmt "github.com/weaveplatform/artifactweave/internal/format/cocoapods"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	podfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/store"

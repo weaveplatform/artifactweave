@@ -1,4 +1,4 @@
-package cocoapods
+package cocoapodshttp
 
 import (
 	"bytes"
@@ -10,11 +10,11 @@ import (
 	"strings"
 	"testing"
 
-	podfmt "github.com/weaveplatform/artifactweave/internal/format/cocoapods"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	podfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 

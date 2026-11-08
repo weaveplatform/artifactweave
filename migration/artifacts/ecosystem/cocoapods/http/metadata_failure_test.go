@@ -1,4 +1,4 @@
-package cocoapods
+package cocoapodshttp
 
 import (
 	"context"
@@ -9,8 +9,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	podfmt "github.com/weaveplatform/artifactweave/internal/format/cocoapods"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	podfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 

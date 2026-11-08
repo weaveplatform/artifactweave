@@ -26,7 +26,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/bower"
 	"github.com/weaveplatform/artifactweave/internal/server/cargo"
 	"github.com/weaveplatform/artifactweave/internal/server/chef"
-	"github.com/weaveplatform/artifactweave/internal/server/cocoapods"
 	"github.com/weaveplatform/artifactweave/internal/server/composer"
 	"github.com/weaveplatform/artifactweave/internal/server/conan"
 	"github.com/weaveplatform/artifactweave/internal/server/conda"
@@ -61,6 +60,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	cocoapodshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods/http"
 	golanghttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
@@ -246,7 +246,7 @@ var protocols = []func(Config) pkgroute.Protocol{
 		})
 	},
 	func(cfg Config) pkgroute.Protocol {
-		return cocoapods.Protocol(cocoapods.Options{RemoteSources: cfg.RemoteSources})
+		return cocoapodshttp.Protocol(cocoapodshttp.Options{RemoteSources: cfg.RemoteSources})
 	},
 	func(cfg Config) pkgroute.Protocol {
 		return pypi.Protocol(

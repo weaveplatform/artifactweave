@@ -10,7 +10,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/bower"
 	"github.com/weaveplatform/artifactweave/internal/format/cargo"
 	"github.com/weaveplatform/artifactweave/internal/format/chef"
-	"github.com/weaveplatform/artifactweave/internal/format/cocoapods"
 	"github.com/weaveplatform/artifactweave/internal/format/composer"
 	"github.com/weaveplatform/artifactweave/internal/format/conan"
 	"github.com/weaveplatform/artifactweave/internal/format/conda"
@@ -41,6 +40,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/vagrant"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang"
 )
 
