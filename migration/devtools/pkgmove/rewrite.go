@@ -125,6 +125,9 @@ func globMatch(glob, elems []string) bool {
 // editCounts says what a rewrite changed in one file, for the plan.
 type editCounts struct {
 	paths, imports, qualifiers, aliases, clauses, duplicates int
+	// names counts the import names given to a renamed package whose
+	// directory is named otherwise.
+	names int
 	// fuzz counts the FUZZ_PKGS entries a moved fuzz target changes, and
 	// unused the imports that fix removes once nothing uses them.
 	fuzz, unused int
@@ -138,6 +141,7 @@ func (c editCounts) String() string {
 	}{
 		{c.imports, "import"},
 		{c.qualifiers, "qualifier"},
+		{c.names, "import name"},
 		{c.aliases, "import alias"},
 		{c.clauses, "package clause"},
 		{c.duplicates, "removed repeated import"},
@@ -276,6 +280,17 @@ func (rw *rewriter) rewriteGo(p string, src []byte, skipText bool) ([]byte, edit
 				es = append(es, edit{start: u, end: u + len(e.oldName), text: e.newName})
 			}
 			n.qualifiers += len(uses)
+			// goimports, which make fmt runs after the move, takes an
+			// unnamed import for a package named like its path's last
+			// element. For a package whose directory is named otherwise,
+			// such as <type>http in http/, it then adds a named copy of
+			// the import for the renamed qualifiers and can keep the
+			// unnamed one, which Go rejects as a redeclaration. Naming the
+			// import as goimports would leaves it nothing to add.
+			if path.Base(e.to) != e.newName {
+				es = append(es, edit{start: off, end: off, text: e.newName + " "})
+				n.names++
+			}
 		} else {
 			es = append(es, edit{start: off, end: off, text: e.oldName + " "})
 			n.aliases++
