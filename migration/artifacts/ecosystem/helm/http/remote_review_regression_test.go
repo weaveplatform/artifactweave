@@ -1,4 +1,4 @@
-package helm_test
+package helmhttp_test
 
 import (
 	"archive/tar"

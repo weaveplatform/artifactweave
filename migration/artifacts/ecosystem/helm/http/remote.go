@@ -1,4 +1,4 @@
-package helm
+package helmhttp
 
 import (
 	"bytes"
@@ -12,9 +12,9 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	helmfmt "github.com/weaveplatform/artifactweave/internal/format/helm"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	helmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/types"

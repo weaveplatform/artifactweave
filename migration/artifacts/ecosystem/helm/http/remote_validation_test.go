@@ -1,4 +1,4 @@
-package helm
+package helmhttp
 
 import (
 	"bytes"
@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	helmfmt "github.com/weaveplatform/artifactweave/internal/format/helm"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	helmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm"
 )
 
 func TestAccRemoteAdmissionCancellationAndLimits(t *testing.T) {

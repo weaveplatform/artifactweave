@@ -65,7 +65,7 @@ var formats = map[string]formatImpact{
 	},
 	"golang": {"./migration/artifacts/ecosystem/golang/...", "@goproxy,@go,@package_wiring", nil},
 	"helm": {
-		"./internal/format/helm/...",
+		"./migration/artifacts/ecosystem/helm/...",
 		"@helm,@package_wiring",
 		[]string{"helm", "jf"},
 	},

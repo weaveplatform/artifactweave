@@ -1,4 +1,4 @@
-package helm
+package helmhttp
 
 import (
 	"archive/tar"
@@ -15,8 +15,8 @@ import (
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
 	"gopkg.in/yaml.v3"
 
-	helmfmt "github.com/weaveplatform/artifactweave/internal/format/helm"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	helmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm"
 	"github.com/weaveplatform/artifactweave/migration/platform/archive"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )

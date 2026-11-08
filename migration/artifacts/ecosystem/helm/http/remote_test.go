@@ -1,4 +1,4 @@
-package helm_test
+package helmhttp_test
 
 import (
 	"bytes"
@@ -18,8 +18,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"gopkg.in/yaml.v3"
 
-	helmfmt "github.com/weaveplatform/artifactweave/internal/format/helm"
-	"github.com/weaveplatform/artifactweave/internal/server/helm"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
@@ -28,6 +26,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	helmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm"
+	helmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
@@ -126,8 +126,11 @@ func (f *remoteFixture) mount(t *testing.T, public string, relative bool) {
 				}
 			},
 		},
-		helm.Protocol(
-			helm.Options{Format: helmfmt.Settings{RelativeURLs: &relative}, RemoteSources: f.svc},
+		helmhttp.Protocol(
+			helmhttp.Options{
+				Format:        helmfmt.Settings{RelativeURLs: &relative},
+				RemoteSources: f.svc,
+			},
 		),
 	)
 	f.h = r
