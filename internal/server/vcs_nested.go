@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/server/vcs"
+	vcshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/vcs/http"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
@@ -96,7 +96,7 @@ func (s artifactoryService) vcsNested(w http.ResponseWriter, r *http.Request) {
 			var filename string
 			var ok bool
 			ref, filename, ok = strings.Cut(ref, "!")
-			if !ok || !vcs.ValidFilePath(filename) {
+			if !ok || !vcshttp.ValidFilePath(filename) {
 				apierror.Write(
 					w,
 					apierror.ProfileArtifactory,
@@ -114,7 +114,7 @@ func (s artifactoryService) vcsNested(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if !vcs.ValidProject(owner, name) {
+	if !vcshttp.ValidProject(owner, name) {
 		apierror.Write(
 			w,
 			apierror.ProfileArtifactory,
@@ -181,7 +181,7 @@ func (s artifactoryService) vcsNested(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	if !vcs.ValidRef(ref) || !vcs.ValidExtension(ext) {
+	if !vcshttp.ValidRef(ref) || !vcshttp.ValidExtension(ext) {
 		apierror.Write(
 			w,
 			apierror.ProfileArtifactory,

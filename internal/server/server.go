@@ -26,7 +26,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/composer"
 	"github.com/weaveplatform/artifactweave/internal/server/gems"
 	"github.com/weaveplatform/artifactweave/internal/server/gitlfs"
-	"github.com/weaveplatform/artifactweave/internal/server/jetbrainsplugins"
 	"github.com/weaveplatform/artifactweave/internal/server/luarocks"
 	"github.com/weaveplatform/artifactweave/internal/server/machinelearning"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
@@ -56,6 +55,7 @@ import (
 	helmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm/http"
 	hexhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/hex/http"
 	huggingfacehttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface/http"
+	jetbrainspluginshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/jetbrainsplugins/http"
 	nimmodelhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nimmodel/http"
 	nixhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nix/http"
 	npmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm/http"
@@ -291,7 +291,7 @@ var protocols = []func(Config) pkgroute.Protocol{
 		return nimmodelhttp.Protocol(cfg.RemoteSources)
 	},
 	func(cfg Config) pkgroute.Protocol {
-		return jetbrainsplugins.Protocol(cfg.RemoteSources)
+		return jetbrainspluginshttp.Protocol(cfg.RemoteSources)
 	},
 	func(Config) pkgroute.Protocol { return golanghttp.Protocol() },
 	func(cfg Config) pkgroute.Protocol {

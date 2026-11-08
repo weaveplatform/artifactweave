@@ -689,7 +689,7 @@
       "owner_issue": 774,
       "evidence": "test/acceptance/features/jetbrainsplugins.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/jetbrains-plugins-repositories",
-      "route_file": "internal/server/jetbrainsplugins/protocol.go",
+      "route_file": "migration/artifacts/ecosystem/jetbrainsplugins/http/protocol.go",
       "p9c": true
     },
     {

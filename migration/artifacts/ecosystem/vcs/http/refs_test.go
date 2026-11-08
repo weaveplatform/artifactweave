@@ -1,4 +1,4 @@
-package vcs
+package vcshttp
 
 import (
 	"fmt"

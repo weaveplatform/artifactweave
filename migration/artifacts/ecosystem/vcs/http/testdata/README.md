@@ -9,7 +9,7 @@ or server capture is included here.
 Regenerate into a temporary directory and compare the hashes before replacing:
 
 ```sh
-python3 internal/server/vcs/testdata/generate.py --output /tmp/vcs-git-fixtures
+python3 migration/artifacts/ecosystem/vcs/http/testdata/generate.py --output /tmp/vcs-git-fixtures
 ```
 
 Full archives contain both `README.md` and `sub/README.md`, plus `sub/ONLY.md`

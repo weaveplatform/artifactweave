@@ -1,4 +1,4 @@
-package jetbrainsplugins_test
+package jetbrainspluginshttp_test
 
 import (
 	"archive/zip"
@@ -20,7 +20,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/server/jetbrainsplugins"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
@@ -30,6 +29,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	jetbrainspluginshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/jetbrainsplugins/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
@@ -121,7 +121,7 @@ func newRouteFixture(t *testing.T) *routeFixture {
 				_, _ = io.Copy(w, body)
 			}
 		},
-	}, jetbrainsplugins.Protocol(svc))
+	}, jetbrainspluginshttp.Protocol(svc))
 	return &routeFixture{t: t, up: up, clock: clock, db: db, items: items, h: router, blobs: blobs}
 }
 

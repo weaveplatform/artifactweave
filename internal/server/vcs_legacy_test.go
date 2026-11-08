@@ -13,9 +13,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/server/vcs"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	vcshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/vcs/http"
 )
 
 const vcsLegacyOID = "81305b86f97f1361e68f51397943eff6dd635520"
@@ -27,7 +27,7 @@ func TestAccVCSLegacyResolvesCommitAndRejectsRedirectChanges(t *testing.T) {
 }
 
 func TestAccVCSPeerBoundsCombinedTagAndBranchCounts(t *testing.T) {
-	tags := make([]map[string]any, vcs.MaxRefs)
+	tags := make([]map[string]any, vcshttp.MaxRefs)
 	for i := range tags {
 		tags[i] = map[string]any{
 			"name":     fmt.Sprintf("v%d", i),

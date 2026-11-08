@@ -1,5 +1,5 @@
-// Package vcs implements the remote-only Artifactory VCS archive protocol.
-package vcs
+// Package vcshttp implements the remote-only Artifactory VCS archive protocol.
+package vcshttp
 
 import (
 	"encoding/hex"

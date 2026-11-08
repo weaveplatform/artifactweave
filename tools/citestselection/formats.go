@@ -76,7 +76,7 @@ var formats = map[string]formatImpact{
 	"helmoci": {"", "@clients&&@helm", []string{"helm", "jf"}},
 	"hex":     {"./migration/artifacts/ecosystem/hex/...", "@hex", []string{"hex"}},
 	"jetbrainsplugins": {
-		"./internal/server/jetbrainsplugins/...",
+		"./migration/artifacts/ecosystem/jetbrainsplugins/http/...",
 		"@jetbrainsplugins",
 		[]string{"jetbrains"},
 	},
@@ -116,7 +116,7 @@ var formats = map[string]formatImpact{
 		"@terraform_backend,@terraform_backend_api",
 		[]string{"terraform"},
 	},
-	"vcs": {"./internal/server/vcs/...", "@vcs", []string{"maven"}},
+	"vcs": {"./migration/artifacts/ecosystem/vcs/http/...", "@vcs", []string{"maven"}},
 }
 
 type affectedPlan struct {

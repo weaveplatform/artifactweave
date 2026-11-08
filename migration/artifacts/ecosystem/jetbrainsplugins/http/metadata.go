@@ -1,4 +1,4 @@
-package jetbrainsplugins
+package jetbrainspluginshttp
 
 import (
 	"context"
