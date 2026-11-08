@@ -9,7 +9,7 @@ import (
 	"time"
 
 	tfbe "github.com/weaveplatform/artifactweave/internal/format/terraformbackend"
-	"github.com/weaveplatform/artifactweave/internal/service/terraformstate"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/terraformstate"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )

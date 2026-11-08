@@ -408,7 +408,7 @@ func apiReviewPersistence(path string) (string, string, []string) {
 	if strings.HasPrefix(path, "/artifactory/api/build") {
 		return "build", "build names/numbers/runs retain complete legacy collections; store keysets may be collected; append/replay and run detail are singular", []string{
 			"internal/server/builds.go",
-			"internal/service/build/build.go",
+			"migration/artifacts/core/build/build.go",
 			"internal/sqlstore/sqlcommon/builds.go",
 			"internal/server/builds_status_test.go",
 		}

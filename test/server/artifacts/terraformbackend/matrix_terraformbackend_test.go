@@ -3,7 +3,7 @@ package terraformbackend_test
 import (
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/service/terraformstate"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/terraformstate"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 

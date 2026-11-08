@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/service/build"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
@@ -21,7 +21,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// The Builds API (decision 0014, research 22 §3): internal/service/build
+// The Builds API (decision 0014, research 22 §3): migration/artifacts/core/build
 // does the work, and these handlers bind its requests and render its
 // answers.
 
