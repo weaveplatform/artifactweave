@@ -11,11 +11,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/remote"
-	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -35,15 +36,15 @@ func TestAccRemoteSparseCacheOfflineRedirectAndIntegrity(t *testing.T) {
 			t.Fatal(err)
 		}
 		key := []byte(strings.Repeat("k", 32))
-		resolver, err := remote.NewResolver(
+		resolver, err := upstream.NewResolver(
 			items.Store,
 			nil,
-			remote.ResolverOptions{RevisionKey: key},
+			upstream.ResolverOptions{RevisionKey: key},
 		)
 		if err != nil {
 			t.Fatal(err)
 		}
-		pool := new(remote.Pool)
+		pool := new(upstream.Pool)
 		policy := &remote.Policy{
 			Store:   items.Store,
 			Blobs:   items.Blobs,
@@ -230,15 +231,15 @@ func TestAccRemoteRejectsCorruptIndexAndCrate(t *testing.T) {
 			t.Fatal(err)
 		}
 		key := []byte(strings.Repeat("k", 32))
-		resolver, err := remote.NewResolver(
+		resolver, err := upstream.NewResolver(
 			items.Store,
 			nil,
-			remote.ResolverOptions{RevisionKey: key},
+			upstream.ResolverOptions{RevisionKey: key},
 		)
 		if err != nil {
 			t.Fatal(err)
 		}
-		pool := new(remote.Pool)
+		pool := new(upstream.Pool)
 		policy := &remote.Policy{
 			Store:   items.Store,
 			Blobs:   items.Blobs,
@@ -326,15 +327,15 @@ func TestAccRemoteTemplateAndSparseValidation(t *testing.T) {
 			t.Fatal(err)
 		}
 		key := []byte(strings.Repeat("k", 32))
-		resolver, err := remote.NewResolver(
+		resolver, err := upstream.NewResolver(
 			items.Store,
 			nil,
-			remote.ResolverOptions{RevisionKey: key},
+			upstream.ResolverOptions{RevisionKey: key},
 		)
 		if err != nil {
 			t.Fatal(err)
 		}
-		pool := new(remote.Pool)
+		pool := new(upstream.Pool)
 		policy := &remote.Policy{
 			Store:   items.Store,
 			Blobs:   items.Blobs,

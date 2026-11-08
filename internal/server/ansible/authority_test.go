@@ -17,10 +17,11 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	ansiblefmt "github.com/weaveplatform/artifactweave/internal/format/ansible"
-	"github.com/weaveplatform/artifactweave/internal/remote"
-	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -155,10 +156,10 @@ func TestAccGalaxyCDNArchiveStripsCredentialsAndHonorsPatterns(t *testing.T) {
 	if err := f.db.Repos().Update(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
-	resolver, err := remote.NewResolver(
+	resolver, err := upstream.NewResolver(
 		f.db,
 		nil,
-		remote.ResolverOptions{
+		upstream.ResolverOptions{
 			RevisionKey:           []byte(strings.Repeat("k", 32)),
 			AllowedPrivateOrigins: []string{cdn.URL},
 		},
@@ -257,10 +258,10 @@ func TestAccGalaxyRetainsCatalogFencesDuringArchiveDownload(t *testing.T) {
 	})
 	cdn := httptest.NewServer(router)
 	t.Cleanup(cdn.Close)
-	resolver, err := remote.NewResolver(
+	resolver, err := upstream.NewResolver(
 		f.db,
 		nil,
-		remote.ResolverOptions{
+		upstream.ResolverOptions{
 			RevisionKey:           []byte(strings.Repeat("k", 32)),
 			AllowedPrivateOrigins: []string{cdn.URL},
 		},

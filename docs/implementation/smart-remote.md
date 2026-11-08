@@ -74,10 +74,10 @@ bounded current state without changing Artifactory Storage responses.
 ## Qualification and remaining captures
 
 Controlled-peer/native evidence: `smart_remote.feature` (curl/JFrog CLI), Smart tests in
-`internal/remote`, registry credential round-trip/revocation tests in `internal/auth`,
-source and Maven contract tests, server authentication/status tests, item ownership
-regressions, and shared in-memory/SQLite/PostgreSQL Smart-cache contracts. Fake peer
-success is not a vendor parity claim.
+`migration/artifacts/core/remote/smart`, registry credential round-trip/revocation tests
+in `internal/auth`, source and Maven contract tests, server authentication/status tests,
+item ownership regressions, and shared in-memory/SQLite/PostgreSQL Smart-cache
+contracts. Fake peer success is not a vendor parity claim.
 
 Add these cases to **RC-8 / #216** for P19 capture:
 

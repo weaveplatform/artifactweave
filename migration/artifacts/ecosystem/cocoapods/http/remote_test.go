@@ -10,10 +10,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/remote"
-	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	podfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
@@ -207,7 +208,7 @@ func TestUnitApprovedCrossOriginSourceTransport(t *testing.T) {
 	}
 	fetch := func(private []string) error {
 		t.Helper()
-		resolver, err := remote.NewResolver(store, nil, remote.ResolverOptions{
+		resolver, err := upstream.NewResolver(store, nil, upstream.ResolverOptions{
 			RevisionKey: []byte(strings.Repeat("k", 32)), AllowedPrivateOrigins: private,
 		})
 		if err != nil {
@@ -217,7 +218,7 @@ func TestUnitApprovedCrossOriginSourceTransport(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		client, err := remote.NewClient(c, options)
+		client, err := upstream.NewClient(c, options)
 		if err != nil {
 			return err
 		}

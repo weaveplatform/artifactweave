@@ -65,7 +65,7 @@ var formats = map[string]formatImpact{
 	},
 	"golang": {"./migration/artifacts/ecosystem/golang/...", "@goproxy,@go,@package_wiring", nil},
 	"helm": {
-		"./internal/format/helm/...",
+		"./migration/artifacts/ecosystem/helm/...",
 		"@helm,@package_wiring",
 		[]string{"helm", "jf"},
 	},
@@ -86,7 +86,7 @@ var formats = map[string]formatImpact{
 	},
 	"nimmodel": {"", "@nimmodel", []string{"crane"}},
 	"npm": {
-		"./internal/format/npm/...",
+		"./migration/artifacts/ecosystem/npm/...",
 		"@npm,@package_wiring",
 		[]string{"node", "npm12", "jf"},
 	},
@@ -96,14 +96,14 @@ var formats = map[string]formatImpact{
 		[]string{"dotnet", "dotnet11", "jf"},
 	},
 	"pypi": {
-		"./internal/format/pypi/...",
+		"./migration/artifacts/ecosystem/pypi/...",
 		"@pypi,@package_wiring",
 		[]string{"python", "jf"},
 	},
 	"skills": {"./internal/format/skills/...", "@skills", []string{"jf"}},
 	"swift":  {"./internal/format/swift/...", "@swift", []string{"swift"}},
 	"terraform": {
-		"./internal/format/terraform/...",
+		"./migration/artifacts/ecosystem/terraform/...",
 		"@terraform&&~@terraform_backend&&~@terraform_backend_api,@package_wiring",
 		[]string{"terraform", "jf"},
 	},

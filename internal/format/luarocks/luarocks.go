@@ -11,11 +11,11 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -198,7 +198,7 @@ func (Handler) Resolve(
 	if !errors.Is(err, store.ErrNotFound) {
 		return "", fmt.Errorf("luarocks: manifest: %w", err)
 	}
-	_, err = env.Store.WorkQueue().Get(ctx, KindManifest, c.Key)
+	_, err = env.WorkQueue.Get(ctx, KindManifest, c.Key)
 	if err == nil {
 		return d.Path, nil
 	}

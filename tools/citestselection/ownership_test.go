@@ -115,7 +115,7 @@ func TestUnitOwnershipV2RejectsInvalidInventories(t *testing.T) {
 			Version: 2,
 			Packages: map[string]string{
 				"internal/server":                        "shared",
-				"internal/server/npm":                    "npm",
+				"internal/server/xyz":                    "npm",
 				"migration/access/adapters/http":         "shared",
 				"migration/app":                          "shared",
 				"migration/artifacts/ecosystem/npm/http": "npm",
@@ -153,7 +153,7 @@ func TestUnitOwnershipV2RejectsInvalidInventories(t *testing.T) {
 		{"version 1", func(o *testOwnership) { o.Version = 1 }, "version 1, want 2"},
 		{"missing version", func(o *testOwnership) { o.Version = 0 }, "version 0, want 2"},
 		{"package outside owned directories", func(o *testOwnership) {
-			o.Packages["internal/format/npm"] = "npm"
+			o.Packages["internal/legacy/xyz"] = "npm"
 		}, "invalid test package owner"},
 		{"staged ecosystem package outside http", func(o *testOwnership) {
 			o.Packages["migration/artifacts/ecosystem/npm"] = "npm"
@@ -257,9 +257,9 @@ func useTestOwnership(t *testing.T, inventory testOwnership) {
 func TestUnitSharedFilesFollowRootTestMoves(t *testing.T) {
 	root := t.TempDir()
 	for file, source := range map[string]string{
-		"internal/server/status_test.go":          "package server\nfunc TestAccStatus() {}\n",
-		"internal/server/registry_shared_test.go": "package server\nfunc TestAccRegistryShared() {}\n",
-		"internal/format/npm/tarball_test.go":     "package npm\nfunc TestUnitTarball() {}\n",
+		"internal/server/status_test.go":                    "package server\nfunc TestAccStatus() {}\n",
+		"internal/server/registry_shared_test.go":           "package server\nfunc TestAccRegistryShared() {}\n",
+		"migration/artifacts/ecosystem/npm/tarball_test.go": "package npm\nfunc TestUnitTarball() {}\n",
 		"test/server/artifacts/npm/npm_auth_paths_test.go": "package npm\n" +
 			"func TestUnitNPMAuthPaths() {}\nfunc TestAccNPMAuthPaths() {}\n",
 	} {
@@ -286,7 +286,9 @@ func TestUnitSharedFilesFollowRootTestMoves(t *testing.T) {
 	if !ok || owner != "shared" {
 		t.Fatalf("root test before the move = %q, %t", owner, ok)
 	}
-	before := proposeAffected([]change{{status: "M", path: "internal/format/npm/tarball.go"}})
+	before := proposeAffected(
+		[]change{{status: "M", path: "migration/artifacts/ecosystem/npm/tarball.go"}},
+	)
 	if !before.hasSharedTests || !slices.Contains(before.units, "./internal/server") {
 		t.Fatalf("npm plan before the move omitted its root dependency: %+v", before)
 	}
@@ -345,7 +347,7 @@ func TestUnitSharedFilesFollowRootTestMoves(t *testing.T) {
 		names = append(names, entry.Package+" "+entry.Name)
 	}
 	if want := []string{
-		"./internal/format/npm TestUnitTarball",
+		"./migration/artifacts/ecosystem/npm TestUnitTarball",
 		"./test/server/artifacts/npm TestAccNPMAuthPaths",
 		"./test/server/artifacts/npm TestUnitNPMAuthPaths",
 	}; !slices.Equal(names, want) {

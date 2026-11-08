@@ -16,13 +16,14 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
-	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	podfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -80,13 +81,13 @@ func newRouteFixture(t *testing.T) *routeFixture {
 		}
 	}
 	key := []byte(strings.Repeat("k", 32))
-	resolver, err := remote.NewResolver(db, nil, remote.ResolverOptions{
+	resolver, err := upstream.NewResolver(db, nil, upstream.ResolverOptions{
 		RevisionKey: key, AllowedPrivateOrigins: []string{up.URL},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	pool := new(remote.Pool)
+	pool := new(upstream.Pool)
 	policy := &remote.Policy{
 		Store: db, Blobs: blobs, Items: items,
 		Pool: pool, Options: resolver.Options, Key: key,

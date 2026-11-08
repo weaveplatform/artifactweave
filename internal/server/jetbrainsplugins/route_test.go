@@ -20,14 +20,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/jetbrainsplugins"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
-	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -80,13 +81,13 @@ func newRouteFixture(t *testing.T) *routeFixture {
 		t.Fatal(err)
 	}
 	items := &item.Service{Store: db, Blobs: blobs, Now: clock.Now, Formats: ecosystem.For}
-	resolver, err := remote.NewResolver(db, nil, remote.ResolverOptions{
+	resolver, err := upstream.NewResolver(db, nil, upstream.ResolverOptions{
 		RevisionKey: []byte(strings.Repeat("k", 32)),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	pool := new(remote.Pool)
+	pool := new(upstream.Pool)
 	policy := &remote.Policy{
 		Store: db, Blobs: blobs, Items: items, Pool: pool,
 		Key: []byte(strings.Repeat("k", 32)), Now: clock.Now,

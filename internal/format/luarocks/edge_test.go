@@ -165,7 +165,9 @@ func TestUnitManifestHookBoundaries(t *testing.T) {
 	}
 	var queued, derived []string
 	env := format.Env{
-		Store: db,
+		Store:     db,
+		Leases:    db.Leases(),
+		WorkQueue: db.WorkQueue(),
 		Enqueue: func(_ context.Context, kind, key string, _ []byte) error {
 			queued = append(queued, kind+":"+key)
 			return nil
@@ -354,15 +356,19 @@ func TestUnitManifestReadFaultBoundaries(t *testing.T) {
 		{"blob read", itemLookupStore{Store: inmem.New(), item: &item}, testBlobs{body: []byte("lua >= 5.4"), readErr: errors.New("read offline")}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			env := format.Env{Store: tc.store, Blobs: tc.blobs}
+			env := format.Env{
+				Store:     tc.store,
+				Leases:    tc.store.Leases(),
+				WorkQueue: tc.store.WorkQueue(),
+				Blobs:     tc.blobs,
+			}
 			if _, err := filterVersion(ctx, env, c, []manifestEntry{entry}, "5.4"); err == nil {
 				t.Fatal("filterVersion accepted a read failure")
 			}
 		})
 	}
-	env := format.Env{
-		Store: itemLookupStore{Store: inmem.New(), getErr: errors.New("item offline")},
-	}
+	lookup := itemLookupStore{Store: inmem.New(), getErr: errors.New("item offline")}
+	env := format.Env{Store: lookup, Leases: lookup.Leases(), WorkQueue: lookup.WorkQueue()}
 	if _, err := (Handler{}).Resolve(ctx, env, c, format.Download{Path: ManifestPath}); err == nil {
 		t.Fatal("manifest resolver accepted an item-store failure")
 	}
@@ -393,7 +399,8 @@ func TestUnitManifestSearchFaultIsNotPublished(t *testing.T) {
 	if err := db.Repos().Create(ctx, c); err != nil {
 		t.Fatal(err)
 	}
-	env := format.Env{Store: itemLookupStore{Store: db, searchErr: errors.New("index offline")}}
+	lookup := itemLookupStore{Store: db, searchErr: errors.New("index offline")}
+	env := format.Env{Store: lookup, Leases: lookup.Leases(), WorkQueue: lookup.WorkQueue()}
 	if err := h.Work(ctx, env, types.WorkItem{Kind: KindManifest, Key: c.Key}); err == nil {
 		t.Fatal("work published a manifest after search failed")
 	}

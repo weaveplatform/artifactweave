@@ -62,18 +62,18 @@ When a test file leaves a shared directory such as `internal/server`:
 | Agent Plugins | `test/server/artifacts/agentplugins` |
 | Docker/OCI | `migration/artifacts/ecosystem/docker/http`, `test/server/artifacts/docker` |
 | Go modules | `migration/artifacts/ecosystem/golang/http`, `test/server/artifacts/golang` |
-| Helm | `internal/server/helm`, `test/server/artifacts/helm` |
+| Helm | `migration/artifacts/ecosystem/helm/http`, `test/server/artifacts/helm` |
 | Helm OCI | `test/server/artifacts/helmoci` |
 | LuaRocks | `internal/server/luarocks` |
 | Maven | `test/server/artifacts/maven` |
 | NIM model | `migration/artifacts/ecosystem/nimmodel/http` |
-| npm | `internal/server/npm`, `test/server/artifacts/npm` |
+| npm | `migration/artifacts/ecosystem/npm/http`, `test/server/artifacts/npm` |
 | NuGet | `migration/artifacts/ecosystem/nuget/http`, `test/server/artifacts/nuget` |
-| PyPI | `internal/server/pypi`, `test/server/artifacts/pypi` |
+| PyPI | `migration/artifacts/ecosystem/pypi/http`, `test/server/artifacts/pypi` |
 | Dart pub | `internal/server/pub` |
 | RubyGems | `internal/server/gems`, `test/server/artifacts/gems` |
 | Skills | `internal/server/skills` |
-| Terraform registry | `internal/server/terraform`, `test/server/artifacts/terraform` |
+| Terraform registry | `migration/artifacts/ecosystem/terraform/http`, `test/server/artifacts/terraform` |
 | Terraform backend | `internal/server/terraformbackend`, `test/server/artifacts/terraformbackend` |
 | Shared | `internal/server`, `internal/server/pkgroute`, `test/server/access` |
 

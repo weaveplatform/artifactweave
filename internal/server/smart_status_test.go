@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/smart"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -15,23 +15,23 @@ import (
 func TestAccSmartDiagnosticAuthorizationAndExactPath(t *testing.T) {
 	calls := 0
 	w := newItemWorld(t, true, func(c *Config) {
-		c.RemoteStatus = func(ctx context.Context, key, path string) (remote.SmartStatus, error) {
+		c.RemoteStatus = func(ctx context.Context, key, path string) (smart.SmartStatus, error) {
 			calls++
 			if _, ok := ctx.Deadline(); !ok {
 				t.Error("unbounded diagnostics")
 			}
 			if key == "missing" {
-				return remote.SmartStatus{}, store.ErrNotFound
+				return smart.SmartStatus{}, store.ErrNotFound
 			}
-			return remote.SmartStatus{
+			return smart.SmartStatus{
 				Repository: key,
 				Path:       path,
-				Representations: []remote.SmartRepresentationStatus{
+				Representations: []smart.SmartRepresentationStatus{
 					{
 						Downloads: 9007199254740993,
 						Claimed:   7,
 						Uncertain: 2,
-						Work: []remote.SmartWorkStatus{
+						Work: []smart.SmartWorkStatus{
 							{Operation: "statistics", State: types.WorkParked, Attempts: 1},
 						},
 					},

@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	format "github.com/weaveplatform/artifactweave/internal/format/huggingface"
-	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 )
 
 func TestUnitRemoteMetadataRejectsIdentityPathAndDigestFaults(t *testing.T) {

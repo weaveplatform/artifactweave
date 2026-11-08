@@ -5,8 +5,8 @@ import (
 	"errors"
 	"strings"
 
-	npmfmt "github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	npmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"

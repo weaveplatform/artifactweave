@@ -8,14 +8,16 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/format/generic"
-	"github.com/weaveplatform/artifactweave/internal/remote"
-	"github.com/weaveplatform/artifactweave/internal/source"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/smart"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 	nimmodelhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nimmodel/http"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
@@ -37,7 +39,7 @@ func (rt *runtime) openRemoteSources(
 		return nil, err
 	}
 	accessAPI := rt.access.API()
-	resolver, err := remote.NewResolver(rt.store, rt.keys, remote.ResolverOptions{
+	resolver, err := upstream.NewResolver(rt.store, rt.keys, upstream.ResolverOptions{
 		RevisionKey: key, AllowedPrivateOrigins: allowedPrivateOrigins,
 		Certificates: accessAPI.Keys,
 	})
@@ -143,7 +145,7 @@ func (rt *runtime) openRemoteSources(
 	}
 	content := &docker.RegistryContent{
 		Policy: registryPolicy,
-		Registries: &remote.RegistryClients{
+		Registries: &upstream.RegistryClients{
 			Pool:    &rt.registryHTTP,
 			Options: resolver.RegistryOptions,
 		},
@@ -185,7 +187,7 @@ func (rt *runtime) openRemoteSources(
 		return nil, fmt.Errorf("remote maven companions: %w", err)
 	}
 	mavenBackend.Eager = rt.mavenEager.Queue
-	rt.smartRemote, err = remote.NewSmart(
+	rt.smartRemote, err = smart.NewSmart(
 		ctx,
 		policy,
 		&rt.remoteHTTP,
@@ -198,7 +200,7 @@ func (rt *runtime) openRemoteSources(
 	if err != nil {
 		return nil, fmt.Errorf("remote smart runtime: %w", err)
 	}
-	rt.smartRegistry, err = remote.NewSmart(
+	rt.smartRegistry, err = smart.NewSmart(
 		ctx,
 		registryPolicy,
 		&rt.remoteHTTP,

@@ -12,8 +12,9 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/remote"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -29,7 +30,7 @@ type repoWorld struct {
 	db *inmem.Store
 	// fail makes the store's repository index fail the named operations.
 	fail       map[string]bool
-	remoteHTTP *remote.Pool
+	remoteHTTP *upstream.Pool
 }
 
 func newRepoWorld(t *testing.T) *repoWorld {
@@ -50,7 +51,7 @@ func newRepoWorld(t *testing.T) *repoWorld {
 		t.Fatal(err)
 	}
 	w := &repoWorld{t: t, db: db, fail: map[string]bool{}}
-	w.remoteHTTP = new(remote.Pool)
+	w.remoteHTTP = new(upstream.Pool)
 	t.Cleanup(w.remoteHTTP.Close)
 	w.h = New(Config{
 		BaseURL: "https://reg.example", CompatVersion: "7.155.0",

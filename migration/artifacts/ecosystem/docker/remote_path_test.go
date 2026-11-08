@@ -7,8 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/remote"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 )
 
 // The parser keeps its own copy of the name grammar the transport checks. A
@@ -17,9 +18,9 @@ import (
 // within 255 characters: the transport refuses longer ones and the parser
 // leaves that to it.
 func TestUnitRegistryPathNameGrammarMatchesTransport(t *testing.T) {
-	client, err := remote.NewRegistry(
+	client, err := upstream.NewRegistry(
 		repo.Config{URL: "https://registry.example", Class: repo.Remote, PackageType: repo.Docker},
-		remote.RegistryOptions{
+		upstream.RegistryOptions{
 			Transport: remote.Options{
 				Revision: "test",
 				Prepare:  func(*http.Request) error { return nil },

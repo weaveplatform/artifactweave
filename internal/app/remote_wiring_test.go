@@ -4,8 +4,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/remote"
-	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 )
@@ -34,7 +35,7 @@ func TestAccRemoteWiringInstallsFormatHooks(t *testing.T) {
 			t.Fatalf("%s policy does not project the NuGet empty feed", name)
 		}
 	}
-	clients, ok := content.Registries.(*remote.RegistryClients)
+	clients, ok := content.Registries.(*upstream.RegistryClients)
 	if !ok || clients.Pool != &w.rt.registryHTTP || clients.Options == nil {
 		t.Fatal("registry content does not open the runtime's registry clients")
 	}

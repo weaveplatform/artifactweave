@@ -7,7 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
-	"github.com/weaveplatform/artifactweave/internal/server/pypi"
+	pypihttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi/http"
 )
 
 // Warehouse GET operations share the protocol's delivery fences and source
@@ -17,8 +17,8 @@ func (s artifactoryService) registerPypiMetadataRoutes(r chi.Router) {
 	pkgroute.Mount(
 		protocol,
 		s.protocolOptions(),
-		pypi.Protocol(
-			pypi.Options{Format: s.cfg.FormatSettings.PyPI, RemoteSources: s.cfg.RemoteSources},
+		pypihttp.Protocol(
+			pypihttp.Options{Format: s.cfg.FormatSettings.PyPI, RemoteSources: s.cfg.RemoteSources},
 		),
 	)
 	serve := func(w http.ResponseWriter, r *http.Request) {
