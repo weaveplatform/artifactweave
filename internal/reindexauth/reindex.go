@@ -6,10 +6,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -20,43 +20,44 @@ var errReindexDenied = fmt.Errorf(
 	work.ErrPermanent,
 )
 
-// New restores only a trusted queue payload's identity reference.
-// Current restores token scope/expiry or the password revision; Authorize reads
-// current permissions. No persisted admin/group/permission snapshot is trusted.
+// New returns the check that a queued remote reindex passes before it runs
+// and whenever its format rechecks (format.Env.CheckReindex). It trusts only
+// the credential reference in the queue payload, never a stored admin flag,
+// group or permission: authn's Current restores the credential as it is now
+// (a token's scope and expiry, or the password revision), and authz's
+// Authorize evaluates the caller's permissions as they are now. The check
+// refuses with a permanent work error when authn is nil, when the payload
+// does not parse or names a user other than the request's or a registry
+// token, when the credential no longer holds, and when the caller lacks
+// Manage on the repository. Any other failure is wrapped as "reindex current
+// credential: %w" or "reindex current permissions: %w", so the work retries.
 func New(
-	st store.Store,
-	a *auth.Authenticator,
+	authn accessapi.Authenticator,
+	authz accessapi.Authorizer,
 ) func(context.Context, repo.Config, format.WorkRequest) error {
 	return func(ctx context.Context, c repo.Config, req format.WorkRequest) error {
-		var reference auth.CredentialReference
-		if a == nil || json.Unmarshal(req.Credential, &reference) != nil ||
+		var reference kernel.CredentialReference
+		if authn == nil || json.Unmarshal(req.Credential, &reference) != nil ||
 			reference.Name != req.By ||
 			reference.Registry != nil {
 			return errReindexDenied
 		}
-		p, err := a.Current(ctx, reference.Principal(), st.Tokens())
+		p, err := authn.Current(ctx, reference.Principal())
 		if err != nil {
-			if errors.Is(err, auth.ErrBadCredentials) || errors.Is(err, auth.ErrPasswordExpired) ||
+			if errors.Is(err, kernel.ErrBadCredentials) ||
+				errors.Is(err, kernel.ErrPasswordExpired) ||
 				errors.Is(err, store.ErrNotFound) {
 				return errReindexDenied
 			}
 			return fmt.Errorf("reindex current credential: %w", err)
 		}
-		_, d, err := auth.Authorize(
-			ctx,
-			authz.Sources{
-				Permissions:      st.Permissions(),
-				Groups:           st.Groups(),
-				AnonymousEnabled: p.Anonymous,
-			},
-			p,
-		)
+		_, d, err := authz.Authorize(ctx, p, p.Anonymous)
 		if err != nil {
 			return fmt.Errorf("reindex current permissions: %w", err)
 		}
 		if !d.Allows(
 			types.ResourceArtifact,
-			authz.Repo{Key: c.Key, Class: string(c.Class)},
+			accessapi.Repo{Key: c.Key, Class: string(c.Class)},
 			"",
 			types.ActionManage,
 		) {

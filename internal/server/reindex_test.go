@@ -119,12 +119,13 @@ func reindexWorld(
 		if q, err = work.New(cfg.Store, work.Options{}); err != nil {
 			t.Fatal(err)
 		}
+		api := withAccess(*cfg).Access
 		derived := &item.Service{
 			Store:            cfg.Store,
 			Blobs:            cfg.Blobs,
 			Work:             q,
 			Formats:          pick,
-			ReindexAuthorize: reindexauth.New(cfg.Store, cfg.Auth),
+			ReindexAuthorize: reindexauth.New(api.Authenticator, api.Authorizer),
 		}
 		if err := derived.RegisterWork(q); err != nil {
 			t.Fatal(err)

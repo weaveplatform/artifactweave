@@ -198,7 +198,7 @@ func (s artifactoryService) items(st store.Store) *item.Service {
 		Blobs:            s.cfg.Blobs,
 		Keys:             s.cfg.Access.Keys,
 		Formats:          s.format,
-		ReindexAuthorize: reindexauth.New(st, s.cfg.Auth),
+		ReindexAuthorize: reindexauth.New(s.cfg.Access.Authenticator, s.cfg.Access.Authorizer),
 	}
 	// A nil queue must not become a non-nil Enqueuer.
 	if s.cfg.Work != nil {
