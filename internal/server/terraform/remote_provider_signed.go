@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -23,7 +23,7 @@ type providerClaim struct {
 }
 
 func (h handler) remoteProviderURL(r *http.Request, b providerBundle, index int) (string, error) {
-	p, _ := auth.FromContext(r.Context())
+	p, _ := kernel.FromContext(r.Context())
 	reference, err := p.DownloadReference()
 	if err != nil {
 		return "", fmt.Errorf("terraform provider identity: %w", err)
@@ -63,7 +63,7 @@ func (b providerBundle) resultIndex(kind int) int {
 }
 
 func (h handler) remoteSignedProvider(w http.ResponseWriter, r *http.Request, c claims) {
-	if h.o.Auth == nil || c.Credential == nil || c.Source == nil || c.Provider == nil {
+	if h.o.Authenticator == nil || c.Credential == nil || c.Source == nil || c.Provider == nil {
 		h.k.Error(w, r, forbidden)
 		return
 	}
@@ -89,29 +89,16 @@ func (h handler) remoteSignedProvider(w http.ResponseWriter, r *http.Request, c 
 		h.k.Error(w, r, forbidden)
 		return
 	}
-	principal, err := h.o.Auth.RestoreDownload(
-		r.Context(),
-		c.Subject,
-		*c.Credential,
-		h.k.DB().Tokens(),
-	)
-	var d *authz.Decider
+	principal, err := h.o.Authenticator.RestoreDownload(r.Context(), c.Subject, *c.Credential)
+	var d accessapi.Decider
 	if err == nil {
-		principal, d, err = auth.Authorize(
-			r.Context(),
-			authz.Sources{
-				Permissions:      h.k.DB().Permissions(),
-				Groups:           h.k.DB().Groups(),
-				AnonymousEnabled: principal.Anonymous,
-			},
-			principal,
-		)
+		principal, d, err = h.o.Authorizer.Authorize(r.Context(), principal, principal.Anonymous)
 	}
 	if err != nil {
 		h.k.Error(w, r, forbidden)
 		return
 	}
-	ctx := auth.WithAuthorized(r.Context(), principal, d)
+	ctx := accessapi.WithCaller(r.Context(), principal, d)
 	r = r.WithContext(ctx)
 	if !h.k.Require(w, r, c.Path, types.ActionRead) {
 		return

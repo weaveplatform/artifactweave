@@ -19,11 +19,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	format "github.com/weaveplatform/artifactweave/internal/format/huggingface"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	formatapi "github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
@@ -624,9 +624,9 @@ func (h handler) lfsBatch(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, apierror.New(http.StatusBadRequest, "invalid LFS batch"))
 		return
 	}
-	p, _ := auth.FromContext(r.Context())
+	p, _ := kernel.FromContext(r.Context())
 	credential, err := p.DownloadReference()
-	if err != nil || h.o.Auth == nil || h.o.Keys == nil {
+	if err != nil || h.o.Authenticator == nil || h.o.Keys == nil {
 		h.k.Error(
 			w,
 			r,

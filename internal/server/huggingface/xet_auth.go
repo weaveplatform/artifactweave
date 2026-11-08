@@ -13,11 +13,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	format "github.com/weaveplatform/artifactweave/internal/format/huggingface"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -31,26 +31,26 @@ const (
 )
 
 type xetClaim struct {
-	Repo       string                  `json:"repo"`
-	Member     string                  `json:"member"`
-	Kind       string                  `json:"kind"`
-	Owner      string                  `json:"owner"`
-	Name       string                  `json:"name"`
-	Reference  string                  `json:"reference,omitempty"`
-	File       string                  `json:"file,omitempty"`
-	Revision   string                  `json:"revision"`
-	Write      bool                    `json:"write"`
-	Subject    string                  `json:"subject"`
-	Credential auth.DownloadCredential `json:"credential"`
-	Issued     int64                   `json:"issued"`
-	Expires    int64                   `json:"expires"`
+	Repo       string                    `json:"repo"`
+	Member     string                    `json:"member"`
+	Kind       string                    `json:"kind"`
+	Owner      string                    `json:"owner"`
+	Name       string                    `json:"name"`
+	Reference  string                    `json:"reference,omitempty"`
+	File       string                    `json:"file,omitempty"`
+	Revision   string                    `json:"revision"`
+	Write      bool                      `json:"write"`
+	Subject    string                    `json:"subject"`
+	Credential kernel.DownloadCredential `json:"credential"`
+	Issued     int64                     `json:"issued"`
+	Expires    int64                     `json:"expires"`
 }
 
 func (h handler) xetReadToken(w http.ResponseWriter, r *http.Request)  { h.xetToken(w, r, false) }
 func (h handler) xetWriteToken(w http.ResponseWriter, r *http.Request) { h.xetToken(w, r, true) }
 
 func (h handler) xetToken(w http.ResponseWriter, r *http.Request, write bool) {
-	if !h.o.XetEnabled || h.o.Keys == nil || h.o.Auth == nil {
+	if !h.o.XetEnabled || h.o.Keys == nil || h.o.Authenticator == nil {
 		h.xetUnavailable(w, r)
 		return
 	}
@@ -82,7 +82,7 @@ func (h handler) xetToken(w http.ResponseWriter, r *http.Request, write bool) {
 		h.k.Error(w, r, badIdentity())
 		return
 	}
-	p, _ := auth.FromContext(r.Context())
+	p, _ := kernel.FromContext(r.Context())
 	credential, err := p.DownloadReference()
 	if err != nil {
 		h.k.Error(
@@ -188,7 +188,7 @@ func (h handler) verifyXet(raw string) (xetClaim, bool) {
 func (h handler) xetAuthority(r *http.Request, write bool) (*http.Request, xetClaim, error) {
 	forbidden := apierror.New(http.StatusForbidden, "invalid or expired Xet authority")
 	var c xetClaim
-	if !h.o.XetEnabled || h.o.Auth == nil {
+	if !h.o.XetEnabled || h.o.Authenticator == nil {
 		return nil, c, forbidden
 	}
 	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
@@ -216,26 +216,18 @@ func (h handler) xetAuthority(r *http.Request, write bool) (*http.Request, xetCl
 
 func (h handler) restoreXetClaim(r *http.Request, c xetClaim, write bool) (*http.Request, error) {
 	forbidden := apierror.New(http.StatusForbidden, "invalid or expired Xet authority")
-	if h.o.Auth == nil || c.Write != write || c.Repo != pkgroute.RequestFrom(r).Repo.Key {
+	if h.o.Authenticator == nil || c.Write != write || c.Repo != pkgroute.RequestFrom(r).Repo.Key {
 		return nil, forbidden
 	}
-	p, err := h.o.Auth.RestoreDownload(r.Context(), c.Subject, c.Credential, h.k.DB().Tokens())
-	var d *authz.Decider
+	p, err := h.o.Authenticator.RestoreDownload(r.Context(), c.Subject, c.Credential)
+	var d accessapi.Decider
 	if err == nil {
-		p, d, err = auth.Authorize(
-			r.Context(),
-			authz.Sources{
-				Permissions:      h.k.DB().Permissions(),
-				Groups:           h.k.DB().Groups(),
-				AnonymousEnabled: p.Anonymous,
-			},
-			p,
-		)
+		p, d, err = h.o.Authorizer.Authorize(r.Context(), p, p.Anonymous)
 	}
 	if err != nil {
 		return nil, forbidden
 	}
-	r = r.WithContext(auth.WithAuthorized(r.Context(), p, d))
+	r = r.WithContext(accessapi.WithCaller(r.Context(), p, d))
 	id, _ := format.ParseIdentity(c.Kind, c.Owner, c.Name)
 	action := types.ActionRead
 	if write {

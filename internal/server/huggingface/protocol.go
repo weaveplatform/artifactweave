@@ -15,10 +15,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	format "github.com/weaveplatform/artifactweave/internal/format/huggingface"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -27,9 +27,24 @@ import (
 
 const signingPurpose = "huggingfaceml-lfs-upload-v1"
 
+// Options configures the Hugging Face protocol. Its access contracts read
+// through the request's context, so a server binds them over the store the
+// router kit serves, and the migration's permission scan joins the
+// migration's transaction.
 type Options struct {
-	XetEnabled    bool
-	Auth          *auth.Authenticator
+	XetEnabled bool
+	// Authenticator rechecks the credential that a Xet token or an LFS
+	// upload grant names, against current state, before the grant is
+	// honoured. Nil, as on a server without authentication, answers a Xet
+	// token request 501 and refuses the Xet CAS routes and an LFS batch
+	// upload 403.
+	Authenticator accessapi.Authenticator
+	// Authorizer evaluates the permissions of the principal that
+	// Authenticator restores. It is required whenever Authenticator is set.
+	Authorizer accessapi.Authorizer
+	// Grants reports a permission target whose access a legacy layout
+	// migration would change. The migration route requires it.
+	Grants        accessapi.Grants
 	RemoteSources *source.Service
 	Keys          *crypt.Keyring
 	Now           func() time.Time

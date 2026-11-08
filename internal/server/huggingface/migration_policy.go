@@ -1,27 +1,22 @@
 package huggingface
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	format "github.com/weaveplatform/artifactweave/internal/format/huggingface"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-type migrationPathPair struct {
-	source      string
-	destination string
-	folder      bool
-}
-
-// Compare each permission's entire target union. Keeping every grant's
-// applicability unchanged preserves users, groups and anonymous grants,
-// including exclusions; merely checking the administrator would not.
+// Grants.AccessChange compares each permission's entire target union for
+// every moved pair. Keeping every grant's applicability unchanged preserves
+// users, groups and anonymous grants, including exclusions; merely checking
+// the administrator would not.
 func (h handler) migrationPolicy(
 	r *http.Request,
 	id format.Identity,
@@ -40,24 +35,33 @@ func (h handler) migrationPolicy(
 		c.BlackedOut != nil && *c.BlackedOut {
 		return apierror.New(http.StatusConflict, "repository changed or is blacked out")
 	}
-	pairs := make([]migrationPathPair, 0, len(files)+3)
-	pairs = append(pairs,
-		migrationPathPair{id.Kind + "/" + id.RepoID(), id.Prefix(), true},
-		migrationPathPair{status.Source, status.Destination, true})
+	pairs := make([]accessapi.PathPair, 0, len(files)+3)
+	pairs = append(
+		pairs,
+		accessapi.PathPair{
+			Source:      id.Kind + "/" + id.RepoID(),
+			Destination: id.Prefix(),
+			Folder:      true,
+		},
+		accessapi.PathPair{Source: status.Source, Destination: status.Destination, Folder: true},
+	)
 	for _, file := range files {
-		pairs = append(pairs, migrationPathPair{file.item.FullPath(), file.path, false})
+		pairs = append(
+			pairs,
+			accessapi.PathPair{Source: file.item.FullPath(), Destination: file.path},
+		)
 	}
 	if ref != "" {
-		pairs = append(pairs, migrationPathPair{status.Source, ref, false})
+		pairs = append(pairs, accessapi.PathPair{Source: status.Source, Destination: ref})
 	}
 	patterns := repo.PatternsOf(c)
 	for _, pair := range pairs {
 		if patterns.Accepts(
-			pair.source,
-			pair.folder,
+			pair.Source,
+			pair.Folder,
 		) != patterns.Accepts(
-			pair.destination,
-			pair.folder,
+			pair.Destination,
+			pair.Folder,
 		) {
 			return apierror.New(
 				http.StatusConflict,
@@ -65,59 +69,28 @@ func (h handler) migrationPolicy(
 			)
 		}
 	}
-	page := store.Page{Limit: maxMigrationItems}
-	seen := 0
-	for {
-		permissions, next, err := h.k.DB().Permissions().List(r.Context(), page)
-		if err != nil {
-			return fmt.Errorf("huggingface: migration permissions: %w", err)
-		}
-		for _, permission := range permissions {
-			seen++
-			if seen > maxMigrationItems {
-				return apierror.New(
-					http.StatusRequestEntityTooLarge,
-					"migration permission scan exceeds 1024 permissions",
-				)
-			}
-			resource := permission.Resources[types.ResourceArtifact]
-			var targets []types.Target
-			for key, rule := range resource.Targets {
-				if types.MatchesRepository(key, c.Key, string(c.Class)) {
-					targets = append(targets, rule)
-				}
-			}
-			for _, pair := range pairs {
-				if migrationAllows(
-					targets,
-					pair.source,
-					pair.folder,
-				) != migrationAllows(
-					targets,
-					pair.destination,
-					pair.folder,
-				) {
-					return apierror.New(
-						http.StatusConflict,
-						"permission target changes access after migration: "+permission.Name,
-					)
-				}
-			}
-		}
-		if next == "" {
-			return nil
-		}
-		page.After = next
+	name, err := h.o.Grants.AccessChange(
+		r.Context(),
+		c.Key,
+		string(c.Class),
+		pairs,
+		maxMigrationItems,
+	)
+	switch {
+	case errors.Is(err, accessapi.ErrScanLimit):
+		return apierror.New(
+			http.StatusRequestEntityTooLarge,
+			"migration permission scan exceeds 1024 permissions",
+		)
+	case err != nil:
+		return fmt.Errorf("huggingface: migration permissions: %w", err)
+	case name != "":
+		return apierror.New(
+			http.StatusConflict,
+			"permission target changes access after migration: "+name,
+		)
 	}
-}
-
-func migrationAllows(targets []types.Target, path string, folder bool) bool {
-	for _, target := range targets {
-		if authz.TargetAllows(target, path, folder) {
-			return true
-		}
-	}
-	return false
+	return nil
 }
 
 func migrationAccessDenied() error {

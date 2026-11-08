@@ -15,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/migration/access"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
@@ -96,6 +97,12 @@ func newFixture(t *testing.T) *fixture {
 
 func (f *fixture) router(keys *crypt.Keyring) http.Handler {
 	f.t.Helper()
+	// Bound over f.read, the store the router kit serves, so a test that
+	// swaps in a failing store fails the access reads too.
+	m, err := access.New(access.Deps{Store: f.read})
+	if err != nil {
+		f.t.Fatal(err)
+	}
 	r := chi.NewRouter()
 	r.Use(baseurl.Middleware("https://registry.test"))
 	r.Use(func(next http.Handler) http.Handler {
@@ -136,7 +143,15 @@ func (f *fixture) router(keys *crypt.Keyring) http.Handler {
 				}
 			},
 		},
-		Protocol(Options{Keys: keys, Now: func() time.Time { return f.now }}),
+		Protocol(Options{
+			Authorizer:      m.API().Authorizer,
+			KeyPairs:        m.API().Keys,
+			Restrictions:    m.API().Restrictions,
+			Identity:        m.API().Identity,
+			AnonymousAccess: m.API().AnonymousAccess,
+			Keys:            keys,
+			Now:             func() time.Time { return f.now },
+		}),
 	)
 	return r
 }

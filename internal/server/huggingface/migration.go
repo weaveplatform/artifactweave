@@ -11,10 +11,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	format "github.com/weaveplatform/artifactweave/internal/format/huggingface"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -80,7 +80,7 @@ func (m migrationRequest) paths() (format.Identity, string, string, bool) {
 }
 
 func (h handler) migrateLegacy(w http.ResponseWriter, r *http.Request) {
-	p, _ := auth.FromContext(r.Context())
+	p, _ := kernel.FromContext(r.Context())
 	if !p.Admin {
 		h.k.Error(
 			w,

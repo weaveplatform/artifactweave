@@ -206,7 +206,13 @@ type Config struct {
 // through the router kit (decision 0032). A format with a protocol adds its
 // constructor here.
 var protocols = []func(Config) pkgroute.Protocol{
-	func(cfg Config) pkgroute.Protocol { return nix.Protocol(cfg.RemoteSources) },
+	func(cfg Config) pkgroute.Protocol {
+		return nix.Protocol(nix.Options{
+			RemoteSources: cfg.RemoteSources,
+			Authorizer:    cfg.Access.Authorizer,
+			KeyPairs:      cfg.Access.Keys,
+		})
+	},
 	func(cfg Config) pkgroute.Protocol {
 		return puppet.Protocol(puppet.Options{Blobs: cfg.Blobs, RemoteSources: cfg.RemoteSources})
 	},
@@ -222,7 +228,9 @@ var protocols = []func(Config) pkgroute.Protocol{
 	func(cfg Config) pkgroute.Protocol {
 		return huggingface.Protocol(huggingface.Options{
 			XetEnabled:    cfg.HuggingFaceXetEnabled,
-			Auth:          cfg.Auth,
+			Authenticator: cfg.Access.Authenticator,
+			Authorizer:    cfg.Access.Authorizer,
+			Grants:        cfg.Access.Grants,
 			RemoteSources: cfg.RemoteSources,
 			Keys:          cfg.Keys,
 		})
@@ -245,16 +253,27 @@ var protocols = []func(Config) pkgroute.Protocol{
 		)
 	},
 	func(cfg Config) pkgroute.Protocol {
-		return terraform.Protocol(
-			terraform.Options{Keys: cfg.Keys, RemoteSources: cfg.RemoteSources, Auth: cfg.Auth},
-		)
+		return terraform.Protocol(terraform.Options{
+			Authenticator:   cfg.Access.Authenticator,
+			Authorizer:      cfg.Access.Authorizer,
+			KeyPairs:        cfg.Access.Keys,
+			Restrictions:    cfg.Access.Restrictions,
+			Identity:        cfg.Access.Identity,
+			AnonymousAccess: cfg.Access.AnonymousAccess,
+			RemoteSources:   cfg.RemoteSources,
+			Keys:            cfg.Keys,
+		})
 	},
 	func(cfg Config) pkgroute.Protocol {
 		return helm.Protocol(
 			helm.Options{Format: cfg.FormatSettings.Helm, RemoteSources: cfg.RemoteSources},
 		)
 	},
-	func(cfg Config) pkgroute.Protocol { return hex.Protocol(hex.Options{RemoteSources: cfg.RemoteSources}) },
+	func(cfg Config) pkgroute.Protocol {
+		return hex.Protocol(
+			hex.Options{RemoteSources: cfg.RemoteSources, KeyPairs: cfg.Access.Keys},
+		)
+	},
 	func(cfg Config) pkgroute.Protocol {
 		return luarocks.Protocol(luarocks.Options{RemoteSources: cfg.RemoteSources})
 	},
@@ -500,9 +519,12 @@ func New(cfg Config) http.Handler {
 	terraformbackend.Register(
 		r,
 		terraformbackend.Options{
-			Items: artSvc.items(cfg.Store),
-			Keys:  cfg.Keys,
-			Fault: func(r *http.Request, err error) { noteCause(r.Context(), err) },
+			Items:        artSvc.items(cfg.Store),
+			Keys:         cfg.Keys,
+			Fault:        func(r *http.Request, err error) { noteCause(r.Context(), err) },
+			Authorizer:   cfg.Access.Authorizer,
+			Identity:     cfg.Access.Identity,
+			Restrictions: cfg.Access.Restrictions,
 		},
 	)
 	for _, p := range mounted {

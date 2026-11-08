@@ -14,28 +14,47 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	nixfmt "github.com/weaveplatform/artifactweave/internal/format/nix"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/keymaterial"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func Protocol(remote *source.Service) pkgroute.Protocol {
+// Options configures the Nix binary-cache protocol. Its access contracts
+// read through the request's context, so a server binds them over the store
+// the router kit serves.
+type Options struct {
+	// RemoteSources serves remote repositories; nil answers them 501.
+	RemoteSources *source.Service
+	// Authorizer re-evaluates the caller's permissions against current
+	// state just before a hosted or virtual repository's narinfo or archive
+	// is served. Serving those requires it.
+	Authorizer accessapi.Authorizer
+	// KeyPairs reads the Ed25519 key pairs a repository names: a hosted
+	// repository signs the narinfo it serves with its primary pair, and a
+	// remote repository verifies upstream signatures against its pairs. A
+	// repository that names a key pair requires it.
+	KeyPairs accessapi.Keys
+}
+
+// Protocol mounts the Nix binary-cache routes for local, federated and
+// virtual repositories, and for remote ones when o.RemoteSources is set.
+func Protocol(o Options) pkgroute.Protocol {
 	sources := map[repo.Class]pkgroute.Source{
 		repo.Local:     pkgroute.Local{},
 		repo.Federated: pkgroute.Local{},
 		repo.Virtual:   pkgroute.Local{},
 	}
-	if remote != nil {
-		sources[repo.Remote] = pkgroute.Remote{Service: remote}
+	if o.RemoteSources != nil {
+		sources[repo.Remote] = pkgroute.Remote{Service: o.RemoteSources}
 	}
 	return pkgroute.Protocol{
 		Name:         "nix",
@@ -43,7 +62,7 @@ func Protocol(remote *source.Service) pkgroute.Protocol {
 		ErrorProfile: apierror.ProfileArtifactory,
 		Sources:      sources,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
-			h := handler{k}
+			h := handler{k: k, o: o}
 			r.Get("/*", h.read)
 			r.Head("/*", h.read)
 			r.Put("/*", h.put)
@@ -54,7 +73,10 @@ func Protocol(remote *source.Service) pkgroute.Protocol {
 }
 
 type (
-	handler struct{ k *pkgroute.Kit }
+	handler struct {
+		k *pkgroute.Kit
+		o Options
+	}
 	located struct {
 		info    nixfmt.Info
 		archive *types.Item
@@ -64,7 +86,7 @@ type (
 )
 
 func (h handler) fail(w http.ResponseWriter, r *http.Request, err error) {
-	p, _ := auth.FromContext(r.Context())
+	p, _ := kernel.FromContext(r.Context())
 	h.k.Error(w, r, pkgroute.SourceError(err, p.Anonymous || p.Name == ""))
 }
 
@@ -242,20 +264,12 @@ func (h handler) current(r *http.Request, paths ...string) error {
 	if !reflect.DeepEqual(c, fresh) {
 		return source.ErrSuperseded
 	}
-	p, _ := auth.FromContext(r.Context())
-	p, d, err := auth.Authorize(
-		r.Context(),
-		authz.Sources{
-			Permissions:      h.k.DB().Permissions(),
-			Groups:           h.k.DB().Groups(),
-			AnonymousEnabled: true,
-		},
-		p,
-	)
+	p, _ := kernel.FromContext(r.Context())
+	p, d, err := h.o.Authorizer.Authorize(r.Context(), p, true)
 	if err != nil {
 		return fmt.Errorf("nix: current permissions: %w", err)
 	}
-	r = r.WithContext(auth.WithAuthorized(r.Context(), p, d))
+	r = r.WithContext(accessapi.WithCaller(r.Context(), p, d))
 	for _, path := range paths {
 		if !h.k.Can(r, path, types.ActionRead) {
 			return source.ErrDenied
@@ -272,7 +286,7 @@ func (h handler) sign(r *http.Request, info *nixfmt.Info) error {
 	if c.PrimaryKeyPairRef == "" {
 		return nil
 	}
-	pair, err := h.k.DB().Keys().Keypair(r.Context(), c.PrimaryKeyPairRef)
+	pair, err := h.o.KeyPairs.Keypair(r.Context(), c.PrimaryKeyPairRef)
 	if err != nil || pair.Type != types.KeypairEd25519 {
 		return apierror.New(503, "Nix signing key is unavailable")
 	}
