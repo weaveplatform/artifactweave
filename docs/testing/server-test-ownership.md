@@ -74,10 +74,10 @@ When a test file leaves a shared directory such as `internal/server`:
 | Skills | `internal/server/skills` |
 | Terraform registry | `internal/server/terraform`, `test/server/terraform` |
 | Terraform backend | `internal/server/terraformbackend`, `test/server/terraformbackend` |
-| Shared | `internal/server`, `internal/server/apierror`, `internal/server/baseurl`, `internal/server/pkgroute`, `test/server/shared` |
+| Shared | `internal/server`, `internal/server/apierror`, `internal/server/baseurl`, `internal/server/pkgroute`, `test/server/access` |
 
-`test/server/agentcommon`, `test/server/registryfixture`, and
-`test/server/support` contain fixtures and helpers, not test suites. A change
+`test/server/support` and the packages under it (`harness`, `agentcommon` and
+`registryfixture`) contain fixtures and helpers, not test suites. A change
 to one of them must select its dependent test packages. A change to shared
 server code, authentication, routing, store contracts, or registrations must
 select every affected owner. #673 implements those reverse dependencies and

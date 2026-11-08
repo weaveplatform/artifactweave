@@ -11,8 +11,8 @@ import (
 
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/test/server/registryfixture"
 	"github.com/weaveplatform/artifactweave/test/server/support"
+	"github.com/weaveplatform/artifactweave/test/server/support/registryfixture"
 )
 
 // jfHelmAQL is the search jf helm push (jf 2.126.0, jfrog-cli-artifactory

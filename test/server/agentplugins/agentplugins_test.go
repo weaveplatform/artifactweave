@@ -13,7 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/pkg/types"
-	"github.com/weaveplatform/artifactweave/test/server/agentcommon"
+	"github.com/weaveplatform/artifactweave/test/server/support/agentcommon"
 )
 
 var (
