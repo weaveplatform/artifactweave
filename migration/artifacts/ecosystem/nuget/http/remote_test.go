@@ -23,6 +23,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	nugetfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
 	nugethttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
@@ -87,7 +88,7 @@ func newRemoteFixture(t *testing.T, options ...fakeupstream.Options) *remoteFixt
 		Options:         resolver.Options,
 		Key:             []byte(strings.Repeat("k", 32)),
 		Now:             clock.Now,
-		ProjectResponse: remote.ProjectNuGetEmptyFeed,
+		ProjectResponse: nugetfmt.ProjectNuGetEmptyFeed,
 	}
 	t.Cleanup(policy.Pool.Close)
 	svc := &source.Service{

@@ -1,4 +1,4 @@
-package remote
+package nuget
 
 import (
 	"io"
@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 )
 
@@ -34,7 +35,7 @@ func ProjectNuGetEmptyFeed(q source.Request, res *http.Response) error {
 	original := res.Body
 	res.Body = http.NoBody
 	if err := original.Close(); err != nil {
-		return PolicyError(err)
+		return remote.PolicyError(err)
 	}
 	res.Body = io.NopCloser(strings.NewReader(emptyNuGetFeed))
 	res.StatusCode = http.StatusOK

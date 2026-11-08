@@ -182,6 +182,8 @@
         {"from":"internal/remote/maven.go","action":"move","to":"artifacts/ecosystem/maven","file":"remote_backend.go","ticket":"RMT-03"},
         {"from":"internal/remote/maven_eager.go","action":"move","to":"artifacts/ecosystem/maven","file":"remote_eager.go","ticket":"RMT-03"},
         {"from":"internal/remote/maven_test.go","action":"move","to":"artifacts/ecosystem/maven","file":"remote_backend_test.go","ticket":"RMT-03"},
+        {"from":"internal/remote/nuget_empty_feed.go","action":"move","to":"artifacts/ecosystem/nuget","file":"remote_empty_feed.go","ticket":"RMT-04"},
+        {"from":"internal/remote/nuget_empty_feed_test.go","action":"move","to":"artifacts/ecosystem/nuget","file":"remote_empty_feed_test.go","ticket":"RMT-04"},
         {"from":"internal/sqlstore/postgres/driver.go","action":"move","to":"platform/sql/postgres","file":"postgres.go","ticket":"STO-07"},
         {"from":"internal/sqlstore/sqlcommon/dialect.go","action":"move","to":"platform/sql/dialect","ticket":"STO-04"},
         {"from":"internal/sqlstore/sqlcommon/migrate.go","action":"move","to":"platform/sql/dialect","ticket":"STO-04"},

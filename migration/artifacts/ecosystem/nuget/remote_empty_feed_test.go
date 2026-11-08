@@ -1,4 +1,4 @@
-package remote
+package nuget
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -181,8 +182,8 @@ func TestAccNuGetEmptyFeedClosesTransportBodyOnce(t *testing.T) {
 			q.Repo.StoreArtifactsLocally = &persist
 			q.Repo.BypassHeadRequests = ptr(true)
 			var closed atomic.Int32
-			w.p.Options = func(context.Context, repo.Config) (Options, error) {
-				return Options{
+			w.p.Options = func(context.Context, repo.Config) (remote.Options, error) {
+				return remote.Options{
 					Revision: "revision",
 					WrapTransport: func(base *http.Transport) (http.RoundTripper, func()) {
 						return &nugetTrackedTransport{

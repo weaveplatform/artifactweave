@@ -17,6 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -132,12 +133,12 @@ func (rt *runtime) openRemoteSources(
 		Key:             key,
 		CheckCurrent:    checkCurrent(revalidate),
 		GitFetch:        cocoapods.FetchCocoaPodsGit,
-		ProjectResponse: remote.ProjectNuGetEmptyFeed,
+		ProjectResponse: nuget.ProjectNuGetEmptyFeed,
 	}
 	registryPolicy := &remote.Policy{
 		Store: rt.store, Blobs: rt.blobs, Items: items,
 		Options: resolver.Options, CheckCurrent: checkCurrent(registryRevalidate), Key: key,
-		GitFetch: cocoapods.FetchCocoaPodsGit, ProjectResponse: remote.ProjectNuGetEmptyFeed,
+		GitFetch: cocoapods.FetchCocoaPodsGit, ProjectResponse: nuget.ProjectNuGetEmptyFeed,
 	}
 	content := &remote.RegistryContent{
 		Policy:  registryPolicy,

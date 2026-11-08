@@ -12,6 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
@@ -63,7 +64,7 @@ func TestAccStatusNuGetV3Remote(t *testing.T) {
 			Pool:            new(remote.Pool),
 			Options:         resolver.Options,
 			Key:             []byte(strings.Repeat("k", 32)),
-			ProjectResponse: remote.ProjectNuGetEmptyFeed,
+			ProjectResponse: nuget.ProjectNuGetEmptyFeed,
 		}
 		t.Cleanup(policy.Pool.Close)
 		cfg.RemoteSources = &source.Service{
