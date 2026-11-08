@@ -91,7 +91,7 @@ var formats = map[string]formatImpact{
 		[]string{"node", "npm12", "jf"},
 	},
 	"nuget": {
-		"./internal/format/nuget/...",
+		"./migration/artifacts/ecosystem/nuget/...",
 		"@nuget&&~@gradle",
 		[]string{"dotnet", "dotnet11", "jf"},
 	},

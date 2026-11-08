@@ -1426,7 +1426,7 @@
   {
     "route": "DELETE /artifactory/api/nuget/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/nuget.handler.remove-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/nuget/http.handler.remove-fm",
     "review_family": "native-nuget",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -6472,7 +6472,7 @@
   {
     "route": "GET /artifactory/api/nuget/v3/{repoKey}/",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/nuget.handler.serviceIndex-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/nuget/http.handler.serviceIndex-fm",
     "review_family": "native-nuget",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6491,7 +6491,7 @@
   {
     "route": "GET /artifactory/api/nuget/v3/{repoKey}/autocomplete",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/nuget.handler.autocomplete-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/nuget/http.handler.autocomplete-fm",
     "review_family": "native-nuget",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6510,7 +6510,7 @@
   {
     "route": "GET /artifactory/api/nuget/v3/{repoKey}/flatcontainer/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/nuget.handler.flat-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/nuget/http.handler.flat-fm",
     "review_family": "native-nuget",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6529,7 +6529,7 @@
   {
     "route": "GET /artifactory/api/nuget/v3/{repoKey}/index.json",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/nuget.handler.serviceIndex-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/nuget/http.handler.serviceIndex-fm",
     "review_family": "native-nuget",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6548,7 +6548,7 @@
   {
     "route": "GET /artifactory/api/nuget/v3/{repoKey}/query",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/nuget.handler.search-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/nuget/http.handler.search-fm",
     "review_family": "native-nuget",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6567,7 +6567,7 @@
   {
     "route": "GET /artifactory/api/nuget/v3/{repoKey}/registration-semver2/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/nuget/registration.go: internal/server/nuget.handler.registration.func1",
+    "handler": "migration/artifacts/ecosystem/nuget/http/registration.go: migration/artifacts/ecosystem/nuget/http.handler.registration.func1",
     "review_family": "native-nuget",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6586,7 +6586,7 @@
   {
     "route": "GET /artifactory/api/nuget/v3/{repoKey}/registration/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/nuget/registration.go: internal/server/nuget.handler.registration.func1",
+    "handler": "migration/artifacts/ecosystem/nuget/http/registration.go: migration/artifacts/ecosystem/nuget/http.handler.registration.func1",
     "review_family": "native-nuget",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6605,7 +6605,7 @@
   {
     "route": "GET /artifactory/api/nuget/v3/{repoKey}/{symbol}/{key}/{file}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/nuget.handler.symbolFile-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/nuget/http.handler.symbolFile-fm",
     "review_family": "native-nuget",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6624,7 +6624,7 @@
   {
     "route": "GET /artifactory/api/nuget/{repoKey}/",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/nuget.handler.v2-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/nuget/http.handler.v2-fm",
     "review_family": "native-nuget",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6643,7 +6643,7 @@
   {
     "route": "GET /artifactory/api/nuget/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/nuget.handler.v2-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/nuget/http.handler.v2-fm",
     "review_family": "native-nuget",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12519,7 +12519,7 @@
   {
     "route": "HEAD /artifactory/api/nuget/v3/{repoKey}/",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/nuget.handler.serviceIndex-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/nuget/http.handler.serviceIndex-fm",
     "review_family": "native-nuget",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12538,7 +12538,7 @@
   {
     "route": "HEAD /artifactory/api/nuget/v3/{repoKey}/flatcontainer/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/nuget.handler.flat-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/nuget/http.handler.flat-fm",
     "review_family": "native-nuget",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12557,7 +12557,7 @@
   {
     "route": "HEAD /artifactory/api/nuget/v3/{repoKey}/index.json",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/nuget.handler.serviceIndex-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/nuget/http.handler.serviceIndex-fm",
     "review_family": "native-nuget",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12576,7 +12576,7 @@
   {
     "route": "HEAD /artifactory/api/nuget/v3/{repoKey}/registration-semver2/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/nuget/registration.go: internal/server/nuget.handler.registration.func1",
+    "handler": "migration/artifacts/ecosystem/nuget/http/registration.go: migration/artifacts/ecosystem/nuget/http.handler.registration.func1",
     "review_family": "native-nuget",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12595,7 +12595,7 @@
   {
     "route": "HEAD /artifactory/api/nuget/v3/{repoKey}/registration/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/nuget/registration.go: internal/server/nuget.handler.registration.func1",
+    "handler": "migration/artifacts/ecosystem/nuget/http/registration.go: migration/artifacts/ecosystem/nuget/http.handler.registration.func1",
     "review_family": "native-nuget",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12614,7 +12614,7 @@
   {
     "route": "HEAD /artifactory/api/nuget/v3/{repoKey}/{symbol}/{key}/{file}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/nuget.handler.symbolFile-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/nuget/http.handler.symbolFile-fm",
     "review_family": "native-nuget",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12633,7 +12633,7 @@
   {
     "route": "HEAD /artifactory/api/nuget/{repoKey}/",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/nuget.handler.v2-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/nuget/http.handler.v2-fm",
     "review_family": "native-nuget",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12652,7 +12652,7 @@
   {
     "route": "HEAD /artifactory/api/nuget/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/nuget.handler.v2-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/nuget/http.handler.v2-fm",
     "review_family": "native-nuget",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -16882,7 +16882,7 @@
   {
     "route": "POST /artifactory/api/nuget/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/nuget.handler.relist-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/nuget/http.handler.relist-fm",
     "review_family": "native-nuget",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -21202,7 +21202,7 @@
   {
     "route": "PUT /artifactory/api/nuget/v3/{repoKey}/symbols",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/nuget.handler.symbols-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/nuget/http.handler.symbols-fm",
     "review_family": "native-nuget",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -21221,7 +21221,7 @@
   {
     "route": "PUT /artifactory/api/nuget/v3/{repoKey}/symbols/",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/nuget.handler.symbols-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/nuget/http.handler.symbols-fm",
     "review_family": "native-nuget",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -21240,7 +21240,7 @@
   {
     "route": "PUT /artifactory/api/nuget/{repoKey}/",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/nuget.handler.push-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/nuget/http.handler.push-fm",
     "review_family": "native-nuget",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -21259,7 +21259,7 @@
   {
     "route": "PUT /artifactory/api/nuget/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/nuget.handler.push-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/nuget/http.handler.push-fm",
     "review_family": "native-nuget",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",

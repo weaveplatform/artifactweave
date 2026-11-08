@@ -638,7 +638,7 @@ These assignments describe planned work, not current runtime support.
 
 ## Verification
 
-- **Unit tests** in `internal/format/nuget` for nuspec parsing (namespaces, casing, missing
+- **Unit tests** in `migration/artifacts/ecosystem/nuget` for nuspec parsing (namespaces, casing, missing
   elements), normalisation tables from Microsoft's and JFrog's examples, the canonical name,
   duplicate refusal by every route, overwrite at the version's own path, symbols linking, the
   `nuget.*` properties, PDB v7/Portable PDB keys, malformed offsets and extraction budgets,

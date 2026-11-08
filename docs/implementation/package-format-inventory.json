@@ -353,7 +353,7 @@
       "owner_issue": 0,
       "evidence": "test/acceptance/features/nuget_exit.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
-      "route_file": "internal/server/nuget/nuget.go",
+      "route_file": "migration/artifacts/ecosystem/nuget/http/nuget.go",
       "p9c": false
     },
     {

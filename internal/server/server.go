@@ -41,7 +41,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/nimmodel"
 	"github.com/weaveplatform/artifactweave/internal/server/nix"
 	"github.com/weaveplatform/artifactweave/internal/server/npm"
-	"github.com/weaveplatform/artifactweave/internal/server/nuget"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/server/pub"
 	"github.com/weaveplatform/artifactweave/internal/server/puppet"
@@ -62,6 +61,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	cocoapodshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods/http"
 	golanghttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang/http"
+	nugethttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -299,8 +299,8 @@ var protocols = []func(Config) pkgroute.Protocol{
 			Format:         cfg.FormatSettings.NPM,
 		})
 	},
-	func(cfg Config) pkgroute.Protocol { return nuget.V3(cfg.RemoteSources) },
-	func(cfg Config) pkgroute.Protocol { return nuget.V2(cfg.RemoteSources) },
+	func(cfg Config) pkgroute.Protocol { return nugethttp.V3(cfg.RemoteSources) },
+	func(cfg Config) pkgroute.Protocol { return nugethttp.V2(cfg.RemoteSources) },
 	func(cfg Config) pkgroute.Protocol {
 		return gems.Protocol(gems.Options{RemoteSources: cfg.RemoteSources})
 	},

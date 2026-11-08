@@ -27,7 +27,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/format/nix"
 	"github.com/weaveplatform/artifactweave/internal/format/npm"
-	"github.com/weaveplatform/artifactweave/internal/format/nuget"
 	"github.com/weaveplatform/artifactweave/internal/format/opkg"
 	"github.com/weaveplatform/artifactweave/internal/format/pub"
 	"github.com/weaveplatform/artifactweave/internal/format/puppet"
@@ -42,6 +41,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
 )
 
 // Settings are the server-wide options of the formats that take any, from
