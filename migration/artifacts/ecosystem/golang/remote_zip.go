@@ -12,6 +12,15 @@ import (
 	modzip "golang.org/x/mod/zip"
 )
 
+// ErrGoResponse reports an upstream body that is not a complete, valid
+// GOPROXY answer for the path it was fetched for: a size over the
+// endpoint's bound or a body shorter than declared, a version list line
+// that is not a version with an optional RFC 3339 time, a go.mod of
+// another module, a .info that fails CheckInfo for the requested version,
+// an @latest that fails it for the version it names, or a module zip that
+// fails x/mod's checks or does not decompress. A resource's Validate
+// returns it before the body is admitted, so nothing invalid is cached. It
+// is one package variable, and callers match it with errors.Is.
 var ErrGoResponse = errors.New("remote: invalid upstream go module response")
 
 // x/mod's canonical ZIP validation takes a filename. Stage a bounded private

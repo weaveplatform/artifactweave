@@ -28,6 +28,17 @@ type GoSource struct {
 	}
 }
 
+// Read fetches the GOPROXY resource that q.Resource.Path names (a module's
+// @v/list or @latest, or a version's .info, .mod or .zip, with the module
+// path case-escaped or not) from the remote repository q.Repo through
+// Source. GoResource rebuilds the resource from the path and method alone,
+// keeping only the caller's range and conditional fields, so a caller
+// cannot choose the upstream target or validation. The rest of q (subject,
+// access, project, visited incarnations) passes through to Source's fences.
+// It returns source.ErrUnsupported when Source is nil or q.Repo is not a
+// remote Go repository, source.ErrInvalidRequest when the path or method
+// names no Go read, and otherwise Source's error wrapped with "go upstream
+// source", which errors.Is still matches.
 func (g GoSource) Read(ctx context.Context, q source.Request) (source.Result, error) {
 	if g.Source == nil || q.Repo.Class != repo.Remote || q.Repo.PackageType != repo.Go {
 		return source.Result{}, source.ErrUnsupported
@@ -50,6 +61,10 @@ func (g GoSource) Read(ctx context.Context, q source.Request) (source.Result, er
 // escaped GOPROXY target. Module ZIPs and go.mod files are immutable. Info,
 // list and latest retain the existing format's metadata classification and
 // remain authoritative upstream bytes, independent of downloaded cache items.
+// The resource's Validate checks the complete body before it is admitted
+// (ErrGoResponse). An empty method means GET; any method but GET and HEAD,
+// and a path that names no Go read or cannot be case-escaped, answer
+// source.ErrInvalidRequest.
 func GoResource(path, method string) (source.Resource, error) {
 	if method == "" {
 		method = http.MethodGet
