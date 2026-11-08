@@ -7,7 +7,7 @@ func TestUnitOwnedTestDirAcceptsLegacyAndStagedLayouts(t *testing.T) {
 		"internal/server":                            true,
 		"internal/server/npm":                        true,
 		"test/server":                                true,
-		"test/server/npm":                            true,
+		"test/server/access":                         true,
 		"test/server/artifacts/npm":                  true,
 		"test/server/support/harness":                true,
 		"internal/app":                               true,

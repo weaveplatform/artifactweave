@@ -26,7 +26,7 @@ func TestUnitAffectedPlanChoosesOnlyOwnedChanges(t *testing.T) {
 		{"new npm implementation", []change{{status: "A", path: "internal/format/npm/new.go"}}, "format", "npm"},
 		{"Terraform fixture", []change{{status: "M", path: "internal/format/terraform/terraformtest/fixture.go"}}, "format", "terraform"},
 		{"agent packages server adapter", []change{{status: "M", path: "internal/server/agentpackages/handler.go"}}, "format", "agentpackages"},
-		{"Helm OCI test", []change{{status: "M", path: "test/server/helmoci/push_test.go"}}, "format", "helmoci"},
+		{"Helm OCI test", []change{{status: "M", path: "test/server/artifacts/helmoci/push_test.go"}}, "format", "helmoci"},
 		{"deployment only", []change{{status: "M", path: "deploy/check.sh"}}, "deployment", ""},
 		{"docs only", []change{{status: "M", path: "README.md"}}, "docs", ""},
 		{"deployment guide only", []change{{status: "M", path: "deploy/platform/terraform/aws/cdn/README.md"}}, "docs", ""},
@@ -36,7 +36,7 @@ func TestUnitAffectedPlanChoosesOnlyOwnedChanges(t *testing.T) {
 		{"shared auth", []change{{status: "M", path: "internal/auth/auth.go"}}, "full", ""},
 		{"shared server", []change{{status: "M", path: "internal/server/server.go"}}, "full", ""},
 		{"shared fixture", []change{{status: "M", path: "test/server/support/support.go"}}, "full", ""},
-		{"new server test", []change{{status: "A", path: "test/server/npm/new_test.go"}}, "full", ""},
+		{"new server test", []change{{status: "A", path: "test/server/artifacts/npm/new_test.go"}}, "full", ""},
 		{"unknown root test", []change{{status: "M", path: "internal/server/unknown_test.go"}}, "full", ""},
 		{"unknown format", []change{{status: "M", path: "migration/artifacts/ecosystem/newformat/handler.go"}}, "full", ""},
 		{"shared format code", []change{{status: "M", path: "migration/artifacts/ecosystem/registry.go"}}, "full", ""},
@@ -56,7 +56,7 @@ func TestUnitAffectedPlanChoosesOnlyOwnedChanges(t *testing.T) {
 		})
 	}
 	npm := proposeAffected([]change{{status: "M", path: "internal/format/npm/handler.go"}})
-	for _, pkg := range []string{"./internal/format/npm/...", "./internal/server/npm", "./test/server/npm", "./internal/server"} {
+	for _, pkg := range []string{"./internal/format/npm/...", "./internal/server/npm", "./test/server/artifacts/npm", "./internal/server"} {
 		if !slices.Contains(npm.units, pkg) {
 			t.Errorf("npm plan omitted %s", pkg)
 		}
@@ -76,7 +76,7 @@ func TestUnitAffectedPlanChoosesOnlyOwnedChanges(t *testing.T) {
 		}
 	}
 	docker := proposeAffected([]change{{status: "M", path: "internal/format/docker/handler.go"}})
-	for _, pkg := range []string{"./test/server/docker", "./test/server/helmoci", "./internal/server/nimmodel"} {
+	for _, pkg := range []string{"./test/server/artifacts/docker", "./test/server/artifacts/helmoci", "./internal/server/nimmodel"} {
 		if !slices.Contains(docker.units, pkg) {
 			t.Errorf("Docker plan omitted dependent package %s", pkg)
 		}
@@ -197,7 +197,9 @@ func TestUnitFormatSourceOwnerStagedLayouts(t *testing.T) {
 			"test/server/artifacts":                  "shared",
 			"test/server/artifacts/helm":             "shared",
 			"test/server/artifacts/npm":              "npm",
-			"test/server/npm":                        "npm",
+			// No ecosystem suite lives directly under test/server, but
+			// formatSourceOwner still maps a format directory there.
+			"test/server/cargo": "cargo",
 		},
 		SharedFiles: map[string][]string{
 			"migration/app":         {"router_test.go"},
@@ -215,7 +217,7 @@ func TestUnitFormatSourceOwnerStagedLayouts(t *testing.T) {
 		"test/server/artifacts/npm/publish_test.go":              "npm",
 		"test/server/artifacts/npm/fixture.go":                   "npm",
 		"internal/format/npm/handler.go":                         "npm",
-		"test/server/npm/publish_test.go":                        "npm",
+		"test/server/cargo/publish_test.go":                      "cargo",
 		"migration/artifacts/ecosystem/pypi/http/routes_test.go": "",
 		"internal/artifacts/ecosystem/pypi/http/routes_test.go":  "",
 		"test/server/artifacts/helm/push_test.go":                "",

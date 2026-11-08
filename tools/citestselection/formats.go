@@ -206,7 +206,7 @@ func proposeAffected(changes []change) affectedPlan {
 	}
 	if owner == "docker" {
 		// Helm OCI and NIM model exercise the same registry protocol stack.
-		units = append(units, "./test/server/helmoci", "./internal/server/nimmodel")
+		units = append(units, "./test/server/artifacts/helmoci", "./internal/server/nimmodel")
 	}
 	slices.Sort(units)
 	units = slices.Compact(units)

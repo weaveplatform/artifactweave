@@ -128,7 +128,7 @@ func TestUnitAcceptanceOnlyOwnersKeepNarrowSelection(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, path := range []string{
-		"test/server/helmoci/helmoci_test.go",
+		"test/server/artifacts/helmoci/helmoci_test.go",
 		"internal/server/nimmodel/nimmodel.go",
 	} {
 		candidate := proposeAffected([]change{{status: "M", path: path}})
@@ -216,7 +216,7 @@ func TestUnitAffectedFormatSelectsOwnedMixedPackageEntries(t *testing.T) {
 			t.Errorf("unrelated root suite selected: %+v", entry)
 		}
 	}
-	if rootEntries == 0 || !slices.Contains(selection.Acc, "./test/server/maven") ||
+	if rootEntries == 0 || !slices.Contains(selection.Acc, "./test/server/artifacts/maven") ||
 		!slices.Contains(selection.Acc, "./internal/app") {
 		t.Fatalf("Maven acceptance dependencies omitted: %+v", selection)
 	}
