@@ -1,4 +1,4 @@
-package remote
+package golang
 
 import (
 	"archive/zip"
@@ -10,8 +10,6 @@ import (
 
 	"golang.org/x/mod/module"
 	modzip "golang.org/x/mod/zip"
-
-	goformat "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang"
 )
 
 var ErrGoResponse = errors.New("remote: invalid upstream go module response")
@@ -19,7 +17,7 @@ var ErrGoResponse = errors.New("remote: invalid upstream go module response")
 // x/mod's canonical ZIP validation takes a filename. Stage a bounded private
 // copy so every blob backend receives the same validation outside SQL, without
 // depending on the implementation of its ReadSeeker. No archive is extracted.
-func validateGoZip(ctx context.Context, f goformat.File, body io.Reader, size int64) error {
+func validateGoZip(ctx context.Context, f File, body io.Reader, size int64) error {
 	if size < 0 || size > modzip.MaxZipFile {
 		return ErrGoResponse
 	}

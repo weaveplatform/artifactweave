@@ -1,4 +1,4 @@
-package remote
+package golang
 
 import (
 	"context"
@@ -16,7 +16,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	goformat "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang"
 )
 
 // GoSource is the GOPROXY reader for the P10 virtual resolver. It deliberately
@@ -58,7 +57,7 @@ func GoResource(path, method string) (source.Resource, error) {
 	if method != http.MethodGet && method != http.MethodHead {
 		return source.Resource{}, source.ErrInvalidRequest
 	}
-	q, err := goformat.ParseRequest(path)
+	q, err := ParseRequest(path)
 	if err != nil {
 		return source.Resource{}, source.ErrInvalidRequest
 	}
@@ -73,10 +72,10 @@ func GoResource(path, method string) (source.Resource, error) {
 		GoneIsMissing: true,
 	}
 	switch q.Kind {
-	case goformat.KindList:
+	case KindList:
 		r.Kind, r.Path, r.UpstreamPath = source.ResourceKindVersions, q.Module+"/@v/list", escaped+"/@v/list"
 		r.Accept = "text/plain"
-	case goformat.KindLatest:
+	case KindLatest:
 		r.Kind, r.Path, r.UpstreamPath = source.ResourceKindMetadata, q.Module+"/@latest", escaped+"/@latest"
 		r.Accept = "application/json"
 	default:
@@ -84,14 +83,14 @@ func GoResource(path, method string) (source.Resource, error) {
 		if escapeErr != nil {
 			return source.Resource{}, source.ErrInvalidRequest
 		}
-		if q.Kind == goformat.KindInfo {
+		if q.Kind == KindInfo {
 			r.Kind = source.ResourceKindMetadata
 		}
 		f := q.File()
 		r.Path, r.UpstreamPath = f.Path(), escaped+"/@v/"+version+"."+f.Ext
-		r.Accept = map[goformat.Kind]string{
-			goformat.KindInfo: "application/json", goformat.KindMod: "text/plain",
-			goformat.KindZip: "application/zip",
+		r.Accept = map[Kind]string{
+			KindInfo: "application/json", KindMod: "text/plain",
+			KindZip: "application/zip",
 		}[q.Kind]
 	}
 	r.UpstreamPath = (&url.URL{Path: r.UpstreamPath}).EscapedPath()
@@ -103,21 +102,21 @@ func GoResource(path, method string) (source.Resource, error) {
 
 func validateGoResource(
 	ctx context.Context,
-	q goformat.Request,
+	q Request,
 	body io.ReadSeeker,
 	size int64,
 ) error {
 	if err := ctx.Err(); err != nil {
 		return fmt.Errorf("validate go response: %w", err)
 	}
-	if q.Kind == goformat.KindZip {
+	if q.Kind == KindZip {
 		return validateGoZip(ctx, q.File(), body, size)
 	}
-	limit := int64(goformat.MaxInfo)
+	limit := int64(MaxInfo)
 	switch q.Kind {
-	case goformat.KindMod:
+	case KindMod:
 		limit = modzip.MaxGoMod
-	case goformat.KindList:
+	case KindList:
 		limit = 4 << 20
 	}
 	if size < 0 || size > limit {
@@ -128,28 +127,28 @@ func validateGoResource(
 		return ErrGoResponse
 	}
 	switch q.Kind {
-	case goformat.KindList:
+	case KindList:
 		return validateGoList(q.Module, data)
-	case goformat.KindMod:
+	case KindMod:
 		f, parseErr := modfile.ParseLax("go.mod", data, nil)
 		if parseErr != nil || f.Module == nil || f.Module.Mod.Path != q.Module {
 			return ErrGoResponse
 		}
 		return nil
-	case goformat.KindLatest:
+	case KindLatest:
 		var fields map[string]json.RawMessage
 		var version string
 		if json.Unmarshal(data, &fields) != nil ||
 			json.Unmarshal(fields["Version"], &version) != nil {
 			return ErrGoResponse
 		}
-		selected, parseErr := goformat.ParseRequest(q.Module + "/@v/" + version + ".info")
+		selected, parseErr := ParseRequest(q.Module + "/@v/" + version + ".info")
 		if parseErr != nil {
 			return ErrGoResponse
 		}
 		q = selected
 	}
-	if err = goformat.CheckInfo(q.File(), data); err != nil {
+	if err = CheckInfo(q.File(), data); err != nil {
 		return ErrGoResponse
 	}
 	return nil
@@ -164,7 +163,7 @@ func validateGoList(modulePath string, data []byte) error {
 		if len(fields) > 2 {
 			return ErrGoResponse
 		}
-		if _, err := goformat.ParseRequest(modulePath + "/@v/" + fields[0] + ".info"); err != nil {
+		if _, err := ParseRequest(modulePath + "/@v/" + fields[0] + ".info"); err != nil {
 			return ErrGoResponse
 		}
 		// Artifactory's optional timestamp extension is preserved byte-for-byte.

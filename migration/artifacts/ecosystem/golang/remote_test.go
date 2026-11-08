@@ -1,4 +1,4 @@
-package remote
+package golang
 
 import (
 	"archive/zip"
@@ -18,7 +18,7 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	goformat "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -53,6 +53,10 @@ func goArchive(t *testing.T, name, version string) []byte {
 func goSourceFixture(t *testing.T) (*policyWorld, GoSource, source.Request) {
 	t.Helper()
 	w := policyFixture(t)
+	// The registry (artifacts/ecosystem) imports this package, so an
+	// in-package test names the Go handler itself; without it the cache
+	// writes go through the generic handler and skip the Go index.
+	w.p.Items.Formats = func(repo.PackageType) format.Handler { return Handler{} }
 	w.c.PackageType = repo.Go
 	if err := w.db.Repos().Update(t.Context(), w.c); err != nil {
 		t.Fatal(err)
@@ -307,7 +311,7 @@ func TestUnitGoBodyValidationRejectsWrongIdentity(t *testing.T) {
 	if err := info.Validate(
 		t.Context(),
 		strings.NewReader(""),
-		goformat.MaxInfo+1,
+		MaxInfo+1,
 	); !errors.Is(
 		err,
 		ErrGoResponse,
