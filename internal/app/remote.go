@@ -15,6 +15,7 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -129,12 +130,12 @@ func (rt *runtime) openRemoteSources(
 		Options:      resolver.Options,
 		Key:          key,
 		CheckCurrent: checkCurrent(revalidate),
-		GitFetch:     remote.FetchCocoaPodsGit,
+		GitFetch:     cocoapods.FetchCocoaPodsGit,
 	}
 	registryPolicy := &remote.Policy{
 		Store: rt.store, Blobs: rt.blobs, Items: items,
 		Options: resolver.Options, CheckCurrent: checkCurrent(registryRevalidate), Key: key,
-		GitFetch: remote.FetchCocoaPodsGit,
+		GitFetch: cocoapods.FetchCocoaPodsGit,
 	}
 	content := &remote.RegistryContent{
 		Policy:  registryPolicy,

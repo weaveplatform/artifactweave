@@ -1,4 +1,4 @@
-package remote
+package cocoapods
 
 import (
 	"archive/tar"
@@ -24,9 +24,9 @@ import (
 	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/storage/memory"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	podfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods"
 	"github.com/weaveplatform/artifactweave/migration/kernel/antpath"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
@@ -38,11 +38,11 @@ const (
 )
 
 type cocoaPodsCheckout struct {
-	policy           *Policy
+	policy           *remote.Policy
 	request          source.Request
 	permit           source.Permit
-	options          Options
-	client           *Client
+	options          remote.Options
+	client           *remote.Client
 	remainingBytes   int64
 	remainingObjects int
 	repositories     int
@@ -57,10 +57,10 @@ type cocoaPodsCheckout struct {
 // attacker-controlled filesystem/configuration is ever executed.
 func FetchCocoaPodsGit(
 	ctx context.Context,
-	p *Policy,
+	p *remote.Policy,
 	q source.Request,
 	permit source.Permit,
-	opts Options,
+	opts remote.Options,
 ) (*http.Response, error) {
 	if q.Repo.PackageType != repo.CocoaPods || q.Resource.CocoaPodsGit == nil || p.Pool == nil ||
 		!permit.UpstreamNetworkAllowed {
@@ -72,12 +72,13 @@ func FetchCocoaPodsGit(
 	}
 	client, err := p.Pool.Client(q.Repo, opts)
 	if err != nil {
+		//nolint:wrapcheck // preserves upstream error identity
 		return nil, err
 	}
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	var output bytes.Buffer
-	compressed := &cocoaPodsLimitedWriter{writer: &output, remaining: podfmt.MaxArchiveBytes}
+	compressed := &cocoaPodsLimitedWriter{writer: &output, remaining: MaxArchiveBytes}
 	gz := gzip.NewWriter(compressed)
 	tw := tar.NewWriter(gz)
 	checkout := &cocoaPodsCheckout{
@@ -133,7 +134,7 @@ func (g *cocoaPodsCheckout) repository(
 			checkout:   g,
 			repository: strings.TrimSuffix(spec.URL, "/"),
 		},
-		CheckRedirect: func(*http.Request, []*http.Request) error { return ErrRedirect },
+		CheckRedirect: func(*http.Request, []*http.Request) error { return remote.ErrRedirect },
 	}
 	session, err := githttp.NewClient(httpClient).NewUploadPackSession(endpoint, nil)
 	if err != nil {
@@ -164,9 +165,9 @@ func (g *cocoaPodsCheckout) repository(
 	if err != nil {
 		return cocoaPodsGitError(err)
 	}
-	data, err := io.ReadAll(io.LimitReader(response, podfmt.MaxArchiveBytes+1))
+	data, err := io.ReadAll(io.LimitReader(response, MaxArchiveBytes+1))
 	closeErr := response.Close()
-	if err != nil || closeErr != nil || len(data) > podfmt.MaxArchiveBytes {
+	if err != nil || closeErr != nil || len(data) > MaxArchiveBytes {
 		return source.ErrInvalidResult
 	}
 	objects, err := decodeCocoaPodsPack(ctx, data, g.remainingBytes, g.remainingObjects)
@@ -390,7 +391,7 @@ func (g *cocoaPodsCheckout) file(
 	}
 	g.seen[path] = true
 	blob, err := object.GetBlob(objects, entry.Hash)
-	if err != nil || blob.Size < 0 || blob.Size > podfmt.MaxArchiveBytes {
+	if err != nil || blob.Size < 0 || blob.Size > MaxArchiveBytes {
 		return source.ErrInvalidResult
 	}
 	g.files++
@@ -434,6 +435,7 @@ func (t cocoaPodsGitTransport) RoundTrip(req *http.Request) (*http.Response, err
 			g.permit,
 			g.options.Revision,
 		); err != nil {
+			//nolint:wrapcheck // preserves upstream error identity
 			return nil, err
 		}
 	}
@@ -445,7 +447,7 @@ func (t cocoaPodsGitTransport) RoundTrip(req *http.Request) (*http.Response, err
 	var body []byte
 	if req.Method == http.MethodPost {
 		target = t.repository + "/git-upload-pack"
-		limit = podfmt.MaxArchiveBytes
+		limit = MaxArchiveBytes
 		var err error
 		body, err = io.ReadAll(io.LimitReader(req.Body, 4097))
 		if err != nil || len(body) > 4096 {
@@ -469,7 +471,7 @@ func (t cocoaPodsGitTransport) RoundTrip(req *http.Request) (*http.Response, err
 	}
 	response, err := g.client.Do(
 		req.Context(),
-		Request{
+		remote.Request{
 			Method:            req.Method,
 			ExternalURL:       target,
 			CheckURL:          guard,
@@ -481,11 +483,12 @@ func (t cocoaPodsGitTransport) RoundTrip(req *http.Request) (*http.Response, err
 		},
 	)
 	if err != nil {
+		//nolint:wrapcheck // preserves upstream error identity
 		return nil, err
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return nil, ResponseError(response, time.Now())
+		return nil, remote.ResponseError(response, time.Now())
 	}
 	data, err := io.ReadAll(io.LimitReader(response.Body, limit+1))
 	if err != nil || int64(len(data)) > limit {

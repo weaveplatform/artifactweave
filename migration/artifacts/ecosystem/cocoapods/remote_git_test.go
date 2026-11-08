@@ -1,4 +1,4 @@
-package remote
+package cocoapods
 
 import (
 	"archive/tar"
@@ -20,6 +20,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/storage/memory"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
@@ -343,15 +344,19 @@ func TestAccCocoaPodsGitDestinationAndTransport(t *testing.T) {
 		ExternalDependenciesEnabled:  &enabled,
 		ExternalDependenciesPatterns: []string{srv.URL + "/**"},
 	}
-	client, err := NewClient(
+	client, err := remote.NewClient(
 		c,
-		Options{CheckURL: func(context.Context, *url.URL) error { return nil }},
+		remote.Options{CheckURL: func(context.Context, *url.URL) error { return nil }},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer client.Close()
-	g := &cocoaPodsCheckout{policy: &Policy{}, client: client, request: source.Request{Repo: c}}
+	g := &cocoaPodsCheckout{
+		policy:  &remote.Policy{},
+		client:  client,
+		request: source.Request{Repo: c},
+	}
 	transport := cocoaPodsGitTransport{checkout: g, repository: srv.URL + "/main.git"}
 	for _, tc := range []struct {
 		name, method, path, body string

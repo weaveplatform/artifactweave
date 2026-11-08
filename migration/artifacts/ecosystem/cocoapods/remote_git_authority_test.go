@@ -1,4 +1,4 @@
-package remote
+package cocoapods
 
 import (
 	"context"
@@ -14,12 +14,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	podfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -62,7 +63,7 @@ func TestAccCocoaPodsGitTransportCredentialIsolation(t *testing.T) {
 	}
 	db := inmem.New()
 	saveRepo(t, db, c)
-	resolver := resolverFor(t, db, ResolverOptions{
+	resolver := resolverFor(t, db, remote.ResolverOptions{
 		RootCAsPEM: roots, AllowedPrivateOrigins: []string{child.URL},
 	})
 	opts := resolveFor(t, resolver, c)
@@ -71,13 +72,13 @@ func TestAccCocoaPodsGitTransportCredentialIsolation(t *testing.T) {
 		t.Fatal(err)
 	}
 	opts.Jar.SetCookies(childURL, []*http.Cookie{{Name: "session", Value: "source-cookie"}})
-	client, err := NewClient(c, opts)
+	client, err := remote.NewClient(c, opts)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(client.Close)
 	checkout := &cocoaPodsCheckout{
-		policy: &Policy{}, client: client, request: source.Request{Repo: repo.Masked(c)},
+		policy: &remote.Policy{}, client: client, request: source.Request{Repo: repo.Masked(c)},
 	}
 	for _, method := range []string{http.MethodGet, http.MethodPost} {
 		for _, raw := range []string{root.URL + "/main.git", child.URL + "/dep.git"} {
@@ -208,6 +209,10 @@ func cocoaPodsAuthorityFixture(t *testing.T) (*policyWorld, source.Request) {
 	t.Helper()
 	w := policyFixture(t)
 	w.p.GitFetch = FetchCocoaPodsGit
+	// The registry (artifacts/ecosystem) imports this package, so an
+	// in-package test names the CocoaPods handler itself; without it the
+	// cache writes go through the generic handler and skip the slice's hooks.
+	w.p.Items.Formats = func(repo.PackageType) format.Handler { return Handler{} }
 	w.c.PackageType = repo.CocoaPods
 	w.c.ExternalDependenciesEnabled = ptr(true)
 	w.c.ExternalDependenciesPatterns = []string{w.up.URL + "/**"}
@@ -225,7 +230,7 @@ func cocoaPodsAuthorityFixture(t *testing.T) (*policyWorld, source.Request) {
 	q.Resource.Mutable, q.Resource.NoCrossOriginAuth = true, true
 	q.Resource.CheckURL = func(context.Context, *url.URL) error { return nil }
 	q.Resource.Validate = func(ctx context.Context, body io.ReadSeeker, size int64) error {
-		return podfmt.ValidateSourceArchive(ctx, body, size, ".tar.gz")
+		return ValidateSourceArchive(ctx, body, size, ".tar.gz")
 	}
 	if err := w.db.Permissions().Create(t.Context(), types.Permission{
 		Name: "git-reader", Resources: map[types.ResourceType]types.Resource{
@@ -239,7 +244,7 @@ func cocoaPodsAuthorityFixture(t *testing.T) (*policyWorld, source.Request) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	resolver := resolverFor(t, w.db, ResolverOptions{})
+	resolver := resolverFor(t, w.db, remote.ResolverOptions{})
 	w.p.Options = resolver.Options
 	// The policy passes CheckCurrent its own store, w.db, so the kit over
 	// w.db asks the same permissions, inside the policy's transaction
