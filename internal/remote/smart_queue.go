@@ -14,27 +14,27 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type smartJob struct {
-	Key          types.RemoteCacheKey     `json:"key"`
-	Identity     types.SourceIdentity     `json:"identity"`
-	Epoch        int64                    `json:"epoch"`
-	ItemID       int64                    `json:"item_id"`
-	SHA256       string                   `json:"sha256"`
-	Kind         source.ResourceKind      `json:"kind"`
-	UpstreamPath string                   `json:"upstream_path,omitempty"`
-	Principal    auth.CredentialReference `json:"principal"`
-	Statistics   bool                     `json:"statistics"`
-	Trace        []string                 `json:"trace,omitempty"`
+	Key          types.RemoteCacheKey       `json:"key"`
+	Identity     types.SourceIdentity       `json:"identity"`
+	Epoch        int64                      `json:"epoch"`
+	ItemID       int64                      `json:"item_id"`
+	SHA256       string                     `json:"sha256"`
+	Kind         source.ResourceKind        `json:"kind"`
+	UpstreamPath string                     `json:"upstream_path,omitempty"`
+	Principal    kernel.CredentialReference `json:"principal"`
+	Statistics   bool                       `json:"statistics"`
+	Trace        []string                   `json:"trace,omitempty"`
 }
 
 func (s *Smart) enqueue(
@@ -44,7 +44,7 @@ func (s *Smart) enqueue(
 	key types.RemoteCacheKey,
 	statistics bool,
 ) (string, error) {
-	principal, ok := auth.FromContext(ctx)
+	principal, ok := kernel.FromContext(ctx)
 	if !ok {
 		return "", source.ErrDenied
 	}
@@ -178,9 +178,9 @@ func (s *Smart) restore(
 	}
 	p := job.Principal.Principal()
 	if p.Registry != nil {
-		p, err = s.auth.CurrentRegistry(ctx, p, s.policy.Store.Tokens())
+		p, err = s.authn.CurrentRegistry(ctx, p)
 	} else {
-		p, err = s.auth.Current(ctx, p, s.policy.Store.Tokens())
+		p, err = s.authn.Current(ctx, p)
 	}
 	if err != nil {
 		return ctx, q, permit, opts, source.ErrDenied
@@ -188,26 +188,18 @@ func (s *Smart) restore(
 	if p.Registry != nil && !smartRegistryGrant(p.Registry, c.Key, job.UpstreamPath) {
 		return ctx, q, permit, opts, source.ErrDenied
 	}
-	p, d, err := auth.Authorize(
-		ctx,
-		authz.Sources{
-			Permissions:      s.policy.Store.Permissions(),
-			Groups:           s.policy.Store.Groups(),
-			AnonymousEnabled: p.Anonymous,
-		},
-		p,
-	)
+	p, d, err := s.authz.Authorize(ctx, p, p.Anonymous)
 	if err != nil {
 		return ctx, q, permit, opts, source.ErrDenied
 	}
-	ctx = auth.WithAuthorized(ctx, p, d)
+	ctx = accessapi.WithCaller(ctx, p, d)
 	ctx = context.WithValue(ctx, smartActiveKey{}, true)
 	ctx = context.WithValue(ctx, smartTraceKey{}, job.Trace)
 	ctx, err = smartEnter(ctx, s.node+"/"+string(permit.Identity.Repository))
 	q = source.Request{
 		Repo:    c,
-		Subject: auth.SubjectOf(p),
-		Access:  authz.AsAPI(d),
+		Subject: accessapi.SubjectOf(p),
+		Access:  d,
 		Project: c.ProjectKey,
 		Resource: source.Resource{
 			Kind:         job.Kind,

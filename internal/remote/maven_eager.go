@@ -14,10 +14,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -28,12 +28,12 @@ const MavenCompanionKind = "maven.remote-companion"
 type (
 	eagerKey struct{}
 	mavenJob struct {
-		Repo      string                   `json:"repo"`
-		Path      string                   `json:"path"`
-		Origin    string                   `json:"origin"`
-		Identity  types.SourceIdentity     `json:"identity"`
-		Revision  string                   `json:"revision"`
-		Principal auth.CredentialReference `json:"principal"`
+		Repo      string                     `json:"repo"`
+		Path      string                     `json:"path"`
+		Origin    string                     `json:"origin"`
+		Identity  types.SourceIdentity       `json:"identity"`
+		Revision  string                     `json:"revision"`
+		Principal kernel.CredentialReference `json:"principal"`
 	}
 )
 
@@ -44,24 +44,31 @@ type (
 type MavenEager struct {
 	service *source.Service
 	policy  *Policy
-	auth    *auth.Authenticator
+	authn   accessapi.Authenticator
+	authz   accessapi.Authorizer
 	queue   *work.Queue
 	cancel  context.CancelFunc
 	workers sync.WaitGroup
 }
 
+// NewMavenEager starts two workers that fetch, through service and under
+// policy, the companions that Queue records. A job runs as the principal
+// whose read queued it, rechecked when it runs: authn's Current must still
+// accept that principal's credential and authz must still grant it, or the
+// job fails permanently with source.ErrDenied.
 func NewMavenEager(
 	ctx context.Context,
 	service *source.Service,
 	policy *Policy,
-	authenticator *auth.Authenticator,
+	authn accessapi.Authenticator,
+	authz accessapi.Authorizer,
 	log *slog.Logger,
 ) (*MavenEager, error) {
 	q, err := work.New(policy.Store, work.Options{Workers: 2, MaxAttempts: 3, Log: log})
 	if err != nil {
 		return nil, fmt.Errorf("maven companion queue: %w", err)
 	}
-	e := &MavenEager{service: service, policy: policy, auth: authenticator, queue: q}
+	e := &MavenEager{service: service, policy: policy, authn: authn, authz: authz, queue: q}
 	if err = q.Handle(MavenCompanionKind, e.run); err != nil {
 		return nil, fmt.Errorf("maven companion handler: %w", err)
 	}
@@ -93,7 +100,7 @@ func (e *MavenEager) Queue(ctx context.Context, q source.Request, permit source.
 		return
 	}
 	target := mavenCompanion(q.Repo, q.Resource.Path)
-	principal, ok := auth.FromContext(ctx)
+	principal, ok := kernel.FromContext(ctx)
 	if target == "" || !ok {
 		return
 	}
@@ -174,29 +181,21 @@ func (e *MavenEager) run(ctx context.Context, it types.WorkItem) error {
 	if err != nil || opts.Revision != job.Revision {
 		return errors.Join(work.ErrPermanent, source.ErrSuperseded)
 	}
-	p, err := e.auth.Current(ctx, job.Principal.Principal(), e.policy.Store.Tokens())
+	p, err := e.authn.Current(ctx, job.Principal.Principal())
 	if err != nil {
 		return errors.Join(work.ErrPermanent, source.ErrDenied)
 	}
-	p, d, err := auth.Authorize(
-		ctx,
-		authz.Sources{
-			Permissions:      e.policy.Store.Permissions(),
-			Groups:           e.policy.Store.Groups(),
-			AnonymousEnabled: p.Anonymous,
-		},
-		p,
-	)
+	p, d, err := e.authz.Authorize(ctx, p, p.Anonymous)
 	if err != nil {
 		return errors.Join(work.ErrPermanent, source.ErrDenied)
 	}
-	ctx = auth.WithAuthorized(ctx, p, d)
+	ctx = accessapi.WithCaller(ctx, p, d)
 	result, err := e.service.Read(
 		ctx,
 		source.Request{
 			Repo:    c,
-			Subject: auth.SubjectOf(p),
-			Access:  authz.AsAPI(d),
+			Subject: accessapi.SubjectOf(p),
+			Access:  d,
 			Project: c.ProjectKey,
 			Resource: source.Resource{
 				Kind:   source.ResourceKindArtifact,

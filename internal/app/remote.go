@@ -32,8 +32,10 @@ func (rt *runtime) openRemoteSources(
 	if err != nil {
 		return nil, err
 	}
+	accessAPI := rt.access.API()
 	resolver, err := remote.NewResolver(rt.store, rt.keys, remote.ResolverOptions{
 		RevisionKey: key, AllowedPrivateOrigins: allowedPrivateOrigins,
+		Certificates: accessAPI.Keys,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("remote resolver: %w", err)
@@ -165,7 +167,14 @@ func (rt *runtime) openRemoteSources(
 		HTTP:       mavenBackend,
 		Cache:      mavenBackend,
 	}
-	rt.mavenEager, err = remote.NewMavenEager(ctx, service, policy, rt.auth, log)
+	rt.mavenEager, err = remote.NewMavenEager(
+		ctx,
+		service,
+		policy,
+		accessAPI.Authenticator,
+		accessAPI.Authorizer,
+		log,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("remote maven companions: %w", err)
 	}
@@ -174,7 +183,8 @@ func (rt *runtime) openRemoteSources(
 		ctx,
 		policy,
 		&rt.remoteHTTP,
-		rt.auth,
+		accessAPI.Authenticator,
+		accessAPI.Authorizer,
 		"remote.smart",
 		log,
 	)
@@ -185,7 +195,8 @@ func (rt *runtime) openRemoteSources(
 		ctx,
 		registryPolicy,
 		&rt.remoteHTTP,
-		rt.auth,
+		accessAPI.Authenticator,
+		accessAPI.Authorizer,
 		"remote.smart.registry",
 		log,
 	)
