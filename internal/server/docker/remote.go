@@ -12,9 +12,9 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
 	"github.com/weaveplatform/artifactweave/internal/remote"
-	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )

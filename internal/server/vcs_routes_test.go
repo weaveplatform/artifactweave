@@ -19,10 +19,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/vcs"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 

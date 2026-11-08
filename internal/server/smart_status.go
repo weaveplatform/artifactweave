@@ -11,8 +11,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )

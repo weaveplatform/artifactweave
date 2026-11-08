@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 )
 
 // GetReverseProxyConfiguration answers administrators with the reverse

@@ -13,10 +13,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/postgres"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/fault"
 )
 

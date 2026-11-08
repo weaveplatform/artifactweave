@@ -17,9 +17,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	ml "github.com/weaveplatform/artifactweave/internal/format/machinelearning"
-	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )

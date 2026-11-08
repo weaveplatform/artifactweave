@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
 type part struct {

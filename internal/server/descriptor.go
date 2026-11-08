@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/descriptor"
-	"github.com/weaveplatform/artifactweave/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
 // patchConfiguration is PATCH /api/system/configuration: the YAML descriptor

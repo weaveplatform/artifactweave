@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	accessgen "github.com/weaveplatform/artifactweave/internal/server/gen/access"
 	"github.com/weaveplatform/artifactweave/internal/service/roles"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 

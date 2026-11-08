@@ -5,8 +5,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
 func (s artifactoryService) registerChefReindex(r chi.Router) {

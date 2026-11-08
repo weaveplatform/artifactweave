@@ -19,11 +19,11 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	podfmt "github.com/weaveplatform/artifactweave/internal/format/cocoapods"
-	"github.com/weaveplatform/artifactweave/internal/server/apierror"
-	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )

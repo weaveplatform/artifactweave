@@ -13,12 +13,12 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
-	"github.com/weaveplatform/artifactweave/internal/server/apierror"
-	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	accessgen "github.com/weaveplatform/artifactweave/internal/server/gen/access"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/internal/service/permission"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 

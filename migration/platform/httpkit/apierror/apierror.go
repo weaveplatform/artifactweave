@@ -1,11 +1,3 @@
-// Package apierror renders errors with the response profile each client expects.
-// Artifactory, Access, the OCI distribution API, Xray, npm and the Terraform
-// registry all use different JSON shapes, and clients read them differently:
-// jfrog-client-go prints the whole body after the status (only its release
-// bundle import reads errors[0].message, and its Xray scan reads error), the
-// Terraform providers join every errors[] entry, and Docker clients read
-// errors[].code. One table here is the only place a shape is defined. See
-// decision record 0002.
 package apierror
 
 import (
@@ -76,6 +68,9 @@ type Error struct {
 	RetryAfterSeconds int
 }
 
+// Error returns Message alone, without Status or Code, so an Error that is
+// wrapped or logged reads as the text its envelope gives the client; Write
+// reads the other fields from the struct.
 func (e *Error) Error() string { return e.Message }
 
 // New builds an Error for a status with a message.

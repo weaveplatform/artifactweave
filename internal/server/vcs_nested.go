@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/vcs"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
 // vcsNested handles the path forms JFrog documents for GitLab subgroup

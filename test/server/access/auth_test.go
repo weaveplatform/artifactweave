@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support"

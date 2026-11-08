@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 

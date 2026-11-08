@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 

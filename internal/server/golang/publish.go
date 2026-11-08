@@ -8,8 +8,8 @@ import (
 	"net/http"
 
 	goformat "github.com/weaveplatform/artifactweave/internal/format/golang"
-	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 

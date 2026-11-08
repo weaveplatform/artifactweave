@@ -23,8 +23,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/format/rpm"
 	"github.com/weaveplatform/artifactweave/internal/reindexauth"
-	"github.com/weaveplatform/artifactweave/internal/server/apierror"
-	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/build"
@@ -33,6 +31,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )

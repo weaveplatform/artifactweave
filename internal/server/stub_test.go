@@ -10,7 +10,7 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 
-	"github.com/weaveplatform/artifactweave/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 

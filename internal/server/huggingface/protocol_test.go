@@ -24,7 +24,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
-	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	"github.com/weaveplatform/artifactweave/internal/server/huggingface"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
@@ -34,6 +33,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"

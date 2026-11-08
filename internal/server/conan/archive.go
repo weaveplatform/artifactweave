@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	conanfmt "github.com/weaveplatform/artifactweave/internal/format/conan"
-	"github.com/weaveplatform/artifactweave/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
 // archiveDigests verifies the files Conan put inside a package/export archive.
