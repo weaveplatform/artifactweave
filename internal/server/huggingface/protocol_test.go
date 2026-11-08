@@ -28,6 +28,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/access"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -87,6 +88,12 @@ func newFixture(t *testing.T, class repo.Class, setup ...func(*fixture) *source.
 	if len(setup) != 0 {
 		remoteSources = setup[0](f)
 	}
+	// Bound over f.db after setup, as the router kit's store is, so a setup
+	// that swaps in a failing store fails the access reads too.
+	m, err := access.New(access.Deps{Store: f.db, Authenticator: authenticator})
+	if err != nil {
+		t.Fatal(err)
+	}
 	r := chi.NewRouter()
 	r.Use(baseurl.Middleware(""))
 	r.Use(func(next http.Handler) http.Handler {
@@ -140,7 +147,14 @@ func newFixture(t *testing.T, class repo.Class, setup ...func(*fixture) *source.
 				_, _ = io.Copy(w, rc)
 			}
 		},
-	}, huggingface.Protocol(huggingface.Options{XetEnabled: f.xetEnabled, Keys: keys, Auth: authenticator, RemoteSources: remoteSources}))
+	}, huggingface.Protocol(huggingface.Options{
+		XetEnabled:    f.xetEnabled,
+		Keys:          keys,
+		RemoteSources: remoteSources,
+		Authenticator: m.API().Authenticator,
+		Authorizer:    m.API().Authorizer,
+		Grants:        m.API().Grants,
+	}))
 	f.server = httptest.NewServer(r)
 	t.Cleanup(f.server.Close)
 	return f

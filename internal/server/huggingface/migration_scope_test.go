@@ -17,6 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/huggingface"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/migration/access"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -63,11 +64,15 @@ func migrationScopeFixture(t *testing.T) (*fixture, *migrationReadCounter, http.
 	}
 	f := &fixture{t: t, db: db, items: items}
 	f.legacyRevision("models", "1700000000", sha, false)
+	m, err := access.New(access.Deps{Store: db})
+	if err != nil {
+		t.Fatal(err)
+	}
 	router := chi.NewRouter()
 	pkgroute.Mount(router, pkgroute.Options{
 		Store: db, Items: func() *item.Service { return items },
 		ItemError: func(_ context.Context, _ string, err error) error { return err },
-	}, huggingface.Protocol(huggingface.Options{}))
+	}, huggingface.Protocol(huggingface.Options{Grants: m.API().Grants}))
 	return f, blobs, router
 }
 

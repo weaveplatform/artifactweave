@@ -222,7 +222,9 @@ var protocols = []func(Config) pkgroute.Protocol{
 	func(cfg Config) pkgroute.Protocol {
 		return huggingface.Protocol(huggingface.Options{
 			XetEnabled:    cfg.HuggingFaceXetEnabled,
-			Auth:          cfg.Auth,
+			Authenticator: cfg.Access.Authenticator,
+			Authorizer:    cfg.Access.Authorizer,
+			Grants:        cfg.Access.Grants,
 			RemoteSources: cfg.RemoteSources,
 			Keys:          cfg.Keys,
 		})
