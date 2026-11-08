@@ -10,10 +10,11 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
@@ -78,11 +79,8 @@ func mappedRuntimeRequest(
 	if err != nil {
 		t.Fatal(err)
 	}
-	p, decider, err := auth.Authorize(
-		t.Context(),
-		authz.Sources{Permissions: w.rt.store.Permissions(), Groups: w.rt.store.Groups()},
-		p,
-	)
+	authorizer := accesstest.Over(t, w.rt.store).API().Authorizer
+	p, decider, err := authorizer.Authorize(t.Context(), p, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,14 +90,14 @@ func mappedRuntimeRequest(
 	if err != nil {
 		t.Fatal(err)
 	}
-	return auth.WithAuthorized(
+	return accessapi.WithCaller(
 		t.Context(),
 		p,
 		decider,
 	), source.Request{
 		Repo:    w.c,
 		Subject: auth.SubjectOf(p),
-		Access:  authz.AsAPI(decider),
+		Access:  decider,
 	}, d
 }
 

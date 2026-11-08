@@ -12,8 +12,8 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -45,6 +45,7 @@ func transitiveFixture(t *testing.T) *transitiveWorld {
 		if err = c.Store.Repos().Update(t.Context(), up); err != nil {
 			t.Fatal(err)
 		}
+		authorizer := accesstest.Over(t, c.Store).API().Authorizer
 		c.RemoteSources = &source.Service{
 			Resolve: sourceIdentity,
 			HTTP: sourceBackend(
@@ -98,11 +99,7 @@ func transitiveFixture(t *testing.T) *transitiveWorld {
 				if err != nil {
 					return source.ErrDenied
 				}
-				_, decider, err := auth.Authorize(
-					ctx,
-					authz.Sources{Permissions: c.Store.Permissions(), Groups: c.Store.Groups()},
-					p,
-				)
+				_, decider, err := authorizer.Authorize(ctx, p, false)
 				if err != nil {
 					return err
 				}
