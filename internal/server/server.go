@@ -232,7 +232,9 @@ var protocols = []func(Config) pkgroute.Protocol{
 	},
 	func(Config) pkgroute.Protocol { return agentpackages.Protocol() },
 	func(cfg Config) pkgroute.Protocol {
-		return conan.Protocol(conan.Options{RemoteSources: cfg.RemoteSources, Tokens: cfg.Tokens})
+		return conan.Protocol(conan.Options{
+			RemoteSources: cfg.RemoteSources, Tokens: cfg.Access.Tokens,
+		})
 	},
 	func(cfg Config) pkgroute.Protocol {
 		return cocoapods.Protocol(cocoapods.Options{RemoteSources: cfg.RemoteSources})

@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/auth/token"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
@@ -17,23 +17,23 @@ func (h handler) authenticate(w http.ResponseWriter, r *http.Request) {
 		h.method(w, r)
 		return
 	}
-	p, err := auth.RequireAuthenticated(r.Context())
+	p, err := kernel.RequireAuthenticated(r.Context())
 	if err != nil {
 		h.error(w, r, err)
 		return
 	}
 	name, secret, ok := r.BasicAuth()
 	if !ok || name != p.Name || secret == "" {
-		h.error(w, r, auth.ErrUnauthenticated)
+		h.error(w, r, kernel.ErrUnauthenticated)
 		return
 	}
-	if !auth.LooksLikeToken(secret) {
+	if !accessapi.LooksLikeToken(secret) {
 		if !p.Password || h.tokens == nil {
 			h.error(w, r, apierror.ErrNotImplemented)
 			return
 		}
 		expiry := time.Hour
-		issued, err := h.tokens.Issue(r.Context(), token.Request{
+		issued, err := h.tokens.Issue(r.Context(), accessapi.TokenRequest{
 			Username: p.Name, Scope: p.Scope, Identity: p.Identity,
 			ExpiresIn: &expiry, NotAfter: p.TokenExpires,
 			Description: "Conan client login", ForceRevocable: true,
@@ -57,7 +57,7 @@ func (h handler) checkCredentials(w http.ResponseWriter, r *http.Request) {
 		h.method(w, r)
 		return
 	}
-	p, err := auth.RequireAuthenticated(r.Context())
+	p, err := kernel.RequireAuthenticated(r.Context())
 	if err != nil {
 		h.error(w, r, err)
 		return

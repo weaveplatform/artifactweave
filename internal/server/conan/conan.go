@@ -10,17 +10,21 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	conanfmt "github.com/weaveplatform/artifactweave/internal/format/conan"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
+// Options configures the Conan protocol.
 type Options struct {
 	RemoteSources *source.Service
-	Tokens        *token.Service
+	// Tokens issues the token Conan's authenticate exchanges a password
+	// for. Nil answers that exchange 501; a caller that sent a token gets
+	// it back either way.
+	Tokens accessapi.Tokens
 }
 
 func Protocol(o Options) pkgroute.Protocol {
@@ -51,7 +55,7 @@ func Protocol(o Options) pkgroute.Protocol {
 
 type handler struct {
 	k      *pkgroute.Kit
-	tokens *token.Service
+	tokens accessapi.Tokens
 }
 
 func (h handler) serve(w http.ResponseWriter, r *http.Request) {
