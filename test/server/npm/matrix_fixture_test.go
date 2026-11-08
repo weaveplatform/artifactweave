@@ -8,13 +8,13 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 type matrixFixture struct {
@@ -28,7 +28,7 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 	t.Helper()
 	var blobs blob.Store
 	var tokens *token.Service
-	h, db, _ := npmServer(t, func(cfg *server.Config) {
+	h, db, _ := npmServer(t, func(cfg *harness.Config) {
 		blobs, tokens = cfg.Blobs, cfg.Tokens
 		for _, c := range append([]repo.Config{{Key: "libs-local", Class: repo.Local}}, npmRepos[1:]...) {
 			if err := cfg.Store.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {

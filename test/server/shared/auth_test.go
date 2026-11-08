@@ -8,11 +8,11 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 func do(
@@ -36,7 +36,7 @@ func seededHandler(t *testing.T) (http.Handler, *inmem.Store) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return server.New(server.Config{CompatVersion: "7.155.0", Store: db, Auth: a}), db
+	return harness.Router(harness.Config{CompatVersion: "7.155.0", Store: db, Auth: a}), db
 }
 
 func basic(user, password string) map[string]string {

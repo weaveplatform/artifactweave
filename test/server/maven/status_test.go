@@ -5,13 +5,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 const overwriter = "overwriter:pw"
@@ -50,7 +50,7 @@ type mavenStatusWorld struct {
 
 func newMavenStatusWorld(t *testing.T, anonymous bool) mavenStatusWorld {
 	t.Helper()
-	h, _, _ := mavenServer(t, func(cfg *server.Config) {
+	h, _, _ := mavenServer(t, func(cfg *harness.Config) {
 		if anonymous {
 			if err := cfg.Store.Settings().
 				Put(t.Context(), types.SettingAnonymousAccess, true); err != nil {

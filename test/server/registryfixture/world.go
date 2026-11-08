@@ -9,13 +9,13 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // World is the production router over an in-memory store and a file-system
@@ -47,7 +47,7 @@ func (b signingBlobs) SignURL(_ context.Context, sha string, o blob.SignOptions)
 
 // New builds the same full-router item world used by the root registry tests.
 // The tune callbacks run after stores and authentication are ready.
-func New(t *testing.T, anonymous bool, tune ...func(*server.Config)) *World {
+func New(t *testing.T, anonymous bool, tune ...harness.Tune) *World {
 	t.Helper()
 	ctx := t.Context()
 	db := inmem.New()
@@ -114,7 +114,7 @@ func New(t *testing.T, anonymous bool, tune ...func(*server.Config)) *World {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := server.Config{
+	cfg := harness.Config{
 		BaseURL:       "https://reg.example",
 		CompatVersion: "7.155.0",
 		Store:         db,
@@ -124,7 +124,7 @@ func New(t *testing.T, anonymous bool, tune ...func(*server.Config)) *World {
 	for _, fn := range tune {
 		fn(&cfg)
 	}
-	return &World{T: t, Handler: server.New(cfg), DB: db, Blobs: cfg.Blobs}
+	return &World{T: t, Handler: harness.Router(cfg), DB: db, Blobs: cfg.Blobs}
 }
 
 // Do sends a request to the world's router as the user as, with the password

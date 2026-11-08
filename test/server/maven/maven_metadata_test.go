@@ -6,18 +6,18 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // A GET of maven-metadata.xml, or of its checksum, straight after a deploy
 // returns the metadata that deploy changed: the read runs the queued work,
 // since no worker runs here.
 func TestAccMavenMetadataRebuiltOnRead(t *testing.T) {
-	w := newItemWorld(t, false, func(cfg *server.Config) {
+	w := newItemWorld(t, false, func(cfg *harness.Config) {
 		q, err := work.New(cfg.Store, work.Options{})
 		if err != nil {
 			t.Fatal(err)

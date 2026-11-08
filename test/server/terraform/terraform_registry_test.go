@@ -17,13 +17,13 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // The native CLI discovers the registry, resolves a tagged module, then
@@ -82,7 +82,7 @@ func TestAccTerraformModuleInit(t *testing.T) {
 	}
 	cfg := Config{Store: db, Blobs: blobs, Auth: a, Tokens: tokens}
 	tuneRegistry(&cfg)
-	h := server.New(cfg)
+	h := harness.Router(cfg)
 	// A sig parameter on a generated JFrog operation cannot authorize it.
 	wantStatus(
 		t,

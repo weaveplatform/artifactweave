@@ -7,19 +7,19 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/format/nuget"
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 func nugetStatusFixture(t *testing.T, anonymous bool) http.Handler {
 	t.Helper()
 	var blobs blob.Store
-	h, db, _ := nugetServer(t, func(cfg *server.Config) {
+	h, db, _ := nugetServer(t, func(cfg *harness.Config) {
 		blobs = cfg.Blobs
 		for _, c := range []repo.Config{
 			{Key: "libs-local", Class: repo.Local},

@@ -10,11 +10,11 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // nugetKeyFixture is the router over a seeded store with the P8 reindex
@@ -60,11 +60,11 @@ func newNugetKeyFixture(t *testing.T) *nugetKeyFixture {
 		t.Fatal(err)
 	}
 	var log bytes.Buffer
-	cfg := server.Config{
+	cfg := harness.Config{
 		CompatVersion: "7.155.0", Store: db, Auth: a,
 		Logger: slog.New(slog.NewJSONHandler(&log, nil)),
 	}
-	return &nugetKeyFixture{h: server.New(cfg), db: db, tokens: tokens, log: &log}
+	return &nugetKeyFixture{h: harness.Router(cfg), db: db, tokens: tokens, log: &log}
 }
 
 // X-NuGet-ApiKey is Basic credentials, "<user>:<password or token>", on the

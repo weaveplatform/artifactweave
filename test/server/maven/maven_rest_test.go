@@ -8,11 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // newMavenWorld is an item world with a Maven repository, maven-local, and
@@ -20,7 +20,7 @@ import (
 // done when a read asks for it.
 func newMavenWorld(t *testing.T) *itemWorld {
 	t.Helper()
-	w := newItemWorld(t, false, func(cfg *server.Config) {
+	w := newItemWorld(t, false, func(cfg *harness.Config) {
 		q, err := work.New(cfg.Store, work.Options{})
 		if err != nil {
 			t.Fatal(err)

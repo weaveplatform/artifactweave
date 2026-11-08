@@ -7,12 +7,12 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 func testHandler() http.Handler {
-	return server.New(Config{
+	return harness.Router(Config{
 		BaseURL: "https://cfg.example.com", CompatVersion: "7.155.0",
 		Revision: "v0.1.0-3-gabc",
 	})

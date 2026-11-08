@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 const overwriter = "overwriter:pw"
@@ -52,7 +52,7 @@ type goStatusWorld struct {
 func newGoStatusWorld(t *testing.T, anonymous bool) goStatusWorld {
 	t.Helper()
 	var tokens *token.Service
-	h, db, _ := goServer(t, func(cfg *server.Config) {
+	h, db, _ := goServer(t, func(cfg *harness.Config) {
 		tokens = cfg.Tokens
 		if anonymous {
 			if err := cfg.Store.Settings().

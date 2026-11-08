@@ -7,16 +7,16 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
-type Config = server.Config
+type Config = harness.Config
 
 var (
 	testHash            = support.TestHash
@@ -101,5 +101,5 @@ func backendServer(
 	for _, fn := range tune {
 		fn(&cfg)
 	}
-	return server.New(cfg), db, tokens
+	return harness.Router(cfg), db, tokens
 }

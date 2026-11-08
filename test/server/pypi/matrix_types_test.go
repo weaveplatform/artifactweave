@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 const dockerA = "docker-a"
@@ -242,7 +242,7 @@ func holds(repoKey, path string, want types.Actions) rule {
 type matrixPart struct {
 	seed func(*testing.T, *matrixFixture)
 	rows func() []matrixRow
-	tune func(*server.Config)
+	tune harness.Tune
 }
 
 type matrixRow struct {

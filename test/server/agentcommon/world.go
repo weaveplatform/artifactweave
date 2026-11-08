@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
@@ -15,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // World is the production router over an in-memory store and a file-system
@@ -54,7 +54,7 @@ func NewWorld(t *testing.T) *World {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := server.New(server.Config{
+	h := harness.Router(harness.Config{
 		BaseURL: "https://reg.example", CompatVersion: "7.155.0",
 		Store: db, Blobs: blobs, Auth: a,
 	})

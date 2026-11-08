@@ -19,7 +19,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	gemfmt "github.com/weaveplatform/artifactweave/internal/format/gems"
 	"github.com/weaveplatform/artifactweave/internal/remote"
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
@@ -31,6 +30,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 type world struct {
@@ -54,7 +54,7 @@ func newWorld(t *testing.T) *world {
 	return newWorldWith(t, nil)
 }
 
-func newWorldWith(t *testing.T, configure func(*server.Config)) *world {
+func newWorldWith(t *testing.T, configure harness.Tune) *world {
 	t.Helper()
 	db := inmem.New()
 	support.Seed(t, db)
@@ -80,11 +80,11 @@ func newWorldWith(t *testing.T, configure func(*server.Config)) *world {
 		t.Fatal(err)
 	}
 	b := repopath.Read(t, "internal/format/gems/testdata/rake-12.3.1.gem")
-	cfg := server.Config{Store: db, Blobs: blobs, Auth: a, BaseURL: "https://reg.example"}
+	cfg := harness.Config{Store: db, Blobs: blobs, Auth: a, BaseURL: "https://reg.example"}
 	if configure != nil {
 		configure(&cfg)
 	}
-	return &world{t: t, db: db, h: server.New(cfg), blobs: blobs, gem: b}
+	return &world{t: t, db: db, h: harness.Router(cfg), blobs: blobs, gem: b}
 }
 
 func (w *world) do(
@@ -395,7 +395,7 @@ func TestAccNativeYankQueryForm(t *testing.T) {
 
 func TestAccNativeRawRubyGemsTokenAuth(t *testing.T) {
 	var tokens *token.Service
-	w := newWorldWith(t, func(cfg *server.Config) {
+	w := newWorldWith(t, func(cfg *harness.Config) {
 		if err := cfg.Store.Instance().Init(t.Context(), types.InstanceIdentity{
 			InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
 		}); err != nil {
@@ -710,7 +710,7 @@ func TestAccRemoteRejectsIndexDrift(t *testing.T) {
 
 func newRemoteWorld(t *testing.T, up *fakeupstream.Server) *world {
 	t.Helper()
-	return newWorldWith(t, func(cfg *server.Config) {
+	return newWorldWith(t, func(cfg *harness.Config) {
 		c := repo.Config{
 			Key:         "gems-remote",
 			Class:       repo.Remote,

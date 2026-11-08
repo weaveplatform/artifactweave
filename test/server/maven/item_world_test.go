@@ -8,11 +8,11 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 type itemWorld struct {
@@ -23,7 +23,7 @@ type itemWorld struct {
 
 // newItemWorld retains the reader and deployer principals used by the Maven
 // server-assembly cases, while each case adds only its own Maven repositories.
-func newItemWorld(t *testing.T, anonymous bool, tune ...func(*server.Config)) *itemWorld {
+func newItemWorld(t *testing.T, anonymous bool, tune ...harness.Tune) *itemWorld {
 	t.Helper()
 	db := inmem.New()
 	cheapSeed(t, db)
@@ -64,7 +64,7 @@ func newItemWorld(t *testing.T, anonymous bool, tune ...func(*server.Config)) *i
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := server.Config{
+	cfg := harness.Config{
 		BaseURL:       "https://reg.example",
 		CompatVersion: "7.155.0",
 		Store:         db,
@@ -74,7 +74,7 @@ func newItemWorld(t *testing.T, anonymous bool, tune ...func(*server.Config)) *i
 	for _, fn := range tune {
 		fn(&cfg)
 	}
-	return &itemWorld{t: t, h: server.New(cfg), db: db}
+	return &itemWorld{t: t, h: harness.Router(cfg), db: db}
 }
 
 func (w *itemWorld) do(

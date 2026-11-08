@@ -8,7 +8,6 @@ import (
 	"time"
 
 	npmfmt "github.com/weaveplatform/artifactweave/internal/format/npm"
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
@@ -16,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // npmOpsWorld is an item world with npm repositories, a work queue that
@@ -24,7 +24,7 @@ import (
 func npmOpsWorld(t *testing.T) (*itemWorld, *work.Queue) {
 	t.Helper()
 	var q *work.Queue
-	w := newItemWorld(t, false, func(cfg *server.Config) {
+	w := newItemWorld(t, false, func(cfg *harness.Config) {
 		var err error
 		if q, err = work.New(cfg.Store, work.Options{}); err != nil {
 			t.Fatal(err)

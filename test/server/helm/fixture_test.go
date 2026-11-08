@@ -7,13 +7,13 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 var (
@@ -53,7 +53,7 @@ func fixtureRepos(name string, kind repo.PackageType) []repo.Config {
 // this package. Each matrix/status fixture adds its own permission model.
 func helmServer(
 	t *testing.T,
-	tune ...func(*server.Config),
+	tune ...harness.Tune,
 ) (http.Handler, *inmem.Store, *token.Service) {
 	t.Helper()
 	db := inmem.New()
@@ -84,12 +84,12 @@ func helmServer(
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := server.Config{
+	cfg := harness.Config{
 		CompatVersion: "7.155.0", Store: db, Blobs: blobs, Auth: a,
 		Tokens: tokens, PasswordHash: testHash,
 	}
 	for _, fn := range tune {
 		fn(&cfg)
 	}
-	return server.New(cfg), db, tokens
+	return harness.Router(cfg), db, tokens
 }

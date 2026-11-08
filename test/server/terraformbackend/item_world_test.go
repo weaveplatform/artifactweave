@@ -9,11 +9,11 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 type itemWorld struct {
@@ -53,7 +53,7 @@ func newItemWorld(t *testing.T, _ bool, tune ...func(*Config)) *itemWorld {
 	for _, fn := range tune {
 		fn(&cfg)
 	}
-	return &itemWorld{t: t, h: server.New(cfg), db: db, blobs: cfg.Blobs}
+	return &itemWorld{t: t, h: harness.Router(cfg), db: db, blobs: cfg.Blobs}
 }
 
 func (w *itemWorld) do(method, path, as, body string) *httptest.ResponseRecorder {
