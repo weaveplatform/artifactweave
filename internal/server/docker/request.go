@@ -5,9 +5,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -62,8 +62,8 @@ func (q Request) Path(segments ...string) string {
 // (Options.Authenticated) it is refused as one without the right, so that
 // a principal stored without its decider is never allowed everything.
 func (q Request) Require(r *http.Request, path string, want types.Actions) error {
-	p, ok := auth.FromContext(r.Context())
-	d := auth.DeciderFrom(r.Context())
+	p, ok := kernel.FromContext(r.Context())
+	d, _ := accessapi.DeciderFrom(r.Context())
 	if d == nil {
 		if !q.authenticated {
 			return nil
@@ -74,7 +74,7 @@ func (q Request) Require(r *http.Request, path string, want types.Actions) error
 		return Errorf(http.StatusUnauthorized, CodeUnauthorized,
 			"the token does not grant this access to %s", q.scopeName())
 	}
-	if d.Allows(types.ResourceArtifact, authz.Repo{
+	if d.Allows(types.ResourceArtifact, accessapi.Repo{
 		Key: q.Repo.Key, Class: string(q.Repo.Class),
 	}, path, want) {
 		return nil
@@ -143,7 +143,7 @@ func (q Request) granted(a *types.RegistryAccess, method string, want types.Acti
 // GrantsCatalog reports whether the request's credential may list the
 // catalog: any but a registry token without registry:catalog:*.
 func GrantsCatalog(r *http.Request) bool {
-	p, ok := auth.FromContext(r.Context())
+	p, ok := kernel.FromContext(r.Context())
 	if !ok || p.Registry == nil {
 		return true
 	}
@@ -158,11 +158,11 @@ func GrantsCatalog(r *http.Request) bool {
 // authentication. The repository's root is asked as a folder, which a grant
 // on any path below it makes readable.
 func (g *Registry) readsAnything(r *http.Request, c repo.Config) bool {
-	d := auth.DeciderFrom(r.Context())
+	d, _ := accessapi.DeciderFrom(r.Context())
 	if d == nil {
 		return !g.authenticated
 	}
-	return d.AllowsFolder(types.ResourceArtifact, authz.Repo{
+	return d.AllowsFolder(types.ResourceArtifact, accessapi.Repo{
 		Key: c.Key, Class: string(c.Class),
 	}, "", types.ActionRead)
 }

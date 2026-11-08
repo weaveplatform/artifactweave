@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -43,7 +43,7 @@ func (g *Registry) serveV1Auth(w http.ResponseWriter, r *http.Request) {
 // reference token, or a registry token (decision 0005). Anonymous gets
 // 401: it has nothing to put in the entry.
 func (g *Registry) writeAuth(w http.ResponseWriter, r *http.Request, s apierror.Profile) {
-	p, ok := auth.FromContext(r.Context())
+	p, ok := kernel.FromContext(r.Context())
 	secret := presented(r)
 	if !ok || p.Anonymous || secret == "" {
 		apierror.Write(w, s, Errorf(http.StatusUnauthorized, CodeUnauthorized,
@@ -51,8 +51,8 @@ func (g *Registry) writeAuth(w http.ResponseWriter, r *http.Request, s apierror.
 		return
 	}
 	var email string
-	if g.store != nil {
-		u, err := g.store.Users().Get(r.Context(), p.Name)
+	if g.identity != nil {
+		u, err := g.identity.User(r.Context(), p.Name)
 		switch {
 		case err == nil:
 			email = u.Email

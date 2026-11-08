@@ -30,6 +30,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/service/registry"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -92,6 +93,11 @@ type Options struct {
 	// Tokens signs registry tokens; nil leaves the token endpoint
 	// unimplemented.
 	Tokens TokenIssuer
+	// Identity reads the email of the user a config.json entry names
+	// (writeAuth); nil leaves the email empty, for tests of the router
+	// alone. A user it does not know, as an OIDC token may name, has no
+	// email, and any other error answers 500.
+	Identity accessapi.Identity
 	// Authenticated is set when the server authenticates every request
 	// before the registry sees it and stores each principal with the
 	// decider that authorised it. A request without a decider is then
@@ -113,6 +119,7 @@ type Registry struct {
 	parent    string
 	fault     func(*http.Request, error)
 	tokens    TokenIssuer
+	identity  accessapi.Identity
 	endpoints map[endpointKey]Endpoint
 	// blobs, uploads and serveBlob serve blobs; uploads is nil without a
 	// blob store.
@@ -131,7 +138,8 @@ type endpointKey struct {
 func New(o Options) *Registry {
 	g := &Registry{
 		sources: o.Sources, authenticated: o.Authenticated,
-		store: o.Store, fault: o.Fault, tokens: o.Tokens, endpoints: map[endpointKey]Endpoint{},
+		store: o.Store, fault: o.Fault, tokens: o.Tokens, identity: o.Identity,
+		endpoints: map[endpointKey]Endpoint{},
 	}
 	if o.SubdomainMatch {
 		g.parent = baseHost(o.BaseURL)

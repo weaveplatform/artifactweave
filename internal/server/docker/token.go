@@ -8,9 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/auth/token"
-	"github.com/weaveplatform/artifactweave/internal/authz"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -27,9 +26,14 @@ const (
 	catalogScope    = "registry:catalog:*"
 )
 
-// TokenIssuer signs registry tokens; internal/auth/token implements it.
+// TokenIssuer signs registry tokens. IssueRegistry is accessapi.Tokens',
+// which satisfies it, with that contract's errors, which the token endpoint
+// answers as they come.
 type TokenIssuer interface {
-	IssueRegistry(ctx context.Context, r token.RegistryRequest) (token.Issued, error)
+	IssueRegistry(
+		ctx context.Context,
+		r accessapi.RegistryTokenRequest,
+	) (accessapi.IssuedToken, error)
 }
 
 // registerToken registers the token endpoint, GET on the realm
@@ -56,7 +60,7 @@ type tokenResponse struct {
 // specification has it, so the registry then answers the request that
 // needed them. account, client_id, offline_token and service are ignored.
 func (g *Registry) serveToken(w http.ResponseWriter, r *http.Request, q Request) {
-	p, ok := auth.FromContext(r.Context())
+	p, ok := kernel.FromContext(r.Context())
 	if !ok {
 		// Only a server built without authentication gets here.
 		Write(w, Errorf(http.StatusUnauthorized, CodeUnauthorized, "authentication required"))
@@ -81,7 +85,7 @@ func (g *Registry) serveToken(w http.ResponseWriter, r *http.Request, q Request)
 	}
 	username := p.Name
 	if p.Anonymous {
-		username = auth.AnonymousUser
+		username = kernel.AnonymousUser
 	}
 	// The token keeps the caller's scope, so it never acts more broadly than
 	// the credential behind it, and an OIDC-exchanged caller's identity, so
@@ -92,7 +96,7 @@ func (g *Registry) serveToken(w http.ResponseWriter, r *http.Request, q Request)
 	if p.Registry != nil {
 		parent = p.TokenParent
 	}
-	issued, err := g.tokens.IssueRegistry(r.Context(), token.RegistryRequest{
+	issued, err := g.tokens.IssueRegistry(r.Context(), accessapi.RegistryTokenRequest{
 		Username: username, ExpiresIn: lifetime(p, time.Now()), Access: access,
 		Scope: p.Scope, Identity: p.Identity, Parent: parent,
 	})
@@ -104,7 +108,7 @@ func (g *Registry) serveToken(w http.ResponseWriter, r *http.Request, q Request)
 	//nolint:gosec // G117: issuing the token to its holder is the endpoint's purpose
 	_ = json.NewEncoder(w).Encode(tokenResponse{
 		Token: issued.AccessToken, AccessToken: issued.AccessToken, ExpiresIn: issued.ExpiresIn,
-		IssuedAt: issued.Record.IssuedAt.UTC().Format(time.RFC3339),
+		IssuedAt: issued.IssuedAt.UTC().Format(time.RFC3339),
 	})
 }
 
@@ -112,7 +116,7 @@ func (g *Registry) serveToken(w http.ResponseWriter, r *http.Request, q Request)
 // that obtained it when that is less, so a token never outlives the
 // credential behind it. A token that obtained one has a second left at
 // least, as it verified.
-func lifetime(p auth.Principal, now time.Time) time.Duration {
+func lifetime(p kernel.Principal, now time.Time) time.Duration {
 	d := types.RegistryTokenExpiry
 	if !p.TokenExpires.IsZero() {
 		d = min(d, p.TokenExpires.Sub(now).Truncate(time.Second))
@@ -126,7 +130,7 @@ func lifetime(p auth.Principal, now time.Time) time.Duration {
 // grants nothing.
 func (g *Registry) grant(
 	ctx context.Context,
-	p auth.Principal,
+	p kernel.Principal,
 	realm, scope string,
 ) (types.RegistryGrant, error) {
 	rest, acts, ok := cutLast(scope, ":")
@@ -191,7 +195,7 @@ func (g *Registry) allowedOn(ctx context.Context, realm, name string) ([]string,
 			targets = append(targets, target{realm, image})
 		}
 	}
-	d := auth.DeciderFrom(ctx)
+	d, _ := accessapi.DeciderFrom(ctx)
 	var allowed []string
 	for _, t := range targets {
 		if !ValidName(t.image) {
@@ -204,7 +208,7 @@ func (g *Registry) allowedOn(ctx context.Context, realm, name string) ([]string,
 		if !found || d == nil {
 			continue
 		}
-		repo := authz.Repo{Key: c.Key, Class: string(c.Class)}
+		repo := accessapi.Repo{Key: c.Key, Class: string(c.Class)}
 		for a, need := range map[string]types.Actions{
 			actionPull: types.ActionRead, actionPush: types.ActionWrite,
 			actionDelete: types.ActionDelete,

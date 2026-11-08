@@ -305,9 +305,11 @@ func npmAccounts(cfg Config) npm.Accounts {
 	}
 }
 
-// newRegistry is the Docker registry for cfg. A nil token service must not
-// become a non-nil interface, which would leave the token endpoint
-// registered with nothing to sign.
+// newRegistry is the Docker registry for cfg, with the access module's token
+// service and user accounts. A nil token service must not become a non-nil
+// interface, which would leave the token endpoint registered with nothing to
+// sign: cfg.Access holds nil interfaces, never typed nils, and a nil
+// interface converts to a nil one, so they are assigned as they are.
 func newRegistry(cfg Config, artSvc artifactoryService) *docker.Registry {
 	o := docker.Options{
 		Sources:        cfg.RegistrySources,
@@ -316,8 +318,11 @@ func newRegistry(cfg Config, artSvc artifactoryService) *docker.Registry {
 		SubdomainMatch: cfg.DockerSubdomainMatch,
 		BaseURL:        cfg.BaseURL,
 		// The middleware authenticates every request whenever an
-		// authenticator is configured (authenticate).
-		Authenticated: cfg.Auth != nil,
+		// authenticator is configured (authenticate). cfg.Access holds one
+		// bound over that authenticator whenever there is a store; without
+		// one the registry serves no repository, so the setting decides
+		// nothing.
+		Authenticated: cfg.Access.Authenticator != nil,
 		Fault:         func(r *http.Request, err error) { noteCause(r.Context(), err) },
 		// The registry serves only docker, oci and helmoci repositories,
 		// whose format takes no settings.
@@ -335,9 +340,8 @@ func newRegistry(cfg Config, artSvc artifactoryService) *docker.Registry {
 		) bool {
 			return artSvc.redirectManifest(w, r, cfg.Store, found{repo: c, item: it}, mediaType)
 		},
-	}
-	if cfg.Tokens != nil {
-		o.Tokens = cfg.Tokens
+		Tokens:   cfg.Access.Tokens,
+		Identity: cfg.Access.Identity,
 	}
 	return docker.New(o)
 }

@@ -17,6 +17,8 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	"github.com/weaveplatform/artifactweave/internal/authz"
+	"github.com/weaveplatform/artifactweave/migration/access"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -30,7 +32,10 @@ type tokenWorld struct {
 	t      *testing.T
 	db     store.Store
 	tokens *token.Service
-	h      http.Handler
+	// api is the access module bound over db and tokens, which the
+	// registry reaches the service through.
+	api accessapi.API
+	h   http.Handler
 }
 
 func newTokenWorld(t *testing.T) *tokenWorld {
@@ -69,13 +74,22 @@ func newTokenWorld(t *testing.T) *tokenWorld {
 		Create(ctx, types.User{Name: "writer", Email: "w@example.com"}); err != nil {
 		t.Fatal(err)
 	}
+	// The registry reaches the service and the users through the access
+	// module's binding, as the server wires them from app's module.
+	m, err := access.New(access.Deps{Store: db, Tokens: tokens})
+	if err != nil {
+		t.Fatal(err)
+	}
+	api := m.API()
 	g := New(Options{
-		Store: db, Tokens: tokens, SubdomainMatch: true, BaseURL: "https://reg.example.com",
+		Store: db, Tokens: api.Tokens, Identity: api.Identity,
+		SubdomainMatch: true, BaseURL: "https://reg.example.com",
 	})
 	return &tokenWorld{
 		t:      t,
 		db:     db,
 		tokens: tokens,
+		api:    api,
 		h:      baseurl.Middleware("")(g.Challenge(router(g))),
 	}
 }
@@ -381,7 +395,7 @@ func TestAccTokenEndpointErrors(t *testing.T) {
 		"issuer": New(Options{Store: w.db, Tokens: failingIssuer{}, Fault: note}),
 		"store": New(Options{
 			Store:  faultyStore{w.db, faultyRepos{RepoStore: w.db.Repos(), get: true}},
-			Tokens: w.tokens, Fault: note,
+			Tokens: w.api.Tokens, Fault: note,
 		}),
 	} {
 		req := httptest.NewRequest(http.MethodGet,
@@ -400,8 +414,11 @@ func TestAccTokenEndpointErrors(t *testing.T) {
 
 type failingIssuer struct{}
 
-func (failingIssuer) IssueRegistry(context.Context, token.RegistryRequest) (token.Issued, error) {
-	return token.Issued{}, errors.New("no key")
+func (failingIssuer) IssueRegistry(
+	context.Context,
+	accessapi.RegistryTokenRequest,
+) (accessapi.IssuedToken, error) {
+	return accessapi.IssuedToken{}, errors.New("no key")
 }
 
 func TestAccRequested(t *testing.T) {
@@ -831,7 +848,8 @@ func TestAccAuthEndpoints(t *testing.T) {
 	// A store failure answers 500 and is noted.
 	var noted error
 	g := New(Options{
-		Store: failingUsers{w.db}, Fault: func(_ *http.Request, err error) { noted = err },
+		Store: w.db, Identity: failingIdentity{},
+		Fault: func(_ *http.Request, err error) { noted = err },
 	})
 	req := httptest.NewRequest(http.MethodGet, "/artifactory/api/docker/r/v1/auth", nil)
 	req.Header.Set("Authorization", "Bearer tok")
@@ -847,13 +865,9 @@ func TestAccAuthEndpoints(t *testing.T) {
 	}
 }
 
-// failingUsers is a store whose users cannot be read.
-type failingUsers struct{ store.Store }
+// failingIdentity is an identity service whose users cannot be read.
+type failingIdentity struct{ accessapi.Identity }
 
-func (failingUsers) Users() store.UserStore { return brokenUsers{} }
-
-type brokenUsers struct{ store.UserStore }
-
-func (brokenUsers) Get(context.Context, string) (types.User, error) {
-	return types.User{}, errors.New("database down")
+func (failingIdentity) User(context.Context, string) (accessapi.UserInfo, error) {
+	return accessapi.UserInfo{}, errors.New("database down")
 }

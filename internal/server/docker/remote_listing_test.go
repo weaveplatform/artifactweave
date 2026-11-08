@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func TestAccRemoteListingFinalFenceAndHead(t *testing.T) {
@@ -30,7 +30,9 @@ func TestAccRemoteListingFinalFenceAndHead(t *testing.T) {
 					method = "HEAD"
 				}
 				r := httptest.NewRequest(method, "/v2/remote/image/tags/list", nil)
-				r = r.WithContext(auth.WithPrincipal(r.Context(), auth.Principal{Name: "reader"}))
+				r = r.WithContext(
+					kernel.WithPrincipal(r.Context(), kernel.Principal{Name: "reader"}),
+				)
 				w := httptest.NewRecorder()
 				checks := map[string]int{}
 				first := ""
