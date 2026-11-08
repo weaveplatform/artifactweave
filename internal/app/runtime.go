@@ -160,6 +160,7 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	fs := formatSettings(cfg, keys)
 	derived := &item.Service{
 		Store: st, Blobs: hot.store, Work: queue, Formats: fs.For,
+		Keys:             accessModule.API().Keys,
 		ReindexAuthorize: reindexauth.New(st, authn),
 		Periodic: map[string]time.Duration{
 			maven.KindSnapshots: cfg.Maven.SnapshotCleanupInterval,

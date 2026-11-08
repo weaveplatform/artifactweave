@@ -11,6 +11,8 @@ import (
 	"github.com/ProtonMail/go-crypto/openpgp"
 
 	"github.com/weaveplatform/artifactweave/internal/format/terraform/terraformtest"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
@@ -142,6 +144,7 @@ func TestUnitHandlerDeletionAndWorkFailures(t *testing.T) {
 	pkg := validIndexPackage()
 	env := format.Env{
 		Store: st,
+		Keys:  &accessapitest.Keys{},
 		Inspection: inspection{
 			sha:  stored.Actual.SHA256,
 			path: stored.FullPath(), pkg: pkg,
@@ -230,47 +233,40 @@ func TestUnitHandlerDeletionAndWorkFailures(t *testing.T) {
 }
 
 func TestUnitSignFeedBindsPackagesAndRejectsBadKeys(t *testing.T) {
-	st := inmem.New()
+	keys := &accessapitest.Keys{Keypairs: map[string]accessapi.Keypair{}}
 	ctx := t.Context()
 	local := repo.Config{Key: "opkg-local", Class: repo.Local, PackageType: repo.Opkg}
 	files := map[string][]byte{PackagesName: []byte("Package: alpha\n\n")}
-	if err := SignFeed(ctx, st, local, files); err != nil || files[SignatureName] != nil {
+	if err := SignFeed(ctx, keys, local, files); err != nil || files[SignatureName] != nil {
 		t.Fatalf("unsigned feed: %v", err)
 	}
 	local.PrimaryKeyPairRef = "missing"
-	if err := SignFeed(ctx, st, local, files); err == nil {
+	if err := SignFeed(ctx, keys, local, files); err == nil {
 		t.Fatal("missing key accepted")
 	}
-	if err := st.Keys().
-		CreateKeypair(ctx, types.Keypair{Name: "wrong", Type: types.KeypairRSA}); err != nil {
-		t.Fatal(err)
-	}
+	keys.Keypairs["wrong"] = types.Keypair{Name: "wrong", Type: types.KeypairRSA}
 	local.PrimaryKeyPairRef = "wrong"
-	if err := SignFeed(ctx, st, local, files); err == nil {
+	if err := SignFeed(ctx, keys, local, files); err == nil {
 		t.Fatal("RSA key accepted as GPG")
 	}
-	if err := st.Keys().CreateKeypair(ctx, types.Keypair{
+	keys.Keypairs["bad"] = types.Keypair{
 		Name: "bad", Type: types.KeypairGPG,
 		PrivateKey: "not armored",
-	}); err != nil {
-		t.Fatal(err)
 	}
 	local.PrimaryKeyPairRef = "bad"
-	if err := SignFeed(ctx, st, local, files); err == nil {
+	if err := SignFeed(ctx, keys, local, files); err == nil {
 		t.Fatal("bad GPG key accepted")
 	}
 	key, err := terraformtest.NewKey()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := st.Keys().CreateKeypair(ctx, types.Keypair{
+	keys.Keypairs["good"] = types.Keypair{
 		Name: "good", Type: types.KeypairGPG,
 		PrivateKey: key.Private, PublicKey: key.Public,
-	}); err != nil {
-		t.Fatal(err)
 	}
 	local.PrimaryKeyPairRef = "good"
-	if err := SignFeed(ctx, st, local, files); err != nil {
+	if err := SignFeed(ctx, keys, local, files); err != nil {
 		t.Fatal(err)
 	}
 	ring, err := openpgp.ReadArmoredKeyRing(strings.NewReader(key.Public))
@@ -288,8 +284,62 @@ func TestUnitSignFeedBindsPackagesAndRejectsBadKeys(t *testing.T) {
 		t.Fatalf("generated index signature: %v", err)
 	}
 	virtual := repo.Config{Class: repo.Virtual, KeyPair: "good", PrimaryKeyPairRef: "missing"}
-	if err := SignFeed(ctx, st, virtual, files); err != nil {
+	if err := SignFeed(ctx, keys, virtual, files); err != nil {
 		t.Fatalf("virtual signing ref: %v", err)
+	}
+}
+
+func TestUnitIndexWorkSignsFeedWithEnvKeys(t *testing.T) {
+	st := inmem.New()
+	c := *repo.Defaults(&repo.Config{
+		Key: "opkg-local", Class: repo.Local, PackageType: repo.Opkg, PrimaryKeyPairRef: "feed",
+	})
+	if err := st.Repos().Create(t.Context(), c); err != nil {
+		t.Fatal(err)
+	}
+	stored, err := st.Items().Put(t.Context(), types.Item{
+		RepoKey: c.Key, Path: "feed", Name: "alpha_1.0_all.ipk",
+		Size: 123, Actual: types.Checksums{SHA256: strings.Repeat("a", 64)},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	key, err := terraformtest.NewKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	generated := map[string][]byte{}
+	env := format.Env{
+		Store: st,
+		// The store holds no key pair, so a feed signed with this one was
+		// signed through Keys.
+		Keys: &accessapitest.Keys{Keypairs: map[string]accessapi.Keypair{"feed": {
+			Name: "feed", Type: accessapi.KeypairGPG, PrivateKey: key.Private,
+		}}},
+		Inspection: inspection{
+			sha: stored.Actual.SHA256, path: stored.FullPath(), pkg: validIndexPackage(),
+		},
+		Derive: func(_ context.Context, d format.Derived) (types.Item, error) {
+			body, err := io.ReadAll(d.Body)
+			generated[d.Path] = body
+			return types.Item{}, err
+		},
+	}
+	work := types.WorkItem{Kind: KindIndex, Key: c.Key}
+	if err := (Handler{}).Work(t.Context(), env, work); err != nil {
+		t.Fatal(err)
+	}
+	ring, err := openpgp.ReadArmoredKeyRing(strings.NewReader(key.Public))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := openpgp.CheckArmoredDetachedSignature(
+		ring,
+		bytes.NewReader(generated["feed/"+PackagesName]),
+		bytes.NewReader(generated["feed/"+SignatureName]),
+		nil,
+	); err != nil {
+		t.Fatalf("Packages.sig not signed with the key pair from Keys: %v", err)
 	}
 }
 

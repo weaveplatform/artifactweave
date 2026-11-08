@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,6 +12,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ProtonMail/go-crypto/openpgp"
+
+	"github.com/weaveplatform/artifactweave/internal/format/terraform/terraformtest"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -143,6 +149,7 @@ func TestUnitIndexWorkTracksRepositoryAndPublicationFailures(t *testing.T) {
 	failure := errors.New("index persistence failed")
 	env = format.Env{
 		Store: st, Now: func() time.Time { return time.Unix(1700000000, 0) },
+		Keys:       &accessapitest.Keys{},
 		Inspection: inspection{sha: pkg.SHA256, path: pkg.Path, pkg: pkg},
 		Derive: func(context.Context, format.Derived) (types.Item, error) {
 			return types.Item{}, failure
@@ -182,18 +189,70 @@ func TestUnitIndexWorkTracksRepositoryAndPublicationFailures(t *testing.T) {
 	}
 }
 
-func TestUnitSigningRejectsWrongKeyType(t *testing.T) {
-	t.Parallel()
+func TestUnitIndexWorkSignsMetadataWithEnvKeys(t *testing.T) {
 	st := inmem.New()
-	ctx := t.Context()
-	if err := st.Keys().
-		CreateKeypair(ctx, types.Keypair{Name: "rsa", Type: types.KeypairRSA}); err != nil {
+	c := *repo.Defaults(&repo.Config{
+		Key: "rpm-local", Class: repo.Local, PackageType: repo.RPM, PrimaryKeyPairRef: "yum",
+	})
+	if err := st.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
+	pkg, _, _ := metadataFixture(t)
+	if _, err := st.Items().Put(t.Context(), types.Item{
+		RepoKey: c.Key, Name: pkg.Path, Actual: types.Checksums{SHA256: pkg.SHA256},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	key, err := terraformtest.NewKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	generated := map[string][]byte{}
+	env := format.Env{
+		Store: st, Now: func() time.Time { return time.Unix(1700000000, 0) },
+		// The store holds no key pair, so metadata signed with this one was
+		// signed through Keys.
+		Keys: &accessapitest.Keys{Keypairs: map[string]accessapi.Keypair{"yum": {
+			Name: "yum", Type: accessapi.KeypairGPG, PrivateKey: key.Private, PublicKey: key.Public,
+		}}},
+		Inspection: inspection{sha: pkg.SHA256, path: pkg.Path, pkg: pkg},
+		Derive: func(_ context.Context, d format.Derived) (types.Item, error) {
+			body, err := io.ReadAll(d.Body)
+			generated[d.Path] = body
+			return types.Item{}, err
+		},
+	}
+	work := types.WorkItem{Kind: KindIndex, Key: c.Key}
+	if err := (Handler{}).Work(t.Context(), env, work); err != nil {
+		t.Fatal(err)
+	}
+	if string(generated["repodata/repomd.xml.key"]) != key.Public {
+		t.Fatal("repomd.xml.key is not the public key of the pair from Keys")
+	}
+	ring, err := openpgp.ReadArmoredKeyRing(strings.NewReader(key.Public))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := openpgp.CheckArmoredDetachedSignature(
+		ring,
+		bytes.NewReader(generated["repodata/repomd.xml"]),
+		bytes.NewReader(generated["repodata/repomd.xml.asc"]),
+		nil,
+	); err != nil {
+		t.Fatalf("repomd.xml.asc not signed with the key pair from Keys: %v", err)
+	}
+}
+
+func TestUnitSigningRejectsWrongKeyType(t *testing.T) {
+	t.Parallel()
+	keys := &accessapitest.Keys{Keypairs: map[string]accessapi.Keypair{
+		"rsa": {Name: "rsa", Type: types.KeypairRSA},
+	}}
+	ctx := t.Context()
 	c := repo.Config{PrimaryKeyPairRef: "rsa"}
 	if err := signMetadata(
 		ctx,
-		st,
+		keys,
 		c,
 		map[string][]byte{"repodata/repomd.xml": []byte("x")},
 	); err == nil {
@@ -223,13 +282,11 @@ func TestUnitIndexAndSigningSurfaceStorageFailures(t *testing.T) {
 	if err := (Handler{}).Reindex(canceled, env, c); !errors.Is(err, context.Canceled) {
 		t.Fatalf("canceled item search was lost: %v", err)
 	}
-	if err := st.Keys().CreateKeypair(ctx, types.Keypair{
+	keys := &accessapitest.Keys{Keypairs: map[string]accessapi.Keypair{"rpm-invalid-gpg": {
 		Name: "rpm-invalid-gpg", Type: types.KeypairGPG, PrivateKey: "invalid key",
-	}); err != nil {
-		t.Fatal(err)
-	}
+	}}}
 	c.PrimaryKeyPairRef = "rpm-invalid-gpg"
-	if err := signMetadata(ctx, st, c, map[string][]byte{
+	if err := signMetadata(ctx, keys, c, map[string][]byte{
 		"repodata/repomd.xml": []byte("manifest"),
 	}); err == nil {
 		t.Fatal("invalid GPG private key signed RPM metadata")

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
@@ -250,7 +251,7 @@ func (Handler) Work(ctx context.Context, env format.Env, work types.WorkItem) er
 		if err != nil {
 			return err
 		}
-		if err := signMetadata(ctx, env.Store, c, meta.Files); err != nil {
+		if err := signMetadata(ctx, env.Keys, c, meta.Files); err != nil {
 			return err
 		}
 		paths := make([]string, 0, len(meta.Files))
@@ -317,14 +318,14 @@ func autoCalculate(c repo.Config) bool {
 
 func signMetadata(
 	ctx context.Context,
-	st store.Store,
+	keys accessapi.Keys,
 	c repo.Config,
 	files map[string][]byte,
 ) error {
 	if c.PrimaryKeyPairRef == "" {
 		return nil
 	}
-	pair, err := st.Keys().Keypair(ctx, c.PrimaryKeyPairRef)
+	pair, err := keys.Keypair(ctx, c.PrimaryKeyPairRef)
 	if err != nil {
 		return fmt.Errorf("rpm: metadata signing key: %w", err)
 	}

@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
@@ -55,6 +56,11 @@ var (
 type Service struct {
 	Store store.Store
 	Blobs blob.Store
+	// Keys is the format.Env.Keys of every operation, which the formats'
+	// derived work signs Alpine, Debian, Opkg and RPM metadata with. Nil
+	// leaves Env.Keys nil, so a service that runs derived work for a
+	// repository that names a signing key pair must set it.
+	Keys accessapi.Keys
 	// Now supplies the time; nil means time.Now.
 	Now func() time.Time
 	// Formats returns a package type's format; nil means the generic

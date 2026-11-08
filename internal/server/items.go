@@ -196,6 +196,7 @@ func (s artifactoryService) items(st store.Store) *item.Service {
 	svc := &item.Service{
 		Store:            st,
 		Blobs:            s.cfg.Blobs,
+		Keys:             s.cfg.Access.Keys,
 		Formats:          s.format,
 		ReindexAuthorize: reindexauth.New(st, s.cfg.Auth),
 	}

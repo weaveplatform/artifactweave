@@ -14,6 +14,7 @@ import (
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
 
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
@@ -249,7 +250,7 @@ func (Handler) Work(ctx context.Context, env format.Env, work types.WorkItem) er
 		if err != nil {
 			return err
 		}
-		if err := SignFeed(ctx, env.Store, c, generated); err != nil {
+		if err := SignFeed(ctx, env.Keys, c, generated); err != nil {
 			return err
 		}
 		for name, body := range generated {
@@ -270,7 +271,7 @@ func (Handler) Work(ctx context.Context, env format.Env, work types.WorkItem) er
 	return nil
 }
 
-func signingKey(ctx context.Context, st store.Store, c repo.Config) (types.Keypair, error) {
+func signingKey(ctx context.Context, keys accessapi.Keys, c repo.Config) (types.Keypair, error) {
 	ref := c.PrimaryKeyPairRef
 	if c.Class == repo.Virtual {
 		ref = c.KeyPair
@@ -278,7 +279,7 @@ func signingKey(ctx context.Context, st store.Store, c repo.Config) (types.Keypa
 	if ref == "" {
 		return types.Keypair{}, nil
 	}
-	pair, err := st.Keys().Keypair(ctx, ref)
+	pair, err := keys.Keypair(ctx, ref)
 	if err != nil {
 		return pair, fmt.Errorf("opkg: signing key: %w", err)
 	}
@@ -289,9 +290,17 @@ func signingKey(ctx context.Context, st store.Store, c repo.Config) (types.Keypa
 }
 
 // SignFeed signs the uncompressed Packages bytes, which the opkg client
-// verifies before trusting the package digests inside the feed.
-func SignFeed(ctx context.Context, st store.Store, c repo.Config, files map[string][]byte) error {
-	pair, err := signingKey(ctx, st, c)
+// verifies before trusting the package digests inside the feed, with the
+// repository's GPG key pair read through keys: keyPair for a virtual
+// repository, primaryKeyPairRef for any other. A repository that names no
+// pair leaves files unsigned without reading keys.
+func SignFeed(
+	ctx context.Context,
+	keys accessapi.Keys,
+	c repo.Config,
+	files map[string][]byte,
+) error {
+	pair, err := signingKey(ctx, keys, c)
 	if err != nil || pair.Name == "" {
 		return err
 	}

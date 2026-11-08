@@ -41,6 +41,7 @@ func (s *Service) Env() format.Env { return s.env() }
 func (s *Service) env() format.Env {
 	env := format.Env{
 		Store:    s.Store,
+		Keys:     s.Keys,
 		Now:      s.now,
 		Layouts:  &layouts{s: s, seen: map[string]*layout.Layout{}},
 		Derive:   s.derive,

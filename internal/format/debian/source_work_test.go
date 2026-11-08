@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/format/terraform/terraformtest"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -89,24 +91,20 @@ func TestUnitWorkPublishesOnlyCompleteSourcePackages(t *testing.T) {
 		types.WorkItem{Kind: KindIndex, Key: "unknown-repository"}); err != nil {
 		t.Fatalf("work for removed repository: %v", err)
 	}
+	pairs := &accessapitest.Keys{Keypairs: map[string]accessapi.Keypair{}}
+	env.Keys = pairs
 	keyed := c
 	keyed.PrimaryKeyPairRef = "missing-keypair"
 	if err := buildIndex(t.Context(), env, keyed); err == nil {
 		t.Fatal("source Release published without its configured signing key")
 	}
-	if err := st.Keys().CreateKeypair(t.Context(), types.Keypair{
-		Name: "rsa-key", Type: types.KeypairRSA,
-	}); err != nil {
-		t.Fatal(err)
-	}
+	pairs.Keypairs["rsa-key"] = types.Keypair{Name: "rsa-key", Type: types.KeypairRSA}
 	keyed.PrimaryKeyPairRef = "rsa-key"
 	if err := buildIndex(t.Context(), env, keyed); err == nil {
 		t.Fatal("source Release published with a non-GPG key")
 	}
-	if err := st.Keys().CreateKeypair(t.Context(), types.Keypair{
+	pairs.Keypairs["invalid-gpg"] = types.Keypair{
 		Name: "invalid-gpg", Type: types.KeypairGPG, PrivateKey: "not a key",
-	}); err != nil {
-		t.Fatal(err)
 	}
 	keyed.PrimaryKeyPairRef = "invalid-gpg"
 	if err := buildIndex(t.Context(), env, keyed); err == nil {
@@ -116,10 +114,8 @@ func TestUnitWorkPublishesOnlyCompleteSourcePackages(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := st.Keys().CreateKeypair(t.Context(), types.Keypair{
+	pairs.Keypairs["source-gpg"] = types.Keypair{
 		Name: "source-gpg", Type: types.KeypairGPG, PrivateKey: key.Private,
-	}); err != nil {
-		t.Fatal(err)
 	}
 	keyed.PrimaryKeyPairRef = "source-gpg"
 	if err := buildIndex(t.Context(), env, keyed); err != nil {

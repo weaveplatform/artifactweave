@@ -11,6 +11,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ProtonMail/go-crypto/openpgp"
+	"github.com/ProtonMail/go-crypto/openpgp/clearsign"
+
+	"github.com/weaveplatform/artifactweave/internal/format/terraform/terraformtest"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -120,5 +126,78 @@ func TestUnitWorkPublishesReleaseAndAllArchitectureIndexes(t *testing.T) {
 	}
 	if got := len(generated); got < 6 {
 		t.Fatalf("reindex did not retain the generated apt view: %d files", got)
+	}
+}
+
+func TestUnitWorkSignsReleaseWithEnvKeys(t *testing.T) {
+	st := inmem.New()
+	c := *repo.Defaults(&repo.Config{
+		Key: "debian-local", Class: repo.Local, PackageType: repo.Debian, PrimaryKeyPairRef: "apt",
+	})
+	if err := st.Repos().Create(t.Context(), c); err != nil {
+		t.Fatal(err)
+	}
+	body := fixture(t, validControl)
+	b, err := ReadBinary(t.Context(), bytes.NewReader(body), int64(len(body)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := sha256.Sum256(body)
+	m := md5.Sum(body) //nolint:gosec // Debian Packages wire checksum.
+	const path = "pool/main/h/hello/hello_1.0-1_amd64.deb"
+	it, err := st.Items().Put(t.Context(), types.Item{
+		RepoKey: c.Key, Name: path, Size: int64(len(body)),
+		Actual: types.Checksums{SHA256: fmt.Sprintf("%x", h), MD5: fmt.Sprintf("%x", m)},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Items().SetProperties(t.Context(), it.ID, types.Properties{
+		PropDistribution: {"stable"}, PropComponent: {"main"}, PropArchitecture: {"amd64"},
+	}, time.Time{}); err != nil {
+		t.Fatal(err)
+	}
+	key, err := terraformtest.NewKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	generated := map[string][]byte{}
+	env := format.Env{
+		Store: st,
+		// The store holds no key pair, so a Release signed with this one was
+		// signed through Keys.
+		Keys: &accessapitest.Keys{Keypairs: map[string]accessapi.Keypair{"apt": {
+			Name: "apt", Type: accessapi.KeypairGPG, PrivateKey: key.Private,
+		}}},
+		Inspection: inspection{sha: it.Actual.SHA256, path: path, binary: b},
+		Derive: func(_ context.Context, d format.Derived) (types.Item, error) {
+			body, err := io.ReadAll(d.Body)
+			generated[d.Path] = body
+			return types.Item{}, err
+		},
+	}
+	work := types.WorkItem{Kind: KindIndex, Key: c.Key}
+	if err := (Handler{}).Work(t.Context(), env, work); err != nil {
+		t.Fatal(err)
+	}
+	release := generated["dists/stable/Release"]
+	ring, err := openpgp.ReadArmoredKeyRing(strings.NewReader(key.Public))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := openpgp.CheckArmoredDetachedSignature(
+		ring, bytes.NewReader(release), bytes.NewReader(generated["dists/stable/Release.gpg"]), nil,
+	); err != nil {
+		t.Fatalf("Release.gpg not signed with the key pair from Keys: %v", err)
+	}
+	inRelease := generated["dists/stable/InRelease"]
+	block, _ := clearsign.Decode(inRelease)
+	if block == nil || !bytes.Equal(block.Plaintext, release) {
+		t.Fatalf("InRelease does not carry the Release body: %q", inRelease)
+	}
+	if _, err := openpgp.CheckDetachedSignature(
+		ring, bytes.NewReader(block.Bytes), block.ArmoredSignature.Body, nil,
+	); err != nil {
+		t.Fatalf("InRelease not signed with the key pair from Keys: %v", err)
 	}
 }
