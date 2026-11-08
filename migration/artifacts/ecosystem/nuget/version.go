@@ -69,7 +69,6 @@ func ParseVersion(v string) (Version, bool) {
 	return out, true
 }
 
-// number reads one numeric part.
 func number(p string) (int, bool) {
 	if p == "" || strings.TrimLeft(p, "0123456789") != "" {
 		return 0, false

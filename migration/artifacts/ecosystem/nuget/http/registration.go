@@ -262,7 +262,6 @@ func (h handler) registrationPage(
 	writeCompressed(w, r, out)
 }
 
-// entry is v's catalog entry.
 func (u hiveURLs) entry(name string, v version) catalogEntry {
 	m := v.meta
 	e := catalogEntry{

@@ -1,14 +1,3 @@
-// Package nugethttp serves NuGet's protocols on NuGet repositories (decision
-// 0038), mounted through the router kit (decision 0032): the v3 API under
-// /artifactory/api/nuget/v3/{repoKey}/ (V3) and, under
-// /artifactory/api/nuget/{repoKey}/, the v2 Atom feed and the push, delete and relist the v3
-// index's PackagePublish names (V2). Every feed is built on each request
-// from what the NuGet format keeps in the package index, for the caller
-// and the request's base URL. Feeds need no derived documents, and a version
-// is served once its deploy commits. PDB reads wait for derived symbol work. Downloads go through the item routes'
-// download, so the download policy and counts apply to them as to any
-// file, and a push stores through the item service, whose NuGet format
-// checks and indexes it as it does a REST deploy.
 package nugethttp
 
 import (

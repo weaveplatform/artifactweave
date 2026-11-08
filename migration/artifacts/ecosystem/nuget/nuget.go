@@ -1,28 +1,3 @@
-// Package nuget is the format of NuGet repositories (decision 0038). It
-// reads each package's .nuspec, indexes a .nupkg or .snupkg at its
-// canonical name as a file of its version (decision 0018) with the
-// per-version Metadata the v3 and v2 feeds are built from, and keeps the
-// nuget.* properties. Every write reaches it through the item service, so
-// a package pushed by dotnet nuget push, deployed by jf rt upload, or
-// landed by a copy, a move or a restore is indexed the same way.
-//
-// Every repository behaves as one created with 7.x's Enforce Layout, with
-// no switch (DV-111): versions are normalised, a version has one package
-// whichever route brings it, and a .nupkg or .snupkg that is no valid
-// package, or is not at its canonical name, is refused (Admit). Files of
-// any other name, legacy .symbols.nupkg included, are stored as plain
-// items.
-//
-// A version is its package, the id lower-cased, and its version,
-// normalised and lower-cased (PackageName, VersionKey). Its files are
-// every file at one of its canonical names: its .nupkg and, when pushed,
-// its .snupkg. Admit keeps that to one of each, but a trash restore, which
-// no format refuses, can bring back a second; the one deployed first, a
-// tie broken by path, is the one the Metadata describes, so the hooks and
-// a reindex agree whatever the order of events.
-//
-// There is no unlisted state (decision 0038, "Delete and relist"), so no
-// property changes the index and the format is no format.Annotator.
 package nuget
 
 import (
@@ -78,7 +53,6 @@ func (Handler) Inspect(
 	return in, err
 }
 
-// read reads the stored content sha as a package.
 func read(ctx context.Context, env format.Env, sha string) (*inspection, error) {
 	n, err := ReadStored(ctx, env.Blobs, sha)
 	switch {

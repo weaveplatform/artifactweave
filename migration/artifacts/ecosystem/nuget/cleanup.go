@@ -143,7 +143,6 @@ func cleanSnapshots(ctx context.Context, env format.Env, c repo.Config, name str
 	return env.Remove(ctx, c, doomed, Deleter) //nolint:wrapcheck // the item service's own
 }
 
-// filePaths are the paths of v's files.
 func filePaths(ctx context.Context, st store.Store, v types.PackageVersion) ([]string, error) {
 	ids, err := st.Packages().Files(ctx, v.ID)
 	if err != nil {
