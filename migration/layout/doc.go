@@ -2,10 +2,11 @@
 // migration: the ledger is complete, every package documents itself to the
 // standard, staged packages keep the dependency rules, tests read fixtures by
 // root-relative paths, only access and the kernel touch the credential
-// fields of the request principal, and production code stores a principal
-// without its permission decider only where that is the point. It has no
-// production code. The tests are the enforcement, so a violation fails the
-// gate instead of waiting for review.
+// fields of the request principal, tests outside access stay off its
+// internals, and production code stores a principal without its permission
+// decider only where that is the point. It has no production code. The tests
+// are the enforcement, so a violation fails the gate instead of waiting for
+// review.
 //
 // # Role
 //
@@ -76,4 +77,12 @@
 //     the remote reindex, which stores the caller it has just rechecked so
 //     that its permissions are evaluated afresh; its cases prove each way of
 //     naming it is caught.
+//   - TestUnitTestsAvoidAccessInternals,
+//     TestUnitAccessInternalsRuleDetectsViolations: outside access, no test
+//     imports internal/authz, internal/auth, internal/auth/token or a package
+//     of access core other than test support. Only the server root,
+//     internal/app and the test/server harnesses may import the
+//     authenticator and the token service, until TST-04 to TST-07 and WEB-22
+//     remove the reason, and an allowlist entry that no file uses fails; the
+//     second proves each rule can fail.
 package layout
