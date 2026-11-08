@@ -16,7 +16,7 @@ document names. [Research 32](../32-terraform-backend.md) records what Terraform
 go-tfe v1.110.0 send and read, what HashiCorp documents for the TFE API, what JFrog's
 documentation, blog and Jira show of 7.x, and what no source confirms.
 
-artifactweave serves the backend API through `internal/server/terraformbackend` and stores
+artifactweave serves the backend API through `migration/artifacts/ecosystem/terraformbackend/http` and stores
 workspaces, locks and state through `migration/artifacts/core/terraformstate`. Repositories are
 local only, with `encryptStates` defaulting to `true` (research 32 section 4). The native
 `terraform_backend.feature` exercises this API through Terraform's `remote` backend.
@@ -335,7 +335,7 @@ or SaaS 7.80 to 7.174.0 changes the backend otherwise.
 
 ## Implementation notes (#558)
 
-The API is mounted at the route forms above by `internal/server/terraformbackend`.
+The API is mounted at the route forms above by `migration/artifacts/ecosystem/terraformbackend/http`.
 The storage service remains the only workspace, lock and state writer. Its sealed
 state is one AEAD message, so writes and downloads buffer that message for validation;
 raw PUTs have no backend size cap, while inline JSON creates retain the 64 MiB

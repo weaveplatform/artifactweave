@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"testing"
 
-	tfbe "github.com/weaveplatform/artifactweave/internal/format/terraformbackend"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/formattest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
+	tfbe "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend"
 )
 
 // itemWrites is the format with the item routes' writes let through under

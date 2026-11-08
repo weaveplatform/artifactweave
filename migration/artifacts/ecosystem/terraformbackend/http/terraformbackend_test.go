@@ -1,4 +1,4 @@
-package terraformbackend
+package terraformbackendhttp
 
 import (
 	"bytes"
@@ -17,12 +17,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	tfbe "github.com/weaveplatform/artifactweave/internal/format/terraformbackend"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/terraformstate"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	tfbe "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"

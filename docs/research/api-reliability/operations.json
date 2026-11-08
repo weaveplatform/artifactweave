@@ -1895,7 +1895,7 @@
   {
     "route": "DELETE /artifactory/api/terraform/remote/v2/organizations/{repo}/workspaces/{name}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -1914,7 +1914,7 @@
   {
     "route": "DELETE /artifactory/api/terraform/remote/v2/workspaces/{id}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -9233,7 +9233,7 @@
   {
     "route": "GET /artifactory/api/terraform/remote/v2/account/details",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -9252,7 +9252,7 @@
   {
     "route": "GET /artifactory/api/terraform/remote/v2/organizations/{repo}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -9271,7 +9271,7 @@
   {
     "route": "GET /artifactory/api/terraform/remote/v2/organizations/{repo}/entitlement-set",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -9290,7 +9290,7 @@
   {
     "route": "GET /artifactory/api/terraform/remote/v2/organizations/{repo}/workspaces",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -9309,7 +9309,7 @@
   {
     "route": "GET /artifactory/api/terraform/remote/v2/organizations/{repo}/workspaces/{name}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -9328,7 +9328,7 @@
   {
     "route": "GET /artifactory/api/terraform/remote/v2/ping",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.Register.func1.2",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.Register.func1.2",
     "review_family": "native-terraform",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -9347,7 +9347,7 @@
   {
     "route": "GET /artifactory/api/terraform/remote/v2/state-versions",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -9366,7 +9366,7 @@
   {
     "route": "GET /artifactory/api/terraform/remote/v2/state-versions/{id}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -9385,7 +9385,7 @@
   {
     "route": "GET /artifactory/api/terraform/remote/v2/state-versions/{id}/download",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -9404,7 +9404,7 @@
   {
     "route": "GET /artifactory/api/terraform/remote/v2/workspaces/{id}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -9423,7 +9423,7 @@
   {
     "route": "GET /artifactory/api/terraform/remote/v2/workspaces/{id}/current-state-version",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -18368,7 +18368,7 @@
   {
     "route": "POST /artifactory/api/terraform/remote/v2/organizations/{repo}/workspaces",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -18387,7 +18387,7 @@
   {
     "route": "POST /artifactory/api/terraform/remote/v2/workspaces/{id}/actions/force-unlock",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -18406,7 +18406,7 @@
   {
     "route": "POST /artifactory/api/terraform/remote/v2/workspaces/{id}/actions/lock",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -18425,7 +18425,7 @@
   {
     "route": "POST /artifactory/api/terraform/remote/v2/workspaces/{id}/actions/unlock",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -18444,7 +18444,7 @@
   {
     "route": "POST /artifactory/api/terraform/remote/v2/workspaces/{id}/state-versions",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -21722,7 +21722,7 @@
   {
     "route": "PUT /artifactory/api/terraform/remote/v2/state-versions/{id}/content",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",

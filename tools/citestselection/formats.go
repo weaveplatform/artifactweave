@@ -108,7 +108,7 @@ var formats = map[string]formatImpact{
 		[]string{"terraform", "jf"},
 	},
 	"terraformbackend": {
-		"./internal/format/terraformbackend/...",
+		"./migration/artifacts/ecosystem/terraformbackend/...",
 		"@terraform_backend,@terraform_backend_api",
 		[]string{"terraform"},
 	},

@@ -1,4 +1,4 @@
-package terraformbackend
+package terraformbackendhttp
 
 import (
 	"crypto/hmac"
@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
-	tfbe "github.com/weaveplatform/artifactweave/internal/format/terraformbackend"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/terraformstate"
+	tfbe "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"

@@ -6,7 +6,7 @@ import (
 	"errors"
 	"testing"
 
-	tfbe "github.com/weaveplatform/artifactweave/internal/format/terraformbackend"
+	tfbe "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"

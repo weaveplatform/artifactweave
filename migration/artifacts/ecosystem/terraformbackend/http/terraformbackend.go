@@ -1,6 +1,6 @@
-// Package terraformbackend serves the TFE-shaped API used by Terraform's
+// Package terraformbackendhttp serves the TFE-shaped API used by Terraform's
 // remote backend (decision 0041). Repository items remain its source of truth.
-package terraformbackend
+package terraformbackendhttp
 
 import (
 	"encoding/json"
@@ -14,11 +14,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	tfbe "github.com/weaveplatform/artifactweave/internal/format/terraformbackend"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/terraformstate"
+	tfbe "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"

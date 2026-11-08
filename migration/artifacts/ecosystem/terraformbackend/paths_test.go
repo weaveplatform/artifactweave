@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	tfbe "github.com/weaveplatform/artifactweave/internal/format/terraformbackend"
+	tfbe "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 

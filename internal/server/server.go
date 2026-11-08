@@ -41,7 +41,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/puppet"
 	"github.com/weaveplatform/artifactweave/internal/server/skills"
 	"github.com/weaveplatform/artifactweave/internal/server/swift"
-	"github.com/weaveplatform/artifactweave/internal/server/terraformbackend"
 	"github.com/weaveplatform/artifactweave/internal/server/vagrant"
 	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
@@ -63,6 +62,7 @@ import (
 	nugethttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget/http"
 	pypihttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi/http"
 	terraformhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/http"
+	terraformbackendhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -466,8 +466,8 @@ func New(cfg Config) http.Handler {
 	mounted = append(mounted, cfg.Protocols...)
 	if cfg.Auth != nil {
 		r.Use(authenticate(cfg.Auth, cfg.Store, func(req *http.Request) bool {
-			if terraformbackend.IsPath(req.URL.Path) {
-				return terraformbackend.SkipsAuthentication(req)
+			if terraformbackendhttp.IsPath(req.URL.Path) {
+				return terraformbackendhttp.SkipsAuthentication(req)
 			}
 			return slices.ContainsFunc(mounted, func(p pkgroute.Protocol) bool {
 				return p.SkipsAuthentication(req)
@@ -518,9 +518,9 @@ func New(cfg Config) http.Handler {
 	// handle the ordinary one-segment forms.
 	r.Get("/artifactory/api/vcs/*", artSvc.vcsNested)
 	registry.Register(r)
-	terraformbackend.Register(
+	terraformbackendhttp.Register(
 		r,
-		terraformbackend.Options{
+		terraformbackendhttp.Options{
 			Items:        artSvc.items(cfg.Store),
 			Keys:         cfg.Keys,
 			Fault:        func(r *http.Request, err error) { noteCause(r.Context(), err) },
