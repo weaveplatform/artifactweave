@@ -18,7 +18,7 @@ func TestUnitReverseClosureIncludesTransitiveProductionConsumers(t *testing.T) {
 		base + "format/maven": nil,
 	}
 	got := reverseClosure(graph, []string{base + "format/npm"}, "npm")
-	for _, want := range []string{"./internal/format/npm", "./internal/server/npm", "./internal/server", "./internal/app"} {
+	for _, want := range []string{"./migration/artifacts/ecosystem/npm", "./migration/artifacts/ecosystem/npm/http", "./internal/server", "./internal/app"} {
 		if !slices.Contains(got, want) {
 			t.Errorf("reverse closure omitted %s: %v", want, got)
 		}
@@ -49,7 +49,7 @@ func TestUnitActualNPMReverseDependencies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"./internal/format/npm", "./internal/server/npm", "./internal/server", "./internal/app"} {
+	for _, want := range []string{"./migration/artifacts/ecosystem/npm", "./migration/artifacts/ecosystem/npm/http", "./internal/server", "./internal/app"} {
 		if !slices.Contains(got, want) {
 			t.Errorf("actual import graph omitted %s: %v", want, got)
 		}
@@ -80,8 +80,11 @@ func TestUnitImportGraphIncludesStagedPackages(t *testing.T) {
 		imports("npmhttp", "migration/artifacts/ecosystem/npm"))
 	write("internal/artifacts/ecosystem/npm/npm.go",
 		imports("npm", "migration/artifacts/ecosystem/npm"))
-	write("internal/server/npm/npm.go", imports("npm", "migration/artifacts/ecosystem/npm/http"))
-	write("internal/server/server.go", imports("server", "internal/server/npm"))
+	write(
+		"migration/artifacts/ecosystem/npm/http/npm.go",
+		imports("npm", "migration/artifacts/ecosystem/npm/http"),
+	)
+	write("internal/server/server.go", imports("server", "migration/artifacts/ecosystem/npm/http"))
 	write("migration/app/app.go", imports("app", "internal/server"))
 	write("cmd/artifactweave/main.go", imports("main", "migration/app"))
 	write("migration/artifacts/ecosystem/pypi/pypi.go", imports("pypi"))
@@ -107,7 +110,7 @@ func TestUnitImportGraphIncludesStagedPackages(t *testing.T) {
 	want := []string{
 		"./internal/artifacts/ecosystem/npm",
 		"./internal/server",
-		"./internal/server/npm",
+		"./migration/artifacts/ecosystem/npm/http",
 		"./migration/artifacts/ecosystem/npm",
 		"./migration/artifacts/ecosystem/npm/http",
 	}

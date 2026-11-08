@@ -5,10 +5,10 @@ import (
 	"context" //nolint:gosec // npm's dist.shasum is SHA-1 by definition
 	"testing"
 
-	npmfmt "github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	npmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"

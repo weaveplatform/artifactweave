@@ -6,8 +6,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/server/npm"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	npmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -80,7 +80,7 @@ func keepNPMCredential(ctx context.Context, r *http.Request, p kernel.Principal)
 	if p.TokenID == "" || !npmOperation(r.URL.Path) {
 		return ctx
 	}
-	var c npm.Credential
+	var c npmhttp.Credential
 	if user, password, ok := r.BasicAuth(); ok {
 		c.User, c.Password = user, password
 	} else if scheme, raw, _ := strings.Cut(r.Header.Get("Authorization"), " "); strings.EqualFold(scheme, "Bearer") {
@@ -98,29 +98,29 @@ func keepNPMCredential(ctx context.Context, r *http.Request, p kernel.Principal)
 // gets that token back, as it sent it, Basic or Bearer; it is the
 // credential the caller already holds, so nothing new is handed out.
 // [I] What 7.x answers a token caller is undocumented (#216).
-func (s artifactoryService) npmCredential(ctx context.Context) (npm.Credential, error) {
+func (s artifactoryService) npmCredential(ctx context.Context) (npmhttp.Credential, error) {
 	p, err := kernel.RequireAuthenticated(ctx)
 	if err != nil {
-		return npm.Credential{}, err //nolint:wrapcheck // an apierror value
+		return npmhttp.Credential{}, err //nolint:wrapcheck // an apierror value
 	}
 	if p.TokenID != "" {
-		c, ok := ctx.Value(npmCredentialKey{}).(npm.Credential)
+		c, ok := ctx.Value(npmCredentialKey{}).(npmhttp.Credential)
 		if !ok {
-			return npm.Credential{}, kernel.ErrUnauthenticated
+			return npmhttp.Credential{}, kernel.ErrUnauthenticated
 		}
 		return c, nil
 	}
 	if !p.Password {
-		return npm.Credential{}, kernel.ErrUnauthenticated
+		return npmhttp.Credential{}, kernel.ErrUnauthenticated
 	}
 	if s.cfg.Access.Tokens == nil {
-		return npm.Credential{}, apierror.ErrNotImplemented
+		return npmhttp.Credential{}, apierror.ErrNotImplemented
 	}
 	secret, err := s.cfg.Access.Tokens.EncryptedPassword(ctx, p.Name)
 	if err != nil {
-		return npm.Credential{}, s.internalError(ctx, "npm encrypted password", err)
+		return npmhttp.Credential{}, s.internalError(ctx, "npm encrypted password", err)
 	}
-	return npm.Credential{User: p.Name, Password: secret}, nil
+	return npmhttp.Credential{User: p.Name, Password: secret}, nil
 }
 
 // GetNpmAuth answers .npmrc lines that authenticate npm as the caller.
@@ -132,7 +132,7 @@ func (s artifactoryService) GetNpmAuth(
 	if err != nil {
 		return nil, err
 	}
-	return artgen.GetNpmAuth200TextResponse(npm.AuthLines(c)), nil
+	return artgen.GetNpmAuth200TextResponse(npmhttp.AuthLines(c)), nil
 }
 
 // GetNpmScopeAuth answers .npmrc lines that point an npm scope at a
@@ -159,9 +159,9 @@ func (s artifactoryService) GetNpmScopeAuth(
 		return nil, badRequestf("Repository '%s' is not an npm repository", req.RepoKey)
 	}
 	scope := strings.TrimPrefix(req.Scope, "@")
-	if !npm.ValidScope(scope) {
+	if !npmhttp.ValidScope(scope) {
 		return nil, badRequestf("'%s' is not an npm scope", req.Scope)
 	}
 	registry := baseurl.From(ctx) + npmAPI + url.PathEscape(rc.Key) + "/"
-	return artgen.GetNpmScopeAuth200TextResponse(npm.ScopeAuthLines(scope, registry, c)), nil
+	return artgen.GetNpmScopeAuth200TextResponse(npmhttp.ScopeAuthLines(scope, registry, c)), nil
 }

@@ -5,7 +5,7 @@ import "testing"
 func TestUnitOwnedTestDirAcceptsLegacyAndStagedLayouts(t *testing.T) {
 	for dir, want := range map[string]bool{
 		"internal/server":                            true,
-		"internal/server/npm":                        true,
+		"migration/artifacts/ecosystem/npm/http":     true,
 		"test/server":                                true,
 		"test/server/access":                         true,
 		"test/server/artifacts/npm":                  true,
@@ -25,7 +25,7 @@ func TestUnitOwnedTestDirAcceptsLegacyAndStagedLayouts(t *testing.T) {
 		"migration/artifacts/adapters":               false,
 		"migration/artifacts/core/item":              false,
 		"migration":                                  false,
-		"internal/format/npm":                        false,
+		"migration/artifacts/ecosystem/npm":          false,
 		"internal/serverx":                           false,
 		"test/serverx":                               false,
 		"test/acceptance":                            false,

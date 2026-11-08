@@ -37,7 +37,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/luarocks"
 	"github.com/weaveplatform/artifactweave/internal/server/machinelearning"
 	"github.com/weaveplatform/artifactweave/internal/server/nix"
-	"github.com/weaveplatform/artifactweave/internal/server/npm"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/server/pub"
 	"github.com/weaveplatform/artifactweave/internal/server/puppet"
@@ -62,6 +61,7 @@ import (
 	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
 	golanghttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang/http"
 	nimmodelhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nimmodel/http"
+	npmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm/http"
 	nugethttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
@@ -293,7 +293,7 @@ var protocols = []func(Config) pkgroute.Protocol{
 	},
 	func(Config) pkgroute.Protocol { return golanghttp.Protocol() },
 	func(cfg Config) pkgroute.Protocol {
-		return npm.Protocol(npm.Options{
+		return npmhttp.Protocol(npmhttp.Options{
 			RemoteSources:  cfg.RemoteSources,
 			Accounts:       npmAccounts(cfg),
 			MaxPublishSize: cfg.NPMMaxPublishSize,
@@ -320,8 +320,8 @@ var protocols = []func(Config) pkgroute.Protocol{
 // interface, which the npm handlers answer 501. cfg.Access holds nil
 // interfaces, never typed nils, and a nil interface converts to a nil one,
 // so they are assigned as they are.
-func npmAccounts(cfg Config) npm.Accounts {
-	return npm.Accounts{
+func npmAccounts(cfg Config) npmhttp.Accounts {
+	return npmhttp.Accounts{
 		Passwords:   cfg.Access.Authenticator,
 		Tokens:      cfg.Access.Tokens,
 		TokenExpiry: cfg.NPMLoginTokenExpiry,

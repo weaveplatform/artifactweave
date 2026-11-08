@@ -3,9 +3,9 @@ package npm_test
 import (
 	"testing"
 
-	npmfmt "github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	npmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )

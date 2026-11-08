@@ -86,7 +86,7 @@ var formats = map[string]formatImpact{
 	},
 	"nimmodel": {"", "@nimmodel", []string{"crane"}},
 	"npm": {
-		"./internal/format/npm/...",
+		"./migration/artifacts/ecosystem/npm/...",
 		"@npm,@package_wiring",
 		[]string{"node", "npm12", "jf"},
 	},

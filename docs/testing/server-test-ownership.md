@@ -67,7 +67,7 @@ When a test file leaves a shared directory such as `internal/server`:
 | LuaRocks | `internal/server/luarocks` |
 | Maven | `test/server/artifacts/maven` |
 | NIM model | `migration/artifacts/ecosystem/nimmodel/http` |
-| npm | `internal/server/npm`, `test/server/artifacts/npm` |
+| npm | `migration/artifacts/ecosystem/npm/http`, `test/server/artifacts/npm` |
 | NuGet | `migration/artifacts/ecosystem/nuget/http`, `test/server/artifacts/nuget` |
 | PyPI | `internal/server/pypi`, `test/server/artifacts/pypi` |
 | Dart pub | `internal/server/pub` |

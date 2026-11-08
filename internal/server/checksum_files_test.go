@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"testing"
 
-	npmfmt "github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
+	npmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
 )
 
 // TestAccServerWrittenChecksumFiles (#399): under client-checksums, the

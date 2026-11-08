@@ -23,7 +23,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/luarocks"
 	"github.com/weaveplatform/artifactweave/internal/format/machinelearning"
 	"github.com/weaveplatform/artifactweave/internal/format/nix"
-	"github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/format/opkg"
 	"github.com/weaveplatform/artifactweave/internal/format/pub"
 	"github.com/weaveplatform/artifactweave/internal/format/puppet"
@@ -41,6 +40,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
 )
 

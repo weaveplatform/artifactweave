@@ -5,12 +5,12 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/format/pypi"
 	"github.com/weaveplatform/artifactweave/internal/format/terraformbackend"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/pkg/types"
