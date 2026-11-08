@@ -308,6 +308,9 @@ change that adds a name appends its row; the change column gives the ticket of t
 | `PolicyError` | `artifacts/core/remote` | Classifies a failure of the policy's work as the source service's typed error or sentinel, which format rules in the slices return unwrapped; it was `policyError` | RMT-03 |
 | `TransportRequest` | `artifacts/core/remote` | The upstream request for a source request and its cached representation, from which format rules build their own exchanges; it was `transportRequest` | RMT-03 |
 | `Policy.Check` | `artifacts/core/remote` | The authority fence a format rule calls after its own upstream exchanges, before it uses what it fetched; it was the method `check` | RMT-03 |
+| `ProjectEmptyFeed` | `artifacts/ecosystem/nuget` | The NuGet v2 empty-feed projection that the remote policy reaches through `Policy.ProjectResponse`: a bodyless upstream 204 of an opted-in feed or query becomes one fixed empty Atom feed; it was an unexported function of the policy's package | RMT-04 |
+| `Policy.ProjectResponse` | `artifacts/core/remote` | The hook that may rewrite an upstream response before admission, after the module-location projection and before missing-status normalisation; nil leaves every response as sent | RMT-04 |
+| `Policy.CacheKey` | `artifacts/core/remote` | The remote cache key of a request under a credential revision, which tests outside the policy's package compare, the NuGet slice's among them; it was the method `cacheKey`, and its identity terms, `nuget-empty-feed-v1` among them, are unchanged | RMT-04 |
 
 ### Placeholders
 

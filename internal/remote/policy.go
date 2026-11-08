@@ -44,6 +44,10 @@ type Policy struct {
 	// format whose protocol gives a status a meaning of its own (NuGet v2 reads a
 	// bodyless 204 as an empty feed). It runs after the module-location projection
 	// and before missing-status normalisation; nil leaves every response as sent.
+	// The application installs nuget.ProjectEmptyFeed. A hook that replaces
+	// res.Body closes the body it replaces; the policy closes whichever body res
+	// holds when the fetch ends. An error it returns ends the fetch as it is, with
+	// no fallback to a cached copy, so it is one of the source service's errors.
 	ProjectResponse func(q source.Request, res *http.Response) error
 	Store           store.Store
 	Blobs           blob.Store
@@ -228,6 +232,19 @@ func (p *Policy) cachedOnly(ctx context.Context, q source.Request) (source.Resul
 	return source.Result{Item: &it}, nil
 }
 
+// CacheKey is the remote cache key of q under the credential revision: the
+// repository key and resource path, revision as SettingsRevision, and as
+// Variant a keyed HMAC-SHA256 (Key) of every term that changes the
+// representation. The terms are the resource's kind, mutability, escaped
+// path, variant and Accept, its query when the repository propagates query
+// parameters, its upstream path, external URL (not for a Git LFS object, which
+// its SHA-256 names), checksums and expected content type when any is set, and
+// each opt-in rule set on it, the NuGet empty feed ("nuget-empty-feed-v1") and
+// the accepted media types among them. The keyed fingerprint keeps sensitive
+// query values out of an observable key. Cached entries are stored under the
+// key, so each term's encoding must stay as it is, and a new opt-in term is
+// added only when its option is set, which leaves every existing key unchanged.
+// It reads neither the store nor the network.
 func (p *Policy) CacheKey(q source.Request, revision string) types.RemoteCacheKey {
 	query := ""
 	if enabled(q.Repo.PropagateQueryParams) {

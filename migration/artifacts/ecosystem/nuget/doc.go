@@ -32,7 +32,10 @@
 // hooks (decision 0032), so every write and delete in a NuGet repository
 // reaches it whichever API carried it. The slice's protocol package,
 // nuget/http, builds the v3 and v2 feeds from the index and the Metadata
-// kept here.
+// kept here. Its upstream rule, the v2 empty-feed projection, plugs into
+// core remote's shared retrieval and cache policy (decision 0007) through
+// the policy's response hook; this package imports core remote, which
+// never imports it back (decision 0044).
 //
 // # Inputs
 //
@@ -45,12 +48,17 @@
 //     and versions, reads pushed and cached packages, decodes the Metadata
 //     its feeds are built from, keys PDB reads (PDBKey, SymbolPath) and
 //     checks a remote repository's package before it is cached
-//     (ValidateRemote).
+//     (ValidateRemote); and core remote's policy (remote.Policy), which
+//     hands each upstream response it fetches, to fill the cache or to
+//     deliver without storing, to ProjectEmptyFeed through its
+//     ProjectResponse hook, installed by the application on both remote
+//     policies.
 //   - Driven: the format hooks' environment (format.Env), through which
 //     Handler reads stored packages, keeps the package index, the nuget.*
 //     properties and the extracted PDBs, enqueues its work, removes the
 //     pre-releases the cleanup drops, and reads a remote repository's
-//     cache for its reindex.
+//     cache for its reindex; and core remote, whose PolicyError classifies
+//     a failure to close the upstream body the projection replaces.
 //
 // # Outputs
 //
@@ -71,6 +79,8 @@
 //     KindSnapshots, Deleter).
 //   - ValidateRemote: the identity and archive checks of a remote
 //     repository's .nupkg.
+//   - ProjectEmptyFeed: the response hook that serves a v2 feed's bodyless
+//     upstream 204 as the one fixed empty Atom feed.
 //
 // # Invariants
 //
@@ -88,6 +98,11 @@
 //     taken as trusted.
 //   - Refusal texts (ErrNotPackage and Admit's reasons) reach dotnet and
 //     the JFrog CLI in the response body, so they stay byte-identical.
+//   - The empty-feed projection applies only to a request that opts in
+//     (source.Resource.NuGetEmptyFeed, set for v2 feeds and queries) and
+//     only to a bodyless 204. It is part of the representation's cache
+//     identity, whose term ("nuget-empty-feed-v1") core remote keeps, and a
+//     204 of any other request keeps the policy's generic handling.
 //
 // # References
 //
@@ -96,14 +111,24 @@
 //   - Decision 0032: docs/research/decisions/0032-package-format-handlers.md
 //     (format hooks and optional interfaces), and decision 0018:
 //     docs/research/decisions/0018-package-index.md.
-//   - docs/operations/nuget-remote.md (remote NuGet repositories).
+//   - docs/operations/nuget-remote.md (remote NuGet repositories), and
+//     docs/implementation/remote-retrieval-contract.md, "NuGet v2 empty
+//     feed projection" (decision 0038, #629), which cites the NuGet
+//     client's reading of a 204 as an empty feed:
+//     https://github.com/NuGet/NuGet.Client/blob/dev/src/NuGet.Core/NuGet.Protocol/LegacyFeed/V2FeedParser.cs.
+//   - Decision 0007: docs/research/decisions/0007-remote-repositories.md
+//     (format rules classify and validate; core remote owns transport and
+//     cache policy), and decision 0044:
+//     docs/research/decisions/0044-modular-monolith-migration.md,
+//     "Artifacts and remote".
 //   - JFrog NuGet repositories and the migration tool that normalises a
 //     repository's layout, as decision 0038 cites them:
 //     https://docs.jfrog.com/artifactory/docs/nuget-repositories and
 //     https://docs.jfrog.com/artifactory/docs/migration-tool.
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     line 231 (ecosystem/nuget), line 379 (one slice per package type),
-//     line 664 (the P10 virtual.go) and line 997 (the mapping row).
+//     line 658 (remote_empty_feed.go), line 664 (the P10 virtual.go) and
+//     lines 997 and 1014 (the mapping rows).
 //   - Plan: docs/implementation/plan.md#p8-pypi-nuget-helm-terraform-locals,
 //     #p9-remote-repositories and #p9d-modular-monolith-migration, epic ECO
 //     (https://github.com/weaveplatform/artifactweave/issues/943).
@@ -111,8 +136,9 @@
 //     handler), https://github.com/weaveplatform/artifactweave/issues/571
 //     (PDB symbol serving), https://github.com/weaveplatform/artifactweave/issues/629
 //     (remote v2 and symbols), https://github.com/weaveplatform/artifactweave/issues/700
-//     (reindex of cached remote packages) and
-//     https://github.com/weaveplatform/artifactweave/issues/1018
+//     (reindex of cached remote packages),
+//     https://github.com/weaveplatform/artifactweave/issues/1018 and
+//     https://github.com/weaveplatform/artifactweave/issues/1021
 //
 // # Status
 //
@@ -141,4 +167,10 @@
 //     admission, payload limits, entry names and zip directory bounds, and
 //     the reindex of a remote repository's cache, with the access test kit
 //     (access/accesstest) for the reindex's credential and its revocation.
+//   - remote_empty_feed_test.go: the empty-feed projection through core
+//     remote's policy against a fake upstream (caching, refresh, offline
+//     and no-store reads, validation and the publication fence, cache
+//     identity, generic 204 handling, deceptive 204s, and each transport
+//     body closed once); remote_fixture_test.go holds the policy fixture
+//     they share with nothing else.
 package nuget

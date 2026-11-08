@@ -133,12 +133,12 @@ func (rt *runtime) openRemoteSources(
 		Key:             key,
 		CheckCurrent:    checkCurrent(revalidate),
 		GitFetch:        cocoapods.FetchCocoaPodsGit,
-		ProjectResponse: nuget.ProjectNuGetEmptyFeed,
+		ProjectResponse: nuget.ProjectEmptyFeed,
 	}
 	registryPolicy := &remote.Policy{
 		Store: rt.store, Blobs: rt.blobs, Items: items,
 		Options: resolver.Options, CheckCurrent: checkCurrent(registryRevalidate), Key: key,
-		GitFetch: cocoapods.FetchCocoaPodsGit, ProjectResponse: nuget.ProjectNuGetEmptyFeed,
+		GitFetch: cocoapods.FetchCocoaPodsGit, ProjectResponse: nuget.ProjectEmptyFeed,
 	}
 	content := &remote.RegistryContent{
 		Policy:  registryPolicy,

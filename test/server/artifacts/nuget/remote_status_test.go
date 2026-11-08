@@ -64,7 +64,7 @@ func TestAccStatusNuGetV3Remote(t *testing.T) {
 			Pool:            new(remote.Pool),
 			Options:         resolver.Options,
 			Key:             []byte(strings.Repeat("k", 32)),
-			ProjectResponse: nuget.ProjectNuGetEmptyFeed,
+			ProjectResponse: nuget.ProjectEmptyFeed,
 		}
 		t.Cleanup(policy.Pool.Close)
 		cfg.RemoteSources = &source.Service{

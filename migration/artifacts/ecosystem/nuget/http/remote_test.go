@@ -88,7 +88,7 @@ func newRemoteFixture(t *testing.T, options ...fakeupstream.Options) *remoteFixt
 		Options:         resolver.Options,
 		Key:             []byte(strings.Repeat("k", 32)),
 		Now:             clock.Now,
-		ProjectResponse: nugetfmt.ProjectNuGetEmptyFeed,
+		ProjectResponse: nugetfmt.ProjectEmptyFeed,
 	}
 	t.Cleanup(policy.Pool.Close)
 	svc := &source.Service{
