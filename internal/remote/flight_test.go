@@ -78,26 +78,26 @@ func TestAccLastWaiterCancelsAndNewDemandStartsFresh(t *testing.T) {
 }
 
 func TestAccAdmissionLimitsQueueAndCancellation(t *testing.T) {
-	a := admission{perRepo: 1, global: 2, queue: 1}
-	releaseA, err := a.acquire(t.Context(), "a")
+	a := Admission{perRepo: 1, global: 2, queue: 1}
+	releaseA, err := a.Acquire(t.Context(), "a")
 	if err != nil {
 		t.Fatal(err)
 	}
-	releaseB, err := a.acquire(t.Context(), "b")
+	releaseB, err := a.Acquire(t.Context(), "b")
 	if err != nil {
 		t.Fatal(err)
 	}
 	ctx, cancel := context.WithCancel(t.Context())
 	waiting := make(chan error, 1)
 	go func() {
-		release, err := a.acquire(ctx, "a")
+		release, err := a.Acquire(ctx, "a")
 		if release != nil {
 			release()
 		}
 		waiting <- err
 	}()
 	waitFor(t, func() bool { a.mu.Lock(); defer a.mu.Unlock(); return a.repos["a"].queued == 1 })
-	if _, err = a.acquire(t.Context(), "a"); !errors.Is(err, ErrBusy) {
+	if _, err = a.Acquire(t.Context(), "a"); !errors.Is(err, ErrBusy) {
 		t.Fatal(err)
 	}
 	cancel()
@@ -106,7 +106,7 @@ func TestAccAdmissionLimitsQueueAndCancellation(t *testing.T) {
 	}
 	third := make(chan func(), 1)
 	go func() {
-		release, err := a.acquire(t.Context(), "c")
+		release, err := a.Acquire(t.Context(), "c")
 		if err != nil {
 			t.Error(err)
 		}
@@ -129,13 +129,13 @@ func TestAccAdmissionLimitsQueueAndCancellation(t *testing.T) {
 }
 
 func TestAccDefaultAdmissionAndCanceledInitialRequest(t *testing.T) {
-	a := new(admission)
+	a := new(Admission)
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	if _, err := a.acquire(ctx, "r"); !errors.Is(err, context.Canceled) {
+	if _, err := a.Acquire(ctx, "r"); !errors.Is(err, context.Canceled) {
 		t.Fatal(err)
 	}
-	release, err := a.acquire(t.Context(), "r")
+	release, err := a.Acquire(t.Context(), "r")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -68,7 +68,7 @@ type Policy struct {
 	MetadataLimit int64
 	flights       FlightGroup[fillResult]
 	probes        FlightGroup[fillResult]
-	capacity      admission
+	capacity      Admission
 }
 
 type fillResult struct {
@@ -92,7 +92,7 @@ func (p *Policy) now() time.Time {
 // call more than once, or ErrBusy when the repository's queue is full, or
 // the context's error, wrapped, when ctx ends first.
 func (p *Policy) Acquire(ctx context.Context, repoKey string) (func(), error) {
-	return p.capacity.acquire(ctx, repoKey)
+	return p.capacity.Acquire(ctx, repoKey)
 }
 
 func (p *Policy) Read(

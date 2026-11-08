@@ -69,7 +69,7 @@ func TestUnitVaryAndRetryBounds(t *testing.T) {
 		{now.Add(20 * time.Second).Format(http.TimeFormat), 20 * time.Second},
 		{now.Add(-time.Hour).Format(http.TimeFormat), time.Second},
 	} {
-		if got := retryAfter(tc.value, now); got != tc.expected {
+		if got := RetryAfter(tc.value, now); got != tc.expected {
 			t.Fatal(tc.value, got)
 		}
 	}

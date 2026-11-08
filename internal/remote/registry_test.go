@@ -293,16 +293,7 @@ func TestAccRegistryExchangeCoalescingAndCancellation(t *testing.T) {
 		group.Go(func() { failures <- registryGet(t.Context(), f.registry, "team/image") })
 	}
 	deadline := time.Now().Add(5 * time.Second)
-	for {
-		f.registry.flights.mu.Lock()
-		count := 0
-		for _, active := range f.registry.flights.active {
-			count = active.waiters
-		}
-		f.registry.flights.mu.Unlock()
-		if count == 17 {
-			break
-		}
+	for f.registry.flights.Pending() != 17 {
 		if time.Now().After(deadline) {
 			t.Fatal("waiters did not join")
 		}

@@ -72,7 +72,7 @@ type Registry struct {
 	challenges  map[string]registryChallenge
 	tokens      map[string]registryToken
 	flights     FlightGroup[registryToken]
-	capacity    admission
+	capacity    Admission
 }
 
 func NewRegistry(c repo.Config, opts RegistryOptions) (*Registry, error) {

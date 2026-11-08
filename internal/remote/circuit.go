@@ -146,7 +146,7 @@ func (p *Policy) RecordResponse(
 		s.OfflineUntil = time.Time{}
 		s.RetryAfterUntil = time.Time{}
 		if res.StatusCode == 429 {
-			s.RetryAfterUntil = p.now().Add(retryAfter(res.Header.Get("Retry-After"), p.now()))
+			s.RetryAfterUntil = p.now().Add(RetryAfter(res.Header.Get("Retry-After"), p.now()))
 		}
 	})
 }

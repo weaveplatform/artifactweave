@@ -24,7 +24,7 @@ func (r *Registry) token(ctx context.Context, challenge registryChallenge) (regi
 		// coalesced work loses caller deadlines, so the total includes queueing too.
 		shared, cancel := context.WithTimeout(shared, time.Minute)
 		defer cancel()
-		release, err := r.capacity.acquire(shared, "registry")
+		release, err := r.capacity.Acquire(shared, "registry")
 		if err != nil {
 			return registryToken{}, err
 		}
@@ -90,7 +90,7 @@ func registryTokenStatus(res *http.Response, now time.Time) error {
 	}
 	failure := &source.HTTPError{Status: res.StatusCode, Kind: source.FailureKindHTTP}
 	if res.StatusCode == http.StatusTooManyRequests {
-		failure.RetryAfter = retryAfter(res.Header.Get("Retry-After"), now)
+		failure.RetryAfter = RetryAfter(res.Header.Get("Retry-After"), now)
 	}
 	return failure
 }

@@ -132,7 +132,7 @@ func TestAccBypassCallerHEADAndFallback(t *testing.T) {
 }
 
 func TestUnitURLPreservation(t *testing.T) {
-	base, _ := baseURL("https://example.test/root?sig=a%2Fb+z&x=1")
+	base, _ := BaseURL("https://example.test/root?sig=a%2Fb+z&x=1")
 	for _, tc := range []struct {
 		path, query, expected string
 		raw, propagate        bool
@@ -161,7 +161,7 @@ func TestUnitURLPreservation(t *testing.T) {
 		}
 	}
 	for _, raw := range []string{"file:///tmp/x", "http://", "https://u:p@example.test", "https://example.test/#f", "://"} {
-		if _, err := baseURL(raw); !errors.Is(err, ErrURL) {
+		if _, err := BaseURL(raw); !errors.Is(err, ErrURL) {
 			t.Fatal(raw, err)
 		}
 	}
@@ -178,7 +178,7 @@ func TestUnitP2MetadataFileBaseURLNormalizesOnlyP2(t *testing.T) {
 		{repo.P2, "https://eclipse.example/site/sub/content.xml", "https://eclipse.example/site/sub/p2.index"},
 		{repo.Generic, "https://eclipse.example/site/content.jar", "https://eclipse.example/site/content.jar/p2.index"},
 	} {
-		base, err := baseURL(tc.base)
+		base, err := BaseURL(tc.base)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -187,7 +187,7 @@ func TestUnitP2MetadataFileBaseURLNormalizesOnlyP2(t *testing.T) {
 			t.Errorf("%s %s: URL=%v, error=%v, want %s", tc.format, tc.base, u, err, tc.expected)
 		}
 	}
-	base, err := baseURL("https://eclipse.example/site/content.jar")
+	base, err := BaseURL("https://eclipse.example/site/content.jar")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -202,7 +202,7 @@ func TestUnitP2MetadataFileBaseURLNormalizesOnlyP2(t *testing.T) {
 	) {
 		t.Errorf("P2 base URL accepted a query fragment: %v", err)
 	}
-	signed, err := baseURL("https://eclipse.example/site/content.jar?signature=a%2Fb")
+	signed, err := BaseURL("https://eclipse.example/site/content.jar?signature=a%2Fb")
 	if err != nil {
 		t.Fatal(err)
 	}

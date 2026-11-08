@@ -82,12 +82,24 @@ func (g *FlightGroup[T]) Do(
 	}
 }
 
+// Pending reports how many callers wait on the group's active flights.
+// Tests poll it to know every caller has joined before the shared work ends.
+func (g *FlightGroup[T]) Pending() int {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	n := 0
+	for _, f := range g.active {
+		n += f.waiters
+	}
+	return n
+}
+
 type admissionState struct{ active, queued int }
 
-// admission bounds active work and queued callers without creating a goroutine
+// Admission bounds active work and queued callers without creating a goroutine
 // for each blocked request. A single notification wakes contenders to recheck
 // under the mutex; no repository reserves a global slot while it is full.
-type admission struct {
+type Admission struct {
 	mu                     sync.Mutex
 	changed                chan struct{}
 	repos                  map[string]*admissionState
@@ -95,7 +107,7 @@ type admission struct {
 	perRepo, global, queue int
 }
 
-func (a *admission) acquire(ctx context.Context, repoKey string) (func(), error) {
+func (a *Admission) Acquire(ctx context.Context, repoKey string) (func(), error) {
 	a.mu.Lock()
 	if a.changed == nil {
 		a.changed = make(chan struct{})
@@ -144,14 +156,14 @@ func (a *admission) acquire(ctx context.Context, repoKey string) (func(), error)
 	}
 }
 
-func (a *admission) dequeue(key string, r *admissionState) {
+func (a *Admission) dequeue(key string, r *admissionState) {
 	r.queued--
 	if r.queued == 0 && r.active == 0 {
 		delete(a.repos, key)
 	}
 }
 
-func (a *admission) release(key string, r *admissionState) {
+func (a *Admission) release(key string, r *admissionState) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.active--

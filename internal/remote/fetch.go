@@ -531,7 +531,7 @@ func ResponseError(res *http.Response, now time.Time) error {
 	if status == 401 || status == 403 || status == 429 || status >= 500 && status <= 599 {
 		failure := &source.HTTPError{Status: status, Kind: source.FailureKindHTTP}
 		if status == 429 {
-			failure.RetryAfter = retryAfter(res.Header.Get("Retry-After"), now)
+			failure.RetryAfter = RetryAfter(res.Header.Get("Retry-After"), now)
 		}
 		return failure
 	}

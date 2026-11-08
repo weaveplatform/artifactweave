@@ -38,7 +38,7 @@ func NewClient(c repo.Config, opts Options) (*Client, error) {
 	c.PropagateQueryParams = copySetting(c.PropagateQueryParams)
 	c.BypassHeadRequests = copySetting(c.BypassHeadRequests)
 	c.MetadataRetrievalTimeoutSecs = copySetting(c.MetadataRetrievalTimeoutSecs)
-	base, err := baseURL(c.URL)
+	base, err := BaseURL(c.URL)
 	if err != nil {
 		return nil, err
 	}

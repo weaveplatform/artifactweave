@@ -79,7 +79,7 @@ func cacheableVary(v string) bool {
 	return true
 }
 
-func retryAfter(raw string, now time.Time) time.Duration {
+func RetryAfter(raw string, now time.Time) time.Duration {
 	d := time.Second
 	if seconds, err := strconv.ParseInt(strings.TrimSpace(raw), 10, 32); err == nil {
 		d = time.Duration(seconds) * time.Second
