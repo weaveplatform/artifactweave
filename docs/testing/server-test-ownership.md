@@ -33,10 +33,10 @@ of P9d:
 - `<root>/<module>/adapters/http` and everything below it.
 
 Every `packages` key must be one of these directories. A test in a format's
-directory (`internal/server/<type>`, `test/server/<type>`,
-`test/server/artifacts/<type>` or `<root>/artifacts/ecosystem/<type>/http`)
-counts as that format's code on a narrow PR only when its package owner is that
-format; any other owner, `shared` included, selects full CI.
+directory (`internal/server/<type>`, `test/server/artifacts/<type>` or
+`<root>/artifacts/ecosystem/<type>/http`) counts as that format's code on a
+narrow PR only when its package owner is that format; any other owner, `shared`
+included, selects full CI.
 
 ## Moving a root test
 
@@ -58,22 +58,23 @@ When a test file leaves a shared directory such as `internal/server`:
 
 | Owner | Independently runnable server test packages |
 | --- | --- |
-| Agent Packages | `test/server/agentpackages` |
-| Agent Plugins | `test/server/agentplugins` |
-| Docker/OCI | `internal/server/docker`, `test/server/docker` |
-| Go modules | `internal/server/golang`, `test/server/golang` |
-| Helm | `internal/server/helm`, `test/server/helm` |
-| Helm OCI | `test/server/helmoci` |
+| Agent Packages | `test/server/artifacts/agentpackages` |
+| Agent Plugins | `test/server/artifacts/agentplugins` |
+| Docker/OCI | `internal/server/docker`, `test/server/artifacts/docker` |
+| Go modules | `internal/server/golang`, `test/server/artifacts/golang` |
+| Helm | `internal/server/helm`, `test/server/artifacts/helm` |
+| Helm OCI | `test/server/artifacts/helmoci` |
 | LuaRocks | `internal/server/luarocks` |
-| Maven | `test/server/maven` |
+| Maven | `test/server/artifacts/maven` |
 | NIM model | `internal/server/nimmodel` |
-| npm | `internal/server/npm`, `test/server/npm` |
-| NuGet | `internal/server/nuget`, `test/server/nuget` |
-| PyPI | `internal/server/pypi`, `test/server/pypi` |
+| npm | `internal/server/npm`, `test/server/artifacts/npm` |
+| NuGet | `internal/server/nuget`, `test/server/artifacts/nuget` |
+| PyPI | `internal/server/pypi`, `test/server/artifacts/pypi` |
 | Dart pub | `internal/server/pub` |
+| RubyGems | `internal/server/gems`, `test/server/artifacts/gems` |
 | Skills | `internal/server/skills` |
-| Terraform registry | `internal/server/terraform`, `test/server/terraform` |
-| Terraform backend | `internal/server/terraformbackend`, `test/server/terraformbackend` |
+| Terraform registry | `internal/server/terraform`, `test/server/artifacts/terraform` |
+| Terraform backend | `internal/server/terraformbackend`, `test/server/artifacts/terraformbackend` |
 | Shared | `internal/server`, `internal/server/apierror`, `internal/server/baseurl`, `internal/server/pkgroute`, `test/server/access` |
 
 `test/server/support` and the packages under it (`harness`, `agentcommon` and

@@ -1,7 +1,8 @@
 package support
 
 // PyPIRoutes is the implemented PyPI protocol inventory. The root server
-// package guards registration; test/server/pypi checks status and principals.
+// package guards registration; test/server/artifacts/pypi checks status and
+// principals.
 func PyPIRoutes() map[string]bool {
 	const base = "/artifactory/api/pypi/"
 	return map[string]bool{

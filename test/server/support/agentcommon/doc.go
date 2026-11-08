@@ -3,8 +3,8 @@
 //
 // # Role
 //
-// Test support, outside the modules, for test/server/agentpackages and
-// test/server/agentplugins.
+// Test support, outside the modules, for test/server/artifacts/agentpackages
+// and test/server/artifacts/agentplugins.
 //
 // # Inputs
 //

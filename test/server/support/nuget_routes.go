@@ -1,8 +1,9 @@
 package support
 
 // NuGetRoutes lists the implemented NuGet route patterns. The root package
-// uses this inventory for registration/stub checks; test/server/nuget runs
-// their status and principal assertions independently.
+// uses this inventory for registration/stub checks;
+// test/server/artifacts/nuget runs their status and principal assertions
+// independently.
 func NuGetRoutes() map[string]bool {
 	return map[string]bool{
 		"DELETE /artifactory/api/nuget/{repoKey}/{id}/{version}":                        true,
