@@ -8,14 +8,14 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/nimmodel"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -62,23 +62,19 @@ func (rt *runtime) openRemoteSources(
 		if id != permit.Identity {
 			return source.ErrSuperseded
 		}
-		p, ok := auth.FromContext(ctx)
+		p, ok := kernel.FromContext(ctx)
 		if !ok {
 			return source.ErrDenied
 		}
 		if registry && p.Registry != nil {
-			p, err = rt.auth.CurrentRegistry(ctx, p, rt.store.Tokens())
+			p, err = accessAPI.Authenticator.CurrentRegistry(ctx, p)
 		} else {
-			p, err = rt.auth.Current(ctx, p, rt.store.Tokens())
+			p, err = accessAPI.Authenticator.Current(ctx, p)
 		}
 		if err != nil {
 			return source.ErrDenied
 		}
-		_, d, err := auth.Authorize(ctx, authz.Sources{
-			Permissions:      rt.store.Permissions(),
-			Groups:           rt.store.Groups(),
-			AnonymousEnabled: p.Anonymous,
-		}, p)
+		_, d, err := accessAPI.Authorizer.Authorize(ctx, p, p.Anonymous)
 		if err != nil {
 			return source.ErrUnavailable
 		}
@@ -95,7 +91,7 @@ func (rt *runtime) openRemoteSources(
 		}
 		if !allows(
 			types.ResourceArtifact,
-			authz.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)},
+			accessapi.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)},
 			path,
 			types.ActionRead,
 		) {
