@@ -183,7 +183,10 @@ the work.
 - **Placement that differs from the target document.** Pattern helpers go to
   `kernel/antpath` and `artifacts/api/repo`; `keymaterial` goes to `platform/keymaterial`;
   `idtoken` stays a separate package, `access/core/idtoken`, with `idtokentest` below it;
-  the legacy layout test package is deleted and the staged `layout` package replaces it.
+  the legacy layout test package is deleted and the staged `layout` package replaces it;
+  the authentication suite, all that the server test package `shared` holds, becomes the
+  access module's suite package `test/server/access`, where the target document folds
+  `shared` into `test/server/support`.
 - **New packages the target document does not name:** `artifacts/adapters/http/itemkit`,
   `test/server/support/harness`, `platform/testkit/{repopath,storekit,fault}`,
   `platform/idempotency`, `platform/apilimit`, `platform/archivecheck`, `kernel/antpath`

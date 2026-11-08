@@ -27,10 +27,15 @@ imports `internal/server`, `test/server/support` must never import it, and the
 root tests keep their in-package `newItemWorld`, which must build the same
 world.
 
-`test/server/registryfixture` assembles the full server with the registry's
-authentication, repository, and signed blob setup for Docker and Helm OCI.
+Two fixtures under `test/server/support` build a world that more than one
+suite shares. `test/server/support/registryfixture` assembles the full server
+with the registry's authentication, repository, and signed blob setup for
+Docker and Helm OCI; `test/server/support/agentcommon` assembles the world of
+Agent Packages and Agent Plugins. Like the harness, they build the router, so
+`test/server/support` never imports them.
 
-`test/server/shared` contains the full-router authentication assertion.
+`test/server/access` is the access module's suite and contains the full-router
+authentication assertion.
 `test/server/nuget` contains the NuGet v2/v3 status table, route × principal
 matrix, API-key and force-authentication cases, symbols lifecycle, remote
 status cases, and generated reindex method check. `test/server/npm` contains
@@ -56,7 +61,7 @@ permission, lifecycle and reindex routes using the same fixture. Run each
 independently with:
 
 ```sh
-go test ./test/server/shared
+go test ./test/server/access
 go test ./test/server/nuget
 go test ./test/server/npm
 go test ./test/server/golang
