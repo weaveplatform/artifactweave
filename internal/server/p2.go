@@ -13,13 +13,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/format/p2"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -30,7 +31,7 @@ var errP2VirtualCycle = errors.New("server: p2 virtual repository cycle")
 // Remote reads still cross the common source policy and cache boundary.
 func (s artifactoryService) tryP2Item(w http.ResponseWriter, r *http.Request,
 	st store.Store, c repo.Config, cached bool, req itemRequest,
-	p auth.Principal, acc access,
+	p kernel.Principal, acc access,
 ) bool {
 	if c.PackageType != repo.P2 {
 		return false
@@ -73,7 +74,7 @@ func p2ArchiveURL(raw string) (string, bool) {
 }
 
 func (s artifactoryService) serveP2Archive(w http.ResponseWriter, r *http.Request,
-	c repo.Config, cached bool, req itemRequest, p auth.Principal, acc access,
+	c repo.Config, cached bool, req itemRequest, p kernel.Principal, acc access,
 	archiveURL string,
 ) {
 	if !acc.file(c, req.path, types.ActionRead) ||
@@ -86,7 +87,7 @@ func (s artifactoryService) serveP2Archive(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	q := source.Request{
-		Repo: c, Subject: auth.SubjectOf(p), Access: acc.d,
+		Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.d,
 		Project: c.ProjectKey, CacheOnly: cached,
 		Resource: source.Resource{
 			Kind: source.ResourceKindArtifact, Path: req.path, Method: http.MethodGet,
@@ -157,7 +158,7 @@ func (s artifactoryService) serveP2Archive(w http.ResponseWriter, r *http.Reques
 }
 
 func (s artifactoryService) serveP2Virtual(w http.ResponseWriter, r *http.Request,
-	st store.Store, c repo.Config, req itemRequest, p auth.Principal, acc access,
+	st store.Store, c repo.Config, req itemRequest, p kernel.Principal, acc access,
 ) {
 	if !acc.folder(c, req.path, types.ActionRead) ||
 		!acc.file(c, req.path, types.ActionRead) ||

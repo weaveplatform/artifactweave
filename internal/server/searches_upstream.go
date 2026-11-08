@@ -8,12 +8,12 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
@@ -58,7 +58,7 @@ func (u *upstreamSearch) request(key string) source.Request {
 	c := u.r.configs[key]
 	return source.Request{
 		Repo:    c,
-		Subject: auth.SubjectOf(u.r.p),
+		Subject: accessapi.SubjectOf(u.r.p),
 		Access:  u.r.acc.d,
 		Project: c.ProjectKey,
 	}

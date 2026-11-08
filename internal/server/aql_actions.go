@@ -5,11 +5,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -25,7 +25,7 @@ import (
 func (s artifactoryService) aqlAction(
 	ctx context.Context,
 	st store.Store,
-	p auth.Principal,
+	p kernel.Principal,
 	q *aql.Query,
 	configs map[string]repo.Config,
 	hits []aql.Hit,

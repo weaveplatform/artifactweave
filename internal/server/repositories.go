@@ -15,11 +15,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/repos"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
@@ -168,10 +168,10 @@ func (s artifactoryService) log() *slog.Logger {
 	return s.cfg.Logger
 }
 
-// adminOnly refuses a caller who is not an administrator (auth.RequireAdmin).
+// adminOnly refuses a caller who is not an administrator (kernel.RequireAdmin).
 // The wrap keeps the typed error, so the response carries its status.
 func adminOnly(ctx context.Context) error {
-	if _, err := auth.RequireAdmin(ctx); err != nil {
+	if _, err := kernel.RequireAdmin(ctx); err != nil {
 		return fmt.Errorf("repositories: %w", err)
 	}
 	return nil
@@ -180,21 +180,21 @@ func adminOnly(ctx context.Context) error {
 // principal returns the caller of a read. The middleware lets a request
 // without one through only to public routes, so none here means a router
 // built without authentication, which is refused as unauthenticated.
-func principal(ctx context.Context) (auth.Principal, error) {
-	p, ok := auth.FromContext(ctx)
+func principal(ctx context.Context) (kernel.Principal, error) {
+	p, ok := kernel.FromContext(ctx)
 	if !ok {
-		return p, auth.ErrUnauthenticated
+		return p, kernel.ErrUnauthenticated
 	}
 	return p, nil
 }
 
 // denied refuses a read: anonymous is told to authenticate, a user that
 // they lack the right.
-func denied(p auth.Principal) error {
+func denied(p kernel.Principal) error {
 	if p.Anonymous {
-		return auth.ErrUnauthenticated
+		return kernel.ErrUnauthenticated
 	}
-	return auth.ErrForbidden
+	return kernel.ErrForbidden
 }
 
 func badRequestf(format string, a ...any) error {
@@ -209,7 +209,7 @@ func notFoundRepo(key string) error {
 func (s artifactoryService) readerFor(
 	ctx context.Context,
 	st store.Store,
-) (auth.Principal, func(repo.Config) bool, error) {
+) (kernel.Principal, func(repo.Config) bool, error) {
 	p, err := principal(ctx)
 	if err != nil {
 		return p, nil, err
@@ -224,7 +224,7 @@ func (s artifactoryService) readerFor(
 
 // view is the configuration a reader receives: everything but secrets for
 // an admin, the public subset for anyone else.
-func view(p auth.Principal, c repo.Config) repo.Config {
+func view(p kernel.Principal, c repo.Config) repo.Config {
 	if p.Admin {
 		return repo.Masked(c)
 	}
@@ -410,10 +410,10 @@ func (s artifactoryService) CheckIfRepositoryExists(
 func (s artifactoryService) readOne(
 	ctx context.Context,
 	key string,
-) (auth.Principal, repo.Config, error) {
+) (kernel.Principal, repo.Config, error) {
 	st, err := s.content()
 	if err != nil {
-		return auth.Principal{}, repo.Config{}, err
+		return kernel.Principal{}, repo.Config{}, err
 	}
 	p, can, err := s.readerFor(ctx, st)
 	if err != nil {
@@ -1009,11 +1009,11 @@ func (s artifactoryService) DeleteRepository(
 	req artgen.DeleteRepositoryRequestObject,
 ) (artgen.DeleteRepositoryResponseObject, error) {
 	key := string(req.RepoKey)
-	admin, err := auth.RequireAdmin(ctx)
+	admin, err := kernel.RequireAdmin(ctx)
 	if err != nil {
 		// A user without the right gets the documented failure report;
 		// without credentials the ordinary 401.
-		if p, ok := auth.FromContext(ctx); ok && !p.Anonymous {
+		if p, ok := kernel.FromContext(ctx); ok && !p.Anonymous {
 			return artgen.DeleteRepository403JSONResponse(
 				failed(key, fmt.Sprintf(msgNoRight, key, p.Name, key)),
 			), nil
@@ -1050,9 +1050,9 @@ func (s artifactoryService) DeleteRepositories(
 	ctx context.Context,
 	req artgen.DeleteRepositoriesRequestObject,
 ) (artgen.DeleteRepositoriesResponseObject, error) {
-	admin, err := auth.RequireAdmin(ctx)
+	admin, err := kernel.RequireAdmin(ctx)
 	if err != nil {
-		if p, ok := auth.FromContext(ctx); ok && !p.Anonymous {
+		if p, ok := kernel.FromContext(ctx); ok && !p.Anonymous {
 			return failFast403(fmt.Sprintf(
 				"User: ('%s') has insufficient permission to delete repositories", p.Name)), nil
 		}

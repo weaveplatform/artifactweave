@@ -10,12 +10,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/format/cran"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -40,7 +41,7 @@ type cranCandidate struct {
 
 func (s artifactoryService) tryCranItem(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	cached bool, req itemRequest, p auth.Principal, acc access,
+	cached bool, req itemRequest, p kernel.Principal, acc access,
 ) bool {
 	if !cran.Serves(c.PackageType) || req.isFolder {
 		return false
@@ -65,7 +66,7 @@ func (s artifactoryService) tryCranItem(
 
 func (s artifactoryService) serveCranIndex(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	cached bool, req itemRequest, p auth.Principal, acc access,
+	cached bool, req itemRequest, p kernel.Principal, acc access,
 ) {
 	ctx := r.Context()
 	feed, name, ok := cran.IndexPath(req.path)
@@ -150,7 +151,7 @@ func cranPackageReadable(
 
 func (s artifactoryService) cranMemberIndex(
 	ctx context.Context, st store.Store, c repo.Config, cached bool, indexPath string,
-	p auth.Principal, acc access,
+	p kernel.Principal, acc access,
 ) (cranIndexView, error) {
 	view := cranIndexView{repo: c}
 	var body []byte
@@ -161,7 +162,7 @@ func (s artifactoryService) cranMemberIndex(
 				pkgroute.SourceError(source.ErrUnavailable, p.Anonymous))
 		}
 		query := source.Request{
-			Repo: c, Subject: auth.SubjectOf(p), Access: acc.d, Project: c.ProjectKey,
+			Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.d, Project: c.ProjectKey,
 			CacheOnly: cached,
 			Resource:  source.Resource{Path: indexPath, Method: http.MethodGet},
 		}
@@ -245,7 +246,7 @@ func (s artifactoryService) readCranBlob(ctx context.Context, sha string) ([]byt
 
 func (s artifactoryService) cranCandidates(
 	ctx context.Context, st store.Store, c repo.Config, indexPath string,
-	p auth.Principal, acc access, seen map[string]bool,
+	p kernel.Principal, acc access, seen map[string]bool,
 ) ([]cranCandidate, error) {
 	if seen[c.Key] || len(seen) >= 8 {
 		return nil, errCranVirtualCycle
@@ -320,7 +321,7 @@ func (s artifactoryService) cranCandidates(
 
 func (s artifactoryService) serveCranPackage(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	cached bool, req itemRequest, p auth.Principal, acc access,
+	cached bool, req itemRequest, p kernel.Principal, acc access,
 ) {
 	if len(req.props) != 0 || r.URL.RawQuery != "" || cached && c.Class != repo.Remote {
 		writeErr(w, r, itemNotFound())
@@ -379,10 +380,10 @@ func (s artifactoryService) serveCranPackage(
 
 func (s artifactoryService) serveRemoteCranPackage(
 	w http.ResponseWriter, r *http.Request, c repo.Config, cached bool,
-	req itemRequest, expected cran.Package, p auth.Principal, acc access,
+	req itemRequest, expected cran.Package, p kernel.Principal, acc access,
 ) {
 	query := source.Request{
-		Repo: c, Subject: auth.SubjectOf(p), Access: acc.d, Project: c.ProjectKey,
+		Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.d, Project: c.ProjectKey,
 		CacheOnly: cached,
 		Resource: source.Resource{
 			Kind: source.ResourceKindArtifact, Path: req.path, Method: r.Method,

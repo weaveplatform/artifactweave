@@ -5,10 +5,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/format/agentplugins"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -41,7 +41,7 @@ func (s artifactoryService) getAgentMarketplace(w http.ResponseWriter, r *http.R
 
 func (s artifactoryService) tryAgentMarketplaceItem(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	cached bool, req itemRequest, p auth.Principal, acc access,
+	cached bool, req itemRequest, p kernel.Principal, acc access,
 ) bool {
 	if c.PackageType != repo.AgentPlugins || c.Class != repo.Local || cached ||
 		req.isFolder || len(req.props) != 0 || !agentplugins.IsReservedMarketplace(req.path) {
@@ -57,7 +57,7 @@ func (s artifactoryService) tryAgentMarketplaceItem(
 
 func (s artifactoryService) serveAgentMarketplace(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	name string, p auth.Principal, acc access,
+	name string, p kernel.Principal, acc access,
 ) {
 	if err := generic.CheckDownload(c, name, false); err != nil {
 		writeErr(w, r, s.itemError(r.Context(), "download check", err))

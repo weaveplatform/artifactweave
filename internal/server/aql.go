@@ -13,10 +13,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -60,14 +60,14 @@ func (s artifactoryService) searchAQL(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, err)
 		return
 	}
-	if p, ok := auth.FromContext(ctx); ok && p.Anonymous {
+	if p, ok := kernel.FromContext(ctx); ok && p.Anonymous {
 		// Artifactory refuses anonymous queries with 403, even with anonymous
 		// access on (research 22 §1.3); with it off the request never gets
 		// here, and the middleware's 401 asks for credentials.
 		writeErr(w, r, apierror.New(http.StatusForbidden, "AQL queries need an authenticated user"))
 		return
 	}
-	p, err := auth.RequireAuthenticated(ctx)
+	p, err := kernel.RequireAuthenticated(ctx)
 	if err != nil {
 		writeErr(w, r, err)
 		return
@@ -213,7 +213,7 @@ func (s artifactoryService) aqlFailure(
 func nesting(
 	ctx context.Context,
 	az accessapi.Authorizer,
-	p auth.Principal,
+	p kernel.Principal,
 	configs map[string]repo.Config,
 	now time.Time,
 ) (aql.Nesting, error) {
@@ -314,7 +314,7 @@ func aqlRepositories(configs map[string]repo.Config) aql.Repositories {
 func readable(
 	ctx context.Context,
 	az accessapi.Authorizer,
-	p auth.Principal,
+	p kernel.Principal,
 	configs map[string]repo.Config,
 	hits []aql.Hit,
 ) ([]aql.Hit, error) {
@@ -398,7 +398,7 @@ func (s artifactoryService) dispatchAlternateAQL(
 	w http.ResponseWriter,
 	r *http.Request,
 	st store.Store,
-	p auth.Principal,
+	p kernel.Principal,
 	q *aql.Query,
 ) bool {
 	if q.Transitive {

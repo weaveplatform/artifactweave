@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/descriptor"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
@@ -107,7 +107,7 @@ func (s artifactoryService) redirect(
 	r *http.Request,
 	st store.Store,
 	f found,
-	p auth.Principal,
+	p kernel.Principal,
 ) bool {
 	return s.redirectAs(w, r, st, f, p, f.item.MimeType, true)
 }
@@ -125,7 +125,7 @@ func (s artifactoryService) redirectManifest(
 	f found,
 	mediaType string,
 ) bool {
-	p, _ := auth.FromContext(r.Context())
+	p, _ := kernel.FromContext(r.Context())
 	return s.redirectAs(w, r, st, f, p, mediaType, false)
 }
 
@@ -136,7 +136,7 @@ func (s artifactoryService) redirectAs(
 	r *http.Request,
 	st store.Store,
 	f found,
-	p auth.Principal,
+	p kernel.Principal,
 	contentType string,
 	count bool,
 ) bool {
@@ -262,7 +262,7 @@ func countsDownload(r *http.Request, status int) bool {
 // recordDownload updates the item's statistics and its package version's
 // last download (decision 0018). Best effort: a failed count must not fail
 // the download.
-func recordDownload(ctx context.Context, st store.Store, f found, p auth.Principal) {
+func recordDownload(ctx context.Context, st store.Store, f found, p kernel.Principal) {
 	at := time.Now().UTC()
 	_ = st.Items().RecordDownload(ctx, f.item.ID, store.Download{By: p.Name, At: at})
 	_ = pkgindex.RecordDownload(ctx, st, f.item.ID, at)

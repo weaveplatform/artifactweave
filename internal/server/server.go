@@ -62,6 +62,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/mirror"
@@ -351,7 +352,7 @@ func newRegistry(cfg Config, artSvc artifactoryService) *docker.Registry {
 		// A layer downloads as any file does: redirected to a signed URL
 		// when the repository says so (decision 0029), and counted.
 		ServeBlob: func(w http.ResponseWriter, r *http.Request, c repo.Config, it types.Item) {
-			p, _ := auth.FromContext(r.Context())
+			p, _ := kernel.FromContext(r.Context())
 			artSvc.serveFile(w, r, cfg.Store, found{repo: c, item: it}, p)
 		},
 		// A manifest at or above the minimum size redirects too, as on 7.x

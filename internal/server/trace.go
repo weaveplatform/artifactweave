@@ -9,12 +9,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -127,7 +128,7 @@ func (s artifactoryService) traceDownload(
 	st store.Store,
 	r *http.Request,
 	req itemRequest,
-	p auth.Principal,
+	p kernel.Principal,
 	acc access,
 	t *resolutionTrace,
 ) error {
@@ -160,7 +161,7 @@ func (s artifactoryService) traceDownload(
 			t.stepf("Resolving remote source with current read authorization")
 			result, readErr := s.cfg.RemoteSources.Read(ctx, source.Request{
 				Repo:     c,
-				Subject:  auth.SubjectOf(p),
+				Subject:  accessapi.SubjectOf(p),
 				Access:   acc.d,
 				Resource: remoteResource(r, req.path),
 				Matrix:   req.matrix(),
@@ -232,7 +233,7 @@ func (s artifactoryService) traceContained(
 	c repo.Config,
 	cached bool,
 	p string,
-	caller auth.Principal,
+	caller kernel.Principal,
 	acc access,
 	dl *download,
 ) error {

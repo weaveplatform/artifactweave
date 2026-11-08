@@ -14,9 +14,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -237,7 +237,7 @@ func (s artifactoryService) overwriteRight(
 	ctx context.Context,
 	st store.Store,
 	acc access,
-	p auth.Principal,
+	p kernel.Principal,
 	l landing,
 ) (bool, error) {
 	moves, err := s.items(st).SidecarsBeside(ctx, l.src, l.dest)

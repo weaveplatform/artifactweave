@@ -4,10 +4,10 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -19,7 +19,7 @@ func (s artifactoryService) protocolOptions() pkgroute.Options {
 		Store: s.cfg.Store,
 		Items: func() *item.Service { return s.items(s.cfg.Store) },
 		ServeItem: func(w http.ResponseWriter, r *http.Request, c repo.Config, it types.Item) {
-			p, _ := auth.FromContext(r.Context())
+			p, _ := kernel.FromContext(r.Context())
 			s.serveFile(w, r, s.cfg.Store, found{repo: c, item: it}, p)
 		},
 		DeployItem: func(w http.ResponseWriter, r *http.Request, c repo.Config, rest string) {

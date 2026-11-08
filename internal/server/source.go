@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/format/alpine"
 	"github.com/weaveplatform/artifactweave/internal/format/cran"
 	"github.com/weaveplatform/artifactweave/internal/format/debian"
@@ -26,8 +25,10 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -35,7 +36,7 @@ import (
 // getRemoteItem returns false for existing folder/archive browsing, which remains
 // cache-only. Native adapters and virtual member fetching require their own opt-in.
 func (s artifactoryService) getRemoteItem(w http.ResponseWriter, r *http.Request, c repo.Config,
-	req itemRequest, p auth.Principal, acc access,
+	req itemRequest, p kernel.Principal, acc access,
 ) bool {
 	ctx := r.Context()
 	if strings.HasSuffix(req.key, types.CacheSuffix) && maven.Serves(c.PackageType) &&
@@ -82,7 +83,7 @@ func (s artifactoryService) getRemoteItem(w http.ResponseWriter, r *http.Request
 	}
 	query := source.Request{
 		Repo:      c,
-		Subject:   auth.SubjectOf(p),
+		Subject:   accessapi.SubjectOf(p),
 		Access:    acc.d,
 		Resource:  resource,
 		Matrix:    req.matrix(),

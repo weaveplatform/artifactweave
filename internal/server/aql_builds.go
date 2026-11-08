@@ -8,11 +8,10 @@ import (
 	"slices"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -34,7 +33,7 @@ func (s artifactoryService) searchBuildsAQL(
 	w http.ResponseWriter,
 	r *http.Request,
 	st store.Store,
-	p auth.Principal,
+	p kernel.Principal,
 	q *aql.Query,
 ) {
 	ctx := r.Context()
@@ -113,7 +112,7 @@ func (s artifactoryService) searchBuildsAQL(
 func (s artifactoryService) nestBuilds(
 	ctx context.Context,
 	st store.Store,
-	p auth.Principal,
+	p kernel.Principal,
 	q *aql.Query,
 	now time.Time,
 	hits []aql.BuildHit,
@@ -144,6 +143,6 @@ func buildScoped(sc types.Scope) bool {
 // on the build-info repository, at the run's document path.
 func (a access) readsRun(b types.Build) bool {
 	repoKey, path := b.DocumentItem()
-	return a.d.Allows(types.ResourceBuild, authz.Repo{Key: repoKey, Class: string(repo.Local)},
+	return a.d.Allows(types.ResourceBuild, accessapi.Repo{Key: repoKey, Class: string(repo.Local)},
 		path, types.ActionRead)
 }

@@ -11,12 +11,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -44,7 +44,7 @@ type peerAQLRow struct {
 
 func (s artifactoryService) transitivePeer(
 	ctx context.Context,
-	p auth.Principal,
+	p kernel.Principal,
 	c repo.Config,
 	q *aql.Query,
 	limit int,
@@ -83,7 +83,7 @@ func (s artifactoryService) transitivePeer(
 		ctx,
 		source.Request{
 			Repo:     c,
-			Subject:  auth.SubjectOf(p),
+			Subject:  accessapi.SubjectOf(p),
 			Access:   d,
 			Project:  c.ProjectKey,
 			Resource: resource,

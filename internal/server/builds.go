@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/service/build"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
@@ -33,7 +33,7 @@ const buildsPath = "/artifactory/api/build"
 type buildAccess struct{ access }
 
 func (b buildAccess) Build(repoKey, path string, folder bool, want types.Actions) bool {
-	t := authz.Repo{Key: repoKey, Class: string(repo.Local)}
+	t := accessapi.Repo{Key: repoKey, Class: string(repo.Local)}
 	if folder {
 		return b.d.AllowsFolder(types.ResourceBuild, t, path, want)
 	}
@@ -47,10 +47,10 @@ func (b buildAccess) Item(c repo.Config, path string, want types.Actions) bool {
 // buildCaller returns the build service, the caller and its permissions.
 func (s artifactoryService) buildCaller(
 	ctx context.Context,
-) (*build.Service, auth.Principal, buildAccess, error) {
+) (*build.Service, kernel.Principal, buildAccess, error) {
 	st, err := s.content()
 	if err != nil {
-		return nil, auth.Principal{}, buildAccess{}, err
+		return nil, kernel.Principal{}, buildAccess{}, err
 	}
 	p, a, err := s.itemCaller(ctx, st)
 	return s.builds(st), p, buildAccess{a}, err
@@ -60,7 +60,7 @@ func (s artifactoryService) buildCaller(
 // 404 message for a build or run that does not exist.
 func (s artifactoryService) buildError(
 	ctx context.Context,
-	p auth.Principal,
+	p kernel.Principal,
 	project, missing string,
 	err error,
 ) error {
