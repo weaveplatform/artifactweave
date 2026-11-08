@@ -47,15 +47,19 @@ var formats = map[string]formatImpact{
 	"debian":        {"./internal/format/debian/...", "@debian", []string{"debian"}},
 	"gems":          {"./internal/format/gems/...", "@gems", []string{"ruby"}},
 	"gitlfs":        {"./internal/format/gitlfs/...", "@gitlfs", []string{"gitlfs"}},
-	"cocoapods":     {"./internal/format/cocoapods/...", "@cocoapods", []string{"cocoapods"}},
-	"vagrant":       {"./internal/format/vagrant/...", "@vagrant", []string{"vagrant"}},
+	"cocoapods": {
+		"./migration/artifacts/ecosystem/cocoapods/...",
+		"@cocoapods",
+		[]string{"cocoapods"},
+	},
+	"vagrant": {"./internal/format/vagrant/...", "@vagrant", []string{"vagrant"}},
 	"agentplugins": {
 		"./internal/format/agentplugins/...",
 		"@agentplugins,@agentplugins_clients",
 		[]string{"jf"},
 	},
 	"docker": {
-		"./internal/format/docker/...",
+		"./migration/artifacts/ecosystem/docker/...",
 		"@clients,@nimmodel",
 		[]string{"crane", "oras", "cosign", "helm", "jf"},
 	},
@@ -76,7 +80,7 @@ var formats = map[string]formatImpact{
 	"luarocks":    {"./internal/format/luarocks/...", "@luarocks", []string{"luarocks", "jf"}},
 	"composer":    {"./internal/format/composer/...", "@composer", []string{"composer"}},
 	"maven": {
-		"./internal/format/maven/...",
+		"./migration/artifacts/ecosystem/maven/...",
 		"@maven&&~@gradle,@package_wiring&&~@gradle",
 		[]string{"maven", "maven39", "sbt", "jf"},
 	},
@@ -87,7 +91,7 @@ var formats = map[string]formatImpact{
 		[]string{"node", "npm12", "jf"},
 	},
 	"nuget": {
-		"./internal/format/nuget/...",
+		"./migration/artifacts/ecosystem/nuget/...",
 		"@nuget&&~@gradle",
 		[]string{"dotnet", "dotnet11", "jf"},
 	},
@@ -206,7 +210,11 @@ func proposeAffected(changes []change) affectedPlan {
 	}
 	if owner == "docker" {
 		// Helm OCI and NIM model exercise the same registry protocol stack.
-		units = append(units, "./test/server/artifacts/helmoci", "./internal/server/nimmodel")
+		units = append(
+			units,
+			"./test/server/artifacts/helmoci",
+			"./migration/artifacts/ecosystem/nimmodel/http",
+		)
 	}
 	slices.Sort(units)
 	units = slices.Compact(units)
@@ -253,7 +261,10 @@ func ownerCoverPackages(owner string, conf formatImpact, inventory testOwnership
 	}
 	if len(coverPackages) == 0 {
 		// Test-only owners still need a stable instrumented package set.
-		coverPackages = append(coverPackages, modulePath+"/internal/server/docker/...")
+		coverPackages = append(
+			coverPackages,
+			modulePath+"/migration/artifacts/ecosystem/docker/http/...",
+		)
 	}
 	slices.Sort(coverPackages)
 	return slices.Compact(coverPackages)

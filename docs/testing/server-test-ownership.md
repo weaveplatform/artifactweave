@@ -60,15 +60,15 @@ When a test file leaves a shared directory such as `internal/server`:
 | --- | --- |
 | Agent Packages | `test/server/artifacts/agentpackages` |
 | Agent Plugins | `test/server/artifacts/agentplugins` |
-| Docker/OCI | `internal/server/docker`, `test/server/artifacts/docker` |
+| Docker/OCI | `migration/artifacts/ecosystem/docker/http`, `test/server/artifacts/docker` |
 | Go modules | `migration/artifacts/ecosystem/golang/http`, `test/server/artifacts/golang` |
 | Helm | `internal/server/helm`, `test/server/artifacts/helm` |
 | Helm OCI | `test/server/artifacts/helmoci` |
 | LuaRocks | `internal/server/luarocks` |
 | Maven | `test/server/artifacts/maven` |
-| NIM model | `internal/server/nimmodel` |
+| NIM model | `migration/artifacts/ecosystem/nimmodel/http` |
 | npm | `internal/server/npm`, `test/server/artifacts/npm` |
-| NuGet | `internal/server/nuget`, `test/server/artifacts/nuget` |
+| NuGet | `migration/artifacts/ecosystem/nuget/http`, `test/server/artifacts/nuget` |
 | PyPI | `internal/server/pypi`, `test/server/artifacts/pypi` |
 | Dart pub | `internal/server/pub` |
 | RubyGems | `internal/server/gems`, `test/server/artifacts/gems` |

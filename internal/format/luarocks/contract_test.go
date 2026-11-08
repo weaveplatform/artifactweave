@@ -37,9 +37,8 @@ func contractRock(t *testing.T, name, version string, n int) []byte {
 
 func TestUnitFormatContract(t *testing.T) {
 	formattest.Run(t, formattest.Format{
-		Type:          repo.LuaRocks,
-		RepoWork:      []string{luarocks.KindManifest},
-		NoRemoteCache: true,
+		Type:     repo.LuaRocks,
+		RepoWork: []string{luarocks.KindManifest},
 		Version: func(p, v string, n int) formattest.Version {
 			version := v + "-1"
 			stem := p + "-" + version

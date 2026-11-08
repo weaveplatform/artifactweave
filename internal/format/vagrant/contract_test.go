@@ -43,8 +43,10 @@ func TestUnitFormatContract(t *testing.T) {
 	formattest.Run(
 		t,
 		formattest.Format{
-			Type:          repo.Vagrant,
-			Handler:       contractHandler{},
+			Type:    repo.Vagrant,
+			Handler: contractHandler{},
+			// Vagrant repositories are local or federated only: a remote
+			// one is refused, and so is a write into a remote's cache.
 			NoRemoteCache: true,
 			Version: func(p, v string, n int) formattest.Version {
 				var b bytes.Buffer

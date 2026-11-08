@@ -142,7 +142,7 @@ func (s *Smart) currentEntry(
 	permit source.Permit,
 	key types.RemoteCacheKey,
 ) (types.RemoteCacheEntry, error) {
-	if err := s.policy.check(ctx, q, permit, key.SettingsRevision); err != nil {
+	if err := s.policy.Check(ctx, q, permit, key.SettingsRevision); err != nil {
 		return types.RemoteCacheEntry{}, err
 	}
 	// Begin takes the source lifetime lock before reading mutable state. The
@@ -185,7 +185,8 @@ func (s *Smart) restore(
 	if err != nil {
 		return ctx, q, permit, opts, source.ErrDenied
 	}
-	if p.Registry != nil && !smartRegistryGrant(p.Registry, c.Key, job.UpstreamPath) {
+	if p.Registry != nil &&
+		!smartRegistryGrant(s.registryPath, p.Registry, c.Key, job.UpstreamPath) {
 		return ctx, q, permit, opts, source.ErrDenied
 	}
 	p, d, err := s.authz.Authorize(ctx, p, p.Anonymous)
@@ -194,6 +195,7 @@ func (s *Smart) restore(
 	}
 	ctx = accessapi.WithCaller(ctx, p, d)
 	ctx = context.WithValue(ctx, smartActiveKey{}, true)
+	ctx = WithOutbound(ctx, Outbound{Header: smartHeaders})
 	ctx = context.WithValue(ctx, smartTraceKey{}, job.Trace)
 	ctx, err = smartEnter(ctx, s.node+"/"+string(permit.Identity.Repository))
 	q = source.Request{
@@ -209,13 +211,20 @@ func (s *Smart) restore(
 		},
 	}
 	if err == nil {
-		err = s.policy.check(ctx, q, permit, opts.Revision)
+		err = s.policy.Check(ctx, q, permit, opts.Revision)
 	}
 	return ctx, q, permit, opts, err
 }
 
-func smartRegistryGrant(access *types.RegistryAccess, key, path string) bool {
-	name, _, _, err := registryResource(path)
+func smartRegistryGrant(
+	registryPath func(string) (image, operation, reference string, err error),
+	access *types.RegistryAccess,
+	key, path string,
+) bool {
+	if registryPath == nil {
+		return false
+	}
+	name, _, _, err := registryPath(path)
 	if err != nil {
 		return false
 	}
@@ -262,7 +271,7 @@ func (s *Smart) run(ctx context.Context, workItem types.WorkItem) error {
 	if err == nil {
 		release, e := s.policy.capacity.acquire(ctx, q.Repo.Key)
 		if e != nil {
-			return policyError(e)
+			return PolicyError(e)
 		}
 		defer release()
 		if job.Statistics {
@@ -315,7 +324,7 @@ func (s *Smart) refresh(
 	job smartJob,
 ) error {
 	started := s.policy.now()
-	properties := smartProperties(q.Repo) && smartPropertyPath(q)
+	properties := smartProperties(q.Repo) && smartPropertyPath(s.registryPath, q)
 	var incoming types.Properties
 	var present bool
 	var err error

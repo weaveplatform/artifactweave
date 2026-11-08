@@ -23,25 +23,25 @@ import (
 type (
 	smartSessionKey struct{}
 	smartSession    struct {
-		peer              SmartPeer
-		opts              Options
-		isMetadataRequest bool
+		peer SmartPeer
+		opts Options
 	}
 )
 
 // Smart adds authenticated discovery and bounded durable side effects to
 // one shared policy. Registry and ordinary policies keep separate validators.
 type Smart struct {
-	policy    *Policy
-	pool      *Pool
-	authn     accessapi.Authenticator
-	authz     accessapi.Authorizer
-	queue     *work.Queue
-	kind      string
-	node      string
-	discovery flightGroup[SmartPeer]
-	cancel    context.CancelFunc
-	workers   sync.WaitGroup
+	policy       *Policy
+	pool         Upstream
+	authn        accessapi.Authenticator
+	authz        accessapi.Authorizer
+	registryPath func(string) (image, operation, reference string, err error)
+	queue        *work.Queue
+	kind         string
+	node         string
+	discovery    flightGroup[SmartPeer]
+	cancel       context.CancelFunc
+	workers      sync.WaitGroup
 }
 
 // NewSmart attaches smart remote discovery and side effects to p, with pool
@@ -53,10 +53,11 @@ type Smart struct {
 func NewSmart(
 	ctx context.Context,
 	p *Policy,
-	pool *Pool,
+	pool Upstream,
 	authn accessapi.Authenticator,
 	authz accessapi.Authorizer,
 	kind string,
+	registryPath func(string) (image, operation, reference string, err error),
 	log *slog.Logger,
 ) (*Smart, error) {
 	queue, err := work.New(p.Store, work.Options{Workers: 2, MaxAttempts: 3, Log: log, Now: p.now})
@@ -65,13 +66,14 @@ func NewSmart(
 	}
 	digest := sha256.Sum256(p.Key)
 	s := &Smart{
-		policy: p,
-		pool:   pool,
-		authn:  authn,
-		authz:  authz,
-		queue:  queue,
-		kind:   kind,
-		node:   hex.EncodeToString(digest[:12]),
+		policy:       p,
+		pool:         pool,
+		authn:        authn,
+		authz:        authz,
+		registryPath: registryPath,
+		queue:        queue,
+		kind:         kind,
+		node:         hex.EncodeToString(digest[:12]),
 	}
 	if err = queue.Handle(kind, s.run); err != nil {
 		return nil, fmt.Errorf("smart remote worker: %w", err)
@@ -119,10 +121,16 @@ func smartAbsence(c repo.Config) bool {
 		c.ContentSynchronisation.Source.OriginAbsenceDetection
 }
 
-func smartPropertyPath(q source.Request) bool {
+func smartPropertyPath(
+	registryPath func(string) (image, operation, reference string, err error),
+	q source.Request,
+) bool {
 	switch q.Repo.PackageType {
 	case repo.Docker, repo.OCI, repo.HelmOCI:
-		_, operation, ref, err := registryResource(q.Resource.UpstreamPath)
+		if registryPath == nil {
+			return false
+		}
+		_, operation, ref, err := registryPath(q.Resource.UpstreamPath)
 		return err == nil && operation == "manifests" && !strings.HasPrefix(ref, "sha256:")
 	default:
 		return q.Resource.Kind == source.ResourceKindArtifact
@@ -146,6 +154,7 @@ func (s *Smart) Read(
 		return s.policy.Read(ctx, q, permit)
 	}
 	ctx = context.WithValue(ctx, smartActiveKey{}, true)
+	ctx = WithOutbound(ctx, Outbound{Header: smartHeaders})
 	ctx, err := smartEnter(ctx, s.node+"/"+string(permit.Identity.Repository))
 	if err != nil {
 		return source.Result{}, smartError("read", err)
@@ -162,27 +171,29 @@ func (s *Smart) Read(
 	}
 	opts, err := s.policy.Options(ctx, q.Repo)
 	if err != nil {
-		return source.Result{}, policyError(err)
+		return source.Result{}, PolicyError(err)
 	}
 	if opts.Revision != peer.revision {
 		return source.Result{}, source.ErrSuperseded
 	}
-	ctx = context.WithValue(
-		ctx,
-		smartSessionKey{},
-		smartSession{peer: peer, opts: opts, isMetadataRequest: q.Resource.RequireSmart},
-	)
+	ctx = context.WithValue(ctx, smartSessionKey{}, smartSession{peer: peer, opts: opts})
+	if q.Resource.RequireSmart {
+		ctx = WithOutbound(ctx, Outbound{
+			Header: smartHeaders,
+			Allow:  func(target string) bool { return smartMetadataTarget(peer, target) },
+		})
+	}
 	out, err := s.policy.Read(ctx, q, permit)
 	if err != nil || out.Item == nil || q.Resource.Method != http.MethodGet ||
 		q.Resource.RequireSmart {
 		return out, smartError("status", err)
 	}
-	key := s.policy.cacheKey(q, opts.Revision)
+	key := s.policy.CacheKey(q, opts.Revision)
 	entry, err := s.policy.readEntry(ctx, key, permit)
 	if err != nil {
 		return source.Result{}, smartError("read", err)
 	}
-	if smartDue(q, entry.Smart, s.policy.now()) {
+	if smartDue(s.registryPath, q, entry.Smart, s.policy.now()) {
 		jobKey, e := s.enqueue(ctx, q, permit, key, false)
 		if e == nil {
 			e = s.queue.EnsureFresh(ctx, s.kind, jobKey)
@@ -213,9 +224,9 @@ func smartMetadataTarget(peer SmartPeer, target string) bool {
 	if err != nil {
 		return false
 	}
-	u, err := checkedURL(target)
-	b, baseErr := checkedURL(base)
-	if err != nil || baseErr != nil || origin(u) != origin(b) ||
+	u, err := CheckedURL(target)
+	b, baseErr := CheckedURL(base)
+	if err != nil || baseErr != nil || Origin(u) != Origin(b) ||
 		strings.ContainsAny(u.Path, "%?#") ||
 		strings.Contains(strings.ToLower(u.EscapedPath()), "%2f") {
 		return false
@@ -238,7 +249,7 @@ func (s *Smart) prepareUpload(
 	opts Options,
 	u *item.CacheUpload,
 ) error {
-	if !smartPropertyPath(q) ||
+	if !smartPropertyPath(s.registryPath, q) ||
 		!enabled(q.Repo.SynchronizeProperties) && !smartProperties(q.Repo) ||
 		u.NoStore ||
 		q.Repo.StoreArtifactsLocally != nil && !*q.Repo.StoreArtifactsLocally {

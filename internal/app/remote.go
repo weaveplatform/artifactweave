@@ -10,11 +10,15 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/remote"
-	"github.com/weaveplatform/artifactweave/internal/server/nimmodel"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
+	nimmodelhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nimmodel/http"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -122,37 +126,43 @@ func (rt *runtime) openRemoteSources(
 		}
 	}
 	policy := &remote.Policy{
-		Store:        rt.store,
-		Blobs:        rt.blobs,
-		Items:        items,
-		Pool:         &rt.remoteHTTP,
-		Options:      resolver.Options,
-		Key:          key,
-		CheckCurrent: checkCurrent(revalidate),
+		Store:           rt.store,
+		Blobs:           rt.blobs,
+		Items:           items,
+		Pool:            &rt.remoteHTTP,
+		Options:         resolver.Options,
+		Key:             key,
+		CheckCurrent:    checkCurrent(revalidate),
+		GitFetch:        cocoapods.FetchCocoaPodsGit,
+		ProjectResponse: nuget.ProjectEmptyFeed,
 	}
 	registryPolicy := &remote.Policy{
 		Store: rt.store, Blobs: rt.blobs, Items: items,
 		Options: resolver.Options, CheckCurrent: checkCurrent(registryRevalidate), Key: key,
+		GitFetch: cocoapods.FetchCocoaPodsGit, ProjectResponse: nuget.ProjectEmptyFeed,
 	}
-	content := &remote.RegistryContent{
-		Policy:  registryPolicy,
-		Pool:    &rt.registryHTTP,
-		Options: resolver.RegistryOptions,
+	content := &docker.RegistryContent{
+		Policy: registryPolicy,
+		Registries: &remote.RegistryClients{
+			Pool:    &rt.registryHTTP,
+			Options: resolver.RegistryOptions,
+		},
 	}
 	content.Install()
+	rt.registryPath = docker.ParseRegistryPath
 	rt.registrySources = &source.Service{
 		Resolve:    resolve,
 		Revalidate: registryRevalidate,
 		HTTP:       content,
 		Cache:      content,
 	}
-	mavenBackend := &remote.MavenBackend{Policy: policy}
+	mavenBackend := &maven.MavenBackend{Policy: policy}
 	policy.PrepareUpload = func(
 		ctx context.Context, q source.Request, permit source.Permit,
 		opts remote.Options, upload *item.CacheUpload,
 	) error {
 		if q.Repo.PackageType == repo.NIMModel {
-			nimmodel.PrepareUpload(q, upload)
+			nimmodelhttp.PrepareUpload(q, upload)
 			return nil
 		}
 		return mavenBackend.PrepareUpload(ctx, q, permit, opts, upload)
@@ -163,7 +173,7 @@ func (rt *runtime) openRemoteSources(
 		HTTP:       mavenBackend,
 		Cache:      mavenBackend,
 	}
-	rt.mavenEager, err = remote.NewMavenEager(
+	rt.mavenEager, err = maven.NewMavenEager(
 		ctx,
 		service,
 		policy,
@@ -182,6 +192,7 @@ func (rt *runtime) openRemoteSources(
 		accessAPI.Authenticator,
 		accessAPI.Authorizer,
 		"remote.smart",
+		rt.registryPath,
 		log,
 	)
 	if err != nil {
@@ -194,6 +205,7 @@ func (rt *runtime) openRemoteSources(
 		accessAPI.Authenticator,
 		accessAPI.Authorizer,
 		"remote.smart.registry",
+		rt.registryPath,
 		log,
 	)
 	if err != nil {

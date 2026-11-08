@@ -45,8 +45,9 @@ func TestUnitModuleContract(t *testing.T) {
 	formattest.Run(t, formattest.Format{
 		Type:  repo.Terraform,
 		Local: typed(repo.TerraformModule),
-		// A remote repository has no terraformType, so it indexes nothing
-		// until P9 serves Terraform remotes.
+		// A remote repository takes no terraformType (decision 0040): its
+		// registry metadata comes from the upstream, so the format indexes
+		// none of the files it caches.
 		NoRemoteCache: true,
 		Version: func(p, v string, n int) formattest.Version {
 			pkg := "example/" + p + "/aws"
@@ -84,8 +85,9 @@ func TestUnitModuleContract(t *testing.T) {
 // reindex from empty recomputes.
 func TestUnitProviderPackageContract(t *testing.T) {
 	formattest.Run(t, formattest.Format{
-		Type:          repo.Terraform,
-		Local:         typed(repo.TerraformProvider),
+		Type:  repo.Terraform,
+		Local: typed(repo.TerraformProvider),
+		// As for modules, a remote repository takes no terraformType.
 		NoRemoteCache: true,
 		Version:       providerRelease(t),
 	})

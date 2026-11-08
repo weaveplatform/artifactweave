@@ -394,7 +394,9 @@ A split package's files go to several targets, so `move` takes them file by file
    a generated file (change its generator and run `make generate`) and a file that no
    load compiles. An in-package test that would close an import cycle becomes an external
    test with `pkgmove fix -ticket ID -external FILE...`, which reports each unexported
-   name it uses for an `export_test.go`.
+   name it uses for an `export_test.go`. The files of one run form the external test
+   package together, so what one of them declares stays in sight of the others, and only
+   names from the package's other files are reported.
 6. Run `pkgmove check`, then the verification of the
    [per-ticket checklist](#per-ticket-checklist), and commit.
 

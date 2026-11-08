@@ -86,12 +86,13 @@ func newRouteFixture(t *testing.T) *routeFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
+	pool := new(remote.Pool)
 	policy := &remote.Policy{
-		Store: db, Blobs: blobs, Items: items, Pool: new(remote.Pool),
+		Store: db, Blobs: blobs, Items: items, Pool: pool,
 		Key: []byte(strings.Repeat("k", 32)), Now: clock.Now,
 		Options: resolver.Options,
 	}
-	t.Cleanup(policy.Pool.Close)
+	t.Cleanup(pool.Close)
 	svc := &source.Service{
 		HTTP: policy, Cache: policy,
 		Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {

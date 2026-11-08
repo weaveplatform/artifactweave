@@ -40,7 +40,7 @@ func transportHeaders(h http.Header) {
 }
 
 func (s *sourceSecurity) authorized(u *url.URL) bool {
-	return origin(u) == origin(s.base) ||
+	return Origin(u) == Origin(s.base) ||
 		(enabled(s.config.AllowAnyHostAuth) && u.Scheme == "https")
 }
 
@@ -51,13 +51,13 @@ func (s *sourceSecurity) prepare(req *http.Request) error {
 		req.Header.Del(h.Name)
 	}
 	transportHeaders(req.Header)
-	if _, err := checkedURL(req.URL.String()); err != nil {
+	if _, err := CheckedURL(req.URL.String()); err != nil {
 		return err
 	}
 	if s.base.Scheme == "https" && req.URL.Scheme != "https" {
 		return ErrSecurity
 	}
-	if req.Context().Value(noCrossOriginAuthKey{}) == true && origin(req.URL) != origin(s.base) {
+	if req.Context().Value(noCrossOriginAuthKey{}) == true && Origin(req.URL) != Origin(s.base) {
 		return nil
 	}
 	if s.authorized(req.URL) {
@@ -124,7 +124,7 @@ func (t *secureTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		physical.URL = &u
 		physical.Host = req.URL.Host
 		noAuth := req.Context().Value(noCrossOriginAuthKey{}) == true &&
-			origin(req.URL) != origin(t.source.base)
+			Origin(req.URL) != Origin(t.source.base)
 		tr := t.forAuthority(req.URL, proxy, noAuth)
 		res, roundErr := tr.RoundTrip(physical)
 		if roundErr == nil {
@@ -142,7 +142,7 @@ func (t *secureTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func (t *secureTransport) forAuthority(logical, proxy *url.URL, noAuth bool) *http.Transport {
-	key := origin(logical)
+	key := Origin(logical)
 	if noAuth {
 		key += "|no-auth"
 	}

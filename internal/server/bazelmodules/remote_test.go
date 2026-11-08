@@ -208,15 +208,16 @@ func remoteService(t *testing.T, items *item.Service) *source.Service {
 	if err != nil {
 		t.Fatal(err)
 	}
+	pool := new(remote.Pool)
 	policy := &remote.Policy{
 		Store:   items.Store,
 		Blobs:   items.Blobs,
 		Items:   items,
-		Pool:    new(remote.Pool),
+		Pool:    pool,
 		Options: resolver.Options,
 		Key:     key,
 	}
-	t.Cleanup(policy.Pool.Close)
+	t.Cleanup(pool.Close)
 	return &source.Service{
 		HTTP:  policy,
 		Cache: policy,

@@ -46,11 +46,14 @@ func (t *tree) externalFiles(args []string) ([]string, error) {
 // package's external test package, the way out of an import cycle that the
 // in-package form would close (rule 14 of #935): the clause becomes
 // <name>_test, and each exported package-level declaration it uses gets the
-// package's qualifier and import. What the conversion cannot carry is
-// reported: each unexported declaration, field or method it uses, which
-// needs an exported name in export_test.go; each method it declares; and
-// each of its package-level declarations that another in-package file uses,
-// which takes the fields and methods of a type along.
+// package's qualifier and import. The files converted in the same run land
+// in that external package together, so what they declare, with the fields
+// and methods of their types, stays in sight of one another and is neither
+// qualified nor reported. What the conversion cannot carry is reported: each
+// unexported declaration, field or method it uses from the package's other
+// files, which needs an exported name in export_test.go; each method it
+// declares; and each of its package-level declarations that a file staying
+// in the package uses, which takes the fields and methods of a type along.
 func (r *fixRun) external(rel string, loads [][]*packages.Package) {
 	pkg, f := r.inPackageVariant(rel, loads)
 	if f == nil {
@@ -67,11 +70,26 @@ func (r *fixRun) external(rel string, loads [][]*packages.Package) {
 	g.clause = pkg.Types.Name() + "_test"
 	self := pkg.Fset.File(f.Pos())
 	here := func(obj types.Object) bool { return pkg.Fset.File(obj.Pos()) == self }
+	converted := func(obj types.Object) bool {
+		if obj == nil || !obj.Pos().IsValid() {
+			return false
+		}
+		orel, ok := r.t.rel(pkg.Fset.File(obj.Pos()).Name())
+		return ok && r.plan.external[orel]
+	}
+	// A method a converted file declares on a package type cannot stay
+	// there, so its uses elsewhere are reported like any unexported name.
+	carried := func(obj types.Object) bool {
+		if fn, ok := obj.(*types.Func); ok && fn.Signature().Recv() != nil {
+			return converted(receiverType(fn.Signature().Recv().Type()))
+		}
+		return converted(obj)
+	}
 	reported := map[string]bool{}
 	ast.Inspect(f, func(node ast.Node) bool {
 		id, ok := node.(*ast.Ident)
 		obj := tf.info.Uses[id]
-		if !ok || obj == nil || obj.Pkg() != pkg.Types || here(obj) {
+		if !ok || obj == nil || obj.Pkg() != pkg.Types || here(obj) || carried(obj) {
 			return true
 		}
 		switch kind := objectKind(obj); {
@@ -103,7 +121,7 @@ func (r *fixRun) external(rel string, loads [][]*packages.Package) {
 	}
 	for _, other := range pkg.Syntax {
 		orel, ok := r.t.rel(pkg.Fset.File(other.Pos()).Name())
-		if other == f || !ok {
+		if other == f || !ok || r.plan.external[orel] {
 			continue
 		}
 		seen := map[string]bool{}
@@ -148,6 +166,18 @@ func (r *fixRun) inPackageVariant(
 		}
 	}
 	return nil, nil
+}
+
+// receiverType returns the declaration of a method receiver's named type,
+// through a pointer; nil for any other type.
+func receiverType(t types.Type) types.Object {
+	if p, ok := t.(*types.Pointer); ok {
+		t = p.Elem()
+	}
+	if n, ok := t.(*types.Named); ok {
+		return n.Obj()
+	}
+	return nil
 }
 
 // objectKind names the kind of a declaration for a message.

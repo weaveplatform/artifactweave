@@ -1,16 +1,12 @@
 package remote
 
 import (
-	"context"
 	"errors"
-	"io"
 	"net/url"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/source"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 )
 
 func TestAccSmartPeerEndpointAuthority(t *testing.T) {
@@ -45,48 +41,6 @@ func TestAccSmartPeerEndpointAuthority(t *testing.T) {
 		if _, err := peer.StorageURL("", nil); !errors.Is(err, source.ErrInvalidRequest) {
 			t.Fatal(peer, err)
 		}
-	}
-}
-
-func TestAccMavenPreparedMetadataKeepsAdmission(t *testing.T) {
-	w, m := mavenFixture(t)
-	q := w.request("listing", source.ResourceKindMetadata)
-	q.Resource.Variant = "listing-v1"
-	q.Resource.ExpectedContentType = "application/json"
-	called := 0
-	q.Resource.ValidateMetadata = func(_ context.Context, body io.ReadSeeker, _ int64, _ source.MetadataResponse) error {
-		called++
-		b, err := io.ReadAll(body)
-		if err != nil || string(b) != "{}" {
-			return source.ErrInvalidResult
-		}
-		return nil
-	}
-	w.up.Set(
-		"/listing",
-		fakeupstream.Resource{
-			Body:   []byte("{}"),
-			Header: map[string][]string{"Content-Type": {"application/json"}},
-		},
-	)
-	result, err := m.Read(t.Context(), q, w.permit)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if w.bytes(result) != "{}" || called == 0 {
-		t.Fatal("custom admission was replaced", called)
-	}
-	// A nil pool would panic if the prepared response asked for checksum files.
-	w.p.Pool = nil
-	if err = m.PrepareUpload(t.Context(), q, w.permit, Options{}, &item.CacheUpload{}); err != nil {
-		t.Fatal(err)
-	}
-	ordinary := w.request("org/acme/app/maven-metadata.xml", source.ResourceKindMetadata)
-	prepared, err := m.prepare(t.Context(), ordinary)
-	if err != nil || prepared.Resource.Variant != "maven-source-v1" ||
-		prepared.Resource.Validate == nil ||
-		preparedMetadata(prepared.Resource) {
-		t.Fatal("ordinary Maven admission changed", prepared.Resource, err)
 	}
 }
 

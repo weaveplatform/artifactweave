@@ -638,12 +638,13 @@ These assignments describe planned work, not current runtime support.
 
 ## Verification
 
-- **Unit tests** in `internal/format/nuget` for nuspec parsing (namespaces, casing, missing
-  elements), normalisation tables from Microsoft's and JFrog's examples, the canonical name,
-  duplicate refusal by every route, overwrite at the version's own path, symbols linking, the
-  `nuget.*` properties, PDB v7/Portable PDB keys, malformed offsets and extraction budgets,
-  shared-owner deletion/overwrite/copy/restore/reindex, and the `maxUniqueSnapshots` rule; `formattest` on every store, with a
-  reindex that reproduces the index (#542).
+- **Unit tests** in `migration/artifacts/ecosystem/nuget` for nuspec parsing (namespaces,
+  casing, missing elements), normalisation tables from Microsoft's and JFrog's examples, the
+  canonical name, duplicate refusal by every route, overwrite at the version's own path,
+  symbols linking, the `nuget.*` properties, PDB v7/Portable PDB keys, malformed offsets and
+  extraction budgets, shared-owner deletion/overwrite/copy/restore/reindex, and the
+  `maxUniqueSnapshots` rule; `formattest` on every store, with a reindex that reproduces the
+  index (#542).
 - **Server tests** driving `NuGet.Protocol`'s request sequences: restore through the flat
   container and through the registration, pages at 129 versions, gzip, both hives (#543);
   search and autocomplete filters and paging (#544); `dotnet nuget push` with

@@ -83,14 +83,14 @@ func (p *Policy) fetch(
 	out := fillResult{key: key}
 	token, err := p.Store.RemoteCache().Begin(ctx, key)
 	if err != nil {
-		return out, policyError(err)
+		return out, PolicyError(err)
 	}
 	if token.Source != permit.Identity {
 		return out, source.ErrSuperseded
 	}
-	res, err := p.fetchResponse(ctx, q, permit, opts, transportRequest(q, e))
+	res, err := p.fetchResponse(ctx, q, permit, opts, TransportRequest(q, e))
 	if err != nil {
-		failure := policyError(err)
+		failure := PolicyError(err)
 		if stateErr := p.recordFailure(ctx, q, permit, opts.Revision, failure); stateErr != nil {
 			return out, stateErr
 		}
@@ -100,8 +100,10 @@ func (p *Policy) fetch(
 	if err = projectModuleLocation(q, res); err != nil {
 		return out, err
 	}
-	if err = projectNuGetEmptyFeed(q, res); err != nil {
-		return out, err
+	if p.ProjectResponse != nil {
+		if err = p.ProjectResponse(q, res); err != nil {
+			return out, err
+		}
 	}
 	normalizeMissing(q, res)
 	if res.StatusCode != http.StatusOK {
@@ -128,7 +130,7 @@ func (p *Policy) fetch(
 				p.upload(q, permit, opts.Revision, token, res, true),
 			)
 			if cacheErr != nil {
-				failure := policyError(cacheErr)
+				failure := PolicyError(cacheErr)
 				if stateErr := p.recordFailure(
 					ctx,
 					q,
@@ -148,12 +150,12 @@ func (p *Policy) fetch(
 			return out, nil
 		}
 	default:
-		return p.fallback(q, key, e, responseError(res, p.now()))
+		return p.fallback(q, key, e, ResponseError(res, p.now()))
 	}
 	u := p.upload(q, permit, opts.Revision, token, res, false)
 	committed, err := p.cache(ctx, q, permit, opts, u)
 	if err != nil {
-		failure := policyError(err)
+		failure := PolicyError(err)
 		if stateErr := p.recordFailure(ctx, q, permit, opts.Revision, failure); stateErr != nil {
 			return out, stateErr
 		}
@@ -244,15 +246,15 @@ func (p *Policy) directOnce(
 	if !noStore {
 		token, err = p.Store.RemoteCache().Begin(ctx, key)
 		if err != nil {
-			return source.Result{}, policyError(err)
+			return source.Result{}, PolicyError(err)
 		}
 		if token.Source != permit.Identity {
 			return source.Result{}, source.ErrSuperseded
 		}
 	}
-	res, err := p.fetchResponse(ctx, q, permit, opts, transportRequest(q, old))
+	res, err := p.fetchResponse(ctx, q, permit, opts, TransportRequest(q, old))
 	if err != nil {
-		failure := policyError(err)
+		failure := PolicyError(err)
 		if stateErr := p.recordFailure(ctx, q, permit, opts.Revision, failure); stateErr != nil {
 			return source.Result{}, stateErr
 		}
@@ -262,8 +264,10 @@ func (p *Policy) directOnce(
 	if err = projectModuleLocation(q, res); err != nil {
 		return source.Result{}, err
 	}
-	if err = projectNuGetEmptyFeed(q, res); err != nil {
-		return source.Result{}, err
+	if p.ProjectResponse != nil {
+		if err = p.ProjectResponse(q, res); err != nil {
+			return source.Result{}, err
+		}
 	}
 	normalizeMissing(q, res)
 	if res.StatusCode != http.StatusOK || q.Resource.Method == http.MethodHead {
@@ -290,7 +294,7 @@ func (p *Policy) directOnce(
 		return p.resultFor(ctx, q, updated)
 	case http.StatusOK:
 	default:
-		return source.Result{}, responseError(res, p.now())
+		return source.Result{}, ResponseError(res, p.now())
 	}
 	if q.Resource.Method == http.MethodHead {
 		claimed, parseErr := item.ParseChecksums(types.Checksums{
@@ -323,7 +327,7 @@ func (p *Policy) directOnce(
 	u := p.upload(q, permit, opts.Revision, token, res, true)
 	transient, err := p.cache(ctx, q, permit, opts, u)
 	if err != nil {
-		failure := policyError(err)
+		failure := PolicyError(err)
 		if stateErr := p.recordFailure(ctx, q, permit, opts.Revision, failure); stateErr != nil {
 			return source.Result{}, stateErr
 		}
@@ -371,14 +375,14 @@ func (p *Policy) negative(
 		return nil
 	}
 	err := p.Store.Tx(ctx, func(tx context.Context) error {
-		if currentErr := p.check(tx, q, permit, revision); currentErr != nil {
+		if currentErr := p.Check(tx, q, permit, revision); currentErr != nil {
 			return currentErr
 		}
 		return p.Store.RemoteCache().
 			Negative(tx, token, p.now().Add(time.Duration(seconds)*time.Second))
 	})
 	if err != nil {
-		return policyError(err)
+		return PolicyError(err)
 	}
 	return nil
 }
@@ -388,7 +392,7 @@ func (p *Policy) probeKey(
 	permit source.Permit,
 	state types.RemoteSourceState,
 ) string {
-	return p.flightKey(
+	return p.FlightKey(
 		types.RemoteCacheKey{
 			RepoKey:          key.RepoKey,
 			SettingsRevision: key.SettingsRevision,
@@ -447,7 +451,7 @@ func (p *Policy) upload(
 		By:           q.Subject.Name,
 		NoStore:      noStore,
 		MaxBytes:     limit,
-		CheckCurrent: func(ctx context.Context, _ store.Store) error { return p.check(ctx, q, permit, revision) },
+		CheckCurrent: func(ctx context.Context, _ store.Store) error { return p.Check(ctx, q, permit, revision) },
 	}
 }
 
@@ -458,7 +462,18 @@ func (p *Policy) metadataLimit(kind types.RemoteKind) int64 {
 	return 0
 }
 
-func (p *Policy) check(
+// Check is the authority fence of a read under revision, the credential
+// revision the read's options carried. Inside a Maven companion job
+// (EagerKey) it answers source.ErrSuperseded when revision is not the one
+// the job was queued under. CheckCurrent then decides when it is set (the
+// application's repeats the read's authorisation and compares the
+// repository's current credential revision); otherwise Check answers
+// source.ErrSuperseded unless the repository's source identity is still
+// permit's, or the error of reading it. It reads the store, never the
+// network, so it can run inside a publication transaction; format rules
+// call it after their own upstream exchanges, before anything they fetched
+// is used.
+func (p *Policy) Check(
 	ctx context.Context,
 	q source.Request,
 	permit source.Permit,
@@ -506,7 +521,13 @@ func normalizeMissing(q source.Request, res *http.Response) {
 	}
 }
 
-func responseError(res *http.Response, now time.Time) error {
+// ResponseError is the error of an upstream answer that is neither content
+// nor a protocol-declared absence: a *source.HTTPError carrying 401, 403,
+// 429 (with the Retry-After it gives, read against now) or a 5xx status as
+// an HTTP failure, and any other status as a 502 protocol failure. Format
+// rules that make their own upstream exchanges return it unwrapped, so the
+// source service maps the failure as it does for the policy's own reads.
+func ResponseError(res *http.Response, now time.Time) error {
 	status := res.StatusCode
 	if status == 401 || status == 403 || status == 429 || status >= 500 && status <= 599 {
 		failure := &source.HTTPError{Status: status, Kind: source.FailureKindHTTP}
@@ -565,7 +586,7 @@ func (p *Policy) revalidate(
 	if q.Resource.ValidateMetadata != nil {
 		metadata := metadataResponse(res, e.Kind)
 		if err := p.validateCachedMetadata(ctx, q.Resource, e, metadata); err != nil {
-			return types.RemoteCacheEntry{}, policyError(err)
+			return types.RemoteCacheEntry{}, PolicyError(err)
 		}
 		e.MetadataBaseURL = metadata.BaseURL
 	}
@@ -581,7 +602,7 @@ func (p *Policy) revalidate(
 	e.NegativeUntil = time.Time{}
 	var updated types.RemoteCacheEntry
 	err := p.Store.Tx(ctx, func(tx context.Context) error {
-		if currentErr := p.check(tx, q, permit, revision); currentErr != nil {
+		if currentErr := p.Check(tx, q, permit, revision); currentErr != nil {
 			return currentErr
 		}
 		var putErr error
@@ -592,7 +613,7 @@ func (p *Policy) revalidate(
 		return nil
 	})
 	if err != nil {
-		return types.RemoteCacheEntry{}, policyError(err)
+		return types.RemoteCacheEntry{}, PolicyError(err)
 	}
 	return updated, nil
 }

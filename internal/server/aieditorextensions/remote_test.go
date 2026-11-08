@@ -100,15 +100,16 @@ func newFixture(t *testing.T) *fixture {
 	if err != nil {
 		t.Fatal(err)
 	}
+	pool := new(remote.Pool)
 	policy := &remote.Policy{
 		Store:   db,
 		Blobs:   blobs,
 		Items:   items,
-		Pool:    new(remote.Pool),
+		Pool:    pool,
 		Key:     []byte(strings.Repeat("k", 32)),
 		Options: resolver.Options,
 	}
-	t.Cleanup(policy.Pool.Close)
+	t.Cleanup(pool.Close)
 	svc := &source.Service{
 		HTTP:  policy,
 		Cache: policy,
