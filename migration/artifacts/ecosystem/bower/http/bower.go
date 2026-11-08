@@ -1,5 +1,5 @@
-// Package bower serves the Bower registry and bower-art-resolver 2.0 protocol.
-package bower
+// Package bowerhttp serves the Bower registry and bower-art-resolver 2.0 protocol.
+package bowerhttp
 
 import (
 	"context"
@@ -13,10 +13,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	bowerfmt "github.com/weaveplatform/artifactweave/internal/format/bower"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	bowerfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bower"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"

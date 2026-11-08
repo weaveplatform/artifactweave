@@ -361,7 +361,7 @@ func apiReviewPolicy(e *apiReviewOperation) {
 		e.Pagination = "singular registration mutation; no collection query"
 		e.Evidence = append(
 			e.Evidence,
-			"internal/server/bower/register.go",
+			"migration/artifacts/ecosystem/bower/http/register.go",
 			"pkg/store/storetest/bower.go",
 		)
 	}

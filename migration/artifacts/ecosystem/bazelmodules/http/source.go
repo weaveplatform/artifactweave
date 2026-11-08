@@ -1,4 +1,4 @@
-package bazelmodules
+package bazelmoduleshttp
 
 import (
 	"context"

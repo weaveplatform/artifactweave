@@ -1,4 +1,4 @@
-package bower
+package bowerhttp
 
 import (
 	"archive/tar"
@@ -10,7 +10,7 @@ import (
 	"slices"
 	"strings"
 
-	bowerfmt "github.com/weaveplatform/artifactweave/internal/format/bower"
+	bowerfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bower"
 )
 
 func validGitTarget(tag string) bool {

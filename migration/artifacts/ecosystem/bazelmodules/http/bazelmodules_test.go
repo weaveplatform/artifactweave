@@ -1,4 +1,4 @@
-package bazelmodules_test
+package bazelmoduleshttp_test
 
 import (
 	"archive/tar"
@@ -26,8 +26,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	fmtbazel "github.com/weaveplatform/artifactweave/internal/format/bazelmodules"
-	"github.com/weaveplatform/artifactweave/internal/server/bazelmodules"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
@@ -36,6 +34,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	fmtbazel "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bazelmodules"
+	bazelmoduleshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bazelmodules/http"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
@@ -101,7 +101,7 @@ func newFixtureWith(t *testing.T, makeRemote func(*item.Service) *source.Service
 				_, _ = io.Copy(w, rc)
 			}
 		},
-	}, bazelmodules.Protocol(remote))
+	}, bazelmoduleshttp.Protocol(remote))
 	return &fixture{t: t, db: db, items: items, router: r, local: local}
 }
 

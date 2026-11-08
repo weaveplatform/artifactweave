@@ -738,7 +738,7 @@ jobs:
         if: needs.impact.outputs.profile == 'full' || contains(format(',{0},', needs.impact.outputs.clients), ',bazel,')
         env:
           ARTIFACTWEAVE_BAZEL_CLIENT: '1'
-        run: go test ./internal/server/bazelmodules -run '^TestAccBazelClient$' -count=1 -timeout=7m -v
+        run: go test ./migration/artifacts/ecosystem/bazelmodules/http -run '^TestAccBazelClient$' -count=1 -timeout=7m -v
 
       - name: Record native client image identities
         if: always()

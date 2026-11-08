@@ -65,7 +65,7 @@
       "owner_issue": 768,
       "evidence": "test/acceptance/features/bower.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/bower-repositories",
-      "route_file": "internal/server/bower/bower.go",
+      "route_file": "migration/artifacts/ecosystem/bower/http/bower.go",
       "p9c": true
     },
     {
@@ -559,9 +559,9 @@
       "lifecycle": "reindex, delete, restore",
       "status": "native",
       "owner_issue": 772,
-      "evidence": "internal/server/bazelmodules/bazelmodules_test.go",
+      "evidence": "migration/artifacts/ecosystem/bazelmodules/http/bazelmodules_test.go",
       "source": "https://docs.jfrog.com/artifactory/docs/bazel-modules-repositories",
-      "route_file": "internal/server/bazelmodules/bazelmodules.go",
+      "route_file": "migration/artifacts/ecosystem/bazelmodules/http/bazelmodules.go",
       "p9c": true
     },
     {

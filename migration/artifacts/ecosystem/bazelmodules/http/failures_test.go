@@ -1,4 +1,4 @@
-package bazelmodules_test
+package bazelmoduleshttp_test
 
 import (
 	"crypto/sha256"

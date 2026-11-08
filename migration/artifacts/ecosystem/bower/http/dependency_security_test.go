@@ -1,4 +1,4 @@
-package bower
+package bowerhttp
 
 import (
 	"archive/tar"

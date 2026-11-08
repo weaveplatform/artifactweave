@@ -1,5 +1,5 @@
-// Package bazelmodules serves the Bazel index registry protocol.
-package bazelmodules
+// Package bazelmoduleshttp serves the Bazel index registry protocol.
+package bazelmoduleshttp
 
 import (
 	"bytes"
@@ -19,10 +19,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	fmtbazel "github.com/weaveplatform/artifactweave/internal/format/bazelmodules"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	fmtbazel "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bazelmodules"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
