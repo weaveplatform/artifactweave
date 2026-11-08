@@ -1,4 +1,4 @@
-package remote
+package remote_test
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -159,11 +160,11 @@ func TestUnitResponseBaseSanitizationAndLegacyCompatibility(t *testing.T) {
 		t.Fatal(err)
 	}
 	res := &http.Response{Request: &http.Request{URL: u}}
-	if got := responseBase(res); got != "https://example.com/dir/index.json" {
+	if got := remote.ResponseBase(res); got != "https://example.com/dir/index.json" {
 		t.Fatal(got)
 	}
-	if metadataResponse(res, types.RemoteUnique).BaseURL != "" ||
-		responseBase(&http.Response{}) != "" {
+	if remote.MetadataResponse(res, types.RemoteUnique).BaseURL != "" ||
+		remote.ResponseBase(&http.Response{}) != "" {
 		t.Fatal("artifact or absent URL gained context")
 	}
 	w := policyFixture(t)

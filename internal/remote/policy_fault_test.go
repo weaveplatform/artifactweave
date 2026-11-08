@@ -1,4 +1,4 @@
-package remote
+package remote_test
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -82,9 +83,9 @@ func TestAccPolicyRawMetadataOfflineUsesNoResolverAndTracksUsage(t *testing.T) {
 	if err != nil || !e.LastUsed.Equal(w.clock.Now()) {
 		t.Fatal(e, err)
 	}
-	w.p.Options = func(context.Context, repo.Config) (Options, error) {
+	w.p.Options = func(context.Context, repo.Config) (remote.Options, error) {
 		t.Fatal("offline resolved transport")
-		return Options{}, nil
+		return remote.Options{}, nil
 	}
 	q.Repo.Offline = ptr(true)
 	q.Repo.HardFail = ptr(true)
@@ -205,7 +206,7 @@ func TestAccPolicyTruncationCircuitAndRecoveryAfterRestart(t *testing.T) {
 		t.Fatal(w.up.Requests())
 	}
 	// A new policy instance shares only durable state, never its old flights.
-	w.p = &Policy{
+	w.p = &remote.Policy{
 		Store:   w.db,
 		Blobs:   w.blobs,
 		Items:   w.p.Items,
@@ -237,13 +238,8 @@ func TestAccPolicyTruncationCircuitAndRecoveryAfterRestart(t *testing.T) {
 	secondQ.Resource.Path = "second.txt"
 	second := make(chan error, 1)
 	go func() { _, err := w.read(secondQ); second <- err }()
-	probeKey := w.p.probeKey(w.p.CacheKey(q, "credential-1"), w.permit, state)
-	waitFor(t, func() bool {
-		w.p.probes.mu.Lock()
-		defer w.p.probes.mu.Unlock()
-		f := w.p.probes.active[probeKey]
-		return f != nil && f.waiters == 2
-	})
+	probeKey := w.p.ProbeKey(w.p.CacheKey(q, "credential-1"), w.permit, state)
+	waitFor(t, func() bool { return w.p.ProbeWaiters(probeKey) == 2 })
 	if w.up.Count("GET", "/second.txt") != 0 {
 		t.Fatal("second path bypassed probe")
 	}
@@ -363,13 +359,8 @@ func TestAccPolicyRecoveryHEADWaiterHonorsRenewedCooldown(t *testing.T) {
 		}
 		second <- e
 	}()
-	key := w.p.probeKey(w.p.CacheKey(q, "credential-1"), w.permit, state)
-	waitFor(t, func() bool {
-		w.p.probes.mu.Lock()
-		defer w.p.probes.mu.Unlock()
-		f := w.p.probes.active[key]
-		return f != nil && f.waiters == 2
-	})
+	key := w.p.ProbeKey(w.p.CacheKey(q, "credential-1"), w.permit, state)
+	waitFor(t, func() bool { return w.p.ProbeWaiters(key) == 2 })
 	gate.Release()
 	if err = <-first; err != nil {
 		t.Fatal(err)
@@ -401,7 +392,9 @@ func TestAccPolicyDisableCircuitAndCredentialRotationRecoverImmediately(t *testi
 			if mode == "disabled" {
 				q.Repo.AssumedOfflinePeriodSecs = ptr(0)
 			} else {
-				w.p.Options = func(context.Context, repo.Config) (Options, error) { return Options{Revision: "credential-2"}, nil }
+				w.p.Options = func(context.Context, repo.Config) (remote.Options, error) {
+					return remote.Options{Revision: "credential-2"}, nil
+				}
 			}
 			w.up.Set("/file.txt", fakeupstream.Resource{Body: []byte("healthy")})
 			w.mustRead(q, "healthy")
@@ -452,7 +445,9 @@ func TestAccPolicySecurityTimeoutAndZeroNegativeTTL(t *testing.T) {
 		w.up.Set("/meta.txt", fakeupstream.Resource{Body: []byte("good")})
 		w.mustRead(q, "good")
 		w.clock.Advance(time.Hour)
-		w.p.Options = func(context.Context, repo.Config) (Options, error) { return Options{}, ErrSecurity }
+		w.p.Options = func(context.Context, repo.Config) (remote.Options, error) {
+			return remote.Options{}, remote.ErrSecurity
+		}
 		_, err := w.read(q)
 		var f *source.HTTPError
 		if !errors.As(err, &f) || f.Kind != source.FailureKindSecurity {
@@ -519,13 +514,8 @@ func TestAccPolicySharedFallbackHonorsEachCallersHardFail(t *testing.T) {
 	strict.Repo.HardFail = ptr(true)
 	second := make(chan error, 1)
 	go func() { _, e := w.read(strict); second <- e }()
-	key := w.p.flightKey(w.p.CacheKey(q, "credential-1"), w.permit.Identity)
-	waitFor(t, func() bool {
-		w.p.flights.mu.Lock()
-		defer w.p.flights.mu.Unlock()
-		f := w.p.flights.active[key]
-		return f != nil && f.waiters == 2
-	})
+	key := w.p.FlightKey(w.p.CacheKey(q, "credential-1"), w.permit.Identity)
+	waitFor(t, func() bool { return w.p.FlightWaiters(key) == 2 })
 	gate.Release()
 	if err := <-first; err != nil {
 		t.Fatal(err)
@@ -598,7 +588,7 @@ func TestAccPolicy304ChecksValidatorsAndUpdatesCacheRules(t *testing.T) {
 				t.Fatal(err)
 			}
 			e, err := w.db.RemoteCache().Read(t.Context(), w.p.CacheKey(q, "credential-1"))
-			if err != nil || w.p.fresh(q, e) {
+			if err != nil || w.p.Fresh(q, e) {
 				t.Fatal("304 lost restrictive cache rules", e, err)
 			}
 		})

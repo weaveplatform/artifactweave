@@ -1,4 +1,4 @@
-package remote
+package remote_test
 
 import (
 	"context"
@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -31,7 +32,7 @@ type policyWorld struct {
 	blobs  blob.Store
 	clock  *fakeupstream.Clock
 	up     *fakeupstream.Server
-	p      *Policy
+	p      *remote.Policy
 	c      repo.Config
 	permit source.Permit
 }
@@ -55,16 +56,18 @@ func policyFixture(t *testing.T) *policyWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := &Policy{
+	p := &remote.Policy{
 		Store: db,
 		Blobs: blobs,
 		Items: &item.Service{Store: db, Blobs: blobs, Now: clock.Now},
-		Pool:  new(Pool),
+		Pool:  new(remote.Pool),
 		Now:   clock.Now,
 		Key: []byte(
 			"test-only-query-identity",
 		),
-		Options: func(context.Context, repo.Config) (Options, error) { return Options{Revision: "credential-1"}, nil },
+		Options: func(context.Context, repo.Config) (remote.Options, error) {
+			return remote.Options{Revision: "credential-1"}, nil
+		},
 	}
 	t.Cleanup(p.Pool.Close)
 	return &policyWorld{
@@ -292,12 +295,8 @@ func TestAccPolicyConcurrentMissCancellationAndIsolation(t *testing.T) {
 	<-barrier.Reached()
 	second := make(chan error, 1)
 	go func() { _, err := w.read(q); second <- err }()
-	key := w.p.flightKey(w.p.CacheKey(q, "credential-1"), w.permit.Identity)
-	waitFor(t, func() bool {
-		w.p.flights.mu.Lock()
-		defer w.p.flights.mu.Unlock()
-		return w.p.flights.active[key] != nil && w.p.flights.active[key].waiters == 2
-	})
+	key := w.p.FlightKey(w.p.CacheKey(q, "credential-1"), w.permit.Identity)
+	waitFor(t, func() bool { return w.p.FlightWaiters(key) == 2 })
 	cancel()
 	if err := <-first; !errors.Is(err, context.Canceled) {
 		t.Fatal(err)
@@ -309,7 +308,9 @@ func TestAccPolicyConcurrentMissCancellationAndIsolation(t *testing.T) {
 	if w.up.Count("HEAD", "") != 1 || w.up.Count("GET", "") != 1 {
 		t.Fatal(w.up.Requests())
 	} // R14
-	w.p.Options = func(context.Context, repo.Config) (Options, error) { return Options{Revision: "credential-2"}, nil }
+	w.p.Options = func(context.Context, repo.Config) (remote.Options, error) {
+		return remote.Options{Revision: "credential-2"}, nil
+	}
 	w.up.Set("/file.txt", fakeupstream.Resource{Body: []byte("new credential content")})
 	w.mustRead(q, "new credential content")
 	if w.up.Count("GET", "") != 2 {
@@ -377,7 +378,7 @@ func TestAccPolicyAdapterTargetsAndPreparation(t *testing.T) {
 	q := w.request("canonical/file.txt", source.ResourceKindArtifact)
 	q.Resource.UpstreamPath = "actual/file.txt"
 	prepared := 0
-	w.p.PrepareUpload = func(ctx context.Context, got source.Request, _ source.Permit, _ Options, u *item.CacheUpload) error {
+	w.p.PrepareUpload = func(ctx context.Context, got source.Request, _ source.Permit, _ remote.Options, u *item.CacheUpload) error {
 		prepared++
 		outside := false
 		w.db.AfterCommit(ctx, func() { outside = true })
@@ -427,7 +428,7 @@ func TestAccPolicyAdapterTargetsAndPreparation(t *testing.T) {
 	if w.p.CacheKey(q, "credential-1") == oldKey {
 		t.Fatal("URL absent from identity")
 	}
-	r := TransportRequest(q, types.RemoteCacheEntry{})
+	r := remote.TransportRequest(q, types.RemoteCacheEntry{})
 	if r.ExternalURL != q.Resource.ExternalURL || r.Path != "" || r.Query != "" {
 		t.Fatal(r)
 	}
@@ -437,7 +438,7 @@ func TestAccPolicyAdapterPreparationFailureAndFence(t *testing.T) {
 	w := policyFixture(t)
 	w.up.Set("/file.txt", fakeupstream.Resource{Body: []byte("body")})
 	q := w.request("file.txt", source.ResourceKindArtifact)
-	w.p.PrepareUpload = func(context.Context, source.Request, source.Permit, Options, *item.CacheUpload) error {
+	w.p.PrepareUpload = func(context.Context, source.Request, source.Permit, remote.Options, *item.CacheUpload) error {
 		return item.ErrBadChecksum
 	}
 	if _, err := w.read(q); err == nil {
@@ -450,7 +451,7 @@ func TestAccPolicyAdapterPreparationFailureAndFence(t *testing.T) {
 	) {
 		t.Fatal("failure published", err)
 	}
-	w.p.PrepareUpload = func(context.Context, source.Request, source.Permit, Options, *item.CacheUpload) error {
+	w.p.PrepareUpload = func(context.Context, source.Request, source.Permit, remote.Options, *item.CacheUpload) error {
 		w.p.CheckCurrent = func(context.Context, store.Store, source.Request, source.Permit, string) error {
 			return source.ErrDenied
 		}

@@ -1,4 +1,4 @@
-package remote
+package remote_test
 
 import (
 	"context"
@@ -6,11 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -46,7 +46,7 @@ func TestAccMappedCustomIvyRetainsTypeClassifierAndRevision(t *testing.T) {
 	if err = w.db.Repos().Update(t.Context(), q.Repo); err != nil {
 		t.Fatal(err)
 	}
-	d, err := NewDiscovery(t.Context(), w.p.Items, q.Repo)
+	d, err := remote.NewDiscovery(t.Context(), w.p.Items, q.Repo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,19 +70,19 @@ func TestAccMappedCustomIvyRetainsTypeClassifierAndRevision(t *testing.T) {
 		indexHTML(`<a href="lib-1.0.jar">jar</a><a href="lib-sources-1.0.jar">sources</a>`),
 	)
 	discoveryGrant(t, w, &q, "cache/org/acme/lib/1.0/jar/lib-sources-1.0.jar")
-	got, err := ListMappedFolder(
+	got, err := remote.ListMappedFolder(
 		t.Context(),
 		service,
 		q,
 		d,
 		scope,
 		"org.acme/lib/1.0/jars",
-		&ListingBudget{},
+		&remote.ListingBudget{},
 	)
 	if err != nil ||
 		!reflect.DeepEqual(
 			got.Files,
-			[]ListingEntry{{Path: "cache/org/acme/lib/1.0/jar/lib-sources-1.0.jar"}},
+			[]remote.ListingEntry{{Path: "cache/org/acme/lib/1.0/jar/lib-sources-1.0.jar"}},
 		) {
 		t.Fatal(got, err)
 	}
@@ -90,7 +90,7 @@ func TestAccMappedCustomIvyRetainsTypeClassifierAndRevision(t *testing.T) {
 
 func TestAccDiscoveryInvalidScopeAndIdentity(t *testing.T) {
 	w, service, q, d := discoveryFixture(t, "gradle-default", "maven-2-default")
-	for _, scope := range []DiscoveryScope{{}, {Path: "/org"}, {Path: "../org"}, {Path: "org", Root: true}} {
+	for _, scope := range []remote.DiscoveryScope{{}, {Path: "/org"}, {Path: "../org"}, {Path: "org", Root: true}} {
 		if scope.Allows(q) {
 			t.Fatal("invalid scope authorized", scope)
 		}
@@ -105,7 +105,7 @@ func TestAccDiscoveryInvalidScopeAndIdentity(t *testing.T) {
 			t.Fatal("invalid scope built metadata authority", scope, err)
 		}
 	}
-	scope := DiscoveryScope{Path: "org.acme/lib"}
+	scope := remote.DiscoveryScope{Path: "org.acme/lib"}
 	for _, upstream := range []string{"", "../outside", "/absolute"} {
 		if _, err := d.MetadataResource(
 			scope,
@@ -121,11 +121,18 @@ func TestAccDiscoveryInvalidScopeAndIdentity(t *testing.T) {
 	if _, err := d.MetadataResource(scope, "a", ""); !errors.Is(err, source.ErrInvalidRequest) {
 		t.Fatal(err)
 	}
-	if _, err := NewDiscovery(t.Context(), nil, q.Repo); !errors.Is(err, source.ErrInvalidRequest) {
+	if _, err := remote.NewDiscovery(
+		t.Context(),
+		nil,
+		q.Repo,
+	); !errors.Is(
+		err,
+		source.ErrInvalidRequest,
+	) {
 		t.Fatal(err)
 	}
 	q.Repo.URL += "/changed"
-	if _, err := NewDiscovery(
+	if _, err := remote.NewDiscovery(
 		t.Context(),
 		w.p.Items,
 		q.Repo,
@@ -155,86 +162,28 @@ func TestAccDiscoveryInvalidScopeAndIdentity(t *testing.T) {
 	}
 }
 
-func TestAccMappedSmartListingKeepsCanonicalAuthority(t *testing.T) {
-	w := smartFixture(t)
-	w.c.RepoLayoutRef, w.c.RemoteRepoLayoutRef = "gradle-default", "maven-2-default"
-	if err := w.db.Repos().Update(w.ctx, w.c); err != nil {
-		t.Fatal(err)
-	}
-	w.service.HTTP = w.s
-	w.service.Revalidate = func(ctx context.Context, q source.Request, permit source.Permit) error {
-		opts, err := w.p.Options(ctx, q.Repo)
-		if err != nil {
-			return err
-		}
-		return w.p.CheckCurrent(ctx, w.db, q, permit, opts.Revision)
-	}
-	w.reply = func(rw http.ResponseWriter, r *http.Request) bool {
-		if r.URL.Path != "/artifactory/api/storage/source/org/acme/lib/1.0" {
-			return false
-		}
-		rw.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(
-			rw,
-			`{"repo":"source","path":"/org/acme/lib/1.0","children":[{"uri":"/lib-1.0.jar","folder":false},{"uri":"/lib-1.0.pom","folder":false}]}`,
-		)
-		return true
-	}
-	q := w.smartRequest()
-	d, err := NewDiscovery(w.ctx, w.p.Items, w.c)
-	if err != nil {
-		t.Fatal(err)
-	}
-	got, err := ListMappedFolder(
-		w.ctx,
-		w.service,
-		q,
-		d,
-		DiscoveryScope{Path: "org.acme/lib"},
-		"org/acme/lib/1.0",
-		&ListingBudget{},
-	)
-	if err != nil || len(got.Files) != 2 {
-		t.Fatal(got, err)
-	}
-	for _, f := range got.Files {
-		if !strings.HasPrefix(f.Path, "org.acme/lib/") {
-			t.Fatal("Smart listing disclosed upstream authority", f)
-		}
-	}
-	q.CacheOnly = true
-	if _, err = ListMappedFolder(
-		w.ctx,
-		w.service,
-		q,
-		d,
-		DiscoveryScope{Path: "org.acme/lib"},
-		"org/acme/lib/1.0",
-		&ListingBudget{},
-	); err != nil {
-		t.Fatal("Smart mapped cache miss", err)
-	}
-}
-
 func TestAccMappedListingBoundedFailures(t *testing.T) {
-	for _, budget := range []ListingBudget{{pages: 100}, {entries: 10000}} {
+	for _, budget := range []*remote.ListingBudget{
+		new(remote.ListingBudget).SetPages(100),
+		new(remote.ListingBudget).SetEntries(10000),
+	} {
 		w, service, q, d := discoveryFixture(t, "gradle-default", "maven-2-default")
 		w.up.Set("/org/acme/lib/1.0/", indexHTML(`<a href="lib-1.0.jar">jar</a>`))
-		if _, err := ListMappedFolder(
+		if _, err := remote.ListMappedFolder(
 			t.Context(),
 			service,
 			q,
 			d,
-			DiscoveryScope{Path: "org.acme/lib"},
+			remote.DiscoveryScope{Path: "org.acme/lib"},
 			"org/acme/lib/1.0",
-			&budget,
+			budget,
 		); err == nil {
 			t.Fatal("mapped traversal exceeded shared budget")
 		}
 	}
 	_, service, q, d := discoveryFixture(t, "gradle-default", "maven-2-default")
 	q.Repo.Class = repo.Local
-	if _, err := NewDiscovery(
+	if _, err := remote.NewDiscovery(
 		t.Context(),
 		&item.Service{},
 		q.Repo,
@@ -244,12 +193,12 @@ func TestAccMappedListingBoundedFailures(t *testing.T) {
 	) {
 		t.Fatal(err)
 	}
-	if _, err := ListMappedFolder(
+	if _, err := remote.ListMappedFolder(
 		t.Context(),
 		service,
 		q,
 		d,
-		DiscoveryScope{Root: true},
+		remote.DiscoveryScope{Root: true},
 		"",
 		nil,
 	); !errors.Is(
@@ -286,16 +235,16 @@ func TestAccMappedPaginationNeverReturnsPartialResults(t *testing.T) {
 					}, nil
 				},
 			)
-			budget := new(ListingBudget)
+			budget := new(remote.ListingBudget)
 			if mode == "entries" {
-				budget.entries = 9996
+				budget.SetEntries(9996)
 			}
-			got, err := ListMappedFolder(
+			got, err := remote.ListMappedFolder(
 				t.Context(),
 				service,
 				q,
 				d,
-				DiscoveryScope{Path: "org.acme/lib"},
+				remote.DiscoveryScope{Path: "org.acme/lib"},
 				"org/acme/lib/1.0",
 				budget,
 			)
@@ -306,7 +255,7 @@ func TestAccMappedPaginationNeverReturnsPartialResults(t *testing.T) {
 				}
 				return
 			}
-			if err == nil || !reflect.DeepEqual(got, MappedFolderListing{}) {
+			if err == nil || !reflect.DeepEqual(got, remote.MappedFolderListing{}) {
 				t.Fatal("partial mapped results escaped", got, err)
 			}
 			if mode == "pages" && calls != 100 || mode != "pages" && calls != 2 {

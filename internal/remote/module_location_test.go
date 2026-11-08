@@ -1,4 +1,4 @@
-package remote
+package remote_test
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -165,7 +166,7 @@ func TestAccModuleLocationProjectionBoundsAndIdentity(t *testing.T) {
 			Body:       http.NoBody,
 			Header:     http.Header{"X-Terraform-Get": {value}},
 		}
-		if projectModuleLocation(q, res) == nil {
+		if remote.ProjectModuleLocation(q, res) == nil {
 			t.Fatal("invalid header accepted")
 		}
 	}
@@ -173,21 +174,21 @@ func TestAccModuleLocationProjectionBoundsAndIdentity(t *testing.T) {
 		{StatusCode: 204, ContentLength: 1, Body: http.NoBody},
 		{StatusCode: 204, TransferEncoding: []string{"chunked"}, Body: http.NoBody},
 	} {
-		if projectModuleLocation(q, res) == nil {
+		if remote.ProjectModuleLocation(q, res) == nil {
 			t.Fatal("nonempty204 accepted")
 		}
 	}
 	res := &http.Response{StatusCode: 404, Body: http.NoBody}
-	if projectModuleLocation(q, res) != nil || res.StatusCode != 404 {
+	if remote.ProjectModuleLocation(q, res) != nil || res.StatusCode != 404 {
 		t.Fatal("error response changed")
 	}
 	q.Resource.ModuleDownloadLocation = false
 	res.StatusCode = 204
-	if projectModuleLocation(q, res) != nil || res.StatusCode != 204 {
+	if remote.ProjectModuleLocation(q, res) != nil || res.StatusCode != 204 {
 		t.Fatal("generic behavior changed")
 	}
 	q.Resource.ModuleDownloadLocation = true
-	req := TransportRequest(
+	req := remote.TransportRequest(
 		q,
 		types.RemoteCacheEntry{
 			Blob:         types.Blob{Checksums: types.Checksums{SHA256: "digest"}},
