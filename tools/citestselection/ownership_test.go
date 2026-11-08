@@ -115,7 +115,7 @@ func TestUnitOwnershipV2RejectsInvalidInventories(t *testing.T) {
 			Version: 2,
 			Packages: map[string]string{
 				"internal/server":                        "shared",
-				"migration/artifacts/ecosystem/npm/http": "npm",
+				"internal/server/xyz":                    "npm",
 				"migration/access/adapters/http":         "shared",
 				"migration/app":                          "shared",
 				"migration/artifacts/ecosystem/npm/http": "npm",
@@ -153,7 +153,7 @@ func TestUnitOwnershipV2RejectsInvalidInventories(t *testing.T) {
 		{"version 1", func(o *testOwnership) { o.Version = 1 }, "version 1, want 2"},
 		{"missing version", func(o *testOwnership) { o.Version = 0 }, "version 0, want 2"},
 		{"package outside owned directories", func(o *testOwnership) {
-			o.Packages["migration/artifacts/ecosystem/npm"] = "npm"
+			o.Packages["internal/legacy/xyz"] = "npm"
 		}, "invalid test package owner"},
 		{"staged ecosystem package outside http", func(o *testOwnership) {
 			o.Packages["migration/artifacts/ecosystem/npm"] = "npm"

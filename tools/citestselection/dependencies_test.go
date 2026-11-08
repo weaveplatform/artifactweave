@@ -10,14 +10,15 @@ import (
 
 func TestUnitReverseClosureIncludesTransitiveProductionConsumers(t *testing.T) {
 	base := modulePath + "/internal/"
+	staged := modulePath + "/migration/artifacts/ecosystem/"
 	graph := map[string][]string{
-		base + "format/npm":   nil,
-		base + "server/npm":   {base + "format/npm"},
-		base + "server":       {base + "server/npm"},
-		base + "app":          {base + "server", base + "format/npm"},
+		staged + "npm":        nil,
+		staged + "npm/http":   {staged + "npm"},
+		base + "server":       {staged + "npm/http"},
+		base + "app":          {base + "server", staged + "npm"},
 		base + "format/maven": nil,
 	}
-	got := reverseClosure(graph, []string{base + "format/npm"}, "npm")
+	got := reverseClosure(graph, []string{staged + "npm"}, "npm")
 	for _, want := range []string{"./migration/artifacts/ecosystem/npm", "./migration/artifacts/ecosystem/npm/http", "./internal/server", "./internal/app"} {
 		if !slices.Contains(got, want) {
 			t.Errorf("reverse closure omitted %s: %v", want, got)
@@ -45,7 +46,10 @@ func TestUnitSourceImportGraphFailsOnMissingInternalPackage(t *testing.T) {
 }
 
 func TestUnitActualNPMReverseDependencies(t *testing.T) {
-	got, err := reverseDependentUnits([]string{modulePath + "/internal/format/npm"}, "npm")
+	got, err := reverseDependentUnits(
+		[]string{modulePath + "/migration/artifacts/ecosystem/npm"},
+		"npm",
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,10 +84,6 @@ func TestUnitImportGraphIncludesStagedPackages(t *testing.T) {
 		imports("npmhttp", "migration/artifacts/ecosystem/npm"))
 	write("internal/artifacts/ecosystem/npm/npm.go",
 		imports("npm", "migration/artifacts/ecosystem/npm"))
-	write(
-		"migration/artifacts/ecosystem/npm/http/npm.go",
-		imports("npm", "migration/artifacts/ecosystem/npm/http"),
-	)
 	write("internal/server/server.go", imports("server", "migration/artifacts/ecosystem/npm/http"))
 	write("migration/app/app.go", imports("app", "internal/server"))
 	write("cmd/artifactweave/main.go", imports("main", "migration/app"))
@@ -96,7 +96,7 @@ func TestUnitImportGraphIncludesStagedPackages(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := graph[modulePath+"/internal/server/npm"]; !slices.Equal(
+	if got := graph[modulePath+"/internal/server"]; !slices.Equal(
 		got, []string{modulePath + "/migration/artifacts/ecosystem/npm/http"},
 	) {
 		t.Fatalf("legacy package's staged import was not recorded: %q", got)
@@ -110,7 +110,6 @@ func TestUnitImportGraphIncludesStagedPackages(t *testing.T) {
 	want := []string{
 		"./internal/artifacts/ecosystem/npm",
 		"./internal/server",
-		"./migration/artifacts/ecosystem/npm/http",
 		"./migration/artifacts/ecosystem/npm",
 		"./migration/artifacts/ecosystem/npm/http",
 	}

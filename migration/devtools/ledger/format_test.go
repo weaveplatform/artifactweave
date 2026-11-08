@@ -29,7 +29,7 @@ func TestUnitFormatIsCanonicalAndIdempotent(t *testing.T) {
         {"from":"internal/formatregistry","action":"move","to":"artifacts/ecosystem","rename":{"formats.go":"registry.go"},"ticket":"ART-05"},
         {"from":"internal/layout","action":"delete","ticket":"PRO-02","note":"the staged layout tests replace it; see <migration/README.md> & the plan"},
         {"from":"internal/server","action":"split","ticket":"WEB-22"},
-        {"from":"migration/artifacts/ecosystem/npm/http","action":"move","to":"artifacts/ecosystem/npm/http","name":"npmhttp","ticket":"ECO-06"}
+        {"from":"internal/server/xyz","action":"move","to":"artifacts/ecosystem/npm/http","name":"npmhttp","ticket":"ECO-06"}
     ],
     "files": [
         {"from":"internal/server/handlers.go","action":"split","targets":["artifacts/adapters/http","access/adapters/http"],"ticket":"WEB-03"},

@@ -1,11 +1,3 @@
-// Package npmhttp serves the npm registry of npm repositories at
-// /artifactory/api/npm/{repoKey}/ (decision 0034), mounted through the
-// router kit (decision 0032). Packuments and version manifests are built on
-// each request from what the npm format keeps in the package index, and
-// tarballs download through the item routes' download, so redirects and
-// download counts apply to them as to any file. A publish stores the
-// tarball through the item service, whose npm format indexes it as it
-// indexes a REST deploy.
 package npmhttp
 
 import (

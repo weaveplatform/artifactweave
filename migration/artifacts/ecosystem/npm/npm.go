@@ -1,13 +1,3 @@
-// Package npm is the format of npm repositories (decision 0034). It reads
-// each tarball's package.json, indexes a tarball at its canonical path as
-// a version of its package (decision 0018) with the per-version Metadata
-// that packuments and search are built from, and keeps the npm.*
-// properties. Every write reaches it through the item service, so a
-// tarball deployed by npm publish, by jf npm publish's REST deploy, or
-// landed by a copy, a move or a restore is indexed the same way.
-//
-// A .tgz anywhere else, or one without a readable package.json, is stored
-// but not indexed: every repository has strict layout (DV-041).
 package npm
 
 import (

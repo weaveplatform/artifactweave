@@ -68,8 +68,8 @@ func TestUnitValidateRejectsInvalidEntries(t *testing.T) {
 		},
 
 		{
-			"file from", func(l *Ledger) { l.Files[0].From = "migration/artifacts/ecosystem/npm/http test.go" },
-			`file "migration/artifacts/ecosystem/npm/http test.go": from "migration/artifacts/ecosystem/npm/http test.go" does not match`,
+			"file from", func(l *Ledger) { l.Files[0].From = "internal/server/xyz test.go" },
+			`file "internal/server/xyz test.go": from "internal/server/xyz test.go" does not match`,
 		},
 		{
 			"file action", func(l *Ledger) { l.Files[0].Action = ActionMerge },
@@ -108,8 +108,8 @@ func TestUnitValidateRejectsInvalidEntries(t *testing.T) {
 			`from "internal/layout" appears in 2 entries`,
 		},
 		{"file from repeats a package from", func(l *Ledger) {
-			l.Files = append(l.Files, File{From: "migration/artifacts/ecosystem/npm/http", Action: ActionDelete, Ticket: "ECO-06"})
-		}, `from "migration/artifacts/ecosystem/npm/http" appears in 2 entries`},
+			l.Files = append(l.Files, File{From: "internal/server/xyz", Action: ActionDelete, Ticket: "ECO-06"})
+		}, `from "internal/server/xyz" appears in 2 entries`},
 		{
 			"repeated placeholder", func(l *Ledger) { l.Placeholders = append(l.Placeholders, l.Placeholders[0]) },
 			"placeholder migration/artifacts/core/virtual appears 2 times",
@@ -118,7 +118,7 @@ func TestUnitValidateRejectsInvalidEntries(t *testing.T) {
 			l.Packages = append(l.Packages, Package{
 				From: "internal/c", Action: ActionMerge, To: "artifacts/ecosystem/npm/http", Ticket: "ECO-06",
 			})
-		}, `package "migration/artifacts/ecosystem/npm/http": move target migration/artifacts/ecosystem/npm/http is shared`},
+		}, `package "internal/server/xyz": move target migration/artifacts/ecosystem/npm/http is shared`},
 		{
 			"merge target alone", func(l *Ledger) { l.Packages = l.Packages[:5] },
 			`package "internal/a": merge target migration/platform/ab has no other entry`,
@@ -154,7 +154,7 @@ func TestUnitValidateReportsEveryErrorInOrder(t *testing.T) {
 	errs := l.Validate()
 	want := []string{
 		"schema is 0",
-		`package "migration/artifacts/ecosystem/npm/http": ticket`,
+		`package "internal/server/xyz": ticket`,
 		`placeholder "artifacts/core/virtual": phases`,
 	}
 	if len(errs) != len(want) {
