@@ -142,7 +142,7 @@ func (s *Smart) currentEntry(
 	permit source.Permit,
 	key types.RemoteCacheKey,
 ) (types.RemoteCacheEntry, error) {
-	if err := s.policy.check(ctx, q, permit, key.SettingsRevision); err != nil {
+	if err := s.policy.Check(ctx, q, permit, key.SettingsRevision); err != nil {
 		return types.RemoteCacheEntry{}, err
 	}
 	// Begin takes the source lifetime lock before reading mutable state. The
@@ -209,7 +209,7 @@ func (s *Smart) restore(
 		},
 	}
 	if err == nil {
-		err = s.policy.check(ctx, q, permit, opts.Revision)
+		err = s.policy.Check(ctx, q, permit, opts.Revision)
 	}
 	return ctx, q, permit, opts, err
 }
@@ -262,7 +262,7 @@ func (s *Smart) run(ctx context.Context, workItem types.WorkItem) error {
 	if err == nil {
 		release, e := s.policy.capacity.acquire(ctx, q.Repo.Key)
 		if e != nil {
-			return policyError(e)
+			return PolicyError(e)
 		}
 		defer release()
 		if job.Statistics {

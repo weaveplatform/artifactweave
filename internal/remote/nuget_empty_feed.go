@@ -34,7 +34,7 @@ func projectNuGetEmptyFeed(q source.Request, res *http.Response) error {
 	original := res.Body
 	res.Body = http.NoBody
 	if err := original.Close(); err != nil {
-		return policyError(err)
+		return PolicyError(err)
 	}
 	res.Body = io.NopCloser(strings.NewReader(emptyNuGetFeed))
 	res.StatusCode = http.StatusOK

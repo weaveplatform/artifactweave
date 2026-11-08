@@ -187,7 +187,7 @@ func TestAccModuleLocationProjectionBoundsAndIdentity(t *testing.T) {
 		t.Fatal("generic behavior changed")
 	}
 	q.Resource.ModuleDownloadLocation = true
-	req := transportRequest(
+	req := TransportRequest(
 		q,
 		types.RemoteCacheEntry{
 			Blob:         types.Blob{Checksums: types.Checksums{SHA256: "digest"}},

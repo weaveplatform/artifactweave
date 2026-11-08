@@ -46,7 +46,7 @@ func (c *RegistryContent) children(
 			return layout.Config{}, err
 		}
 		child.Resource = resource
-		if err = c.Policy.check(ctx, child, permit, opts.Revision); err != nil {
+		if err = c.Policy.Check(ctx, child, permit, opts.Revision); err != nil {
 			return layout.Config{}, err
 		}
 		result, err := c.Policy.Read(ctx, child, permit)
@@ -88,7 +88,7 @@ func (c *RegistryContent) children(
 		return layout.Config{}, err
 	}
 	child.Resource = resource
-	if err = c.Policy.check(ctx, child, permit, opts.Revision); err != nil {
+	if err = c.Policy.Check(ctx, child, permit, opts.Revision); err != nil {
 		return layout.Config{}, err
 	}
 	result, err := c.Policy.Read(ctx, child, permit)

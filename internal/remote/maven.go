@@ -133,9 +133,9 @@ func (m *MavenBackend) PrepareUpload(
 	}
 	client, err := m.Policy.Pool.Client(q.Repo, opts)
 	if err != nil {
-		return policyError(err)
+		return PolicyError(err)
 	}
-	request := transportRequest(q, types.RemoteCacheEntry{})
+	request := TransportRequest(q, types.RemoteCacheEntry{})
 	request.Method, request.Metadata = http.MethodGet, true
 	request.Header = nil
 	algorithms := []item.Algorithm{item.SHA1, item.MD5}
@@ -150,7 +150,7 @@ func (m *MavenBackend) PrepareUpload(
 		checksumRequest.Path += "." + string(alg)
 		res, err := client.Do(ctx, checksumRequest)
 		if err != nil {
-			return policyError(err)
+			return PolicyError(err)
 		}
 		data, readErr := io.ReadAll(io.LimitReader(res.Body, 1025))
 		_ = res.Body.Close()
@@ -196,7 +196,7 @@ func (m *MavenBackend) PrepareUpload(
 			break
 		}
 	}
-	return m.Policy.check(ctx, q, permit, opts.Revision)
+	return m.Policy.Check(ctx, q, permit, opts.Revision)
 }
 
 // A protocol adapter's bounded metadata admission is already complete. Treating

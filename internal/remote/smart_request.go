@@ -41,7 +41,7 @@ func (s *Smart) request(
 			return nil, ErrSecurity
 		}
 	}
-	if err = s.policy.check(ctx, q, permit, opts.Revision); err != nil {
+	if err = s.policy.Check(ctx, q, permit, opts.Revision); err != nil {
 		return nil, err
 	}
 	state, err := s.policy.state(ctx, q, opts.Revision)
@@ -64,7 +64,7 @@ func (s *Smart) request(
 	cancel = func() { metadataCancel(); outerCancel() }
 	if err = client.checkURL(ctx, u); err != nil {
 		cancel()
-		return nil, policyError(err)
+		return nil, PolicyError(err)
 	}
 	req, err := http.NewRequestWithContext(ctx, method, u.String(), bytes.NewReader(body))
 	if err != nil {
@@ -80,7 +80,7 @@ func (s *Smart) request(
 	if client.prepare != nil {
 		if err = client.prepare(req); err != nil {
 			cancel()
-			return nil, policyError(err)
+			return nil, PolicyError(err)
 		}
 	}
 	if method == http.MethodPut {
@@ -96,7 +96,7 @@ func (s *Smart) request(
 	res, err := transport.Do(req)
 	if err != nil {
 		cancel()
-		failure := policyError(err)
+		failure := PolicyError(err)
 		if stateErr := s.policy.recordFailure(
 			stateContext,
 			q,

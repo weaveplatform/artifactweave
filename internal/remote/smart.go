@@ -162,7 +162,7 @@ func (s *Smart) Read(
 	}
 	opts, err := s.policy.Options(ctx, q.Repo)
 	if err != nil {
-		return source.Result{}, policyError(err)
+		return source.Result{}, PolicyError(err)
 	}
 	if opts.Revision != peer.revision {
 		return source.Result{}, source.ErrSuperseded

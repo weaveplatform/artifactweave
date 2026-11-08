@@ -25,17 +25,14 @@ import (
 
 const MavenCompanionKind = "maven.remote-companion"
 
-type (
-	eagerKey struct{}
-	mavenJob struct {
-		Repo      string                     `json:"repo"`
-		Path      string                     `json:"path"`
-		Origin    string                     `json:"origin"`
-		Identity  types.SourceIdentity       `json:"identity"`
-		Revision  string                     `json:"revision"`
-		Principal kernel.CredentialReference `json:"principal"`
-	}
-)
+type mavenJob struct {
+	Repo      string                     `json:"repo"`
+	Path      string                     `json:"path"`
+	Origin    string                     `json:"origin"`
+	Identity  types.SourceIdentity       `json:"identity"`
+	Revision  string                     `json:"revision"`
+	Principal kernel.CredentialReference `json:"principal"`
+}
 
 // MavenEager persists deduplicated companion work without retaining credentials.
 // Two workers share the regular source admission limits. Pending/leased/parked
@@ -96,7 +93,7 @@ func mavenCompanion(c repo.Config, p string) string {
 }
 
 func (e *MavenEager) Queue(ctx context.Context, q source.Request, permit source.Permit) {
-	if ctx.Value(eagerKey{}) != nil {
+	if ctx.Value(EagerKey{}) != nil {
 		return
 	}
 	target := mavenCompanion(q.Repo, q.Resource.Path)
@@ -105,7 +102,7 @@ func (e *MavenEager) Queue(ctx context.Context, q source.Request, permit source.
 		return
 	}
 	opts, err := e.policy.Options(ctx, q.Repo)
-	if err != nil || e.policy.check(ctx, q, permit, opts.Revision) != nil {
+	if err != nil || e.policy.Check(ctx, q, permit, opts.Revision) != nil {
 		return
 	}
 	job := mavenJob{
@@ -160,7 +157,7 @@ func (e *MavenEager) run(ctx context.Context, it types.WorkItem) error {
 		return errors.Join(work.ErrPermanent, source.ErrInvalidRequest)
 	}
 	ctx, cancel := context.WithTimeout(
-		context.WithValue(ctx, eagerKey{}, job.Revision),
+		context.WithValue(ctx, EagerKey{}, job.Revision),
 		time.Minute,
 	)
 	defer cancel()
@@ -218,11 +215,4 @@ func (e *MavenEager) run(ctx context.Context, it types.WorkItem) error {
 		}
 	}
 	return nil
-}
-
-// The stored credential revision also fences the interval between restoring a
-// job and the source backend acquiring its own transport options.
-func mavenCompanionRevision(ctx context.Context, revision string) bool {
-	expected, ok := ctx.Value(eagerKey{}).(string)
-	return !ok || expected == revision
 }

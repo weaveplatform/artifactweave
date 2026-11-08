@@ -73,7 +73,7 @@ func (p *Policy) changeState(
 		return p.Store.RemoteCache().PutState(tx, q.Repo.Key, state)
 	})
 	if err != nil {
-		return policyError(err)
+		return PolicyError(err)
 	}
 	return nil
 }

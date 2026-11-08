@@ -80,7 +80,7 @@ func (p *Policy) Read(
 	var revision string
 	defer func() {
 		if retErr == nil && revision != "" {
-			out.Revalidate = func(current context.Context) error { return p.check(current, q, permit, revision) }
+			out.Revalidate = func(current context.Context) error { return p.Check(current, q, permit, revision) }
 		}
 	}()
 	if permit.Intent == source.RetrievalIntentCacheOnly || !permit.UpstreamNetworkAllowed ||
@@ -95,7 +95,7 @@ func (p *Policy) Read(
 	}
 	opts, err := p.Options(ctx, q.Repo)
 	if err != nil {
-		return source.Result{}, policyError(err)
+		return source.Result{}, PolicyError(err)
 	}
 	if !mavenCompanionRevision(ctx, opts.Revision) {
 		return source.Result{}, source.ErrSuperseded
@@ -121,7 +121,7 @@ func (p *Policy) Read(
 	defer cancel()
 	release, err := p.capacity.acquire(ctx, q.Repo.Key)
 	if err != nil {
-		return source.Result{}, policyError(err)
+		return source.Result{}, PolicyError(err)
 	}
 	defer release()
 	if noStore || q.Resource.Method == http.MethodHead {
@@ -136,8 +136,8 @@ func (p *Policy) Read(
 	if err != nil {
 		return source.Result{}, err
 	}
-	if err = p.check(ctx, q, permit, opts.Revision); err != nil {
-		return source.Result{}, policyError(err)
+	if err = p.Check(ctx, q, permit, opts.Revision); err != nil {
+		return source.Result{}, PolicyError(err)
 	}
 	if filled.isTransient {
 		// A previously unknown no-store/Vary response cannot be handed to
@@ -206,7 +206,7 @@ func (p *Policy) cachedOnly(ctx context.Context, q source.Request) (source.Resul
 	if q.Resource.Checksums != (types.Checksums{}) {
 		want, parseErr := item.ParseChecksums(q.Resource.Checksums)
 		if parseErr != nil {
-			return source.Result{}, policyError(parseErr)
+			return source.Result{}, PolicyError(parseErr)
 		}
 		if verifyErr := blob.Verify(
 			blob.Digests{SHA256: want.SHA256, SHA512: want.SHA512, SHA1: want.SHA1, MD5: want.MD5},
@@ -217,7 +217,7 @@ func (p *Policy) cachedOnly(ctx context.Context, q source.Request) (source.Resul
 				MD5:    it.Actual.MD5,
 			},
 		); verifyErr != nil {
-			return source.Result{}, policyError(verifyErr)
+			return source.Result{}, PolicyError(verifyErr)
 		}
 	}
 	return source.Result{Item: &it}, nil
@@ -404,7 +404,7 @@ func (p *Policy) used(token types.RemoteCacheToken) func(context.Context) error 
 	}
 }
 
-func transportRequest(q source.Request, e types.RemoteCacheEntry) Request {
+func TransportRequest(q source.Request, e types.RemoteCacheEntry) Request {
 	path := q.Resource.EscapedPath
 	if path == "" {
 		path = (&url.URL{Path: q.Resource.Path}).EscapedPath()
@@ -447,7 +447,7 @@ func transportRequest(q source.Request, e types.RemoteCacheEntry) Request {
 	}
 }
 
-func policyError(err error) error {
+func PolicyError(err error) error {
 	var typed *source.HTTPError
 	if errors.As(err, &typed) {
 		return typed

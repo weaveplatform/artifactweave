@@ -37,7 +37,7 @@ func (s *Smart) query(
 	}
 	release, err := s.policy.capacity.acquire(ctx, q.Repo.Key)
 	if err != nil {
-		return source.Result{}, policyError(err)
+		return source.Result{}, PolicyError(err)
 	}
 	defer release()
 	res, err := s.request(
@@ -73,7 +73,7 @@ func (s *Smart) query(
 	); err != nil {
 		return source.Result{}, source.ErrInvalidResult
 	}
-	if err = s.policy.check(ctx, q, permit, opts.Revision); err != nil {
+	if err = s.policy.Check(ctx, q, permit, opts.Revision); err != nil {
 		return source.Result{}, err
 	}
 	return source.Result{
@@ -86,6 +86,6 @@ func (s *Smart) query(
 				Size:      int64(len(body)),
 			},
 		},
-		Revalidate: func(current context.Context) error { return s.policy.check(current, q, permit, opts.Revision) },
+		Revalidate: func(current context.Context) error { return s.policy.Check(current, q, permit, opts.Revision) },
 	}, nil
 }

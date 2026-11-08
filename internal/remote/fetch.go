@@ -83,14 +83,14 @@ func (p *Policy) fetch(
 	out := fillResult{key: key}
 	token, err := p.Store.RemoteCache().Begin(ctx, key)
 	if err != nil {
-		return out, policyError(err)
+		return out, PolicyError(err)
 	}
 	if token.Source != permit.Identity {
 		return out, source.ErrSuperseded
 	}
-	res, err := p.fetchResponse(ctx, q, permit, opts, transportRequest(q, e))
+	res, err := p.fetchResponse(ctx, q, permit, opts, TransportRequest(q, e))
 	if err != nil {
-		failure := policyError(err)
+		failure := PolicyError(err)
 		if stateErr := p.recordFailure(ctx, q, permit, opts.Revision, failure); stateErr != nil {
 			return out, stateErr
 		}
@@ -128,7 +128,7 @@ func (p *Policy) fetch(
 				p.upload(q, permit, opts.Revision, token, res, true),
 			)
 			if cacheErr != nil {
-				failure := policyError(cacheErr)
+				failure := PolicyError(cacheErr)
 				if stateErr := p.recordFailure(
 					ctx,
 					q,
@@ -153,7 +153,7 @@ func (p *Policy) fetch(
 	u := p.upload(q, permit, opts.Revision, token, res, false)
 	committed, err := p.cache(ctx, q, permit, opts, u)
 	if err != nil {
-		failure := policyError(err)
+		failure := PolicyError(err)
 		if stateErr := p.recordFailure(ctx, q, permit, opts.Revision, failure); stateErr != nil {
 			return out, stateErr
 		}
@@ -244,15 +244,15 @@ func (p *Policy) directOnce(
 	if !noStore {
 		token, err = p.Store.RemoteCache().Begin(ctx, key)
 		if err != nil {
-			return source.Result{}, policyError(err)
+			return source.Result{}, PolicyError(err)
 		}
 		if token.Source != permit.Identity {
 			return source.Result{}, source.ErrSuperseded
 		}
 	}
-	res, err := p.fetchResponse(ctx, q, permit, opts, transportRequest(q, old))
+	res, err := p.fetchResponse(ctx, q, permit, opts, TransportRequest(q, old))
 	if err != nil {
-		failure := policyError(err)
+		failure := PolicyError(err)
 		if stateErr := p.recordFailure(ctx, q, permit, opts.Revision, failure); stateErr != nil {
 			return source.Result{}, stateErr
 		}
@@ -323,7 +323,7 @@ func (p *Policy) directOnce(
 	u := p.upload(q, permit, opts.Revision, token, res, true)
 	transient, err := p.cache(ctx, q, permit, opts, u)
 	if err != nil {
-		failure := policyError(err)
+		failure := PolicyError(err)
 		if stateErr := p.recordFailure(ctx, q, permit, opts.Revision, failure); stateErr != nil {
 			return source.Result{}, stateErr
 		}
@@ -371,14 +371,14 @@ func (p *Policy) negative(
 		return nil
 	}
 	err := p.Store.Tx(ctx, func(tx context.Context) error {
-		if currentErr := p.check(tx, q, permit, revision); currentErr != nil {
+		if currentErr := p.Check(tx, q, permit, revision); currentErr != nil {
 			return currentErr
 		}
 		return p.Store.RemoteCache().
 			Negative(tx, token, p.now().Add(time.Duration(seconds)*time.Second))
 	})
 	if err != nil {
-		return policyError(err)
+		return PolicyError(err)
 	}
 	return nil
 }
@@ -447,7 +447,7 @@ func (p *Policy) upload(
 		By:           q.Subject.Name,
 		NoStore:      noStore,
 		MaxBytes:     limit,
-		CheckCurrent: func(ctx context.Context, _ store.Store) error { return p.check(ctx, q, permit, revision) },
+		CheckCurrent: func(ctx context.Context, _ store.Store) error { return p.Check(ctx, q, permit, revision) },
 	}
 }
 
@@ -458,7 +458,7 @@ func (p *Policy) metadataLimit(kind types.RemoteKind) int64 {
 	return 0
 }
 
-func (p *Policy) check(
+func (p *Policy) Check(
 	ctx context.Context,
 	q source.Request,
 	permit source.Permit,
@@ -571,7 +571,7 @@ func (p *Policy) revalidate(
 	if q.Resource.ValidateMetadata != nil {
 		metadata := metadataResponse(res, e.Kind)
 		if err := p.validateCachedMetadata(ctx, q.Resource, e, metadata); err != nil {
-			return types.RemoteCacheEntry{}, policyError(err)
+			return types.RemoteCacheEntry{}, PolicyError(err)
 		}
 		e.MetadataBaseURL = metadata.BaseURL
 	}
@@ -587,7 +587,7 @@ func (p *Policy) revalidate(
 	e.NegativeUntil = time.Time{}
 	var updated types.RemoteCacheEntry
 	err := p.Store.Tx(ctx, func(tx context.Context) error {
-		if currentErr := p.check(tx, q, permit, revision); currentErr != nil {
+		if currentErr := p.Check(tx, q, permit, revision); currentErr != nil {
 			return currentErr
 		}
 		var putErr error
@@ -598,7 +598,7 @@ func (p *Policy) revalidate(
 		return nil
 	})
 	if err != nil {
-		return types.RemoteCacheEntry{}, policyError(err)
+		return types.RemoteCacheEntry{}, PolicyError(err)
 	}
 	return updated, nil
 }

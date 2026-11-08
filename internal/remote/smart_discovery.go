@@ -34,9 +34,9 @@ func (s *Smart) Discover(
 	}
 	opts, err := s.policy.Options(ctx, q.Repo)
 	if err != nil {
-		return SmartPeer{}, policyError(err)
+		return SmartPeer{}, PolicyError(err)
 	}
-	if err = s.policy.check(ctx, q, permit, opts.Revision); err != nil {
+	if err = s.policy.Check(ctx, q, permit, opts.Revision); err != nil {
 		return SmartPeer{}, err
 	}
 	peer.revision = opts.Revision
@@ -64,7 +64,7 @@ func (s *Smart) Discover(
 		return s.discover(shared, q, permit, opts, peer)
 	})
 	if err == nil {
-		err = s.policy.check(ctx, q, permit, opts.Revision)
+		err = s.policy.Check(ctx, q, permit, opts.Revision)
 	}
 	return peer, smartError("discovery", err)
 }
@@ -87,7 +87,7 @@ func (s *Smart) discover(
 	defer cancel()
 	release, err := s.policy.capacity.acquire(ctx, q.Repo.Key)
 	if err != nil {
-		return SmartPeer{}, policyError(err)
+		return SmartPeer{}, PolicyError(err)
 	}
 	defer release()
 	version, noStore, err := s.document(ctx, q, permit, opts, peer.BaseURL+"/api/system/version")
@@ -114,7 +114,7 @@ func (s *Smart) discover(
 	if !noStore && !private &&
 		(q.Repo.StoreArtifactsLocally == nil || *q.Repo.StoreArtifactsLocally) {
 		err = s.policy.Store.Tx(ctx, func(tx context.Context) error {
-			if e := s.policy.check(tx, q, permit, opts.Revision); e != nil {
+			if e := s.policy.Check(tx, q, permit, opts.Revision); e != nil {
 				return smartError("operation", e)
 			}
 			state, e := s.policy.state(tx, q, opts.Revision)
@@ -196,7 +196,7 @@ func (s *Smart) document(
 	if err != nil || len(b) > 1<<20 || json.Unmarshal(b, &doc) != nil || doc == nil {
 		return nil, false, source.ErrInvalidResult
 	}
-	if err = s.policy.check(ctx, q, permit, opts.Revision); err != nil {
+	if err = s.policy.Check(ctx, q, permit, opts.Revision); err != nil {
 		return nil, false, err
 	}
 	return doc, parseCacheRules(res.Header.Get("Cache-Control")).mustNotStore ||

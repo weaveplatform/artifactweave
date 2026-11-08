@@ -427,7 +427,7 @@ func TestAccPolicyAdapterTargetsAndPreparation(t *testing.T) {
 	if w.p.cacheKey(q, "credential-1") == oldKey {
 		t.Fatal("URL absent from identity")
 	}
-	r := transportRequest(q, types.RemoteCacheEntry{})
+	r := TransportRequest(q, types.RemoteCacheEntry{})
 	if r.ExternalURL != q.Resource.ExternalURL || r.Path != "" || r.Query != "" {
 		t.Fatal(r)
 	}
