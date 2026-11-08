@@ -25,9 +25,9 @@ R31.
 
 ### Packages and routes
 
-The HTTP layer is `migration/artifacts/ecosystem/terraform/http`, mounted through the protocol router kit of
-decision 0032 at `/artifactory/api/terraform/` with the encoded-key resolver and the
-host-root mount of [#532](https://github.com/weaveplatform/artifactweave/issues/532). Path
+The HTTP layer is `migration/artifacts/ecosystem/terraform/http`, mounted through the protocol
+router kit of decision 0032 at `/artifactory/api/terraform/` with the encoded-key resolver and
+the host-root mount of [#532](https://github.com/weaveplatform/artifactweave/issues/532). Path
 parsing, the index hooks and the hashes are `migration/artifacts/ecosystem/terraform`.
 
 | Method | Path | Answer |
@@ -564,8 +564,8 @@ These assignments describe planned work, not current runtime support.
     shared contract suite of decision 0032 (#533);
   - `h1:` against the hashes Terraform records for a HashiCorp release;
   - signature verification with a test GPG pair.
-- **`migration/artifacts/ecosystem/terraform/http` tests**, in the per-format status table and route × principal
-  matrix of decision 0032:
+- **`migration/artifacts/ecosystem/terraform/http` tests**, in the per-format status table and
+  route × principal matrix of decision 0032:
   - every status above, and the envelope on each refusal;
   - discovery to an anonymous caller and to one with a bad token;
   - the key resolver over keys containing `__` and `-rt-ns-`, capitals, and a key `v1`;

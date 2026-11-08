@@ -1,21 +1,3 @@
-// Package terraform is the format of Terraform registry repositories
-// (decision 0040): the modules and Terraform provider packages that users
-// store in terraform repositories, which the module registry, the provider
-// registry and the network mirror serve. It reads the paths of what is
-// stored, keeps the package index, computes the h1: hashes of a Terraform
-// provider package's archives, and makes the checks a registry download
-// runs. The Terraform backend's state is decision 0041's, under a package
-// type of its own.
-//
-// A repository's terraformType chooses what it indexes. A MODULE
-// repository indexes each module zip at <ns>/<name>/<system>/<version>.zip
-// as version <version> of package <ns>/<name>/<system>. A PROVIDER
-// repository indexes the files of a Terraform provider package's release
-// at [<folders>/]<ns>/<type>/<version>/ as version <version> of package
-// <ns>/<type>: its archives, its SHA256SUMS, the SHA256SUMS's signature and
-// its manifest. Any other file, a module zip in a PROVIDER repository and
-// the reverse included, is stored and not indexed, and so is everything in
-// a repository without terraformType. The format sets no property.
 package terraform
 
 import (

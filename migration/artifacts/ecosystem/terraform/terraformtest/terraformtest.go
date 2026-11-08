@@ -1,9 +1,3 @@
-// Package terraformtest builds Terraform registry content for tests (role 2
-// of epic #526: Terraform modules and Terraform provider packages that
-// artifactweave stores): GPG key pairs, the files of a Terraform provider
-// package's release laid out and signed as HashiCorp publishes them, and
-// module zips. The registry's and the server's tests share it, so they
-// deploy the bytes the terraform CLI installs.
 package terraformtest
 
 import (

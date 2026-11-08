@@ -1,5 +1,3 @@
-// Package terraformhttp serves Terraform's discovery and module registry
-// through the package router kit (decision 0040).
 package terraformhttp
 
 import (
