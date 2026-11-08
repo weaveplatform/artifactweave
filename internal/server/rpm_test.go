@@ -261,6 +261,7 @@ func TestAccRPMVirtualSigningRejectsMissingAndInvalidKeys(t *testing.T) {
 		}
 	}
 	manifest, _, _ := rpmUpstreamFixture(t)
+	keys := withAccess(Config{Store: w.db}).Access.Keys
 	for _, tc := range []struct {
 		key      string
 		expected error
@@ -271,7 +272,7 @@ func TestAccRPMVirtualSigningRejectsMissingAndInvalidKeys(t *testing.T) {
 		{"rpm-invalid-gpg", nil},
 	} {
 		files := map[string][]byte{"repodata/repomd.xml": manifest}
-		err := signVirtualRPM(t.Context(), w.db, repo.Config{KeyPair: tc.key}, files)
+		err := signVirtualRPM(t.Context(), keys, repo.Config{KeyPair: tc.key}, files)
 		if tc.key == "rpm-invalid-gpg" {
 			if err == nil {
 				t.Error("invalid GPG private key signed virtual metadata")

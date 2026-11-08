@@ -278,7 +278,7 @@ func (s artifactoryService) CalculateYumRepositoryMetadata(
 		if err != nil {
 			return nil, s.internalError(ctx, "RPM virtual metadata", err)
 		}
-		if err := signVirtualRPM(ctx, st, c, meta.Files); err != nil {
+		if err := signVirtualRPM(ctx, s.cfg.Access.Keys, c, meta.Files); err != nil {
 			return nil, s.internalError(ctx, "RPM virtual metadata signing", err)
 		}
 		return artgen.CalculateYumRepositoryMetadata200TextResponse(
