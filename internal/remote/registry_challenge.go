@@ -128,7 +128,7 @@ func parseRegistryChallenge(values []string, image string, tokens bool) (registr
 		if parsed.scheme != "bearer" || !tokens {
 			continue
 		}
-		realm, err := checkedURL(parsed.values["realm"])
+		realm, err := CheckedURL(parsed.values["realm"])
 		if err != nil {
 			return registryChallenge{}, ErrRegistryChallenge
 		}

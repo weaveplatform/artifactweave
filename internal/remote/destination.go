@@ -18,7 +18,7 @@ type destinationPolicy struct {
 	lookup  func(context.Context, string) ([]net.IPAddr, error)
 }
 
-func origin(u *url.URL) string {
+func Origin(u *url.URL) string {
 	return strings.ToLower(
 		u.Scheme,
 	) + "://" + net.JoinHostPort(
@@ -37,7 +37,7 @@ func port(u *url.URL) string {
 	return "80"
 }
 
-func checkedURL(raw string) (*url.URL, error) {
+func CheckedURL(raw string) (*url.URL, error) {
 	u, err := baseURL(raw)
 	if err != nil || strings.ContainsAny(u.Hostname(), "%\\\x00\r\n") {
 		return nil, ErrSecurity
@@ -62,7 +62,7 @@ func checkedURL(raw string) (*url.URL, error) {
 }
 
 func (p *destinationPolicy) addresses(ctx context.Context, u *url.URL) ([]string, error) {
-	if _, err := checkedURL(u.String()); err != nil {
+	if _, err := CheckedURL(u.String()); err != nil {
 		return nil, err
 	}
 	host := strings.TrimSuffix(strings.ToLower(u.Hostname()), ".")
@@ -93,7 +93,7 @@ func (p *destinationPolicy) addresses(ctx context.Context, u *url.URL) ([]string
 			return nil, ErrSecurity
 		}
 		a = a.Unmap()
-		if forbiddenAddress(a) || (!p.private[origin(u)] && !publicAddress(a)) {
+		if forbiddenAddress(a) || (!p.private[Origin(u)] && !publicAddress(a)) {
 			return nil, ErrSecurity
 		}
 		addresses = append(addresses, net.JoinHostPort(a.String(), port(u)))

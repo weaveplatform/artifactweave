@@ -12,12 +12,14 @@ import (
 // The format slices' tests install the hooks on their own fixtures, so only
 // this composition shows a hook the application stopped installing. A policy
 // without it still serves every request, only differently: a NuGet v2 204
-// would no longer be an empty feed.
+// would no longer be an empty feed, and without the registry path parser
+// Smart Remote would stop synchronising registry properties.
 func TestAccRemoteWiringInstallsFormatHooks(t *testing.T) {
 	w := newRemoteWorld(t)
+	content := w.rt.registrySources.HTTP.(*remote.RegistryContent)
 	policies := map[string]*remote.Policy{
 		"remote":   w.rt.remoteSources.HTTP.(*maven.MavenBackend).Policy,
-		"registry": w.rt.registrySources.HTTP.(*remote.RegistryContent).Policy,
+		"registry": content.Policy,
 	}
 	for name, p := range policies {
 		res := &http.Response{
@@ -30,5 +32,17 @@ func TestAccRemoteWiringInstallsFormatHooks(t *testing.T) {
 			res.StatusCode != http.StatusOK {
 			t.Fatalf("%s policy does not project the NuGet empty feed", name)
 		}
+	}
+	clients, ok := content.Registries.(*remote.RegistryClients)
+	if !ok || clients.Pool != &w.rt.registryHTTP || clients.Options == nil {
+		t.Fatal("registry content does not open the runtime's registry clients")
+	}
+	if w.rt.registryPath == nil {
+		t.Fatal("no registry path parser for Smart Remote")
+	}
+	image, operation, reference, err := w.rt.registryPath("library/alpine/manifests/latest")
+	if err != nil || image != "library/alpine" || operation != "manifests" ||
+		reference != "latest" {
+		t.Fatalf("registry path: %q %q %q %v", image, operation, reference, err)
 	}
 }

@@ -15,7 +15,6 @@ import (
 	"sync"
 
 	"github.com/weaveplatform/artifactweave/internal/source"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -25,8 +24,7 @@ import (
 // shared policy. The pool and resolver belong to the application lifetime.
 type RegistryContent struct {
 	Policy      *Policy
-	Pool        *RegistryPool
-	Options     func(context.Context, repo.Config) (RegistryOptions, error)
+	Registries  Registries
 	mu          sync.Mutex
 	descriptors map[string]layout.Descriptor
 }
@@ -43,19 +41,13 @@ func (c *RegistryContent) fetch(
 	opts Options,
 	request Request,
 ) (*http.Response, error) {
-	image, operation, reference, err := registryResource(q.Resource.UpstreamPath)
+	image, operation, reference, err := ParseRegistryPath(q.Resource.UpstreamPath)
 	if err != nil {
 		return nil, err
 	}
-	credentials, err := c.Options(ctx, q.Repo)
+	client, err := c.Registries.Open(ctx, q.Repo, permit.Identity, opts.Revision)
 	if err != nil {
-		return nil, err
-	}
-	if credentials.Transport.Revision != opts.Revision {
-		return nil, source.ErrSuperseded
-	}
-	client, err := c.Pool.Client(q.Repo, permit.Identity, credentials)
-	if err != nil {
+		//nolint:wrapcheck // preserves upstream error identity
 		return nil, err
 	}
 	request.Path = operation + "/" + reference
@@ -70,6 +62,7 @@ func (c *RegistryContent) fetch(
 				Status: http.StatusUnauthorized,
 			}
 		}
+		//nolint:wrapcheck // preserves upstream error identity
 		return nil, err
 	}
 	if res.StatusCode == http.StatusNotFound && operation == "blobs" {
@@ -96,7 +89,7 @@ func (c *RegistryContent) fetch(
 	return res, nil
 }
 
-func registryResource(path string) (image, operation, reference string, err error) {
+func ParseRegistryPath(path string) (image, operation, reference string, err error) {
 	parts := strings.Split(path, "/")
 	if len(parts) < 3 {
 		return "", "", "", ErrRequest
@@ -135,7 +128,7 @@ func (c *RegistryContent) prepare(
 	opts Options,
 	u *item.CacheUpload,
 ) error {
-	image, operation, reference, err := registryResource(q.Resource.UpstreamPath)
+	image, operation, reference, err := ParseRegistryPath(q.Resource.UpstreamPath)
 	if err != nil {
 		return err
 	}
@@ -280,7 +273,7 @@ func (c *RegistryContent) validateDescriptors(
 // share exact bytes; delivery separately checks each caller's accepted types.
 func RegistryResource(image, operation, reference string) (source.Resource, error) {
 	upstream := image + "/" + operation + "/" + reference
-	if _, _, _, err := registryResource(upstream); err != nil {
+	if _, _, _, err := ParseRegistryPath(upstream); err != nil {
 		return source.Resource{}, err
 	}
 	r := source.Resource{

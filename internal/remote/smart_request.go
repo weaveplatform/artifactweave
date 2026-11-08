@@ -26,9 +26,9 @@ func (s *Smart) request(
 	if err != nil {
 		return nil, err
 	}
-	u, err := checkedURL(target)
-	base, baseErr := checkedURL(peer.BaseURL)
-	if err != nil || baseErr != nil || origin(u) != origin(base) {
+	u, err := CheckedURL(target)
+	base, baseErr := CheckedURL(peer.BaseURL)
+	if err != nil || baseErr != nil || Origin(u) != Origin(base) {
 		return nil, ErrSecurity
 	}
 	if method == http.MethodPost && !validSmartPOST(q, peer, target, body) {

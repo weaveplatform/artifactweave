@@ -133,6 +133,7 @@ func smartFixture(t *testing.T) *smartWorld {
 		api.Authenticator,
 		api.Authorizer,
 		"remote.smart",
+		nil,
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
 	)
 	if err != nil {

@@ -363,7 +363,10 @@ func TestAccNIMMetadataAndPairedDockerRegistryKeepSeparateAuthority(t *testing.T
 	pool := new(remote.RegistryPool)
 	t.Cleanup(pool.Close)
 	content := &remote.RegistryContent{
-		Policy: registryPolicy, Pool: pool, Options: f.resolver.RegistryOptions,
+		Policy: registryPolicy,
+		Registries: &remote.RegistryClients{
+			Pool: pool, Options: f.resolver.RegistryOptions,
+		},
 	}
 	content.Install()
 	registrySvc := &source.Service{

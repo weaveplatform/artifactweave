@@ -12,14 +12,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-var (
-	ErrRegistryChallenge = errors.New("remote: invalid upstream registry authentication challenge")
-	ErrRegistryDenied    = errors.New("remote: upstream registry authentication denied")
-)
+var ErrRegistryChallenge = errors.New("remote: invalid upstream registry authentication challenge")
 
 // RegistryOptions comes from Resolver.RegistryOptions, never downstream headers.
 // Now is an optional clock for deterministic expiry tests.
@@ -86,7 +84,7 @@ func NewRegistry(c repo.Config, opts RegistryOptions) (*Registry, error) {
 		c.DockerAPIVersion != "" && c.DockerAPIVersion != repo.DockerV2 {
 		return nil, ErrConfiguration
 	}
-	base, err := checkedURL(c.URL)
+	base, err := CheckedURL(c.URL)
 	if err != nil {
 		return nil, err
 	}
@@ -130,11 +128,11 @@ func (r *Registry) prepare(opts RegistryOptions) func(*http.Request) error {
 		req.Header.Del("Authorization")
 		auth, _ := req.Context().Value(registryAuthorizationKey{}).(registryAuthorization)
 		if auth.realm != "" {
-			if origin(req.URL) == auth.realm &&
+			if Origin(req.URL) == auth.realm &&
 				r.realmCredentials(req.URL, opts.allowRealmCredentials) {
 				setRegistryBasic(req, opts)
 			}
-		} else if origin(req.URL) == origin(r.base) {
+		} else if Origin(req.URL) == Origin(r.base) {
 			if auth.token != "" {
 				prefix := strings.TrimRight(r.base.Path, "/") + "/v2/"
 				permitted := req.URL.Path == prefix
@@ -159,7 +157,7 @@ func setRegistryBasic(req *http.Request, opts RegistryOptions) {
 }
 
 func (r *Registry) realmCredentials(u *url.URL, allow bool) bool {
-	if origin(u) == origin(r.base) {
+	if Origin(u) == Origin(r.base) {
 		return true
 	}
 	if u.Scheme != "https" {
@@ -230,7 +228,7 @@ func (r *Registry) do(ctx context.Context, image string, q Request) (*http.Respo
 		return res, err
 	}
 	// Never trust an authentication challenge served by a blob/CDN redirect.
-	sameOrigin := origin(res.Request.URL) == origin(r.base)
+	sameOrigin := Origin(res.Request.URL) == Origin(r.base)
 	header := res.Header.Values("WWW-Authenticate")
 	_ = res.Body.Close()
 	if !sameOrigin {
@@ -302,13 +300,13 @@ func (r *Registry) cached(image string) (registryChallenge, registryToken) {
 }
 
 func (r *Registry) checkRealm(ctx context.Context, raw string) error {
-	u, err := checkedURL(raw)
+	u, err := CheckedURL(raw)
 	if err != nil || (r.base.Scheme == "https" && u.Scheme != "https") {
 		return ErrSecurity
 	}
 	// HTTP is accepted only at the configured registry origin, never a second
 	// realm where the token or Basic credentials would travel in plaintext.
-	if u.Scheme != "https" && origin(u) != origin(r.base) {
+	if u.Scheme != "https" && Origin(u) != Origin(r.base) {
 		return ErrSecurity
 	}
 	if err = r.client.checkURL(ctx, u); err != nil {
@@ -318,6 +316,11 @@ func (r *Registry) checkRealm(ctx context.Context, raw string) error {
 }
 
 func (r *Registry) Close() { r.client.Close() }
+
+func (r *Registry) Base() *url.URL {
+	u := *r.base
+	return &u
+}
 
 type pooledRegistry struct {
 	fingerprint [32]byte
@@ -375,6 +378,45 @@ func (p *RegistryPool) Remove(key string) {
 		old.registry.Close()
 		delete(p.clients, key)
 	}
+}
+
+type RegistryClients struct {
+	Pool    *RegistryPool
+	Options func(context.Context, repo.Config) (RegistryOptions, error)
+}
+
+func (r *RegistryClients) Open(
+	ctx context.Context,
+	c repo.Config,
+	id types.SourceIdentity,
+	revision string,
+) (RegistryClient, error) {
+	creds, err := r.Options(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+	if creds.Transport.Revision != revision {
+		return nil, source.ErrSuperseded
+	}
+	client, err := r.Pool.Client(c, id, creds)
+	if err != nil {
+		return nil, err
+	}
+	return client, nil
+}
+
+func (r *RegistryClients) Foreign(
+	ctx context.Context,
+	c repo.Config,
+	opts Options,
+	q Request,
+) (*http.Response, error) {
+	client, err := NewClient(c, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer client.Close()
+	return client.Do(ctx, q)
 }
 
 func (p *RegistryPool) Close() {

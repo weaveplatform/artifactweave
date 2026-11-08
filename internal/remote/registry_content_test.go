@@ -22,7 +22,7 @@ import (
 
 func TestAccRegistryResourceValidation(t *testing.T) {
 	for _, path := range []string{"image", "image/unknown/x", "image/manifests/bad tag", "image/blobs/latest", "image/referrers/sha256:no", "image/tags/other", "UPPER/manifests/latest"} {
-		if _, _, _, err := registryResource(path); err == nil {
+		if _, _, _, err := ParseRegistryPath(path); err == nil {
 			t.Errorf("accepted %s", path)
 		}
 	}

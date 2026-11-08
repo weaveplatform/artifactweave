@@ -85,7 +85,7 @@ func NewResolver(st store.Store, keyring *crypt.Keyring, opts ResolverOptions) (
 		}
 	}
 	for _, raw := range opts.AllowedPrivateOrigins {
-		if _, err := checkedURL(raw); err != nil {
+		if _, err := CheckedURL(raw); err != nil {
 			return nil, ErrConfiguration
 		}
 	}
@@ -110,7 +110,7 @@ func (r *Resolver) Options(ctx context.Context, c repo.Config) (Options, error) 
 	if !bytes.Equal(a, b) || stored.Class != repo.Remote {
 		return Options{}, ErrConfiguration
 	}
-	base, err := checkedURL(stored.URL)
+	base, err := CheckedURL(stored.URL)
 	if err != nil {
 		return Options{}, err
 	}
@@ -122,19 +122,19 @@ func (r *Resolver) Options(ctx context.Context, c repo.Config) (Options, error) 
 		return Options{}, err
 	}
 	policy := &destinationPolicy{
-		private: map[string]bool{origin(base): true},
+		private: map[string]bool{Origin(base): true},
 		lookup:  r.options.LookupIP,
 	}
 	configuredOrigins := append(sourceEndpoints(stored), r.options.AllowedPrivateOrigins...)
 	for _, raw := range configuredOrigins {
-		u, parseErr := checkedURL(raw)
+		u, parseErr := CheckedURL(raw)
 		if parseErr != nil {
 			return Options{}, ErrConfiguration
 		}
-		policy.private[origin(u)] = true
+		policy.private[Origin(u)] = true
 	}
 	if proxy != nil {
-		policy.private[origin(proxy)] = true
+		policy.private[Origin(proxy)] = true
 	}
 	identity, err := r.certificate(ctx, stored.ClientTLSCertificate)
 	if err != nil {
@@ -246,7 +246,7 @@ func (r *Resolver) proxy(
 	if !strings.Contains(host, "://") {
 		host = "http://" + host
 	}
-	u, err := checkedURL(host)
+	u, err := CheckedURL(host)
 	if err != nil || u.Path != "" && u.Path != "/" || u.RawQuery != "" || u.Port() != "" {
 		return nil, doc, ErrConfiguration
 	}

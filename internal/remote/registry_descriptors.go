@@ -24,7 +24,7 @@ func (c *RegistryContent) Read(
 	if err != nil {
 		return out, err
 	}
-	image, operation, reference, err := registryResource(q.Resource.UpstreamPath)
+	image, operation, reference, err := ParseRegistryPath(q.Resource.UpstreamPath)
 	if err != nil || operation != "manifests" && operation != "blobs" {
 		return out, err
 	}
@@ -146,7 +146,7 @@ func registryExternal(ctx context.Context, c repo.Config, opts Options, raw stri
 	if !enabled(c.ExternalDependenciesEnabled) || opts.CheckURL == nil {
 		return ErrSecurity
 	}
-	u, err := checkedURL(raw)
+	u, err := CheckedURL(raw)
 	if err != nil {
 		return ErrSecurity
 	}
@@ -203,15 +203,16 @@ func (c *RegistryContent) external(
 		return nil
 	}
 	opts.Jar = nil
-	client, err := NewClient(config, opts)
-	if err != nil {
-		return nil, err
-	}
-	defer client.Close()
-	return client.Do(ctx, Request{Method: http.MethodGet, ExternalURL: raw})
+	//nolint:wrapcheck // preserves upstream error identity
+	return c.Registries.Foreign(
+		ctx,
+		config,
+		opts,
+		Request{Method: http.MethodGet, ExternalURL: raw},
+	)
 }
 
-func registryNext(client *Registry, image, operation, reference, link string) (string, error) {
+func registryNext(client RegistryClient, image, operation, reference, link string) (string, error) {
 	if len(link) > 8192 {
 		return "", ErrRequest
 	}
@@ -230,16 +231,17 @@ func registryNext(client *Registry, image, operation, reference, link string) (s
 		}
 		upstream, err := client.Image(image)
 		if err != nil {
+			//nolint:wrapcheck // preserves upstream error identity
 			return "", err
 		}
 		expected := strings.TrimRight(
-			client.base.Path,
+			client.Base().Path,
 			"/",
 		) + "/v2/" + upstream + "/" + operation + "/" + reference
-		base := *client.base
+		base := *client.Base()
 		base.Path = expected
 		next = base.ResolveReference(next)
-		if origin(next) != origin(client.base) || next.Path != expected || next.User != nil ||
+		if Origin(next) != Origin(client.Base()) || next.Path != expected || next.User != nil ||
 			next.Fragment != "" ||
 			next.RawQuery == "" {
 			return "", ErrSecurity

@@ -15,7 +15,7 @@ import (
 
 func (c *RegistryContent) pages(
 	ctx context.Context,
-	client *Registry,
+	client RegistryClient,
 	image, operation, reference string,
 	res *http.Response,
 ) (*http.Response, error) {
@@ -81,6 +81,7 @@ func (c *RegistryContent) pages(
 			},
 		)
 		if err != nil {
+			//nolint:wrapcheck // preserves upstream error identity
 			return nil, err
 		}
 		if res.StatusCode != 200 {

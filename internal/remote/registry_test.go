@@ -557,6 +557,34 @@ func TestAccRegistryPoolAndNaming(t *testing.T) {
 	}
 }
 
+// A failed Open must return a nil interface, not a nil *Registry inside a
+// non-nil RegistryClient, which a caller checking client != nil would use.
+func TestUnitRegistryClientsOpenReturnsUntypedNil(t *testing.T) {
+	var pool RegistryPool
+	t.Cleanup(pool.Close)
+	clients := &RegistryClients{
+		Pool: &pool,
+		Options: func(context.Context, repo.Config) (RegistryOptions, error) {
+			return RegistryOptions{Transport: Options{Revision: "current"}}, nil
+		},
+	}
+	c := repo.Config{Key: "docker-remote", Class: repo.Remote, PackageType: repo.Docker}
+	identity := types.SourceIdentity{
+		Kind:       types.ExternalHTTP,
+		Repository: "incarnation",
+		Generation: "one",
+	}
+	client, err := clients.Open(t.Context(), c, identity, "stale")
+	if !errors.Is(err, source.ErrSuperseded) || client != nil {
+		t.Fatalf("revision mismatch: %#v %v", client, err)
+	}
+	identity.Kind = ""
+	client, err = clients.Open(t.Context(), c, identity, "current")
+	if err == nil || client != nil {
+		t.Fatalf("pool refusal: %#v %v", client, err)
+	}
+}
+
 func TestAccRegistryPublicRealmDNSDenied(t *testing.T) {
 	f := newRegistryFixture(t, "")
 	st := inmem.New()

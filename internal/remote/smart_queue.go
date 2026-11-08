@@ -185,7 +185,8 @@ func (s *Smart) restore(
 	if err != nil {
 		return ctx, q, permit, opts, source.ErrDenied
 	}
-	if p.Registry != nil && !smartRegistryGrant(p.Registry, c.Key, job.UpstreamPath) {
+	if p.Registry != nil &&
+		!smartRegistryGrant(s.registryPath, p.Registry, c.Key, job.UpstreamPath) {
 		return ctx, q, permit, opts, source.ErrDenied
 	}
 	p, d, err := s.authz.Authorize(ctx, p, p.Anonymous)
@@ -214,8 +215,15 @@ func (s *Smart) restore(
 	return ctx, q, permit, opts, err
 }
 
-func smartRegistryGrant(access *types.RegistryAccess, key, path string) bool {
-	name, _, _, err := registryResource(path)
+func smartRegistryGrant(
+	registryPath func(string) (image, operation, reference string, err error),
+	access *types.RegistryAccess,
+	key, path string,
+) bool {
+	if registryPath == nil {
+		return false
+	}
+	name, _, _, err := registryPath(path)
 	if err != nil {
 		return false
 	}
@@ -315,7 +323,7 @@ func (s *Smart) refresh(
 	job smartJob,
 ) error {
 	started := s.policy.now()
-	properties := smartProperties(q.Repo) && smartPropertyPath(q)
+	properties := smartProperties(q.Repo) && smartPropertyPath(s.registryPath, q)
 	var incoming types.Properties
 	var present bool
 	var err error

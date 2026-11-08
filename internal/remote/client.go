@@ -234,7 +234,7 @@ func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
 		if c.checkURL == nil || r.Path != "" || r.Query != "" {
 			return nil, ErrSecurity
 		}
-		u, err = checkedURL(r.ExternalURL)
+		u, err = CheckedURL(r.ExternalURL)
 	} else {
 		u, err = requestURL(c.config, c.base, r.Path, r.Query)
 	}
@@ -509,7 +509,7 @@ func (c *Client) requestClient(ctx context.Context, r Request) *http.Client {
 		if err := redirect(next, via); err != nil {
 			return err
 		}
-		if origin(next.URL) == origin(via[0].URL) {
+		if Origin(next.URL) == Origin(via[0].URL) {
 			smartHeaders(next)
 		}
 		return nil
@@ -522,7 +522,7 @@ func (c *Client) validGitLFSActionHeaders(u *url.URL, r Request) bool {
 		return true
 	}
 	if c.config.PackageType != repo.GitLFS || r.Method != http.MethodGet ||
-		r.ExternalURL == "" || !r.NoCrossOriginAuth || origin(u) != origin(c.base) ||
+		r.ExternalURL == "" || !r.NoCrossOriginAuth || Origin(u) != Origin(c.base) ||
 		!source.ValidGitLFSActionHeaders(r.GitLFSActionHeaders) {
 		return false
 	}

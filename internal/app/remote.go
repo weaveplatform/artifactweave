@@ -141,11 +141,14 @@ func (rt *runtime) openRemoteSources(
 		GitFetch: cocoapods.FetchCocoaPodsGit, ProjectResponse: nuget.ProjectEmptyFeed,
 	}
 	content := &remote.RegistryContent{
-		Policy:  registryPolicy,
-		Pool:    &rt.registryHTTP,
-		Options: resolver.RegistryOptions,
+		Policy: registryPolicy,
+		Registries: &remote.RegistryClients{
+			Pool:    &rt.registryHTTP,
+			Options: resolver.RegistryOptions,
+		},
 	}
 	content.Install()
+	rt.registryPath = remote.ParseRegistryPath
 	rt.registrySources = &source.Service{
 		Resolve:    resolve,
 		Revalidate: registryRevalidate,
@@ -188,6 +191,7 @@ func (rt *runtime) openRemoteSources(
 		accessAPI.Authenticator,
 		accessAPI.Authorizer,
 		"remote.smart",
+		rt.registryPath,
 		log,
 	)
 	if err != nil {
@@ -200,6 +204,7 @@ func (rt *runtime) openRemoteSources(
 		accessAPI.Authenticator,
 		accessAPI.Authorizer,
 		"remote.smart.registry",
+		rt.registryPath,
 		log,
 	)
 	if err != nil {

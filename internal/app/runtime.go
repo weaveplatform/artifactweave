@@ -72,6 +72,11 @@ type runtime struct {
 	remoteSources   *source.Service
 	registryHTTP    remote.RegistryPool
 	registrySources *source.Service
+	// registryPath is the registry path grammar both Smart Remote runtimes
+	// are given. Nil silently turns off property synchronisation for
+	// registry requests and refuses every side effect a registry token
+	// queued, with no error anywhere.
+	registryPath func(string) (image, operation, reference string, err error)
 	// formats are the formats' options, which the server and the work
 	// queue's item service share.
 	formats   ecosystem.Settings

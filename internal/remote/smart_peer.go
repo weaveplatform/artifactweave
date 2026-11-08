@@ -24,7 +24,7 @@ type SmartPeer struct {
 // api/<package>/<repository> forms. Query-bearing and ambiguous endpoint paths
 // cannot safely identify a different management API and are refused.
 func ParseSmartPeer(c repo.Config) (SmartPeer, error) {
-	u, err := checkedURL(c.URL)
+	u, err := CheckedURL(c.URL)
 	if err != nil || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" ||
 		strings.ContainsAny(
 			u.Path,
@@ -68,7 +68,7 @@ func (p SmartPeer) StorageURL(path string, query url.Values) (string, error) {
 			return "", source.ErrInvalidRequest
 		}
 	}
-	u, err := checkedURL(p.BaseURL)
+	u, err := CheckedURL(p.BaseURL)
 	if err != nil || u.RawQuery != "" || u.ForceQuery || p.Repository == "" ||
 		p.Repository == "." || p.Repository == ".." || strings.ContainsAny(p.Repository, "/\\%?#:;\r\n") {
 		return "", source.ErrInvalidRequest
