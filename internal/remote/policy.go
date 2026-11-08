@@ -32,6 +32,10 @@ type Policy struct {
 	// Fetch overrides only the protocol exchange. Authentication adapters retain
 	// the source identity and credential revision used by this cache operation.
 	Fetch func(context.Context, source.Request, source.Permit, Options, Request) (*http.Response, error)
+	// GitFetch answers a request for a CocoaPods Git checkout (q.Resource.CocoaPodsGit
+	// set). The application installs cocoapods.FetchCocoaPodsGit; nil answers
+	// source.ErrUnsupported, as a policy without a pool does.
+	GitFetch func(ctx context.Context, p *Policy, q source.Request, permit source.Permit, opts Options) (*http.Response, error)
 	// PrepareUpload performs bounded adapter work outside SQL, after the main
 	// response succeeds and before validation/publication. It uses the same
 	// transport security and cannot replace the final CheckCurrent fence.

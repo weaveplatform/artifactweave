@@ -182,7 +182,7 @@ func (s *Smart) document(
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
 		if res.StatusCode == http.StatusTooManyRequests {
-			return nil, false, responseError(res, s.policy.now())
+			return nil, false, ResponseError(res, s.policy.now())
 		}
 		return nil, false, smartStatus(res.StatusCode)
 	}

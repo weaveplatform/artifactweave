@@ -129,10 +129,12 @@ func (rt *runtime) openRemoteSources(
 		Options:      resolver.Options,
 		Key:          key,
 		CheckCurrent: checkCurrent(revalidate),
+		GitFetch:     remote.FetchCocoaPodsGit,
 	}
 	registryPolicy := &remote.Policy{
 		Store: rt.store, Blobs: rt.blobs, Items: items,
 		Options: resolver.Options, CheckCurrent: checkCurrent(registryRevalidate), Key: key,
+		GitFetch: remote.FetchCocoaPodsGit,
 	}
 	content := &remote.RegistryContent{
 		Policy:  registryPolicy,

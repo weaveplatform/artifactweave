@@ -36,8 +36,8 @@ type Options struct {
 }
 
 type Request struct {
-	// gitUploadPack is set only by the closed CocoaPods Git-object adapter.
-	gitUploadPack bool
+	// GitUploadPack is set only by the closed CocoaPods Git-object adapter.
+	GitUploadPack bool
 	// ExternalURL is a metadata/token-realm URL, never combined with Path/Query.
 	// It requires a resolved destination policy.
 	ExternalURL string
@@ -192,7 +192,7 @@ func redirectPolicy(opts Options) func(*http.Request, []*http.Request) error {
 
 //nolint:gocyclo // Preserves transport guards while admitting closed protocol-specific POSTs.
 func (c *Client) Do(ctx context.Context, r Request) (*http.Response, error) {
-	gitPOST := r.gitUploadPack && r.Method == http.MethodPost &&
+	gitPOST := r.GitUploadPack && r.Method == http.MethodPost &&
 		c.config.PackageType == repo.CocoaPods && r.Metadata && r.NoCrossOriginAuth &&
 		r.ExternalURL != "" && r.Path == "" && r.Query == "" &&
 		len(r.Body) > 0 && len(r.Body) <= 4096 &&

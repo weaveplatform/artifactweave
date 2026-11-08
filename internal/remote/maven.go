@@ -158,7 +158,7 @@ func (m *MavenBackend) PrepareUpload(
 			continue
 		}
 		if res.StatusCode != http.StatusOK {
-			return responseError(res, m.Policy.now())
+			return ResponseError(res, m.Policy.now())
 		}
 		if readErr != nil || len(data) > 1024 {
 			return item.ErrBadChecksum

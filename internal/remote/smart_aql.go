@@ -54,7 +54,7 @@ func (s *Smart) query(
 	}
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
-		return source.Result{}, responseError(res, s.policy.now())
+		return source.Result{}, ResponseError(res, s.policy.now())
 	}
 	media, _, err := mime.ParseMediaType(res.Header.Get("Content-Type"))
 	if err != nil || media != "application/json" {

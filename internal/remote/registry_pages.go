@@ -85,7 +85,7 @@ func (c *RegistryContent) pages(
 		}
 		if res.StatusCode != 200 {
 			_ = res.Body.Close()
-			return nil, responseError(res, c.Policy.now())
+			return nil, ResponseError(res, c.Policy.now())
 		}
 	}
 	var data []byte

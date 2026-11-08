@@ -55,8 +55,9 @@ type cocoaPodsCheckout struct {
 // fetchCocoaPodsGit keeps Git transport behind the same source policy as HTTP
 // archives. Only the final validated tar is published; no Git checkout or
 // attacker-controlled filesystem/configuration is ever executed.
-func (p *Policy) fetchCocoaPodsGit(
+func FetchCocoaPodsGit(
 	ctx context.Context,
+	p *Policy,
 	q source.Request,
 	permit source.Permit,
 	opts Options,
@@ -475,7 +476,7 @@ func (t cocoaPodsGitTransport) RoundTrip(req *http.Request) (*http.Response, err
 			NoCrossOriginAuth: true,
 			Metadata:          true,
 			Body:              body,
-			gitUploadPack:     req.Method == http.MethodPost,
+			GitUploadPack:     req.Method == http.MethodPost,
 			Header:            http.Header{"Accept": {accept}},
 		},
 	)
@@ -484,7 +485,7 @@ func (t cocoaPodsGitTransport) RoundTrip(req *http.Request) (*http.Response, err
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return nil, responseError(response, time.Now())
+		return nil, ResponseError(response, time.Now())
 	}
 	data, err := io.ReadAll(io.LimitReader(response.Body, limit+1))
 	if err != nil || int64(len(data)) > limit {

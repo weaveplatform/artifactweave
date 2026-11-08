@@ -148,7 +148,7 @@ func (p *Policy) fetch(
 			return out, nil
 		}
 	default:
-		return p.fallback(q, key, e, responseError(res, p.now()))
+		return p.fallback(q, key, e, ResponseError(res, p.now()))
 	}
 	u := p.upload(q, permit, opts.Revision, token, res, false)
 	committed, err := p.cache(ctx, q, permit, opts, u)
@@ -290,7 +290,7 @@ func (p *Policy) directOnce(
 		return p.resultFor(ctx, q, updated)
 	case http.StatusOK:
 	default:
-		return source.Result{}, responseError(res, p.now())
+		return source.Result{}, ResponseError(res, p.now())
 	}
 	if q.Resource.Method == http.MethodHead {
 		claimed, parseErr := item.ParseChecksums(types.Checksums{
@@ -506,7 +506,7 @@ func normalizeMissing(q source.Request, res *http.Response) {
 	}
 }
 
-func responseError(res *http.Response, now time.Time) error {
+func ResponseError(res *http.Response, now time.Time) error {
 	status := res.StatusCode
 	if status == 401 || status == 403 || status == 429 || status >= 500 && status <= 599 {
 		failure := &source.HTTPError{Status: status, Kind: source.FailureKindHTTP}

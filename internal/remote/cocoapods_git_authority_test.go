@@ -207,6 +207,7 @@ func TestAccCocoaPodsGitRevocationDuringSubmoduleFetch(t *testing.T) {
 func cocoaPodsAuthorityFixture(t *testing.T) (*policyWorld, source.Request) {
 	t.Helper()
 	w := policyFixture(t)
+	w.p.GitFetch = FetchCocoaPodsGit
 	w.c.PackageType = repo.CocoaPods
 	w.c.ExternalDependenciesEnabled = ptr(true)
 	w.c.ExternalDependenciesPatterns = []string{w.up.URL + "/**"}
