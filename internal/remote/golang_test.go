@@ -13,9 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	goformat "github.com/weaveplatform/artifactweave/internal/format/golang"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -56,12 +57,8 @@ func goSourceFixture(t *testing.T) (*policyWorld, GoSource, source.Request) {
 	if err := w.db.Repos().Update(t.Context(), w.c); err != nil {
 		t.Fatal(err)
 	}
-	subject := authz.Subject{Name: "reader", Admin: true}
-	access, err := authz.New(
-		t.Context(),
-		authz.Sources{Permissions: w.db.Permissions(), Groups: w.db.Groups()},
-		subject,
-	)
+	subject := accessapi.Subject{Name: "reader", Admin: true}
+	access, err := accesstest.Over(t, w.db).Decide(t.Context(), subject, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +69,7 @@ func goSourceFixture(t *testing.T) (*policyWorld, GoSource, source.Request) {
 		HTTP: w.p, Cache: w.p,
 	}
 	return w, GoSource{Source: s},
-		source.Request{Repo: w.c, Subject: subject, Access: authz.AsAPI(access)}
+		source.Request{Repo: w.c, Subject: subject, Access: access}
 }
 
 func readGo(

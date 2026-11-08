@@ -14,9 +14,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	podfmt "github.com/weaveplatform/artifactweave/internal/format/cocoapods"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
@@ -217,7 +218,7 @@ func cocoaPodsAuthorityFixture(t *testing.T) (*policyWorld, source.Request) {
 	git := source.CocoaPodsGitSource{URL: w.up.URL + "/main.git", Branch: "main", Submodules: true}
 	q := w.request("HelloPod/1.0.0/source.tar.gz", source.ResourceKindArtifact)
 	q.Repo = w.c
-	q.Subject = authz.Subject{Name: "git-reader"}
+	q.Subject = accessapi.Subject{Name: "git-reader"}
 	q.Resource.CocoaPodsGit = &git
 	q.Resource.ExternalURL, q.Resource.Variant = git.URL, git.Variant()
 	q.Resource.Mutable, q.Resource.NoCrossOriginAuth = true, true
@@ -239,6 +240,10 @@ func cocoaPodsAuthorityFixture(t *testing.T) (*policyWorld, source.Request) {
 	}
 	resolver := resolverFor(t, w.db, ResolverOptions{})
 	w.p.Options = resolver.Options
+	// The policy passes CheckCurrent its own store, w.db, so the kit over
+	// w.db asks the same permissions, inside the policy's transaction
+	// through ctx.
+	kit := accesstest.Over(t, w.db)
 	w.p.CheckCurrent = func(ctx context.Context, st store.Store, q source.Request, _ source.Permit, revision string) error {
 		current, err := st.Repos().Get(ctx, q.Repo.Key)
 		if err != nil || store.RemotePolicyChanged(current, q.Repo) {
@@ -248,13 +253,9 @@ func cocoaPodsAuthorityFixture(t *testing.T) (*policyWorld, source.Request) {
 		if err != nil || opts.Revision != revision {
 			return source.ErrSuperseded
 		}
-		access, err := authz.New(
-			ctx,
-			authz.Sources{Permissions: st.Permissions(), Groups: st.Groups()},
-			q.Subject,
-		)
+		access, err := kit.Decide(ctx, q.Subject, false)
 		if err != nil || !access.Allows(
-			types.ResourceArtifact, authz.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)},
+			types.ResourceArtifact, accessapi.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)},
 			q.Resource.Path, types.ActionRead,
 		) {
 			return source.ErrDenied

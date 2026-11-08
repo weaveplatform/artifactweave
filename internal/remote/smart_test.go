@@ -15,12 +15,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/source"
-	"github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -65,42 +65,25 @@ func smartFixture(t *testing.T) *smartWorld {
 		t.Fatal(err)
 	}
 	w.permit.Identity, _ = w.db.RemoteCache().Source(t.Context(), w.c.Key)
-	hash, err := auth.HashPasswordWith(
-		auth.HashParams{Time: 1, MemoryKiB: 8, Threads: 1},
-		"reader-password",
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = w.db.Users().
+	hash := accesstest.HashPassword(t, "reader-password")
+	if err := w.db.Users().
 		Create(t.Context(), types.User{Name: "reader", PasswordHash: hash}); err != nil {
 		t.Fatal(err)
 	}
-	if err = w.db.Permissions().
+	if err := w.db.Permissions().
 		Create(t.Context(), types.Permission{Name: "read", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {Targets: map[string]types.Target{w.c.Key: {}}, Actions: types.Grants{Users: map[string]types.Actions{"reader": types.ActionRead}}}}}); err != nil {
 		t.Fatal(err)
 	}
-	a, err := auth.NewAuthenticator(
-		w.db.Users(),
-		w.db.Settings(),
-		auth.Options{Hash: auth.HashParams{Time: 1, MemoryKiB: 8, Threads: 1}, Now: w.clock.Now},
-	)
+	kit := accesstest.Over(t, w.db, accesstest.WithNow(w.clock.Now))
+	api := kit.API()
+	p, err := api.Authenticator.Basic(t.Context(), "reader", "reader-password")
 	if err != nil {
 		t.Fatal(err)
 	}
-	p, err := a.Basic(t.Context(), "reader", "reader-password")
+	w.ctx, err = kit.Authorize(t.Context(), p, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	p, decider, err := auth.Authorize(
-		t.Context(),
-		authz.Sources{Permissions: w.db.Permissions(), Groups: w.db.Groups()},
-		p,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	w.ctx = auth.WithAuthorized(t.Context(), p, decider)
 	resolver, err := NewResolver(
 		w.db,
 		nil,
@@ -123,27 +106,19 @@ func smartFixture(t *testing.T) *smartWorld {
 		if err != nil || opts.Revision != revision {
 			return source.ErrSuperseded
 		}
-		principal, ok := auth.FromContext(ctx)
+		principal, ok := kernel.FromContext(ctx)
 		if !ok {
 			return source.ErrDenied
 		}
-		principal, err = a.Current(ctx, principal, w.db.Tokens())
+		principal, err = api.Authenticator.Current(ctx, principal)
 		if err != nil {
 			return source.ErrDenied
 		}
-		_, d, err := auth.Authorize(
-			ctx,
-			authz.Sources{
-				Permissions:      w.db.Permissions(),
-				Groups:           w.db.Groups(),
-				AnonymousEnabled: principal.Anonymous,
-			},
-			principal,
-		)
+		_, d, err := api.Authorizer.Authorize(ctx, principal, principal.Anonymous)
 		if err != nil ||
 			!d.Allows(
 				types.ResourceArtifact,
-				authz.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)},
+				accessapi.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)},
 				q.Resource.Path,
 				types.ActionRead,
 			) {
@@ -151,16 +126,12 @@ func smartFixture(t *testing.T) *smartWorld {
 		}
 		return generic.CheckDownload(q.Repo, q.Resource.Path, false)
 	}
-	module, err := access.New(access.Deps{Store: w.db, Authenticator: a})
-	if err != nil {
-		t.Fatal(err)
-	}
 	w.s, err = NewSmart(
 		t.Context(),
 		w.p,
 		w.p.Pool,
-		module.API().Authenticator,
-		module.API().Authorizer,
+		api.Authenticator,
+		api.Authorizer,
 		"remote.smart",
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
 	)
@@ -257,9 +228,10 @@ func (w *smartWorld) servePeer(rw http.ResponseWriter, r *http.Request) {
 }
 
 func (w *smartWorld) smartRequest() source.Request {
-	p, _ := auth.FromContext(w.ctx)
+	p, _ := kernel.FromContext(w.ctx)
+	d, _ := accessapi.DeciderFrom(w.ctx)
 	q := w.request("file.bin", source.ResourceKindArtifact)
-	q.Subject, q.Access = auth.SubjectOf(p), authz.AsAPI(auth.DeciderFrom(w.ctx))
+	q.Subject, q.Access = accessapi.SubjectOf(p), d
 	return q
 }
 
