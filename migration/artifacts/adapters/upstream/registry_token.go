@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 )
 
 func (r *Registry) token(ctx context.Context, challenge registryChallenge) (registryToken, error) {

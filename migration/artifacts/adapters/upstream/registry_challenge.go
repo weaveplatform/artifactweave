@@ -7,7 +7,7 @@ import (
 
 	"golang.org/x/net/http/httpguts"
 
-	"github.com/weaveplatform/artifactweave/internal/remote"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 )
 
 type registryChallenge struct{ scheme, realm, service, scope string }

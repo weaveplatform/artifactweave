@@ -66,7 +66,7 @@
         {"from":"internal/layout","action":"delete","ticket":"PRO-02"},
         {"from":"internal/openapibundle","action":"move","to":"devtools/openapibundle","ticket":"PLT-19"},
         {"from":"internal/reindexauth","action":"move","to":"artifacts/core/reindexauth","ticket":"ART-13"},
-        {"from":"internal/remote","action":"split","ticket":"RMT-09"},
+        {"from":"internal/remote","action":"move","to":"artifacts/core/remote","ticket":"RMT-09"},
         {"from":"internal/repos","action":"move","to":"artifacts/core/repos","ticket":"ART-12"},
         {"from":"internal/server","action":"split","ticket":"WEB-22"},
         {"from":"internal/server/agentpackages","action":"move","to":"artifacts/ecosystem/agentpackages/http","name":"agentpackageshttp","ticket":"ECO-22"},

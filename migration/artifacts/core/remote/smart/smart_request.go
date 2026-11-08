@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 )
 
 // Peer management requests reuse resolved security and pooled transports, but

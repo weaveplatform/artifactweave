@@ -5,7 +5,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/remote"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 )
 
 // enabled reports a repository switch that is set and on, as core remote's

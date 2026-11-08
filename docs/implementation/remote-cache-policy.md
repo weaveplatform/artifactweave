@@ -1,7 +1,7 @@
 # Shared remote retrieval policy
 
 Issue [#620](https://github.com/weaveplatform/artifactweave/issues/620) implements
-`internal/remote.Policy` as the HTTP/cache backend for the
+`migration/artifacts/core/remote.Policy` as the HTTP/cache backend for the
 [source boundary](source-boundary.md). It follows the
 [remote retrieval contract](remote-retrieval-contract.md), using the
 [bounded transport](remote-http-transport.md) and durable cache tokens. Generic

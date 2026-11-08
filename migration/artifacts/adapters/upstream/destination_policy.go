@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/remote"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 )
 
 // destinationPolicy grants private-network access only to authorities configured
