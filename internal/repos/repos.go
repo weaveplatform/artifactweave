@@ -6,7 +6,6 @@
 package repos
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -16,15 +15,13 @@ import (
 	"strings"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
-
-// MsgKeyExists answers a create whose key is taken, compared without case.
-const MsgKeyExists = "Case insensitive repository key already exists"
 
 func badRequestf(format string, a ...any) error {
 	return apierror.New(http.StatusBadRequest, fmt.Sprintf(format, a...))
@@ -57,7 +54,7 @@ func PrepareCreate(c repo.Config, existing []repo.Config) (repo.Config, error) {
 		existing,
 		func(e repo.Config) bool { return strings.EqualFold(e.Key, c.Key) },
 	) {
-		return c, badRequestf(MsgKeyExists)
+		return c, badRequestf(artifactsapi.MsgKeyExists)
 	}
 	return c, nil
 }
@@ -220,7 +217,7 @@ func Merge(stored repo.Config, patch map[string]json.RawMessage) (repo.Config, e
 		"key": stored.Key, "rclass": string(stored.Class), "packageType": string(stored.PackageType),
 	} {
 		raw, ok := patch[field]
-		if !ok || IsNull(raw) {
+		if !ok || artifactsapi.IsNull(raw) {
 			delete(patch, field)
 			continue
 		}
@@ -253,7 +250,7 @@ func Merge(stored repo.Config, patch map[string]json.RawMessage) (repo.Config, e
 		return stored, fmt.Errorf("decode repository: %w", err)
 	}
 	for field, raw := range patch {
-		if IsNull(raw) {
+		if artifactsapi.IsNull(raw) {
 			delete(doc, field)
 		} else {
 			doc[field] = raw
@@ -279,14 +276,6 @@ func Merge(stored repo.Config, patch map[string]json.RawMessage) (repo.Config, e
 	}
 	return out, nil
 }
-
-func IsNull(raw json.RawMessage) bool { return bytes.Equal(bytes.TrimSpace(raw), []byte("null")) }
-
-// ErrChanged is a repository delete that found the repository's content
-// changing under it: an item it moved to the trash can was gone by the time
-// it deleted the content. Nothing is deleted, and a retry sees the content
-// as it now is.
-var ErrChanged = errors.New("repos: the repository's content changed during the delete")
 
 // Remove deletes key with its content, in one transaction: the items of the
 // repository and, for a remote, its cache, the root records that hold their
@@ -401,11 +390,11 @@ func Remove(ctx context.Context, st store.Store, key, by string) (int64, bool, e
 // without an entry, and its reference is released here. A file it removed
 // would leave an entry holding a reference the delete never removed, which
 // purging the entry would release a second time, so that refuses the whole
-// delete as ErrChanged instead.
+// delete as artifactsapi.ErrChanged instead.
 func release(ctx context.Context, st store.Store, removed, held map[string]int64) error {
 	for sha, n := range held {
 		if removed[sha] < n {
-			return fmt.Errorf("%w: blob %s", ErrChanged, sha)
+			return fmt.Errorf("%w: blob %s", artifactsapi.ErrChanged, sha)
 		}
 	}
 	for sha, n := range removed {

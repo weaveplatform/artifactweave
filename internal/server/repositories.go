@@ -17,6 +17,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/repos"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -53,7 +54,7 @@ const (
 // page shows the update confirmation, so its wording is our own, as are the
 // error messages not listed here.
 const (
-	msgKeyExists  = repos.MsgKeyExists
+	msgKeyExists  = artifactsapi.MsgKeyExists
 	msgProtected  = "Cannot delete repository: repository key is blank, trash or support bundle"
 	msgRemoved    = "Repository '%s' and all its content have been removed successfully."
 	msgNoConfig   = "Cannot delete repository: '%s', repository config does not exist"

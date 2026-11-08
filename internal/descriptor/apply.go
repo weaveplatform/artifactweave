@@ -12,6 +12,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/repos"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
@@ -310,7 +311,7 @@ func planRepo(
 	fields := map[string]json.RawMessage{}
 	for k, v := range c.Fields {
 		// A null on a new repository is its default anyway.
-		if !repos.IsNull(v) {
+		if !artifactsapi.IsNull(v) {
 			fields[k] = v
 		}
 	}

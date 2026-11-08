@@ -11,6 +11,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
@@ -428,7 +429,15 @@ func TestUnitRemoveWhileTheContentChanges(t *testing.T) {
 			t.Fatal(err)
 		}
 	}}
-	if _, _, err := Remove(ctx, removed, "libs", "admin"); !errors.Is(err, ErrChanged) {
+	if _, _, err := Remove(
+		ctx,
+		removed,
+		"libs",
+		"admin",
+	); !errors.Is(
+		err,
+		artifactsapi.ErrChanged,
+	) {
 		t.Fatalf("Remove: %v", err)
 	}
 	if _, err := db.Items().Get(ctx, "libs", false, "f.txt"); err != nil {
