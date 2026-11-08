@@ -186,7 +186,9 @@ func TestUnitTerraformPathsSelectOnlyTheirAffectedLane(t *testing.T) {
 }
 
 func TestUnitAffectedFormatSelectsOwnedMixedPackageEntries(t *testing.T) {
-	candidate := proposeAffected([]change{{status: "M", path: "internal/format/maven/maven.go"}})
+	candidate := proposeAffected(
+		[]change{{status: "M", path: "migration/artifacts/ecosystem/maven/maven.go"}},
+	)
 	if candidate.profile != "format" || candidate.owner != "maven" {
 		t.Fatalf("Maven impact: %+v", candidate)
 	}

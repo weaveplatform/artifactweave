@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/formattest"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 )
 
 // file is a fixture file whose content changes with each deploy n.

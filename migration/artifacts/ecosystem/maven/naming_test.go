@@ -3,7 +3,7 @@ package maven_test
 import (
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/format/maven"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 )
 
 // The predicates answer as Artifactory's MavenNaming does for the same

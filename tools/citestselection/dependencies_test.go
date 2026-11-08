@@ -23,7 +23,7 @@ func TestUnitReverseClosureIncludesTransitiveProductionConsumers(t *testing.T) {
 			t.Errorf("reverse closure omitted %s: %v", want, got)
 		}
 	}
-	if slices.Contains(got, "./internal/format/maven") {
+	if slices.Contains(got, "./migration/artifacts/ecosystem/maven") {
 		t.Fatal("unrelated format selected")
 	}
 }

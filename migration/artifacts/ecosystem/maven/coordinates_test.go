@@ -3,9 +3,9 @@ package maven_test
 import (
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 )
 
 func mustLayout(t *testing.T, name string) *layout.Layout {

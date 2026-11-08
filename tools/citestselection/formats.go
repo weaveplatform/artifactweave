@@ -80,7 +80,7 @@ var formats = map[string]formatImpact{
 	"luarocks":    {"./internal/format/luarocks/...", "@luarocks", []string{"luarocks", "jf"}},
 	"composer":    {"./internal/format/composer/...", "@composer", []string{"composer"}},
 	"maven": {
-		"./internal/format/maven/...",
+		"./migration/artifacts/ecosystem/maven/...",
 		"@maven&&~@gradle,@package_wiring&&~@gradle",
 		[]string{"maven", "maven39", "sbt", "jf"},
 	},

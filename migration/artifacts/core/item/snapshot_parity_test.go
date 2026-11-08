@@ -3,13 +3,13 @@ package item_test
 import (
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 )
 
 // The item service's copy of maven.IsNonUniqueSnapshot answers as the
 // original does, on the snapshot paths of the Maven naming table
-// (internal/format/maven/naming_test.go) and on paths of other package
+// (migration/artifacts/ecosystem/maven/naming_test.go) and on paths of other package
 // types, which the copy judges too.
 func TestUnitNonUniqueSnapshotMatchesMaven(t *testing.T) {
 	for _, p := range []string{

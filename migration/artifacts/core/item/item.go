@@ -707,7 +707,7 @@ func Sidecar(p string) (artifact string, a Algorithm, ok bool) {
 	return "", "", false
 }
 
-// mavenMetadata is the name of Maven's metadata files. internal/format/maven
+// mavenMetadata is the name of Maven's metadata files. migration/artifacts/ecosystem/maven
 // names them too, but its tests import this package.
 const mavenMetadata = "maven-metadata.xml"
 
