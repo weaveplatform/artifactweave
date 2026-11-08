@@ -292,18 +292,17 @@ var protocols = []func(Config) pkgroute.Protocol{
 	},
 }
 
-// npmAccounts is what npm's login and logout need from cfg. A nil
-// authenticator or token service must stay a nil interface, which the npm
-// handlers answer 501, rather than one holding a nil pointer.
+// npmAccounts is what npm's login and logout need from cfg: the access
+// module's authenticator and token service. An absent one must stay a nil
+// interface, which the npm handlers answer 501. cfg.Access holds nil
+// interfaces, never typed nils, and a nil interface converts to a nil one,
+// so they are assigned as they are.
 func npmAccounts(cfg Config) npm.Accounts {
-	a := npm.Accounts{TokenExpiry: cfg.NPMLoginTokenExpiry}
-	if cfg.Auth != nil {
-		a.Passwords = cfg.Auth
+	return npm.Accounts{
+		Passwords:   cfg.Access.Authenticator,
+		Tokens:      cfg.Access.Tokens,
+		TokenExpiry: cfg.NPMLoginTokenExpiry,
 	}
-	if cfg.Tokens != nil {
-		a.Tokens = cfg.Tokens
-	}
-	return a
 }
 
 // newRegistry is the Docker registry for cfg. A nil token service must not

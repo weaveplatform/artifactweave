@@ -12,6 +12,8 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	"github.com/weaveplatform/artifactweave/internal/server/npm"
+	"github.com/weaveplatform/artifactweave/migration/access"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -74,8 +76,14 @@ func newAccounts(t *testing.T, settings map[string]any, expiry time.Duration) *a
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Login and logout reach the service through the access module's
+	// binding, as the server wires them from app's module.
+	m, err := access.New(access.Deps{Store: f.db, Authenticator: a, Tokens: tokens})
+	if err != nil {
+		t.Fatal(err)
+	}
 	f.remount(t, npm.Options{Accounts: npm.Accounts{
-		Passwords: a, Tokens: tokens, TokenExpiry: expiry,
+		Passwords: a, Tokens: m.API().Tokens, TokenExpiry: expiry,
 	}})
 	return &accounts{fixture: f, auth: a, tokens: tokens}
 }
@@ -375,8 +383,8 @@ var errTokens = errors.New("token store down")
 // failingTokens is a token service whose store is down.
 type failingTokens struct{}
 
-func (failingTokens) Issue(context.Context, token.Request) (token.Issued, error) {
-	return token.Issued{}, errTokens
+func (failingTokens) Issue(context.Context, accessapi.TokenRequest) (accessapi.IssuedToken, error) {
+	return accessapi.IssuedToken{}, errTokens
 }
 
 func (failingTokens) RevokeValue(context.Context, string) error { return errTokens }

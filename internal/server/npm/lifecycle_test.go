@@ -11,9 +11,9 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	npmfmt "github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/server/npm"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -127,7 +127,7 @@ func TestAccDistTagRefusals(t *testing.T) {
 	}{
 		{"PUT", "rich/dist-tags/qa", "writer", `"1.0.0"`, http.StatusForbidden, ""},
 		{"PUT", "rich/dist-tags/qa", "reader", `"1.0.0"`, http.StatusForbidden, ""},
-		{"PUT", "rich/dist-tags/qa", auth.AnonymousUser, `"1.0.0"`, http.StatusUnauthorized, ""},
+		{"PUT", "rich/dist-tags/qa", kernel.AnonymousUser, `"1.0.0"`, http.StatusUnauthorized, ""},
 		{"DELETE", "rich/dist-tags/beta", "nobody", "", http.StatusForbidden, ""},
 		// tagone may annotate 1.x, but beta is on 2.0.0-beta.1.
 		{"PUT", "rich/dist-tags/beta", "tagone", `"1.0.0"`, http.StatusForbidden, ""},
@@ -272,7 +272,7 @@ func TestAccDeprecateRefusals(t *testing.T) {
 		// writer may deploy, which lets the body be read, but not annotate.
 		{"writer", "rich", deprecateAll, http.StatusForbidden, ""},
 		{"reader", "rich", deprecateAll, http.StatusForbidden, ""},
-		{auth.AnonymousUser, "rich", deprecateAll, http.StatusUnauthorized, ""},
+		{kernel.AnonymousUser, "rich", deprecateAll, http.StatusUnauthorized, ""},
 		// tagone may annotate 1.0.0 but not 2.0.0-beta.1.
 		{"tagone", "rich", deprecateAll, http.StatusForbidden, ""},
 		{"tagger", "absent", deprecateAll, http.StatusNotFound, "package not found: absent"},
@@ -370,7 +370,7 @@ func TestAccUnpublishRefusals(t *testing.T) {
 		msg                      string
 	}{
 		{"DELETE", "rich/-rev/1-0", "reader", "", http.StatusForbidden, ""},
-		{"DELETE", "rich/-rev/1-0", auth.AnonymousUser, "", http.StatusUnauthorized, ""},
+		{"DELETE", "rich/-rev/1-0", kernel.AnonymousUser, "", http.StatusUnauthorized, ""},
 		{"DELETE", "rich/-rev/1-0", "narrow", "", http.StatusForbidden, ""},
 		// pruner may delete 1.x, not 2.0.0-beta.1.
 		{"DELETE", "rich/-rev/1-0", "pruner", "", http.StatusForbidden, ""},

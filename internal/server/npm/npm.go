@@ -17,11 +17,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	npmfmt "github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
@@ -112,9 +112,9 @@ func (handler) ping(w http.ResponseWriter, _ *http.Request) {
 // whoami names the caller. npm asks only when it holds a token; an
 // anonymous caller is told to authenticate.
 func (h handler) whoami(w http.ResponseWriter, r *http.Request) {
-	p, ok := auth.FromContext(r.Context())
+	p, ok := kernel.FromContext(r.Context())
 	if !ok || p.Anonymous {
-		h.k.Error(w, r, auth.ErrUnauthenticated)
+		h.k.Error(w, r, kernel.ErrUnauthenticated)
 		return
 	}
 	writeJSON(w, http.StatusOK, jsonType, map[string]string{"username": p.Name})
