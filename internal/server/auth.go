@@ -9,7 +9,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
-	"github.com/weaveplatform/artifactweave/internal/server/docker"
+	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -98,7 +98,7 @@ func authenticate(
 				if errors.Is(err, auth.ErrPasswordExpired) && ownPasswordChange(r, p.Name) {
 					err = nil
 				}
-				if err == nil && p.Registry != nil && !docker.IsRegistryPath(r.URL.Path) {
+				if err == nil && p.Registry != nil && !dockerhttp.IsRegistryPath(r.URL.Path) {
 					// A registry token is good for the registry alone
 					// (decision 0005).
 					err = auth.ErrBadCredentials
@@ -121,7 +121,7 @@ func authenticate(
 				)
 				return
 			}
-			if docker.ChallengesAnonymous(r.URL.Path) {
+			if dockerhttp.ChallengesAnonymous(r.URL.Path) {
 				// The registry challenges a request without credentials even
 				// while anonymous access is on: an anonymous client then
 				// fetches an anonymous token and pulls with it, and one with

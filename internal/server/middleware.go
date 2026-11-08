@@ -13,7 +13,7 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 
-	"github.com/weaveplatform/artifactweave/internal/server/docker"
+	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
@@ -148,7 +148,7 @@ func bodyTooLarge(limit int64) *apierror.Error {
 func normalizeContentType(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ct := r.Header.Get("Content-Type")
-		if ct != "" && !docker.IsRegistryPath(r.URL.Path) &&
+		if ct != "" && !dockerhttp.IsRegistryPath(r.URL.Path) &&
 			!strings.HasPrefix(r.URL.Path, "/artifactory/api/lfs/") {
 			if mt, params, err := mime.ParseMediaType(
 				ct,

@@ -10,13 +10,13 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/remote"
-	"github.com/weaveplatform/artifactweave/internal/server/nimmodel"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
+	nimmodelhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nimmodel/http"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -158,7 +158,7 @@ func (rt *runtime) openRemoteSources(
 		opts remote.Options, upload *item.CacheUpload,
 	) error {
 		if q.Repo.PackageType == repo.NIMModel {
-			nimmodel.PrepareUpload(q, upload)
+			nimmodelhttp.PrepareUpload(q, upload)
 			return nil
 		}
 		return mavenBackend.PrepareUpload(ctx, q, permit, opts, upload)

@@ -8,9 +8,9 @@ import (
 	"net/url"
 	"strings"
 
-	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/migration/kernel/antpath"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )

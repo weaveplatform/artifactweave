@@ -27,7 +27,7 @@ use the existing P9 remote policy. Cached tag metadata is indexed as
 `Nimmodel.versionId` properties, so the existing property search can find a
 model by name or version.
 
-Run the controlled tests with `go test ./internal/server/nimmodel ./migration/artifacts/api/repo`.
+Run the controlled tests with `go test ./migration/artifacts/ecosystem/nimmodel/http ./migration/artifacts/api/repo`.
 The `@nimmodel` acceptance scenario uses a controlled NGC response and a
 native `crane pull` through the paired Docker remote, then repeats the reads
 offline. CI runs the scenario when its pinned native client is available.

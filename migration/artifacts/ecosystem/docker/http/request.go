@@ -1,0 +1,168 @@
+package dockerhttp
+
+import (
+	"net/http"
+	"slices"
+	"strings"
+
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/pkg/types"
+)
+
+// Request is a registry request with its operation parsed and, for an
+// operation on an image, its repository resolved and its name validated.
+type Request struct {
+	Kind Kind
+	// RepoKey is the repository the request addressed: the subdomain, or
+	// the key in /artifactory/api/docker/<key>/v2. It is empty for /v2/,
+	// /v2/_catalog and /v2/token on the repository path, which address no
+	// repository, and may be "null", which the token realm uses for that
+	// (research 17). Only an operation on an image resolves it into Repo.
+	RepoKey string
+	// Repo is the resolved repository, set when Kind is an image operation.
+	Repo repo.Config
+	// Name is the image name inside the repository.
+	Name string
+	// Reference is the digest, tag or upload session the path ends in.
+	Reference string
+	// base is the path up to the image name in the form the request used,
+	// so that Path answers in the same form.
+	base string
+	// isResolved is set once Repo holds the repository RepoKey names.
+	isResolved bool
+	// scope is the image's name as the client wrote it, when base does not
+	// imply it: a mount source under the Artifactory prefix named in the
+	// repository form, <repo>/<image>.
+	scope string
+	// authenticated is the registry's Options.Authenticated, which decides
+	// how Require answers a request without a decider.
+	authenticated bool
+}
+
+// Path returns the absolute path of an operation on the request's image in
+// the addressing form the client used, for Location headers: the client
+// may only know the registry by that form.
+// Path("blobs", "uploads", id) is .../<name>/blobs/uploads/<id>.
+func (q Request) Path(segments ...string) string {
+	return q.base + "/" + q.Name + "/" + strings.Join(segments, "/")
+}
+
+// Require answers nil when the caller holds every action in want on path,
+// a path inside the repository. Otherwise it answers what the registry
+// tells a client: UNAUTHORIZED to an anonymous caller, so that it sends
+// credentials, and DENIED to anyone else. A registry token must also
+// grant the actions for the image as this request names it; one that does
+// not gets UNAUTHORIZED, whose challenge (Challenge) names the scope the
+// client then fetches a token for, as Docker's registry answers an
+// insufficient scope. A request without a permission decider reaches the
+// handler on a server built without authentication, which only tests
+// build, and is allowed. On a server that authenticates every request
+// (Options.Authenticated) it is refused as one without the right, so that
+// a principal stored without its decider is never allowed everything.
+func (q Request) Require(r *http.Request, path string, want types.Actions) error {
+	p, ok := kernel.FromContext(r.Context())
+	d, _ := accessapi.DeciderFrom(r.Context())
+	if d == nil {
+		if !q.authenticated {
+			return nil
+		}
+		return q.refuse(ok && !p.Anonymous)
+	}
+	if p.Registry != nil && !q.granted(p.Registry, r.Method, want) {
+		return Errorf(http.StatusUnauthorized, CodeUnauthorized,
+			"the token does not grant this access to %s", q.scopeName())
+	}
+	if d.Allows(types.ResourceArtifact, accessapi.Repo{
+		Key: q.Repo.Key, Class: string(q.Repo.Class),
+	}, path, want) {
+		return nil
+	}
+	return q.refuse(!p.Anonymous)
+}
+
+// refuse answers a caller without the right: UNAUTHORIZED unless it is a
+// user, so that it sends credentials, and DENIED to a user.
+func (q Request) refuse(user bool) error {
+	if !user {
+		return Errorf(http.StatusUnauthorized, CodeUnauthorized, "authentication required")
+	}
+	return Errorf(http.StatusForbidden, CodeDenied,
+		"requested access to %s in %s is denied", q.Name, q.Repo.Key)
+}
+
+// scopeName is the image's name as the client wrote it, the name of its
+// token scope: on the repository path it begins with the repository key.
+func (q Request) scopeName() string {
+	if q.scope != "" {
+		return q.scope
+	}
+	if strings.HasPrefix(q.base, "/v2/") {
+		return q.RepoKey + "/" + q.Name
+	}
+	return q.Name
+}
+
+// granted reports whether a registry token grants every action want needs
+// on the request's image. A grant binds the name as the client wrote it
+// and the realm it was issued under: null names repository-path names,
+// any other realm names that repository's images. Read needs pull,
+// Deploy and Annotate push, and Delete delete on a DELETE but push
+// otherwise: a scope names what the client does, and replacing a tag is
+// part of a push, which Docker asks pull,push for (the permissions still
+// require Delete, DV-035). Manage is never granted.
+func (q Request) granted(a *types.RegistryAccess, method string, want types.Actions) bool {
+	pathMethod := strings.HasPrefix(q.base, "/v2/")
+	if a.Realm == "" && !pathMethod || a.Realm != "" && !strings.EqualFold(a.Realm, q.RepoKey) {
+		return false
+	}
+	need := map[types.Actions]string{
+		types.ActionRead: actionPull, types.ActionWrite: actionPush,
+		types.ActionAnnotate: actionPush, types.ActionDelete: actionPush,
+	}
+	if method == http.MethodDelete {
+		need[types.ActionDelete] = actionDelete
+	}
+	name := q.scopeName()
+	for bit := types.Actions(1); bit != 0 && bit <= want; bit <<= 1 {
+		if want&bit == 0 {
+			continue
+		}
+		action, known := need[bit]
+		if !known || !slices.ContainsFunc(a.Grants, func(g types.RegistryGrant) bool {
+			return g.Type == scopeRepository && strings.EqualFold(g.Name, name) &&
+				(slices.Contains(g.Actions, action) || slices.Contains(g.Actions, actionAll))
+		}) {
+			return false
+		}
+	}
+	return true
+}
+
+// GrantsCatalog reports whether the request's credential may list the
+// catalog: any but a registry token without registry:catalog:*.
+func GrantsCatalog(r *http.Request) bool {
+	p, ok := kernel.FromContext(r.Context())
+	if !ok || p.Registry == nil {
+		return true
+	}
+	return slices.ContainsFunc(p.Registry.Grants, func(g types.RegistryGrant) bool {
+		return g.Type == scopeRegistry && g.Name == "catalog" && len(g.Actions) > 0
+	})
+}
+
+// readsAnything reports whether the caller may read some path in c, which
+// lets it list c's images in a catalog; a request without a decider reads
+// everything exactly where Require allows it, on a server built without
+// authentication. The repository's root is asked as a folder, which a grant
+// on any path below it makes readable.
+func (g *Registry) readsAnything(r *http.Request, c repo.Config) bool {
+	d, _ := accessapi.DeciderFrom(r.Context())
+	if d == nil {
+		return !g.authenticated
+	}
+	return d.AllowsFolder(types.ResourceArtifact, accessapi.Repo{
+		Key: c.Key, Class: string(c.Class),
+	}, "", types.ActionRead)
+}

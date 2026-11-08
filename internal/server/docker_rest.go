@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"net/http"
 
-	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
-	"github.com/weaveplatform/artifactweave/internal/server/docker"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
+	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
+	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -45,7 +45,7 @@ func (s artifactoryService) DeleteDockerTag(
 	switch {
 	case name == "" || tag == "":
 		return nil, badRequestf("dockerRepository and tag are required")
-	case !docker.ValidName(name):
+	case !dockerhttp.ValidName(name):
 		return nil, badRequestf("invalid image name '%s'", name)
 	case !layout.ValidTag(tag):
 		return nil, badRequestf("invalid tag '%s'", tag)
@@ -157,9 +157,9 @@ func promotionArgs(b *artgen.PromoteDockerImageJSONRequestBody) (promotion, erro
 	a.toName = orDefault(deref(b.TargetDockerRepository), a.name)
 	a.toTag = orDefault(deref(b.TargetTag), a.tag)
 	switch {
-	case !docker.ValidName(a.name):
+	case !dockerhttp.ValidName(a.name):
 		return a, badRequestf("invalid image name '%s'", a.name)
-	case !docker.ValidName(a.toName):
+	case !dockerhttp.ValidName(a.toName):
 		return a, badRequestf("invalid image name '%s'", a.toName)
 	case a.tag == "" && a.toTag != "":
 		return a, badRequestf("targetTag needs tag: promoting every tag keeps their names")
@@ -237,7 +237,7 @@ func (s artifactoryService) FindParentManifestLists(
 	switch {
 	case name == "" || tag == "":
 		return nil, badRequestf("dockerRepository and tag are required")
-	case !docker.ValidName(name):
+	case !dockerhttp.ValidName(name):
 		return nil, badRequestf("invalid image name '%s'", name)
 	case !layout.ValidTag(tag):
 		return nil, badRequestf("invalid tag '%s'", tag)
@@ -270,7 +270,7 @@ func (s artifactoryService) FindParentManifestLists(
 // not found, and anything but a local or federated Docker, OCI or Helm OCI
 // repository cannot take part (decision 0031).
 func promotionRepo(ctx context.Context, st store.Store, key string) (repo.Config, error) {
-	c, served, err := docker.Lookup(ctx, st, key)
+	c, served, err := dockerhttp.Lookup(ctx, st, key)
 	switch {
 	case err != nil:
 		return c, err //nolint:wrapcheck // the lookup names itself
@@ -299,7 +299,7 @@ func orDefault(v, def string) string {
 // missing key or another package type is not found, and a remote or
 // virtual repository is refused until the registry serves those.
 func dockerRepo(ctx context.Context, st store.Store, key string) (repo.Config, error) {
-	c, found, err := docker.Lookup(ctx, st, key)
+	c, found, err := dockerhttp.Lookup(ctx, st, key)
 	switch {
 	case err != nil:
 		return c, err //nolint:wrapcheck // the lookup names itself

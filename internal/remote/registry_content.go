@@ -14,10 +14,10 @@ import (
 	"strings"
 	"sync"
 
-	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 

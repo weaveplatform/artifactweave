@@ -29,7 +29,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/composer"
 	"github.com/weaveplatform/artifactweave/internal/server/conan"
 	"github.com/weaveplatform/artifactweave/internal/server/conda"
-	"github.com/weaveplatform/artifactweave/internal/server/docker"
 	"github.com/weaveplatform/artifactweave/internal/server/gems"
 	"github.com/weaveplatform/artifactweave/internal/server/gitlfs"
 	"github.com/weaveplatform/artifactweave/internal/server/helm"
@@ -38,7 +37,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/jetbrainsplugins"
 	"github.com/weaveplatform/artifactweave/internal/server/luarocks"
 	"github.com/weaveplatform/artifactweave/internal/server/machinelearning"
-	"github.com/weaveplatform/artifactweave/internal/server/nimmodel"
 	"github.com/weaveplatform/artifactweave/internal/server/nix"
 	"github.com/weaveplatform/artifactweave/internal/server/npm"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
@@ -60,7 +58,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	cocoapodshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods/http"
+	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
 	golanghttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang/http"
+	nimmodelhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nimmodel/http"
 	nugethttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
@@ -285,7 +285,7 @@ var protocols = []func(Config) pkgroute.Protocol{
 		)
 	},
 	func(cfg Config) pkgroute.Protocol {
-		return nimmodel.Protocol(cfg.RemoteSources)
+		return nimmodelhttp.Protocol(cfg.RemoteSources)
 	},
 	func(cfg Config) pkgroute.Protocol {
 		return jetbrainsplugins.Protocol(cfg.RemoteSources)
@@ -332,8 +332,8 @@ func npmAccounts(cfg Config) npm.Accounts {
 // interface, which would leave the token endpoint registered with nothing to
 // sign: cfg.Access holds nil interfaces, never typed nils, and a nil
 // interface converts to a nil one, so they are assigned as they are.
-func newRegistry(cfg Config, artSvc artifactoryService) *docker.Registry {
-	o := docker.Options{
+func newRegistry(cfg Config, artSvc artifactoryService) *dockerhttp.Registry {
+	o := dockerhttp.Options{
 		Sources:        cfg.RegistrySources,
 		Store:          cfg.Store,
 		Blobs:          cfg.Blobs,
@@ -365,7 +365,7 @@ func newRegistry(cfg Config, artSvc artifactoryService) *docker.Registry {
 		Tokens:   cfg.Access.Tokens,
 		Identity: cfg.Access.Identity,
 	}
-	return docker.New(o)
+	return dockerhttp.New(o)
 }
 
 // Mirrors is what the storage endpoints need from the runtime's blob
@@ -447,7 +447,7 @@ func New(cfg Config) http.Handler {
 		accessLog(logger),
 		baseurl.Middleware(cfg.BaseURL),
 		remote.SmartTrace,
-		docker.APIVersion,
+		dockerhttp.APIVersion,
 		registry.Challenge,
 		normalizeContentType,
 		collectionSlash,

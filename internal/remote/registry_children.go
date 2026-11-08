@@ -5,9 +5,9 @@ import (
 	"io"
 	"sync/atomic"
 
-	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 )
 
 type (

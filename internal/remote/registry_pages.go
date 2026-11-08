@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
+	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 )
 
 func (c *RegistryContent) pages(

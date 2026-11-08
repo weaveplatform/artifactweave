@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/server/docker"
+	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
@@ -34,7 +34,7 @@ func errorProfileFor(path string) apierror.Profile {
 		// envelope under all three (decisions 0037, 0038 and 0039), and
 		// pip, twine, NuGet.Protocol and helm read only the status.
 		return apierror.ProfileArtifactory
-	case docker.IsRegistryPath(path):
+	case dockerhttp.IsRegistryPath(path):
 		// The JFrog operations beside the registry (promote,
 		// parentManifests) keep the Artifactory envelope (decision 0031).
 		return apierror.ProfileOCI

@@ -177,7 +177,7 @@
       "owner_issue": 0,
       "evidence": "test/acceptance/features/docker.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
-      "route_file": "internal/server/docker/route.go",
+      "route_file": "migration/artifacts/ecosystem/docker/http/route.go",
       "p9c": false
     },
     {
@@ -209,7 +209,7 @@
       "owner_issue": 0,
       "evidence": "test/acceptance/features/helm_oci.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
-      "route_file": "internal/server/docker/route.go",
+      "route_file": "migration/artifacts/ecosystem/docker/http/route.go",
       "p9c": false
     },
     {
@@ -369,7 +369,7 @@
       "owner_issue": 0,
       "evidence": "test/acceptance/features/registry_clients.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
-      "route_file": "internal/server/docker/route.go",
+      "route_file": "migration/artifacts/ecosystem/docker/http/route.go",
       "p9c": false
     },
     {
@@ -738,7 +738,7 @@
       "owner_issue": 0,
       "evidence": "test/acceptance/features/nimmodel_remote.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
-      "route_file": "internal/server/nimmodel/nimmodel.go",
+      "route_file": "migration/artifacts/ecosystem/nimmodel/http/nimmodel.go",
       "p9c": false
     },
     {

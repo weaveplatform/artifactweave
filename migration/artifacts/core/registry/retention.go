@@ -7,9 +7,9 @@ import (
 	"path"
 	"slices"
 
-	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )

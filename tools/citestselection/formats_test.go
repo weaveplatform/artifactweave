@@ -75,8 +75,10 @@ func TestUnitAffectedPlanChoosesOnlyOwnedChanges(t *testing.T) {
 			t.Errorf("Conan plan did not instrument %s", pkg)
 		}
 	}
-	docker := proposeAffected([]change{{status: "M", path: "internal/format/docker/handler.go"}})
-	for _, pkg := range []string{"./test/server/artifacts/docker", "./test/server/artifacts/helmoci", "./internal/server/nimmodel"} {
+	docker := proposeAffected(
+		[]change{{status: "M", path: "migration/artifacts/ecosystem/docker/handler.go"}},
+	)
+	for _, pkg := range []string{"./test/server/artifacts/docker", "./test/server/artifacts/helmoci", "./migration/artifacts/ecosystem/nimmodel/http"} {
 		if !slices.Contains(docker.units, pkg) {
 			t.Errorf("Docker plan omitted dependent package %s", pkg)
 		}

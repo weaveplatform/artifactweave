@@ -97,7 +97,7 @@
   {
     "route": "CONNECT /artifactory/api/docker/{repo-key}/v2/_catalog",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -116,7 +116,7 @@
   {
     "route": "CONNECT /artifactory/api/docker/{repo-key}/v2/{imageName}/tags/list",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -135,7 +135,7 @@
   {
     "route": "CONNECT /artifactory/api/docker/{repoKey}/v2",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -154,7 +154,7 @@
   {
     "route": "CONNECT /artifactory/api/docker/{repoKey}/v2/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -249,7 +249,7 @@
   {
     "route": "CONNECT /v2",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).serveRoot-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).serveRoot-fm",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -268,7 +268,7 @@
   {
     "route": "CONNECT /v2/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).serveRoot-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).serveRoot-fm",
     "review_family": "native-docker",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -1181,7 +1181,7 @@
   {
     "route": "DELETE /artifactory/api/docker/{repo-key}/v2/_catalog",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -1200,7 +1200,7 @@
   {
     "route": "DELETE /artifactory/api/docker/{repo-key}/v2/{imageName}/tags/list",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -1219,7 +1219,7 @@
   {
     "route": "DELETE /artifactory/api/docker/{repoKey}/v2",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -1238,7 +1238,7 @@
   {
     "route": "DELETE /artifactory/api/docker/{repoKey}/v2/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -1265,7 +1265,7 @@
       "acc.file",
       "apierror.New",
       "artgen.DeleteDockerTag200TextResponse",
-      "docker.ValidName",
+      "dockerhttp.ValidName",
       "errors.Is",
       "fmt.Sprintf",
       "layout.ReservedTag",
@@ -2422,7 +2422,7 @@
   {
     "route": "DELETE /v2",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).serveRoot-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).serveRoot-fm",
     "review_family": "content-and-configuration",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -2441,7 +2441,7 @@
   {
     "route": "DELETE /v2/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).serveRoot-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).serveRoot-fm",
     "review_family": "native-docker",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -5251,7 +5251,7 @@
   {
     "route": "GET /artifactory/api/docker/{repoKey}/v1/auth",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).serveV1Auth-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).serveV1Auth-fm",
     "review_family": "native-docker",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -5270,7 +5270,7 @@
   {
     "route": "GET /artifactory/api/docker/{repoKey}/v2",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -5289,7 +5289,7 @@
   {
     "route": "GET /artifactory/api/docker/{repoKey}/v2/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6279,7 +6279,7 @@
   {
     "route": "GET /artifactory/api/nimmodel/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/nimmodel.handler.read-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/nimmodel/http.handler.read-fm",
     "review_family": "native-nimmodel",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -11429,7 +11429,7 @@
   {
     "route": "GET /v2",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).serveRoot-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).serveRoot-fm",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -11448,7 +11448,7 @@
   {
     "route": "GET /v2/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).serveRoot-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).serveRoot-fm",
     "review_family": "native-docker",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12177,7 +12177,7 @@
   {
     "route": "HEAD /artifactory/api/docker/{repo-key}/v2/_catalog",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12196,7 +12196,7 @@
   {
     "route": "HEAD /artifactory/api/docker/{repo-key}/v2/{imageName}/tags/list",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12215,7 +12215,7 @@
   {
     "route": "HEAD /artifactory/api/docker/{repoKey}/v2",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12234,7 +12234,7 @@
   {
     "route": "HEAD /artifactory/api/docker/{repoKey}/v2/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12462,7 +12462,7 @@
   {
     "route": "HEAD /artifactory/api/nimmodel/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/nimmodel.handler.read-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/nimmodel/http.handler.read-fm",
     "review_family": "native-nimmodel",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -13075,7 +13075,7 @@
   {
     "route": "HEAD /v2",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).serveRoot-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).serveRoot-fm",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -13094,7 +13094,7 @@
   {
     "route": "HEAD /v2/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).serveRoot-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).serveRoot-fm",
     "review_family": "native-docker",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -13227,7 +13227,7 @@
   {
     "route": "OPTIONS /artifactory/api/docker/{repo-key}/v2/_catalog",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -13246,7 +13246,7 @@
   {
     "route": "OPTIONS /artifactory/api/docker/{repo-key}/v2/{imageName}/tags/list",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -13265,7 +13265,7 @@
   {
     "route": "OPTIONS /artifactory/api/docker/{repoKey}/v2",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -13284,7 +13284,7 @@
   {
     "route": "OPTIONS /artifactory/api/docker/{repoKey}/v2/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -13379,7 +13379,7 @@
   {
     "route": "OPTIONS /v2",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).serveRoot-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).serveRoot-fm",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -13398,7 +13398,7 @@
   {
     "route": "OPTIONS /v2/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).serveRoot-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).serveRoot-fm",
     "review_family": "native-docker",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -13781,7 +13781,7 @@
   {
     "route": "PATCH /artifactory/api/docker/{repo-key}/v2/_catalog",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -13800,7 +13800,7 @@
   {
     "route": "PATCH /artifactory/api/docker/{repo-key}/v2/{imageName}/tags/list",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -13819,7 +13819,7 @@
   {
     "route": "PATCH /artifactory/api/docker/{repoKey}/v2",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -13838,7 +13838,7 @@
   {
     "route": "PATCH /artifactory/api/docker/{repoKey}/v2/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -14035,7 +14035,7 @@
   {
     "route": "PATCH /v2",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).serveRoot-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).serveRoot-fm",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -14054,7 +14054,7 @@
   {
     "route": "PATCH /v2/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).serveRoot-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).serveRoot-fm",
     "review_family": "native-docker",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -15806,7 +15806,7 @@
   {
     "route": "POST /artifactory/api/docker/{repo-key}/v2/_catalog",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -15862,7 +15862,7 @@
   {
     "route": "POST /artifactory/api/docker/{repo-key}/v2/{imageName}/tags/list",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -15881,7 +15881,7 @@
   {
     "route": "POST /artifactory/api/docker/{repoKey}/v2",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -15900,7 +15900,7 @@
   {
     "route": "POST /artifactory/api/docker/{repoKey}/v2/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -19588,7 +19588,7 @@
   {
     "route": "POST /v2",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).serveRoot-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).serveRoot-fm",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -19607,7 +19607,7 @@
   {
     "route": "POST /v2/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).serveRoot-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).serveRoot-fm",
     "review_family": "native-docker",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -20853,7 +20853,7 @@
   {
     "route": "PUT /artifactory/api/docker/{repo-key}/v2/_catalog",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -20872,7 +20872,7 @@
   {
     "route": "PUT /artifactory/api/docker/{repo-key}/v2/{imageName}/tags/list",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -20891,7 +20891,7 @@
   {
     "route": "PUT /artifactory/api/docker/{repoKey}/v2",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -20910,7 +20910,7 @@
   {
     "route": "PUT /artifactory/api/docker/{repoKey}/v2/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -22184,7 +22184,7 @@
   {
     "route": "PUT /v2",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).serveRoot-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).serveRoot-fm",
     "review_family": "content-and-configuration",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -22203,7 +22203,7 @@
   {
     "route": "PUT /v2/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).serveRoot-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).serveRoot-fm",
     "review_family": "native-docker",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -22353,7 +22353,7 @@
   {
     "route": "QUERY /artifactory/api/docker/{repo-key}/v2/_catalog",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -22372,7 +22372,7 @@
   {
     "route": "QUERY /artifactory/api/docker/{repo-key}/v2/{imageName}/tags/list",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -22391,7 +22391,7 @@
   {
     "route": "QUERY /artifactory/api/docker/{repoKey}/v2",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -22410,7 +22410,7 @@
   {
     "route": "QUERY /artifactory/api/docker/{repoKey}/v2/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -22505,7 +22505,7 @@
   {
     "route": "QUERY /v2",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).serveRoot-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).serveRoot-fm",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -22524,7 +22524,7 @@
   {
     "route": "QUERY /v2/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).serveRoot-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).serveRoot-fm",
     "review_family": "native-docker",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -22657,7 +22657,7 @@
   {
     "route": "TRACE /artifactory/api/docker/{repo-key}/v2/_catalog",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -22676,7 +22676,7 @@
   {
     "route": "TRACE /artifactory/api/docker/{repo-key}/v2/{imageName}/tags/list",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -22695,7 +22695,7 @@
   {
     "route": "TRACE /artifactory/api/docker/{repoKey}/v2",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -22714,7 +22714,7 @@
   {
     "route": "TRACE /artifactory/api/docker/{repoKey}/v2/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).servePrefix-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).servePrefix-fm",
     "review_family": "native-docker",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -22809,7 +22809,7 @@
   {
     "route": "TRACE /v2",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).serveRoot-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).serveRoot-fm",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -22828,7 +22828,7 @@
   {
     "route": "TRACE /v2/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/docker.(*Registry).serveRoot-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/docker/http.(*Registry).serveRoot-fm",
     "review_family": "native-docker",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",

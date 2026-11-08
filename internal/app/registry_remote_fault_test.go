@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
-	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )

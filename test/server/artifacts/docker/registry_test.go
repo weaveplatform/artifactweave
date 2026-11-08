@@ -13,12 +13,12 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/go-cmp/cmp"
 
-	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
-	"github.com/weaveplatform/artifactweave/internal/server/docker"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
+	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -26,7 +26,7 @@ import (
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
-// The registry's own routing is tested in internal/server/docker; these
+// The registry's own routing is tested in migration/artifacts/ecosystem/docker/http; these
 // rows and tests cover what the server adds: authentication in front of
 // it, the version header on the middleware's answers, the mounting under
 // both prefixes and the reverse proxy read (#220).
@@ -41,7 +41,7 @@ const (
 )
 
 // The blob routes (#222), on the repository path; the router tests in
-// internal/server/docker cover the other addressing forms.
+// migration/artifacts/ecosystem/docker/http cover the other addressing forms.
 const (
 	blobRoute    = "/v2/{repo}/{name}/blobs/{digest}"
 	uploadsRoute = "/v2/{repo}/{name}/blobs/uploads/"
@@ -324,24 +324,24 @@ func TestAccRegistryProbeHeaders(t *testing.T) {
 		want := `Bearer realm="http://example.com/artifactory/api/docker/` + realm +
 			`/v2/token",service="example.com"`
 		if rec.Code != http.StatusUnauthorized ||
-			rec.Header().Get(docker.APIVersionHeader) != "registry/2.0" ||
+			rec.Header().Get(dockerhttp.APIVersionHeader) != "registry/2.0" ||
 			rec.Header().Get("WWW-Authenticate") != want {
 			t.Fatalf("%s: %d %v", path, rec.Code, rec.Header())
 		}
 		var body struct{ Errors []struct{ Code string } }
 		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil ||
-			len(body.Errors) != 1 || body.Errors[0].Code != docker.CodeUnauthorized {
+			len(body.Errors) != 1 || body.Errors[0].Code != dockerhttp.CodeUnauthorized {
 			t.Fatalf("%s: %s", path, rec.Body)
 		}
 		rec = do(t, h, http.MethodGet, path, basic("admin", "pw"), "")
 		if rec.Code != http.StatusOK ||
-			rec.Header().Get(docker.APIVersionHeader) != "registry/2.0" ||
+			rec.Header().Get(dockerhttp.APIVersionHeader) != "registry/2.0" ||
 			rec.Body.String() != "{}" {
 			t.Fatalf("%s as admin: %d %v %s", path, rec.Code, rec.Header(), rec.Body)
 		}
 	}
 	rec := do(t, h, http.MethodGet, "/artifactory/api/system/ping", nil, "")
-	if rec.Header().Get(docker.APIVersionHeader) != "" {
+	if rec.Header().Get(dockerhttp.APIVersionHeader) != "" {
 		t.Fatal("a non-registry path carries the registry header")
 	}
 }
@@ -427,8 +427,8 @@ func TestAccRegistrySubdomainThroughServer(t *testing.T) {
 	// On the repository's subdomain app is the image, which has no such
 	// tag; on the parent it would be a repository, which does not exist.
 	for host, want := range map[string]string{
-		"docker-local.reg.example.com": docker.CodeManifestUnknown,
-		"reg.example.com":              docker.CodeNameUnknown,
+		"docker-local.reg.example.com": dockerhttp.CodeManifestUnknown,
+		"reg.example.com":              dockerhttp.CodeNameUnknown,
 	} {
 		headers := basic("admin", "pw")
 		headers["X-Forwarded-Host"] = host
@@ -487,7 +487,7 @@ func TestAccDockerOperationsReachTheGeneratedServer(t *testing.T) {
 		rec := do(t, h, http.MethodPost, "/artifactory/api/docker/nope/v2/"+op,
 			map[string]string{"Content-Type": "application/json"}, body)
 		if rec.Code != http.StatusNotFound ||
-			rec.Header().Get(docker.APIVersionHeader) != "" {
+			rec.Header().Get(dockerhttp.APIVersionHeader) != "" {
 			t.Fatalf("%s: %d %v %s", op, rec.Code, rec.Header(), rec.Body)
 		}
 		if diff := cmp.Diff(decode(t, want), decode(t, rec.Body.String())); diff != "" {
@@ -547,7 +547,7 @@ func TestAccRegistryBlobsDownloadAsFiles(t *testing.T) {
 	// Uploads need Deploy on the image: deployer holds it on libs-local only.
 	rec = w.do(http.MethodPost, "/v2/docker-local/app/blobs/uploads/", "deployer", "")
 	if rec.Code != http.StatusForbidden ||
-		rec.Header().Get(docker.APIVersionHeader) != "registry/2.0" {
+		rec.Header().Get(dockerhttp.APIVersionHeader) != "registry/2.0" {
 		t.Fatalf("deployer: %d %v %s", rec.Code, rec.Header(), rec.Body)
 	}
 }
@@ -1102,7 +1102,7 @@ func TestAccRegistryListings(t *testing.T) {
 		if diff := cmp.Diff(decode(t, want), decode(t, rec.Body.String())); diff != "" {
 			t.Errorf("%s: %s", path, diff)
 		}
-		if rec.Header().Get(docker.APIVersionHeader) != "registry/2.0" {
+		if rec.Header().Get(dockerhttp.APIVersionHeader) != "registry/2.0" {
 			t.Errorf("%s: %v", path, rec.Header())
 		}
 	}
@@ -1150,7 +1150,7 @@ func TestAccMultiArchDelete(t *testing.T) {
 	if rec.Code != http.StatusOK ||
 		rec.Body.String() != "Deleted tag 'multi' of image 'app' in 'docker-local'." ||
 		!strings.HasPrefix(rec.Header().Get("Content-Type"), "text/plain") ||
-		rec.Header().Get(docker.APIVersionHeader) != "" {
+		rec.Header().Get(dockerhttp.APIVersionHeader) != "" {
 		t.Fatalf("%d %v %q", rec.Code, rec.Header(), rec.Body)
 	}
 	if rec := w.do(http.MethodGet, "/v2/docker-local/app/manifests/multi", "admin", ""); rec.Code !=

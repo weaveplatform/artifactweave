@@ -59,7 +59,7 @@ var formats = map[string]formatImpact{
 		[]string{"jf"},
 	},
 	"docker": {
-		"./internal/format/docker/...",
+		"./migration/artifacts/ecosystem/docker/...",
 		"@clients,@nimmodel",
 		[]string{"crane", "oras", "cosign", "helm", "jf"},
 	},
@@ -210,7 +210,11 @@ func proposeAffected(changes []change) affectedPlan {
 	}
 	if owner == "docker" {
 		// Helm OCI and NIM model exercise the same registry protocol stack.
-		units = append(units, "./test/server/artifacts/helmoci", "./internal/server/nimmodel")
+		units = append(
+			units,
+			"./test/server/artifacts/helmoci",
+			"./migration/artifacts/ecosystem/nimmodel/http",
+		)
 	}
 	slices.Sort(units)
 	units = slices.Compact(units)
