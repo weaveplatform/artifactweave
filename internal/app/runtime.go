@@ -158,9 +158,11 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	// before Run leases. The maxUniqueSnapshots cleanups wait for their timers,
 	// as 7.x's do.
 	fs := formatSettings(cfg, keys)
+	accessAPI := accessModule.API()
 	derived := &item.Service{
 		Store: st, Blobs: hot.store, Work: queue, Formats: fs.For,
-		ReindexAuthorize: reindexauth.New(st, authn),
+		Keys:             accessAPI.Keys,
+		ReindexAuthorize: reindexauth.New(accessAPI.Authenticator, accessAPI.Authorizer),
 		Periodic: map[string]time.Duration{
 			maven.KindSnapshots: cfg.Maven.SnapshotCleanupInterval,
 			nuget.KindSnapshots: cfg.NuGet.SnapshotCleanupInterval,

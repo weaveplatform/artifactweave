@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -34,7 +34,7 @@ func TestUnitMetadataRootRequiresActualRootGrant(t *testing.T) {
 			}
 			if !allows(
 				types.ResourceArtifact,
-				authz.Repo{Key: q.Repo.Key},
+				accessapi.Repo{Key: q.Repo.Key},
 				full,
 				types.ActionRead,
 			) {

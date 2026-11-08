@@ -23,6 +23,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
+	"github.com/weaveplatform/artifactweave/migration/access"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
@@ -37,6 +38,12 @@ func resolverFor(t *testing.T, st store.Store, opts ResolverOptions) *Resolver {
 	key, err := crypt.New([]byte("0123456789abcdef0123456789abcdef"))
 	if err != nil {
 		t.Fatal(err)
+	}
+	// The resolver reads a remote's client certificate only through
+	// Certificates, so bind the test store's, as the application binds its
+	// own; without it a remote that names one would panic.
+	if opts.Certificates == nil {
+		opts.Certificates = access.KeysOf(st)
 	}
 	r, err := NewResolver(st, key, opts)
 	if err != nil {

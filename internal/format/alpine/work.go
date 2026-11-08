@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/platform/keymaterial"
@@ -60,7 +61,7 @@ func (Handler) Work(ctx context.Context, env format.Env, work types.WorkItem) er
 			return fmt.Errorf("%w: more than %d entries", errInvalidIndex, maxIndexEntries)
 		}
 	}
-	keyName, key, err := SigningKey(ctx, env.Store, c)
+	keyName, key, err := SigningKey(ctx, env.Keys, c)
 	if err != nil {
 		return err
 	}
@@ -85,12 +86,14 @@ func (Handler) Work(ctx context.Context, env format.Env, work types.WorkItem) er
 	return nil
 }
 
-// SigningKey selects the repository's configured apk signing pair. Virtual
-// repositories use keyPair; local and federated repositories use the primary
-// keypair shared with Artifactory's public-key download endpoint.
+// SigningKey selects the repository's configured apk signing pair, read
+// through keys. Virtual repositories use keyPair; local and federated
+// repositories use the primary keypair shared with Artifactory's public-key
+// download endpoint. A repository that names no pair is unsigned: SigningKey
+// returns "", nil, nil without reading keys.
 func SigningKey(
 	ctx context.Context,
-	st store.Store,
+	keys accessapi.Keys,
 	c repo.Config,
 ) (string, *rsa.PrivateKey, error) {
 	ref := c.PrimaryKeyPairRef
@@ -100,7 +103,7 @@ func SigningKey(
 	if ref == "" {
 		return "", nil, nil
 	}
-	pair, err := st.Keys().Keypair(ctx, ref)
+	pair, err := keys.Keypair(ctx, ref)
 	if err != nil {
 		return "", nil, fmt.Errorf("alpine: signing key %s: %w", ref, err)
 	}

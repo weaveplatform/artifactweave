@@ -9,8 +9,12 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/reindexauth"
+	"github.com/weaveplatform/artifactweave/migration/access"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -92,15 +96,17 @@ func TestUnitQueuedTokenKeepsScopeAndCurrentAuthority(t *testing.T) {
 			}
 			req := format.WorkRequest{By: by, Credential: raw}
 			c := repo.Config{Key: "remote", Class: repo.Remote, PackageType: repo.NuGet}
-			check := reindexauth.New(st, a)
+			api := bind(t, st, a)
+			check := reindexauth.New(api.Authenticator, api.Authorizer)
 			err = check(t.Context(), c, req)
 			if change == "allowed" {
 				if err != nil {
 					t.Fatal(err)
 				}
+				absent := bind(t, st, nil)
 				if err = reindexauth.New(
-					st,
-					nil,
+					absent.Authenticator,
+					absent.Authorizer,
 				)(
 					t.Context(),
 					c,
@@ -111,9 +117,10 @@ func TestUnitQueuedTokenKeepsScopeAndCurrentAuthority(t *testing.T) {
 				) {
 					t.Fatal("absent authenticator", err)
 				}
+				failing := bind(t, permissionFailure{st}, a)
 				if err = reindexauth.New(
-					permissionFailure{st},
-					a,
+					failing.Authenticator,
+					failing.Authorizer,
 				)(
 					t.Context(),
 					c,
@@ -122,9 +129,10 @@ func TestUnitQueuedTokenKeepsScopeAndCurrentAuthority(t *testing.T) {
 					errors.Is(err, work.ErrPermanent) {
 					t.Fatal("permission storage fault must retry", err)
 				}
+				failing = bind(t, tokenFailure{st}, a)
 				if err = reindexauth.New(
-					tokenFailure{st},
-					a,
+					failing.Authenticator,
+					failing.Authorizer,
 				)(
 					t.Context(),
 					c,
@@ -138,6 +146,46 @@ func TestUnitQueuedTokenKeepsScopeAndCurrentAuthority(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUnitReindexRefusesCallerThatLostManage(t *testing.T) {
+	c := repo.Config{Key: "remote", Class: repo.Remote, PackageType: repo.NuGet}
+	raw, err := json.Marshal(kernel.CredentialReference{Name: "manager", TokenID: "opaque-id"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := format.WorkRequest{By: "manager", Credential: raw}
+	manage := true
+	authz := &accessapitest.Authorizer{DecideFunc: func(
+		_ context.Context, s accessapi.Subject, _ bool,
+	) (accessapi.Decider, error) {
+		return &accessapitest.Decider{AllowsFunc: func(
+			rt accessapi.ResourceType, r accessapi.Repo, path string, want accessapi.Actions,
+		) bool {
+			return manage && s.Name == "manager" && rt == types.ResourceArtifact &&
+				r == accessapi.Repo{Key: c.Key, Class: string(c.Class)} && path == "" &&
+				want == types.ActionManage
+		}}, nil
+	}}
+	check := reindexauth.New(&accessapitest.Authenticator{}, authz)
+	if err := check(t.Context(), c, req); err != nil {
+		t.Fatalf("caller holding Manage on the repository refused: %v", err)
+	}
+	manage = false
+	if err := check(t.Context(), c, req); !errors.Is(err, work.ErrPermanent) {
+		t.Fatalf("caller that lost Manage accepted: %v", err)
+	}
+}
+
+// bind binds the access module over st and a, as the application binds its
+// store and authenticator; a nil a leaves the API without an Authenticator.
+func bind(t *testing.T, st store.Store, a *auth.Authenticator) accessapi.API {
+	t.Helper()
+	m, err := access.New(access.Deps{Store: st, Authenticator: a})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return m.API()
 }
 
 var errStore = errors.New("permission storage failure")

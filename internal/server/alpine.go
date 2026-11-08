@@ -102,7 +102,7 @@ func (s artifactoryService) serveAlpineIndex(
 		for _, candidate := range candidates {
 			packages = append(packages, candidate.packageInfo)
 		}
-		keyName, key, err := alpine.SigningKey(ctx, st, c)
+		keyName, key, err := alpine.SigningKey(ctx, s.cfg.Access.Keys, c)
 		if err != nil {
 			writeErr(w, r, s.internalError(ctx, "Alpine virtual signing key", err))
 			return
