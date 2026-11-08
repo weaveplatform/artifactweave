@@ -263,6 +263,11 @@ type IndexedSource struct {
 	Archives  []SourceArchive
 }
 
+// SourceArchive is one archive a source package's .dsc names, as the
+// repository stores it beside the .dsc: its file name, and the size and
+// digests of the stored bytes, which must equal the .dsc's declarations
+// before the source is indexed. The Sources record takes its size and
+// digests from here, never from the .dsc.
 type SourceArchive struct {
 	Name      string
 	Size      int64

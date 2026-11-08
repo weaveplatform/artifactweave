@@ -1,4 +1,3 @@
-// Package debian implements Debian package and repository metadata.
 package debian
 
 import (

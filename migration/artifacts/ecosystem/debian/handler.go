@@ -18,6 +18,14 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// KindIndex is the work kind that rebuilds a local or federated
+// repository's apt metadata (Work), keyed by the repository.
+// KindReindexNoProps is the work kind of the reindex operation asked with
+// writeProps=0: Work rebuilds the package index without rewriting the
+// deb.name and deb.version properties, then queues KindIndex. Debian needs
+// a kind of its own because the item service runs the shared
+// format.KindReindexNoProps only for Opkg. The work queue keeps these
+// values, so they never change.
 const (
 	KindIndex          = "debian.index"
 	KindReindexNoProps = "debian.reindex-no-props"
@@ -45,8 +53,15 @@ func snapshotPath(p string) bool {
 	return p == "snapshots" || strings.HasPrefix(p, "snapshots/")
 }
 
+// Serves reports whether t is the Debian package type.
 func Serves(t repo.PackageType) bool { return t == repo.Debian }
 
+// Handler is the Debian format's hooks: it checks every binary (.deb,
+// .ddeb) and source (.dsc) package written to a Debian repository and the
+// coordinates it is deployed with, keeps the package index and deb.name and
+// deb.version properties in step with the binaries, keeps snapshots
+// immutable, and derives a local or federated repository's apt metadata as
+// queued work (KindIndex), signed when the repository names a key pair.
 type Handler struct{ generic.Handler }
 
 type inspection struct {
@@ -59,6 +74,12 @@ type sourceInspection struct {
 	source    Source
 }
 
+// Inspect reads and checks the stored content a write puts at a .dsc,
+// .deb or .ddeb path, before the write's transaction, and returns the
+// parsed source or binary for Admit and Deployed, so a package is read
+// once per write. A checksum deploy and any other path inspect nothing. A
+// write with no content digest, or whose package is invalid, is refused
+// with 400.
 func (Handler) Inspect(
 	ctx context.Context,
 	env format.Env,
@@ -85,6 +106,20 @@ func (Handler) Inspect(
 	return inspection{sha: w.Checksums.SHA256, path: w.Path, binary: binary}, nil
 }
 
+// Admit refuses (409) a write under snapshots/ that the server's snapshot
+// publication (WithSnapshotWrite) did not make, then applies the generic
+// deploy policy, wrapping its refusal, and passes a checksum deploy. No
+// write may put apt metadata under dists/ (anything in a binary-<arch> or
+// source folder, a Release, InRelease or Release.gpg) into a local or
+// federated repository, which derives its own (409). A .dsc needs a valid
+// path in a repository without the trivial layout, and dsc.distribution and
+// dsc.component properties with valid values unless a remote caches it
+// without them (400). A .deb, or a .ddeb where ddebSupported is on, needs a
+// valid path, and its deb.distribution, deb.component and deb.architecture
+// properties must be all absent or all valid, each architecture the
+// package's own unless it is Architecture: all (400). Admit repeats
+// Inspect's checks unless Inspect already read the same content at the same
+// path. Any other file passes.
 func (Handler) Admit(
 	ctx context.Context,
 	env format.Env,
@@ -151,6 +186,14 @@ func (Handler) Admit(
 	return w, nil
 }
 
+// Deployed sets a stored binary's deb.name and deb.version properties,
+// brings its version in the package index up to date and, for a local or
+// federated repository's own write, queues the metadata rebuild. A
+// version's files are every binary in the repository whose control data
+// gives that name and version, so Deployed reads them all rather than
+// trusting their paths. A source package file (a .dsc, .diff.gz or
+// .tar.* archive) only queues the rebuild, which lists the source once
+// all its parts are stored. Folders and other files change nothing.
 func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
 	if it.Folder {
 		return nil
@@ -174,6 +217,11 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 	return queue(ctx, env, c, it.Cached)
 }
 
+// Deleting refuses (409) to delete anything under snapshots/ except as
+// part of a whole snapshot folder (WithSnapshotDelete), and queues the
+// metadata rebuild when a local or federated repository's own binary or
+// source package file is about to be deleted, so the rebuild is asked for
+// exactly when the delete commits.
 func (Handler) Deleting(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
 	if snapshotPath(it.FullPath()) && ctx.Value(snapshotDeleteKey{}) != true {
 		return format.Rejectf(http.StatusConflict, "Delete the complete Debian snapshot folder")
@@ -184,6 +232,10 @@ func (Handler) Deleting(ctx context.Context, env format.Env, c repo.Config, it t
 	return queue(ctx, env, c, it.Cached)
 }
 
+// Deleted re-syncs each removed binary's version in the package index,
+// once per name and version, from that version's remaining binaries. A
+// version with none left is not its concern: the item service has already
+// pruned it.
 func (Handler) Deleted(
 	ctx context.Context,
 	env format.Env,
@@ -211,8 +263,12 @@ func (Handler) Deleted(
 	return nil
 }
 
+// WorkKinds returns KindIndex and KindReindexNoProps, the kinds Work runs.
 func (Handler) WorkKinds() []string { return []string{KindIndex, KindReindexNoProps} }
 
+// Owed makes a read of a local or federated repository's apt metadata wait
+// for its pending rebuild, so a client never reads metadata that lags a
+// completed write. A remote's cache owes nothing.
 func (Handler) Owed(c repo.Config, cached bool, path string) []format.WorkRef {
 	if !cached && derives(c) && isGenerated(path) {
 		return []format.WorkRef{{Kind: KindIndex, Key: c.Key}}
@@ -220,6 +276,10 @@ func (Handler) Owed(c repo.Config, cached bool, path string) []format.WorkRef {
 	return nil
 }
 
+// Classify classes apt metadata under dists/ as derived, so replication
+// and federation skip it and each side generates its own, and every other
+// path as unique, a snapshot's copied metadata included, since it cannot
+// be generated again.
 func (Handler) Classify(_ repo.Config, path string) format.Class {
 	if isGenerated(path) {
 		return format.ClassDerived
@@ -227,6 +287,12 @@ func (Handler) Classify(_ repo.Config, path string) format.Class {
 	return format.ClassUnique
 }
 
+// Reindex rebuilds repository c's package index from its binaries (a
+// remote's from its cache): a package per name and a version per version,
+// whose files are its binaries and whose creation time is the oldest
+// file's. It reads every binary, failing on the first that is missing or
+// invalid, and restores the deb.name and deb.version properties. A local
+// or federated repository's metadata rebuild is then queued.
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	return reindex(ctx, env, c, true)
 }

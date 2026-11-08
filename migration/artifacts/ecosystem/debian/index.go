@@ -17,6 +17,13 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// PropDistribution, PropComponent and PropArchitecture are the matrix
+// parameters a client deploys a binary with, as the JFrog Debian
+// documentation gives them, naming the distributions, components and
+// architectures whose indexes list it; a binary deployed without them is
+// stored but never indexed. PropName and PropVersion are the properties
+// Deployed and Reindex set from the binary's control data. The items keep
+// these names, so they never change.
 const (
 	PropDistribution = "deb.distribution"
 	PropComponent    = "deb.component"
