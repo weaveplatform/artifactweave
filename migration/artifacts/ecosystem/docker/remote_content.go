@@ -1,4 +1,4 @@
-package remote
+package docker
 
 import (
 	"bytes"
@@ -11,22 +11,23 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"regexp"
 	"strings"
 	"sync"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // RegistryContent installs Distribution authentication and validation on a fresh
 // shared policy. The pool and resolver belong to the application lifetime.
 type RegistryContent struct {
-	Policy      *Policy
-	Registries  Registries
+	Policy      *remote.Policy
+	Registries  remote.Registries
 	mu          sync.Mutex
-	descriptors map[string]layout.Descriptor
+	descriptors map[string]Descriptor
 }
 
 func (c *RegistryContent) Install() {
@@ -38,8 +39,8 @@ func (c *RegistryContent) fetch(
 	ctx context.Context,
 	q source.Request,
 	permit source.Permit,
-	opts Options,
-	request Request,
+	opts remote.Options,
+	request remote.Request,
 ) (*http.Response, error) {
 	image, operation, reference, err := ParseRegistryPath(q.Resource.UpstreamPath)
 	if err != nil {
@@ -56,7 +57,7 @@ func (c *RegistryContent) fetch(
 	request.Method = http.MethodGet
 	res, err := client.Do(ctx, image, request)
 	if err != nil {
-		if errors.Is(err, ErrRegistryDenied) {
+		if errors.Is(err, remote.ErrRegistryDenied) {
 			return nil, &source.HTTPError{
 				Kind:   source.FailureKindHTTP,
 				Status: http.StatusUnauthorized,
@@ -76,7 +77,7 @@ func (c *RegistryContent) fetch(
 		}
 	}
 	if digest := res.Header.Get("Docker-Content-Digest"); digest != "" {
-		value, ok := layout.SHA256Hex(digest)
+		value, ok := SHA256Hex(digest)
 		if !ok {
 			_ = res.Body.Close()
 			return nil, item.ErrBadChecksum
@@ -89,34 +90,42 @@ func (c *RegistryContent) fetch(
 	return res, nil
 }
 
+// registryName is the Distribution name grammar the registry transport's
+// (*remote.Registry).Image checks before it sends a request. The parser must
+// accept exactly the names the transport does, or a cached path could name an
+// image the upstream is never asked for.
+var registryName = regexp.MustCompile(
+	`^[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*(?:/[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*)*$`,
+)
+
 func ParseRegistryPath(path string) (image, operation, reference string, err error) {
 	parts := strings.Split(path, "/")
 	if len(parts) < 3 {
-		return "", "", "", ErrRequest
+		return "", "", "", remote.ErrRequest
 	}
 	image = strings.Join(parts[:len(parts)-2], "/")
 	operation, reference = parts[len(parts)-2], parts[len(parts)-1]
 	if !registryName.MatchString(image) {
-		return "", "", "", ErrRequest
+		return "", "", "", remote.ErrRequest
 	}
 	switch operation {
 	case "manifests":
-		if _, ok := layout.SHA256Hex(
+		if _, ok := SHA256Hex(
 			reference,
 		); !ok &&
-			(!layout.ValidTag(reference) || layout.ReservedTag(reference)) {
-			return "", "", "", ErrRequest
+			(!ValidTag(reference) || ReservedTag(reference)) {
+			return "", "", "", remote.ErrRequest
 		}
 	case "blobs", "referrers":
-		if _, ok := layout.SHA256Hex(reference); !ok {
-			return "", "", "", ErrRequest
+		if _, ok := SHA256Hex(reference); !ok {
+			return "", "", "", remote.ErrRequest
 		}
 	case "tags":
 		if reference != "list" {
-			return "", "", "", ErrRequest
+			return "", "", "", remote.ErrRequest
 		}
 	default:
-		return "", "", "", ErrRequest
+		return "", "", "", remote.ErrRequest
 	}
 	return image, operation, reference, nil
 }
@@ -125,7 +134,7 @@ func (c *RegistryContent) prepare(
 	ctx context.Context,
 	q source.Request,
 	permit source.Permit,
-	opts Options,
+	opts remote.Options,
 	u *item.CacheUpload,
 ) error {
 	image, operation, reference, err := ParseRegistryPath(q.Resource.UpstreamPath)
@@ -135,7 +144,7 @@ func (c *RegistryContent) prepare(
 	if operation == "blobs" {
 		return c.prepareBlob(permit, opts.Revision, image, reference, u)
 	}
-	limit := int64(layout.MaxManifestSize)
+	limit := int64(MaxManifestSize)
 	if operation == "tags" {
 		limit = 16 << 20
 	}
@@ -163,21 +172,21 @@ func (c *RegistryContent) prepare(
 			Tags []string `json:"tags"`
 		}
 		if err = json.Unmarshal(body, &list); err != nil {
-			return ErrRequest
+			return remote.ErrRequest
 		}
 		for _, tag := range list.Tags {
-			if !layout.ValidTag(tag) || layout.ReservedTag(tag) {
-				return ErrRequest
+			if !ValidTag(tag) || ReservedTag(tag) {
+				return remote.ErrRequest
 			}
 		}
 		return nil
 	}
-	manifest, err := layout.ParseManifest(u.ContentType, body, digest)
+	manifest, err := ParseManifest(u.ContentType, body, digest)
 	if err != nil {
-		return ErrRequest
+		return remote.ErrRequest
 	}
 	if operation == "referrers" && !manifest.IsIndex() {
-		return ErrRequest
+		return remote.ErrRequest
 	}
 	if err = c.validateDescriptors(ctx, q, opts, manifest); err != nil {
 		return err
@@ -193,7 +202,7 @@ func (c *RegistryContent) prepare(
 				return item.ErrRemoteLength
 			}
 			if d.MediaType != manifest.MediaType {
-				return ErrRequest
+				return remote.ErrRequest
 			}
 		}
 	}
@@ -205,10 +214,10 @@ func (c *RegistryContent) prepare(
 			return childErr
 		}
 		folder := reference
-		if h, ok := layout.SHA256Hex(reference); ok {
-			folder = layout.DigestFolder(h)
+		if h, ok := SHA256Hex(reference); ok {
+			folder = DigestFolder(h)
 		}
-		u.Properties = layout.Properties(manifest, image, folder, config)
+		u.Properties = Properties(manifest, image, folder, config)
 		u.PublishMetadata = true
 	}
 	return nil
@@ -239,10 +248,10 @@ func (c *RegistryContent) prepareBlob(
 func (c *RegistryContent) validateDescriptors(
 	ctx context.Context,
 	q source.Request,
-	opts Options,
-	m layout.Manifest,
+	opts remote.Options,
+	m Manifest,
 ) error {
-	descriptors := append(append([]layout.Descriptor(nil), m.Layers...), m.Manifests...)
+	descriptors := append(append([]Descriptor(nil), m.Layers...), m.Manifests...)
 	if m.Config != nil {
 		descriptors = append(descriptors, *m.Config)
 	}
@@ -250,14 +259,14 @@ func (c *RegistryContent) validateDescriptors(
 		descriptors = append(descriptors, *m.Subject)
 	}
 	if len(descriptors) > 4096 {
-		return ErrRequest
+		return remote.ErrRequest
 	}
 	for _, d := range descriptors {
-		if _, ok := layout.SHA256Hex(
+		if _, ok := SHA256Hex(
 			d.Digest,
 		); !ok || d.Size < 0 || d.Size == math.MaxInt64 ||
 			len(d.URLs) > 16 {
-			return ErrRequest
+			return remote.ErrRequest
 		}
 		for _, raw := range d.URLs {
 			if err := registryExternal(ctx, q.Repo, opts, raw); err != nil {
@@ -286,35 +295,35 @@ func RegistryResource(image, operation, reference string) (source.Resource, erro
 	case "manifests":
 		r.Accept = strings.Join(
 			[]string{
-				layout.MediaTypeOCIIndex,
-				layout.MediaTypeOCIManifest,
-				layout.MediaTypeDockerList,
-				layout.MediaTypeDockerManifest,
+				MediaTypeOCIIndex,
+				MediaTypeOCIManifest,
+				MediaTypeDockerList,
+				MediaTypeDockerManifest,
 			},
 			", ",
 		)
 		folder := reference
-		if h, ok := layout.SHA256Hex(reference); ok {
-			folder = layout.DigestFolder(h)
+		if h, ok := SHA256Hex(reference); ok {
+			folder = DigestFolder(h)
 			r.Checksums = types.Checksums{SHA256: h}
 		} else {
 			r.Kind = source.ResourceKindMetadata
 		}
-		r.Path = image + "/" + folder + "/" + layout.ManifestFile
+		r.Path = image + "/" + folder + "/" + ManifestFile
 	case "blobs":
-		h, _ := layout.SHA256Hex(reference)
-		r.Path = layout.UploadPath(image, h)
+		h, _ := SHA256Hex(reference)
+		r.Path = UploadPath(image, h)
 		r.Checksums = types.Checksums{SHA256: h}
 	case "tags":
 		r.Path = image + "/_remote/tags.json"
 		r.Kind = source.ResourceKindVersions
 		r.PermissionFolder, r.PermissionPath = true, image
 	case "referrers":
-		h, _ := layout.SHA256Hex(reference)
+		h, _ := SHA256Hex(reference)
 		r.Path = image + "/_remote/referrers/" + h + ".json"
 		r.Kind = source.ResourceKindMetadata
 		r.PermissionFolder, r.PermissionPath = true, image
-		r.Accept = layout.MediaTypeOCIIndex
+		r.Accept = MediaTypeOCIIndex
 	}
 	return r, nil
 }

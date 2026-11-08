@@ -1,4 +1,4 @@
-package remote
+package docker
 
 import (
 	"context"
@@ -8,9 +8,9 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/migration/kernel/antpath"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -22,6 +22,7 @@ func (c *RegistryContent) Read(
 ) (source.Result, error) {
 	out, err := c.Policy.Read(ctx, q, permit)
 	if err != nil {
+		//nolint:wrapcheck // preserves upstream error identity
 		return out, err
 	}
 	image, operation, reference, err := ParseRegistryPath(q.Resource.UpstreamPath)
@@ -75,7 +76,7 @@ func (c *RegistryContent) Read(
 		if propsErr != nil {
 			return source.Result{}, source.ErrUnavailable
 		}
-		if values := props[layout.ManifestTypeProperty]; len(values) > 0 {
+		if values := props[ManifestTypeProperty]; len(values) > 0 {
 			contentType = values[0]
 		}
 	} else {
@@ -87,13 +88,13 @@ func (c *RegistryContent) Read(
 			return source.Result{}, source.ErrInvalidResult
 		}
 	}
-	body, err := io.ReadAll(io.LimitReader(reader, layout.MaxManifestSize+1))
+	body, err := io.ReadAll(io.LimitReader(reader, MaxManifestSize+1))
 	if err == nil {
 		_, err = reader.Seek(0, io.SeekStart)
 	}
-	var m layout.Manifest
+	var m Manifest
 	if err == nil {
-		m, err = layout.ParseManifest(contentType, body, "")
+		m, err = ParseManifest(contentType, body, "")
 	}
 	if err != nil {
 		if out.Stream != nil {
@@ -113,16 +114,16 @@ func descriptorKey(id types.SourceIdentity, revision, image, digest string) stri
 func (c *RegistryContent) remember(
 	id types.SourceIdentity,
 	revision, image string,
-	m layout.Manifest,
+	m Manifest,
 ) {
-	descriptors := append(append([]layout.Descriptor(nil), m.Layers...), m.Manifests...)
+	descriptors := append(append([]Descriptor(nil), m.Layers...), m.Manifests...)
 	if m.Config != nil {
 		descriptors = append(descriptors, *m.Config)
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.descriptors == nil {
-		c.descriptors = make(map[string]layout.Descriptor)
+		c.descriptors = make(map[string]Descriptor)
 	}
 	if len(c.descriptors)+len(descriptors) > 4096 {
 		clear(c.descriptors)
@@ -135,20 +136,20 @@ func (c *RegistryContent) remember(
 func (c *RegistryContent) descriptor(
 	id types.SourceIdentity,
 	revision, image, digest string,
-) (layout.Descriptor, bool) {
+) (Descriptor, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	d, ok := c.descriptors[descriptorKey(id, revision, image, digest)]
 	return d, ok
 }
 
-func registryExternal(ctx context.Context, c repo.Config, opts Options, raw string) error {
+func registryExternal(ctx context.Context, c repo.Config, opts remote.Options, raw string) error {
 	if !enabled(c.ExternalDependenciesEnabled) || opts.CheckURL == nil {
-		return ErrSecurity
+		return remote.ErrSecurity
 	}
-	u, err := CheckedURL(raw)
+	u, err := remote.CheckedURL(raw)
 	if err != nil {
-		return ErrSecurity
+		return remote.ErrSecurity
 	}
 	allowed := false
 	for _, pattern := range c.ExternalDependenciesPatterns {
@@ -158,15 +159,16 @@ func registryExternal(ctx context.Context, c repo.Config, opts Options, raw stri
 		}
 	}
 	if !allowed {
-		return ErrSecurity
+		return remote.ErrSecurity
 	}
+	//nolint:wrapcheck // preserves upstream error identity
 	return opts.CheckURL(ctx, u)
 }
 
 func (c *RegistryContent) external(
 	ctx context.Context,
 	config repo.Config,
-	opts Options,
+	opts remote.Options,
 	raw string,
 ) (*http.Response, error) {
 	if err := registryExternal(ctx, config, opts, raw); err != nil {
@@ -208,13 +210,16 @@ func (c *RegistryContent) external(
 		ctx,
 		config,
 		opts,
-		Request{Method: http.MethodGet, ExternalURL: raw},
+		remote.Request{Method: http.MethodGet, ExternalURL: raw},
 	)
 }
 
-func registryNext(client RegistryClient, image, operation, reference, link string) (string, error) {
+func registryNext(
+	client remote.RegistryClient,
+	image, operation, reference, link string,
+) (string, error) {
 	if len(link) > 8192 {
-		return "", ErrRequest
+		return "", remote.ErrRequest
 	}
 	for _, part := range strings.Split(link, ",") {
 		part = strings.TrimSpace(part)
@@ -223,11 +228,11 @@ func registryNext(client RegistryClient, image, operation, reference, link strin
 		}
 		end := strings.IndexByte(part, '>')
 		if !strings.HasPrefix(part, "<") || end < 1 {
-			return "", ErrRequest
+			return "", remote.ErrRequest
 		}
 		next, err := url.Parse(part[1:end])
 		if err != nil {
-			return "", ErrRequest
+			return "", remote.ErrRequest
 		}
 		upstream, err := client.Image(image)
 		if err != nil {
@@ -241,21 +246,26 @@ func registryNext(client RegistryClient, image, operation, reference, link strin
 		base := *client.Base()
 		base.Path = expected
 		next = base.ResolveReference(next)
-		if Origin(next) != Origin(client.Base()) || next.Path != expected || next.User != nil ||
+		if remote.Origin(next) != remote.Origin(client.Base()) || next.Path != expected ||
+			next.User != nil ||
 			next.Fragment != "" ||
 			next.RawQuery == "" {
-			return "", ErrSecurity
+			return "", remote.ErrSecurity
 		}
 		values, err := url.ParseQuery(next.RawQuery)
 		if err != nil {
-			return "", ErrRequest
+			return "", remote.ErrRequest
 		}
 		for key := range values {
 			if key != "n" && key != "last" && key != "artifactType" {
-				return "", ErrRequest
+				return "", remote.ErrRequest
 			}
 		}
 		return next.RawQuery, nil
 	}
 	return "", nil
 }
+
+// enabled reports a repository switch that is set and on, as core remote's
+// own helper does; an unset switch is off.
+func enabled(v *bool) bool { return v != nil && *v }

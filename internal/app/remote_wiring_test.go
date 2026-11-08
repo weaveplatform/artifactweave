@@ -6,6 +6,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 )
 
@@ -16,7 +17,7 @@ import (
 // Smart Remote would stop synchronising registry properties.
 func TestAccRemoteWiringInstallsFormatHooks(t *testing.T) {
 	w := newRemoteWorld(t)
-	content := w.rt.registrySources.HTTP.(*remote.RegistryContent)
+	content := w.rt.registrySources.HTTP.(*docker.RegistryContent)
 	policies := map[string]*remote.Policy{
 		"remote":   w.rt.remoteSources.HTTP.(*maven.MavenBackend).Policy,
 		"registry": content.Policy,

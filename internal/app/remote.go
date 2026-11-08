@@ -15,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 	nimmodelhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nimmodel/http"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
@@ -140,7 +141,7 @@ func (rt *runtime) openRemoteSources(
 		Options: resolver.Options, CheckCurrent: checkCurrent(registryRevalidate), Key: key,
 		GitFetch: cocoapods.FetchCocoaPodsGit, ProjectResponse: nuget.ProjectEmptyFeed,
 	}
-	content := &remote.RegistryContent{
+	content := &docker.RegistryContent{
 		Policy: registryPolicy,
 		Registries: &remote.RegistryClients{
 			Pool:    &rt.registryHTTP,
@@ -148,7 +149,7 @@ func (rt *runtime) openRemoteSources(
 		},
 	}
 	content.Install()
-	rt.registryPath = remote.ParseRegistryPath
+	rt.registryPath = docker.ParseRegistryPath
 	rt.registrySources = &source.Service{
 		Resolve:    resolve,
 		Revalidate: registryRevalidate,

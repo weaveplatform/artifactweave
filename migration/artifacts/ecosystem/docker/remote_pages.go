@@ -1,4 +1,4 @@
-package remote
+package docker
 
 import (
 	"bytes"
@@ -9,13 +9,14 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
-	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
+	"github.com/weaveplatform/artifactweave/internal/remote"
 )
 
 func (c *RegistryContent) pages(
 	ctx context.Context,
-	client RegistryClient,
+	client remote.RegistryClient,
 	image, operation, reference string,
 	res *http.Response,
 ) (*http.Response, error) {
@@ -23,7 +24,7 @@ func (c *RegistryContent) pages(
 		return res, nil
 	}
 	var tags []string
-	var descriptors []layout.Descriptor
+	var descriptors []Descriptor
 	seen := map[string]bool{}
 	var total int
 	first := res
@@ -35,7 +36,7 @@ func (c *RegistryContent) pages(
 			return nil, fmt.Errorf("read registry listing: %w", err)
 		}
 		if total > 16<<20 || page >= 128 {
-			return nil, ErrRequest
+			return nil, remote.ErrRequest
 		}
 		// The assembled listing must not persist a page that upstream marked
 		// private to a request. Its validators no longer describe combined bytes.
@@ -48,13 +49,13 @@ func (c *RegistryContent) pages(
 				Tags []string `json:"tags"`
 			}
 			if err = json.Unmarshal(body, &listing); err != nil {
-				return nil, ErrRequest
+				return nil, remote.ErrRequest
 			}
 			tags = append(tags, listing.Tags...)
 		} else {
-			manifest, parseErr := layout.ParseManifest(res.Header.Get("Content-Type"), body, "")
+			manifest, parseErr := ParseManifest(res.Header.Get("Content-Type"), body, "")
 			if parseErr != nil || !manifest.IsIndex() {
-				return nil, ErrRequest
+				return nil, remote.ErrRequest
 			}
 			descriptors = append(descriptors, manifest.Manifests...)
 		}
@@ -66,18 +67,18 @@ func (c *RegistryContent) pages(
 			break
 		}
 		if seen[query] {
-			return nil, ErrRequest
+			return nil, remote.ErrRequest
 		}
 		seen[query] = true
 		res, err = client.Do(
 			ctx,
 			image,
-			Request{
+			remote.Request{
 				Method:   http.MethodGet,
 				Path:     operation + "/" + reference,
 				Query:    query,
 				Metadata: true,
-				Header:   http.Header{"Accept": {layout.MediaTypeOCIIndex}},
+				Header:   http.Header{"Accept": {MediaTypeOCIIndex}},
 			},
 		)
 		if err != nil {
@@ -86,7 +87,7 @@ func (c *RegistryContent) pages(
 		}
 		if res.StatusCode != 200 {
 			_ = res.Body.Close()
-			return nil, ResponseError(res, c.Policy.now())
+			return nil, remote.ResponseError(res, policyNow(c.Policy))
 		}
 	}
 	var data []byte
@@ -96,7 +97,7 @@ func (c *RegistryContent) pages(
 		data, _ = json.Marshal(
 			map[string]any{
 				"schemaVersion": 2,
-				"mediaType":     layout.MediaTypeOCIIndex,
+				"mediaType":     MediaTypeOCIIndex,
 				"manifests":     descriptors,
 			},
 		)
@@ -108,4 +109,15 @@ func (c *RegistryContent) pages(
 		first.Header.Del(key)
 	}
 	return first, nil
+}
+
+// policyNow is the shared policy's clock as (*remote.Policy).now reads it,
+// which this package cannot call: the injected Now first, else the wall
+// clock, in UTC. It must stay in step with that method, or a Retry-After
+// read here would be judged against another clock than the policy's own.
+func policyNow(p *remote.Policy) time.Time {
+	if p.Now != nil {
+		return p.Now().UTC()
+	}
+	return time.Now().UTC()
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -23,24 +24,24 @@ func TestAccSmartRegistryGrantAndPropertyPath(t *testing.T) {
 			},
 		}
 		if remote.SmartRegistryGrant(
-			remote.ParseRegistryPath, access, "remote", "image/manifests/tag",
+			docker.ParseRegistryPath, access, "remote", "image/manifests/tag",
 		) != (realm != "other") {
 			t.Fatal("realm grant", realm)
 		}
-		if remote.SmartRegistryGrant(remote.ParseRegistryPath, access, "remote", "bad") ||
+		if remote.SmartRegistryGrant(docker.ParseRegistryPath, access, "remote", "bad") ||
 			remote.SmartRegistryGrant(
-				remote.ParseRegistryPath, access, "remote", "private/manifests/tag",
+				docker.ParseRegistryPath, access, "remote", "private/manifests/tag",
 			) {
 			t.Fatal("scope widened")
 		}
 	}
 	for _, ref := range []string{"tag", "sha256:" + strings.Repeat("a", 64)} {
-		resource, err := remote.RegistryResource("image", "manifests", ref)
+		resource, err := docker.RegistryResource("image", "manifests", ref)
 		if err != nil {
 			t.Fatal(err)
 		}
 		q := source.Request{Repo: repo.Config{PackageType: repo.OCI}, Resource: resource}
-		if remote.SmartPropertyPath(remote.ParseRegistryPath, q) != (ref == "tag") ||
+		if remote.SmartPropertyPath(docker.ParseRegistryPath, q) != (ref == "tag") ||
 			remote.SmartStoragePath(q) != q.Resource.Path {
 			t.Fatal("digest pull synchronized tag properties")
 		}
@@ -51,7 +52,7 @@ func TestAccSmartRegistryGrantAndPropertyPath(t *testing.T) {
 // application hands NewSmart. Without one, a registry request must neither
 // synchronise properties nor match a registry token's grant.
 func TestUnitSmartRegistryPathNilParserFailsClosed(t *testing.T) {
-	resource, err := remote.RegistryResource("image", "manifests", "tag")
+	resource, err := docker.RegistryResource("image", "manifests", "tag")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -20,6 +20,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
 	nimmodelhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nimmodel/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -362,7 +363,7 @@ func TestAccNIMMetadataAndPairedDockerRegistryKeepSeparateAuthority(t *testing.T
 	}
 	pool := new(remote.RegistryPool)
 	t.Cleanup(pool.Close)
-	content := &remote.RegistryContent{
+	content := &docker.RegistryContent{
 		Policy: registryPolicy,
 		Registries: &remote.RegistryClients{
 			Pool: pool, Options: f.resolver.RegistryOptions,

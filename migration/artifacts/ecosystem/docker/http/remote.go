@@ -9,7 +9,6 @@ import (
 	"slices"
 	"strconv"
 
-	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
@@ -42,7 +41,7 @@ func (g *Registry) serveRemote(w http.ResponseWriter, r *http.Request, q Request
 	if q.Kind == KindTags {
 		ref = "list"
 	}
-	resource, err := remote.RegistryResource(q.Name, op, ref)
+	resource, err := layout.RegistryResource(q.Name, op, ref)
 	if err != nil {
 		Write(w, Errorf(http.StatusBadRequest, CodeNameInvalid, "invalid registry reference"))
 		return

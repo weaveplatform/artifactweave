@@ -1,4 +1,4 @@
-package remote
+package docker
 
 import (
 	"context"
@@ -13,10 +13,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -48,7 +48,7 @@ func TestAccRegistryListingPaginationAndBoundaries(t *testing.T) {
 				calls++
 				w.Header().Set("Content-Type", "application/json")
 				if mode == "referrers" {
-					w.Header().Set("Content-Type", layout.MediaTypeOCIIndex)
+					w.Header().Set("Content-Type", MediaTypeOCIIndex)
 				}
 				if r.URL.RawQuery == "" || mode == "loop" {
 					next := path + "?last=a"
@@ -73,7 +73,7 @@ func TestAccRegistryListingPaginationAndBoundaries(t *testing.T) {
 				if mode == "referrers" {
 					_, _ = io.WriteString(
 						w,
-						`{"schemaVersion":2,"mediaType":"`+layout.MediaTypeOCIIndex+`","manifests":[]}`,
+						`{"schemaVersion":2,"mediaType":"`+MediaTypeOCIIndex+`","manifests":[]}`,
 					)
 					return
 				}
@@ -86,10 +86,10 @@ func TestAccRegistryListingPaginationAndBoundaries(t *testing.T) {
 			})
 			up := httptest.NewServer(router)
 			t.Cleanup(up.Close)
-			client, err := NewRegistry(
+			client, err := remote.NewRegistry(
 				repo.Config{URL: up.URL, Class: repo.Remote, PackageType: repo.Docker},
-				RegistryOptions{
-					Transport: Options{
+				remote.RegistryOptions{
+					Transport: remote.Options{
 						Revision: "test",
 						Prepare:  func(*http.Request) error { return nil },
 						CheckURL: func(context.Context, *url.URL) error { return nil },
@@ -103,12 +103,12 @@ func TestAccRegistryListingPaginationAndBoundaries(t *testing.T) {
 			res, err := client.Do(
 				t.Context(),
 				"team/image",
-				Request{Method: "GET", Path: operation + "/" + reference},
+				remote.Request{Method: "GET", Path: operation + "/" + reference},
 			)
 			if err != nil {
 				t.Fatal(err)
 			}
-			content := RegistryContent{Policy: &Policy{}}
+			content := RegistryContent{Policy: &remote.Policy{}}
 			res, err = content.pages(t.Context(), client, "team/image", operation, reference, res)
 			if mode != "tags" && mode != "referrers" {
 				if err == nil {
@@ -143,18 +143,18 @@ func TestAccRegistryDescriptorIntegrityAndForeignPolicy(t *testing.T) {
 			ExternalDependenciesPatterns: []string{"https://layers.example/**"},
 		},
 	}
-	opts := Options{CheckURL: func(context.Context, *url.URL) error { return nil }}
-	d := layout.Descriptor{Digest: "sha256:" + strings.Repeat("a", 64), Size: 5}
+	opts := remote.Options{CheckURL: func(context.Context, *url.URL) error { return nil }}
+	d := Descriptor{Digest: "sha256:" + strings.Repeat("a", 64), Size: 5}
 	for _, mode := range []string{"valid", "digest", "negative size", "too many", "foreign blocked", "foreign invalid", "foreign allowed"} {
 		t.Run(mode, func(t *testing.T) {
-			m := layout.Manifest{Layers: []layout.Descriptor{d}}
+			m := Manifest{Layers: []Descriptor{d}}
 			switch mode {
 			case "digest":
 				m.Layers[0].Digest = "sha512:bad"
 			case "negative size":
 				m.Layers[0].Size = -1
 			case "too many":
-				m.Layers = make([]layout.Descriptor, 4097)
+				m.Layers = make([]Descriptor, 4097)
 			case "foreign blocked":
 				m.Layers[0].URLs = []string{"https://elsewhere.example/layer"}
 			case "foreign invalid":
@@ -172,7 +172,7 @@ func TestAccRegistryDescriptorIntegrityAndForeignPolicy(t *testing.T) {
 		source.Permit{}.Identity,
 		"revision",
 		"image",
-		layout.Manifest{Layers: []layout.Descriptor{d}},
+		Manifest{Layers: []Descriptor{d}},
 	)
 	if _, ok := c.descriptor(source.Permit{}.Identity, "rotated", "image", d.Digest); ok {
 		t.Fatal("descriptor crossed credential revision")
