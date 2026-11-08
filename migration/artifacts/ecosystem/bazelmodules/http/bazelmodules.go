@@ -1,4 +1,3 @@
-// Package bazelmoduleshttp serves the Bazel index registry protocol.
 package bazelmoduleshttp
 
 import (
@@ -45,6 +44,13 @@ func (virtualSource) Item(
 	return pkgroute.Found{}, source.ErrUnsupported
 }
 
+// Protocol returns the Bazel index registry protocol for the router kit:
+// GET and HEAD of every path under /artifactory/api/bazelmodules/{repoKey},
+// for local and federated repositories from their own items, virtual ones
+// from their members, and remote ones through remote when it is not nil; a
+// class without a source answers 501. The virtual class's source supports
+// no single-item lookup, because the protocol reads a virtual repository's
+// members itself.
 func Protocol(remote *source.Service) pkgroute.Protocol {
 	sources := map[repo.Class]pkgroute.Source{
 		repo.Local: pkgroute.Local{}, repo.Federated: pkgroute.Local{},

@@ -1,4 +1,3 @@
-// Package bazelmodules validates Bazel module registry uploads.
 package bazelmodules
 
 import (
@@ -42,12 +41,16 @@ var (
 	versionArgRE             = regexp.MustCompile(`\bversion\s*=\s*["']([^"']+)["']`)
 )
 
+// Serves reports whether t is the Bazel modules package type.
 func Serves(t repo.PackageType) bool { return t == repo.BazelModules }
 
 // ValidName and ValidVersion are deliberately narrower than arbitrary item
 // names. An ambiguous registry path cannot become an upload or a fetch target.
 func ValidName(name string) bool { return nameRE.MatchString(name) && name != "." && name != ".." }
 
+// ValidVersion reports whether version is a module version the registry
+// accepts: a digit, then up to 127 letters, digits, dots, underscores,
+// pluses and hyphens.
 func ValidVersion(version string) bool {
 	return versionRE.MatchString(version) && version != "." && version != ".."
 }
@@ -55,6 +58,11 @@ func ValidVersion(version string) bool {
 // File identifies a native local publication file.
 type File struct{ Name, Version, Kind, ArchiveType string }
 
+// ParseFile reads path as a hosted publication file,
+// modules/<name>/<version>/<file>, where file is MODULE.bazel or an archive
+// named *.tar.gz, *.tgz, *.tar or *.zip, a .tgz being typed tar.gz. It
+// reports false for any other path, metadata.json and source.json
+// included, since the protocol derives those.
 func ParseFile(path string) (File, bool) {
 	parts := strings.Split(path, "/")
 	if len(parts) != 4 || parts[0] != "modules" || !ValidName(parts[1]) || !ValidVersion(parts[2]) {
@@ -105,6 +113,9 @@ func ParseModule(body []byte) (string, string, error) {
 }
 
 type (
+	// Handler is the Bazel modules format's hooks. It embeds the generic
+	// hooks, so a deploy, a delete and the class of a path are handled as
+	// for generic content.
 	Handler    struct{ generic.Handler }
 	inspection struct {
 		sha string
@@ -112,6 +123,13 @@ type (
 	}
 )
 
+// Inspect checks a hosted upload before the write's transaction: a
+// MODULE.bazel must parse with ParseModule and match its path, and an
+// archive must have the type its name gives and hold only clean regular
+// files and folders, within 10,000 entries and 512 MiB. The outcome, valid
+// or not, is returned for Admit, so an upload is read once; only failing
+// to open the stored content is an error. A remote's cached write and a
+// checksum deploy inspect nothing.
 func (Handler) Inspect(
 	ctx context.Context,
 	env format.Env,
@@ -182,6 +200,10 @@ func (Handler) Inspect(
 	return &inspection{sha: w.Checksums.SHA256, err: err}, nil
 }
 
+// Admit refuses with 409 a hosted upload outside the publication layout
+// or whose inspection failed, then applies the generic deploy policy,
+// wrapping its refusal. A remote's cached write and a checksum deploy go
+// straight to the generic policy.
 func (Handler) Admit(
 	ctx context.Context,
 	env format.Env,
@@ -243,8 +265,11 @@ func (Handler) GuardWrite(
 	return nil
 }
 
-// The native HTTP view is derived from current stored items. Reindex validates
-// every publication rather than maintaining a second mutable metadata copy.
+// Reindex re-checks, as Inspect does, every file under modules/ in
+// repository c's own items, and fails on the first that is outside the
+// layout or does not pass. The native view is derived from the current
+// stored items, so there is no second, mutable copy of the metadata to
+// rebuild.
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	page := store.Page{Limit: store.MaxLimit}
 	for {

@@ -1,5 +1,3 @@
-// Package bower validates Bower package trees and indexes versions from
-// their bower.json manifest. The item tree remains the source of truth.
 package bower
 
 import (
@@ -24,22 +22,36 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// MaxManifestBytes bounds a bower.json, hosted or fetched, at 1 MiB; a
+// larger one is refused before it is parsed.
 const MaxManifestBytes = 1 << 20
 
 var nameRE = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9._-]{0,99}$`)
 
+// ErrManifest is what DecodeManifest and DecodeGitManifest return for
+// every manifest they refuse.
 var ErrManifest = errors.New("bower: invalid bower manifest")
 
+// Manifest is the part of a bower.json the registry checks: the name and
+// version that identify the package, and its dependencies, at most 1,000,
+// each a valid name with a non-empty target of at most 512 bytes.
 type Manifest struct {
 	Name         string            `json:"name"`
 	Version      string            `json:"version"`
 	Dependencies map[string]string `json:"dependencies,omitempty"`
 }
 
+// Serves reports whether t is the Bower package type.
 func Serves(t repo.PackageType) bool { return t == repo.Bower }
 
+// ValidName reports whether name is a Bower package name the registry
+// accepts: a letter, then up to 99 letters, digits, dots, underscores and
+// hyphens.
 func ValidName(name string) bool { return nameRE.MatchString(name) && name != "." && name != ".." }
 
+// ValidVersion reports whether version is a full semantic version,
+// major.minor.patch with an optional pre-release and build, written
+// without the v that a Git tag adds.
 func ValidVersion(version string) bool {
 	core := strings.SplitN(strings.SplitN(version, "+", 2)[0], "-", 2)[0]
 	return strings.Count(core, ".") == 2 && semver.IsValid("v"+version)
@@ -63,6 +75,8 @@ func ParsePath(p string) (name, version, file string, ok bool) {
 	return parts[0], parts[1], strings.Join(parts[2:], "/"), true
 }
 
+// ManifestPath is the item path of the bower.json of package name at
+// version: <name>/<version>/bower.json.
 func ManifestPath(name, version string) string {
 	return name + "/" + version + "/bower.json"
 }
@@ -126,6 +140,8 @@ func decodeManifest(body []byte, optionalVersion bool) (Manifest, error) {
 	return m, nil
 }
 
+// Handler is the Bower format's hooks. It embeds the generic hooks, so a
+// delete and the class of a path are handled as for generic content.
 type Handler struct{ generic.Handler }
 
 type inspection struct {
@@ -133,6 +149,11 @@ type inspection struct {
 	manifest  Manifest
 }
 
+// Inspect reads and checks the stored bower.json a write puts at a
+// manifest path, before the write's transaction, and returns it for Admit,
+// so a manifest is read once per write. A checksum deploy and any other
+// file inspect nothing. A manifest that is invalid or does not match its
+// path is refused with 400.
 func (Handler) Inspect(
 	ctx context.Context,
 	env format.Env,
@@ -149,6 +170,11 @@ func (Handler) Inspect(
 	return inspection{sha: w.Checksums.SHA256, path: w.Path, manifest: m}, nil
 }
 
+// Admit applies the generic deploy policy, wrapping its refusal, then
+// passes a checksum deploy. Any other write must be inside a versioned
+// package tree (400), and a bower.json must pass the checks Inspect makes,
+// which Admit repeats unless Inspect already read the same content at the
+// same path.
 func (Handler) Admit(
 	ctx context.Context,
 	env format.Env,
@@ -180,6 +206,9 @@ func (Handler) Admit(
 	return w, nil
 }
 
+// Deployed links a stored bower.json to its version in the package index,
+// creating the package and version when they are new. Folders and other
+// files change nothing.
 func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
 	if it.Folder || !strings.HasSuffix(it.FullPath(), "/bower.json") {
 		return nil
@@ -196,6 +225,11 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 	return nil
 }
 
+// Reindex rebuilds repository c's package index from its stored manifests
+// (a remote's from its cache): a package per name and a version per
+// bower.json, its versions sorted by version string and the package taking
+// the first one's creation time. It fails on the first manifest that is
+// missing or invalid.
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	storedRef := pkgindex.Stored(c)
 	var wanted []pkgindex.Indexed

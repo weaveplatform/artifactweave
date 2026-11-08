@@ -1,4 +1,3 @@
-// Package bowerhttp serves the Bower registry and bower-art-resolver 2.0 protocol.
 package bowerhttp
 
 import (
@@ -22,8 +21,20 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// Options configures the Bower protocol. RemoteSources serves remote
+// repositories and fetches through them; nil leaves the remote class
+// without a source, so a remote repository answers 501.
 type Options struct{ RemoteSources *source.Service }
 
+// Protocol returns the Bower registry protocol for the router kit, under
+// /artifactory/api/bower/{repoKey}: GET and HEAD of the package list,
+// search and lookup, refs and binaries, and POST /packages to register a
+// package. Local and federated repositories are served from their own
+// items, virtual ones from their members, and remote ones through
+// o.RemoteSources when it is set; a class without a source answers 501.
+// It reserves {repoKey}/reindex for the JFrog reindex operation beside the
+// protocol. The virtual class's source supports no single-item lookup,
+// because the protocol reads a virtual repository's members itself.
 func Protocol(o Options) pkgroute.Protocol {
 	sources := map[repo.Class]pkgroute.Source{
 		repo.Local: pkgroute.Local{}, repo.Federated: pkgroute.Local{},
