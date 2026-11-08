@@ -1,4 +1,4 @@
-package remote
+package maven
 
 import (
 	"context"
@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -40,7 +41,7 @@ type mavenJob struct {
 // returns interrupted leases so another process can safely resume them.
 type MavenEager struct {
 	service *source.Service
-	policy  *Policy
+	policy  *remote.Policy
 	authn   accessapi.Authenticator
 	authz   accessapi.Authorizer
 	queue   *work.Queue
@@ -56,7 +57,7 @@ type MavenEager struct {
 func NewMavenEager(
 	ctx context.Context,
 	service *source.Service,
-	policy *Policy,
+	policy *remote.Policy,
 	authn accessapi.Authenticator,
 	authz accessapi.Authorizer,
 	log *slog.Logger,
@@ -93,7 +94,7 @@ func mavenCompanion(c repo.Config, p string) string {
 }
 
 func (e *MavenEager) Queue(ctx context.Context, q source.Request, permit source.Permit) {
-	if ctx.Value(EagerKey{}) != nil {
+	if ctx.Value(remote.EagerKey{}) != nil {
 		return
 	}
 	target := mavenCompanion(q.Repo, q.Resource.Path)
@@ -157,7 +158,7 @@ func (e *MavenEager) run(ctx context.Context, it types.WorkItem) error {
 		return errors.Join(work.ErrPermanent, source.ErrInvalidRequest)
 	}
 	ctx, cancel := context.WithTimeout(
-		context.WithValue(ctx, EagerKey{}, job.Revision),
+		context.WithValue(ctx, remote.EagerKey{}, job.Revision),
 		time.Minute,
 	)
 	defer cancel()

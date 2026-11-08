@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -149,7 +150,7 @@ func (rt *runtime) openRemoteSources(
 		HTTP:       content,
 		Cache:      content,
 	}
-	mavenBackend := &remote.MavenBackend{Policy: policy}
+	mavenBackend := &maven.MavenBackend{Policy: policy}
 	policy.PrepareUpload = func(
 		ctx context.Context, q source.Request, permit source.Permit,
 		opts remote.Options, upload *item.CacheUpload,
@@ -166,7 +167,7 @@ func (rt *runtime) openRemoteSources(
 		HTTP:       mavenBackend,
 		Cache:      mavenBackend,
 	}
-	rt.mavenEager, err = remote.NewMavenEager(
+	rt.mavenEager, err = maven.NewMavenEager(
 		ctx,
 		service,
 		policy,

@@ -65,7 +65,7 @@ type runtime struct {
 	multipart        *multipart.Service
 	// work runs derived work after the changes that need it (decision 0033).
 	work            *work.Queue
-	mavenEager      *remote.MavenEager
+	mavenEager      *maven.MavenEager
 	smartRemote     *remote.Smart
 	smartRegistry   *remote.Smart
 	remoteHTTP      remote.Pool

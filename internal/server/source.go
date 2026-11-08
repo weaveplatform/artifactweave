@@ -20,7 +20,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/opkg"
 	"github.com/weaveplatform/artifactweave/internal/format/p2"
 	"github.com/weaveplatform/artifactweave/internal/format/rpm"
-	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
@@ -789,7 +788,7 @@ func (s artifactoryService) mavenSourceRequest(
 		return q, fmt.Errorf("resolve maven source: %w", err)
 	}
 	if !q.CacheOnly {
-		resolved, err := remote.ResolveMavenSource(ctx, s.cfg.RemoteSources, items, q)
+		resolved, err := maven.ResolveMavenSource(ctx, s.cfg.RemoteSources, items, q)
 		if err != nil {
 			return q, fmt.Errorf("resolve maven source: %w", err)
 		}

@@ -1,4 +1,4 @@
-package remote
+package maven
 
 import (
 	"context"
@@ -10,10 +10,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -30,6 +32,10 @@ func mavenFixture(t *testing.T) (*policyWorld, *MavenBackend) {
 		t.Fatal(err)
 	}
 	w.permit.Identity, _ = w.db.RemoteCache().Source(t.Context(), w.c.Key)
+	// The registry (artifacts/ecosystem) imports this package, so an
+	// in-package test names the Maven handler itself; without it the cache
+	// writes go through the generic handler and skip the Maven index.
+	w.p.Items.Formats = func(repo.PackageType) format.Handler { return Handler{} }
 	m := &MavenBackend{Policy: w.p}
 	w.p.PrepareUpload = m.PrepareUpload
 	return w, m
@@ -218,16 +224,18 @@ func TestAccMavenDurableCompanionAuthorityAndRetries(t *testing.T) {
 				w.c.URL += "/changed"
 				err = w.db.Repos().Update(ctx, w.c)
 			case "credential changed":
-				w.p.Options = func(context.Context, repo.Config) (Options, error) { return Options{Revision: "changed"}, nil }
+				w.p.Options = func(context.Context, repo.Config) (remote.Options, error) {
+					return remote.Options{Revision: "changed"}, nil
+				}
 			case "credential raced":
 				calls := 0
-				w.p.Options = func(context.Context, repo.Config) (Options, error) {
+				w.p.Options = func(context.Context, repo.Config) (remote.Options, error) {
 					calls++
 					revision := "credential-1"
 					if calls > 1 {
 						revision = "changed"
 					}
-					return Options{Revision: revision}, nil
+					return remote.Options{Revision: revision}, nil
 				}
 			case "offline":
 				w.c.Offline = new(true)
@@ -339,7 +347,13 @@ func TestAccMavenPreparedMetadataKeepsAdmission(t *testing.T) {
 	}
 	// A nil pool would panic if the prepared response asked for checksum files.
 	w.p.Pool = nil
-	if err = m.PrepareUpload(t.Context(), q, w.permit, Options{}, &item.CacheUpload{}); err != nil {
+	if err = m.PrepareUpload(
+		t.Context(),
+		q,
+		w.permit,
+		remote.Options{},
+		&item.CacheUpload{},
+	); err != nil {
 		t.Fatal(err)
 	}
 	ordinary := w.request("org/acme/app/maven-metadata.xml", source.ResourceKindMetadata)

@@ -1,4 +1,4 @@
-package remote
+package maven
 
 import (
 	"cmp"
@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/remote"
 	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -24,7 +24,7 @@ import (
 // MavenBackend opts only Maven-family routes into format-aware source retrieval.
 // Other adapters keep the shared policy's existing behavior.
 type MavenBackend struct {
-	Policy *Policy
+	Policy *remote.Policy
 	Eager  func(context.Context, source.Request, source.Permit)
 }
 
@@ -33,7 +33,8 @@ func (m *MavenBackend) Read(
 	q source.Request,
 	permit source.Permit,
 ) (source.Result, error) {
-	if !maven.Serves(q.Repo.PackageType) || preparedMetadata(q.Resource) {
+	if !Serves(q.Repo.PackageType) || preparedMetadata(q.Resource) {
+		//nolint:wrapcheck // preserves upstream error identity
 		return m.Policy.Read(ctx, q, permit)
 	}
 	prepared, err := m.prepare(ctx, q)
@@ -47,6 +48,7 @@ func (m *MavenBackend) Read(
 		(q.Repo.StoreArtifactsLocally == nil || *q.Repo.StoreArtifactsLocally) {
 		m.Eager(ctx, q, permit)
 	}
+	//nolint:wrapcheck // preserves upstream error identity
 	return result, err
 }
 
@@ -58,13 +60,13 @@ func (m *MavenBackend) prepare(ctx context.Context, q source.Request) (source.Re
 	r := &q.Resource
 	validationLayout, validationPath := local, r.Path
 	r.Variant = "maven-source-v1"
-	if maven.IsMetadata(r.Path) {
+	if IsMetadata(r.Path) {
 		r.Kind = source.ResourceKindMetadata
 		r.Accept = "application/xml"
 		r.EscapedPath = (&url.URL{Path: r.Path}).EscapedPath()
 		r.ExpectedContentType = "application/xml"
 	} else {
-		r.Mutable = maven.IsNonUniqueSnapshot(r.Path)
+		r.Mutable = IsNonUniqueSnapshot(r.Path)
 	}
 	if q.Repo.RemoteRepoLayoutRef != "" && q.Repo.RemoteRepoLayoutRef != q.Repo.RepoLayoutRef {
 		upstream, err := m.Policy.Items.Layout(ctx, q.Repo.RemoteRepoLayoutRef)
@@ -76,14 +78,14 @@ func (m *MavenBackend) prepare(ctx context.Context, q source.Request) (source.Re
 			return q, source.ErrInvalidRequest
 		}
 		r.UpstreamPath = (&url.URL{Path: mapped}).EscapedPath()
-		if maven.IsPom(mapped) && !maven.IsPom(r.Path) {
+		if IsPom(mapped) && !IsPom(r.Path) {
 			// Descriptor projection can change .pom to ivy-*.xml. Preserve
 			// the actual upstream POM's admission rules despite that spelling.
 			validationLayout, validationPath = upstream, mapped
 		}
 	}
 	r.Validate = func(ctx context.Context, body io.ReadSeeker, size int64) error {
-		if err := maven.ValidateRemote(
+		if err := ValidateRemote(
 			ctx,
 			q.Repo,
 			validationLayout,
@@ -123,19 +125,19 @@ func (m *MavenBackend) PrepareUpload(
 	ctx context.Context,
 	q source.Request,
 	permit source.Permit,
-	opts Options,
+	opts remote.Options,
 	u *item.CacheUpload,
 ) error {
-	if !maven.Serves(q.Repo.PackageType) || preparedMetadata(q.Resource) ||
+	if !Serves(q.Repo.PackageType) || preparedMetadata(q.Resource) ||
 		q.Repo.RemoteRepoChecksumPolicyType == repo.IgnoreAndGenerate ||
 		u.Declared != (types.Checksums{}) && q.Repo.RemoteRepoChecksumPolicyType != repo.PassThru {
 		return nil
 	}
 	client, err := m.Policy.Pool.Client(q.Repo, opts)
 	if err != nil {
-		return PolicyError(err)
+		return remote.PolicyError(err)
 	}
-	request := TransportRequest(q, types.RemoteCacheEntry{})
+	request := remote.TransportRequest(q, types.RemoteCacheEntry{})
 	request.Method, request.Metadata = http.MethodGet, true
 	request.Header = nil
 	algorithms := []item.Algorithm{item.SHA1, item.MD5}
@@ -150,7 +152,7 @@ func (m *MavenBackend) PrepareUpload(
 		checksumRequest.Path += "." + string(alg)
 		res, err := client.Do(ctx, checksumRequest)
 		if err != nil {
-			return PolicyError(err)
+			return remote.PolicyError(err)
 		}
 		data, readErr := io.ReadAll(io.LimitReader(res.Body, 1025))
 		_ = res.Body.Close()
@@ -158,7 +160,7 @@ func (m *MavenBackend) PrepareUpload(
 			continue
 		}
 		if res.StatusCode != http.StatusOK {
-			return ResponseError(res, m.Policy.now())
+			return remote.ResponseError(res, policyNow(m.Policy))
 		}
 		if readErr != nil || len(data) > 1024 {
 			return item.ErrBadChecksum
@@ -196,6 +198,7 @@ func (m *MavenBackend) PrepareUpload(
 			break
 		}
 	}
+	//nolint:wrapcheck // preserves upstream error identity
 	return m.Policy.Check(ctx, q, permit, opts.Revision)
 }
 
@@ -214,7 +217,7 @@ func MavenMetadata(
 	service *source.Service,
 	q source.Request,
 	metadataPath string,
-) (maven.SourceMetadata, error) {
+) (SourceMetadata, error) {
 	q.Resource = source.Resource{
 		Kind:   source.ResourceKindMetadata,
 		Path:   metadataPath,
@@ -222,19 +225,19 @@ func MavenMetadata(
 	}
 	result, err := service.Read(ctx, q)
 	if err != nil {
-		return maven.SourceMetadata{}, fmt.Errorf("maven source metadata: %w", err)
+		return SourceMetadata{}, fmt.Errorf("maven source metadata: %w", err)
 	}
 	if result.Stream == nil {
-		return maven.SourceMetadata{}, source.ErrInvalidResult
+		return SourceMetadata{}, source.ErrInvalidResult
 	}
 	defer result.Stream.Body.Close()
-	metadata, err := maven.ReadSourceMetadata(result.Stream.Body)
+	metadata, err := ReadSourceMetadata(result.Stream.Body)
 	if err != nil {
 		return metadata, fmt.Errorf("decode maven source metadata: %w", err)
 	}
 	if result.Revalidate != nil {
 		if err = result.Revalidate(ctx); err != nil {
-			return maven.SourceMetadata{}, fmt.Errorf("maven metadata delivery: %w", err)
+			return SourceMetadata{}, fmt.Errorf("maven metadata delivery: %w", err)
 		}
 	}
 	return metadata, nil
@@ -249,7 +252,7 @@ func ResolveMavenSource(
 	q source.Request,
 ) (string, error) {
 	p := q.Resource.Path
-	if !maven.IsNonUniqueSnapshot(p) && !strings.Contains(p, "[RELEASE]") &&
+	if !IsNonUniqueSnapshot(p) && !strings.Contains(p, "[RELEASE]") &&
 		!strings.Contains(p, "[LATEST]") {
 		return p, nil
 	}
@@ -257,10 +260,10 @@ func ResolveMavenSource(
 	if err != nil {
 		return p, fmt.Errorf("resolve maven layout: %w", err)
 	}
-	if !maven.IsMavenLayout(l) {
+	if !IsMavenLayout(l) {
 		return p, nil
 	}
-	if maven.IsNonUniqueSnapshot(p) {
+	if IsNonUniqueSnapshot(p) {
 		metadata, err := MavenMetadata(
 			ctx,
 			service,
@@ -273,7 +276,7 @@ func ResolveMavenSource(
 		if err != nil {
 			return "", err
 		}
-		co, ok := maven.Read(l, p)
+		co, ok := Read(l, p)
 		if !ok {
 			return p, nil
 		}
@@ -316,7 +319,7 @@ func ResolveMavenSource(
 		return "", store.ErrNotFound
 	}
 	resolved := strings.ReplaceAll(p, token, version)
-	if maven.IsNonUniqueSnapshot(resolved) {
+	if IsNonUniqueSnapshot(resolved) {
 		q.Resource.Path = resolved
 		return ResolveMavenSource(ctx, service, items, q)
 	}
@@ -327,3 +330,18 @@ func validVersion(version string) bool {
 	return version != "" && version != "." && version != ".." &&
 		!strings.ContainsAny(version, "/\\\\\r\n;[]")
 }
+
+// policyNow is the shared policy's clock as (*remote.Policy).now reads it,
+// which this package cannot call: the injected Now first, else the wall
+// clock, in UTC. It must stay in step with that method, or a Retry-After
+// read here would be judged against another clock than the policy's own.
+func policyNow(p *remote.Policy) time.Time {
+	if p.Now != nil {
+		return p.Now().UTC()
+	}
+	return time.Now().UTC()
+}
+
+// enabled reports a repository switch that is set and on, as core remote's
+// own helper does; an unset switch is off.
+func enabled(v *bool) bool { return v != nil && *v }

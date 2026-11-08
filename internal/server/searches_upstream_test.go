@@ -19,6 +19,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -67,7 +68,7 @@ func searchUpstreamWorld(t *testing.T) *upstreamSearchWorld {
 			},
 		}
 		t.Cleanup(policy.Pool.Close)
-		backend := &remote.MavenBackend{Policy: policy}
+		backend := &maven.MavenBackend{Policy: policy}
 		u.svc = &source.Service{
 			Resolve: func(ctx context.Context, r repo.Config) (types.SourceIdentity, error) {
 				return c.Store.RemoteCache().Source(ctx, r.Key)
