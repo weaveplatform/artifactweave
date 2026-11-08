@@ -12,7 +12,7 @@ import (
 	"unicode/utf8"
 
 	format "github.com/weaveplatform/artifactweave/internal/format/aieditorextensions"
-	"github.com/weaveplatform/artifactweave/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
 const maxQueryBody = 64 << 10

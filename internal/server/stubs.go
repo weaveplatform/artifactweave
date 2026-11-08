@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/docker"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
 // errorProfileFor selects the error response contract from the request path.

@@ -6,9 +6,9 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/vcs"
 	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
 func (s artifactoryService) vcsPeerFile(

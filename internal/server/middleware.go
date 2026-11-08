@@ -13,8 +13,8 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 
-	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/docker"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
 // requestIDHeader lines up artifactweave's logs with a reverse proxy's. It is

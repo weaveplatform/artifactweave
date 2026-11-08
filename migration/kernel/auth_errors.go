@@ -3,7 +3,7 @@ package kernel
 import (
 	"net/http"
 
-	"github.com/weaveplatform/artifactweave/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
 // The messages JFrog clients print. No public source documents Artifactory's

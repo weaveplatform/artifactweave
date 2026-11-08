@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth/idtoken"
-	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	accessgen "github.com/weaveplatform/artifactweave/internal/server/gen/access"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
 	distributiongen "github.com/weaveplatform/artifactweave/internal/server/gen/distribution"
@@ -21,6 +20,7 @@ import (
 	gridgen "github.com/weaveplatform/artifactweave/internal/server/gen/grid"
 	pfedgen "github.com/weaveplatform/artifactweave/internal/server/gen/pfed"
 	workergen "github.com/weaveplatform/artifactweave/internal/server/gen/worker"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 

@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/server/apierror"
-	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 

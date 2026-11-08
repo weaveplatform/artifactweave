@@ -16,7 +16,7 @@ import (
 	htmlparse "golang.org/x/net/html"
 
 	pypifmt "github.com/weaveplatform/artifactweave/internal/format/pypi"
-	"github.com/weaveplatform/artifactweave/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
 const (

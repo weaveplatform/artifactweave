@@ -75,7 +75,7 @@ When a test file leaves a shared directory such as `internal/server`:
 | Skills | `internal/server/skills` |
 | Terraform registry | `internal/server/terraform`, `test/server/artifacts/terraform` |
 | Terraform backend | `internal/server/terraformbackend`, `test/server/artifacts/terraformbackend` |
-| Shared | `internal/server`, `internal/server/apierror`, `internal/server/baseurl`, `internal/server/pkgroute`, `test/server/access` |
+| Shared | `internal/server`, `migration/platform/httpkit/apierror`, `migration/platform/httpkit/baseurl`, `internal/server/pkgroute`, `test/server/access` |
 
 `test/server/support` and the packages under it (`harness`, `agentcommon` and
 `registryfixture`) contain fixtures and helpers, not test suites. A change

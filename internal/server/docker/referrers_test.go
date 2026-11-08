@@ -13,9 +13,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
-	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 

@@ -9,8 +9,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
 // buildRouteRecorder records the build name and number each Builds

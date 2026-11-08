@@ -10,9 +10,9 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	accessgen "github.com/weaveplatform/artifactweave/internal/server/gen/access"
 	"github.com/weaveplatform/artifactweave/internal/service/roles"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
 func TestAccGlobalRolesAndEnvironmentsBodies(t *testing.T) {

@@ -48,7 +48,7 @@ configuration PATCH.
 taken from the JFrog docs and from the JFrog CLI and Terraform provider sources. Handlers
 take their codes from that table, not from convention.
 
-**Error response profiles.** One table in `internal/server/apierror`, keyed by profile.
+**Error response profiles.** One table in `migration/platform/httpkit/apierror`, keyed by profile.
 A profile selects the error envelope, response media type, and default authentication
 challenge. Several API surfaces can share a profile; JFrog Distribution and OCI
 registries have distinct profiles.
@@ -79,7 +79,7 @@ the import and export row the one their pages document, `errors[]` beside `error
 **Base URL resolver.** Embedded absolute URLs (npm `dist.tarball`, Helm `urls`, NuGet
 `@id`, Terraform `download_url`, Docker `Location` and `WWW-Authenticate` realm,
 file-info `uri` and `downloadUri`, repository `url`) come from one resolver in
-`internal/server/baseurl` with Artifactory's precedence (OSS 6.20
+`migration/platform/httpkit/baseurl` with Artifactory's precedence (OSS 6.20
 `HttpUtils.getServletContextUrl`, research 17; the 7.x
 [HTTP settings](https://docs.jfrog.com/installation/docs/http-settings) page documents the
 `X-JFrog-Override-Base-Url` header and the Custom Base URL but not their precedence, so the
