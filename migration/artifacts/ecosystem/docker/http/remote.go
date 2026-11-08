@@ -10,8 +10,8 @@ import (
 	"strconv"
 
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
-	"github.com/weaveplatform/artifactweave/internal/source"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"

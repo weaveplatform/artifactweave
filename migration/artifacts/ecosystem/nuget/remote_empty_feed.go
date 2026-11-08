@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 )
 
 const emptyNuGetFeed = `<feed xmlns="http://www.w3.org/2005/Atom"/>`

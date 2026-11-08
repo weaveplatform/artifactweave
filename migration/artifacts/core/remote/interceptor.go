@@ -3,7 +3,7 @@ package remote
 import (
 	"context"
 
-	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 )
 
 // Interceptor reads a remote resource in place of the shared policy. Once

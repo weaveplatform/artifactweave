@@ -12,7 +12,7 @@ per-disclosed-path checks. Operational behavior is documented in
 
 ## Contracts and ownership
 
-`internal/source` imports no server package and does not receive a transaction or
+`migration/artifacts/core/remote/source` imports no server package and does not receive a transaction or
 format write-hook environment. `pkg/types/source.go` defines durable, secret-free
 `RepositoryIncarnation`, `SourceGeneration` and tagged `SourceIdentity` records;
 [#619](https://github.com/weaveplatform/artifactweave/issues/619) owns allocation,
@@ -97,7 +97,7 @@ protocol adapters. Docker retains its separate routing seam; P10 must compose so
 permissions and intent deliberately, and P11
 adds project graph and sharing checks without administrator loopback HTTP.
 
-Tests in `internal/source/source_test.go`, `internal/server/source_test.go` and
+Tests in `migration/artifacts/core/remote/source/source_test.go`, `internal/server/source_test.go` and
 `internal/server/pkgroute/source_test.go` exercise the service and router through
 injected backends: permission/pattern/path refusals before work, explicit intent,
 representation validation, generation/revocation races, safe protocol errors, stream

@@ -14,8 +14,8 @@ import (
 	"golang.org/x/mod/module"
 	modzip "golang.org/x/mod/zip"
 
-	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 )
 
 // GoSource is the GOPROXY reader for the P10 virtual resolver. It deliberately

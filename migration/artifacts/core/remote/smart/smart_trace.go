@@ -6,8 +6,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 )
 
 // SmartOriginHeader carries the Smart Remote nodes a request has passed

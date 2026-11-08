@@ -12,10 +12,10 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/source"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -57,7 +57,7 @@ func (s Remote) Read(
 }
 
 // ReadSource is the optional stream-aware extension of a protocol Source.
-// Format packages consume internal/source directly and never import this HTTP
+// Format packages consume migration/artifacts/core/remote/source directly and never import this HTTP
 // adapter interface.
 type ReadSource interface {
 	Read(*http.Request, repo.Config, source.Resource) (source.Result, error)

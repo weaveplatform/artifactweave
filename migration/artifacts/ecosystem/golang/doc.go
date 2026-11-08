@@ -29,7 +29,7 @@
 //   - Driven: the format hooks' environment (format.Env), through which
 //     Handler reads items and their properties and keeps the package index;
 //     and the application's authority-fenced source service
-//     (internal/source), through which GoSource reads a remote repository
+//     (migration/artifacts/core/remote/source), through which GoSource reads a remote repository
 //     over the shared remote cache policy, never a raw transport.
 //
 // # Outputs

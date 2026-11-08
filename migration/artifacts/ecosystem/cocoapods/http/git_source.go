@@ -3,7 +3,7 @@ package cocoapodshttp
 import (
 	"encoding/json"
 
-	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 )
 
 func gitSource(origin map[string]json.RawMessage) (source.CocoaPodsGitSource, error) {

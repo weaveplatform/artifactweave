@@ -15,7 +15,7 @@
 //
 // # Inputs
 //
-//   - Driving: the source service (internal/source), which reads a remote
+//   - Driving: the source service (migration/artifacts/core/remote/source), which reads a remote
 //     repository through Policy.Read once it has authorised the request;
 //     the listing and discovery callers; Smart Remote; and the format
 //     slices' upstream rules, which call the policy's exported checks.

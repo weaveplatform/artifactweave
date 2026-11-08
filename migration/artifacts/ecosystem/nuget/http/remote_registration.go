@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	nugetfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )

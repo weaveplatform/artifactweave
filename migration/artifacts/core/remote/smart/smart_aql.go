@@ -7,10 +7,10 @@ import (
 	"mime"
 	"net/http"
 
-	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 )
 
 // query deliberately has no persistent response/cache entry: search may disclose

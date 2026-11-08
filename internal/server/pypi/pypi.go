@@ -21,8 +21,8 @@ import (
 
 	pypifmt "github.com/weaveplatform/artifactweave/internal/format/pypi"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
-	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 

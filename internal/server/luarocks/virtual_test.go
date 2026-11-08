@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 )
 
 func TestAccVirtualSourceRequiresProtocolAwareResolution(t *testing.T) {

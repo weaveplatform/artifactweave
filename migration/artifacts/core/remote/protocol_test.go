@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 )
 
 // A policy built without the CocoaPods slice's hook must keep answering a

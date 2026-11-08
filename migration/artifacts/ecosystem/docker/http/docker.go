@@ -12,11 +12,11 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
-	"github.com/weaveplatform/artifactweave/internal/source"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
