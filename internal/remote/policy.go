@@ -404,6 +404,14 @@ func (p *Policy) used(token types.RemoteCacheToken) func(context.Context) error 
 	}
 }
 
+// TransportRequest is the upstream request for q: the resource's escaped
+// path, or the path mapped to the upstream's layout, or its external URL,
+// with its query, Accept header and body. Given e, the cached complete
+// representation of the same resource, it adds e's validator
+// (If-None-Match, else If-Modified-Since) so that the upstream can answer
+// 304; the caller's own validators never reach the upstream. Format rules
+// build their extra exchanges, such as Maven's checksum sidecars, from it
+// so that they go out as the policy's own requests do.
 func TransportRequest(q source.Request, e types.RemoteCacheEntry) Request {
 	path := q.Resource.EscapedPath
 	if path == "" {
@@ -447,6 +455,15 @@ func TransportRequest(q source.Request, e types.RemoteCacheEntry) Request {
 	}
 }
 
+// PolicyError classifies a failure of the policy's own work for the source
+// service: an error that already carries a *source.HTTPError keeps it; the
+// sentinels a caller tests (source.ErrDenied, source.ErrSuperseded,
+// store.ErrNotFound and context.Canceled) pass through, a store conflict
+// reading as superseded; a timeout becomes a 504, a busy pool a 503, a
+// security, connection or integrity failure a 502 of that kind, and
+// anything else a 502 protocol failure. Format rules in the ecosystem
+// slices return it unwrapped, as the policy does, so that the source
+// service maps their failures as it maps the policy's own.
 func PolicyError(err error) error {
 	var typed *source.HTTPError
 	if errors.As(err, &typed) {

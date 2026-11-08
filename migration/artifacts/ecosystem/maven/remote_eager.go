@@ -24,6 +24,10 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// MavenCompanionKind is the persistent work-queue kind of a companion
+// fetch (decision 0033), and the name of the lease that serializes their
+// admission. It is stored with every queued job, so it never changes: a
+// renamed kind would strand the jobs already queued.
 const MavenCompanionKind = "maven.remote-companion"
 
 type mavenJob struct {
@@ -50,10 +54,17 @@ type MavenEager struct {
 }
 
 // NewMavenEager starts two workers that fetch, through service and under
-// policy, the companions that Queue records. A job runs as the principal
-// whose read queued it, rechecked when it runs: authn's Current must still
-// accept that principal's credential and authz must still grant it, or the
-// job fails permanently with source.ErrDenied.
+// policy, the companions that Queue records, on a work queue over the
+// policy's store. A job runs as the principal whose read queued it,
+// rechecked when it runs: authn's Current must still accept that
+// principal's credential and authz must still grant it, or the job fails
+// permanently with source.ErrDenied, as does one whose repository no
+// longer fetches it (offline, blacked out or not caching). A job whose
+// repository is gone, or whose source or credential revision changed,
+// fails permanently with source.ErrSuperseded; any other failure is
+// retried, three attempts in all, before the job is parked. Queue admits
+// no job while 256 are pending, leased or parked. NewMavenEager returns an
+// error when the queue or its handler cannot be set up.
 func NewMavenEager(
 	ctx context.Context,
 	service *source.Service,
@@ -76,6 +87,9 @@ func NewMavenEager(
 	return e, nil
 }
 
+// Close stops the workers and returns once every run has settled; the
+// leases of runs it cuts short are handed back, so another process can
+// resume those jobs. A nil MavenEager closes as a no-op.
 func (e *MavenEager) Close() {
 	if e != nil {
 		e.cancel()
@@ -93,6 +107,15 @@ func mavenCompanion(c repo.Config, p string) string {
 	return ""
 }
 
+// Queue records, at most once, the companion of the file q read: the .jar
+// of a .pom when the repository fetches jars eagerly, and the -sources.jar
+// of a .jar when it fetches sources eagerly. The job holds the caller's
+// credential reference and the credential revision, never a credential.
+// Queue does nothing inside a companion job (remote.EagerKey set), for a
+// file with no companion or a caller with no principal, when the policy's
+// options or its Check fail, or when 256 jobs are pending, leased or
+// parked; a failure to record the job is not reported, since the read it
+// follows has already succeeded.
 func (e *MavenEager) Queue(ctx context.Context, q source.Request, permit source.Permit) {
 	if ctx.Value(remote.EagerKey{}) != nil {
 		return

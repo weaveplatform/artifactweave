@@ -458,6 +458,17 @@ func (p *Policy) metadataLimit(kind types.RemoteKind) int64 {
 	return 0
 }
 
+// Check is the authority fence of a read under revision, the credential
+// revision the read's options carried. Inside a Maven companion job
+// (EagerKey) it answers source.ErrSuperseded when revision is not the one
+// the job was queued under. CheckCurrent then decides when it is set (the
+// application's repeats the read's authorisation and compares the
+// repository's current credential revision); otherwise Check answers
+// source.ErrSuperseded unless the repository's source identity is still
+// permit's, or the error of reading it. It reads the store, never the
+// network, so it can run inside a publication transaction; format rules
+// call it after their own upstream exchanges, before anything they fetched
+// is used.
 func (p *Policy) Check(
 	ctx context.Context,
 	q source.Request,

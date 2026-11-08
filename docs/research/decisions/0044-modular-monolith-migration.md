@@ -304,6 +304,10 @@ change that adds a name appends its row; the change column gives the ticket of t
 | `Policy.GitFetch` | `artifacts/core/remote` | The hook through which the policy answers a CocoaPods Git checkout; nil answers `source.ErrUnsupported`, as a policy without a pool does | RMT-02 |
 | `ResponseError` | `artifacts/core/remote` | The typed `*source.HTTPError` of an upstream answer that is neither content nor an absence, which format rules in the slices return unwrapped; it was `responseError` | RMT-02 |
 | `Request.GitUploadPack` | `artifacts/adapters/upstream` | Marks the CocoaPods Git adapter's upload-pack POST, which `Client.Do` admits only when its whole guard holds; it was `gitUploadPack` | RMT-02 |
+| `EagerKey` | `artifacts/core/remote` | Marks a Maven companion job's context with the credential revision the job was queued under; the policy's reads and `Check` answer `source.ErrSuperseded` when the revision differs. It was `eagerKey` | RMT-03 |
+| `PolicyError` | `artifacts/core/remote` | Classifies a failure of the policy's work as the source service's typed error or sentinel, which format rules in the slices return unwrapped; it was `policyError` | RMT-03 |
+| `TransportRequest` | `artifacts/core/remote` | The upstream request for a source request and its cached representation, from which format rules build their own exchanges; it was `transportRequest` | RMT-03 |
+| `Policy.Check` | `artifacts/core/remote` | The authority fence a format rule calls after its own upstream exchanges, before it uses what it fetched; it was the method `check` | RMT-03 |
 
 ### Placeholders
 

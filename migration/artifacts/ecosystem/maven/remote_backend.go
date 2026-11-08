@@ -28,6 +28,15 @@ type MavenBackend struct {
 	Eager  func(context.Context, source.Request, source.Permit)
 }
 
+// Read answers q through the shared policy. For a Maven-family repository
+// it first prepares the request: maven-metadata.xml is fetched as metadata
+// and a non-unique snapshot as mutable, the path is mapped to the
+// upstream's layout when the repository names another, and the body must
+// pass ValidateRemote before it is cached, or the read fails with a 502
+// integrity failure. After a GET that cached a file, while the upstream
+// may be reached, it hands the read to Eager to queue the file's
+// companion. Other package types, and metadata a protocol adapter has
+// already prepared, go to the policy unchanged.
 func (m *MavenBackend) Read(
 	ctx context.Context,
 	q source.Request,
