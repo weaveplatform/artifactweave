@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -508,31 +510,21 @@ func TestUnitRemoveFailures(t *testing.T) {
 	}
 }
 
-// failingKeys is a key store whose reads fail.
-type failingKeys struct{ store.KeyStore }
-
-func (failingKeys) Keypair(context.Context, string) (types.Keypair, error) {
-	return types.Keypair{}, errors.New("boom")
-}
-
 func TestUnitCheckKeypairs(t *testing.T) {
 	ctx := context.Background()
-	db := inmem.New()
-	if err := db.Keys().CreateKeypair(ctx, types.Keypair{Name: "kp"}); err != nil {
-		t.Fatal(err)
-	}
+	keys := &accessapitest.Keys{Keypairs: map[string]accessapi.Keypair{"kp": {Name: "kp"}}}
 	ok := repo.Config{Key: "r", PrimaryKeyPairRef: "kp", SecondaryKeyPairRef: "kp"}
-	if err := CheckKeypairs(ctx, db.Keys(), ok); err != nil {
+	if err := CheckKeypairs(ctx, keys, ok); err != nil {
 		t.Fatalf("existing pairs: %v", err)
 	}
-	if err := CheckKeypairs(ctx, db.Keys(), repo.Config{Key: "r"}); err != nil {
+	if err := CheckKeypairs(ctx, keys, repo.Config{Key: "r"}); err != nil {
 		t.Fatalf("no references: %v", err)
 	}
-	err := CheckKeypairs(ctx, db.Keys(), repo.Config{Key: "r", SecondaryKeyPairRef: "absent"})
+	err := CheckKeypairs(ctx, keys, repo.Config{Key: "r", SecondaryKeyPairRef: "absent"})
 	if err == nil || !strings.Contains(err.Error(), "Key pair 'absent' does not exist") {
 		t.Fatalf("missing pair: %v", err)
 	}
-	if err := CheckKeypairs(ctx, failingKeys{db.Keys()}, ok); err == nil ||
+	if err := CheckKeypairs(ctx, &accessapitest.Keys{Err: errors.New("boom")}, ok); err == nil ||
 		!strings.Contains(err.Error(), "boom") {
 		t.Fatalf("store failure: %v", err)
 	}
@@ -543,14 +535,10 @@ func TestUnitCheckKeypairs(t *testing.T) {
 // 0040).
 func TestUnitCheckKeypairsOfAProviderRepository(t *testing.T) {
 	ctx := context.Background()
-	db := inmem.New()
-	for _, k := range []types.Keypair{
-		{Name: "gpg", Type: types.KeypairGPG}, {Name: "rsa", Type: types.KeypairRSA},
-	} {
-		if err := db.Keys().CreateKeypair(ctx, k); err != nil {
-			t.Fatal(err)
-		}
-	}
+	keys := &accessapitest.Keys{Keypairs: map[string]accessapi.Keypair{
+		"gpg": {Name: "gpg", Type: accessapi.KeypairGPG},
+		"rsa": {Name: "rsa", Type: accessapi.KeypairRSA},
+	}}
 	tf := func(tt repo.TerraformType, primary, secondary string) repo.Config {
 		return repo.Config{
 			Key: "tf", Class: repo.Local, PackageType: repo.Terraform, TerraformType: tt,
@@ -562,7 +550,7 @@ func TestUnitCheckKeypairsOfAProviderRepository(t *testing.T) {
 		tf(repo.TerraformModule, "rsa", "rsa"),
 		{Key: "deb", Class: repo.Local, PackageType: repo.Debian, PrimaryKeyPairRef: "gpg"},
 	} {
-		if err := CheckKeypairs(ctx, db.Keys(), c); err != nil {
+		if err := CheckKeypairs(ctx, keys, c); err != nil {
 			t.Errorf("%s %s: %v", c.Key, c.TerraformType, err)
 		}
 	}
@@ -570,14 +558,14 @@ func TestUnitCheckKeypairsOfAProviderRepository(t *testing.T) {
 		"primaryKeyPairRef":   tf(repo.TerraformProvider, "rsa", "gpg"),
 		"secondaryKeyPairRef": tf(repo.TerraformProvider, "gpg", "rsa"),
 	} {
-		err := CheckKeypairs(ctx, db.Keys(), c)
+		err := CheckKeypairs(ctx, keys, c)
 		var ae *apierror.Error
 		if !errors.As(err, &ae) || ae.Status != http.StatusBadRequest ||
 			!strings.Contains(ae.Message, field+": names the RSA key pair 'rsa'") {
 			t.Errorf("%s: %v", field, err)
 		}
 	}
-	if err := CheckKeypairs(ctx, db.Keys(), repo.Config{
+	if err := CheckKeypairs(ctx, keys, repo.Config{
 		Key: "deb", Class: repo.Local, PackageType: repo.Debian, PrimaryKeyPairRef: "rsa",
 	}); err == nil || !strings.Contains(err.Error(), "Debian metadata signing requires GPG") {
 		t.Errorf("Debian accepted an RSA pair that cannot sign apt Release: %v", err)
@@ -620,39 +608,32 @@ func TestUnitMergeKeepsTerraformType(t *testing.T) {
 	}
 }
 
+// failingProjects fails the environment reads of one scope: "" for the
+// global environments, or a project's key.
 type failingProjects struct {
-	store.ProjectStore
+	accessapi.Projects
 	scope string
 }
 
-func (f failingProjects) Environments(
-	ctx context.Context,
-	key string,
-) ([]types.Environment, error) {
+func (f failingProjects) Environments(ctx context.Context, key string) ([]string, error) {
 	if key == f.scope {
 		return nil, errors.New("boom")
 	}
-	return f.ProjectStore.Environments(ctx, key) //nolint:wrapcheck // test double
+	return f.Projects.Environments(ctx, key) //nolint:wrapcheck // test double
 }
 
 func TestUnitCheckEnvironments(t *testing.T) {
 	ctx := context.Background()
-	db := inmem.New()
-	if err := db.Projects().Create(ctx, types.Project{Key: "proj"}); err != nil {
-		t.Fatal(err)
-	}
-	for _, e := range []types.Environment{
-		{Name: "QA"},
-		{ProjectKey: "proj", Name: "stage"},       // stored without the prefix
-		{ProjectKey: "proj", Name: "proj-canary"}, // stored with it
-	} {
-		if err := db.Projects().CreateEnvironment(ctx, e); err != nil {
-			t.Fatal(err)
-		}
+	projects := &accessapitest.Projects{
+		Global: []string{"QA"},
+		Projects: map[string]accessapitest.Project{"proj": {Environments: []string{
+			"stage",       // stored without the prefix
+			"proj-canary", // stored with it
+		}}},
 	}
 	check := func(c repo.Config) (string, error) {
 		t.Helper()
-		err := CheckEnvironments(ctx, db.Projects(), &c)
+		err := CheckEnvironments(ctx, projects, &c)
 		return strings.Join(c.Environments, ","), err
 	}
 	for name, tc := range map[string]struct {
@@ -698,7 +679,7 @@ func TestUnitCheckEnvironments(t *testing.T) {
 		"":     {Key: "r", ProjectKey: "proj"},
 		"proj": {Key: "r", ProjectKey: "proj"},
 	} {
-		if err := CheckEnvironments(ctx, failingProjects{db.Projects(), scope}, &c); err == nil ||
+		if err := CheckEnvironments(ctx, failingProjects{projects, scope}, &c); err == nil ||
 			!strings.Contains(err.Error(), "boom") {
 			t.Errorf("store failure for %q: %v", scope, err)
 		}

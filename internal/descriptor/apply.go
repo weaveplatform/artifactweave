@@ -10,11 +10,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/repos"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -75,19 +76,43 @@ type configOp struct {
 	doc          types.ConfigDocument
 }
 
-// Apply checks the whole patch against the store's current state, then,
-// unless dryRun, writes it in one transaction, so a patch with one bad entry
-// changes nothing. Entries that would not change are left alone, which makes
-// applying the same descriptor twice a no-op the second time.
+// Access is what Apply reads and writes of the access module: the key pairs
+// and the global and project environments that repository entries name,
+// and the anonymous access setting of the security section. Every field is
+// required. Apply calls each with the context it was given, or inside its
+// transaction with that transaction's context, so an implementation must
+// take part in the store transaction its context carries: the setting is
+// written in the same transaction as the repositories and configuration
+// documents, and rolls back with them (decision 0009). A server binds them
+// from the access module's API over the store it applies to; config apply
+// and the bootstrap descriptor, which run before any module exists, bind
+// access's store-only contracts over that store.
+type Access struct {
+	Keys            accessapi.Keys
+	Projects        accessapi.Projects
+	AnonymousAccess accessapi.AnonymousAccess
+}
+
+// Apply checks the whole patch against the store's current state and a,
+// then, unless dryRun, writes it in one transaction of st, so a patch with
+// one bad entry changes nothing. Entries that would not change are left
+// alone, which makes applying the same descriptor twice a no-op the second
+// time; the result names what was, or with dryRun would be, created,
+// updated, deleted and left alone. An anonymous access setting that was
+// never written counts as off. A patch the checks refuse answers an error
+// matching ErrInvalid; a failed write is wrapped as "apply configuration:
+// %w". A repository the patch deletes is removed as repos.Remove removes
+// it, by ctx's principal, or by no one when ctx carries none.
 func Apply(
 	ctx context.Context,
 	st store.Store,
+	a Access,
 	p *Patch,
 	now time.Time,
 	dryRun bool,
 ) (Result, error) {
 	res := Result{Changes: p.Changes, DryRun: dryRun}
-	deletes, writes, err := planRepos(ctx, st, p.Repos, &res)
+	deletes, writes, err := planRepos(ctx, st, a, p.Repos, &res)
 	if err != nil {
 		return res, err
 	}
@@ -97,9 +122,11 @@ func Apply(
 	}
 	var anonymousChanged bool
 	if p.AnonymousAccess != nil {
-		var current bool
-		err := st.Settings().Get(ctx, types.SettingAnonymousAccess, &current)
-		if err != nil && !errors.Is(err, store.ErrNotFound) {
+		current, err := a.AnonymousAccess.Enabled(ctx)
+		if errors.Is(err, store.ErrNotFound) {
+			current, err = false, nil
+		}
+		if err != nil {
 			return res, fmt.Errorf("read security.anonAccessEnabled: %w", err)
 		}
 		anonymousChanged = current != *p.AnonymousAccess
@@ -116,7 +143,7 @@ func Apply(
 	// PATCH /api/system/configuration; config apply and the bootstrap
 	// descriptor run outside a request and name no one.
 	by := ""
-	if p, ok := auth.FromContext(ctx); ok {
+	if p, ok := kernel.FromContext(ctx); ok {
 		by = p.Name
 	}
 	err = st.Tx(ctx, func(ctx context.Context) error {
@@ -156,8 +183,7 @@ func Apply(
 		// Write whenever requested: another admin may have changed the setting
 		// after the planning read and before this transaction began.
 		if p.AnonymousAccess != nil {
-			if err := st.Settings().
-				Put(ctx, types.SettingAnonymousAccess, *p.AnonymousAccess); err != nil {
+			if err := a.AnonymousAccess.SetEnabled(ctx, *p.AnonymousAccess); err != nil {
 				return fmt.Errorf("security.anonAccessEnabled: %w", err)
 			}
 		}
@@ -175,6 +201,7 @@ func Apply(
 func planRepos(
 	ctx context.Context,
 	st store.Store,
+	a Access,
 	changes []RepoChange,
 	res *Result,
 ) ([]string, []repoOp, error) {
@@ -225,7 +252,7 @@ func planRepos(
 		}
 		name := c.Section + "." + c.Key
 		op, changed, err := planRepo(c, stored, final, func(c *repo.Config) error {
-			return repos.CheckEnvironments(ctx, st.Projects(), c)
+			return repos.CheckEnvironments(ctx, a.Projects, c)
 		})
 		if err != nil {
 			return nil, nil, entryError(name, err)
@@ -252,7 +279,7 @@ func planRepos(
 		if err := repos.CheckMembers(op.cfg, known); err != nil {
 			return nil, nil, entryError(op.name, err)
 		}
-		if err := repos.CheckKeypairs(ctx, st.Keys(), op.cfg); err != nil {
+		if err := repos.CheckKeypairs(ctx, a.Keys, op.cfg); err != nil {
 			return nil, nil, entryError(op.name, err)
 		}
 	}

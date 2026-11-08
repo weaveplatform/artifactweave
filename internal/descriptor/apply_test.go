@@ -8,9 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/access"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -46,7 +48,7 @@ func TestUnitDescriptorClassesForLuaRocksNIMAndAgentFormats(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				_, err = Apply(context.Background(), db, p, now, false)
+				_, err = Apply(context.Background(), db, accessOf(db), p, now, false)
 				if !tc.allowed[pair.class] {
 					if !errors.Is(err, ErrInvalid) {
 						t.Fatalf("invalid type/class should fail: %v", err)
@@ -86,13 +88,23 @@ federatedRepositories:
 
 var now = time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)
 
+// accessOf binds access's store-only contracts over st, as config apply and
+// the bootstrap descriptor do, so a fault a test puts in st reaches them.
+func accessOf(st store.Store) Access {
+	return Access{
+		Keys:            access.KeysOf(st),
+		Projects:        access.ProjectsOf(st),
+		AnonymousAccess: access.AnonymousAccessOf(st),
+	}
+}
+
 func apply(t *testing.T, st store.Store, doc string) (Result, error) {
 	t.Helper()
 	p, err := Parse([]byte(doc), env(map[string]string{"PROXY_PASSWORD": "pp"}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	return Apply(context.Background(), st, p, now, false)
+	return Apply(context.Background(), st, accessOf(st), p, now, false)
 }
 
 func mustApply(t *testing.T, st store.Store, doc string) Result {
@@ -318,8 +330,11 @@ repoLayouts:
 // which runs outside a request (#504).
 func TestUnitApplyTrashesDeletedRepositoriesAsTheCaller(t *testing.T) {
 	for by, ctx := range map[string]context.Context{
-		"admin": auth.WithPrincipal(context.Background(), auth.Principal{Name: "admin", Admin: true}),
-		"":      context.Background(),
+		"admin": kernel.WithPrincipal(
+			context.Background(),
+			kernel.Principal{Name: "admin", Admin: true},
+		),
+		"": context.Background(),
 	} {
 		db := inmem.New()
 		seedRepo(t, db, repo.Config{Key: "gone", Class: repo.Local})
@@ -330,7 +345,7 @@ func TestUnitApplyTrashesDeletedRepositoriesAsTheCaller(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := Apply(ctx, db, p, now, false); err != nil {
+		if _, err := Apply(ctx, db, accessOf(db), p, now, false); err != nil {
 			t.Fatal(err)
 		}
 		trashed, _, err := db.Trash().List(ctx, "gone", "", store.Page{})
@@ -404,7 +419,7 @@ func TestUnitApplyKeepsKeysAndUpdatesBuildInfo(t *testing.T) {
 	} {
 		p, err := Parse([]byte(doc), env(nil))
 		if err == nil {
-			_, err = Apply(ctx, db, p, now, false)
+			_, err = Apply(ctx, db, accessOf(db), p, now, false)
 		}
 		if !errors.Is(err, ErrInvalid) {
 			t.Errorf("%q: %v", doc, err)
@@ -461,7 +476,7 @@ func TestUnitApplyDryRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := Apply(context.Background(), db, p, now, true)
+	res, err := Apply(context.Background(), db, accessOf(db), p, now, true)
 	if err != nil || len(res.Created) != 6 || !strings.HasPrefix(res.String(), "Dry run") {
 		t.Fatalf("dry run %+v %v", res, err)
 	}
@@ -486,7 +501,8 @@ security:
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = Apply(context.Background(), faulty{Store: db, fail: "setting put"}, p, now, false)
+	st := faulty{Store: db, fail: "setting put"}
+	_, err = Apply(context.Background(), st, accessOf(st), p, now, false)
 	if !errors.Is(err, errBoom) {
 		t.Fatalf("setting write error = %v", err)
 	}
@@ -505,6 +521,62 @@ security:
 	) {
 		t.Fatalf("setting survived failed transaction: enabled %t, error %v", enabled, err)
 	}
+}
+
+// TestUnitAnonymousAccessWriteRollsBackWithTheApply: the anonymous access
+// write is part of the apply's transaction, so a failure after it in that
+// transaction leaves the setting unwritten and the repository the patch
+// created absent (decision 0009).
+func TestUnitAnonymousAccessWriteRollsBackWithTheApply(t *testing.T) {
+	ctx := t.Context()
+	db := inmem.New()
+	p, err := Parse([]byte(`localRepositories:
+  new-local: {type: generic}
+security:
+  anonAccessEnabled: true
+`), noEnv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := accessOf(db)
+	written := &failAfterWrite{AnonymousAccess: a.AnonymousAccess, inTx: db.InTx}
+	a.AnonymousAccess = written
+	if _, err := Apply(ctx, db, a, p, now, false); !errors.Is(err, errBoom) {
+		t.Fatalf("a failure after the write = %v", err)
+	}
+	if !written.readBack {
+		t.Fatal("the transaction did not see the setting it wrote")
+	}
+	if _, err := db.Repos().Get(ctx, "new-local"); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("repository survived the failed transaction: %v", err)
+	}
+	if on, err := access.AnonymousAccessOf(db).Enabled(ctx); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("setting survived the failed transaction: enabled %t, error %v", on, err)
+	}
+}
+
+// failAfterWrite writes the setting through the binding it wraps, reads it
+// back with the same context, then fails, as a later step of the same
+// transaction would. It refuses a context outside the store's transaction
+// before writing: in memory, that write would wait for the transaction to
+// end, and the test would hang instead of failing.
+type failAfterWrite struct {
+	accessapi.AnonymousAccess
+	inTx     func(context.Context) bool
+	readBack bool
+}
+
+var errOutsideTransaction = errors.New("anonymous access written outside the apply's transaction")
+
+func (f *failAfterWrite) SetEnabled(ctx context.Context, on bool) error {
+	if !f.inTx(ctx) {
+		return errOutsideTransaction
+	}
+	if err := f.AnonymousAccess.SetEnabled(ctx, on); err != nil {
+		return err //nolint:wrapcheck // test double
+	}
+	f.readBack, _ = f.AnonymousAccess.Enabled(ctx)
+	return errBoom
 }
 
 var errBoom = errors.New("boom")

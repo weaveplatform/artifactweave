@@ -21346,8 +21346,6 @@
       "repos.PrepareCreate",
       "s.content",
       "s.internalError",
-      "st.Keys",
-      "st.Projects",
       "st.Repos",
       "st.Repos().Create",
       "st.Repos().List"
@@ -21823,8 +21821,6 @@
       "s.content",
       "s.internalError",
       "slices.ContainsFunc",
-      "st.Keys",
-      "st.Projects",
       "st.Repos",
       "st.Repos().Create",
       "st.Repos().List",

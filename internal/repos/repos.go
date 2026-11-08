@@ -15,6 +15,7 @@ import (
 	"slices"
 	"strings"
 
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -98,10 +99,15 @@ func CheckMembers(c repo.Config, known []repo.Config) error {
 }
 
 // CheckKeypairs rejects signing key references (primaryKeyPairRef,
-// secondaryKeyPairRef and Alpine virtual keyPair) to key pairs that do not exist, or whose type the
-// repository cannot use (repo.ValidateKeyPair): a repository would
-// otherwise fail only when it first signs or verifies.
-func CheckKeypairs(ctx context.Context, keys store.KeyStore, c repo.Config) error {
+// secondaryKeyPairRef, and keyPair on an Alpine or Debian virtual
+// repository) to key pairs that do not exist, or whose type the repository
+// cannot use (repo.ValidateKeyPair): a repository would otherwise fail only
+// when it first signs or verifies. It reads each named pair through keys,
+// with ctx, so inside a store transaction the reads take part in it. A
+// missing pair answers 400 "Key pair '<name>' does not exist" and an
+// unusable one 400 with repo.ValidateKeyPair's message; an error reading a
+// pair is wrapped as "repos: key pair <name>: %w".
+func CheckKeypairs(ctx context.Context, keys accessapi.Keys, c repo.Config) error {
 	refs := [][2]string{
 		{"primaryKeyPairRef", c.PrimaryKeyPairRef}, {"secondaryKeyPairRef", c.SecondaryKeyPairRef},
 	}
@@ -144,7 +150,14 @@ func OwesReindex(stored, updated repo.Config) bool {
 // which are named "<projectKey>-<name>". Names compare without regard to case
 // and are stored in the environment's own spelling, because renaming or
 // deleting an environment finds its repositories by that spelling.
-func CheckEnvironments(ctx context.Context, projects store.ProjectStore, c *repo.Config) error {
+//
+// In a project it reads the global and the project's environment names
+// through projects, with ctx, so inside a store transaction the reads take
+// part in it; a project that does not exist has only the built-in and
+// global environments. An unknown name answers 400 "Environment '<name>'
+// does not exist"; an error reading the names is wrapped as "repos: global
+// environments: %w" or "repos: environments of project <key>: %w".
+func CheckEnvironments(ctx context.Context, projects accessapi.Projects, c *repo.Config) error {
 	if c.ProjectKey == "" {
 		c.Environments = nil
 		return nil
@@ -157,15 +170,13 @@ func CheckEnvironments(ctx context.Context, projects store.ProjectStore, c *repo
 	if err != nil {
 		return fmt.Errorf("repos: global environments: %w", err)
 	}
-	for _, e := range global {
-		known = append(known, e.Name)
-	}
+	known = append(known, global...)
 	scoped, err := projects.Environments(ctx, c.ProjectKey)
 	if err != nil && !errors.Is(err, store.ErrNotFound) {
 		return fmt.Errorf("repos: environments of project %s: %w", c.ProjectKey, err)
 	}
-	for _, e := range scoped {
-		known = append(known, projectEnvironment(c.ProjectKey, e.Name))
+	for _, name := range scoped {
+		known = append(known, projectEnvironment(c.ProjectKey, name))
 	}
 	out := make([]string, 0, len(c.Environments))
 	for _, name := range c.Environments {

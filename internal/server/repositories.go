@@ -666,10 +666,10 @@ func (s artifactoryService) CreateRepository(
 	if err := repos.CheckMembers(c, existing); err != nil {
 		return nil, fmt.Errorf("repositories: %w", err)
 	}
-	if err := repos.CheckKeypairs(ctx, st.Keys(), c); err != nil {
+	if err := repos.CheckKeypairs(ctx, s.cfg.Access.Keys, c); err != nil {
 		return nil, fmt.Errorf("repositories: %w", err)
 	}
-	if err := repos.CheckEnvironments(ctx, st.Projects(), &c); err != nil {
+	if err := repos.CheckEnvironments(ctx, s.cfg.Access.Projects, &c); err != nil {
 		return nil, fmt.Errorf("repositories: %w", err)
 	}
 	switch err := st.Repos().Create(ctx, c); {
@@ -733,10 +733,10 @@ func (s artifactoryService) CreateMultipleRepositories(
 		if err := repos.CheckMembers(prepared[i], known); err != nil {
 			return nil, fmt.Errorf("repositories: %w", err)
 		}
-		if err := repos.CheckKeypairs(ctx, st.Keys(), prepared[i]); err != nil {
+		if err := repos.CheckKeypairs(ctx, s.cfg.Access.Keys, prepared[i]); err != nil {
 			return nil, fmt.Errorf("repositories: %w", err)
 		}
-		if err := repos.CheckEnvironments(ctx, st.Projects(), &prepared[i]); err != nil {
+		if err := repos.CheckEnvironments(ctx, s.cfg.Access.Projects, &prepared[i]); err != nil {
 			return nil, fmt.Errorf("repositories: %w", err)
 		}
 	}
@@ -874,10 +874,10 @@ func (s artifactoryService) checkReferences(
 	st store.Store,
 	c *repo.Config,
 ) error {
-	if err := repos.CheckKeypairs(ctx, st.Keys(), *c); err != nil {
+	if err := repos.CheckKeypairs(ctx, s.cfg.Access.Keys, *c); err != nil {
 		return fmt.Errorf("repositories: %w", err)
 	}
-	if err := repos.CheckEnvironments(ctx, st.Projects(), c); err != nil {
+	if err := repos.CheckEnvironments(ctx, s.cfg.Access.Projects, c); err != nil {
 		return fmt.Errorf("repositories: %w", err)
 	}
 	if c.Class != repo.Virtual {
