@@ -28,6 +28,9 @@ import (
 // source.Service; CheckCurrent repeats it inside the short publication transaction
 // and verifies the effective credential revision without network access.
 type Policy struct {
+	// Smart reads, in place of the policy, every request whose context
+	// carries no WithSmart mark; NewSmart in artifacts/core/remote/smart
+	// installs itself here. Nil leaves every read to the policy.
 	Smart Interceptor
 	// Fetch overrides only the protocol exchange. Authentication adapters retain
 	// the source identity and credential revision used by this cache operation.
@@ -82,6 +85,12 @@ func (p *Policy) now() time.Time {
 	return time.Now().UTC()
 }
 
+// Acquire waits for a slot of the policy's upstream capacity for repoKey,
+// which Smart Remote's own peer requests share with the policy's fills: at
+// most 8 active exchanges per repository and 64 in all, with up to 256
+// callers queued per repository. It returns the release, which is safe to
+// call more than once, or ErrBusy when the repository's queue is full, or
+// the context's error, wrapped, when ctx ends first.
 func (p *Policy) Acquire(ctx context.Context, repoKey string) (func(), error) {
 	return p.capacity.acquire(ctx, repoKey)
 }
@@ -177,6 +186,10 @@ func transientResource(q source.Request) bool {
 		q.Repo.StoreArtifactsLocally != nil && !*q.Repo.StoreArtifactsLocally
 }
 
+// MetadataContext bounds a metadata exchange by the repository's metadata
+// retrieval timeout, 60 seconds when unset; an artifact request, or a
+// timeout of zero or less, keeps ctx as it is. The caller calls the cancel
+// function in every case.
 func MetadataContext(ctx context.Context, q source.Request) (context.Context, context.CancelFunc) {
 	if q.Resource.Kind == source.ResourceKindArtifact {
 		return ctx, func() {}
@@ -332,6 +345,11 @@ func (p *Policy) kind(q source.Request) types.RemoteKind {
 	}
 }
 
+// ReadEntry returns the remote cache entry stored under key for the
+// permit's source identity: an entry recorded under another identity
+// answers store.ErrNotFound, as a missing one does, so a source that
+// changed never reads its predecessor's state. A store error comes back
+// wrapped.
 func (p *Policy) ReadEntry(
 	ctx context.Context,
 	key types.RemoteCacheKey,

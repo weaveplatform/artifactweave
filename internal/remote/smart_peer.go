@@ -20,8 +20,16 @@ type SmartPeer struct {
 	revision   string
 }
 
+// Revision returns the credential revision the peer was discovered under,
+// empty for a peer that ParseSmartPeer returned. Smart Remote refuses a peer
+// whose revision is not the repository's current one with
+// source.ErrSuperseded, so a credential change cannot reuse a discovery made
+// with the old credentials.
 func (p SmartPeer) Revision() string { return p.revision }
 
+// WithRevision returns a copy of p marked as discovered under the
+// credential revision r, which Smart's discovery calls. The revision is no
+// field, so neither a SmartPeer literal nor ParseSmartPeer carries one.
 func (p SmartPeer) WithRevision(r string) SmartPeer {
 	p.revision = r
 	return p

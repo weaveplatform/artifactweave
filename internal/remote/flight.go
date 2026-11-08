@@ -17,7 +17,9 @@ type flight[T any] struct {
 	err     error
 }
 
-// FlightGroup gives the shared operation its own context. A departing waiter
+// FlightGroup lets concurrent callers with one key share one run of an
+// operation; its zero value is ready to use, and it must not be copied after
+// first use. The shared operation gets its own context. A departing waiter
 // cannot cancel its peers; the last departure cancels otherwise abandoned I/O.
 // Only persisted results may be shared: an owned stream is never multicast.
 type FlightGroup[T any] struct {
@@ -25,6 +27,12 @@ type FlightGroup[T any] struct {
 	active map[string]*flight[T]
 }
 
+// Do runs work for key, or joins the run already in flight for it, and
+// returns that run's result to every caller still waiting. work runs on a
+// context that keeps the values of the caller who started the run but none
+// of its cancellation, and that ends when the last waiter leaves. A caller
+// whose ctx ends first leaves at once with the context's error, wrapped, and
+// the run goes on for the others.
 func (g *FlightGroup[T]) Do(
 	ctx context.Context,
 	key string,

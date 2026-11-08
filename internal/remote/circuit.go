@@ -12,6 +12,12 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// State returns the repository's upstream availability state as the
+// circuit judges it under the credential revision, without writing it back:
+// a state recorded under another revision loses its Smart negotiation,
+// connection failures and cooldowns, and a repository whose assumed-offline
+// period is zero or less is never offline. A store error comes back
+// wrapped.
 func (p *Policy) State(
 	ctx context.Context,
 	q source.Request,
@@ -35,6 +41,10 @@ func (p *Policy) State(
 	return state, nil
 }
 
+// Cooldown refuses an upstream exchange while state holds one off, by the
+// policy's clock: a 429 *source.HTTPError carrying the rest of a Retry-After
+// pause, or a 502 connectivity failure while the upstream is assumed
+// offline. It returns nil when the exchange may go ahead.
 func (p *Policy) Cooldown(state types.RemoteSourceState) error {
 	now := p.now()
 	if state.RetryAfterUntil.After(now) {
@@ -78,6 +88,15 @@ func (p *Policy) changeState(
 	return nil
 }
 
+// RecordFailure counts err against the repository's circuit when it is a
+// connectivity or timeout *source.HTTPError, and ignores any other error.
+// The tenth failure in a row marks the upstream offline for the
+// assumed-offline period, 300 seconds when unset, and each failure after
+// that starts the period again; a period of zero or less clears the count
+// instead. The write is its own short transaction, bounded
+// even when ctx has ended, and its error is classified by PolicyError:
+// source.ErrSuperseded when the permit's source identity is no longer
+// current.
 func (p *Policy) RecordFailure(
 	ctx context.Context,
 	q source.Request,
@@ -109,6 +128,10 @@ func (p *Policy) RecordFailure(
 	})
 }
 
+// RecordResponse records that the upstream answered: any status clears the
+// connection failures and cooldowns, and a 429 starts a Retry-After pause
+// (from 1 to 300 seconds) that Cooldown then enforces. It writes as
+// RecordFailure does, with the same errors.
 func (p *Policy) RecordResponse(
 	ctx context.Context,
 	q source.Request,

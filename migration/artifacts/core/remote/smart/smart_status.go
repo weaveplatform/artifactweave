@@ -21,6 +21,12 @@ type SmartStatus struct {
 	Truncated       bool                        `json:"truncated"`
 }
 
+// SmartRepresentationStatus is the Smart state of one cached representation
+// of the path: when its properties and its origin were last checked (zero
+// for never), whether the origin was found absent (nil until it was
+// checked), the downloads counted here, how many of them a statistics
+// submission claimed, how many claimed ones the peer never acknowledged, and
+// its queued Smart work.
 type SmartRepresentationStatus struct {
 	PropertiesCheckedAt time.Time         `json:"properties_checked_at"`
 	OriginCheckedAt     time.Time         `json:"origin_checked_at"`
@@ -31,6 +37,9 @@ type SmartRepresentationStatus struct {
 	Work                []SmartWorkStatus `json:"work"`
 }
 
+// SmartWorkStatus is one queued Smart job of a representation: its
+// operation, "refresh" or "statistics", its work-queue state and the
+// attempts made so far.
 type SmartWorkStatus struct {
 	Operation string          `json:"operation"`
 	State     types.WorkState `json:"state"`

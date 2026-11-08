@@ -52,6 +52,12 @@ type Smart struct {
 // rechecked when it runs: authn's CurrentRegistry for a registry token, or
 // Current for any other credential, must still accept it, and authz must
 // still grant it, or the side effect fails permanently with source.ErrDenied.
+// registryPath splits a Docker, OCI or Helm OCI repository's upstream path
+// into image, operation and reference (the application passes the docker
+// slice's ParseRegistryPath, which Smart cannot import); nil gives those
+// repositories no property path and no registry grant. NewSmart installs
+// Smart as p.Smart and chains its property fetch after p's PrepareUpload;
+// Close stops the workers.
 func NewSmart(
 	ctx context.Context,
 	p *remote.Policy,
@@ -98,6 +104,9 @@ func NewSmart(
 	return s, nil
 }
 
+// Close stops the workers that NewSmart started and waits for them to
+// return. Queued jobs stay in the persistent work queue for the next start.
+// Close may be called more than once, and on a nil *Smart.
 func (s *Smart) Close() {
 	if s != nil {
 		s.cancel()
@@ -141,6 +150,18 @@ func smartPropertyPath(
 	}
 }
 
+// Read reads q in place of the shared policy, as Policy.Smart. A read that
+// may not reach the upstream (cache-only, without network permission, or of
+// an offline repository), or of a repository with neither Smart Remote nor
+// property synchronisation on, goes to the policy unchanged; a Smart AQL
+// query among them answers source.ErrUnavailable. Any other read enters the
+// loop trace, refused when the trace already holds this node or 8 nodes,
+// discovers the peer, and reads through the policy with the Smart headers
+// on; a metadata request (RequireSmart) is confined to the peer's storage
+// targets. A GET that delivers an item first brings its properties up to
+// date when a refresh is due, and its Used queues the download's
+// statistics. Errors are the source service's sentinels and typed errors,
+// matched with errors.Is and errors.As.
 func (s *Smart) Read(
 	ctx context.Context,
 	q source.Request,

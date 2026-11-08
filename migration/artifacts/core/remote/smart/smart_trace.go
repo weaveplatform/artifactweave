@@ -10,6 +10,10 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/source"
 )
 
+// SmartOriginHeader carries the Smart Remote nodes a request has passed
+// through, as Artifactory's own Smart Remote sends it. SmartTrace reads up to
+// 8 nodes from it, and Smart's peer requests send it with this node added,
+// so that a chain of Smart remotes that loops back is refused.
 const SmartOriginHeader = "X-Artifactory-Originated"
 
 type smartTraceKey struct{}

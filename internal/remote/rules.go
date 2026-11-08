@@ -58,6 +58,10 @@ func (r cacheRules) permitsStale() bool {
 	return !r.mustNotStore && !r.shouldValidate && !r.mustRevalidate
 }
 
+// MustNotStore reports whether a response with header h may not be kept:
+// its Cache-Control says no-store, or its Vary names anything but Accept and
+// Accept-Encoding, so it could differ by request state that the cache
+// identity leaves out.
 func MustNotStore(h http.Header) bool {
 	return parseCacheRules(h.Get("Cache-Control")).mustNotStore || !cacheableVary(h.Get("Vary"))
 }
