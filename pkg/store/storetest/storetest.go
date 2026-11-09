@@ -7,9 +7,13 @@ package storetest
 import (
 	"testing"
 
+	fedstoretest "github.com/weaveplatform/artifactweave/migration/federation/adapters/storetest"
+	fedport "github.com/weaveplatform/artifactweave/migration/federation/core/port"
 	ntfstoretest "github.com/weaveplatform/artifactweave/migration/notifications/adapters/storetest"
 	ntfport "github.com/weaveplatform/artifactweave/migration/notifications/core/port"
 	platstoretest "github.com/weaveplatform/artifactweave/migration/platform/store/storetest"
+	relstoretest "github.com/weaveplatform/artifactweave/migration/releases/adapters/storetest"
+	relport "github.com/weaveplatform/artifactweave/migration/releases/core/port"
 	retstoretest "github.com/weaveplatform/artifactweave/migration/retention/adapters/storetest"
 	retport "github.com/weaveplatform/artifactweave/migration/retention/core/port"
 	wrkstoretest "github.com/weaveplatform/artifactweave/migration/workers/adapters/storetest"
@@ -35,13 +39,12 @@ func Run(t *testing.T, newStore Factory) {
 	runProjects(t, newStore)
 	ntfstoretest.Run(t, func(t *testing.T) ntfport.Store { return newStore(t) })
 	retstoretest.Run(t, func(t *testing.T) retport.Store { return newStore(t) })
-	runReplications(t, newStore)
+	fedstoretest.Run(t, func(t *testing.T) fedport.Store { return newStore(t) })
 	platstoretest.RunWithoutWatches(
 		t,
 		func(t *testing.T) platstoretest.Store { return newStore(t) },
 	)
-	runPeers(t, newStore)
-	runBundles(t, newStore)
+	relstoretest.Run(t, func(t *testing.T) relport.Store { return newStore(t) })
 	runArchivedItems(t, newStore)
 	wrkstoretest.Run(t, func(t *testing.T) wrkport.Store { return newStore(t) })
 	runBuilds(t, newStore)

@@ -21,11 +21,13 @@ import (
 	"database/sql"
 	"fmt"
 
+	fedsql "github.com/weaveplatform/artifactweave/migration/federation/adapters/sql"
 	ntfsql "github.com/weaveplatform/artifactweave/migration/notifications/adapters/sql"
 	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	platsql "github.com/weaveplatform/artifactweave/migration/platform/store/sql"
+	relsql "github.com/weaveplatform/artifactweave/migration/releases/adapters/sql"
 	retsql "github.com/weaveplatform/artifactweave/migration/retention/adapters/sql"
 	wrksql "github.com/weaveplatform/artifactweave/migration/workers/adapters/sql"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -42,6 +44,8 @@ type Store struct {
 	platform      *platsql.Store
 	notifications *ntfsql.Store
 	retention     *retsql.Store
+	federation    *fedsql.Store
+	releases      *relsql.Store
 	workers       *wrksql.Store
 }
 
@@ -101,6 +105,8 @@ func New(db *sql.DB, d Dialect, keys *crypt.Keyring) *Store {
 	})
 	s.notifications = ntfsql.New(s.Store)
 	s.retention = retsql.New(s.Store)
+	s.federation = fedsql.New(s.Store)
+	s.releases = relsql.New(s.Store)
 	s.workers = wrksql.New(s.Store)
 	return s
 }
@@ -143,6 +149,28 @@ func (s *Store) Cleanup() store.CleanupStore { return s.retention.Cleanup() }
 
 // Archive implements store.Store with the retention module's archive store.
 func (s *Store) Archive() store.ArchiveStore { return s.retention.Archive() }
+
+// Replications implements store.Store with the federation module's
+// replication store.
+func (s *Store) Replications() store.ReplicationStore { return s.federation.Replications() }
+
+// Peers implements store.Store with the federation module's peer store.
+func (s *Store) Peers() store.PeerStore { return s.federation.Peers() }
+
+// Federation implements store.Store with the federation module's federated
+// repository store.
+func (s *Store) Federation() store.FederationStore { return s.federation.Federation() }
+
+// Platform implements store.Store with the federation module's platform
+// federation store.
+func (s *Store) Platform() store.PlatformStore { return s.federation.Platform() }
+
+// Bundles implements store.Store with the releases module's bundle store.
+func (s *Store) Bundles() store.BundleStore { return s.releases.Bundles() }
+
+// Distribution implements store.Store with the releases module's
+// distribution store.
+func (s *Store) Distribution() store.DistributionStore { return s.releases.Distribution() }
 
 // Workers implements store.Store with the workers module's worker store.
 func (s *Store) Workers() store.WorkerStore { return s.workers.Workers() }
