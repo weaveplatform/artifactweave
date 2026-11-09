@@ -98,9 +98,13 @@
       "conan_client_test.go",
       "conan_test.go",
       "conda_test.go",
+      "cran_archive_internal_test.go",
       "cran_archive_test.go",
+      "cran_internal_test.go",
+      "cran_routes_internal_test.go",
       "cran_routes_test.go",
       "cran_test.go",
+      "debian_snapshot_security_internal_test.go",
       "debian_snapshot_security_test.go",
       "debian_snapshot_test.go",
       "debian_source_test.go",
@@ -126,11 +130,14 @@
       "npm_auth_paths_test.go",
       "npm_fixture_test.go",
       "oidc_status_test.go",
+      "opkg_internal_test.go",
       "opkg_test.go",
       "p2_external_cache_integrity_test.go",
+      "p2_external_error_internal_test.go",
       "p2_external_error_test.go",
       "p2_external_helpers_test.go",
       "p2_external_test.go",
+      "p2_internal_test.go",
       "p2_test.go",
       "permissions_fault_test.go",
       "permissions_status_test.go",
@@ -142,6 +149,7 @@
       "request_limits_test.go",
       "reverseproxy_test.go",
       "roles_internal_test.go",
+      "rpm_internal_test.go",
       "rpm_test.go",
       "searches_layout_internal_test.go",
       "searches_routes_test.go",
@@ -170,6 +178,7 @@
       "trash_views_internal_test.go",
       "vcs_delivery_test.go",
       "vcs_legacy_test.go",
+      "vcs_routes_internal_test.go",
       "vcs_routes_test.go",
       "vcs_tables_test.go"
     ],
@@ -269,12 +278,16 @@
     ],
     "cran": [
       "internal/server/conan_test.go",
+      "internal/server/cran_archive_internal_test.go",
       "internal/server/cran_archive_test.go",
+      "internal/server/cran_internal_test.go",
+      "internal/server/cran_routes_internal_test.go",
       "internal/server/cran_routes_test.go",
       "internal/server/cran_test.go",
       "internal/server/status_cran_archive_test.go"
     ],
     "debian": [
+      "internal/server/debian_snapshot_security_internal_test.go",
       "internal/server/debian_snapshot_security_test.go",
       "internal/server/debian_snapshot_test.go",
       "internal/server/debian_source_test.go"
@@ -326,13 +339,16 @@
       "test/server/artifacts/repositories_test.go"
     ],
     "opkg": [
+      "internal/server/opkg_internal_test.go",
       "internal/server/opkg_test.go"
     ],
     "p2": [
       "internal/server/p2_external_cache_integrity_test.go",
+      "internal/server/p2_external_error_internal_test.go",
       "internal/server/p2_external_error_test.go",
       "internal/server/p2_external_helpers_test.go",
       "internal/server/p2_external_test.go",
+      "internal/server/p2_internal_test.go",
       "internal/server/p2_test.go"
     ],
     "puppet": [
@@ -344,6 +360,7 @@
       "test/server/artifacts/reindex_test.go"
     ],
     "rpm": [
+      "internal/server/rpm_internal_test.go",
       "internal/server/rpm_test.go"
     ],
     "terraform": [
@@ -357,6 +374,7 @@
     "vcs": [
       "internal/server/vcs_delivery_test.go",
       "internal/server/vcs_legacy_test.go",
+      "internal/server/vcs_routes_internal_test.go",
       "internal/server/vcs_routes_test.go",
       "internal/server/vcs_tables_test.go"
     ]
