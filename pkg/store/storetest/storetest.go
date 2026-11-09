@@ -7,6 +7,7 @@ package storetest
 import (
 	"testing"
 
+	platstoretest "github.com/weaveplatform/artifactweave/migration/platform/store/storetest"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
@@ -30,9 +31,10 @@ func Run(t *testing.T, newStore Factory) {
 	runWebhooks(t, newStore)
 	runCleanup(t, newStore)
 	runReplications(t, newStore)
-	runPlatformOperations(t, newStore)
-	runWork(t, newStore)
-	runInstance(t, newStore)
+	platstoretest.RunWithoutWatches(
+		t,
+		func(t *testing.T) platstoretest.Store { return newStore(t) },
+	)
 	runPeers(t, newStore)
 	runOutbox(t, newStore)
 	runBundles(t, newStore)

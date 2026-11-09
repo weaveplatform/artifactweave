@@ -8,13 +8,13 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/storekit"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 // runWork covers the persistent work queue (decision 0033).
-func runWork(t *testing.T, newStore Factory) {
+func runWork(t *testing.T, newStore func(*testing.T) Store) {
 	t.Run("WorkValidation", func(t *testing.T) { testWorkValidation(t, newStore(t)) })
 	t.Run("WorkLifecycle", func(t *testing.T) { testWorkLifecycle(t, newStore(t)) })
 	t.Run("WorkCoalescing", func(t *testing.T) { testWorkCoalescing(t, newStore(t)) })
@@ -26,8 +26,8 @@ func runWork(t *testing.T, newStore Factory) {
 }
 
 // lease asks for up to limit items of kinds at minute n, held until n+10.
-func lease(holder string, n, limit int, kinds ...string) store.WorkLease {
-	return store.WorkLease{
+func lease(holder string, n, limit int, kinds ...string) work.WorkLease {
+	return work.WorkLease{
 		Kinds:  kinds,
 		Holder: holder,
 		Limit:  limit,
@@ -37,7 +37,7 @@ func lease(holder string, n, limit int, kinds ...string) store.WorkLease {
 }
 
 // keys lists items as kind/key.
-func keys(items []types.WorkItem) []string {
+func keys(items []work.WorkItem) []string {
 	out := make([]string, len(items))
 	for i, it := range items {
 		out[i] = it.Kind + "/" + it.Key
@@ -45,7 +45,7 @@ func keys(items []types.WorkItem) []string {
 	return out
 }
 
-func testWorkValidation(t *testing.T, s store.Store) {
+func testWorkValidation(t *testing.T, s Store) {
 	ctx := context.Background()
 	q := s.WorkQueue()
 	for name, c := range map[string]struct {
@@ -54,10 +54,10 @@ func testWorkValidation(t *testing.T, s store.Store) {
 	}{
 		"no kind":      {"", "k", nil},
 		"no key":       {"maven", "", nil},
-		"long kind":    {strings.Repeat("k", store.MaxWorkKind+1), "k", nil},
-		"long key":     {"maven", strings.Repeat("k", store.MaxWorkKey+1), nil},
+		"long kind":    {strings.Repeat("k", work.MaxWorkKind+1), "k", nil},
+		"long key":     {"maven", strings.Repeat("k", work.MaxWorkKey+1), nil},
 		"not JSON":     {"maven", "k", []byte("{")},
-		"payload size": {"maven", "k", []byte(`"` + strings.Repeat("x", store.MaxWorkPayload) + `"`)},
+		"payload size": {"maven", "k", []byte(`"` + strings.Repeat("x", work.MaxWorkPayload) + `"`)},
 	} {
 		if err := q.Enqueue(
 			ctx,
@@ -67,31 +67,31 @@ func testWorkValidation(t *testing.T, s store.Store) {
 			storekit.At(0),
 		); !errors.Is(
 			err,
-			store.ErrInvalid,
+			kernel.ErrInvalid,
 		) {
 			t.Errorf("%s: %v, want ErrInvalid", name, err)
 		}
 	}
-	for name, req := range map[string]store.WorkLease{
+	for name, req := range map[string]work.WorkLease{
 		"no holder":   {Limit: 1, Until: storekit.At(1), Now: storekit.At(0)},
 		"no expiry":   {Holder: "w", Limit: 1, Now: storekit.At(0)},
 		"past expiry": {Holder: "w", Limit: 1, Until: storekit.At(0), Now: storekit.At(0)},
 	} {
 		_, err := q.Lease(ctx, req)
-		storekit.WantErr(t, err, store.ErrInvalid)
+		storekit.WantErr(t, err, kernel.ErrInvalid)
 		_, _, err = q.LeaseKey(ctx, "maven", "k", req)
-		if !errors.Is(err, store.ErrInvalid) {
+		if !errors.Is(err, kernel.ErrInvalid) {
 			t.Errorf("LeaseKey %s: %v", name, err)
 		}
 	}
 	_, err := q.Get(ctx, "maven", "missing")
-	storekit.WantErr(t, err, store.ErrNotFound)
-	if got := storekit.Get[[]types.WorkItem](t)(q.Lease(ctx, lease("w", 0, 0))); len(got) != 0 {
+	storekit.WantErr(t, err, kernel.ErrNotFound)
+	if got := storekit.Get[[]work.WorkItem](t)(q.Lease(ctx, lease("w", 0, 0))); len(got) != 0 {
 		t.Fatalf("a zero limit leased %v", keys(got))
 	}
 }
 
-func testWorkLifecycle(t *testing.T, s store.Store) {
+func testWorkLifecycle(t *testing.T, s Store) {
 	ctx := context.Background()
 	q := s.WorkQueue()
 	storekit.Must(
@@ -106,11 +106,11 @@ func testWorkLifecycle(t *testing.T, s store.Store) {
 	)
 	storekit.Must(t, q.Enqueue(ctx, "maven", "org.acme:app", nil, storekit.At(1)))
 	storekit.Must(t, q.Enqueue(ctx, "npm", "left-pad", nil, storekit.At(2)))
-	lib := types.WorkItem{
+	lib := work.WorkItem{
 		Kind:      "maven",
 		Key:       "org.acme:lib",
 		Payload:   []byte(`{"folder":"org/acme/lib"}`),
-		State:     types.WorkPending,
+		State:     work.WorkPending,
 		NotBefore: storekit.At(0),
 		Enqueued:  storekit.At(0),
 		Updated:   storekit.At(0),
@@ -119,24 +119,24 @@ func testWorkLifecycle(t *testing.T, s store.Store) {
 		t,
 		"Get",
 		lib,
-		storekit.Get[types.WorkItem](t)(q.Get(ctx, "maven", "org.acme:lib")),
+		storekit.Get[work.WorkItem](t)(q.Get(ctx, "maven", "org.acme:lib")),
 	)
-	storekit.Same(t, "Stats", []types.WorkStats{
+	storekit.Same(t, "Stats", []work.WorkStats{
 		{Kind: "maven", Pending: 2, OldestPending: storekit.At(0)},
 		{Kind: "npm", Pending: 1, OldestPending: storekit.At(2)},
-	}, storekit.Get[[]types.WorkStats](t)(q.Stats(ctx)))
+	}, storekit.Get[[]work.WorkStats](t)(q.Stats(ctx)))
 
 	// The longest due goes first, and Kinds limits what is taken.
-	got := storekit.Get[[]types.WorkItem](t)(q.Lease(ctx, lease("w1", 3, 1, "maven")))
+	got := storekit.Get[[]work.WorkItem](t)(q.Lease(ctx, lease("w1", 3, 1, "maven")))
 	taken := lib
-	taken.State, taken.LeasedBy, taken.LeaseUntil = types.WorkLeased, "w1", storekit.At(13)
+	taken.State, taken.LeasedBy, taken.LeaseUntil = work.WorkLeased, "w1", storekit.At(13)
 	taken.Generation, taken.Attempts, taken.Updated = 1, 1, storekit.At(3)
-	storekit.Same(t, "Lease", []types.WorkItem{taken}, got)
-	got = storekit.Get[[]types.WorkItem](t)(q.Lease(ctx, lease("w2", 3, 10)))
+	storekit.Same(t, "Lease", []work.WorkItem{taken}, got)
+	got = storekit.Get[[]work.WorkItem](t)(q.Lease(ctx, lease("w2", 3, 10)))
 	if diff := keys(got); strings.Join(diff, " ") != "maven/org.acme:app npm/left-pad" {
 		t.Fatalf("second lease took %v", diff)
 	}
-	if again := storekit.Get[[]types.WorkItem](
+	if again := storekit.Get[[]work.WorkItem](
 		t,
 	)(
 		q.Lease(ctx, lease("w3", 4, 10)),
@@ -145,13 +145,13 @@ func testWorkLifecycle(t *testing.T, s store.Store) {
 	) != 0 {
 		t.Fatalf("leased items were taken again: %v", keys(again))
 	}
-	storekit.Same(t, "Stats while leased", []types.WorkStats{
+	storekit.Same(t, "Stats while leased", []work.WorkStats{
 		{Kind: "maven", Leased: 2}, {Kind: "npm", Leased: 1},
-	}, storekit.Get[[]types.WorkStats](t)(q.Stats(ctx)))
+	}, storekit.Get[[]work.WorkStats](t)(q.Stats(ctx)))
 
 	// Extend keeps the lease past its first expiry.
 	storekit.Must(t, q.Extend(ctx, "maven", "org.acme:lib", 1, storekit.At(30), storekit.At(5)))
-	if again := storekit.Get[[]types.WorkItem](
+	if again := storekit.Get[[]work.WorkItem](
 		t,
 	)(
 		q.Lease(ctx, lease("w3", 20, 10, "maven")),
@@ -165,89 +165,89 @@ func testWorkLifecycle(t *testing.T, s store.Store) {
 	// Complete deletes an item no work was asked for during its run.
 	storekit.Must(t, q.Complete(ctx, "npm", "left-pad", 1, storekit.At(6)))
 	_, err := q.Get(ctx, "npm", "left-pad")
-	storekit.WantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, kernel.ErrNotFound)
 
 	// Release hands the run back without counting it.
 	storekit.Must(t, q.Release(ctx, "maven", "org.acme:lib", 1, storekit.At(7)))
-	released := storekit.Get[types.WorkItem](t)(q.Get(ctx, "maven", "org.acme:lib"))
-	if released.State != types.WorkPending || released.Attempts != 0 || released.LeasedBy != "" ||
+	released := storekit.Get[work.WorkItem](t)(q.Get(ctx, "maven", "org.acme:lib"))
+	if released.State != work.WorkPending || released.Attempts != 0 || released.LeasedBy != "" ||
 		!released.LeaseUntil.IsZero() || !released.NotBefore.Equal(storekit.Want(storekit.At(7))) {
 		t.Fatalf("after Release: %+v", released)
 	}
 }
 
-func testWorkCoalescing(t *testing.T, s store.Store) {
+func testWorkCoalescing(t *testing.T, s Store) {
 	ctx := context.Background()
 	q := s.WorkQueue()
 	storekit.Must(t, q.Enqueue(ctx, "maven", "g:a", []byte(`1`), storekit.At(0)))
 	storekit.Must(t, q.Enqueue(ctx, "maven", "g:a", []byte(`2`), storekit.At(1)))
-	it := storekit.Get[types.WorkItem](t)(q.Get(ctx, "maven", "g:a"))
+	it := storekit.Get[work.WorkItem](t)(q.Get(ctx, "maven", "g:a"))
 	if string(it.Payload) != "2" || !it.Enqueued.Equal(storekit.Want(storekit.At(0))) ||
 		!it.NotBefore.Equal(storekit.Want(storekit.At(0))) {
 		t.Fatalf("a second enqueue of a pending key: %+v", it)
 	}
 
 	// Work asked for during a run marks it to run once more.
-	_ = storekit.Get[[]types.WorkItem](t)(q.Lease(ctx, lease("w", 2, 1)))
+	_ = storekit.Get[[]work.WorkItem](t)(q.Lease(ctx, lease("w", 2, 1)))
 	storekit.Must(t, q.Enqueue(ctx, "maven", "g:a", []byte(`3`), storekit.At(3)))
 	storekit.Must(t, q.Enqueue(ctx, "maven", "g:a", []byte(`4`), storekit.At(4)))
-	it = storekit.Get[types.WorkItem](t)(q.Get(ctx, "maven", "g:a"))
-	if it.State != types.WorkLeased || !it.DirtySince.Equal(storekit.Want(storekit.At(3))) ||
+	it = storekit.Get[work.WorkItem](t)(q.Get(ctx, "maven", "g:a"))
+	if it.State != work.WorkLeased || !it.DirtySince.Equal(storekit.Want(storekit.At(3))) ||
 		string(it.Payload) != "4" {
 		t.Fatalf("enqueues during a run: %+v", it)
 	}
 	storekit.Must(t, q.Complete(ctx, "maven", "g:a", 1, storekit.At(5)))
-	it = storekit.Get[types.WorkItem](t)(q.Get(ctx, "maven", "g:a"))
-	wantItem := types.WorkItem{
-		Kind: "maven", Key: "g:a", Payload: []byte(`4`), State: types.WorkPending,
+	it = storekit.Get[work.WorkItem](t)(q.Get(ctx, "maven", "g:a"))
+	wantItem := work.WorkItem{
+		Kind: "maven", Key: "g:a", Payload: []byte(`4`), State: work.WorkPending,
 		Generation: 1, NotBefore: storekit.At(5), Enqueued: storekit.At(3), Updated: storekit.At(5),
 	}
 	storekit.Same(t, "after a run with work asked for during it", wantItem, it)
 
 	// A new lease covers work asked for before it began.
-	_ = storekit.Get[[]types.WorkItem](t)(q.Lease(ctx, lease("w", 6, 1)))
-	it = storekit.Get[types.WorkItem](t)(q.Get(ctx, "maven", "g:a"))
+	_ = storekit.Get[[]work.WorkItem](t)(q.Lease(ctx, lease("w", 6, 1)))
+	it = storekit.Get[work.WorkItem](t)(q.Get(ctx, "maven", "g:a"))
 	if !it.DirtySince.IsZero() || it.Generation != 2 || it.Attempts != 1 {
 		t.Fatalf("second lease: %+v", it)
 	}
 	storekit.Must(t, q.Complete(ctx, "maven", "g:a", 2, storekit.At(7)))
 	_, err := q.Get(ctx, "maven", "g:a")
-	storekit.WantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, kernel.ErrNotFound)
 }
 
-func testWorkFencing(t *testing.T, s store.Store) {
+func testWorkFencing(t *testing.T, s Store) {
 	ctx := context.Background()
 	q := s.WorkQueue()
 	storekit.Must(t, q.Enqueue(ctx, "maven", "g:a", nil, storekit.At(0)))
-	_ = storekit.Get[[]types.WorkItem](t)(q.Lease(ctx, store.WorkLease{
+	_ = storekit.Get[[]work.WorkItem](t)(q.Lease(ctx, work.WorkLease{
 		Holder: "w1", Limit: 1, Until: storekit.At(2), Now: storekit.At(1),
 	}))
 	// The lease ran out; another worker takes the item over.
-	got := storekit.Get[[]types.WorkItem](t)(q.Lease(ctx, lease("w2", 3, 1)))
+	got := storekit.Get[[]work.WorkItem](t)(q.Lease(ctx, lease("w2", 3, 1)))
 	if len(got) != 1 || got[0].Generation != 2 || got[0].Attempts != 2 || got[0].LeasedBy != "w2" {
 		t.Fatalf("taking over an expired lease: %+v", got)
 	}
 	for name, err := range map[string]error{
 		"Complete": q.Complete(ctx, "maven", "g:a", 1, storekit.At(4)),
-		"Fail":     q.Fail(ctx, "maven", "g:a", 1, store.WorkFailure{Error: "x", RetryAt: storekit.At(5), Now: storekit.At(4)}),
-		"Park":     q.Fail(ctx, "maven", "g:a", 1, store.WorkFailure{Error: "x", Park: true, Now: storekit.At(4)}),
+		"Fail":     q.Fail(ctx, "maven", "g:a", 1, work.WorkFailure{Error: "x", RetryAt: storekit.At(5), Now: storekit.At(4)}),
+		"Park":     q.Fail(ctx, "maven", "g:a", 1, work.WorkFailure{Error: "x", Park: true, Now: storekit.At(4)}),
 		"Extend":   q.Extend(ctx, "maven", "g:a", 1, storekit.At(20), storekit.At(4)),
 		"Release":  q.Release(ctx, "maven", "g:a", 1, storekit.At(4)),
 		"missing":  q.Complete(ctx, "maven", "missing", 1, storekit.At(4)),
 	} {
-		if !errors.Is(err, store.ErrConflict) {
+		if !errors.Is(err, kernel.ErrConflict) {
 			t.Errorf("%s by the lapsed run: %v, want ErrConflict", name, err)
 		}
 	}
 	storekit.Must(t, q.Complete(ctx, "maven", "g:a", 2, storekit.At(5)))
-	storekit.WantErr(t, q.Complete(ctx, "maven", "g:a", 2, storekit.At(5)), store.ErrConflict)
+	storekit.WantErr(t, q.Complete(ctx, "maven", "g:a", 2, storekit.At(5)), kernel.ErrConflict)
 }
 
-func testWorkFailures(t *testing.T, s store.Store) {
+func testWorkFailures(t *testing.T, s Store) {
 	ctx := context.Background()
 	q := s.WorkQueue()
 	storekit.Must(t, q.Enqueue(ctx, "maven", "g:a", nil, storekit.At(0)))
-	_ = storekit.Get[[]types.WorkItem](t)(q.Lease(ctx, lease("w", 1, 1)))
+	_ = storekit.Get[[]work.WorkItem](t)(q.Lease(ctx, lease("w", 1, 1)))
 	storekit.Must(
 		t,
 		q.Fail(
@@ -255,18 +255,18 @@ func testWorkFailures(t *testing.T, s store.Store) {
 			"maven",
 			"g:a",
 			1,
-			store.WorkFailure{Error: "boom", RetryAt: storekit.At(30), Now: storekit.At(2)},
+			work.WorkFailure{Error: "boom", RetryAt: storekit.At(30), Now: storekit.At(2)},
 		),
 	)
-	it := storekit.Get[types.WorkItem](t)(q.Get(ctx, "maven", "g:a"))
-	if it.State != types.WorkPending || it.LastError != "boom" || it.Attempts != 1 ||
+	it := storekit.Get[work.WorkItem](t)(q.Get(ctx, "maven", "g:a"))
+	if it.State != work.WorkPending || it.LastError != "boom" || it.Attempts != 1 ||
 		!it.NotBefore.Equal(storekit.Want(storekit.At(30))) || it.LeasedBy != "" {
 		t.Fatalf("after Fail: %+v", it)
 	}
-	if got := storekit.Get[[]types.WorkItem](t)(q.Lease(ctx, lease("w", 29, 1))); len(got) != 0 {
+	if got := storekit.Get[[]work.WorkItem](t)(q.Lease(ctx, lease("w", 29, 1))); len(got) != 0 {
 		t.Fatal("an item was leased before its retry time")
 	}
-	got := storekit.Get[[]types.WorkItem](t)(q.Lease(ctx, lease("w", 30, 1)))
+	got := storekit.Get[[]work.WorkItem](t)(q.Lease(ctx, lease("w", 30, 1)))
 	if len(got) != 1 || got[0].Attempts != 2 {
 		t.Fatalf("retry: %+v", got)
 	}
@@ -277,50 +277,50 @@ func testWorkFailures(t *testing.T, s store.Store) {
 			"maven",
 			"g:a",
 			2,
-			store.WorkFailure{Error: "again", Park: true, Now: storekit.At(31)},
+			work.WorkFailure{Error: "again", Park: true, Now: storekit.At(31)},
 		),
 	)
-	it = storekit.Get[types.WorkItem](t)(q.Get(ctx, "maven", "g:a"))
-	if it.State != types.WorkParked || it.LastError != "again" {
+	it = storekit.Get[work.WorkItem](t)(q.Get(ctx, "maven", "g:a"))
+	if it.State != work.WorkParked || it.LastError != "again" {
 		t.Fatalf("after parking: %+v", it)
 	}
-	if got := storekit.Get[[]types.WorkItem](t)(q.Lease(ctx, lease("w", 100, 1))); len(got) != 0 {
+	if got := storekit.Get[[]work.WorkItem](t)(q.Lease(ctx, lease("w", 100, 1))); len(got) != 0 {
 		t.Fatal("a parked item was leased")
 	}
-	storekit.Same(t, "Stats with a parked item", []types.WorkStats{{Kind: "maven", Parked: 1}},
-		storekit.Get[[]types.WorkStats](t)(q.Stats(ctx)))
+	storekit.Same(t, "Stats with a parked item", []work.WorkStats{{Kind: "maven", Parked: 1}},
+		storekit.Get[[]work.WorkStats](t)(q.Stats(ctx)))
 
 	// A fresh enqueue gives a parked key another chance.
 	storekit.Must(t, q.Enqueue(ctx, "maven", "g:a", nil, storekit.At(40)))
-	it = storekit.Get[types.WorkItem](t)(q.Get(ctx, "maven", "g:a"))
-	if it.State != types.WorkPending || it.Attempts != 0 ||
+	it = storekit.Get[work.WorkItem](t)(q.Get(ctx, "maven", "g:a"))
+	if it.State != work.WorkPending || it.Attempts != 0 ||
 		!it.NotBefore.Equal(storekit.Want(storekit.At(40))) ||
 		!it.Enqueued.Equal(storekit.Want(storekit.At(40))) {
 		t.Fatalf("enqueue of a parked key: %+v", it)
 	}
 
 	// Work asked for during a run that fails is retried, not parked.
-	_ = storekit.Get[[]types.WorkItem](t)(q.Lease(ctx, lease("w", 41, 1)))
+	_ = storekit.Get[[]work.WorkItem](t)(q.Lease(ctx, lease("w", 41, 1)))
 	storekit.Must(t, q.Enqueue(ctx, "maven", "g:a", nil, storekit.At(42)))
-	storekit.Must(t, q.Fail(ctx, "maven", "g:a", 3, store.WorkFailure{
+	storekit.Must(t, q.Fail(ctx, "maven", "g:a", 3, work.WorkFailure{
 		Error: "x", Park: true, RetryAt: storekit.At(50), Now: storekit.At(43),
 	}))
-	it = storekit.Get[types.WorkItem](t)(q.Get(ctx, "maven", "g:a"))
-	if it.State != types.WorkPending || !it.NotBefore.Equal(storekit.Want(storekit.At(50))) ||
+	it = storekit.Get[work.WorkItem](t)(q.Get(ctx, "maven", "g:a"))
+	if it.State != work.WorkPending || !it.NotBefore.Equal(storekit.Want(storekit.At(50))) ||
 		!it.DirtySince.IsZero() {
 		t.Fatalf("a failed run with work asked for during it: %+v", it)
 	}
 }
 
-func testWorkLeaseKey(t *testing.T, s store.Store) {
+func testWorkLeaseKey(t *testing.T, s Store) {
 	ctx := context.Background()
 	q := s.WorkQueue()
 	_, _, err := q.LeaseKey(ctx, "maven", "missing", lease("r", 0, 0))
-	storekit.WantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, kernel.ErrNotFound)
 
 	// A pending item is taken whatever its schedule.
 	storekit.Must(t, q.Enqueue(ctx, "maven", "g:a", nil, storekit.At(0)))
-	_ = storekit.Get[[]types.WorkItem](t)(q.Lease(ctx, lease("w", 1, 1)))
+	_ = storekit.Get[[]work.WorkItem](t)(q.Lease(ctx, lease("w", 1, 1)))
 	storekit.Must(
 		t,
 		q.Fail(
@@ -328,7 +328,7 @@ func testWorkLeaseKey(t *testing.T, s store.Store) {
 			"maven",
 			"g:a",
 			1,
-			store.WorkFailure{RetryAt: storekit.At(60), Now: storekit.At(2)},
+			work.WorkFailure{RetryAt: storekit.At(60), Now: storekit.At(2)},
 		),
 	)
 	it, took, err := q.LeaseKey(ctx, "maven", "g:a", lease("reader", 3, 0))
@@ -351,33 +351,32 @@ func testWorkLeaseKey(t *testing.T, s store.Store) {
 	// A parked one is not.
 	storekit.Must(
 		t,
-		q.Fail(ctx, "maven", "g:a", 3, store.WorkFailure{Park: true, Now: storekit.At(15)}),
+		q.Fail(ctx, "maven", "g:a", 3, work.WorkFailure{Park: true, Now: storekit.At(15)}),
 	)
 	it, took, err = q.LeaseKey(ctx, "maven", "g:a", lease("r", 16, 0))
 	storekit.Must(t, err)
-	if took || it.State != types.WorkParked {
+	if took || it.State != work.WorkParked {
 		t.Fatalf("LeaseKey of a parked item: took=%v %+v", took, it)
 	}
 }
 
-func testWorkTransactions(t *testing.T, s store.Store) {
+func testWorkTransactions(t *testing.T, s Store) {
 	ctx := context.Background()
 	q := s.WorkQueue()
-	boom := errors.New("boom")
 	err := s.Tx(ctx, func(ctx context.Context) error {
 		storekit.Must(t, q.Enqueue(ctx, "maven", "rolled-back", nil, storekit.At(0)))
-		return boom
+		return errBoom
 	})
-	storekit.WantErr(t, err, boom)
+	storekit.WantErr(t, err, errBoom)
 	_, err = q.Get(ctx, "maven", "rolled-back")
-	storekit.WantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, kernel.ErrNotFound)
 	storekit.Must(t, s.Tx(ctx, func(ctx context.Context) error {
 		return q.Enqueue(ctx, "maven", "committed", nil, storekit.At(0))
 	}))
-	_ = storekit.Get[types.WorkItem](t)(q.Get(ctx, "maven", "committed"))
+	_ = storekit.Get[work.WorkItem](t)(q.Get(ctx, "maven", "committed"))
 }
 
-func testWorkConcurrency(t *testing.T, s store.Store) {
+func testWorkConcurrency(t *testing.T, s Store) {
 	ctx := context.Background()
 	q := s.WorkQueue()
 	const items, workers = 40, 8
@@ -398,7 +397,7 @@ func testWorkConcurrency(t *testing.T, s store.Store) {
 		})
 	}
 	wg.Wait()
-	if st := storekit.Get[[]types.WorkStats](t)(q.Stats(ctx)); len(st) != 1 || st[0].Pending != 1 {
+	if st := storekit.Get[[]work.WorkStats](t)(q.Stats(ctx)); len(st) != 1 || st[0].Pending != 1 {
 		t.Fatalf("concurrent enqueues of one key: %+v", st)
 	}
 
@@ -446,7 +445,7 @@ func testWorkConcurrency(t *testing.T, s store.Store) {
 	if len(taken) != items {
 		t.Fatalf("%d of %d items were run", len(taken), items)
 	}
-	if st := storekit.Get[[]types.WorkStats](
+	if st := storekit.Get[[]work.WorkStats](
 		t,
 	)(
 		q.Stats(ctx),

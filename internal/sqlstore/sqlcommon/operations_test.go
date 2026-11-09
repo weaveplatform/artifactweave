@@ -62,9 +62,6 @@ func opsStore(t *testing.T) (*sqlcommon.Store, string) {
 		}}),
 		s.Replications().Put(ctx, types.Replication{Key: "k1", RepoKey: "repo-a", Password: "pw"}),
 		s.Replications().PutRun(ctx, types.ReplicationRun{ReplicationKey: "k1", Started: time.Unix(1, 0)}),
-		s.Configs().Put(ctx, types.ConfigDocument{
-			Kind: types.ConfigLDAP, Key: "corp", Secrets: map[string]string{"manager_password": "mp"},
-		}),
 	} {
 		if err != nil {
 			t.Fatal(err)
@@ -291,58 +288,10 @@ func TestAccOperationsFaults(t *testing.T) {
 			},
 		},
 		{
-			"put config clear secrets",
-			[]string{opsFail("DELETE", "config_secrets")},
-			func(ctx context.Context, s store.Store) error {
-				return s.Configs().
-					Put(ctx, types.ConfigDocument{Kind: types.ConfigLDAP, Key: "corp"})
-			},
-		},
-		{
-			"put config secret",
-			[]string{opsFail("INSERT", "config_secrets")},
-			func(ctx context.Context, s store.Store) error {
-				return s.Configs().Put(ctx, types.ConfigDocument{
-					Kind: types.ConfigLDAP, Key: "corp", Secrets: map[string]string{"a": "b"},
-				})
-			},
-		},
-		{
-			"get config secrets",
-			[]string{opsDrop("config_secrets")},
-			func(ctx context.Context, s store.Store) error {
-				_, err := s.Configs().Get(ctx, types.ConfigLDAP, "corp")
-				return err
-			},
-		},
-		{
-			"delete config secrets",
-			[]string{opsDrop("config_secrets")},
-			func(ctx context.Context, s store.Store) error {
-				return s.Configs().Delete(ctx, types.ConfigLDAP, "corp")
-			},
-		},
-		{
-			"delete config",
-			[]string{opsFail("DELETE", "config_documents")},
-			func(ctx context.Context, s store.Store) error {
-				return s.Configs().Delete(ctx, types.ConfigLDAP, "corp")
-			},
-		},
-		{
 			"corrupt role document",
 			[]string{"UPDATE roles SET environments = 'not json'"},
 			func(ctx context.Context, s store.Store) error {
 				_, err := ps(s).Role(ctx, "p1", "qa")
-				return err
-			},
-		},
-		{
-			"acquire lease update",
-			[]string{opsFail("UPDATE", "leases")},
-			func(ctx context.Context, s store.Store) error {
-				_, err := s.Leases().
-					Acquire(ctx, types.Lease{Name: "gc", Holder: "n", Expires: time.Unix(9, 0)}, time.Unix(1, 0))
 				return err
 			},
 		},
@@ -378,7 +327,6 @@ func TestAccOperationsSealed(t *testing.T) {
 		"named secret":   func() error { _, err := s.Webhooks().Get(ctx, "named"); return err },
 		"webhook list":   func() error { _, err := s.Webhooks().List(ctx, store.WebhookFilter{}); return err },
 		"replication":    func() error { _, err := s.Replications().Get(ctx, "k1"); return err },
-		"config":         func() error { _, err := s.Configs().Get(ctx, types.ConfigLDAP, "corp"); return err },
 	} {
 		if err := op(); !errors.Is(err, sqlcommon.ErrNoKeyring) {
 			t.Errorf("%s: want ErrNoKeyring, got %v", name, err)
@@ -465,20 +413,6 @@ func TestAccOperationsUnmigrated(t *testing.T) {
 			types.ReplicationRun{ReplicationKey: "k", Started: now},
 		),
 		"last replication": errOf(rs.LastRun(ctx, "k")),
-		"get setting":      s.Settings().Get(ctx, "k", new(int)),
-		"put setting":      s.Settings().Put(ctx, "k", 1),
-		"delete setting":   s.Settings().Delete(ctx, "k"),
-		"setting keys":     errOf(s.Settings().Keys(ctx)),
-		"acquire lease": errOf(
-			s.Leases().Acquire(ctx, types.Lease{Name: "l", Holder: "h", Expires: now}, now),
-		),
-		"release lease": s.Leases().Release(ctx, "l", "h"),
-		"list leases":   errOf(s.Leases().List(ctx)),
-		"put config": s.Configs().
-			Put(ctx, types.ConfigDocument{Kind: types.ConfigLDAP, Key: "k"}),
-		"get config":    errOf(s.Configs().Get(ctx, types.ConfigLDAP, "k")),
-		"list config":   errOf(s.Configs().List(ctx, types.ConfigLDAP)),
-		"delete config": s.Configs().Delete(ctx, types.ConfigLDAP, "k"),
 	}
 	_, _, err = cs.Runs(ctx, store.RunFilter{
 		PolicyKey: "k", ItemType: "package",
