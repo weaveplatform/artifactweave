@@ -7,23 +7,23 @@ import (
 	"slices"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
-// Search implements store.BuildStore with the reference evaluator.
+// Search implements port.BuildStore with the reference evaluator.
 func (b buildStore) Search(
 	ctx context.Context,
 	q *aql.Query,
 	o aql.Options,
 ) ([]aql.BuildHit, error) {
 	if q.Domain == aql.DomainItems {
-		return nil, fmt.Errorf("search builds: an %s query: %w", q.Domain, store.ErrInvalid)
+		return nil, fmt.Errorf("search builds: an %s query: %w", q.Domain, kernel.ErrInvalid)
 	}
 	var out []aql.BuildHit
 	err := b.s.Do(ctx, func() error {
 		c := &aql.Corpus{}
 		if q.Joins() {
-			c.Items = items{b.s}.hits(false)
+			c.Items = items(b).hits(false)
 		}
 		b.addBuilds(c)
 		// SelectBuilds builds each hit afresh from the rows it reads in

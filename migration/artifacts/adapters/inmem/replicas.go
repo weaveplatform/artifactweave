@@ -8,13 +8,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/mirror"
 	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// Replicas implements store.Store.
-func (s *Store) Replicas() store.ReplicaIndex { return replicaIndex{s: s, table: "blob_replicas"} }
+// Replicas returns the replica index over the blob_replicas table: which
+// mirror members hold which blobs (decision 0028).
+func (s *Store) Replicas() port.ReplicaIndex { return replicaIndex{s: s, table: "blob_replicas"} }
 
 // replicaIndex is a ReplicaIndex over one table, shared by the hot tier
 // (blob_replicas) and the archive tier (cold_blob_replicas).
@@ -25,22 +27,22 @@ type replicaIndex struct {
 
 type replicaKey struct{ sha256, member string }
 
-func (r replicaIndex) t() *memtx.Table[replicaKey, types.BlobReplica] {
-	return memtx.TableOf[replicaKey, types.BlobReplica](r.s.Store, r.table)
+func (r replicaIndex) t() *memtx.Table[replicaKey, mirror.BlobReplica] {
+	return memtx.TableOf[replicaKey, mirror.BlobReplica](r.s.Store, r.table)
 }
 
-func (r replicaIndex) Put(ctx context.Context, v types.BlobReplica) error {
+func (r replicaIndex) Put(ctx context.Context, v mirror.BlobReplica) error {
 	return r.s.Do(ctx, func() error {
 		if v.SHA256 == "" || v.Member == "" {
-			return fmt.Errorf("%s: sha256 and member are required: %w", r.table, store.ErrInvalid)
+			return fmt.Errorf("%s: sha256 and member are required: %w", r.table, kernel.ErrInvalid)
 		}
 		r.t().Put(replicaKey{v.SHA256, v.Member}, v)
 		return nil
 	})
 }
 
-func (r replicaIndex) Get(ctx context.Context, sha256, member string) (types.BlobReplica, error) {
-	var out types.BlobReplica
+func (r replicaIndex) Get(ctx context.Context, sha256, member string) (mirror.BlobReplica, error) {
+	var out mirror.BlobReplica
 	err := r.s.Do(ctx, func() error {
 		var ok bool
 		if out, ok = r.t().Get(replicaKey{sha256, member}); !ok {
@@ -51,11 +53,11 @@ func (r replicaIndex) Get(ctx context.Context, sha256, member string) (types.Blo
 	return out, err
 }
 
-func (r replicaIndex) ForBlob(ctx context.Context, sha256 string) ([]types.BlobReplica, error) {
-	var out []types.BlobReplica
+func (r replicaIndex) ForBlob(ctx context.Context, sha256 string) ([]mirror.BlobReplica, error) {
+	var out []mirror.BlobReplica
 	err := r.s.Do(ctx, func() error {
-		out = r.t().All(func(k replicaKey, _ types.BlobReplica) bool { return k.sha256 == sha256 },
-			func(a, b types.BlobReplica) int { return strings.Compare(a.Member, b.Member) })
+		out = r.t().All(func(k replicaKey, _ mirror.BlobReplica) bool { return k.sha256 == sha256 },
+			func(a, b mirror.BlobReplica) int { return strings.Compare(a.Member, b.Member) })
 		return nil
 	})
 	return out, err
@@ -71,7 +73,7 @@ func replicaMicros(t time.Time) int64 {
 }
 
 // compareReplicas orders by (Updated, SHA256, Member).
-func compareReplicas(a, b types.BlobReplica) int {
+func compareReplicas(a, b mirror.BlobReplica) int {
 	return cmp.Or(
 		cmp.Compare(replicaMicros(a.Updated), replicaMicros(b.Updated)),
 		strings.Compare(a.SHA256, b.SHA256),
@@ -79,25 +81,25 @@ func compareReplicas(a, b types.BlobReplica) int {
 	)
 }
 
-func replicaSortKey(v types.BlobReplica) []any {
+func replicaSortKey(v mirror.BlobReplica) []any {
 	return []any{replicaMicros(v.Updated), v.SHA256, v.Member}
 }
 
 func (r replicaIndex) List(
-	ctx context.Context, f store.ReplicaFilter, p store.Page,
-) ([]types.BlobReplica, string, error) {
+	ctx context.Context, f mirror.ReplicaFilter, p kernel.Page,
+) ([]mirror.BlobReplica, string, error) {
 	var (
-		out  []types.BlobReplica
+		out  []mirror.BlobReplica
 		next string
 	)
 	err := r.s.Do(ctx, func() error {
-		rows := r.t().All(func(_ replicaKey, v types.BlobReplica) bool {
+		rows := r.t().All(func(_ replicaKey, v mirror.BlobReplica) bool {
 			return (f.Member == "" || v.Member == f.Member) &&
 				(len(f.States) == 0 || slices.Contains(f.States, v.State))
 		}, compareReplicas)
 		var err error
 		out, next, err = memtx.Paginate(rows, p, false, replicaSortKey)
-		return err
+		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
 	})
 	return out, next, err
 }
@@ -115,7 +117,7 @@ func (r replicaIndex) DeleteBlob(ctx context.Context, sha256 string) (int64, err
 	var n int64
 	err := r.s.Do(ctx, func() error {
 		n = r.t().
-			DeleteWhere(func(k replicaKey, _ types.BlobReplica) bool { return k.sha256 == sha256 })
+			DeleteWhere(func(k replicaKey, _ mirror.BlobReplica) bool { return k.sha256 == sha256 })
 		return nil
 	})
 	return n, err
@@ -128,9 +130,9 @@ func (r replicaIndex) UnderReplicated(ctx context.Context, redundancy int) (int6
 		for _, v := range r.t().Rows {
 			seen[v.SHA256] = true
 			switch v.State {
-			case types.ReplicaPresent:
+			case mirror.ReplicaPresent:
 				present[v.SHA256]++
-			case types.ReplicaDeleting:
+			case mirror.ReplicaDeleting:
 				deleting[v.SHA256] = true
 			}
 		}
@@ -150,9 +152,9 @@ func (r replicaIndex) SoleCopies(ctx context.Context) (map[string]int64, error) 
 		holders, deleting := map[string][]string{}, map[string]bool{}
 		for _, v := range r.t().Rows {
 			switch v.State {
-			case types.ReplicaPresent:
+			case mirror.ReplicaPresent:
 				holders[v.SHA256] = append(holders[v.SHA256], v.Member)
-			case types.ReplicaDeleting:
+			case mirror.ReplicaDeleting:
 				deleting[v.SHA256] = true
 			}
 		}
@@ -166,15 +168,15 @@ func (r replicaIndex) SoleCopies(ctx context.Context) (map[string]int64, error) 
 	return out, err
 }
 
-func (r replicaIndex) Counts(ctx context.Context) ([]store.ReplicaCount, error) {
-	var out []store.ReplicaCount
+func (r replicaIndex) Counts(ctx context.Context) ([]mirror.ReplicaCount, error) {
+	var out []mirror.ReplicaCount
 	err := r.s.Do(ctx, func() error {
-		agg := map[[2]string]*store.ReplicaCount{}
+		agg := map[[2]string]*mirror.ReplicaCount{}
 		for _, v := range r.t().Rows {
 			k := [2]string{v.Member, string(v.State)}
 			c, ok := agg[k]
 			if !ok {
-				c = &store.ReplicaCount{Member: v.Member, State: v.State}
+				c = &mirror.ReplicaCount{Member: v.Member, State: v.State}
 				agg[k] = c
 			}
 			c.Count++
@@ -183,7 +185,7 @@ func (r replicaIndex) Counts(ctx context.Context) ([]store.ReplicaCount, error) 
 		for _, c := range agg {
 			out = append(out, *c)
 		}
-		slices.SortFunc(out, func(a, b store.ReplicaCount) int {
+		slices.SortFunc(out, func(a, b mirror.ReplicaCount) int {
 			return cmp.Or(
 				strings.Compare(a.Member, b.Member),
 				strings.Compare(string(a.State), string(b.State)),

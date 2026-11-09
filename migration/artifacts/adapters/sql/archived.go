@@ -7,19 +7,23 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// ArchivedItems implements store.Store.
-func (s *Store) ArchivedItems() store.ArchivedItemStore { return archivedItemStore{s} }
+// ArchivedItems returns the archived item store: the records archived
+// items leave behind (decision 0024).
+func (s *Store) ArchivedItems() port.ArchivedItemStore { return archivedItemStore{s} }
 
-// ColdBlobs implements store.Store.
-func (s *Store) ColdBlobs() store.BlobIndex { return blobIndex{s: s, table: "cold_blobs"} }
+// ColdBlobs returns the cold tier's blob index: the blob index code over
+// the cold_blobs table (decision 0024).
+func (s *Store) ColdBlobs() port.BlobIndex { return blobIndex{s: s, table: "cold_blobs"} }
 
-// ColdReplicas implements store.Store.
-func (s *Store) ColdReplicas() store.ReplicaIndex {
+// ColdReplicas returns the cold tier's replica index: the replica index
+// code over the cold_blob_replicas table (decision 0024).
+func (s *Store) ColdReplicas() port.ReplicaIndex {
 	return replicaIndex{s: s, table: "cold_blob_replicas"}
 }
 
@@ -34,14 +38,14 @@ var archivedCols = []string{
 
 // splitArchived returns the canonical location of an item's original path.
 func splitArchived(full string) (parent, name string, depth int, err error) {
-	parent, name, depth, err = types.SplitItemPath(full)
+	parent, name, depth, err = kernel.SplitItemPath(full)
 	if err != nil {
-		return "", "", 0, fmt.Errorf("archived item: %w: %w", store.ErrInvalid, err)
+		return "", "", 0, fmt.Errorf("archived item: %w: %w", kernel.ErrInvalid, err)
 	}
 	return parent, name, depth, nil
 }
 
-func archivedRow(a types.ArchivedItem) ([]any, error) {
+func archivedRow(a model.ArchivedItem) ([]any, error) {
 	parent, name, depth, err := splitArchived(a.Item.FullPath())
 	if err != nil {
 		return nil, err
@@ -81,9 +85,9 @@ func archivedRow(a types.ArchivedItem) ([]any, error) {
 const archivedSelect = "SELECT id, namespace, package_type, package_name, package_version, policy_key," +
 	" execution_id, archived_at, expires_at, cold_blob_sha256, item, properties, stats FROM archived_items"
 
-func scanArchived(r dialect.EntRow) (types.ArchivedItem, error) {
+func scanArchived(r dialect.EntRow) (model.ArchivedItem, error) {
 	var (
-		a                  types.ArchivedItem
+		a                  model.ArchivedItem
 		archived, expires  sql.NullInt64
 		item, props, stats sql.NullString
 	)
@@ -104,24 +108,24 @@ func scanArchived(r dialect.EntRow) (types.ArchivedItem, error) {
 
 func (a archivedItemStore) AddItem(
 	ctx context.Context,
-	it types.ArchivedItem,
-) (types.ArchivedItem, error) {
-	it = store.Normalise(it)
+	it model.ArchivedItem,
+) (model.ArchivedItem, error) {
+	it = kernel.Normalise(it)
 	row, err := archivedRow(it)
 	if err != nil {
-		return types.ArchivedItem{}, err
+		return model.ArchivedItem{}, err
 	}
 	if it.ID, err = a.s.InsertID(
 		ctx,
 		"add archived item",
-		Insert("archived_items", archivedCols),
+		dialect.Insert("archived_items", archivedCols),
 		row...); err != nil {
-		return types.ArchivedItem{}, err
+		return model.ArchivedItem{}, err
 	}
 	return it, nil
 }
 
-func (a archivedItemStore) Item(ctx context.Context, id int64) (types.ArchivedItem, error) {
+func (a archivedItemStore) Item(ctx context.Context, id int64) (model.ArchivedItem, error) {
 	out, err := scanArchived(
 		a.s.Q(ctx).QueryRowContext(ctx, a.s.Dialect().Rebind(archivedSelect+" WHERE id = ?"), id),
 	)
@@ -133,8 +137,8 @@ func (a archivedItemStore) archived(
 	ctx context.Context,
 	q string,
 	args ...any,
-) ([]types.ArchivedItem, error) {
-	var out []types.ArchivedItem
+) ([]model.ArchivedItem, error) {
+	var out []model.ArchivedItem
 	err := a.s.Rows(ctx, "list archived items", q, args, func(r *sql.Rows) error {
 		v, err := scanArchived(r)
 		out = append(out, v)
@@ -146,7 +150,7 @@ func (a archivedItemStore) archived(
 func (a archivedItemStore) FindItems(
 	ctx context.Context,
 	repoKey, fullPath string,
-) ([]types.ArchivedItem, error) {
+) ([]model.ArchivedItem, error) {
 	parent, name, _, err := splitArchived(fullPath)
 	if err != nil {
 		return nil, err
@@ -161,8 +165,8 @@ func (a archivedItemStore) FindItems(
 }
 
 func (a archivedItemStore) Items(
-	ctx context.Context, f store.ArchivedFilter, p store.Page,
-) ([]types.ArchivedItem, string, error) {
+	ctx context.Context, f port.ArchivedFilter, p kernel.Page,
+) ([]model.ArchivedItem, string, error) {
 	p, err := p.Normalize()
 	if err != nil {
 		return nil, "", err //nolint:wrapcheck // already a store sentinel
@@ -191,10 +195,10 @@ func (a archivedItemStore) Items(
 	if err != nil {
 		return nil, "", err
 	}
-	page, next := store.Trim(
+	page, next := kernel.Trim(
 		out,
 		p.Limit,
-		func(v types.ArchivedItem) []string { return []string{dialect.Itoa(v.ID)} },
+		func(v model.ArchivedItem) []string { return []string{dialect.Itoa(v.ID)} },
 	)
 	return page, next, nil
 }
@@ -212,7 +216,7 @@ func (a archivedItemStore) ExpiredItems(
 	ctx context.Context,
 	before time.Time,
 	limit int,
-) ([]types.ArchivedItem, error) {
+) ([]model.ArchivedItem, error) {
 	return a.archived(ctx, archivedSelect+
 		" WHERE expires_at IS NOT NULL AND expires_at < ? ORDER BY expires_at, id LIMIT ?",
 		before.UnixMicro(), dialect.LimitOr(limit))

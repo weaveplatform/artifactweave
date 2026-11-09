@@ -10,20 +10,25 @@ import (
 	"unicode/utf8"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // --- Trash -----------------------------------------------------------------
+
+// Trash returns the trash store: the trash can that deletes fill and
+// restores and expiry empty (decision 0010).
+func (s *Store) Trash() port.TrashStore { return trash{s} }
 
 type trash struct{ s *Store }
 
 const trashCols = "id, item_json, deleted_at, deleted_by"
 
-func scanTrash(row interface{ Scan(...any) error }) (types.TrashEntry, error) {
+func scanTrash(row interface{ Scan(...any) error }) (model.TrashEntry, error) {
 	var (
-		e       types.TrashEntry
+		e       model.TrashEntry
 		doc     string
 		deleted sql.NullInt64
 	)
@@ -37,18 +42,18 @@ func scanTrash(row interface{ Scan(...any) error }) (types.TrashEntry, error) {
 	return e, nil
 }
 
-func (t trash) Add(ctx context.Context, e types.TrashEntry) (types.TrashEntry, error) {
+func (t trash) Add(ctx context.Context, e model.TrashEntry) (model.TrashEntry, error) {
 	it, err := canonical(e.Record.Item)
 	if err != nil {
 		return e, err
 	}
 	e.Record.Item = it
-	e = store.Normalise(e)
+	e = kernel.Normalise(e)
 	doc, err := json.Marshal(e.Record)
 	if err != nil {
 		return e, fmt.Errorf("encode trash record: %w", err)
 	}
-	e.ID, err = t.s.InsertID(ctx, "add trash entry", Insert("trash", []string{
+	e.ID, err = t.s.InsertID(ctx, "add trash entry", dialect.Insert("trash", []string{
 		"original_repo_key",
 		"original_path",
 		"original_name",
@@ -62,14 +67,14 @@ func (t trash) Add(ctx context.Context, e types.TrashEntry) (types.TrashEntry, e
 	return t.Get(ctx, e.ID)
 }
 
-func (t trash) Get(ctx context.Context, id int64) (types.TrashEntry, error) {
+func (t trash) Get(ctx context.Context, id int64) (model.TrashEntry, error) {
 	e, err := scanTrash(t.s.Q(ctx).QueryRowContext(ctx, t.s.Dialect().Rebind(
 		"SELECT "+trashCols+" FROM trash WHERE id = ?"), id))
 	return e, t.s.Wrap(fmt.Sprintf("get trash entry %d", id), err)
 }
 
-func (t trash) query(ctx context.Context, op, q string, args ...any) ([]types.TrashEntry, error) {
-	var out []types.TrashEntry
+func (t trash) query(ctx context.Context, op, q string, args ...any) ([]model.TrashEntry, error) {
+	var out []model.TrashEntry
 	err := t.s.Rows(ctx, op, q, args, func(rs *sql.Rows) error {
 		e, err := scanTrash(rs)
 		out = append(out, e)
@@ -78,8 +83,8 @@ func (t trash) query(ctx context.Context, op, q string, args ...any) ([]types.Tr
 	return out, err
 }
 
-func (t trash) Find(ctx context.Context, repoKey, fullPath string) ([]types.TrashEntry, error) {
-	parent, name, _, err := types.SplitItemPath(fullPath)
+func (t trash) Find(ctx context.Context, repoKey, fullPath string) ([]model.TrashEntry, error) {
+	parent, name, _, err := kernel.SplitItemPath(fullPath)
 	if err != nil {
 		return nil, nil //nolint:nilerr // a path that cannot name an item has no entries
 	}
@@ -89,8 +94,8 @@ func (t trash) Find(ctx context.Context, repoKey, fullPath string) ([]types.Tras
 }
 
 func (t trash) List(
-	ctx context.Context, repoKey, prefix string, p store.Page,
-) ([]types.TrashEntry, string, error) {
+	ctx context.Context, repoKey, prefix string, p kernel.Page,
+) ([]model.TrashEntry, string, error) {
 	p, err := p.Normalize()
 	if err != nil {
 		return nil, "", fmt.Errorf("list trash: %w", err)
@@ -106,7 +111,7 @@ func (t trash) List(
 		args = append(args, repoKey)
 	}
 	if prefix = strings.Trim(prefix, "/"); prefix != "" {
-		parent, name, _, err := types.SplitItemPath(prefix)
+		parent, name, _, err := kernel.SplitItemPath(prefix)
 		if err != nil {
 			return nil, "", nil //nolint:nilerr // a prefix that cannot name an item matches nothing
 		}
@@ -119,7 +124,7 @@ func (t trash) List(
 	if err != nil {
 		return nil, "", err
 	}
-	page, next := store.Trim(out, p.Limit, func(e types.TrashEntry) []string {
+	page, next := kernel.Trim(out, p.Limit, func(e model.TrashEntry) []string {
 		return []string{
 			e.Record.Item.RepoKey,
 			e.Record.Item.Path,
@@ -143,12 +148,15 @@ func (t trash) Expired(
 	ctx context.Context,
 	before time.Time,
 	limit int,
-) ([]types.TrashEntry, error) {
+) ([]model.TrashEntry, error) {
 	return t.query(ctx, "expired trash entries", "SELECT "+trashCols+
 		" FROM trash WHERE deleted_at < ? ORDER BY deleted_at, id LIMIT ?", before.UnixMicro(), dialect.LimitOr(limit))
 }
 
 // --- Package index ---------------------------------------------------------
+
+// Packages returns the package store: the package index of decision 0018.
+func (s *Store) Packages() port.PackageStore { return packages{s} }
 
 type packages struct{ s *Store }
 
@@ -157,9 +165,9 @@ const (
 	versionCols = "id, package_id, version, order_key, created_at, last_downloaded_at, metadata"
 )
 
-func scanPackage(row interface{ Scan(...any) error }) (types.Package, error) {
+func scanPackage(row interface{ Scan(...any) error }) (model.Package, error) {
 	var (
-		p       types.Package
+		p       model.Package
 		typ     string
 		created sql.NullInt64
 	)
@@ -168,9 +176,9 @@ func scanPackage(row interface{ Scan(...any) error }) (types.Package, error) {
 	return p, err //nolint:wrapcheck // wrapped by the caller
 }
 
-func scanVersion(row interface{ Scan(...any) error }) (types.PackageVersion, error) {
+func scanVersion(row interface{ Scan(...any) error }) (model.PackageVersion, error) {
 	var (
-		v             types.PackageVersion
+		v             model.PackageVersion
 		created, last sql.NullInt64
 		metadata      sql.NullString
 	)
@@ -185,19 +193,28 @@ func scanVersion(row interface{ Scan(...any) error }) (types.PackageVersion, err
 	return v, err //nolint:wrapcheck // wrapped by the caller
 }
 
-func (p packages) Ensure(ctx context.Context, pkg types.Package) (types.Package, error) {
+func (p packages) Ensure(ctx context.Context, pkg model.Package) (model.Package, error) {
 	if pkg.RepoKey == "" || pkg.Name == "" {
 		return pkg, fmt.Errorf(
 			"ensure package: repository and name are required: %w",
-			store.ErrInvalid,
+			kernel.ErrInvalid,
 		)
 	}
-	var out types.Package
+	var out model.Package
 	err := p.s.Tx(ctx, func(ctx context.Context) error {
-		if _, err := p.s.Exec(ctx, "ensure package "+pkg.Name,
-			InsertIgnore("packages", []string{"repo_key", "package_type", "name", "created_at"},
-				[]string{"repo_key", "name"}),
-			pkg.RepoKey, string(pkg.Type), pkg.Name, dialect.Micros(pkg.Created)); err != nil {
+		if _, err := p.s.Exec(
+			ctx,
+			"ensure package "+pkg.Name,
+			dialect.InsertIgnore(
+				"packages",
+				[]string{"repo_key", "package_type", "name", "created_at"},
+				[]string{"repo_key", "name"},
+			),
+			pkg.RepoKey,
+			string(pkg.Type),
+			pkg.Name,
+			dialect.Micros(pkg.Created),
+		); err != nil {
 			return err
 		}
 		var err error
@@ -207,13 +224,13 @@ func (p packages) Ensure(ctx context.Context, pkg types.Package) (types.Package,
 	return out, err
 }
 
-func (p packages) Get(ctx context.Context, id int64) (types.Package, error) {
+func (p packages) Get(ctx context.Context, id int64) (model.Package, error) {
 	out, err := scanPackage(p.s.Q(ctx).QueryRowContext(ctx, p.s.Dialect().Rebind(
 		"SELECT "+packageCols+" FROM packages WHERE id = ?"), id))
 	return out, p.s.Wrap(fmt.Sprintf("get package %d", id), err)
 }
 
-func (p packages) Find(ctx context.Context, repoKey, name string) (types.Package, error) {
+func (p packages) Find(ctx context.Context, repoKey, name string) (model.Package, error) {
 	out, err := scanPackage(p.s.Q(ctx).QueryRowContext(ctx, p.s.Dialect().Rebind(
 		"SELECT "+packageCols+" FROM packages WHERE repo_key = ? AND name = ?"), repoKey, name))
 	return out, p.s.Wrap(fmt.Sprintf("find package %s:%s", repoKey, name), err)
@@ -222,8 +239,8 @@ func (p packages) Find(ctx context.Context, repoKey, name string) (types.Package
 func (p packages) List(
 	ctx context.Context,
 	repoKey string,
-	pg store.Page,
-) ([]types.Package, string, error) {
+	pg kernel.Page,
+) ([]model.Package, string, error) {
 	pg, err := pg.Normalize()
 	if err != nil {
 		return nil, "", fmt.Errorf("list packages: %w", err)
@@ -232,7 +249,7 @@ func (p packages) List(
 	if err != nil {
 		return nil, "", fmt.Errorf("list packages: %w", err)
 	}
-	var out []types.Package
+	var out []model.Package
 	err = p.s.Rows(
 		ctx,
 		"list packages",
@@ -248,10 +265,10 @@ func (p packages) List(
 	if err != nil {
 		return nil, "", err
 	}
-	page, next := store.Trim(
+	page, next := kernel.Trim(
 		out,
 		pg.Limit,
-		func(v types.Package) []string { return []string{v.Name} },
+		func(v model.Package) []string { return []string{v.Name} },
 	)
 	return page, next, nil
 }
@@ -267,12 +284,12 @@ func (p packages) Delete(ctx context.Context, id int64) error {
 
 func (p packages) PutVersion(
 	ctx context.Context,
-	v types.PackageVersion,
-) (types.PackageVersion, error) {
+	v model.PackageVersion,
+) (model.PackageVersion, error) {
 	if v.Version == "" {
-		return v, fmt.Errorf("put package version: version is required: %w", store.ErrInvalid)
+		return v, fmt.Errorf("put package version: version is required: %w", kernel.ErrInvalid)
 	}
-	var out types.PackageVersion
+	var out model.PackageVersion
 	err := p.s.Tx(ctx, func(ctx context.Context) error {
 		pkg, err := p.Get(ctx, v.PackageID)
 		if err != nil {
@@ -281,7 +298,7 @@ func (p packages) PutVersion(
 		if _, err := p.s.Exec(
 			ctx,
 			"put package version "+v.Version,
-			Upsert("package_versions",
+			dialect.Upsert("package_versions",
 				[]string{"package_id", "version", "created_at", "last_downloaded_at", "metadata"},
 				[]string{"package_id", "version"}),
 			v.PackageID,
@@ -303,7 +320,7 @@ func (p packages) PutVersion(
 
 // reorder recomputes the order keys of every version of pkg with its type's
 // comparator and writes the ones that changed.
-func (p packages) reorder(ctx context.Context, pkg types.Package) error {
+func (p packages) reorder(ctx context.Context, pkg model.Package) error {
 	vs, err := p.Versions(ctx, pkg.ID)
 	if err != nil {
 		return err
@@ -312,7 +329,7 @@ func (p packages) reorder(ctx context.Context, pkg types.Package) error {
 	for _, v := range vs {
 		old[v.ID] = v.OrderKey
 	}
-	types.AssignOrderKeys(types.ComparatorFor(pkg.Type), vs)
+	model.AssignOrderKeys(model.ComparatorFor(pkg.Type), vs)
 	for _, v := range vs {
 		if old[v.ID] == v.OrderKey {
 			continue
@@ -334,7 +351,7 @@ func (p packages) Version(
 	ctx context.Context,
 	packageID int64,
 	version string,
-) (types.PackageVersion, error) {
+) (model.PackageVersion, error) {
 	out, err := scanVersion(p.s.Q(ctx).QueryRowContext(ctx, p.s.Dialect().Rebind(
 		"SELECT "+versionCols+" FROM package_versions WHERE package_id = ? AND version = ?",
 	), packageID, version))
@@ -345,8 +362,8 @@ func (p packages) versions(
 	ctx context.Context,
 	op, q string,
 	args ...any,
-) ([]types.PackageVersion, error) {
-	var out []types.PackageVersion
+) ([]model.PackageVersion, error) {
+	var out []model.PackageVersion
 	err := p.s.Rows(ctx, op, q, args, func(rs *sql.Rows) error {
 		v, err := scanVersion(rs)
 		out = append(out, v)
@@ -355,7 +372,7 @@ func (p packages) versions(
 	return out, err
 }
 
-func (p packages) Versions(ctx context.Context, packageID int64) ([]types.PackageVersion, error) {
+func (p packages) Versions(ctx context.Context, packageID int64) ([]model.PackageVersion, error) {
 	return p.versions(ctx, "list package versions", "SELECT "+versionCols+
 		" FROM package_versions WHERE package_id = ? ORDER BY order_key, version", packageID)
 }
@@ -383,7 +400,7 @@ func (p packages) DeleteVersion(ctx context.Context, id int64) error {
 	})
 }
 
-func (p packages) LinkFile(ctx context.Context, f types.VersionFile) error {
+func (p packages) LinkFile(ctx context.Context, f model.VersionFile) error {
 	return p.s.Tx(ctx, func(ctx context.Context) error {
 		for _, check := range []struct {
 			what string
@@ -398,10 +415,10 @@ func (p packages) LinkFile(ctx context.Context, f types.VersionFile) error {
 				return err
 			}
 			if !ok {
-				return fmt.Errorf("link file: %s %d: %w", check.what, check.id, store.ErrNotFound)
+				return fmt.Errorf("link file: %s %d: %w", check.what, check.id, kernel.ErrNotFound)
 			}
 		}
-		_, err := p.s.Exec(ctx, "link file", InsertIgnore(
+		_, err := p.s.Exec(ctx, "link file", dialect.InsertIgnore(
 			"package_version_files",
 			[]string{
 				"version_id",
@@ -430,7 +447,7 @@ func (p packages) Files(ctx context.Context, versionID int64) ([]int64, error) {
 	return out, err
 }
 
-func (p packages) VersionOf(ctx context.Context, itemID int64) (types.PackageVersion, error) {
+func (p packages) VersionOf(ctx context.Context, itemID int64) (model.PackageVersion, error) {
 	out, err := scanVersion(p.s.Q(ctx).QueryRowContext(ctx, p.s.Dialect().Rebind(
 		"SELECT v.id, v.package_id, v.version, v.order_key, v.created_at, v.last_downloaded_at, v.metadata"+
 			" FROM package_versions v JOIN package_version_files f ON f.version_id = v.id"+

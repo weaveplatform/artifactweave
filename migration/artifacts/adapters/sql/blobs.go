@@ -7,13 +7,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// Blobs implements store.Store.
-func (s *Store) Blobs() store.BlobIndex { return blobIndex{s: s, table: "blobs"} }
+// Blobs returns the blob index over the blobs table: content-addressed,
+// reference-counted rows (decisions 0004 and 0010).
+func (s *Store) Blobs() port.BlobIndex { return blobIndex{s: s, table: "blobs"} }
 
 // blobIndex is a BlobIndex over one table with the blobs layout, shared by
 // the hot tier (blobs) and the archive tier (cold_blobs).
@@ -24,9 +26,9 @@ type blobIndex struct {
 
 const blobCols = "sha256, sha512, sha1, md5, size, created_at, ref_count, state, deleted_at"
 
-func scanBlob(row interface{ Scan(...any) error }) (types.Blob, error) {
+func scanBlob(row interface{ Scan(...any) error }) (blob.Blob, error) {
 	var (
-		b                types.Blob
+		b                blob.Blob
 		created, deleted sql.NullInt64
 		state            string
 	)
@@ -44,54 +46,55 @@ func scanBlob(row interface{ Scan(...any) error }) (types.Blob, error) {
 		return b, err //nolint:wrapcheck // wrapped by the caller
 	}
 	b.Created, b.Deleted, b.State = dialect.FromMicros(created), dialect.FromMicros(deleted),
-		types.BlobState(state)
+		blob.BlobState(state)
 	return b, nil
 }
 
-// insertRow adds a row for blob in state unless one exists. Inserting first
-// and then locking means two first references racing on PostgreSQL both end
-// up updating one row, instead of one of them failing on the primary key.
+// insertRow adds a row for the blob in state unless one exists. Inserting
+// first and then locking means two first references racing on PostgreSQL
+// both end up updating one row, instead of one of them failing on the
+// primary key.
 func (b blobIndex) insertRow(
 	ctx context.Context,
-	blob types.Blob,
-	state types.BlobState,
+	row blob.Blob,
+	state blob.BlobState,
 	deleted time.Time,
 ) error {
 	_, err := b.s.Exec(ctx, "insert "+b.table,
-		InsertIgnore(b.table, strings.Split(blobCols, ", "), []string{"sha256"}),
-		blob.Checksums.SHA256, blob.Checksums.SHA512, blob.Checksums.SHA1, blob.Checksums.MD5,
-		blob.Size,
-		dialect.Micros(blob.Created), 0, string(state), dialect.Micros(deleted))
+		dialect.InsertIgnore(b.table, strings.Split(blobCols, ", "), []string{"sha256"}),
+		row.Checksums.SHA256, row.Checksums.SHA512, row.Checksums.SHA1, row.Checksums.MD5,
+		row.Size,
+		dialect.Micros(row.Created), 0, string(state), dialect.Micros(deleted))
 	return err
 }
 
-func (b blobIndex) Ref(ctx context.Context, blob types.Blob, n int64) (types.Blob, error) {
-	if blob.Checksums.SHA256 == "" || n < 0 {
-		return types.Blob{}, fmt.Errorf(
+func (b blobIndex) Ref(ctx context.Context, row blob.Blob, n int64) (blob.Blob, error) {
+	if row.Checksums.SHA256 == "" || n < 0 {
+		return blob.Blob{}, fmt.Errorf(
 			"%s: sha256 and a non-negative count are required: %w",
 			b.table,
-			store.ErrInvalid,
+			kernel.ErrInvalid,
 		)
 	}
-	sha := blob.Checksums.SHA256
-	var out types.Blob
+	sha := row.Checksums.SHA256
+	var out blob.Blob
 	err := b.s.Tx(ctx, func(ctx context.Context) error {
-		if err := b.insertRow(ctx, blob, types.BlobLive, time.Time{}); err != nil {
+		if err := b.insertRow(ctx, row, blob.BlobLive, time.Time{}); err != nil {
 			return err
 		}
 		cur, err := b.get(ctx, sha, true)
 		if err != nil {
 			return err
 		}
-		if cur.State == types.BlobDeleting {
-			return fmt.Errorf("%s %s: %w", b.table, sha, store.ErrDeleting)
+		if cur.State == blob.BlobDeleting {
+			return fmt.Errorf("%s %s: %w", b.table, sha, port.ErrDeleting)
 		}
-		if !sameContent(cur, blob) {
-			return fmt.Errorf("%s sha256 %s: %w", b.table, sha, store.ErrConflict)
+		if !sameContent(cur, row) {
+			return fmt.Errorf("%s sha256 %s: %w", b.table, sha, kernel.ErrConflict)
 		}
 		q := "UPDATE " + b.table + " SET ref_count = ref_count + ? WHERE sha256 = ?"
 		args := []any{n, sha}
-		if cur.State == types.BlobDeleted {
+		if cur.State == blob.BlobDeleted {
 			// Revived by content written again. The digests the tombstone
 			// lacks (it may stand for content the index never recorded) are
 			// filled in; deleted_at stays, telling the caller to check the
@@ -101,8 +104,8 @@ func (b blobIndex) Ref(ctx context.Context, blob types.Blob, n int64) (types.Blo
 				" sha1 = CASE WHEN sha1 = '' THEN ? ELSE sha1 END," +
 				" md5 = CASE WHEN md5 = '' THEN ? ELSE md5 END WHERE sha256 = ?"
 			args = []any{
-				string(types.BlobLive), n, dialect.Micros(blob.Created),
-				blob.Checksums.SHA512, blob.Checksums.SHA1, blob.Checksums.MD5, sha,
+				string(blob.BlobLive), n, dialect.Micros(row.Created),
+				row.Checksums.SHA512, row.Checksums.SHA1, row.Checksums.MD5, sha,
 			}
 		}
 		if _, err := b.s.Exec(ctx, "ref "+b.table, q, args...); err != nil {
@@ -118,7 +121,7 @@ func (b blobIndex) Ref(ctx context.Context, blob types.Blob, n int64) (types.Blo
 // same bytes. A digest is compared only when both record it: a reference may
 // know only sha256 and size, and so may a row garbage collection made for
 // content the index never recorded.
-func sameContent(stored, b types.Blob) bool {
+func sameContent(stored, b blob.Blob) bool {
 	if stored.Size != b.Size {
 		return false
 	}
@@ -128,7 +131,7 @@ func sameContent(stored, b types.Blob) bool {
 		!differ(stored.Checksums.MD5, b.Checksums.MD5)
 }
 
-func (b blobIndex) get(ctx context.Context, sha256 string, lock bool) (types.Blob, error) {
+func (b blobIndex) get(ctx context.Context, sha256 string, lock bool) (blob.Blob, error) {
 	q := "SELECT " + blobCols + " FROM " + b.table + " WHERE sha256 = ?"
 	if lock {
 		q += b.s.LockClause(ctx)
@@ -137,8 +140,8 @@ func (b blobIndex) get(ctx context.Context, sha256 string, lock bool) (types.Blo
 	return out, b.s.Wrap(fmt.Sprintf("get %s %s", b.table, sha256), err)
 }
 
-func (b blobIndex) Unref(ctx context.Context, sha256 string, n int64) (types.Blob, error) {
-	var out types.Blob
+func (b blobIndex) Unref(ctx context.Context, sha256 string, n int64) (blob.Blob, error) {
+	var out blob.Blob
 	err := b.s.Tx(ctx, func(ctx context.Context) error {
 		if err := b.s.ExecOne(ctx, "unref "+b.table+" "+sha256, "UPDATE "+b.table+
 			" SET ref_count = CASE WHEN ref_count > ? THEN ref_count - ? ELSE 0 END WHERE sha256 = ?",
@@ -152,11 +155,11 @@ func (b blobIndex) Unref(ctx context.Context, sha256 string, n int64) (types.Blo
 	return out, err
 }
 
-func (b blobIndex) Get(ctx context.Context, sha256 string) (types.Blob, error) {
+func (b blobIndex) Get(ctx context.Context, sha256 string) (blob.Blob, error) {
 	return b.get(ctx, sha256, false)
 }
 
-func (b blobIndex) Find(ctx context.Context, c types.Checksums) (types.Blob, error) {
+func (b blobIndex) Find(ctx context.Context, c kernel.Checksums) (blob.Blob, error) {
 	var col, val string
 	switch {
 	case c.SHA256 != "":
@@ -166,12 +169,12 @@ func (b blobIndex) Find(ctx context.Context, c types.Checksums) (types.Blob, err
 	case c.MD5 != "":
 		col, val = "md5", c.MD5
 	default:
-		return types.Blob{}, fmt.Errorf("no checksum given: %w", store.ErrInvalid)
+		return blob.Blob{}, fmt.Errorf("no checksum given: %w", kernel.ErrInvalid)
 	}
 	q := "SELECT " + blobCols + " FROM " + b.table + " WHERE " + col + " = ? AND state = ?" +
 		" ORDER BY sha256 LIMIT 1"
 	out, err := scanBlob(
-		b.s.Q(ctx).QueryRowContext(ctx, b.s.Dialect().Rebind(q), val, string(types.BlobLive)),
+		b.s.Q(ctx).QueryRowContext(ctx, b.s.Dialect().Rebind(q), val, string(blob.BlobLive)),
 	)
 	return out, b.s.Wrap(fmt.Sprintf("find %s %s %s", b.table, col, val), err)
 }
@@ -179,10 +182,10 @@ func (b blobIndex) Find(ctx context.Context, c types.Checksums) (types.Blob, err
 // list pages the rows matching where (with args), ordered by sha256.
 func (b blobIndex) list(
 	ctx context.Context,
-	p store.Page,
+	p kernel.Page,
 	where string,
 	args ...any,
-) ([]types.Blob, string, error) {
+) ([]blob.Blob, string, error) {
 	p, err := p.Normalize()
 	if err != nil {
 		return nil, "", err //nolint:wrapcheck // already a store sentinel
@@ -191,7 +194,7 @@ func (b blobIndex) list(
 	if err != nil {
 		return nil, "", err
 	}
-	var out []types.Blob
+	var out []blob.Blob
 	err = b.s.Rows(ctx, "list "+b.table,
 		"SELECT "+blobCols+" FROM "+b.table+" WHERE "+where+" AND "+cond+
 			dialect.OrderBy([]string{"sha256"}, false)+" LIMIT ?",
@@ -204,34 +207,34 @@ func (b blobIndex) list(
 	if err != nil {
 		return nil, "", err
 	}
-	page, next := store.Trim(
+	page, next := kernel.Trim(
 		out,
 		p.Limit,
-		func(v types.Blob) []string { return []string{v.Checksums.SHA256} },
+		func(v blob.Blob) []string { return []string{v.Checksums.SHA256} },
 	)
 	return page, next, nil
 }
 
-func (b blobIndex) Unreferenced(ctx context.Context, p store.Page) ([]types.Blob, string, error) {
-	return b.list(ctx, p, "state = ? AND ref_count = 0", string(types.BlobLive))
+func (b blobIndex) Unreferenced(ctx context.Context, p kernel.Page) ([]blob.Blob, string, error) {
+	return b.list(ctx, p, "state = ? AND ref_count = 0", string(blob.BlobLive))
 }
 
-func (b blobIndex) Deleting(ctx context.Context, p store.Page) ([]types.Blob, string, error) {
-	return b.list(ctx, p, "state = ?", string(types.BlobDeleting))
+func (b blobIndex) Deleting(ctx context.Context, p kernel.Page) ([]blob.Blob, string, error) {
+	return b.list(ctx, p, "state = ?", string(blob.BlobDeleting))
 }
 
 func (b blobIndex) MarkDeleting(
 	ctx context.Context,
-	blob types.Blob,
+	row blob.Blob,
 	at time.Time,
-) (types.Blob, error) {
-	sha := blob.Checksums.SHA256
+) (blob.Blob, error) {
+	sha := row.Checksums.SHA256
 	if sha == "" {
-		return types.Blob{}, fmt.Errorf("%s: sha256 is required: %w", b.table, store.ErrInvalid)
+		return blob.Blob{}, fmt.Errorf("%s: sha256 is required: %w", b.table, kernel.ErrInvalid)
 	}
-	var out types.Blob
+	var out blob.Blob
 	err := b.s.Tx(ctx, func(ctx context.Context) error {
-		if err := b.insertRow(ctx, blob, types.BlobDeleting, at); err != nil {
+		if err := b.insertRow(ctx, row, blob.BlobDeleting, at); err != nil {
 			return err
 		}
 		cur, err := b.get(ctx, sha, true)
@@ -239,15 +242,15 @@ func (b blobIndex) MarkDeleting(
 			return err
 		}
 		switch {
-		case cur.State == types.BlobDeleting:
+		case cur.State == blob.BlobDeleting:
 			out = cur
 			return nil
 		case cur.Refs > 0:
-			return fmt.Errorf("%s %s still referenced: %w", b.table, sha, store.ErrConflict)
+			return fmt.Errorf("%s %s still referenced: %w", b.table, sha, kernel.ErrConflict)
 		}
 		if _, err := b.s.Exec(ctx, "mark "+b.table, "UPDATE "+b.table+
 			" SET state = ?, deleted_at = ? WHERE sha256 = ?",
-			string(types.BlobDeleting), dialect.Micros(at), sha); err != nil {
+			string(blob.BlobDeleting), dialect.Micros(at), sha); err != nil {
 			return err
 		}
 		out, err = b.get(ctx, sha, false)
@@ -263,15 +266,15 @@ func (b blobIndex) FinishDelete(ctx context.Context, sha256 string, at time.Time
 			return err
 		}
 		switch cur.State {
-		case types.BlobDeleted:
+		case blob.BlobDeleted:
 			return nil
-		case types.BlobDeleting:
+		case blob.BlobDeleting:
 			_, err := b.s.Exec(ctx, "finish "+b.table, "UPDATE "+b.table+
 				" SET state = ?, deleted_at = ? WHERE sha256 = ?",
-				string(types.BlobDeleted), dialect.Micros(at), sha256)
+				string(blob.BlobDeleted), dialect.Micros(at), sha256)
 			return err
 		default:
-			return fmt.Errorf("%s %s is live: %w", b.table, sha256, store.ErrConflict)
+			return fmt.Errorf("%s %s is live: %w", b.table, sha256, kernel.ErrConflict)
 		}
 	})
 }
@@ -281,13 +284,13 @@ func (b blobIndex) Prune(ctx context.Context, before time.Time) (int64, error) {
 	err := b.s.Tx(ctx, func(ctx context.Context) error {
 		dropped, err := b.s.Exec(ctx, "prune "+b.table,
 			"DELETE FROM "+b.table+" WHERE state = ? AND deleted_at < ?",
-			string(types.BlobDeleted), dialect.Micros(before))
+			string(blob.BlobDeleted), dialect.Micros(before))
 		if err != nil {
 			return err
 		}
 		cleared, err := b.s.Exec(ctx, "prune "+b.table,
 			"UPDATE "+b.table+" SET deleted_at = NULL WHERE state = ? AND deleted_at < ?",
-			string(types.BlobLive), dialect.Micros(before))
+			string(blob.BlobLive), dialect.Micros(before))
 		n = dropped + cleared
 		return err
 	})
@@ -297,6 +300,6 @@ func (b blobIndex) Prune(ctx context.Context, before time.Time) (int64, error) {
 func (b blobIndex) Totals(ctx context.Context) (count, bytes int64, err error) {
 	err = b.s.Q(ctx).QueryRowContext(ctx, b.s.Dialect().Rebind(
 		"SELECT COUNT(*), COALESCE(SUM(size), 0) FROM "+b.table+" WHERE state = ?"),
-		string(types.BlobLive)).Scan(&count, &bytes)
+		string(blob.BlobLive)).Scan(&count, &bytes)
 	return count, bytes, b.s.Wrap("totals "+b.table, err)
 }

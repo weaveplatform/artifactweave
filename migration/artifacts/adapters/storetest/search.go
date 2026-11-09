@@ -9,9 +9,10 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql/aqltest"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/storekit"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // testItemSearch runs the shared AQL cases
@@ -21,18 +22,18 @@ import (
 // globbing, collation and NULL handling honest. The build runs the
 // relation-path cases join to are stored too, and the builds and
 // build.promotions cases run through the build store.
-func testItemSearch(t *testing.T, st store.Store) {
+func testItemSearch(t *testing.T, st port.Store) {
 	ctx := context.Background()
 	s := st.Items()
-	props := map[string]types.Properties{}
-	stats := map[string]*types.ItemStats{}
+	props := map[string]model.Properties{}
+	stats := map[string]*model.ItemStats{}
 	for _, seed := range aqltest.Seeds() {
 		put := s.Put
 		if seed.Item.IsRoot() {
 			// A root's record is made as setting a property on it makes it.
 			put = s.EnsureRoot
 		}
-		it := storekit.Get[types.Item](t)(put(ctx, seed.Item))
+		it := storekit.Get[model.Item](t)(put(ctx, seed.Item))
 		key := aqltest.Paths([]aql.Hit{{Item: it}})[0]
 		if seed.Properties != nil {
 			storekit.Must(t, s.SetProperties(ctx, it.ID, seed.Properties, storekit.Base))
@@ -56,8 +57,8 @@ func testItemSearch(t *testing.T, st store.Store) {
 			for _, h := range hits {
 				key := aqltest.Paths([]aql.Hit{h})[0]
 				var (
-					wantProps types.Properties
-					wantStats *types.ItemStats
+					wantProps model.Properties
+					wantStats *model.ItemStats
 				)
 				if q.Properties() {
 					wantProps = props[key]
@@ -85,7 +86,7 @@ func testItemSearch(t *testing.T, st store.Store) {
 // testRelatedSearch runs the shared includes of related domains: the
 // store's rows, nested from the store (aql.AQLSource), must render as
 // the reference evaluator's nested from aqltest.Corpus.
-func testRelatedSearch(t *testing.T, st store.Store) {
+func testRelatedSearch(t *testing.T, st port.Store) {
 	ctx := context.Background()
 	corpus := aqltest.Corpus()
 	render := func(res aql.Response) string {
@@ -138,6 +139,7 @@ func testRelatedSearch(t *testing.T, st store.Store) {
 	cancelled, cancel := context.WithCancel(ctx)
 	cancel()
 	src := aql.AQLSource(st.Builds(), st.Items())
+	//nolint:wrapcheck // each call returns the source's own error for the check below
 	for name, call := range map[string]func() error{
 		"runs":       func() error { _, err := src.RunsWithFile(cancelled, false, "a"); return err },
 		"items":      func() error { _, err := src.ItemsWithSHA1(cancelled, "a"); return err },
@@ -152,13 +154,13 @@ func testRelatedSearch(t *testing.T, st store.Store) {
 
 // seedBuilds stores aqltest.BuildSeeds, which a fresh store numbers as
 // aqltest.Corpus does.
-func seedBuilds(t *testing.T, s store.BuildStore) {
+func seedBuilds(t *testing.T, s port.BuildStore) {
 	ctx := context.Background()
 	for _, seed := range aqltest.BuildSeeds() {
-		b := storekit.Get[types.Build](t)(s.Put(ctx, seed.Build))
+		b := storekit.Get[model.Build](t)(s.Put(ctx, seed.Build))
 		for _, p := range seed.Promotions {
 			p.BuildID = b.ID
-			storekit.Get[types.BuildPromotion](t)(s.AddPromotion(ctx, p))
+			storekit.Get[model.BuildPromotion](t)(s.AddPromotion(ctx, p))
 		}
 	}
 }
@@ -166,7 +168,7 @@ func seedBuilds(t *testing.T, s store.BuildStore) {
 // testBuildSearch runs the shared builds and build.promotions cases. Each
 // hit carries the run's own columns, and a promotions hit its promotion,
 // exactly as the reference evaluator returns them.
-func testBuildSearch(t *testing.T, s store.BuildStore) {
+func testBuildSearch(t *testing.T, s port.BuildStore) {
 	ctx := context.Background()
 	corpus := aqltest.Corpus()
 	for _, c := range aqltest.BuildCases() {
@@ -190,7 +192,7 @@ func testBuildSearch(t *testing.T, s store.BuildStore) {
 	}
 	q, err = aql.Parse(`items.find()`)
 	storekit.Must(t, err)
-	if _, err := s.Search(ctx, q, aql.Options{}); !errors.Is(err, store.ErrInvalid) {
+	if _, err := s.Search(ctx, q, aql.Options{}); !errors.Is(err, kernel.ErrInvalid) {
 		t.Fatalf("an items query on the build store: %v", err)
 	}
 }

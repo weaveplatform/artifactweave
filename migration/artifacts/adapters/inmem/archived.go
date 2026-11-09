@@ -6,43 +6,47 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// ArchivedItems implements store.Store.
-func (s *Store) ArchivedItems() store.ArchivedItemStore { return archivedItemStore{s} }
+// ArchivedItems returns the archived item store: the records archived
+// items leave behind (decision 0024).
+func (s *Store) ArchivedItems() port.ArchivedItemStore { return archivedItemStore{s} }
 
-// ColdBlobs implements store.Store.
-func (s *Store) ColdBlobs() store.BlobIndex { return blobIndex{s: s, table: "cold_blobs"} }
+// ColdBlobs returns the cold tier's blob index: the blob index code over
+// the cold_blobs table (decision 0024).
+func (s *Store) ColdBlobs() port.BlobIndex { return blobIndex{s: s, table: "cold_blobs"} }
 
-// ColdReplicas implements store.Store.
-func (s *Store) ColdReplicas() store.ReplicaIndex {
+// ColdReplicas returns the cold tier's replica index: the replica index
+// code over the cold_blob_replicas table (decision 0024).
+func (s *Store) ColdReplicas() port.ReplicaIndex {
 	return replicaIndex{s: s, table: "cold_blob_replicas"}
 }
 
 type archivedItemStore struct{ s *Store }
 
-func (a archivedItemStore) items() *memtx.Table[int64, types.ArchivedItem] {
-	return memtx.TableOf[int64, types.ArchivedItem](a.s.Store, "archived_items")
+func (a archivedItemStore) items() *memtx.Table[int64, model.ArchivedItem] {
+	return memtx.TableOf[int64, model.ArchivedItem](a.s.Store, "archived_items")
 }
 
 // archivedLocation is the canonical (parent, name) of an archived item's
 // original path.
-func archivedLocation(it types.Item) (parent, name string, err error) {
-	parent, name, _, err = types.SplitItemPath(it.FullPath())
+func archivedLocation(it model.Item) (parent, name string, err error) {
+	parent, name, _, err = kernel.SplitItemPath(it.FullPath())
 	if err != nil {
-		return "", "", fmt.Errorf("archived item: %w: %w", store.ErrInvalid, err)
+		return "", "", fmt.Errorf("archived item: %w: %w", kernel.ErrInvalid, err)
 	}
 	return parent, name, nil
 }
 
 func (a archivedItemStore) AddItem(
 	ctx context.Context,
-	it types.ArchivedItem,
-) (types.ArchivedItem, error) {
-	var out types.ArchivedItem
+	it model.ArchivedItem,
+) (model.ArchivedItem, error) {
+	var out model.ArchivedItem
 	err := a.s.Do(ctx, func() error {
 		if _, _, err := archivedLocation(it.Item); err != nil {
 			return err
@@ -55,8 +59,8 @@ func (a archivedItemStore) AddItem(
 	return out, err
 }
 
-func (a archivedItemStore) Item(ctx context.Context, id int64) (types.ArchivedItem, error) {
-	var out types.ArchivedItem
+func (a archivedItemStore) Item(ctx context.Context, id int64) (model.ArchivedItem, error) {
+	var out model.ArchivedItem
 	err := a.s.Do(ctx, func() error {
 		var ok bool
 		if out, ok = a.items().Get(id); !ok {
@@ -70,43 +74,43 @@ func (a archivedItemStore) Item(ctx context.Context, id int64) (types.ArchivedIt
 func (a archivedItemStore) FindItems(
 	ctx context.Context,
 	repoKey, fullPath string,
-) ([]types.ArchivedItem, error) {
-	parent, name, _, err := types.SplitItemPath(fullPath)
+) ([]model.ArchivedItem, error) {
+	parent, name, _, err := kernel.SplitItemPath(fullPath)
 	if err != nil {
-		return nil, fmt.Errorf("find archived items: %w: %w", store.ErrInvalid, err)
+		return nil, fmt.Errorf("find archived items: %w: %w", kernel.ErrInvalid, err)
 	}
-	var out []types.ArchivedItem
+	var out []model.ArchivedItem
 	err = a.s.Do(ctx, func() error {
-		out = a.items().All(func(_ int64, v types.ArchivedItem) bool {
+		out = a.items().All(func(_ int64, v model.ArchivedItem) bool {
 			p, n, err := archivedLocation(v.Item)
 			return err == nil && v.Item.RepoKey == repoKey && p == parent && n == name
-		}, func(x, y types.ArchivedItem) int { return cmp.Compare(y.ID, x.ID) })
+		}, func(x, y model.ArchivedItem) int { return cmp.Compare(y.ID, x.ID) })
 		return nil
 	})
 	return out, err
 }
 
 func (a archivedItemStore) Items(
-	ctx context.Context, f store.ArchivedFilter, p store.Page,
-) ([]types.ArchivedItem, string, error) {
+	ctx context.Context, f port.ArchivedFilter, p kernel.Page,
+) ([]model.ArchivedItem, string, error) {
 	var (
-		out  []types.ArchivedItem
+		out  []model.ArchivedItem
 		next string
 	)
 	err := a.s.Do(ctx, func() error {
-		rows := a.items().All(func(_ int64, v types.ArchivedItem) bool {
+		rows := a.items().All(func(_ int64, v model.ArchivedItem) bool {
 			return (f.RepoKey == "" || v.Item.RepoKey == f.RepoKey) &&
 				(f.PolicyKey == "" || v.PolicyKey == f.PolicyKey) &&
 				(f.ExecutionID == 0 || v.ExecutionID == f.ExecutionID)
-		}, func(x, y types.ArchivedItem) int { return cmp.Compare(x.ID, y.ID) })
+		}, func(x, y model.ArchivedItem) int { return cmp.Compare(x.ID, y.ID) })
 		var err error
 		out, next, err = memtx.Paginate(
 			rows,
 			p,
 			false,
-			func(v types.ArchivedItem) []any { return []any{v.ID} },
+			func(v model.ArchivedItem) []any { return []any{v.ID} },
 		)
-		return err
+		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
 	})
 	return out, next, err
 }
@@ -124,14 +128,14 @@ func (a archivedItemStore) ExpiredItems(
 	ctx context.Context,
 	before time.Time,
 	limit int,
-) ([]types.ArchivedItem, error) {
+) ([]model.ArchivedItem, error) {
 	// Compared at the stored precision, as the SQL column is.
 	before = before.Truncate(time.Microsecond)
-	var out []types.ArchivedItem
+	var out []model.ArchivedItem
 	err := a.s.Do(ctx, func() error {
-		out = a.items().All(func(_ int64, v types.ArchivedItem) bool {
+		out = a.items().All(func(_ int64, v model.ArchivedItem) bool {
 			return !v.ExpiresAt.IsZero() && v.ExpiresAt.Before(before)
-		}, func(x, y types.ArchivedItem) int {
+		}, func(x, y model.ArchivedItem) int {
 			return cmp.Or(x.ExpiresAt.Compare(y.ExpiresAt), cmp.Compare(x.ID, y.ID))
 		})
 		out = out[:min(len(out), expiredLimit(limit))]
@@ -144,7 +148,7 @@ func (a archivedItemStore) ExpiredItems(
 // lists.
 func expiredLimit(limit int) int {
 	if limit <= 0 {
-		return store.DefaultLimit
+		return kernel.DefaultLimit
 	}
-	return min(limit, store.MaxLimit)
+	return min(limit, kernel.MaxLimit)
 }

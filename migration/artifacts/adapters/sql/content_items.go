@@ -10,10 +10,16 @@ import (
 	"unicode/utf8"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
+
+// Items returns the item store: items in the canonical form of decision
+// 0004, with their properties and download statistics, and the AQL item
+// search (decision 0012).
+func (s *Store) Items() port.ItemStore { return items{s} }
 
 type items struct{ s *Store }
 
@@ -32,12 +38,12 @@ var itemWriteCols = []string{
 
 // itemCols are the columns scanItem reads. props_modified_at is not one of
 // itemWriteCols: only the property methods write it, so a Put that
-// replaces an item keeps it (types.Item.PropertiesModified).
+// replaces an item keeps it (model.Item.PropertiesModified).
 var itemCols = "id, " + strings.Join(itemWriteCols, ", ") + ", props_modified_at"
 
-func scanItem(row interface{ Scan(...any) error }) (types.Item, error) {
+func scanItem(row interface{ Scan(...any) error }) (model.Item, error) {
 	var (
-		it                                    types.Item
+		it                                    model.Item
 		typ                                   string
 		created, modified, updated, propsTime sql.NullInt64
 	)
@@ -121,7 +127,7 @@ func (i items) missingRoots(ctx context.Context, q *aql.Query, o aql.Options) ([
 	recorded := map[aql.RepoRef]bool{}
 	for start := 0; start < len(refs); start += searchBatch {
 		batch := refs[start:min(start+searchBatch, len(refs))]
-		args := []any{types.RootPath, types.RootPath}
+		args := []any{kernel.RootPath, kernel.RootPath}
 		for _, r := range batch {
 			args = append(args, r.Key)
 		}
@@ -188,7 +194,7 @@ func (i items) hitProperties(ctx context.Context, hits []aql.Hit) error {
 				}
 				h := &hits[byID[id]]
 				if h.Properties == nil {
-					h.Properties = types.Properties{}
+					h.Properties = model.Properties{}
 				}
 				h.Properties[k] = append(h.Properties[k], v)
 				return nil
@@ -206,7 +212,7 @@ func (i items) hitStats(ctx context.Context, hits []aql.Hit) error {
 			func(rs *sql.Rows) error {
 				var (
 					id               int64
-					st               types.ItemStats
+					st               model.ItemStats
 					last, remoteLast sql.NullInt64
 				)
 				if err := rs.Scan(&id, &st.DownloadCount, &last, &st.LastDownloadedBy,
@@ -223,13 +229,13 @@ func (i items) hitStats(ctx context.Context, hits []aql.Hit) error {
 }
 
 // canonical derives Path, Name and Depth from the item's full path.
-func canonical(it types.Item) (types.Item, error) {
+func canonical(it model.Item) (model.Item, error) {
 	if it.RepoKey == "" {
-		return it, fmt.Errorf("item: repository key is required: %w", store.ErrInvalid)
+		return it, fmt.Errorf("item: repository key is required: %w", kernel.ErrInvalid)
 	}
-	parent, name, depth, err := types.SplitItemPath(it.FullPath())
+	parent, name, depth, err := kernel.SplitItemPath(it.FullPath())
 	if err != nil {
-		return it, fmt.Errorf("item: %w: %w", store.ErrInvalid, err)
+		return it, fmt.Errorf("item: %w: %w", kernel.ErrInvalid, err)
 	}
 	it.Path, it.Name, it.Depth = parent, name, depth
 	return it, nil
@@ -239,24 +245,24 @@ func canonical(it types.Item) (types.Item, error) {
 func folderPath(folder string) string {
 	folder = strings.Trim(folder, "/")
 	if folder == "" {
-		return types.RootPath
+		return kernel.RootPath
 	}
 	return folder
 }
 
-func (i items) Put(ctx context.Context, it types.Item) (types.Item, error) {
+func (i items) Put(ctx context.Context, it model.Item) (model.Item, error) {
 	return i.put(
 		ctx,
 		it,
-		Upsert("items", itemWriteCols, []string{"repo_key", "cached", "path", "name"}),
+		dialect.Upsert("items", itemWriteCols, []string{"repo_key", "cached", "path", "name"}),
 	)
 }
 
-func (i items) Create(ctx context.Context, it types.Item) (types.Item, error) {
-	return i.put(ctx, it, Insert("items", itemWriteCols))
+func (i items) Create(ctx context.Context, it model.Item) (model.Item, error) {
+	return i.put(ctx, it, dialect.Insert("items", itemWriteCols))
 }
 
-func (i items) put(ctx context.Context, it types.Item, statement string) (types.Item, error) {
+func (i items) put(ctx context.Context, it model.Item, statement string) (model.Item, error) {
 	it, err := canonical(it)
 	if err != nil {
 		return it, err
@@ -305,10 +311,10 @@ func (i items) Get(
 	repoKey string,
 	cached bool,
 	fullPath string,
-) (types.Item, error) {
-	parent, name, _, err := types.SplitItemPath(fullPath)
+) (model.Item, error) {
+	parent, name, _, err := kernel.SplitItemPath(fullPath)
 	if err != nil {
-		return types.Item{}, fmt.Errorf("get item %q: %w", fullPath, store.ErrNotFound)
+		return model.Item{}, fmt.Errorf("get item %q: %w", fullPath, kernel.ErrNotFound)
 	}
 	it, err := scanItem(i.s.Q(ctx).QueryRowContext(ctx, i.s.Dialect().Rebind(
 		"SELECT "+itemCols+" FROM items WHERE repo_key = ? AND cached = ? AND path = ? AND name = ?",
@@ -317,7 +323,7 @@ func (i items) Get(
 	return it, i.s.Wrap(fmt.Sprintf("get item %s:%s", repoKey, fullPath), err)
 }
 
-func (i items) GetByID(ctx context.Context, id int64) (types.Item, error) {
+func (i items) GetByID(ctx context.Context, id int64) (model.Item, error) {
 	it, err := scanItem(i.s.Q(ctx).QueryRowContext(ctx, i.s.Dialect().Rebind(
 		"SELECT "+itemCols+" FROM items WHERE id = ?"+i.s.LockClause(ctx)), id))
 	return it, i.s.Wrap(fmt.Sprintf("get item %d", id), err)
@@ -328,11 +334,11 @@ func (i items) list(
 	ctx context.Context,
 	op, where string,
 	args []any,
-	p store.Page,
+	p kernel.Page,
 	cols []string,
 	ints map[string]bool,
-	key func(types.Item) []string,
-) ([]types.Item, string, error) {
+	key func(model.Item) []string,
+) ([]model.Item, string, error) {
 	p, err := p.Normalize()
 	if err != nil {
 		return nil, "", fmt.Errorf("%s: %w", op, err)
@@ -341,7 +347,7 @@ func (i items) list(
 	if err != nil {
 		return nil, "", fmt.Errorf("%s: %w", op, err)
 	}
-	var out []types.Item
+	var out []model.Item
 	err = i.s.Rows(ctx, op, "SELECT "+itemCols+" FROM items WHERE "+where+" AND "+cond+
 		dialect.OrderBy(cols, false)+" LIMIT ?", append(append(args, cargs...), p.Limit+1),
 		func(rs *sql.Rows) error {
@@ -352,13 +358,13 @@ func (i items) list(
 	if err != nil {
 		return nil, "", err
 	}
-	page, next := store.Trim(out, p.Limit, key)
+	page, next := kernel.Trim(out, p.Limit, key)
 	return page, next, nil
 }
 
 func (i items) Children(
-	ctx context.Context, repoKey string, cached bool, folder string, p store.Page,
-) ([]types.Item, string, error) {
+	ctx context.Context, repoKey string, cached bool, folder string, p kernel.Page,
+) ([]model.Item, string, error) {
 	return i.list(
 		ctx,
 		"list children of "+folder,
@@ -367,11 +373,11 @@ func (i items) Children(
 		p,
 		[]string{"name"},
 		nil,
-		func(it types.Item) []string { return []string{it.Name} },
+		func(it model.Item) []string { return []string{it.Name} },
 	)
 }
 
-// notRoot leaves out a repository root's record (types.RootItem), which
+// notRoot leaves out a repository root's record (model.RootItem), which
 // has the root's path but is not inside the root. Depth is enough: every
 // other item is at least one segment deep.
 const notRoot = "depth > 0"
@@ -380,7 +386,7 @@ const notRoot = "depth > 0"
 // folder (not folder itself).
 func under(folder string) (string, []any) {
 	folder = folderPath(folder)
-	if folder == types.RootPath {
+	if folder == kernel.RootPath {
 		return notRoot, nil
 	}
 	prefix := folder + "/"
@@ -394,8 +400,8 @@ func under(folder string) (string, []any) {
 }
 
 func (i items) Descendants(
-	ctx context.Context, repoKey string, cached bool, folder string, p store.Page,
-) ([]types.Item, string, error) {
+	ctx context.Context, repoKey string, cached bool, folder string, p kernel.Page,
+) ([]model.Item, string, error) {
 	cond, args := under(folder)
 	return i.list(
 		ctx,
@@ -405,18 +411,18 @@ func (i items) Descendants(
 		p,
 		[]string{"path", "name"},
 		nil,
-		func(it types.Item) []string { return []string{it.Path, it.Name} },
+		func(it model.Item) []string { return []string{it.Path, it.Name} },
 	)
 }
 
 func (i items) Delete(
 	ctx context.Context, repoKey string, cached bool, fullPath string,
-) (store.DeleteResult, error) {
-	res := store.DeleteResult{BlobRefs: map[string]int64{}}
+) (port.DeleteResult, error) {
+	res := port.DeleteResult{BlobRefs: map[string]int64{}}
 	err := i.s.Tx(ctx, func(ctx context.Context) error {
 		where := "repo_key = ? AND cached = ? AND " + notRoot
 		args := []any{repoKey, cached}
-		if folderPath(fullPath) != types.RootPath {
+		if folderPath(fullPath) != kernel.RootPath {
 			it, err := i.Get(ctx, repoKey, cached, fullPath)
 			if err != nil {
 				return err
@@ -462,34 +468,58 @@ func (i items) Delete(
 		return err
 	})
 	if err != nil {
-		return store.DeleteResult{}, err
+		return port.DeleteResult{}, err
 	}
 	return res, nil
 }
 
-func (i items) Root(ctx context.Context, repoKey string, cached bool) (types.Item, error) {
+func (i items) Root(ctx context.Context, repoKey string, cached bool) (model.Item, error) {
 	it, err := scanItem(i.s.Q(ctx).QueryRowContext(ctx, i.s.Dialect().Rebind(
 		"SELECT "+itemCols+" FROM items WHERE repo_key = ? AND cached = ? AND path = ? AND name = ?",
 	),
-		repoKey, cached, types.RootPath, types.RootPath))
+		repoKey, cached, kernel.RootPath, kernel.RootPath))
 	return it, i.s.Wrap("get the root of "+repoKey, err)
 }
 
-func (i items) EnsureRoot(ctx context.Context, r types.Item) (types.Item, error) {
+func (i items) EnsureRoot(ctx context.Context, r model.Item) (model.Item, error) {
 	if r.RepoKey == "" {
-		return r, fmt.Errorf("repository root: repository key is required: %w", store.ErrInvalid)
+		return r, fmt.Errorf("repository root: repository key is required: %w", kernel.ErrInvalid)
 	}
-	root := types.RootItem(r.RepoKey, r.Cached)
-	var out types.Item
+	root := model.RootItem(r.RepoKey, r.Cached)
+	var out model.Item
 	err := i.s.Tx(ctx, func(ctx context.Context) error {
 		// Ignoring the conflict keeps an existing record as it was, and two
 		// requests creating it at once end with one.
-		if _, err := i.s.Exec(ctx, "create the root of "+r.RepoKey,
-			InsertIgnore("items", itemWriteCols, []string{"repo_key", "cached", "path", "name"}),
-			root.RepoKey, root.Cached, root.Path, root.Name, root.Depth, typeFolder, int64(0),
-			"", "", "", "", "", "", "", "", "",
-			dialect.Micros(r.Created), r.CreatedBy, dialect.Micros(r.Modified), r.ModifiedBy,
-			dialect.Micros(r.Updated), "",
+		if _, err := i.s.Exec(
+			ctx,
+			"create the root of "+r.RepoKey,
+			dialect.InsertIgnore(
+				"items",
+				itemWriteCols,
+				[]string{"repo_key", "cached", "path", "name"},
+			),
+			root.RepoKey,
+			root.Cached,
+			root.Path,
+			root.Name,
+			root.Depth,
+			typeFolder,
+			int64(0),
+			"",
+			"",
+			"",
+			"",
+			"",
+			"",
+			"",
+			"",
+			"",
+			dialect.Micros(r.Created),
+			r.CreatedBy,
+			dialect.Micros(r.Modified),
+			r.ModifiedBy,
+			dialect.Micros(r.Updated),
+			"",
 		); err != nil {
 			return err
 		}
@@ -503,15 +533,15 @@ func (i items) EnsureRoot(ctx context.Context, r types.Item) (types.Item, error)
 func (i items) DeleteRoot(ctx context.Context, repoKey string, cached bool) error {
 	_, err := i.s.Exec(ctx, "delete the root of "+repoKey,
 		"DELETE FROM items WHERE repo_key = ? AND cached = ? AND path = ? AND name = ?",
-		repoKey, cached, types.RootPath, types.RootPath)
+		repoKey, cached, kernel.RootPath, kernel.RootPath)
 	return err
 }
 
 func (i items) FindByChecksum(
 	ctx context.Context,
-	c types.Checksums,
-	p store.Page,
-) ([]types.Item, string, error) {
+	c kernel.Checksums,
+	p kernel.Page,
+) ([]model.Item, string, error) {
 	var col, val string
 	switch {
 	case c.SHA256 != "":
@@ -521,15 +551,15 @@ func (i items) FindByChecksum(
 	case c.MD5 != "":
 		col, val = "md5", c.MD5
 	default:
-		return nil, "", fmt.Errorf("find items: no checksum given: %w", store.ErrInvalid)
+		return nil, "", fmt.Errorf("find items: no checksum given: %w", kernel.ErrInvalid)
 	}
 	return i.list(ctx, "find items by "+col, "type = ? AND "+col+" = ?", []any{typeFile, val},
 		p, []string{"id"}, map[string]bool{"id": true},
-		func(it types.Item) []string { return []string{dialect.Itoa(it.ID)} })
+		func(it model.Item) []string { return []string{dialect.Itoa(it.ID)} })
 }
 
-func (i items) Usage(ctx context.Context) ([]store.RepoUsage, error) {
-	var out []store.RepoUsage
+func (i items) Usage(ctx context.Context) ([]port.RepoUsage, error) {
+	var out []port.RepoUsage
 	err := i.s.Rows(ctx, "repository usage",
 		"SELECT repo_key, cached,"+
 			// Cast because PostgreSQL sums BIGINT into NUMERIC.
@@ -538,7 +568,7 @@ func (i items) Usage(ctx context.Context) ([]store.RepoUsage, error) {
 			" CAST(SUM(CASE WHEN type = 'file' THEN size ELSE 0 END) AS BIGINT)"+
 			" FROM items WHERE "+notRoot+" GROUP BY repo_key, cached ORDER BY repo_key, cached", nil,
 		func(rs *sql.Rows) error {
-			var u store.RepoUsage
+			var u port.RepoUsage
 			err := rs.Scan(&u.RepoKey, &u.Cached, &u.Files, &u.Folders, &u.Bytes)
 			out = append(out, u)
 			return err //nolint:wrapcheck // wrapped by Rows
@@ -558,13 +588,13 @@ func (i items) requireItem(ctx context.Context, id int64) error {
 		return err
 	}
 	if !ok {
-		return fmt.Errorf("item %d: %w", id, store.ErrNotFound)
+		return fmt.Errorf("item %d: %w", id, kernel.ErrNotFound)
 	}
 	return nil
 }
 
-func (i items) Properties(ctx context.Context, id int64) (types.Properties, error) {
-	var out types.Properties
+func (i items) Properties(ctx context.Context, id int64) (model.Properties, error) {
+	var out model.Properties
 	err := i.s.Tx(ctx, func(ctx context.Context) error {
 		if err := i.requireItem(ctx, id); err != nil {
 			return err
@@ -577,8 +607,8 @@ func (i items) Properties(ctx context.Context, id int64) (types.Properties, erro
 }
 
 // props reads the properties of the item with id, which must exist.
-func (i items) props(ctx context.Context, id int64) (types.Properties, error) {
-	out := types.Properties{}
+func (i items) props(ctx context.Context, id int64) (model.Properties, error) {
+	out := model.Properties{}
 	err := i.s.Rows(
 		ctx,
 		"item properties",
@@ -598,7 +628,7 @@ func (i items) props(ctx context.Context, id int64) (types.Properties, error) {
 
 // changeProperties runs write, which changes the properties of the item
 // with id, and stamps the item with at when they changed
-// (store.ItemStore). The properties are read back rather than predicted,
+// (port.ItemStore). The properties are read back rather than predicted,
 // so the stamp follows what the columns' collation and the truncation kept.
 func (i items) changeProperties(
 	ctx context.Context,
@@ -632,8 +662,8 @@ func (i items) changeProperties(
 }
 
 // setKeys replaces the values of every key in props, each cut to
-// types.PropertyValueMax; values that become equal are stored once.
-func (i items) setKeys(ctx context.Context, id int64, props types.Properties) error {
+// model.PropertyValueMax; values that become equal are stored once.
+func (i items) setKeys(ctx context.Context, id int64, props model.Properties) error {
 	for k, values := range props {
 		if _, err := i.s.Exec(ctx, "set property "+k,
 			"DELETE FROM item_properties WHERE item_id = ? AND key = ?", id, k); err != nil {
@@ -643,10 +673,10 @@ func (i items) setKeys(ctx context.Context, id int64, props types.Properties) er
 			if _, err := i.s.Exec(
 				ctx,
 				"set property "+k,
-				InsertIgnore("item_properties", []string{"item_id", "key", "value"}, nil),
+				dialect.InsertIgnore("item_properties", []string{"item_id", "key", "value"}, nil),
 				id,
 				k,
-				types.TruncatePropertyValue(v, types.PropertyValueMax),
+				model.TruncatePropertyValue(v, model.PropertyValueMax),
 			); err != nil {
 				return err
 			}
@@ -658,10 +688,10 @@ func (i items) setKeys(ctx context.Context, id int64, props types.Properties) er
 func (i items) SetProperties(
 	ctx context.Context,
 	id int64,
-	props types.Properties,
+	props model.Properties,
 	at time.Time,
 ) error {
-	if err := store.CheckPropertyKeys(props); err != nil {
+	if err := port.CheckPropertyKeys(props); err != nil {
 		return fmt.Errorf("properties of item %d: %w", id, err)
 	}
 	return i.changeProperties(ctx, id, at, func(ctx context.Context) error {
@@ -676,11 +706,11 @@ func (i items) SetProperties(
 func (i items) PatchProperties(
 	ctx context.Context,
 	id int64,
-	set types.Properties,
+	set model.Properties,
 	remove []string,
 	at time.Time,
 ) error {
-	if err := store.CheckPropertyKeys(set); err != nil {
+	if err := port.CheckPropertyKeys(set); err != nil {
 		return fmt.Errorf("properties of item %d: %w", id, err)
 	}
 	return i.changeProperties(ctx, id, at, func(ctx context.Context) error {
@@ -700,8 +730,8 @@ var statsCols = []string{
 	"remote_origin", "remote_path",
 }
 
-func (i items) Stats(ctx context.Context, id int64) (types.ItemStats, error) {
-	var out types.ItemStats
+func (i items) Stats(ctx context.Context, id int64) (model.ItemStats, error) {
+	var out model.ItemStats
 	err := i.s.Tx(ctx, func(ctx context.Context) error {
 		if err := i.requireItem(ctx, id); err != nil {
 			return err
@@ -726,13 +756,21 @@ func (i items) Stats(ctx context.Context, id int64) (types.ItemStats, error) {
 	return out, err
 }
 
-func (i items) RecordDownload(ctx context.Context, id int64, d store.Download) error {
+func (i items) RecordDownload(ctx context.Context, id int64, d port.Download) error {
 	return i.s.Tx(ctx, func(ctx context.Context) error {
 		if err := i.requireItem(ctx, id); err != nil {
 			return err
 		}
-		if _, err := i.s.Exec(ctx, "record download",
-			InsertIgnore("item_stats", []string{"item_id"}, []string{"item_id"}), id); err != nil {
+		if _, err := i.s.Exec(
+			ctx,
+			"record download",
+			dialect.InsertIgnore(
+				"item_stats",
+				[]string{"item_id"},
+				[]string{"item_id"},
+			),
+			id,
+		); err != nil {
 			return err
 		}
 		if d.Remote {
@@ -755,7 +793,7 @@ func (i items) RecordDownload(ctx context.Context, id int64, d store.Download) e
 	})
 }
 
-func (i items) PutStats(ctx context.Context, id int64, st types.ItemStats) error {
+func (i items) PutStats(ctx context.Context, id int64, st model.ItemStats) error {
 	return i.s.Tx(ctx, func(ctx context.Context) error {
 		if err := i.requireItem(ctx, id); err != nil {
 			return err
@@ -763,7 +801,7 @@ func (i items) PutStats(ctx context.Context, id int64, st types.ItemStats) error
 		_, err := i.s.Exec(
 			ctx,
 			"put statistics",
-			Upsert("item_stats", statsCols, []string{"item_id"}),
+			dialect.Upsert("item_stats", statsCols, []string{"item_id"}),
 			id,
 			st.DownloadCount,
 			dialect.Micros(st.LastDownloaded),

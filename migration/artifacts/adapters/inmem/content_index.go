@@ -8,28 +8,33 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // limitOr applies the default limit for "at most limit" queries.
 func limitOr(limit int) int {
 	if limit <= 0 {
-		return store.DefaultLimit
+		return kernel.DefaultLimit
 	}
-	return min(limit, store.MaxLimit)
+	return min(limit, kernel.MaxLimit)
 }
 
 // --- Trash -----------------------------------------------------------------
 
+// Trash returns the trash store: the trash can that deletes fill and
+// restores and expiry empty (decision 0010).
+func (s *Store) Trash() port.TrashStore { return trash{s} }
+
 type trash struct{ s *Store }
 
-func (t trash) t() *memtx.Table[int64, types.TrashEntry] {
-	return memtx.TableOf[int64, types.TrashEntry](t.s.Store, "trash")
+func (t trash) t() *memtx.Table[int64, model.TrashEntry] {
+	return memtx.TableOf[int64, model.TrashEntry](t.s.Store, "trash")
 }
 
-func (t trash) Add(ctx context.Context, e types.TrashEntry) (types.TrashEntry, error) {
+func (t trash) Add(ctx context.Context, e model.TrashEntry) (model.TrashEntry, error) {
 	it, err := canonical(e.Record.Item)
 	if err != nil {
 		return e, err
@@ -44,8 +49,8 @@ func (t trash) Add(ctx context.Context, e types.TrashEntry) (types.TrashEntry, e
 	return e, err
 }
 
-func (t trash) Get(ctx context.Context, id int64) (types.TrashEntry, error) {
-	var out types.TrashEntry
+func (t trash) Get(ctx context.Context, id int64) (model.TrashEntry, error) {
+	var out model.TrashEntry
 	err := t.s.Do(ctx, func() error {
 		var ok bool
 		if out, ok = t.t().Get(id); !ok {
@@ -58,24 +63,24 @@ func (t trash) Get(ctx context.Context, id int64) (types.TrashEntry, error) {
 
 // deletedKey is the SQL sort value of a deletion time, with an unset time
 // first, as COALESCE(deleted_at, 0) sorts it.
-func deletedKey(e types.TrashEntry) int64 {
+func deletedKey(e model.TrashEntry) int64 {
 	if e.DeletedAt.IsZero() {
 		return 0
 	}
 	return e.DeletedAt.UnixMicro()
 }
 
-func (t trash) Find(ctx context.Context, repoKey, fullPath string) ([]types.TrashEntry, error) {
-	parent, name, _, err := types.SplitItemPath(fullPath)
+func (t trash) Find(ctx context.Context, repoKey, fullPath string) ([]model.TrashEntry, error) {
+	parent, name, _, err := kernel.SplitItemPath(fullPath)
 	if err != nil {
 		return nil, nil //nolint:nilerr // a path that cannot name an item has no entries
 	}
-	var out []types.TrashEntry
+	var out []model.TrashEntry
 	err = t.s.Do(ctx, func() error {
-		out = t.t().All(func(_ int64, e types.TrashEntry) bool {
+		out = t.t().All(func(_ int64, e model.TrashEntry) bool {
 			it := e.Record.Item
 			return it.RepoKey == repoKey && it.Path == parent && it.Name == name
-		}, func(a, b types.TrashEntry) int {
+		}, func(a, b model.TrashEntry) int {
 			return cmp.Or(cmp.Compare(deletedKey(b), deletedKey(a)), cmp.Compare(b.ID, a.ID))
 		})
 		return nil
@@ -84,36 +89,36 @@ func (t trash) Find(ctx context.Context, repoKey, fullPath string) ([]types.Tras
 }
 
 func (t trash) List(
-	ctx context.Context, repoKey, prefix string, p store.Page,
-) ([]types.TrashEntry, string, error) {
-	keep := func(types.TrashEntry) bool { return true }
+	ctx context.Context, repoKey, prefix string, p kernel.Page,
+) ([]model.TrashEntry, string, error) {
+	keep := func(model.TrashEntry) bool { return true }
 	if prefix = strings.Trim(prefix, "/"); prefix != "" {
-		parent, name, _, err := types.SplitItemPath(prefix)
+		parent, name, _, err := kernel.SplitItemPath(prefix)
 		if err != nil {
 			return nil, "", nil //nolint:nilerr // a prefix that cannot name an item matches nothing
 		}
-		keep = func(e types.TrashEntry) bool {
+		keep = func(e model.TrashEntry) bool {
 			it := e.Record.Item
 			return (it.Path == parent && it.Name == name) || below(it.Path, prefix)
 		}
 	}
 	var (
-		out  []types.TrashEntry
+		out  []model.TrashEntry
 		next string
 	)
 	err := t.s.Do(ctx, func() error {
-		rows := t.t().All(func(_ int64, e types.TrashEntry) bool {
+		rows := t.t().All(func(_ int64, e model.TrashEntry) bool {
 			return (repoKey == "" || e.Record.Item.RepoKey == repoKey) && keep(e)
-		}, func(a, b types.TrashEntry) int {
+		}, func(a, b model.TrashEntry) int {
 			x, y := a.Record.Item, b.Record.Item
 			return cmp.Or(cmp.Compare(x.RepoKey, y.RepoKey), cmp.Compare(x.Path, y.Path),
 				cmp.Compare(x.Name, y.Name), cmp.Compare(a.ID, b.ID))
 		})
 		var err error
-		out, next, err = memtx.Paginate(rows, p, false, func(e types.TrashEntry) []any {
+		out, next, err = memtx.Paginate(rows, p, false, func(e model.TrashEntry) []any {
 			return []any{e.Record.Item.RepoKey, e.Record.Item.Path, e.Record.Item.Name, e.ID}
 		})
-		return err
+		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
 	})
 	return out, next, err
 }
@@ -131,13 +136,13 @@ func (t trash) Expired(
 	ctx context.Context,
 	before time.Time,
 	limit int,
-) ([]types.TrashEntry, error) {
-	var out []types.TrashEntry
+) ([]model.TrashEntry, error) {
+	var out []model.TrashEntry
 	err := t.s.Do(ctx, func() error {
 		cutoff := before.UnixMicro()
-		out = t.t().All(func(_ int64, e types.TrashEntry) bool {
+		out = t.t().All(func(_ int64, e model.TrashEntry) bool {
 			return !e.DeletedAt.IsZero() && e.DeletedAt.UnixMicro() < cutoff
-		}, func(a, b types.TrashEntry) int {
+		}, func(a, b model.TrashEntry) int {
 			return cmp.Or(cmp.Compare(deletedKey(a), deletedKey(b)), cmp.Compare(a.ID, b.ID))
 		})
 		out = out[:min(len(out), limitOr(limit))]
@@ -148,38 +153,41 @@ func (t trash) Expired(
 
 // --- Package index ---------------------------------------------------------
 
+// Packages returns the package store: the package index of decision 0018.
+func (s *Store) Packages() port.PackageStore { return packages{s} }
+
 type packages struct{ s *Store }
 
-func (p packages) t() *memtx.Table[int64, types.Package] {
-	return memtx.TableOf[int64, types.Package](p.s.Store, "packages")
+func (p packages) t() *memtx.Table[int64, model.Package] {
+	return memtx.TableOf[int64, model.Package](p.s.Store, "packages")
 }
 
-func (p packages) versions() *memtx.Table[int64, types.PackageVersion] {
-	return memtx.TableOf[int64, types.PackageVersion](p.s.Store, "package_versions")
+func (p packages) versions() *memtx.Table[int64, model.PackageVersion] {
+	return memtx.TableOf[int64, model.PackageVersion](p.s.Store, "package_versions")
 }
 
-func (p packages) files() *memtx.Table[types.VersionFile, bool] {
-	return memtx.TableOf[types.VersionFile, bool](p.s.Store, "package_version_files")
+func (p packages) files() *memtx.Table[model.VersionFile, bool] {
+	return memtx.TableOf[model.VersionFile, bool](p.s.Store, "package_version_files")
 }
 
 // find returns the package (repoKey, name); call it under the lock.
-func (p packages) find(repoKey, name string) (types.Package, bool) {
+func (p packages) find(repoKey, name string) (model.Package, bool) {
 	rows := p.t().
-		All(func(_ int64, v types.Package) bool { return v.RepoKey == repoKey && v.Name == name }, nil)
+		All(func(_ int64, v model.Package) bool { return v.RepoKey == repoKey && v.Name == name }, nil)
 	if len(rows) == 0 {
-		return types.Package{}, false
+		return model.Package{}, false
 	}
 	return rows[0], true
 }
 
-func (p packages) Ensure(ctx context.Context, pkg types.Package) (types.Package, error) {
+func (p packages) Ensure(ctx context.Context, pkg model.Package) (model.Package, error) {
 	if pkg.RepoKey == "" || pkg.Name == "" {
 		return pkg, fmt.Errorf(
 			"ensure package: repository and name are required: %w",
-			store.ErrInvalid,
+			kernel.ErrInvalid,
 		)
 	}
-	var out types.Package
+	var out model.Package
 	err := p.s.Do(ctx, func() error {
 		if cur, ok := p.find(pkg.RepoKey, pkg.Name); ok {
 			out = cur
@@ -193,8 +201,8 @@ func (p packages) Ensure(ctx context.Context, pkg types.Package) (types.Package,
 	return out, err
 }
 
-func (p packages) Get(ctx context.Context, id int64) (types.Package, error) {
-	var out types.Package
+func (p packages) Get(ctx context.Context, id int64) (model.Package, error) {
+	var out model.Package
 	err := p.s.Do(ctx, func() error {
 		var ok bool
 		if out, ok = p.t().Get(id); !ok {
@@ -205,8 +213,8 @@ func (p packages) Get(ctx context.Context, id int64) (types.Package, error) {
 	return out, err
 }
 
-func (p packages) Find(ctx context.Context, repoKey, name string) (types.Package, error) {
-	var out types.Package
+func (p packages) Find(ctx context.Context, repoKey, name string) (model.Package, error) {
+	var out model.Package
 	err := p.s.Do(ctx, func() error {
 		var ok bool
 		if out, ok = p.find(repoKey, name); !ok {
@@ -220,23 +228,23 @@ func (p packages) Find(ctx context.Context, repoKey, name string) (types.Package
 func (p packages) List(
 	ctx context.Context,
 	repoKey string,
-	pg store.Page,
-) ([]types.Package, string, error) {
+	pg kernel.Page,
+) ([]model.Package, string, error) {
 	var (
-		out  []types.Package
+		out  []model.Package
 		next string
 	)
 	err := p.s.Do(ctx, func() error {
-		rows := p.t().All(func(_ int64, v types.Package) bool { return v.RepoKey == repoKey },
-			func(a, b types.Package) int { return cmp.Compare(a.Name, b.Name) })
+		rows := p.t().All(func(_ int64, v model.Package) bool { return v.RepoKey == repoKey },
+			func(a, b model.Package) int { return cmp.Compare(a.Name, b.Name) })
 		var err error
 		out, next, err = memtx.Paginate(
 			rows,
 			pg,
 			false,
-			func(v types.Package) []any { return []any{v.Name} },
+			func(v model.Package) []any { return []any{v.Name} },
 		)
-		return err
+		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
 	})
 	return out, next, err
 }
@@ -246,7 +254,7 @@ func (p packages) Delete(ctx context.Context, id int64) error {
 		if !p.t().Del(id) {
 			return memtx.NotFound("package", id)
 		}
-		for _, v := range p.versions().All(func(_ int64, v types.PackageVersion) bool { return v.PackageID == id }, nil) {
+		for _, v := range p.versions().All(func(_ int64, v model.PackageVersion) bool { return v.PackageID == id }, nil) {
 			p.removeVersion(v.ID)
 		}
 		return nil
@@ -257,14 +265,14 @@ func (p packages) Delete(ctx context.Context, id int64) error {
 // lock.
 func (p packages) removeVersion(id int64) {
 	p.versions().Del(id)
-	p.files().DeleteWhere(func(f types.VersionFile, _ bool) bool { return f.VersionID == id })
+	p.files().DeleteWhere(func(f model.VersionFile, _ bool) bool { return f.VersionID == id })
 }
 
 // sorted returns a package's versions ordered by order key, then version.
-func (p packages) sorted(packageID int64) []types.PackageVersion {
+func (p packages) sorted(packageID int64) []model.PackageVersion {
 	return p.versions().
-		All(func(_ int64, v types.PackageVersion) bool { return v.PackageID == packageID },
-			func(a, b types.PackageVersion) int {
+		All(func(_ int64, v model.PackageVersion) bool { return v.PackageID == packageID },
+			func(a, b model.PackageVersion) int {
 				return cmp.Or(
 					cmp.Compare(a.OrderKey, b.OrderKey),
 					cmp.Compare(a.Version, b.Version),
@@ -274,9 +282,9 @@ func (p packages) sorted(packageID int64) []types.PackageVersion {
 
 // reorder recomputes the order keys of a package's versions; call it under
 // the lock.
-func (p packages) reorder(pkg types.Package) {
+func (p packages) reorder(pkg model.Package) {
 	vs := p.sorted(pkg.ID)
-	types.AssignOrderKeys(types.ComparatorFor(pkg.Type), vs)
+	model.AssignOrderKeys(model.ComparatorFor(pkg.Type), vs)
 	for _, v := range vs {
 		p.versions().Put(v.ID, v)
 	}
@@ -284,12 +292,12 @@ func (p packages) reorder(pkg types.Package) {
 
 func (p packages) PutVersion(
 	ctx context.Context,
-	v types.PackageVersion,
-) (types.PackageVersion, error) {
+	v model.PackageVersion,
+) (model.PackageVersion, error) {
 	if v.Version == "" {
-		return v, fmt.Errorf("put package version: version is required: %w", store.ErrInvalid)
+		return v, fmt.Errorf("put package version: version is required: %w", kernel.ErrInvalid)
 	}
-	var out types.PackageVersion
+	var out model.PackageVersion
 	err := p.s.Do(ctx, func() error {
 		pkg, ok := p.t().Get(v.PackageID)
 		if !ok {
@@ -319,8 +327,8 @@ func (p packages) Version(
 	ctx context.Context,
 	packageID int64,
 	version string,
-) (types.PackageVersion, error) {
-	var out types.PackageVersion
+) (model.PackageVersion, error) {
+	var out model.PackageVersion
 	err := p.s.Do(ctx, func() error {
 		for _, v := range p.sorted(packageID) {
 			if v.Version == version {
@@ -333,8 +341,8 @@ func (p packages) Version(
 	return out, err
 }
 
-func (p packages) Versions(ctx context.Context, packageID int64) ([]types.PackageVersion, error) {
-	var out []types.PackageVersion
+func (p packages) Versions(ctx context.Context, packageID int64) ([]model.PackageVersion, error) {
+	var out []model.PackageVersion
 	err := p.s.Do(ctx, func() error {
 		out = p.sorted(packageID)
 		return nil
@@ -356,12 +364,12 @@ func (p packages) DeleteVersion(ctx context.Context, id int64) error {
 	})
 }
 
-func (p packages) LinkFile(ctx context.Context, f types.VersionFile) error {
+func (p packages) LinkFile(ctx context.Context, f model.VersionFile) error {
 	return p.s.Do(ctx, func() error {
 		if !p.versions().Has(f.VersionID) {
 			return memtx.NotFound("link file: package version", f.VersionID)
 		}
-		if !memtx.TableOf[int64, types.Item](p.s.Store, "items").Has(f.ItemID) {
+		if !memtx.TableOf[int64, model.Item](p.s.Store, "items").Has(f.ItemID) {
 			return memtx.NotFound("link file: item", f.ItemID)
 		}
 		p.files().Put(f, true)
@@ -383,8 +391,8 @@ func (p packages) Files(ctx context.Context, versionID int64) ([]int64, error) {
 	return out, err
 }
 
-func (p packages) VersionOf(ctx context.Context, itemID int64) (types.PackageVersion, error) {
-	var out types.PackageVersion
+func (p packages) VersionOf(ctx context.Context, itemID int64) (model.PackageVersion, error) {
+	var out model.PackageVersion
 	err := p.s.Do(ctx, func() error {
 		var ids []int64
 		for f := range p.files().Rows {

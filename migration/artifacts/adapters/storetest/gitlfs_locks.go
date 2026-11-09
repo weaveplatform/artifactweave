@@ -8,9 +8,10 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/storekit"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func runGitLFSLocks(t *testing.T, newStore Factory) {
@@ -24,22 +25,22 @@ func runGitLFSLocks(t *testing.T, newStore Factory) {
 			storekit.WantErr(
 				t,
 				s.GitLFSLocks().Create(ctx, gitLFSLock("lock-2", "lfs-local", lock.Path)),
-				store.ErrConflict,
+				kernel.ErrConflict,
 			)
 			storekit.WantErr(
 				t,
 				s.GitLFSLocks().Create(ctx, gitLFSLock(lock.ID, "lfs-local", "src/b.bin")),
-				store.ErrConflict,
+				kernel.ErrConflict,
 			)
 			storekit.Same(t, "original lock after collisions", lock,
-				storekit.Get[types.GitLFSLock](t)(s.GitLFSLocks().Get(ctx, lock.RepoKey, lock.ID)))
+				storekit.Get[model.GitLFSLock](t)(s.GitLFSLocks().Get(ctx, lock.RepoKey, lock.ID)))
 			invalid := lock
 			invalid.ID = ""
-			storekit.WantErr(t, s.GitLFSLocks().Create(ctx, invalid), store.ErrInvalid)
+			storekit.WantErr(t, s.GitLFSLocks().Create(ctx, invalid), kernel.ErrInvalid)
 			storekit.WantErr(
 				t,
 				s.GitLFSLocks().Create(ctx, gitLFSLock("other", "absent", "a.bin")),
-				store.ErrNotFound,
+				kernel.ErrNotFound,
 			)
 		})
 		t.Run("ConcurrentExclusivePath", func(t *testing.T) {
@@ -67,7 +68,7 @@ func runGitLFSLocks(t *testing.T, newStore Factory) {
 				switch {
 				case err == nil:
 					created++
-				case errors.Is(err, store.ErrConflict):
+				case errors.Is(err, kernel.ErrConflict):
 				default:
 					t.Errorf("competing create: %v, want conflict", err)
 				}
@@ -80,7 +81,7 @@ func runGitLFSLocks(t *testing.T, newStore Factory) {
 			s := newStore(t)
 			ctx := t.Context()
 			gitLFSRepo(t, s, "lfs-local")
-			ordered := []types.GitLFSLock{
+			ordered := []model.GitLFSLock{
 				gitLFSLock("a", "lfs-local", "a.bin"),
 				gitLFSLock("b", "lfs-local", "b.bin"),
 				gitLFSLock("c", "lfs-local", "c.bin"),
@@ -88,33 +89,33 @@ func runGitLFSLocks(t *testing.T, newStore Factory) {
 			for i := len(ordered) - 1; i >= 0; i-- {
 				storekit.Must(t, s.GitLFSLocks().Create(ctx, ordered[i]))
 			}
-			f := store.GitLFSLockFilter{RepoKey: "lfs-local"}
-			list := func(p store.Page) ([]types.GitLFSLock, string, error) {
+			f := port.GitLFSLockFilter{RepoKey: "lfs-local"}
+			list := func(p kernel.Page) ([]model.GitLFSLock, string, error) {
 				return s.GitLFSLocks().List(ctx, f, p)
 			}
 			storekit.Same(t, "ordered paginated locks", ordered, storekit.Pages(t, 1, list))
-			for _, filter := range []store.GitLFSLockFilter{
+			for _, filter := range []port.GitLFSLockFilter{
 				{RepoKey: "lfs-local", Path: "b.bin"},
 				{RepoKey: "lfs-local", ID: "b"},
 			} {
-				rows, next, err := s.GitLFSLocks().List(ctx, filter, store.Page{})
+				rows, next, err := s.GitLFSLocks().List(ctx, filter, kernel.Page{})
 				storekit.Must(t, err)
-				storekit.Same(t, "filtered lock", []types.GitLFSLock{ordered[1]}, rows)
+				storekit.Same(t, "filtered lock", []model.GitLFSLock{ordered[1]}, rows)
 				if next != "" {
 					t.Fatalf("filtered list next = %q", next)
 				}
 			}
 			rows, _, err := s.GitLFSLocks().List(ctx,
-				store.GitLFSLockFilter{RepoKey: "lfs-local", Path: "missing"}, store.Page{})
+				port.GitLFSLockFilter{RepoKey: "lfs-local", Path: "missing"}, kernel.Page{})
 			storekit.Must(t, err)
 			if len(rows) != 0 {
 				t.Fatalf("missing path returned %d locks", len(rows))
 			}
-			_, _, err = s.GitLFSLocks().List(ctx, store.GitLFSLockFilter{}, store.Page{})
-			storekit.WantErr(t, err, store.ErrInvalid)
-			for _, cursor := range []string{"%%%", store.Cursor("a", "b")} {
-				_, _, err = list(store.Page{After: cursor})
-				storekit.WantErr(t, err, store.ErrInvalidCursor)
+			_, _, err = s.GitLFSLocks().List(ctx, port.GitLFSLockFilter{}, kernel.Page{})
+			storekit.WantErr(t, err, kernel.ErrInvalid)
+			for _, cursor := range []string{"%%%", kernel.Cursor("a", "b")} {
+				_, _, err = list(kernel.Page{After: cursor})
+				storekit.WantErr(t, err, kernel.ErrInvalidCursor)
 			}
 		})
 		t.Run("TransactionRollback", func(t *testing.T) {
@@ -122,27 +123,27 @@ func runGitLFSLocks(t *testing.T, newStore Factory) {
 			ctx := t.Context()
 			gitLFSRepo(t, s, "lfs-local")
 			lock := gitLFSLock("lock-1", "lfs-local", "a.bin")
-			rollback := errors.New("rollback")
+			rollback := errors.New("rollback") //nolint:err113 // the test matches it by identity
 			err := s.Tx(ctx, func(txCtx context.Context) error {
 				if err := s.GitLFSLocks().Create(txCtx, lock); err != nil {
-					return err
+					return err //nolint:wrapcheck // the transaction returns the store's own error
 				}
 				return rollback
 			})
 			storekit.WantErr(t, err, rollback)
 			_, err = s.GitLFSLocks().Get(ctx, lock.RepoKey, lock.ID)
-			storekit.WantErr(t, err, store.ErrNotFound)
+			storekit.WantErr(t, err, kernel.ErrNotFound)
 			storekit.Must(t, s.GitLFSLocks().Create(ctx, lock))
 			err = s.Tx(ctx, func(txCtx context.Context) error {
 				_, err := s.GitLFSLocks().Delete(txCtx, lock.RepoKey, lock.ID)
 				if err != nil {
-					return err
+					return err //nolint:wrapcheck // the transaction returns the store's own error
 				}
 				return rollback
 			})
 			storekit.WantErr(t, err, rollback)
 			storekit.Same(t, "lock survives rolled back delete", lock,
-				storekit.Get[types.GitLFSLock](t)(s.GitLFSLocks().Get(ctx, lock.RepoKey, lock.ID)))
+				storekit.Get[model.GitLFSLock](t)(s.GitLFSLocks().Get(ctx, lock.RepoKey, lock.ID)))
 		})
 		t.Run("RepositoryScopeAndDelete", func(t *testing.T) {
 			s := newStore(t)
@@ -154,35 +155,35 @@ func runGitLFSLocks(t *testing.T, newStore Factory) {
 			storekit.Must(t, s.GitLFSLocks().Create(ctx, one))
 			storekit.Must(t, s.GitLFSLocks().Create(ctx, two))
 			_, err := s.GitLFSLocks().Get(ctx, "lfs-two", one.ID)
-			storekit.WantErr(t, err, store.ErrNotFound)
+			storekit.WantErr(t, err, kernel.ErrNotFound)
 			_, err = s.GitLFSLocks().Delete(ctx, "lfs-two", one.ID)
-			storekit.WantErr(t, err, store.ErrNotFound)
+			storekit.WantErr(t, err, kernel.ErrNotFound)
 			storekit.Must(t, s.Repos().Delete(ctx, "lfs-one"))
 			_, err = s.GitLFSLocks().Get(ctx, "lfs-one", one.ID)
-			storekit.WantErr(t, err, store.ErrNotFound)
+			storekit.WantErr(t, err, kernel.ErrNotFound)
 			storekit.Same(t, "other repository lock remains", two,
-				storekit.Get[types.GitLFSLock](t)(s.GitLFSLocks().Get(ctx, "lfs-two", two.ID)))
-			deleted := storekit.Get[types.GitLFSLock](
+				storekit.Get[model.GitLFSLock](t)(s.GitLFSLocks().Get(ctx, "lfs-two", two.ID)))
+			deleted := storekit.Get[model.GitLFSLock](
 				t,
 			)(
 				s.GitLFSLocks().Delete(ctx, "lfs-two", two.ID),
 			)
 			storekit.Same(t, "deleted lock", two, deleted)
 			_, err = s.GitLFSLocks().Get(ctx, "lfs-two", two.ID)
-			storekit.WantErr(t, err, store.ErrNotFound)
+			storekit.WantErr(t, err, kernel.ErrNotFound)
 		})
 	})
 }
 
-func gitLFSRepo(t *testing.T, s store.Store, key string) {
+func gitLFSRepo(t *testing.T, s port.Store, key string) {
 	t.Helper()
 	storekit.Must(t, s.Repos().Create(t.Context(), repo.Config{
 		Key: key, Class: repo.Local, PackageType: repo.GitLFS,
 	}))
 }
 
-func gitLFSLock(id, repoKey, path string) types.GitLFSLock {
-	return types.GitLFSLock{
+func gitLFSLock(id, repoKey, path string) model.GitLFSLock {
+	return model.GitLFSLock{
 		ID:       id,
 		RepoKey:  repoKey,
 		Path:     path,

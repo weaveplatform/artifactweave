@@ -10,9 +10,10 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/storekit"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // testLongPropertyValues stores property values at and past the limits and
@@ -20,18 +21,18 @@ import (
 // are cut to it. The values are random text (LongText), so PostgreSQL can
 // neither fit one in a B-tree entry nor compress it to fit, as it would a
 // repeated character.
-func testLongPropertyValues(t *testing.T, st store.Store) {
+func testLongPropertyValues(t *testing.T, st port.Store) {
 	ctx := context.Background()
 	s := st.Items()
-	base := LongText(types.PropertyValueMax - 1)
+	base := LongText(model.PropertyValueMax - 1)
 	// v1 and v2 share every character but their last, far past any indexed
 	// prefix. v3 leaves base early with "!", which sorts below every
 	// character LongText uses, so v3 < v1 < v2.
 	v1 := base + "a"
 	v2 := base + "b"
 	v3 := string([]rune(base)[:300]) + "!"
-	props := storekit.Get[types.Properties](t)
-	set := map[string]types.Properties{
+	props := storekit.Get[model.Properties](t)
+	set := map[string]model.Properties{
 		"r/a.txt": {"notes": {v1}},
 		"r/b.txt": {"notes": {v3}},
 		// Past the limit: c's value becomes v1, and d's two values become
@@ -39,7 +40,7 @@ func testLongPropertyValues(t *testing.T, st store.Store) {
 		"r/c.txt": {"notes": {v1 + "past the limit"}},
 		"r/d.txt": {"notes": {v2, v2 + "x"}},
 	}
-	want := map[string]types.Properties{
+	want := map[string]model.Properties{
 		"r/a.txt": {"notes": {v1}},
 		"r/b.txt": {"notes": {v3}},
 		"r/c.txt": {"notes": {v1}},
@@ -47,7 +48,7 @@ func testLongPropertyValues(t *testing.T, st store.Store) {
 	}
 	ids := map[string]int64{}
 	for n, path := range []string{"r/a.txt", "r/b.txt", "r/c.txt", "r/d.txt"} {
-		it := storekit.Get[types.Item](
+		it := storekit.Get[model.Item](
 			t,
 		)(
 			s.Put(ctx, fileItem("r", strings.TrimPrefix(path, "r/"), n+1)),
@@ -63,12 +64,12 @@ func testLongPropertyValues(t *testing.T, st store.Store) {
 		s.PatchProperties(
 			ctx,
 			ids["r/b.txt"],
-			types.Properties{"pair": {base + "😀"}},
+			model.Properties{"pair": {base + "😀"}},
 			nil,
 			storekit.At(2),
 		),
 	)
-	storekit.Same(t, "PatchProperties", types.Properties{"notes": {v3}, "pair": {base}},
+	storekit.Same(t, "PatchProperties", model.Properties{"notes": {v3}, "pair": {base}},
 		props(s.Properties(ctx, ids["r/b.txt"])))
 
 	quote := func(v string) string {
@@ -115,19 +116,19 @@ func testLongPropertyValues(t *testing.T, st store.Store) {
 		}
 	}
 
-	// Build and module properties are cut to types.BuildPropertyValueMax.
-	long := LongText(types.BuildPropertyValueMax)
-	short := string([]rune(long)[:types.BuildPropertyValueMax-1])
+	// Build and module properties are cut to model.BuildPropertyValueMax.
+	long := LongText(model.BuildPropertyValueMax)
+	short := string([]rune(long)[:model.BuildPropertyValueMax-1])
 	b := fxBuild("", "long", "1", 0)
-	b.Properties = types.Properties{"notes": {long + "past", long}}
-	b.Modules[0].Properties = types.Properties{"notes": {short + "😀"}}
-	run := storekit.Get[types.Build](t)(st.Builds().Put(ctx, b))
-	got := storekit.Get[types.Build](t)(st.Builds().ByID(ctx, run.ID))
-	storekit.Same(t, "build properties", types.Properties{"notes": {long}}, got.Properties)
+	b.Properties = model.Properties{"notes": {long + "past", long}}
+	b.Modules[0].Properties = model.Properties{"notes": {short + "😀"}}
+	run := storekit.Get[model.Build](t)(st.Builds().Put(ctx, b))
+	got := storekit.Get[model.Build](t)(st.Builds().ByID(ctx, run.ID))
+	storekit.Same(t, "build properties", model.Properties{"notes": {long}}, got.Properties)
 	storekit.Same(
 		t,
 		"module properties",
-		types.Properties{"notes": {short}},
+		model.Properties{"notes": {short}},
 		got.Modules[0].Properties,
 	)
 	for _, criteria := range []string{
@@ -159,66 +160,66 @@ func LongText(n int) string {
 	return b.String()
 }
 
-// testLongPropertyKeys stores keys of types.PropertyKeyMax characters and
+// testLongPropertyKeys stores keys of model.PropertyKeyMax characters and
 // refuses longer ones with ErrInvalid, writing nothing. The characters are
 // four bytes of UTF-8 each, and the value beside them is as long as a value
 // may be, which is the most a PostgreSQL index entry over a key and a
 // value's prefix has to hold.
-func testLongPropertyKeys(t *testing.T, st store.Store) {
+func testLongPropertyKeys(t *testing.T, st port.Store) {
 	ctx := context.Background()
 	s := st.Items()
-	key := wideText(types.PropertyKeyMax)
-	long := wideText(types.PropertyKeyMax + 1)
-	value := wideText(types.PropertyValueMax / 2)
-	props := storekit.Get[types.Properties](t)
+	key := wideText(model.PropertyKeyMax)
+	long := wideText(model.PropertyKeyMax + 1)
+	value := wideText(model.PropertyValueMax / 2)
+	props := storekit.Get[model.Properties](t)
 	tooLong := func(what string, err error) {
 		t.Helper()
-		if !errors.Is(err, store.ErrInvalid) || !errors.Is(err, types.ErrPropertyKeyTooLong) {
+		if !errors.Is(err, kernel.ErrInvalid) || !errors.Is(err, model.ErrPropertyKeyTooLong) {
 			t.Fatalf("%s: err = %v, want ErrInvalid and ErrPropertyKeyTooLong", what, err)
 		}
 	}
 
-	it := storekit.Get[types.Item](t)(s.Put(ctx, fileItem("r", "keys.txt", 1)))
-	want := types.Properties{key: {value}}
+	it := storekit.Get[model.Item](t)(s.Put(ctx, fileItem("r", "keys.txt", 1)))
+	want := model.Properties{key: {value}}
 	storekit.Must(t, s.SetProperties(ctx, it.ID, want, storekit.At(1)))
 	storekit.Same(t, "a key at the limit", want, props(s.Properties(ctx, it.ID)))
 	tooLong(
 		"SetProperties",
-		s.SetProperties(ctx, it.ID, types.Properties{"ok": {"1"}, long: {"1"}}, storekit.At(2)),
+		s.SetProperties(ctx, it.ID, model.Properties{"ok": {"1"}, long: {"1"}}, storekit.At(2)),
 	)
 	tooLong(
 		"PatchProperties",
-		s.PatchProperties(ctx, it.ID, types.Properties{long: {"1"}}, []string{key}, storekit.At(2)),
+		s.PatchProperties(ctx, it.ID, model.Properties{long: {"1"}}, []string{key}, storekit.At(2)),
 	)
 	storekit.Same(t, "after the refused writes", want, props(s.Properties(ctx, it.ID)))
 
 	bs := st.Builds()
 	b := fxBuild("", "keys", "1", 0)
-	b.Properties = types.Properties{long: {"v"}}
+	b.Properties = model.Properties{long: {"v"}}
 	_, err := bs.Put(ctx, b)
 	tooLong("Put with a build property", err)
-	b.Properties = types.Properties{key: {"v"}}
-	b.Modules[0].Properties = types.Properties{long: {"v"}}
+	b.Properties = model.Properties{key: {"v"}}
+	b.Modules[0].Properties = model.Properties{long: {"v"}}
 	_, err = bs.Put(ctx, b)
 	tooLong("Put with a module property", err)
 	_, err = bs.Latest(ctx, "", "keys")
-	storekit.WantErr(t, err, store.ErrNotFound)
-	moduleValue := wideText(types.BuildPropertyValueMax / 2)
-	b.Modules[0].Properties = types.Properties{key: {moduleValue}}
-	run := storekit.Get[types.Build](t)(bs.Put(ctx, b))
-	got := storekit.Get[types.Build](t)(bs.ByID(ctx, run.ID))
-	storekit.Same(t, "build properties", types.Properties{key: {"v"}}, got.Properties)
+	storekit.WantErr(t, err, kernel.ErrNotFound)
+	moduleValue := wideText(model.BuildPropertyValueMax / 2)
+	b.Modules[0].Properties = model.Properties{key: {moduleValue}}
+	run := storekit.Get[model.Build](t)(bs.Put(ctx, b))
+	got := storekit.Get[model.Build](t)(bs.ByID(ctx, run.ID))
+	storekit.Same(t, "build properties", model.Properties{key: {"v"}}, got.Properties)
 	storekit.Same(
 		t,
 		"module properties",
-		types.Properties{key: {moduleValue}},
+		model.Properties{key: {moduleValue}},
 		got.Modules[0].Properties,
 	)
 	changed := got
-	changed.Properties = types.Properties{long: {"v"}}
+	changed.Properties = model.Properties{long: {"v"}}
 	tooLong("Replace", bs.Replace(ctx, changed))
-	storekit.Same(t, "after the refused Replace", types.Properties{key: {"v"}},
-		storekit.Get[types.Build](t)(bs.ByID(ctx, run.ID)).Properties)
+	storekit.Same(t, "after the refused Replace", model.Properties{key: {"v"}},
+		storekit.Get[model.Build](t)(bs.ByID(ctx, run.ID)).Properties)
 }
 
 // wideText returns n random characters of four bytes of UTF-8 each (emoji,
@@ -227,6 +228,7 @@ func wideText(n int) string {
 	rng := rand.New(rand.NewPCG(3, 4)) //nolint:gosec // test data, not a secret
 	var b strings.Builder
 	for range n {
+		//nolint:gosec // G115: 0x1F600 plus under 80 is far inside rune's range.
 		b.WriteRune(rune(0x1F600 + rng.IntN(80)))
 	}
 	return b.String()

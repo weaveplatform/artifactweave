@@ -8,9 +8,10 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/storekit"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // runBuilds covers build-info runs (decision 0014).
@@ -25,8 +26,8 @@ func runBuilds(t *testing.T, newStore Factory) {
 }
 
 // sum returns checksums unique to n.
-func sum(n int) types.Checksums {
-	return types.Checksums{
+func sum(n int) kernel.Checksums {
+	return kernel.Checksums{
 		SHA1:   repeatHex(n, 40),
 		SHA256: repeatHex(n, 64),
 		MD5:    repeatHex(n, 32),
@@ -45,8 +46,8 @@ func repeatHex(n, length int) string {
 // fxBuild builds a run of name and number that started at minute start,
 // with two modules: one producing two artifacts and consuming a
 // dependency, one carrying properties only.
-func fxBuild(project, name, number string, start int) types.Build {
-	return types.Build{
+func fxBuild(project, name, number string, start int) model.Build {
+	return model.Build{
 		ProjectKey: project,
 		Name:       name,
 		Number:     number,
@@ -54,17 +55,17 @@ func fxBuild(project, name, number string, start int) types.Build {
 		URL:        "https://ci.example/" + name + "/" + number,
 		Created:    storekit.At(start + 1),
 		CreatedBy:  "ci",
-		Properties: types.Properties{
+		Properties: model.Properties{
 			"buildInfo.env.BRANCH": {"main"},
 			"vcs.revision":         {"abc", "abc", "123"},
 			"empty":                {},
 		},
-		Modules: []types.BuildModule{
+		Modules: []model.BuildModule{
 			{
 				ID:         "com.acme:app:" + number,
 				Type:       "maven",
-				Properties: types.Properties{"module.flag": {"on"}},
-				Artifacts: []types.BuildFile{
+				Properties: model.Properties{"module.flag": {"on"}},
+				Artifacts: []model.BuildFile{
 					{
 						Name:      "app.jar",
 						Type:      "jar",
@@ -78,7 +79,7 @@ func fxBuild(project, name, number string, start int) types.Build {
 						Checksums: sum(2),
 					},
 				},
-				Dependencies: []types.BuildFile{
+				Dependencies: []model.BuildFile{
 					{
 						ID:        "org.lib:core:2.0",
 						Name:      "core.jar",
@@ -88,25 +89,25 @@ func fxBuild(project, name, number string, start int) types.Build {
 					},
 				},
 			},
-			{ID: "docs", Type: "generic", Properties: types.Properties{"docs": {"yes"}}},
+			{ID: "docs", Type: "generic", Properties: model.Properties{"docs": {"yes"}}},
 		},
 		Document: []byte(`{"name":"` + name + `","number":"` + number + `"}`),
 	}
 }
 
 // sameBuild fails t when got differs from what the store keeps for v.
-func sameBuild(t *testing.T, what string, v, got types.Build) {
+func sameBuild(t *testing.T, what string, v, got model.Build) {
 	t.Helper()
-	if diff := cmp.Diff(store.NormaliseBuild(v), got, storekit.Opts); diff != "" {
+	if diff := cmp.Diff(port.NormaliseBuild(v), got, storekit.Opts); diff != "" {
 		t.Fatalf("%s (-want +got):\n%s", what, diff)
 	}
 }
 
-func testBuilds(t *testing.T, s store.Store) {
+func testBuilds(t *testing.T, s port.Store) {
 	ctx := context.Background()
 	bs := s.Builds()
 
-	first := storekit.Get[types.Build](t)(bs.Put(ctx, fxBuild("", "app", "1", 0)))
+	first := storekit.Get[model.Build](t)(bs.Put(ctx, fxBuild("", "app", "1", 0)))
 	if first.ID == 0 {
 		t.Fatal("Put assigned no ID")
 	}
@@ -123,166 +124,168 @@ func testBuilds(t *testing.T, s store.Store) {
 		t,
 		"Get by started",
 		want,
-		storekit.Get[types.Build](t)(bs.Get(ctx, "", "app", "1", storekit.At(0))),
+		storekit.Get[model.Build](t)(bs.Get(ctx, "", "app", "1", storekit.At(0))),
 	)
-	sameBuild(t, "ByID", want, storekit.Get[types.Build](t)(bs.ByID(ctx, first.ID)))
+	sameBuild(t, "ByID", want, storekit.Get[model.Build](t)(bs.ByID(ctx, first.ID)))
 
 	// A second publish of the same number is a second run.
-	again := storekit.Get[types.Build](t)(bs.Put(ctx, fxBuild("", "app", "1", 5)))
+	again := storekit.Get[model.Build](t)(bs.Put(ctx, fxBuild("", "app", "1", 5)))
 	if again.ID == first.ID {
 		t.Fatal("second run reused the first run's ID")
 	}
-	if got := storekit.Get[types.Build](
+	if got := storekit.Get[model.Build](
 		t,
 	)(
 		bs.Get(ctx, "", "app", "1", time.Time{}),
 	); got.ID != again.ID {
 		t.Fatalf("Get without started = run %d, want the latest, %d", got.ID, again.ID)
 	}
-	if got := storekit.Get[types.Build](t)(bs.Latest(ctx, "", "app")); got.ID != again.ID {
+	if got := storekit.Get[model.Build](t)(bs.Latest(ctx, "", "app")); got.ID != again.ID {
 		t.Fatalf("Latest = run %d, want %d", got.ID, again.ID)
 	}
 
 	// The same run in another project is a different run.
-	other := storekit.Get[types.Build](t)(bs.Put(ctx, fxBuild("proj", "app", "1", 0)))
-	if got := storekit.Get[types.Build](t)(bs.Latest(ctx, "proj", "app")); got.ID != other.ID {
+	other := storekit.Get[model.Build](t)(bs.Put(ctx, fxBuild("proj", "app", "1", 0)))
+	if got := storekit.Get[model.Build](t)(bs.Latest(ctx, "proj", "app")); got.ID != other.ID {
 		t.Fatalf("project Latest = run %d, want %d", got.ID, other.ID)
 	}
 
 	_, err := bs.Put(ctx, fxBuild("", "app", "1", 0))
-	storekit.WantErr(t, err, store.ErrConflict)
-	for name, b := range map[string]types.Build{
+	storekit.WantErr(t, err, kernel.ErrConflict)
+	for name, b := range map[string]model.Build{
 		"no name":    {Number: "1", Started: storekit.At(0)},
 		"no number":  {Name: "app", Started: storekit.At(0)},
 		"no started": {Name: "app", Number: "1"},
 	} {
 		_, err := bs.Put(ctx, b)
-		if !errors.Is(err, store.ErrInvalid) {
+		if !errors.Is(err, kernel.ErrInvalid) {
 			t.Fatalf("Put %s: err = %v, want ErrInvalid", name, err)
 		}
 	}
 	_, err = bs.Get(ctx, "", "app", "9", time.Time{})
-	storekit.WantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, kernel.ErrNotFound)
 	_, err = bs.Get(ctx, "", "app", "1", storekit.At(3))
-	storekit.WantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, kernel.ErrNotFound)
 	_, err = bs.ByID(ctx, 1<<40)
-	storekit.WantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, kernel.ErrNotFound)
 	_, err = bs.Latest(ctx, "", "missing")
-	storekit.WantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, kernel.ErrNotFound)
 
 	// Replace changes the content and keeps the identity.
 	repl := fxBuild("other", "renamed", "99", 30)
 	repl.ID = first.ID
 	repl.URL = "https://ci.example/append"
 	repl.Modified, repl.ModifiedBy = storekit.At(40), "appender"
-	repl.Properties = types.Properties{"appended": {"true"}}
-	repl.Modules = append(repl.Modules, types.BuildModule{ID: "other/7", Type: "build"})
+	repl.Properties = model.Properties{"appended": {"true"}}
+	repl.Modules = append(repl.Modules, model.BuildModule{ID: "other/7", Type: "build"})
 	repl.Document = []byte(`{"appended":true}`)
 	storekit.Must(t, bs.Replace(ctx, repl))
 	wantRepl := want
 	wantRepl.URL, wantRepl.Modified, wantRepl.ModifiedBy = repl.URL, repl.Modified, repl.ModifiedBy
 	wantRepl.Properties, wantRepl.Modules, wantRepl.Document = repl.Properties, repl.Modules, repl.Document
-	sameBuild(t, "Replace", wantRepl, storekit.Get[types.Build](t)(bs.ByID(ctx, first.ID)))
+	sameBuild(t, "Replace", wantRepl, storekit.Get[model.Build](t)(bs.ByID(ctx, first.ID)))
 	repl.ID = 1 << 40
-	storekit.WantErr(t, bs.Replace(ctx, repl), store.ErrNotFound)
+	storekit.WantErr(t, bs.Replace(ctx, repl), kernel.ErrNotFound)
 
 	// The stored identity keeps the document item path exact.
 	odd := fxBuild("", "team/app", "1 / 2", 0)
 	odd.Started = time.Date(2026, 10, 15, 9, 30, 0, 123_000_000, time.UTC)
-	stored := storekit.Get[types.Build](t)(bs.Put(ctx, odd))
-	repo, full := storekit.Get[types.Build](t)(bs.ByID(ctx, stored.ID)).DocumentItem()
+	stored := storekit.Get[model.Build](t)(bs.Put(ctx, odd))
+	repo, full := storekit.Get[model.Build](t)(bs.ByID(ctx, stored.ID)).DocumentItem()
 	if repo != "artifactory-build-info" || full != "team%2Fapp/1%20%2F%202-1792056600123.json" {
 		t.Fatalf("DocumentItem = %q, %q", repo, full)
 	}
 }
 
-func testBuildRuns(t *testing.T, s store.Store) {
+func testBuildRuns(t *testing.T, s port.Store) {
 	ctx := context.Background()
 	bs := s.Builds()
-	var all []types.BuildRun
-	for i, number := range []string{"1", "2", "2", "3", "10"} {
-		r := storekit.Get[types.Build](t)(bs.Put(ctx, fxBuild("", "app", number, i)))
+	numbers := []string{"1", "2", "2", "3", "10"}
+	all := make([]model.BuildRun, 0, len(numbers)+1)
+	for i, number := range numbers {
+		r := storekit.Get[model.Build](t)(bs.Put(ctx, fxBuild("", "app", number, i)))
 		all = append(all, r.Run())
 	}
 	// Two runs that started at the same instant order by ID.
-	tie := storekit.Get[types.Build](t)(bs.Put(ctx, fxBuild("", "app", "11", 4)))
+	tie := storekit.Get[model.Build](t)(bs.Put(ctx, fxBuild("", "app", "11", 4)))
 	all = append(all, tie.Run())
-	storekit.Get[types.Build](t)(bs.Put(ctx, fxBuild("", "zeta", "1", 9)))
-	storekit.Get[types.Build](t)(bs.Put(ctx, fxBuild("", "beta", "1", 2)))
-	storekit.Get[types.Build](t)(bs.Put(ctx, fxBuild("proj", "gamma", "1", 1)))
+	storekit.Get[model.Build](t)(bs.Put(ctx, fxBuild("", "zeta", "1", 9)))
+	storekit.Get[model.Build](t)(bs.Put(ctx, fxBuild("", "beta", "1", 2)))
+	storekit.Get[model.Build](t)(bs.Put(ctx, fxBuild("proj", "gamma", "1", 1)))
 
-	got := storekit.Pages(t, 2, func(p store.Page) ([]types.BuildRun, string, error) {
+	got := storekit.Pages(t, 2, func(p kernel.Page) ([]model.BuildRun, string, error) {
 		return bs.Runs(ctx, "", "app", p)
 	})
-	wantRuns := []types.BuildRun{all[5], all[4], all[3], all[2], all[1], all[0]}
+	wantRuns := []model.BuildRun{all[5], all[4], all[3], all[2], all[1], all[0]}
 	storekit.Same(t, "Runs newest first", wantRuns, got)
 	if runs, next, err := bs.Runs(
 		ctx,
 		"",
 		"missing",
-		store.Page{},
+		kernel.Page{},
 	); err != nil || len(runs) != 0 ||
 		next != "" {
 		t.Fatalf("Runs of an unknown name = %v, %q, %v", runs, next, err)
 	}
-	_, _, err := bs.Runs(ctx, "", "app", store.Page{After: store.Cursor("x")})
-	storekit.WantErr(t, err, store.ErrInvalidCursor)
+	_, _, err := bs.Runs(ctx, "", "app", kernel.Page{After: kernel.Cursor("x")})
+	storekit.WantErr(t, err, kernel.ErrInvalidCursor)
 
-	names := storekit.Pages(t, 1, func(p store.Page) ([]types.BuildName, string, error) {
+	names := storekit.Pages(t, 1, func(p kernel.Page) ([]model.BuildName, string, error) {
 		return bs.Names(ctx, "", p)
 	})
-	storekit.Same(t, "Names", []types.BuildName{
+	storekit.Same(t, "Names", []model.BuildName{
 		{Name: "app", LastStarted: storekit.At(4)},
 		{Name: "beta", LastStarted: storekit.At(2)},
 		{Name: "zeta", LastStarted: storekit.At(9)},
 	}, names)
-	project := storekit.Get[[]types.BuildName](t)(func() ([]types.BuildName, error) {
-		v, _, err := bs.Names(ctx, "proj", store.Page{})
-		return v, err
+	project := storekit.Get[[]model.BuildName](t)(func() ([]model.BuildName, error) {
+		v, _, err := bs.Names(ctx, "proj", kernel.Page{})
+		return v, err //nolint:wrapcheck // storekit.Get reports the store's own error
 	}())
 	storekit.Same(
 		t,
 		"project Names",
-		[]types.BuildName{{ProjectKey: "proj", Name: "gamma", LastStarted: storekit.At(1)}},
+		[]model.BuildName{{ProjectKey: "proj", Name: "gamma", LastStarted: storekit.At(1)}},
 		project,
 	)
-	_, _, err = bs.Names(ctx, "", store.Page{After: "%%%"})
-	storekit.WantErr(t, err, store.ErrInvalidCursor)
+	_, _, err = bs.Names(ctx, "", kernel.Page{After: "%%%"})
+	storekit.WantErr(t, err, kernel.ErrInvalidCursor)
 }
 
-func testBuildDeletes(t *testing.T, s store.Store) {
+func testBuildDeletes(t *testing.T, s port.Store) {
 	ctx := context.Background()
 	bs := s.Builds()
-	var runs []types.Build
-	for i, number := range []string{"1", "1", "1", "2"} {
+	numbers := []string{"1", "1", "1", "2"}
+	runs := make([]model.Build, 0, len(numbers))
+	for i, number := range numbers {
 		runs = append(
 			runs,
-			storekit.Get[types.Build](t)(bs.Put(ctx, fxBuild("", "app", number, i))),
+			storekit.Get[model.Build](t)(bs.Put(ctx, fxBuild("", "app", number, i))),
 		)
 	}
-	storekit.Get[types.BuildPromotion](
+	storekit.Get[model.BuildPromotion](
 		t,
 	)(
-		bs.AddPromotion(ctx, types.BuildPromotion{BuildID: runs[0].ID, Status: "staged"}),
+		bs.AddPromotion(ctx, model.BuildPromotion{BuildID: runs[0].ID, Status: "staged"}),
 	)
-	storekit.Must(t, bs.PutRetention(ctx, types.BuildRetention{Name: "app", Count: 5}))
+	storekit.Must(t, bs.PutRetention(ctx, model.BuildRetention{Name: "app", Count: 5}))
 
 	// One run per occurrence, the earliest first; an occurrence with no run
 	// left is skipped.
-	deleted := storekit.Get[[]types.BuildRun](
+	deleted := storekit.Get[[]model.BuildRun](
 		t,
 	)(
 		bs.DeleteNumbers(ctx, "", "app", []string{"1", "1", "3"}),
 	)
-	storekit.Same(t, "DeleteNumbers", []types.BuildRun{runs[0].Run(), runs[1].Run()}, deleted)
+	storekit.Same(t, "DeleteNumbers", []model.BuildRun{runs[0].Run(), runs[1].Run()}, deleted)
 	_, err := bs.Promotions(ctx, runs[0].ID)
-	storekit.WantErr(t, err, store.ErrNotFound)
-	left := storekit.Get[[]types.BuildRun](t)(func() ([]types.BuildRun, error) {
-		v, _, err := bs.Runs(ctx, "", "app", store.Page{})
-		return v, err
+	storekit.WantErr(t, err, kernel.ErrNotFound)
+	left := storekit.Get[[]model.BuildRun](t)(func() ([]model.BuildRun, error) {
+		v, _, err := bs.Runs(ctx, "", "app", kernel.Page{})
+		return v, err //nolint:wrapcheck // storekit.Get reports the store's own error
 	}())
-	storekit.Same(t, "after DeleteNumbers", []types.BuildRun{runs[3].Run(), runs[2].Run()}, left)
-	if got := storekit.Get[[]types.BuildRun](
+	storekit.Same(t, "after DeleteNumbers", []model.BuildRun{runs[3].Run(), runs[2].Run()}, left)
+	if got := storekit.Get[[]model.BuildRun](
 		t,
 	)(
 		bs.DeleteNumbers(ctx, "", "app", nil),
@@ -292,58 +295,58 @@ func testBuildDeletes(t *testing.T, s store.Store) {
 		t.Fatalf("DeleteNumbers(nil) deleted %v", got)
 	}
 
-	all := storekit.Get[[]types.BuildRun](t)(bs.DeleteAll(ctx, "", "app"))
-	storekit.Same(t, "DeleteAll oldest first", []types.BuildRun{runs[2].Run(), runs[3].Run()}, all)
+	all := storekit.Get[[]model.BuildRun](t)(bs.DeleteAll(ctx, "", "app"))
+	storekit.Same(t, "DeleteAll oldest first", []model.BuildRun{runs[2].Run(), runs[3].Run()}, all)
 	_, err = bs.Latest(ctx, "", "app")
-	storekit.WantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, kernel.ErrNotFound)
 	_, err = bs.Retention(ctx, "", "app")
-	storekit.WantErr(t, err, store.ErrNotFound)
-	if got := storekit.Get[[]types.BuildRun](t)(bs.DeleteAll(ctx, "", "app")); len(got) != 0 {
+	storekit.WantErr(t, err, kernel.ErrNotFound)
+	if got := storekit.Get[[]model.BuildRun](t)(bs.DeleteAll(ctx, "", "app")); len(got) != 0 {
 		t.Fatalf("second DeleteAll deleted %v", got)
 	}
 }
 
-func testBuildRename(t *testing.T, s store.Store) {
+func testBuildRename(t *testing.T, s port.Store) {
 	ctx := context.Background()
 	bs := s.Builds()
-	a1 := storekit.Get[types.Build](t)(bs.Put(ctx, fxBuild("", "a", "1", 0)))
-	storekit.Get[types.Build](t)(bs.Put(ctx, fxBuild("", "a", "2", 1)))
-	storekit.Get[types.Build](t)(bs.Put(ctx, fxBuild("", "c", "1", 2)))
-	storekit.Must(t, bs.PutRetention(ctx, types.BuildRetention{Name: "a", Count: 3}))
-	storekit.Must(t, bs.PutRetention(ctx, types.BuildRetention{Name: "b", Count: 9}))
+	a1 := storekit.Get[model.Build](t)(bs.Put(ctx, fxBuild("", "a", "1", 0)))
+	storekit.Get[model.Build](t)(bs.Put(ctx, fxBuild("", "a", "2", 1)))
+	storekit.Get[model.Build](t)(bs.Put(ctx, fxBuild("", "c", "1", 2)))
+	storekit.Must(t, bs.PutRetention(ctx, model.BuildRetention{Name: "a", Count: 3}))
+	storekit.Must(t, bs.PutRetention(ctx, model.BuildRetention{Name: "b", Count: 9}))
 
 	storekit.Must(t, bs.Rename(ctx, "", "a", "b"))
-	got := storekit.Get[types.Build](t)(bs.ByID(ctx, a1.ID))
+	got := storekit.Get[model.Build](t)(bs.ByID(ctx, a1.ID))
 	if got.Name != "b" || got.Number != "1" {
 		t.Fatalf("renamed run = %s/%s", got.Name, got.Number)
 	}
 	if _, err := bs.Latest(ctx, "", "a"); err == nil {
 		t.Fatal("old name still has runs")
 	}
-	storekit.Same(t, "moved retention", types.BuildRetention{Name: "b", Count: 3},
-		storekit.Get[types.BuildRetention](t)(bs.Retention(ctx, "", "b")))
+	storekit.Same(t, "moved retention", model.BuildRetention{Name: "b", Count: 3},
+		storekit.Get[model.BuildRetention](t)(bs.Retention(ctx, "", "b")))
 	_, err := bs.Retention(ctx, "", "a")
-	storekit.WantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, kernel.ErrNotFound)
 
 	// A retention left on a name without runs gives way to the renamed
 	// name's, here none.
-	storekit.Must(t, bs.PutRetention(ctx, types.BuildRetention{Name: "orphan", Count: 1}))
+	storekit.Must(t, bs.PutRetention(ctx, model.BuildRetention{Name: "orphan", Count: 1}))
 	storekit.Must(t, bs.Rename(ctx, "", "c", "orphan"))
 	_, err = bs.Retention(ctx, "", "orphan")
-	storekit.WantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, kernel.ErrNotFound)
 
-	storekit.WantErr(t, bs.Rename(ctx, "", "missing", "x"), store.ErrNotFound)
-	storekit.Get[types.Build](t)(bs.Put(ctx, fxBuild("", "c", "1", 2)))
-	storekit.WantErr(t, bs.Rename(ctx, "", "b", "c"), store.ErrConflict)
+	storekit.WantErr(t, bs.Rename(ctx, "", "missing", "x"), kernel.ErrNotFound)
+	storekit.Get[model.Build](t)(bs.Put(ctx, fxBuild("", "c", "1", 2)))
+	storekit.WantErr(t, bs.Rename(ctx, "", "b", "c"), kernel.ErrConflict)
 	storekit.Must(t, bs.Rename(ctx, "", "b", "b"))
-	storekit.WantErr(t, bs.Rename(ctx, "proj", "b", "z"), store.ErrNotFound)
+	storekit.WantErr(t, bs.Rename(ctx, "proj", "b", "z"), kernel.ErrNotFound)
 }
 
-func testBuildPromotions(t *testing.T, s store.Store) {
+func testBuildPromotions(t *testing.T, s port.Store) {
 	ctx := context.Background()
 	bs := s.Builds()
-	run := storekit.Get[types.Build](t)(bs.Put(ctx, fxBuild("", "app", "1", 0)))
-	late := types.BuildPromotion{
+	run := storekit.Get[model.Build](t)(bs.Put(ctx, fxBuild("", "app", "1", 0)))
+	late := model.BuildPromotion{
 		BuildID:    run.ID,
 		Created:    storekit.At(5),
 		CreatedBy:  "admin",
@@ -353,16 +356,17 @@ func testBuildPromotions(t *testing.T, s store.Store) {
 		SourceRepo: "libs-staging",
 		Repo:       "libs-release",
 	}
-	early := types.BuildPromotion{
+	early := model.BuildPromotion{
 		BuildID: run.ID,
 		Created: storekit.At(2),
 		Status:  "staged",
 		Repo:    "libs-staging",
 	}
-	tie := types.BuildPromotion{BuildID: run.ID, Created: storekit.At(2), Status: "tested"}
-	var added []types.BuildPromotion
-	for _, p := range []types.BuildPromotion{late, early, tie} {
-		got := storekit.Get[types.BuildPromotion](t)(bs.AddPromotion(ctx, p))
+	tie := model.BuildPromotion{BuildID: run.ID, Created: storekit.At(2), Status: "tested"}
+	promotions := []model.BuildPromotion{late, early, tie}
+	added := make([]model.BuildPromotion, 0, len(promotions))
+	for _, p := range promotions {
+		got := storekit.Get[model.BuildPromotion](t)(bs.AddPromotion(ctx, p))
 		if got.ID == 0 {
 			t.Fatal("AddPromotion assigned no ID")
 		}
@@ -370,54 +374,54 @@ func testBuildPromotions(t *testing.T, s store.Store) {
 		storekit.Same(t, "AddPromotion", p, got)
 		added = append(added, p)
 	}
-	storekit.Same(t, "Promotions", []types.BuildPromotion{added[1], added[2], added[0]},
-		storekit.Get[[]types.BuildPromotion](t)(bs.Promotions(ctx, run.ID)))
+	storekit.Same(t, "Promotions", []model.BuildPromotion{added[1], added[2], added[0]},
+		storekit.Get[[]model.BuildPromotion](t)(bs.Promotions(ctx, run.ID)))
 
-	_, err := bs.AddPromotion(ctx, types.BuildPromotion{BuildID: 1 << 40})
-	storekit.WantErr(t, err, store.ErrNotFound)
+	_, err := bs.AddPromotion(ctx, model.BuildPromotion{BuildID: 1 << 40})
+	storekit.WantErr(t, err, kernel.ErrNotFound)
 	_, err = bs.Promotions(ctx, 1<<40)
-	storekit.WantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, kernel.ErrNotFound)
 }
 
-func testBuildFiles(t *testing.T, s store.Store) {
+func testBuildFiles(t *testing.T, s port.Store) {
 	ctx := context.Background()
 	bs := s.Builds()
-	one := storekit.Get[types.Build](t)(bs.Put(ctx, fxBuild("", "app", "1", 0)))
+	one := storekit.Get[model.Build](t)(bs.Put(ctx, fxBuild("", "app", "1", 0)))
 	// Another project's run produces the same jar in its second module.
 	two := fxBuild("proj", "lib", "7", 3)
-	two.Modules[1].Artifacts = []types.BuildFile{{Name: "copy.jar", Type: "jar", Checksums: sum(1)}}
-	two = storekit.Get[types.Build](t)(bs.Put(ctx, two))
+	two.Modules[1].Artifacts = []model.BuildFile{{Name: "copy.jar", Type: "jar", Checksums: sum(1)}}
+	two = storekit.Get[model.Build](t)(bs.Put(ctx, two))
 
 	jar := one.Modules[0].Artifacts[0]
-	got := storekit.Get[[]types.BuildFileRef](
+	got := storekit.Get[[]model.BuildFileRef](
 		t,
 	)(
-		bs.FindArtifacts(ctx, types.Checksums{SHA1: sum(1).SHA1}),
+		bs.FindArtifacts(ctx, kernel.Checksums{SHA1: sum(1).SHA1}),
 	)
-	storekit.Same(t, "FindArtifacts by sha1", []types.BuildFileRef{
+	storekit.Same(t, "FindArtifacts by sha1", []model.BuildFileRef{
 		{Run: one.Run(), Module: one.Modules[0].ID, File: jar},
 		{Run: two.Run(), Module: two.Modules[0].ID, File: two.Modules[0].Artifacts[0]},
 		{Run: two.Run(), Module: "docs", File: two.Modules[1].Artifacts[0]},
 	}, got)
 	storekit.Same(t, "FindArtifacts by every checksum", got[:2],
-		storekit.Get[[]types.BuildFileRef](t)(bs.FindArtifacts(ctx, sum(1)))[:2])
-	if got := storekit.Get[[]types.BuildFileRef](t)(bs.FindArtifacts(ctx, types.Checksums{
+		storekit.Get[[]model.BuildFileRef](t)(bs.FindArtifacts(ctx, sum(1)))[:2])
+	if got := storekit.Get[[]model.BuildFileRef](t)(bs.FindArtifacts(ctx, kernel.Checksums{
 		SHA1: sum(1).SHA1, MD5: sum(9).MD5,
 	})); len(got) != 0 {
 		t.Fatalf("a mismatched md5 still matched %v", got)
 	}
 
 	dep := one.Modules[0].Dependencies[0]
-	deps := storekit.Get[[]types.BuildFileRef](
+	deps := storekit.Get[[]model.BuildFileRef](
 		t,
 	)(
-		bs.FindDependencies(ctx, types.Checksums{SHA256: sum(3).SHA256}),
+		bs.FindDependencies(ctx, kernel.Checksums{SHA256: sum(3).SHA256}),
 	)
-	storekit.Same(t, "FindDependencies by sha256", []types.BuildFileRef{
+	storekit.Same(t, "FindDependencies by sha256", []model.BuildFileRef{
 		{Run: one.Run(), Module: one.Modules[0].ID, File: dep},
 		{Run: two.Run(), Module: two.Modules[0].ID, File: two.Modules[0].Dependencies[0]},
 	}, deps)
-	if got := storekit.Get[[]types.BuildFileRef](
+	if got := storekit.Get[[]model.BuildFileRef](
 		t,
 	)(
 		bs.FindDependencies(ctx, sum(1)),
@@ -427,16 +431,16 @@ func testBuildFiles(t *testing.T, s store.Store) {
 		t.Fatalf("an artifact checksum matched dependencies %v", got)
 	}
 
-	_, err := bs.FindArtifacts(ctx, types.Checksums{})
-	storekit.WantErr(t, err, store.ErrInvalid)
-	_, err = bs.FindDependencies(ctx, types.Checksums{})
-	storekit.WantErr(t, err, store.ErrInvalid)
+	_, err := bs.FindArtifacts(ctx, kernel.Checksums{})
+	storekit.WantErr(t, err, kernel.ErrInvalid)
+	_, err = bs.FindDependencies(ctx, kernel.Checksums{})
+	storekit.WantErr(t, err, kernel.ErrInvalid)
 }
 
-func testBuildRetentionPolicy(t *testing.T, s store.Store) {
+func testBuildRetentionPolicy(t *testing.T, s port.Store) {
 	ctx := context.Background()
 	bs := s.Builds()
-	r := types.BuildRetention{
+	r := model.BuildRetention{
 		ProjectKey: "proj", Name: "app", Count: 10, MinimumBuildDate: storekit.At(-60),
 		DeleteArtifacts: true, KeepNumbers: []string{"1.0", "2.0"},
 	}
@@ -445,7 +449,7 @@ func testBuildRetentionPolicy(t *testing.T, s store.Store) {
 		t,
 		"Retention",
 		r,
-		storekit.Get[types.BuildRetention](t)(bs.Retention(ctx, "proj", "app")),
+		storekit.Get[model.BuildRetention](t)(bs.Retention(ctx, "proj", "app")),
 	)
 	r.Count, r.DeleteArtifacts, r.KeepNumbers, r.MinimumBuildDate = 2, false, nil, time.Time{}
 	storekit.Must(t, bs.PutRetention(ctx, r))
@@ -453,8 +457,8 @@ func testBuildRetentionPolicy(t *testing.T, s store.Store) {
 		t,
 		"replaced Retention",
 		r,
-		storekit.Get[types.BuildRetention](t)(bs.Retention(ctx, "proj", "app")),
+		storekit.Get[model.BuildRetention](t)(bs.Retention(ctx, "proj", "app")),
 	)
 	_, err := bs.Retention(ctx, "", "app")
-	storekit.WantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, kernel.ErrNotFound)
 }

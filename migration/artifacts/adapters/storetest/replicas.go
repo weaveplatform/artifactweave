@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/mirror"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/storekit"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // runReplicas covers the replica index of both tiers (decision 0028).
@@ -20,32 +21,32 @@ func runReplicas(t *testing.T, newStore Factory) {
 	t.Run("ReplicaTiersSeparate", func(t *testing.T) {
 		s := newStore(t)
 		ctx := context.Background()
-		storekit.Must(t, s.Replicas().Put(ctx, replica(1, "aws", types.ReplicaPresent, 1)))
+		storekit.Must(t, s.Replicas().Put(ctx, replica(1, "aws", mirror.ReplicaPresent, 1)))
 		_, err := s.ColdReplicas().Get(ctx, replica(1, "aws", "", 0).SHA256, "aws")
-		storekit.WantErr(t, err, store.ErrNotFound)
+		storekit.WantErr(t, err, kernel.ErrNotFound)
 	})
 }
 
 // replica builds the record of fixture blob i on member, updated at minute m.
-func replica(i int, member string, state types.ReplicaState, m int) types.BlobReplica {
-	return types.BlobReplica{
+func replica(i int, member string, state mirror.ReplicaState, m int) mirror.BlobReplica {
+	return mirror.BlobReplica{
 		SHA256: fmt.Sprintf("%064x", i), Member: member, State: state,
 		Size: int64(10 * i), Updated: storekit.At(m),
 	}
 }
 
-func testReplicas(t *testing.T, r store.ReplicaIndex) {
+func testReplicas(t *testing.T, r port.ReplicaIndex) {
 	ctx := context.Background()
-	storekit.WantErr(t, r.Put(ctx, types.BlobReplica{Member: "aws"}), store.ErrInvalid)
-	storekit.WantErr(t, r.Put(ctx, types.BlobReplica{SHA256: "x"}), store.ErrInvalid)
+	storekit.WantErr(t, r.Put(ctx, mirror.BlobReplica{Member: "aws"}), kernel.ErrInvalid)
+	storekit.WantErr(t, r.Put(ctx, mirror.BlobReplica{SHA256: "x"}), kernel.ErrInvalid)
 
-	fixtures := []types.BlobReplica{
-		replica(1, "aws", types.ReplicaPresent, 5),
-		replica(1, "gcp", types.ReplicaPending, 3),
-		replica(1, "azure", types.ReplicaPending, 4),
-		replica(2, "aws", types.ReplicaPresent, 1),
-		replica(2, "gcp", types.ReplicaFailed, 2),
-		replica(3, "gcp", types.ReplicaPending, 0),
+	fixtures := []mirror.BlobReplica{
+		replica(1, "aws", mirror.ReplicaPresent, 5),
+		replica(1, "gcp", mirror.ReplicaPending, 3),
+		replica(1, "azure", mirror.ReplicaPending, 4),
+		replica(2, "aws", mirror.ReplicaPresent, 1),
+		replica(2, "gcp", mirror.ReplicaFailed, 2),
+		replica(3, "gcp", mirror.ReplicaPending, 0),
 	}
 	fixtures[5].Updated = fixtures[5].Updated.AddDate(-1, 0, 0) // oldest
 	failed := fixtures[4]
@@ -58,22 +59,22 @@ func testReplicas(t *testing.T, r store.ReplicaIndex) {
 		t,
 		"Get",
 		failed,
-		storekit.Get[types.BlobReplica](t)(r.Get(ctx, failed.SHA256, "gcp")),
+		storekit.Get[mirror.BlobReplica](t)(r.Get(ctx, failed.SHA256, "gcp")),
 	)
 	_, err := r.Get(ctx, failed.SHA256, "nowhere")
-	storekit.WantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, kernel.ErrNotFound)
 
 	// Put replaces; an unset time comes back unset and sorts first.
 	repaired := fixtures[1]
-	repaired.State, repaired.Updated = types.ReplicaPresent, storekit.At(9)
+	repaired.State, repaired.Updated = mirror.ReplicaPresent, storekit.At(9)
 	storekit.Must(t, r.Put(ctx, repaired))
-	noTime := types.BlobReplica{
+	noTime := mirror.BlobReplica{
 		SHA256: fmt.Sprintf("%064x", 4),
 		Member: "aws",
-		State:  types.ReplicaPending,
+		State:  mirror.ReplicaPending,
 	}
 	storekit.Must(t, r.Put(ctx, noTime))
-	if got := storekit.Get[types.BlobReplica](
+	if got := storekit.Get[mirror.BlobReplica](
 		t,
 	)(
 		r.Get(ctx, noTime.SHA256, "aws"),
@@ -81,57 +82,61 @@ func testReplicas(t *testing.T, r store.ReplicaIndex) {
 		t.Fatalf("unset Updated came back as %v", got.Updated)
 	}
 
-	forBlob := storekit.Get[[]types.BlobReplica](t)(r.ForBlob(ctx, fixtures[0].SHA256))
-	var members []string
+	forBlob := storekit.Get[[]mirror.BlobReplica](t)(r.ForBlob(ctx, fixtures[0].SHA256))
+	members := make([]string, 0, len(forBlob))
 	for _, v := range forBlob {
 		members = append(members, v.Member)
 	}
 	storekit.Same(t, "ForBlob members", []string{"aws", "azure", "gcp"}, members)
 
 	// The repair queue: pending, oldest first, across pages.
-	pending := storekit.Pages(t, 1, func(p store.Page) ([]types.BlobReplica, string, error) {
+	pending := storekit.Pages(t, 1, func(p kernel.Page) ([]mirror.BlobReplica, string, error) {
 		return r.List(
 			ctx,
-			store.ReplicaFilter{States: []types.ReplicaState{types.ReplicaPending}},
+			mirror.ReplicaFilter{States: []mirror.ReplicaState{mirror.ReplicaPending}},
 			p,
 		)
 	})
-	var order []string
+	order := make([]string, 0, len(pending))
 	for _, v := range pending {
 		order = append(order, fmt.Sprintf("%s@%s", v.SHA256[63:], v.Member))
 	}
 	storekit.Same(t, "pending queue", []string{"4@aws", "3@gcp", "1@azure"}, order)
 
-	gcp := storekit.Get[[]types.BlobReplica](
+	gcp := storekit.Get[[]mirror.BlobReplica](
 		t,
 	)(
-		firstPage(r.List(ctx, store.ReplicaFilter{Member: "gcp"}, store.Page{})),
+		firstPage(r.List(ctx, mirror.ReplicaFilter{Member: "gcp"}, kernel.Page{})),
 	)
 	if len(gcp) != 3 {
 		t.Fatalf("member filter: %d records", len(gcp))
 	}
-	all := storekit.Pages(t, 2, func(p store.Page) ([]types.BlobReplica, string, error) {
-		return r.List(ctx, store.ReplicaFilter{}, p)
+	all := storekit.Pages(t, 2, func(p kernel.Page) ([]mirror.BlobReplica, string, error) {
+		return r.List(ctx, mirror.ReplicaFilter{}, p)
 	})
 	if len(all) != 7 {
 		t.Fatalf("unfiltered list: %d records", len(all))
 	}
-	_, _, err = r.List(ctx, store.ReplicaFilter{}, store.Page{After: store.Cursor("x", "y", "z")})
-	storekit.WantErr(t, err, store.ErrInvalidCursor)
+	_, _, err = r.List(
+		ctx,
+		mirror.ReplicaFilter{},
+		kernel.Page{After: kernel.Cursor("x", "y", "z")},
+	)
+	storekit.WantErr(t, err, kernel.ErrInvalidCursor)
 
-	counts := storekit.Get[[]store.ReplicaCount](t)(r.Counts(ctx))
-	storekit.Same(t, "Counts", []store.ReplicaCount{
-		{Member: "aws", State: types.ReplicaPending, Count: 1, Bytes: 0},
-		{Member: "aws", State: types.ReplicaPresent, Count: 2, Bytes: 30},
-		{Member: "azure", State: types.ReplicaPending, Count: 1, Bytes: 10},
-		{Member: "gcp", State: types.ReplicaFailed, Count: 1, Bytes: 20},
-		{Member: "gcp", State: types.ReplicaPending, Count: 1, Bytes: 30},
-		{Member: "gcp", State: types.ReplicaPresent, Count: 1, Bytes: 10},
+	counts := storekit.Get[[]mirror.ReplicaCount](t)(r.Counts(ctx))
+	storekit.Same(t, "Counts", []mirror.ReplicaCount{
+		{Member: "aws", State: mirror.ReplicaPending, Count: 1, Bytes: 0},
+		{Member: "aws", State: mirror.ReplicaPresent, Count: 2, Bytes: 30},
+		{Member: "azure", State: mirror.ReplicaPending, Count: 1, Bytes: 10},
+		{Member: "gcp", State: mirror.ReplicaFailed, Count: 1, Bytes: 20},
+		{Member: "gcp", State: mirror.ReplicaPending, Count: 1, Bytes: 30},
+		{Member: "gcp", State: mirror.ReplicaPresent, Count: 1, Bytes: 10},
 	}, counts)
 
 	// Blob 1 has two present copies (aws, gcp), blob 2 one, 3 none and 4
 	// none. A deleting record takes blob 5 out of the count.
-	storekit.Must(t, r.Put(ctx, replica(5, "aws", types.ReplicaDeleting, 6)))
+	storekit.Must(t, r.Put(ctx, replica(5, "aws", mirror.ReplicaDeleting, 6)))
 	for redundancy, want := range map[int]int64{1: 2, 2: 3, 3: 4} {
 		if n := storekit.Get[int64](t)(r.UnderReplicated(ctx, redundancy)); n != want {
 			t.Fatalf("UnderReplicated(%d) = %d, want %d", redundancy, n, want)
@@ -139,8 +144,8 @@ func testReplicas(t *testing.T, r store.ReplicaIndex) {
 	}
 	// Blob 2's only present copy is on aws. Blob 1 has two, and blob 6's
 	// deleting record keeps it out though gcp holds its only copy.
-	storekit.Must(t, r.Put(ctx, replica(6, "gcp", types.ReplicaPresent, 7)))
-	storekit.Must(t, r.Put(ctx, replica(6, "azure", types.ReplicaDeleting, 7)))
+	storekit.Must(t, r.Put(ctx, replica(6, "gcp", mirror.ReplicaPresent, 7)))
+	storekit.Must(t, r.Put(ctx, replica(6, "azure", mirror.ReplicaDeleting, 7)))
 	storekit.Same(
 		t,
 		"SoleCopies",
@@ -153,12 +158,12 @@ func testReplicas(t *testing.T, r store.ReplicaIndex) {
 	storekit.Must(t, r.Delete(ctx, replica(5, "aws", "", 0).SHA256, "aws"))
 
 	storekit.Must(t, r.Delete(ctx, failed.SHA256, "gcp"))
-	storekit.WantErr(t, r.Delete(ctx, failed.SHA256, "gcp"), store.ErrNotFound)
+	storekit.WantErr(t, r.Delete(ctx, failed.SHA256, "gcp"), kernel.ErrNotFound)
 	n, err := r.DeleteBlob(ctx, fixtures[0].SHA256)
 	if err != nil || n != 3 {
 		t.Fatalf("DeleteBlob = %d, %v", n, err)
 	}
-	if left := storekit.Get[[]types.BlobReplica](
+	if left := storekit.Get[[]mirror.BlobReplica](
 		t,
 	)(
 		r.ForBlob(ctx, fixtures[0].SHA256),

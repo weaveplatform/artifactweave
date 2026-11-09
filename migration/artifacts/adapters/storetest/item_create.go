@@ -7,51 +7,52 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/storekit"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func testItemCreate(t *testing.T, st store.Store) {
+func testItemCreate(t *testing.T, st port.Store) {
 	ctx := t.Context()
 	items := st.Items()
 	original := fileItem("r", "archive/package.tar.gz", 1)
-	created := storekit.Get[types.Item](t)(items.Create(ctx, original))
+	created := storekit.Get[model.Item](t)(items.Create(ctx, original))
 	storekit.Same(t, "created item", stored(original, created.ID), created)
-	props := types.Properties{"owner": {"original"}}
+	props := model.Properties{"owner": {"original"}}
 	storekit.Must(t, items.SetProperties(ctx, created.ID, props, time.Now()))
-	for _, replacement := range []types.Item{fileItem("r", original.FullPath(), 2), folderItem("r", original.FullPath())} {
+	for _, replacement := range []model.Item{fileItem("r", original.FullPath(), 2), folderItem("r", original.FullPath())} {
 		_, err := items.Create(ctx, replacement)
-		storekit.WantErr(t, err, store.ErrConflict)
+		storekit.WantErr(t, err, kernel.ErrConflict)
 	}
 	storekit.Same(
 		t,
 		"original bytes",
 		original.Actual,
-		storekit.Get[types.Item](t)(items.Get(ctx, "r", false, original.FullPath())).Actual,
+		storekit.Get[model.Item](t)(items.Get(ctx, "r", false, original.FullPath())).Actual,
 	)
 	storekit.Same(
 		t,
 		"original properties",
 		props,
-		storekit.Get[types.Properties](t)(items.Properties(ctx, created.ID)),
+		storekit.Get[model.Properties](t)(items.Properties(ctx, created.ID)),
 	)
-	_, err := items.Create(ctx, types.Item{Name: "invalid"})
-	storekit.WantErr(t, err, store.ErrInvalid)
+	_, err := items.Create(ctx, model.Item{Name: "invalid"})
+	storekit.WantErr(t, err, kernel.ErrInvalid)
 	cached := original
 	cached.Cached = true
-	storekit.Get[types.Item](t)(items.Create(ctx, cached))
-	rollback := errors.New("rollback")
+	storekit.Get[model.Item](t)(items.Create(ctx, cached))
+	rollback := errors.New("rollback") //nolint:err113 // the test matches it by identity
 	err = st.Tx(ctx, func(ctx context.Context) error {
 		_, err := items.Create(ctx, fileItem("r", "rolled-back", 3))
 		if err != nil {
-			return err
+			return err //nolint:wrapcheck // the transaction returns the store's own error
 		}
 		return rollback
 	})
 	storekit.WantErr(t, err, rollback)
 	_, err = items.Get(ctx, "r", false, "rolled-back")
-	storekit.WantErr(t, err, store.ErrNotFound)
+	storekit.WantErr(t, err, kernel.ErrNotFound)
 
 	// Two writers racing for a fresh path cannot replace each other's bytes.
 	var wg sync.WaitGroup
@@ -69,7 +70,7 @@ func testItemCreate(t *testing.T, st store.Store) {
 		if err == nil {
 			createdCount++
 		} else {
-			storekit.WantErr(t, err, store.ErrConflict)
+			storekit.WantErr(t, err, kernel.ErrConflict)
 		}
 	}
 	if createdCount != 1 {
