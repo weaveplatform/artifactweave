@@ -383,15 +383,15 @@ func apiReviewPersistence(path string) (string, string, []string) {
 	if strings.HasPrefix(path, apiRestrictionPath) || path == apiRestrictionAuditPath {
 		return "restriction", "audit: default100/max1000, sequence DESC strict id<cursor; filter+administrator-bound cursor; other operations singular", []string{
 			"internal/server/api_restrictions.go",
-			"internal/sqlstore/sqlcommon/api_restriction.go",
-			"pkg/store/storetest/api_restriction.go",
+			"migration/access/adapters/sql/api_restriction.go",
+			"migration/access/adapters/storetest/api_restriction.go",
 		}
 	}
 	if path == "/access/api/v2/users" || path == "/access/api/v2/groups" {
 		return "identity-pages", "GET: default/max1000, indexed name keyset both directions, SQL filters and LIMIT+1; other methods singular mutations; existing name cursor retained", []string{
 			"internal/server/access_identity.go",
-			"internal/sqlstore/sqlcommon/identity_query.go",
-			"pkg/store/storetest/identity_query.go",
+			"migration/access/adapters/sql/identity_query.go",
+			"migration/access/adapters/storetest/identity_query.go",
 		}
 	}
 	if strings.HasPrefix(path, "/access/") ||
@@ -401,8 +401,8 @@ func apiReviewPersistence(path string) (string, string, []string) {
 			"internal/server/tokens.go",
 			"internal/service/identity/identity.go",
 			"internal/auth/token/token.go",
-			"internal/sqlstore/sqlcommon/identity.go",
-			"internal/sqlstore/sqlcommon/operations.go",
+			"migration/access/adapters/sql/identity.go",
+			"migration/access/adapters/sql/projects.go",
 		}
 	}
 	if strings.HasPrefix(path, "/artifactory/api/build") {
@@ -447,6 +447,6 @@ func apiReviewPersistence(path string) (string, string, []string) {
 		"internal/server/items.go",
 		"internal/server/storage.go",
 		"internal/sqlstore/sqlcommon/content_items.go",
-		"internal/sqlstore/sqlcommon/operations.go",
+		"migration/access/adapters/sql/projects.go",
 	}
 }
