@@ -1,4 +1,4 @@
-package types
+package model
 
 // TrashcanSettings control the trash can.
 type TrashcanSettings struct {

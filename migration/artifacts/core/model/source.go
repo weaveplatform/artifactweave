@@ -1,4 +1,4 @@
-package types
+package model
 
 // RepositoryIncarnation identifies one lifetime of a repository. Deleting and
 // recreating the same key must allocate a different identity.

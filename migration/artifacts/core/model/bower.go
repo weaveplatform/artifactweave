@@ -1,4 +1,4 @@
-package types
+package model
 
 // BowerRegistration binds a registry name to a Git locator. It contains no
 // credentials and belongs to one repository lifetime, independently of cache.

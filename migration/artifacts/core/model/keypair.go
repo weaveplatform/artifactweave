@@ -1,4 +1,4 @@
-package types
+package model
 
 // KeypairRole is how a repository uses a key pair: the primary key signs
 // metadata, the secondary is published for clients rotating to it.
