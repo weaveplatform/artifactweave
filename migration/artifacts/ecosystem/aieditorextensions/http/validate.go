@@ -1,4 +1,4 @@
-package aieditorextensions
+package aieditorextensionshttp
 
 import (
 	"archive/zip"

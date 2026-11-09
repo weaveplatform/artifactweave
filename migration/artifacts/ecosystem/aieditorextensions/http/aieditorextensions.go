@@ -1,7 +1,7 @@
-// Package aieditorextensions serves the VS Code gallery API for read-only
+// Package aieditorextensionshttp serves the VS Code gallery API for read-only
 // remote extension repositories. The IDE has no header-authentication channel
 // for this gallery; repository policy still controls anonymous read access.
-package aieditorextensions
+package aieditorextensionshttp
 
 import (
 	"bytes"
@@ -16,10 +16,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	format "github.com/weaveplatform/artifactweave/internal/format/aieditorextensions"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	format "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/aieditorextensions"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/types"

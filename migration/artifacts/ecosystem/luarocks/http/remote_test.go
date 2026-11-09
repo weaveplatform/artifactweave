@@ -1,4 +1,4 @@
-package luarocks_test
+package luarockshttp_test
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/server/luarocks"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
@@ -16,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	luarockshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/luarocks/http"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -31,7 +31,7 @@ func newRemoteFixture(t *testing.T, tune ...func(*pkgroute.Options, *item.Servic
 	t.Helper()
 	up := fakeupstream.New(t, fakeupstream.Options{})
 	clock := fakeupstream.NewClock(time.Date(2026, 10, 23, 0, 0, 0, 0, time.UTC))
-	f := newFixtureWithProtocol(t, repo.Remote, func(items *item.Service) luarocks.Options {
+	f := newFixtureWithProtocol(t, repo.Remote, func(items *item.Service) luarockshttp.Options {
 		c, err := items.Store.Repos().Get(t.Context(), "rocks")
 		if err != nil {
 			t.Fatal(err)
@@ -72,7 +72,7 @@ func newRemoteFixture(t *testing.T, tune ...func(*pkgroute.Options, *item.Servic
 				return items.Store.RemoteCache().Source(ctx, c.Key)
 			},
 		}
-		return luarocks.Options{RemoteSources: svc}
+		return luarockshttp.Options{RemoteSources: svc}
 	}, tune...)
 	return &remoteFixture{fixture: f, up: up, clock: clock}
 }

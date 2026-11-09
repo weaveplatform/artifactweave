@@ -1,4 +1,4 @@
-package luarocks
+package luarockshttp
 
 import (
 	"bytes"
@@ -8,7 +8,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	luafmt "github.com/weaveplatform/artifactweave/internal/format/luarocks"
+	luafmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/luarocks"
 )
 
 const (

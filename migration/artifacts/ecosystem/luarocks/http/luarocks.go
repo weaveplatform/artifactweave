@@ -1,6 +1,6 @@
-// Package luarocks serves local and federated LuaRocks repositories through
+// Package luarockshttp serves local and federated LuaRocks repositories through
 // the native flat rocks-server URL and the native upload API.
-package luarocks
+package luarockshttp
 
 import (
 	"encoding/json"
@@ -13,10 +13,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/format/luarocks"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/luarocks"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"

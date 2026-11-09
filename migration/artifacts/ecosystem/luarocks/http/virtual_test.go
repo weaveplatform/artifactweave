@@ -1,4 +1,4 @@
-package luarocks
+package luarockshttp
 
 import (
 	"errors"

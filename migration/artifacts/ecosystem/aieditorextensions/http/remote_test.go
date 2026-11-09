@@ -1,4 +1,4 @@
-package aieditorextensions_test
+package aieditorextensionshttp_test
 
 import (
 	"archive/zip"
@@ -17,7 +17,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/server/aieditorextensions"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
@@ -26,6 +25,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	aieditorextensionshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/aieditorextensions/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
@@ -143,7 +143,7 @@ func newFixture(t *testing.T) *fixture {
 				}
 			},
 		},
-		aieditorextensions.Protocol(svc),
+		aieditorextensionshttp.Protocol(svc),
 	)
 	f.app = router
 	return f

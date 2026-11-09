@@ -24,7 +24,7 @@ var formats = map[string]formatImpact{
 		[]string{"frogml"},
 	},
 	"aieditorextensions": {
-		"./internal/format/aieditorextensions/...",
+		"./migration/artifacts/ecosystem/aieditorextensions/...",
 		"@aieditorextensions",
 		[]string{"vscode"},
 	},
@@ -81,7 +81,11 @@ var formats = map[string]formatImpact{
 		[]string{"jetbrains"},
 	},
 	"huggingface": {"./migration/artifacts/ecosystem/huggingface/...", "@huggingface", nil},
-	"luarocks":    {"./internal/format/luarocks/...", "@luarocks", []string{"luarocks", "jf"}},
+	"luarocks": {
+		"./migration/artifacts/ecosystem/luarocks/...",
+		"@luarocks",
+		[]string{"luarocks", "jf"},
+	},
 	"composer": {
 		"./migration/artifacts/ecosystem/composer/...",
 		"@composer",

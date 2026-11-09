@@ -64,7 +64,7 @@ When a test file leaves a shared directory such as `internal/server`:
 | Go modules | `migration/artifacts/ecosystem/golang/http`, `test/server/artifacts/golang` |
 | Helm | `migration/artifacts/ecosystem/helm/http`, `test/server/artifacts/helm` |
 | Helm OCI | `test/server/artifacts/helmoci` |
-| LuaRocks | `internal/server/luarocks` |
+| LuaRocks | `migration/artifacts/ecosystem/luarocks/http` |
 | Maven | `test/server/artifacts/maven` |
 | NIM model | `migration/artifacts/ecosystem/nimmodel/http` |
 | npm | `migration/artifacts/ecosystem/npm/http`, `test/server/artifacts/npm` |

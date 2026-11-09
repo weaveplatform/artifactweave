@@ -18,10 +18,8 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/idtoken"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
-	"github.com/weaveplatform/artifactweave/internal/server/aieditorextensions"
 	"github.com/weaveplatform/artifactweave/internal/server/ansible"
 	"github.com/weaveplatform/artifactweave/internal/server/gitlfs"
-	"github.com/weaveplatform/artifactweave/internal/server/luarocks"
 	"github.com/weaveplatform/artifactweave/internal/server/machinelearning"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/server/skills"
@@ -37,6 +35,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	agentpackageshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/agentpackages/http"
+	aieditorextensionshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/aieditorextensions/http"
 	bazelmoduleshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bazelmodules/http"
 	bowerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bower/http"
 	cargohttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cargo/http"
@@ -52,6 +51,7 @@ import (
 	hexhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/hex/http"
 	huggingfacehttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface/http"
 	jetbrainspluginshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/jetbrainsplugins/http"
+	luarockshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/luarocks/http"
 	nimmodelhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nimmodel/http"
 	nixhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nix/http"
 	npmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm/http"
@@ -230,7 +230,7 @@ var protocols = []func(Config) pkgroute.Protocol{
 	func(cfg Config) pkgroute.Protocol { return ansible.Protocol(cfg.RemoteSources) },
 	func(Config) pkgroute.Protocol { return machinelearning.Protocol() },
 	func(cfg Config) pkgroute.Protocol { return chefhttp.Protocol(cfg.RemoteSources) },
-	func(cfg Config) pkgroute.Protocol { return aieditorextensions.Protocol(cfg.RemoteSources) },
+	func(cfg Config) pkgroute.Protocol { return aieditorextensionshttp.Protocol(cfg.RemoteSources) },
 	func(cfg Config) pkgroute.Protocol {
 		return huggingfacehttp.Protocol(huggingfacehttp.Options{
 			XetEnabled:    cfg.HuggingFaceXetEnabled,
@@ -281,7 +281,7 @@ var protocols = []func(Config) pkgroute.Protocol{
 		)
 	},
 	func(cfg Config) pkgroute.Protocol {
-		return luarocks.Protocol(luarocks.Options{RemoteSources: cfg.RemoteSources})
+		return luarockshttp.Protocol(luarockshttp.Options{RemoteSources: cfg.RemoteSources})
 	},
 	func(cfg Config) pkgroute.Protocol { return cargohttp.Protocol(cfg.RemoteSources) },
 	func(cfg Config) pkgroute.Protocol {

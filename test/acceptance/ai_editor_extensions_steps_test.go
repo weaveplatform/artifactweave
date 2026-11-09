@@ -70,8 +70,10 @@ func (w *world) aiEditorFixture() error {
 		}
 		f.assets[kind] = body
 	}
-	raw, err := os.ReadFile(filepath.Join(repoRoot,
-		"internal/server/aieditorextensions/testdata/marketplace-hexeditor.json"))
+	raw, err := os.ReadFile(filepath.Join(
+		repoRoot,
+		"migration/artifacts/ecosystem/aieditorextensions/http/testdata/marketplace-hexeditor.json",
+	))
 	if err != nil {
 		return err
 	}

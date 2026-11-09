@@ -1,4 +1,4 @@
-package aieditorextensions
+package aieditorextensionshttp
 
 import (
 	"bytes"
@@ -12,7 +12,7 @@ import (
 	"net/url"
 	"strings"
 
-	format "github.com/weaveplatform/artifactweave/internal/format/aieditorextensions"
+	format "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/aieditorextensions"
 )
 
 const maxCatalog = 8 << 20

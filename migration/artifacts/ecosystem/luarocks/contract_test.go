@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/format/luarocks"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/formattest"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/luarocks"
 )
 
 func contractRock(t *testing.T, name, version string, n int) []byte {

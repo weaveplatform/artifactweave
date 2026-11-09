@@ -3968,7 +3968,7 @@
   {
     "route": "GET /artifactory/api/aieditorextensions/{repoKey}/assets/{publisher}/{name}/{version}/{assetType}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/aieditorextensions.handler.asset-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/aieditorextensions/http.handler.asset-fm",
     "review_family": "native-aieditorextensions",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6184,7 +6184,7 @@
   {
     "route": "GET /artifactory/api/luarocks/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/luarocks.handler.read-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/luarocks/http.handler.read-fm",
     "review_family": "native-luarocks",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6203,7 +6203,7 @@
   {
     "route": "GET /artifactory/api/luarocks/{repoKey}/api/1/{key}/check_rockspec",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/luarocks.handler.checkRockspec-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/luarocks/http.handler.checkRockspec-fm",
     "review_family": "native-luarocks",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6222,7 +6222,7 @@
   {
     "route": "GET /artifactory/api/luarocks/{repoKey}/api/tool_version",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/luarocks.handler.toolVersion-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/luarocks/http.handler.toolVersion-fm",
     "review_family": "native-luarocks",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -11759,7 +11759,7 @@
   {
     "route": "HEAD /artifactory/api/aieditorextensions/{repoKey}/assets/{publisher}/{name}/{version}/{assetType}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/aieditorextensions.handler.asset-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/aieditorextensions/http.handler.asset-fm",
     "review_family": "native-aieditorextensions",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12443,7 +12443,7 @@
   {
     "route": "HEAD /artifactory/api/luarocks/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/luarocks.handler.read-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/luarocks/http.handler.read-fm",
     "review_family": "native-luarocks",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -14897,7 +14897,7 @@
   {
     "route": "POST /artifactory/api/aieditorextensions/{repoKey}/_apis/public/gallery/extensionquery",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/aieditorextensions.handler.query-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/aieditorextensions/http.handler.query-fm",
     "review_family": "native-aieditorextensions",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16563,7 +16563,7 @@
   {
     "route": "POST /artifactory/api/luarocks/{repoKey}/api/1/{key}/upload",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/luarocks.handler.uploadRockspec-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/luarocks/http.handler.uploadRockspec-fm",
     "review_family": "native-luarocks",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16582,7 +16582,7 @@
   {
     "route": "POST /artifactory/api/luarocks/{repoKey}/api/1/{key}/upload_rock/{versionID}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/luarocks.handler.uploadRock-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/luarocks/http.handler.uploadRock-fm",
     "review_family": "native-luarocks",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",

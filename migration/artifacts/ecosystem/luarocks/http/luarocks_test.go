@@ -1,4 +1,4 @@
-package luarocks_test
+package luarockshttp_test
 
 import (
 	"archive/zip"
@@ -16,7 +16,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/server/luarocks"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -24,6 +23,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	luarockshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/luarocks/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
@@ -53,7 +53,7 @@ func newFixture(
 func newFixtureWithProtocol(
 	t *testing.T,
 	class repo.Class,
-	protocol func(*item.Service) luarocks.Options,
+	protocol func(*item.Service) luarockshttp.Options,
 	tune ...func(*pkgroute.Options, *item.Service),
 ) *fixture {
 	t.Helper()
@@ -104,11 +104,11 @@ func newFixtureWithProtocol(
 	for _, fn := range tune {
 		fn(&options, items)
 	}
-	var configured luarocks.Options
+	var configured luarockshttp.Options
 	if protocol != nil {
 		configured = protocol(items)
 	}
-	pkgroute.Mount(r, options, luarocks.Protocol(configured))
+	pkgroute.Mount(r, options, luarockshttp.Protocol(configured))
 	return &fixture{t, r, items, db, c}
 }
 

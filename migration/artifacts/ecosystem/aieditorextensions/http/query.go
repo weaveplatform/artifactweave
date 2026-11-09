@@ -1,4 +1,4 @@
-package aieditorextensions
+package aieditorextensionshttp
 
 import (
 	"bytes"
@@ -11,7 +11,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	format "github.com/weaveplatform/artifactweave/internal/format/aieditorextensions"
+	format "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/aieditorextensions"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 

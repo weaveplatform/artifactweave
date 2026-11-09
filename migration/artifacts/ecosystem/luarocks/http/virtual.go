@@ -1,4 +1,4 @@
-package luarocks
+package luarockshttp
 
 import (
 	"bytes"
@@ -11,10 +11,10 @@ import (
 	"slices"
 	"strings"
 
-	luafmt "github.com/weaveplatform/artifactweave/internal/format/luarocks"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	luafmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/luarocks"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"

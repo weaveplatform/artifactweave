@@ -1,4 +1,4 @@
-package luarocks_test
+package luarockshttp_test
 
 import (
 	"bytes"

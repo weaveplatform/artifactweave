@@ -1,16 +1,15 @@
 package ecosystem
 
 import (
-	"github.com/weaveplatform/artifactweave/internal/format/aieditorextensions"
 	"github.com/weaveplatform/artifactweave/internal/format/ansible"
 	"github.com/weaveplatform/artifactweave/internal/format/gitlfs"
-	"github.com/weaveplatform/artifactweave/internal/format/luarocks"
 	"github.com/weaveplatform/artifactweave/internal/format/machinelearning"
 	"github.com/weaveplatform/artifactweave/internal/format/skills"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/agentpackages"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/agentplugins"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/aieditorextensions"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/alpine"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bazelmodules"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bower"
@@ -29,6 +28,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/hex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/luarocks"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nix"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
