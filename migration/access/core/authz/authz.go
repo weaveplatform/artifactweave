@@ -1,10 +1,3 @@
-// Package authz evaluates Artifactory's permission model (decision 0006):
-// the admin flag, the union of grants to a user and their groups, permission
-// targets with Ant include and exclude patterns, the anonymous user, and
-// token scopes, which only ever remove actions but for
-// applied-permissions/admin, an administrator's token whatever its subject.
-// It is a library: handlers
-// build a Decider per request and ask it questions.
 package authz
 
 import (
@@ -22,7 +15,10 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// Sources is what a Decider reads once per request.
+// Sources is what New reads once per request: the permissions that apply
+// to the subject and the groups it acts through, which may grant admin
+// privileges. New calls each store in the caller's context, so the reads
+// join the caller's transaction, if there is one.
 type Sources struct {
 	Permissions port.PermissionStore
 	Groups      port.GroupStore
@@ -39,7 +35,9 @@ type rule struct {
 }
 
 // Decider answers permission questions for one subject from one snapshot
-// of the permissions.
+// of the permissions. Its methods only read that snapshot, so one Decider
+// may be used from several goroutines. The zero Decider holds no action and
+// is no administrator.
 type Decider struct {
 	// isAdmin: the subject acts as an administrator (admin-only endpoints).
 	// hasEveryAction: the subject holds every action on content, which an admin keeps
@@ -68,7 +66,11 @@ type Decider struct {
 	member []string
 }
 
-// New reads the permissions that apply to s and returns its Decider.
+// New reads the permissions that apply to s and returns its Decider. An
+// anonymous subject while anonymous access is off gets the zero Decider,
+// without a read. A group of s that no longer exists grants nothing; any
+// other failure to read a group or the permissions is returned, wrapped,
+// with no Decider.
 func New(ctx context.Context, src Sources, s accessapi.Subject) (*Decider, error) {
 	if s.Anonymous && !src.AnonymousEnabled {
 		return &Decider{}, nil
@@ -156,7 +158,8 @@ func (d *Decider) IsRepoVisible(repo accessapi.Repo) bool {
 
 // Holds reports whether g grants every action in want to the subject,
 // directly or through a group it acts as. It answers questions about a
-// permission document itself (who may manage it), not about content.
+// permission document itself (who may manage it), not about content, which
+// only the permission handlers ask, so accessapi.Decider leaves it out.
 func (d *Decider) Holds(g model.Grants, want accessapi.Actions) bool {
 	return heldBy(g, d.user, d.groups).Has(want)
 }
@@ -167,7 +170,8 @@ func (d *Decider) Holds(g model.Grants, want accessapi.Actions) bool {
 // Artifactory 7.x's default exclude-manage rule, without which a holder
 // could hand out rights it lacks, or appoint and remove other managers
 // (decision 0006). Anyone else may change none, so a holder of MANAGE in
-// one section changes nothing in another.
+// one section changes nothing in another. Only the permission service asks
+// it, so accessapi.Decider leaves it out.
 func (d *Decider) Grantable(g model.Grants) accessapi.Actions {
 	if d.isAdmin {
 		return allActions
@@ -183,14 +187,17 @@ func (d *Decider) Grantable(g model.Grants) accessapi.Actions {
 // through, whose entries in a permission are its own (decision 0006). A
 // token scope does not narrow them: a token that acts only through a group
 // is still its user's, so editing the user's entry with it is still a
-// holder editing its own grants.
+// holder editing its own grants. Only the permission service asks it, so
+// accessapi.Decider leaves it out.
 func (d *Decider) Self() (user string, groups []string) {
 	return d.self, slices.Clone(d.member)
 }
 
 // Actions returns every action the subject holds on path in repo's
 // resource. folder is true for a folder, which is also visible when a
-// permitted path lies below it.
+// permitted path lies below it. Allows and AllowsFolder are built on it;
+// accessapi.Decider leaves it out because other modules ask for the
+// actions they need, never for the whole set.
 func (d *Decider) Actions(
 	rt accessapi.ResourceType,
 	repo accessapi.Repo,
@@ -243,6 +250,8 @@ func (d *Decider) AllowsFolder(
 // repository's configuration. Without a scope, or with applied permissions
 // and no repo entries, the permissions alone decide; repo entries
 // (repo:<key>:r) narrow that to the repositories they name.
+// accessapi.Decider leaves it out because other modules ask
+// IsRepoVisible, which applies it with the permissions.
 func (d *Decider) RepoConfig(key string) bool {
 	if d.isAdmin || d.scope == nil {
 		return true
@@ -285,7 +294,7 @@ func (d *Decider) System(area string, want kernel.ScopeActions) bool {
 // user's own flag needs a scope that keeps the user, a group's a scope that
 // keeps the group, and a scope of resource entries alone keeps neither.
 // The flags are read here, not in New, because only the permission APIs
-// ask.
+// ask, which is also why accessapi.Decider leaves it out.
 func (d *Decider) ManagesResources(
 	ctx context.Context,
 	users port.UserStore,

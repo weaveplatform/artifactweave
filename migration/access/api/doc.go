@@ -29,7 +29,7 @@
 // None: the package holds values, pure functions, interfaces and the context
 // accessors, which read and write only the context they are given. The
 // access module implements the interfaces: the evaluator's *Decider in
-// migration/access/core/authz satisfies Decider, and its AsAPI and FromAPI convert
+// access/core/authz satisfies Decider, and its AsAPI and FromAPI convert
 // between the two, AsAPI never returning a typed nil; the module root,
 // package access, binds every contract into the API that its New returns,
 // and accessapitest below this package fakes each contract for other

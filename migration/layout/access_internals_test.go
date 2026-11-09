@@ -17,19 +17,16 @@ import (
 )
 
 // accessInternals are the legacy packages of access that no test outside
-// access may import: the evaluator and the authenticator, which ACC-11 and
-// ACC-12 split into access core, and the token service, which ACC-12 moves
-// there. Staged access core is judged by its path instead (accessInternal).
-var accessInternals = []string{
-	"migration/access/core/authz",
-	"internal/auth",
-	"internal/auth/token",
-}
+// access may import: the authenticator, which ACC-12 splits into access
+// core, and the token service, which ACC-12 moves there. Staged access
+// core, the evaluator among it, is judged by its path instead
+// (accessInternal).
+var accessInternals = []string{"internal/auth", "internal/auth/token"}
 
 // accessSplits are the legacy access packages whose ledger entries split
 // them, so ledger.Translate names no target that places their tests in
 // access.
-var accessSplits = []string{"internal/auth", "migration/access/core/authz"}
+var accessSplits = []string{"internal/auth"}
 
 // allowlistedInternals are the access internals that an allowlisted file may
 // import: the authenticator and the token service, which the server root,
@@ -196,7 +193,6 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 				To:     "artifacts/ecosystem/npm/http",
 			},
 			{From: "internal/auth", Action: ledger.ActionSplit},
-			{From: "migration/access/core/authz", Action: ledger.ActionSplit},
 		},
 	}
 	allow := []accessAllowance{
@@ -204,7 +200,8 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 		{"internal/app/*_test.go", "TST-07"},
 		{"test/server/**", "WEB-22"},
 	}
-	evaluator, authenticator, tokens := accessInternals[0], accessInternals[1], accessInternals[2]
+	evaluator := root + "/access/core/authz"
+	authenticator, tokens := accessInternals[0], accessInternals[1]
 	conforming := map[string]string{
 		"go.mod": "module " + modulePath + "\n",
 		// Each allowlisted root uses its entry, with the legacy paths and
@@ -216,9 +213,8 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 		"test/server/support/assemble.go": file(root + "/access/core/token"),
 		// Access's own tests: staged, in a split legacy package, and in a
 		// legacy package whose entry moves it into access.
-		root + "/access/core/authn/authn_test.go":    file(evaluator, root+"/access/core/authz"),
+		root + "/access/core/authn/authn_test.go":    file(evaluator, authenticator),
 		"internal/auth/auth_test.go":                 file(evaluator),
-		"migration/access/core/authz/authz_test.go":  file(authenticator),
 		"internal/service/identity/identity_test.go": file(evaluator, tokens),
 		// The published contracts and access test support, staged and legacy.
 		"internal/server/xyz/npm_test.go": file(

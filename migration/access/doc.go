@@ -5,12 +5,12 @@
 // # Role
 //
 // access module, module root. Only app imports a module root; other modules
-// reach access through access/api (decision 0044, dependency rules). Until
-// access core holds the authenticator, the evaluator and the token service
-// (https://github.com/weaveplatform/artifactweave/issues/1063 and
-// https://github.com/weaveplatform/artifactweave/issues/1064), the bindings
-// wrap the legacy internal/auth, migration/access/core/authz and internal/auth/token, so
-// consumers can move onto access/api first.
+// reach access through access/api (decision 0044, dependency rules). The
+// bindings wrap the evaluator in access/core/authz and, until access core
+// holds the authenticator and the token service
+// (https://github.com/weaveplatform/artifactweave/issues/1064), the legacy
+// internal/auth and internal/auth/token, so consumers can move onto
+// access/api first.
 //
 // # Inputs
 //

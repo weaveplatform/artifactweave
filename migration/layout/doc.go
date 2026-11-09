@@ -79,9 +79,9 @@
 //     naming it is caught.
 //   - TestUnitTestsAvoidAccessInternals,
 //     TestUnitAccessInternalsRuleDetectsViolations: outside access, no test
-//     imports migration/access/core/authz, internal/auth, internal/auth/token or a package
-//     of access core other than test support. Only the server root,
-//     internal/app and the test/server harnesses may import the
+//     imports internal/auth, internal/auth/token or a package of access
+//     core, such as the evaluator, other than test support. Only the server
+//     root, internal/app and the test/server harnesses may import the
 //     authenticator and the token service, until TST-04 to TST-07 and WEB-22
 //     remove the reason, and an allowlist entry that no file uses fails; the
 //     second proves each rule can fail.
