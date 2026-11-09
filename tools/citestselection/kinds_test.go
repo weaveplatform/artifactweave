@@ -12,7 +12,7 @@ import (
 func TestUnitSelectKindsKeepsMixedPackagesAndBuildTaggedTests(t *testing.T) {
 	root := t.TempDir()
 	for path, source := range map[string]string{
-		"internal/server/repositories_test.go": `package server
+		"test/server/artifacts/repositories_test.go": `package server
 func TestUnitRead() {}
 func TestAccPublish() {}
 func TestAccess() {}

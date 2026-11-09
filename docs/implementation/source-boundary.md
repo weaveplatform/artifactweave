@@ -99,7 +99,7 @@ permissions and intent deliberately, and P11
 adds project graph and sharing checks without administrator loopback HTTP.
 
 Tests in `migration/artifacts/core/remote/source/source_test.go`,
-`internal/server/source_test.go` and `internal/server/pkgroute/source_test.go` exercise
+`test/server/artifacts/source_test.go` and `internal/server/pkgroute/source_test.go` exercise
 the service and router through injected backends: permission/pattern/path refusals
 before work, explicit intent, representation validation, generation/revocation races,
 safe protocol errors, stream ownership, local/federated preservation, cache/virtual
