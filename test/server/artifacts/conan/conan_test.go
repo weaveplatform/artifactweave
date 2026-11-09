@@ -1,4 +1,4 @@
-package conan
+package conan_test
 
 import (
 	"bytes"
@@ -15,17 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
-	"github.com/weaveplatform/artifactweave/test/server/support"
 )
-
-func conanTestArchive(t *testing.T, name, content string) string {
-	return conanTestArchiveEntries(t, map[string]string{name: content})
-}
-
-func conanTestArchiveEntries(t *testing.T, entries map[string]string) string {
-	t.Helper()
-	return support.TarGz(t, entries)
-}
 
 func TestAccConanSearchAndPackageDeletion(t *testing.T) {
 	w := newItemWorld(t, false)

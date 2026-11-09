@@ -144,8 +144,9 @@
 //     and unrelated files kept out of the index, and the refusals.
 //
 // testdata holds the unchanged CRAN assertthat 0.2.1 source archive and
-// Windows binary and its published PACKAGES entry, which the root
-// internal/server cran_routes_test.go and cran_test.go and the acceptance
-// steps also read. The protocol's native R evidence is the @cran
-// acceptance partition (test/acceptance/features/cran.feature).
+// Windows binary and its published PACKAGES entry, which the suites in
+// test/server/artifacts/cran, internal/server's cran_internal_test.go and
+// cran_routes_internal_test.go, and the acceptance steps also read. The
+// protocol's native R evidence is the @cran acceptance partition
+// (test/acceptance/features/cran.feature).
 package cran

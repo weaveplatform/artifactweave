@@ -3,9 +3,9 @@
   ".github/actions/apm-client/action.yml": "3a30e8353a1e00ba2d351c8231d6069c19230bcb2fabd588f57394f070c067cd",
   ".github/actions/jfrog-cli/action.yml": "92ce6c997058db51ea98d2bac453d5dea5e4d103e7af268dda87428b674ab78f",
   ".github/actions/registry-clients/action.yml": "ef020d59ee4b103272682c15cd5a1db1fbf3d0ac782d7fa37200a83c161d0f5e",
-  ".github/workflows/quality-gate.yml": "c83cedb962da708b681621261a621fa069334994e137015a4808fd687485e8d5",
+  ".github/workflows/quality-gate.yml": "e6f0a2abb87969b47318dfc0c529db9d4163ec41f1dff5d3e39048ae5b979860",
   "deploy/check.sh": "264837052199f1e4d93e080aebf8e747ff6f8a12823fb75100e5312cb1b03285",
-  "docs/research/39-vcs-legacy.md": "e9530f0cf85b8c1f19434b37a1481cb2e710d84893e1a8f1a680a791cc50ccd7",
+  "docs/research/39-vcs-legacy.md": "80f1ab4297ddb503ba6d08a26ff30229528c931f734f450111c7d58c29d82777",
   "go.mod": "2993b4c1c9d9bc43cbd699052c4453034ac7e573c916f53dbc96cb9d2c162923",
   "internal/app/conan_client_test.go": "7a6f63d1fb25ee2b4678e00baae4ebd0d4a5592557cf94f634d65f60eec28ae6",
   "internal/server/auth.go": "e83996d74970f3197734abd58f193205cd7870ba86341b364893b4c845f6d468",
@@ -147,8 +147,8 @@
   "test/acceptance/vagrant_steps_test.go": "11c7caa54766244dba9684d2849cbfd63dd45a96b2abc74dbdc7c95f5f831e7b",
   "test/acceptance/vcs_legacy_steps_test.go": "a20d5903e8df7abef71f4caba29366c13fce9055aaed8828aed1ec5b4cf008c5",
   "test/acceptance/vcs_steps_test.go": "09ca06bde446dd78537416b6ce4e4b3c286f1ef3f9e7547bdb1508142a374f74",
-  "test/server/artifacts/conan/conan_client_test.go": "d26a51421ab112b560b1ef04128d046f8ad7d320ea23afad41b5199d3f987612",
-  "test/server/artifacts/vcs/vcs_delivery_test.go": "9dd7bb355e91791f433809482223be87a6569f3ff9b0a2dac7c83457f0fdcd89",
-  "test/server/artifacts/vcs/vcs_legacy_test.go": "3cee3697f7f5d75a3c7d68411144362f948aa8a8098a24ced6ea7b51b5652fb0",
-  "test/server/artifacts/vcs/vcs_routes_test.go": "b7cad8d5f7e921d1ce5a496995d45e93a7db10506bc7ed73d320b7551be85e2f"
+  "test/server/artifacts/conan/conan_client_test.go": "c52485a23f3d17f9c2a7160b000b9e8562b0f92db0f036196879b06a38e95d40",
+  "test/server/artifacts/vcs/vcs_delivery_test.go": "649cd61d8e56a748b3e5bef91ff2c7c41d8320ce217678b79edf439d95117b12",
+  "test/server/artifacts/vcs/vcs_legacy_test.go": "bb6bd54760c8c1e6d3ae4f6a6a0f884cf0da2b58e5d78f7301492712e066b9aa",
+  "test/server/artifacts/vcs/vcs_routes_test.go": "de35f184d0d246832fe3804878e931c435687abbb278f60cc07d67926e887397"
 }

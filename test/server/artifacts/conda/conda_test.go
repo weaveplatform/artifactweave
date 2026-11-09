@@ -1,4 +1,4 @@
-package conda
+package conda_test
 
 import (
 	"archive/zip"

@@ -93,7 +93,7 @@ version, exercising standard and subgroup routes, unchanged archive bytes,
 permissions, and malformed requests. Focused local checks:
 
 ```sh
-ARTIFACTWEAVE_REQUIRE_CURL=1 go test ./internal/server -run '^TestAccVCSRemoteRESTAndSubgroup$' -count=1 -v
+ARTIFACTWEAVE_REQUIRE_CURL=1 go test ./test/server/artifacts/vcs -run '^TestAccVCSRemoteRESTAndSubgroup$' -count=1 -v
 go test ./migration/artifacts/ecosystem/vcs/http -count=1
 ```
 

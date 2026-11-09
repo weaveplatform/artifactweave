@@ -724,7 +724,7 @@ jobs:
           HF_CLIENT_PYTHON="$RUNNER_TEMP/huggingface-hub/bin/python" \
             go test ./migration/artifacts/ecosystem/huggingface/http -run '^TestAccPinnedClient' -count=1 -timeout=5m -v
           HF_XET_PYTHON="$RUNNER_TEMP/huggingface-hub/bin/python" \
-            go test ./internal/server -run '^TestAccHuggingFaceNativeXet$' -count=1 -timeout=5m -v
+            go test ./test/server/artifacts/huggingface -run '^TestAccHuggingFaceNativeXet$' -count=1 -timeout=5m -v
 
       - name: VCS REST curl client acceptance
         if: needs.impact.outputs.profile == 'full' || needs.impact.outputs.owner == 'vcs'
@@ -732,7 +732,7 @@ jobs:
           ARTIFACTWEAVE_REQUIRE_CURL: '1'
         run: |
           curl --version
-          go test ./internal/server -run '^TestAccVCSRemoteRESTAndSubgroup$' -count=1 -v
+          go test ./test/server/artifacts/vcs -run '^TestAccVCSRemoteRESTAndSubgroup$' -count=1 -v
 
       - name: Bazel Bzlmod acceptance (L/R/V/F)
         if: needs.impact.outputs.profile == 'full' || contains(format(',{0},', needs.impact.outputs.clients), ',bazel,')

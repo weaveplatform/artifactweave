@@ -61,21 +61,32 @@ When a test file leaves a shared directory such as `internal/server`:
 | --- | --- |
 | Agent Packages | `test/server/artifacts/agentpackages` |
 | Agent Plugins | `test/server/artifacts/agentplugins` |
+| Chef | `migration/artifacts/ecosystem/chef/http`, `test/server/artifacts/chef` |
+| Conan | `migration/artifacts/ecosystem/conan/http`, `test/server/artifacts/conan` |
+| Conda | `migration/artifacts/ecosystem/conda/http`, `test/server/artifacts/conda` |
+| CRAN | `test/server/artifacts/cran` |
+| Debian | `test/server/artifacts/debian` |
 | Docker/OCI | `migration/artifacts/ecosystem/docker/http`, `test/server/artifacts/docker` |
 | Go modules | `migration/artifacts/ecosystem/golang/http`, `test/server/artifacts/golang` |
 | Helm | `migration/artifacts/ecosystem/helm/http`, `test/server/artifacts/helm` |
 | Helm OCI | `test/server/artifacts/helmoci` |
+| Hex | `migration/artifacts/ecosystem/hex/http`, `test/server/artifacts/hex` |
+| Hugging Face | `migration/artifacts/ecosystem/huggingface/http`, `test/server/artifacts/huggingface` |
 | LuaRocks | `migration/artifacts/ecosystem/luarocks/http` |
 | Maven | `test/server/artifacts/maven` |
 | NIM model | `migration/artifacts/ecosystem/nimmodel/http` |
 | npm | `migration/artifacts/ecosystem/npm/http`, `test/server/artifacts/npm` |
 | NuGet | `migration/artifacts/ecosystem/nuget/http`, `test/server/artifacts/nuget` |
+| Opkg | `test/server/artifacts/opkg` |
+| P2 | `test/server/artifacts/p2` |
 | PyPI | `migration/artifacts/ecosystem/pypi/http`, `test/server/artifacts/pypi` |
+| RPM | `test/server/artifacts/rpm` |
 | Dart pub | `migration/artifacts/ecosystem/pub/http` |
 | RubyGems | `migration/artifacts/ecosystem/gems/http`, `test/server/artifacts/gems` |
 | Skills | `migration/artifacts/ecosystem/skills/http` |
 | Terraform registry | `migration/artifacts/ecosystem/terraform/http`, `test/server/artifacts/terraform` |
 | Terraform backend | `migration/artifacts/ecosystem/terraformbackend/http`, `test/server/artifacts/terraformbackend` |
+| VCS | `migration/artifacts/ecosystem/vcs/http`, `test/server/artifacts/vcs` |
 | Shared | `internal/server`, `internal/server/pkgroute`, `test/server/access`, `test/server/artifacts`, `test/server/configuration` |
 
 `test/server/support` and the packages under it (`harness`, `agentcommon` and
@@ -87,11 +98,11 @@ CI profiles; this inventory supplies the package boundary.
 
 ## Residual root test audit
 
-The 89 direct root test files cover shared server APIs and registration:
-authentication, the in-package parts of the access and artifacts management
-suites (`<name>_internal_test.go`), AQL relations and transitive searches,
-request limits, the format route suites that have not moved yet, OpenAPI,
-status and principal matrices. The file names are explicit in the inventory.
+The 75 direct root test files cover shared server APIs and registration:
+authentication, the in-package parts of the access, artifacts management and
+ecosystem suites (`<name>_internal_test.go`), AQL relations and transitive
+searches, request limits, the format tests that move with their code,
+OpenAPI, status and principal matrices. The file names are explicit in the inventory.
 A new direct root test cannot be treated as format-owned without review.
 
 Some shared API tests use a format-specific fixture. The inventory's
@@ -109,7 +120,6 @@ those tests when that format changes:
 | `test/server/artifacts`: `repositories_format_class_test.go` | Repository class validation across LuaRocks, NIM and Agent formats |
 | `npm_auth_paths_test.go` | Private middleware path recognition and log redaction for npm and LuaRocks |
 | root: `registry_shared_test.go`; `test/server/artifacts`: `sidecar_rights_test.go` | Shared registry content type and sidecar permission rules using Docker and Helm |
-| `encrypt_states_v1_test.go` | Generic v1 repository read using Terraform backend settings |
 
 These tests use shared APIs or private server helpers. A format-only change
 that could affect one of them must include the package that holds it, the root

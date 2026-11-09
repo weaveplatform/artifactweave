@@ -122,10 +122,10 @@
 //   - contract_test.go: the format contract suite (artifacts/core/formattest)
 //     with KindIndex as the repository's work.
 //
-// testdata holds the contract IPKs that build-contract-fixtures.sh makes
-// and the published OpenWrt 24.10.0 index and IPK, which the root
-// test/server/artifacts/opkg/opkg_test.go and the acceptance steps also read;
-// .gitattributes keeps openwrt-Packages with LF line ends and its final
-// blank line on every OS. The protocol's native opkg evidence is the @opkg
-// acceptance partition (test/acceptance/features/opkg.feature).
+// testdata holds the contract IPKs that build-contract-fixtures.sh makes and
+// the published OpenWrt 24.10.0 index and IPK, which internal/server's
+// opkg_internal_test.go and the acceptance steps also read; .gitattributes
+// keeps openwrt-Packages with LF line ends and its final blank line on every
+// OS. The protocol's native opkg evidence is the @opkg acceptance partition
+// (test/acceptance/features/opkg.feature).
 package opkg

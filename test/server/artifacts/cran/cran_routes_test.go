@@ -1,4 +1,4 @@
-package cran
+package cran_test
 
 import (
 	"bytes"
@@ -16,9 +16,15 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
+
+func cranFixtureBytes(t *testing.T, name string) []byte {
+	t.Helper()
+	return repopath.Read(t, "migration/artifacts/ecosystem/cran/testdata/"+name)
+}
 
 func TestUnitCRANRemoteIndexPackageAndInvalidMetadata(t *testing.T) {
 	index := cranFixtureBytes(t, "assertthat-PACKAGES")
@@ -375,6 +381,13 @@ func TestUnitCRANOrderedNestedVirtualMembers(t *testing.T) {
 		t.Fatalf("later readable member not selected after deletion: %s", index.Body)
 	}
 	wantStatus(t, w.do(http.MethodGet, archiveURL, "admin", ""), http.StatusOK)
+}
+
+func cranRepo(t *testing.T, w *itemWorld, c repo.Config) {
+	t.Helper()
+	if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestUnitCRANPOSTUploadRefusalsAndVirtualTarget(t *testing.T) {

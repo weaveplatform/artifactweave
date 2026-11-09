@@ -1,4 +1,4 @@
-package opkg
+package opkg_test
 
 import (
 	"bytes"

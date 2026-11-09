@@ -1,4 +1,4 @@
-package p2
+package p2_test
 
 import (
 	"archive/zip"

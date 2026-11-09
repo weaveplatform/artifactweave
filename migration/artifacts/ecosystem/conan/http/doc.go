@@ -97,7 +97,7 @@
 //     parsing, permission errors, remote metadata checks and archive
 //     safety.
 //
-// The routes are also tested end to end from the server root
+// The routes are also tested end to end from test/server/artifacts/conan
 // (conan_test.go, and conan_client_test.go with the pinned Conan 2 and
 // Conan 1 clients, which make conan-accept runs) and from internal/app
 // (conan_client_test.go and conan_remote_test.go).

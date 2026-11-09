@@ -1,4 +1,4 @@
-package debian
+package debian_test
 
 import (
 	"net/http"

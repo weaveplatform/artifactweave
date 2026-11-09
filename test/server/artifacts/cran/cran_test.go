@@ -1,4 +1,4 @@
-package cran
+package cran_test
 
 import (
 	"bytes"

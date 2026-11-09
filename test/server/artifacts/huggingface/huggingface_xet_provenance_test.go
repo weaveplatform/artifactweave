@@ -1,4 +1,4 @@
-package huggingface
+package huggingface_test
 
 import (
 	"bytes"

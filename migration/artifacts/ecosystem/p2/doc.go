@@ -110,10 +110,11 @@
 //     metadata read errors, declared and total expansion limits, and
 //     corrupt member bytes.
 //
-// testdata holds unmodified files of the published Eclipse GLSP 2.7.0
-// update site (p2.index, the content and artifacts metadata as .jar and
-// .xml.xz, and a source bundle), which the root test/server/artifacts/p2/p2_test.go
-// and the acceptance steps also read. The protocol's native evidence is
-// the @p2 acceptance partition (test/acceptance/features/p2.feature),
-// which drives the Eclipse p2 director.
+// testdata holds unmodified files of the published Eclipse GLSP 2.7.0 update
+// site (p2.index, the content and artifacts metadata as .jar and .xml.xz,
+// and a source bundle), which the suites in test/server/artifacts/p2,
+// internal/server's p2_internal_test.go and the acceptance steps also read.
+// The protocol's native evidence is the @p2 acceptance partition
+// (test/acceptance/features/p2.feature), which drives the Eclipse p2
+// director.
 package p2

@@ -1,4 +1,4 @@
-package conan
+package conan_test
 
 import (
 	"net/http/httptest"

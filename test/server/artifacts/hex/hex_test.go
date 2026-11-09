@@ -1,4 +1,4 @@
-package hex
+package hex_test
 
 import (
 	"bytes"

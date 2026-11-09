@@ -1,4 +1,4 @@
-package p2
+package p2_test
 
 import (
 	"archive/zip"
@@ -12,6 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/p2"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -134,6 +135,11 @@ func TestAccP2ArchiveSuffixIsBoundedAndPermissionChecked(t *testing.T) {
 	); res.Code == http.StatusOK {
 		t.Fatal("missing archive metadata returned success")
 	}
+}
+
+func p2Fixture(t *testing.T, name string) []byte {
+	t.Helper()
+	return repopath.Read(t, "migration/artifacts/ecosystem/p2/testdata/"+name)
 }
 
 func TestAccP2RemoteAndVirtualWirePaths(t *testing.T) {

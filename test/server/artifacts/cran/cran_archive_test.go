@@ -1,7 +1,8 @@
-package cran
+package cran_test
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"net/http"
 	"reflect"
@@ -12,6 +13,12 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+)
+
+const (
+	cranLegacyPath  = "src/contrib/Archive/assertthat/0.2.1/assertthat_0.2.1.tar.gz"
+	cranArchivePath = "src/contrib/Archive/assertthat/assertthat_0.2.1.tar.gz"
+	cranMoveURL     = "/artifactory/api/cran/cran-migrate/move-archives"
 )
 
 func TestAccCRANArchiveMigration(t *testing.T) {
@@ -226,6 +233,64 @@ func TestAccCRANArchiveMigrationHonorsDestinationPolicy(t *testing.T) {
 	) {
 		t.Fatalf("published excluded archive: %v", err)
 	}
+}
+
+type (
+	cranMigrationFailure struct {
+		store.Store
+		fail   bool
+		mode   string
+		cancel context.CancelFunc
+	}
+	cranMigrationItems struct {
+		store.ItemStore
+		owner *cranMigrationFailure
+	}
+)
+
+func (s *cranMigrationFailure) Items() store.ItemStore { return cranMigrationItems{s.Store.Items(), s} }
+
+func (s cranMigrationItems) Create(ctx context.Context, it types.Item) (types.Item, error) {
+	if s.owner.fail {
+		return types.Item{}, errors.New("storage unavailable")
+	}
+	return s.ItemStore.Create(ctx, it)
+}
+
+func (s cranMigrationItems) Descendants(
+	ctx context.Context,
+	key string,
+	cached bool,
+	folder string,
+	page store.Page,
+) ([]types.Item, string, error) {
+	if s.owner.mode == "listing" {
+		return nil, "", errors.New("archive listing unavailable")
+	}
+	entries, next, err := s.ItemStore.Descendants(ctx, key, cached, folder, page)
+	if s.owner.cancel != nil {
+		s.owner.cancel()
+	}
+	return entries, next, err
+}
+
+func (s cranMigrationItems) GetByID(ctx context.Context, id int64) (types.Item, error) {
+	if s.owner.mode == "locking" {
+		return types.Item{}, errors.New("archive lock unavailable")
+	}
+	return s.ItemStore.GetByID(ctx, id)
+}
+
+func (s cranMigrationItems) Get(
+	ctx context.Context,
+	key string,
+	cached bool,
+	p string,
+) (types.Item, error) {
+	if s.owner.mode == "destination" && p == cranArchivePath {
+		return types.Item{}, errors.New("archive destination unavailable")
+	}
+	return s.ItemStore.Get(ctx, key, cached, p)
 }
 
 func TestAccCRANArchiveMigrationStorageFailure(t *testing.T) {

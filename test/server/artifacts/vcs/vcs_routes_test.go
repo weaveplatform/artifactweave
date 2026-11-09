@@ -1,4 +1,4 @@
-package vcs
+package vcs_test
 
 import (
 	"archive/tar"
@@ -230,6 +230,8 @@ func TestAccVCSRemoteRESTAndSubgroup(t *testing.T) {
 		t.Fatal("VCS path validation admitted escape")
 	}
 }
+
+const vcsTestOID = "0123456789abcdef0123456789abcdef01234567"
 
 func vcsTestRefs() []byte {
 	return []byte(vcsPacket(vcsTestOID+" refs/heads/main\n") +
