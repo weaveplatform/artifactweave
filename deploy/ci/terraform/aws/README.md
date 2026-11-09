@@ -80,7 +80,7 @@ zone is billed per zone per month (about $0.50) and stays, because its delegatio
 
 | Name | Version |
 | ---- | ------- |
-| aws | 6.71.0 |
+| aws | 6.72.0 |
 
 ### Modules
 
