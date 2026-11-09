@@ -7,7 +7,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
 )
 
-// Table names of the peers group; the same names as the SQL tables.
+// The table has the SQL table's name and holds the identity as its one row.
 const (
 	tInstance      = "instance"
 	instanceRowKey = 1

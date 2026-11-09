@@ -12,10 +12,11 @@
 // it, and peers will know the instance by it, so it sits in the platform.
 // The composition root calls EnsureInstance before it builds the token
 // service. The identity and its port are declared here, and EnsureInstance
-// takes Store, the one method it calls, so that the package imports no
-// store (decision 0044, "Narrowing"); the metadata store satisfies it, and
-// its SQL and in-memory stores implement InstanceStore. The package imports
-// the kernel and the standard library.
+// takes Store, the one method it calls, so that the package imports no store
+// (decision 0044, "Narrowing"); the metadata store satisfies it, and the
+// platform's store adapters (platform/store/sql and platform/store/inmem)
+// implement InstanceStore. The package imports the kernel and the standard
+// library.
 //
 // # Inputs
 //
@@ -93,15 +94,16 @@
 //     Init return their errors; kernel.ErrConflict from Init, another
 //     instance having stored its identity first, is success).
 //
-// The metadata store's instance contract (the Instance subtest: Get and
-// Update before Init are kernel.ErrNotFound, a second Init is
-// kernel.ErrConflict, keys come back as copies, key rotation, an identity
-// without keys, and cancelled contexts) runs on its in-memory, SQLite and
-// PostgreSQL stores. The composition root's TestAccRuntimeTokens creates
-// the identity on a first start and keeps it across a restart, and its
-// TestAccOpenTokensWithoutIdentity checks that the token service does not
-// start when the identity cannot be read back. The tests beside the shared
-// types' and the metadata store's bridges fail if an alias of the identity,
-// the validator, its sentinel, the protocol version or the port becomes a
-// declared copy.
+// The platform's instance contract (the Instance subtest of
+// platform/store/storetest: Get and Update before Init are
+// kernel.ErrNotFound, a second Init is kernel.ErrConflict, keys come back as
+// copies, key rotation, an identity without keys, and cancelled contexts)
+// runs on the platform's in-memory and SQLite stores and on the metadata
+// store's in-memory, SQLite and PostgreSQL stores. The composition root's
+// TestAccRuntimeTokens creates the identity on a first start and keeps it
+// across a restart, and its TestAccOpenTokensWithoutIdentity checks that the
+// token service does not start when the identity cannot be read back. The
+// tests beside the shared types' and the metadata store's bridges fail if an
+// alias of the identity, the validator, its sentinel, the protocol version
+// or the port becomes a declared copy.
 package instance

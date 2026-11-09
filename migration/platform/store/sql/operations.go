@@ -20,7 +20,6 @@ import (
 // it encodes to.
 func (s *Store) Settings() settings.SettingsStore { return settingStore{s} }
 
-// settingStore keeps the settings table.
 type settingStore struct{ s *Store }
 
 func (st settingStore) Get(ctx context.Context, key string, into any) error {
@@ -76,7 +75,6 @@ func (st settingStore) Keys(ctx context.Context) ([]string, error) {
 // Leases returns the lease store.
 func (s *Store) Leases() work.LeaseStore { return leaseStore{s} }
 
-// leaseStore keeps the leases table.
 type leaseStore struct{ s *Store }
 
 func (l leaseStore) Acquire(ctx context.Context, lease work.Lease, now time.Time) (bool, error) {

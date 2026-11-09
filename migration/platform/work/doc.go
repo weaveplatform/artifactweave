@@ -20,11 +20,11 @@
 // and its rows are declared here, by the package that persists through them,
 // and New takes Store, the two methods the queue calls, so that the package
 // imports no store (decision 0044, "Narrowing"); the metadata store
-// satisfies it. The SQL and in-memory stores implement WorkQueue and
-// LeaseStore, and what must not run twice at once, such as the blob
-// mirror's repair and the NuGet and Nix publication locks, takes a Lease
-// through LeaseStore. The package imports the kernel, the OpenTelemetry
-// metric API and the standard library.
+// satisfies it. The platform's store adapters (platform/store/sql and
+// platform/store/inmem) implement WorkQueue and LeaseStore, and what must
+// not run twice at once, such as the blob mirror's repair and the NuGet and
+// Nix publication locks, takes a Lease through LeaseStore. The package
+// imports the kernel, the OpenTelemetry metric API and the standard library.
 //
 // # Inputs
 //
@@ -131,10 +131,12 @@
 //     a store that fails.
 //   - types_test.go: TestUnitLeaseHeld.
 //
-// The metadata store's work and lease contracts (the Work* subtests:
+// The queue's tests run over the platform's in-memory store. The platform's
+// work and lease contracts (the Work* subtests of platform/store/storetest:
 // validation, lifecycle, coalescing, fencing, failures, LeaseKey,
-// transactions and concurrency; and the Leases subtest) run on its
+// transactions and concurrency; and the Leases subtest) run on the
+// platform's in-memory and SQLite stores and on the metadata store's
 // in-memory, SQLite and PostgreSQL stores. The tests beside the store's and
-// the shared types' bridges fail if an alias of the port or the rows
-// becomes a declared copy.
+// the shared types' bridges fail if an alias of the port or the rows becomes
+// a declared copy.
 package work
