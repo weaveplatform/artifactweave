@@ -25,13 +25,6 @@ func permDecode(t *testing.T, rec *httptest.ResponseRecorder, into any) {
 	}
 }
 
-func mustStatus(t *testing.T, rec *httptest.ResponseRecorder, want int, what string) {
-	t.Helper()
-	if rec.Code != want {
-		t.Fatalf("%s: status %d, want %d: %s", what, rec.Code, want, rec.Body)
-	}
-}
-
 // TestAccPermissionAcrossFormats writes a permission in each API and reads it
 // back in the other two: one stored record, three views (decision 0006).
 func TestAccPermissionAcrossFormats(t *testing.T) {

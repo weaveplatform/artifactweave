@@ -114,6 +114,7 @@
       "download_policy_test.go",
       "encrypt_states_v1_test.go",
       "error_profiles_p8_test.go",
+      "fixtures_test.go",
       "folder_limit_test.go",
       "format_tables_test.go",
       "format_test.go",

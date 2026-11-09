@@ -118,5 +118,3 @@ func TestAccTokenAuthentication(t *testing.T) {
 		t.Errorf("admin token: %d %s", rec.Code, rec.Body)
 	}
 }
-
-func ptr[T any](v T) *T { return &v }

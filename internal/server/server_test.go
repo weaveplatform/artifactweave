@@ -16,7 +16,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
 func testHandler() http.Handler {
@@ -27,17 +26,6 @@ func testHandler() http.Handler {
 			Revision:      "v0.1.0-3-gabc",
 		},
 	)
-}
-
-func do(
-	t *testing.T,
-	h http.Handler,
-	method, path string,
-	headers map[string]string,
-	body string,
-) *httptest.ResponseRecorder {
-	t.Helper()
-	return support.Do(t, h, method, path, headers, body)
 }
 
 func decode(t *testing.T, body string) any {

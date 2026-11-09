@@ -14,12 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
-	"github.com/weaveplatform/artifactweave/test/server/support"
 )
-
-func basic(user, password string) map[string]string {
-	return support.Basic(user, password)
-}
 
 func TestAccAuthenticatePrincipal(t *testing.T) {
 	db := inmem.New()

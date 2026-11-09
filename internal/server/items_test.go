@@ -13,165 +13,18 @@ import (
 	"math"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"slices"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
-
-// itemWorld is a seeded store and blob store behind the router. Every user's
-// password is "pw": admin; reader (in readers, so it reads everything);
-// deployer (may deploy to libs-local but not delete); user (no rights).
-type itemWorld struct {
-	t     *testing.T
-	h     http.Handler
-	db    *inmem.Store
-	blobs blob.Store
-}
-
-// signingBlobs makes a blob store a signer of the routes it lists, with
-// the signing options readable back from the URL. err fails every signature.
-type signingBlobs struct {
-	blob.Store
-	routes []blob.Via
-	err    error
-}
-
-// storageSigner signs storage URLs only, as an object store without a CDN.
-func storageSigner(st blob.Store) signingBlobs {
-	return signingBlobs{Store: st, routes: []blob.Via{blob.ViaStorage}}
-}
-
-func (b signingBlobs) Signs(via blob.Via) bool { return slices.Contains(b.routes, via) }
-
-func (b signingBlobs) SignURL(_ context.Context, sha string, o blob.SignOptions) (string, error) {
-	if b.err != nil {
-		return "", b.err
-	}
-	q := url.Values{"ttl": {o.TTL.String()}, "name": {o.Filename}, "type": {o.ContentType}}
-	return "https://" + o.Via.String() + ".example/" + sha + "?" + q.Encode(), nil
-}
-
-// anonymousRemotes is the permission newItemWorld gives anonymous when
-// anonymous access is on: read on every remote repository.
-const anonymousRemotes = "anonymous-remotes"
-
-// newItemWorld builds the world; tune adjusts the router's configuration,
-// for tests that need another blob store or a logger they can read.
-func newItemWorld(t *testing.T, anonymous bool, tune ...func(*Config)) *itemWorld {
-	t.Helper()
-	ctx := context.Background()
-	db := inmem.New()
-	cheapSeed(t, db)
-	hash := cheapHash
-	for _, u := range []types.User{
-		{Name: "reader", PasswordHash: hash, Groups: []string{authn.ReadersGroup}},
-		{Name: "deployer", PasswordHash: hash},
-		{Name: "user", PasswordHash: hash},
-	} {
-		if err := db.Users().Create(ctx, u); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := db.Permissions().Create(ctx, types.Permission{
-		Name: "deploy-libs",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{
-				"deployer": types.ActionRead | types.ActionWrite,
-			}},
-			Targets: map[string]types.Target{"libs-local": {Include: []string{"**"}}},
-		}},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if anonymous {
-		if err := db.Settings().Put(ctx, types.SettingAnonymousAccess, true); err != nil {
-			t.Fatal(err)
-		}
-		// The seeded Any Remote grants anonymous nothing (#383), so anonymous
-		// reads remotes through a permission of its own, as JFrog advises.
-		if err := db.Permissions().Create(ctx, types.Permission{
-			Name: anonymousRemotes,
-			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{
-					kernel.AnonymousUser: types.ActionRead,
-				}},
-				Targets: map[string]types.Target{types.TargetAnyRemote: {Include: []string{"**"}}},
-			}},
-		}); err != nil {
-			t.Fatal(err)
-		}
-	}
-	for _, c := range []repo.Config{
-		{Key: "libs-local", Class: repo.Local},
-		{Key: "other-local", Class: repo.Local},
-		{Key: "server-local", Class: repo.Local, ChecksumPolicyType: repo.ServerGeneratedChecksums},
-		{Key: "redirect-local", Class: repo.Local, DownloadRedirect: repo.Flex(true)},
-		{Key: "up", Class: repo.Remote, URL: "https://up.example"},
-		{
-			Key: "virt", Class: repo.Virtual, Repositories: []string{"missing", "other-local", "libs-local", "up"},
-			DefaultDeploymentRepo: "libs-local",
-		},
-		{Key: "loop", Class: repo.Virtual, Repositories: []string{"loop"}},
-		{Key: "virt-nodeploy", Class: repo.Virtual, Repositories: []string{"libs-local"}},
-	} {
-		if err := db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
-			t.Fatal(err)
-		}
-	}
-	fsBlobs, err := fs.New(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	a, err := authn.NewAuthenticator(db.Users(), db.Settings(), authn.Options{Hash: testHash})
-	if err != nil {
-		t.Fatal(err)
-	}
-	cfg := Config{
-		BaseURL: "https://reg.example", CompatVersion: "7.155.0",
-		Store: db, Blobs: storageSigner(fsBlobs), Auth: a,
-	}
-	for _, f := range tune {
-		f(&cfg)
-	}
-	w := &itemWorld{t: t, db: db, blobs: cfg.Blobs}
-	w.h = New(cfg)
-	return w
-}
-
-func (w *itemWorld) do(
-	method, path, as, body string,
-	headers ...string,
-) *httptest.ResponseRecorder {
-	w.t.Helper()
-	h := map[string]string{}
-	if as != "" {
-		h = basic(as, "pw")
-	}
-	for i := 0; i+1 < len(headers); i += 2 {
-		h[headers[i]] = headers[i+1]
-	}
-	return do(w.t, w.h, method, path, h, body)
-}
-
-func (w *itemWorld) item(key string, cached bool, p string) types.Item {
-	w.t.Helper()
-	it, err := w.db.Items().Get(context.Background(), key, cached, p)
-	if err != nil {
-		w.t.Fatalf("item %s/%s: %v", key, p, err)
-	}
-	return it
-}
 
 func sha1Hex(s string) string {
 	b := sha1.Sum([]byte(s)) //nolint:gosec // wire checksum
@@ -186,13 +39,6 @@ func sha256Hex(s string) string {
 func sha512Hex(s string) string {
 	b := sha512.Sum512([]byte(s))
 	return hex.EncodeToString(b[:])
-}
-
-func wantStatus(t *testing.T, rec *httptest.ResponseRecorder, want int) {
-	t.Helper()
-	if rec.Code != want {
-		t.Fatalf("status %d, want %d: %s", rec.Code, want, rec.Body)
-	}
 }
 
 func TestAccDeployAndDownload(t *testing.T) {

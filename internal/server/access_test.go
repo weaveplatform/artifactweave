@@ -17,7 +17,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -96,12 +95,6 @@ func accessWorld(t *testing.T) (http.Handler, *token.Service) {
 		// TestAccAdminThroughGroup mints tokens with passwords.
 		Tokens: tokens, AllowBasicAuthTokens: true,
 	}), tokens
-}
-
-// authorizerOver is the access module's Authorizer over st, as New binds it
-// for a Config whose Access is unset.
-func authorizerOver(st store.Store) accessapi.Authorizer {
-	return withAccess(Config{Store: st}).Access.Authorizer
 }
 
 func TestAccPathLevelPermissions(t *testing.T) {

@@ -11,8 +11,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -21,82 +19,6 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
-
-// repoWorld is a seeded store behind the router: admin and "reader" (in the
-// readers group, so the seeded Anything permission lets it read every
-// repository) both use password "pw".
-type repoWorld struct {
-	t  *testing.T
-	h  http.Handler
-	db *inmem.Store
-	// fail makes the store's repository index fail the named operations.
-	fail       map[string]bool
-	remoteHTTP *upstream.Pool
-}
-
-func newRepoWorld(t *testing.T) *repoWorld {
-	t.Helper()
-	ctx := context.Background()
-	db := inmem.New()
-	cheapSeed(t, db)
-	reader := types.User{
-		Name:         "reader",
-		PasswordHash: cheapHash,
-		Groups:       []string{authn.ReadersGroup},
-	}
-	if err := db.Users().Create(ctx, reader); err != nil {
-		t.Fatal(err)
-	}
-	a, err := authn.NewAuthenticator(db.Users(), db.Settings(), authn.Options{Hash: testHash})
-	if err != nil {
-		t.Fatal(err)
-	}
-	w := &repoWorld{t: t, db: db, fail: map[string]bool{}}
-	w.remoteHTTP = new(upstream.Pool)
-	t.Cleanup(w.remoteHTTP.Close)
-	w.h = New(Config{
-		BaseURL: "https://reg.example", CompatVersion: "7.155.0",
-		Store: faultyStore{Store: db, fail: w.fail}, Auth: a,
-		RemoteHTTP: w.remoteHTTP,
-	})
-	return w
-}
-
-func (w *repoWorld) create(cs ...repo.Config) {
-	w.t.Helper()
-	for _, c := range cs {
-		if err := w.db.Repos().Create(context.Background(), *repo.Defaults(&c)); err != nil {
-			w.t.Fatal(err)
-		}
-	}
-}
-
-func (w *repoWorld) do(
-	method, path, as, body string,
-	headers ...string,
-) *httptest.ResponseRecorder {
-	w.t.Helper()
-	h := map[string]string{}
-	if as != "" {
-		h = basic(as, "pw")
-	}
-	if body != "" {
-		h["Content-Type"] = "application/json"
-	}
-	for i := 0; i+1 < len(headers); i += 2 {
-		h[headers[i]] = headers[i+1]
-	}
-	return do(w.t, w.h, method, path, h, body)
-}
-
-func (w *repoWorld) stored(key string) repo.Config {
-	w.t.Helper()
-	c, err := w.db.Repos().Get(context.Background(), key)
-	if err != nil {
-		w.t.Fatal(err)
-	}
-	return c
-}
 
 // faultyStore fails the repository operations named in fail with errBoom.
 type faultyStore struct {

@@ -10,28 +10,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/test/server/support"
 )
-
-func bearerAuth(token string) map[string]string {
-	return support.Bearer(token)
-}
-
-func jsonAs(headers map[string]string) map[string]string {
-	out := map[string]string{"Content-Type": "application/json"}
-	for k, v := range headers {
-		out[k] = v
-	}
-	return out
-}
-
-func formAs(headers map[string]string) map[string]string {
-	out := map[string]string{"Content-Type": "application/x-www-form-urlencoded"}
-	for k, v := range headers {
-		out[k] = v
-	}
-	return out
-}
 
 // allowBasicTokens turns token.allow_basic_auth on, for a fixture whose
 // tests mint their tokens with the admin's password.
