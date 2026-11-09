@@ -65,7 +65,8 @@ func TestUnitBridgeKernelAuthSentinels(t *testing.T) {
 		t.Fatal(err)
 	}
 	db := inmem.New()
-	if err := db.Users().Create(t.Context(), types.User{Name: "ann", PasswordHash: hash}); err != nil {
+	if err := db.Users().
+		Create(t.Context(), types.User{Name: "ann", PasswordHash: hash}); err != nil {
 		t.Fatal(err)
 	}
 	a, err := authn.NewAuthenticator(db.Users(), db.Settings(), authn.Options{Hash: cheap})
