@@ -10,10 +10,10 @@
 // Idempotency-Key header, the credential, the operation and the resource into
 // a ReplayRequest, and the build service runs a protected build append
 // through ReplayStore. The port and its values are declared here, apart from
-// any store, so that the platform imports no module; the metadata store's SQL
-// and in-memory stores implement ReplayStore over the api_replays table, and
-// its Replays returns it. The package imports the kernel and the standard
-// library.
+// any store, so that the platform imports no module; the platform's store
+// adapters (platform/store/sql and platform/store/inmem) implement
+// ReplayStore over the api_replays table, and the metadata store's Replays
+// returns theirs. The package imports the kernel and the standard library.
 //
 // # Inputs
 //
@@ -83,15 +83,16 @@
 // # Testing
 //
 // The package declares only the port and its values, so it has no tests of
-// its own. The metadata store's replay contract (the Replays, ReplayRollback
-// and ReplayInProgressCancellation subtests: concurrent identical requests
-// run the effect once and replay it after, a changed fingerprint is
-// ErrReplayMismatch, another scope and an expired key run new effects,
-// bounded pruning, the requests Validate refuses, failed and nested
-// transactions, and a duplicate that stops waiting when its context ends)
-// runs on its in-memory, SQLite and PostgreSQL stores. The SQLite and
-// PostgreSQL stores' TestAccReplayProcessCrash kills a process inside the
-// receipt transaction, and the PostgreSQL store's
+// its own. The platform's replay contract (the Replays, ReplayRollback and
+// ReplayInProgressCancellation subtests of platform/store/storetest:
+// concurrent identical requests run the effect once and replay it after, a
+// changed fingerprint is ErrReplayMismatch, another scope and an expired key
+// run new effects, bounded pruning, the requests Validate refuses, failed and
+// nested transactions, and a duplicate that stops waiting when its context
+// ends) runs on the platform's in-memory and SQLite stores and on the
+// metadata store's in-memory, SQLite and PostgreSQL stores. The metadata
+// store's SQLite and PostgreSQL stores' TestAccReplayProcessCrash kills a
+// process inside the receipt transaction, and the PostgreSQL store's
 // TestAccReplayPruneDoesNotDeleteRenewal keeps a renewed receipt that a
 // concurrent prune had selected. The build service's AppendOnce tests and the
 // HTTP boundary's idempotency tests run through the port, and the test beside

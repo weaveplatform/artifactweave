@@ -18,8 +18,9 @@
 // administrative recovery routes. The request budget port and its values are
 // declared here, by the package that charges through them, and New takes
 // Store, the one method it calls, so that the package imports no store
-// (decision 0044, "Narrowing"); the metadata store satisfies it, and its SQL
-// and in-memory stores implement RequestBudgetStore. The package imports the
+// (decision 0044, "Narrowing"); the metadata store and the platform's store
+// satisfy it, and the platform's store adapters (platform/store/sql and
+// platform/store/inmem) implement RequestBudgetStore. The package imports the
 // kernel and the standard library.
 //
 // # Inputs
@@ -103,9 +104,11 @@
 //   - recovery_test.go: TestUnitRecoveryReservedAllowance (two concurrent
 //     requests and sixty a minute, the window reset and a canceled context).
 //
-// The metadata store's request budget contract (the RequestBudgets subtest)
-// runs on its in-memory, SQLite and PostgreSQL stores, the HTTP boundary's
-// request limit tests run against this package, and the test beside the
-// metadata store's bridge fails if an alias of the port or its values
-// becomes a declared copy.
+// The tests build their services over the platform's in-memory store. The
+// platform's request budget contract (the RequestBudgets and
+// RequestBudgetBoundedPruning subtests of platform/store/storetest) runs on
+// the platform's in-memory and SQLite stores and on the metadata store's
+// in-memory, SQLite and PostgreSQL stores, the HTTP boundary's request limit
+// tests run against this package, and the test beside the metadata store's
+// bridge fails if an alias of the port or its values becomes a declared copy.
 package apilimit

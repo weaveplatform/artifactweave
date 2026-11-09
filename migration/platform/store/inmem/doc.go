@@ -1,18 +1,22 @@
 // Package inmem is the in-memory implementation of the stores the platform
 // owns: the persistent work queue, leases, settings, configuration
-// documents and this instance's identity.
+// documents, this instance's identity, the federation outbox, upload
+// sessions, API replays and request budgets.
 //
 // # Role
 //
 // platform layer, adapter: the in-memory reference implementation of the
 // platform's ports (work.WorkQueue, work.LeaseStore,
-// settings.SettingsStore, configdoc.ConfigStore and instance.InstanceStore)
-// over a shared memtx.Store. The metadata store's in-memory store builds one
-// Store over its own memtx.Store, delegates its five platform accessors to
-// it and registers the layout fence as a watch; STO-19 moves that
-// composition into app. Tests that need only a platform store, such as the
-// work queue's, build it alone over memtx.New(). The package imports the
-// standard library, the kernel and platform packages only.
+// settings.SettingsStore, configdoc.ConfigStore, instance.InstanceStore,
+// outbox.OutboxStore, session.UploadStore, idempotency.ReplayStore and
+// apilimit.RequestBudgetStore) over a shared memtx.Store. The metadata
+// store's in-memory store builds one Store over its own memtx.Store,
+// delegates its nine platform accessors to it and registers the layout
+// fence as a watch; STO-19 moves that composition into app. Tests that need
+// only a platform store, such as the work queue's, the upload sessions',
+// the cloud blob backends' and the request limiter's, build it alone over
+// memtx.New(). The package imports the standard library, the kernel and
+// platform packages only.
 //
 // # Inputs
 //
@@ -23,8 +27,9 @@
 //
 // # Outputs
 //
-//   - Store, from New, with Settings, Leases, WorkQueue, Configs and
-//     Instance, and memtx's Tx, AfterCommit and Close.
+//   - Store, from New, with Settings, Leases, WorkQueue, Configs, Instance,
+//     Outbox, Uploads, Replays and RequestBudgets, and memtx's Tx,
+//     AfterCommit and Close.
 //
 // # Invariants
 //
@@ -40,12 +45,22 @@
 //   - Settings keep each value as the JSON it encodes to, and times compare
 //     at the precision the SQL columns store, so a read returns what the
 //     SQL store would.
+//   - The replay store writes its records straight into its table's rows,
+//     without kernel.Normalise, because a record's fields are unexported
+//     and Normalise does not reach them; Do normalises the receipt's expiry
+//     before it stores it.
 //
 // # References
 //
 //   - Decision 0015: docs/research/decisions/0015-testing-and-acceptance.md
 //     (the in-memory store is the contract's reference backend).
+//   - Decision 0021: docs/research/decisions/0021-peer-trust-and-sync-protocol.md
+//     (the instance identity and the ordered outbox).
+//   - Decision 0027: docs/research/decisions/0027-cloud-blob-backends.md
+//     (upload sessions in the uploads table).
 //   - Decision 0033: docs/research/decisions/0033-persistent-work-queue.md.
+//   - Decision 0043: docs/research/decisions/0043-api-reliability.md
+//     (API replays and request budgets).
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md
 //     ("Persistence": one in-memory database for every module store, and
 //     the platform's adapters in platform/store).
@@ -56,14 +71,17 @@
 //     and #p9d-modular-monolith-migration, epic STO
 //     (https://github.com/weaveplatform/artifactweave/issues/939).
 //   - https://github.com/weaveplatform/artifactweave/issues/1056
+//   - https://github.com/weaveplatform/artifactweave/issues/1057
 //
 // # Status
 //
-// Implemented P2: the settings, lease, configuration document and instance
-// stores, as the metadata store's (pull request 3). P7: the persistent work
-// queue (issue 297, pull request 299). P9: layout writes fence the remote
-// repositories that use the layout (pull request 680). Staged in P9d: Store
-// and New, with the watches in place of the layout fence.
+// Implemented P2: the settings, lease, configuration document, instance,
+// outbox and upload stores, as the metadata store's (pull request 3). P7:
+// the persistent work queue (issue 297, pull request 299). P9: layout writes
+// fence the remote repositories that use the layout (pull request 680).
+// P9c: the replay and request budget stores (issue 890, pull request 905).
+// Staged in P9d: Store and New, with the watches in place of the layout
+// fence.
 //
 // # Testing
 //
