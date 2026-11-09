@@ -77,50 +77,60 @@ var slashCollections = map[string]string{
 	"/artifactory/api/security/keypair/": "/artifactory/api/security/keypair",
 }
 
-// requestDetails keeps what the strict handlers need beyond their decoded
-// request: the Accept header for media-type negotiation, the raw query of a
-// property search, and the raw body of a repository or Access v2 group
-// update. repo.Config cannot tell a field left out (keep the stored value)
-// from one sent as null (reset it to its default), and an update needs both.
-// A build-info publish or append keeps its raw body too, because the
-// document is stored as published (decision 0014). It runs after middleware.BodyLimit,
-// so the copy is bounded.
-func requestDetails(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := httpkit.WithAccept(r.Context(), r.Header.Get("Accept"))
-		if r.URL.Path == propertySearchPath || r.URL.Path == "/artifactory/api/search/gavc" {
-			ctx = httpkit.WithSearchQuery(ctx, r.URL.RawQuery)
-		}
-		if r.Method == http.MethodPut && policyPaths[r.URL.Path] {
-			if err := normalizePolicyBody(r); err != nil {
-				middleware.BindingError(http.StatusBadRequest)(w, r, err)
-				return
-			}
-		}
-		// A permission create keeps its raw body too: the generated Access
-		// type drops the destination and pipeline_source sections.
-		if (r.Method == http.MethodPost &&
-			(isRepositoryUpdate(r.URL.Path) || r.URL.Path == "/access/api/v2/permissions" ||
-				strings.HasPrefix(r.URL.Path, buildsPath+"/append/"))) ||
-			(r.Method == http.MethodPut && r.URL.Path == buildsPath) ||
-			(r.Method == http.MethodPatch && isGroupUpdate(r.URL.Path)) {
-			b, err := io.ReadAll(r.Body)
-			if err != nil {
-				middleware.BindingError(http.StatusBadRequest)(w, r, err)
-				return
-			}
-			r.Body = io.NopCloser(bytes.NewReader(b))
-			ctx = httpkit.WithRawBody(ctx, b)
-		}
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+// detailOptions name the requests whose details requestDetails keeps. Each
+// contribution is declared beside the handler that reads what it keeps.
+type detailOptions struct {
+	// SearchQuery reports the requests whose raw query is kept
+	// (httpkit.RawSearchQuery), for parameters the generated binding drops.
+	SearchQuery []func(*http.Request) bool
+	// Rewrite normalises a request's body before the generated binding
+	// decodes it, each in order; an error answers 400 as a binding error.
+	Rewrite []func(*http.Request) error
+	// RawBody reports the requests whose raw body is kept (httpkit.RawBody),
+	// for handlers that must tell what the decoded type cannot.
+	RawBody []func(*http.Request) bool
 }
 
-// isGroupUpdate matches PATCH /access/api/v2/groups/{name}, whose raw body
-// tells a field left out from one sent with its stored value.
-func isGroupUpdate(path string) bool {
-	name, ok := strings.CutPrefix(path, accessGroups)
-	return ok && name != "" && !strings.Contains(name, "/")
+// requestDetails keeps what the strict handlers need beyond their decoded
+// request: the Accept header of every request, for media-type negotiation,
+// and the raw query, rewritten body and raw body of the requests o names.
+// It runs after middleware.BodyLimit, so the copy is bounded.
+func requestDetails(o detailOptions) func(http.Handler) http.Handler {
+	matches := func(preds []func(*http.Request) bool, r *http.Request) bool {
+		return slices.ContainsFunc(preds, func(p func(*http.Request) bool) bool { return p(r) })
+	}
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := httpkit.WithAccept(r.Context(), r.Header.Get("Accept"))
+			if matches(o.SearchQuery, r) {
+				ctx = httpkit.WithSearchQuery(ctx, r.URL.RawQuery)
+			}
+			for _, rewrite := range o.Rewrite {
+				if err := rewrite(r); err != nil {
+					middleware.BindingError(http.StatusBadRequest)(w, r, err)
+					return
+				}
+			}
+			if matches(o.RawBody, r) {
+				b, err := io.ReadAll(r.Body)
+				if err != nil {
+					middleware.BindingError(http.StatusBadRequest)(w, r, err)
+					return
+				}
+				r.Body = io.NopCloser(bytes.NewReader(b))
+				ctx = httpkit.WithRawBody(ctx, b)
+			}
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+// keepsRepositoryBody reports a repository update, which keeps its raw
+// body: repo.Config cannot tell a field left out (keep the stored value)
+// from one sent as null (reset it to its default), and an update needs
+// both.
+func keepsRepositoryBody(r *http.Request) bool {
+	return r.Method == http.MethodPost && isRepositoryUpdate(r.URL.Path)
 }
 
 func isRepositoryUpdate(path string) bool {

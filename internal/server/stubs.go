@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
+	terraformhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/http"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
@@ -19,7 +20,8 @@ var errorProfileRules = []httpkit.ProfileRule{
 	{Match: pathPrefix("/xray/"), Profile: apierror.ProfileXray},
 	{
 		Match: func(path string) bool {
-			return npmOperation(path) || isNPMReindex(path) || isTerraformReindex(path)
+			return npmOperation(path) || isNPMReindex(path) ||
+				terraformhttp.IsTerraformReindex(path)
 		},
 		Profile: apierror.ProfileArtifactory,
 	},
@@ -83,19 +85,6 @@ func pathPrefix(prefixes ...string) func(path string) bool {
 		}
 		return false
 	}
-}
-
-// isTerraformReindex reports whether path is the JFrog reindex operation
-// beside the Terraform registry. It is Artifactory's REST operation, not
-// the registry's, so it answers in Artifactory's envelope, as the JFrog
-// operations beside npm's registry do (RTFACT-30181), where the registry's
-// routes answer {"errors":["..."]} (decision 0040). [I] No 7.x capture shows
-// this operation's error body (#216). Only POST is the operation, and no
-// registry route has two segments, so any method takes the envelope.
-func isTerraformReindex(path string) bool {
-	rest, ok := strings.CutPrefix(path, "/artifactory/api/terraform/")
-	key, op, _ := strings.Cut(rest, "/")
-	return ok && key != "" && op == "reindex"
 }
 
 // notSupported answers for JFrog products artifactweave deliberately does not

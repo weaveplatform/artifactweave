@@ -10,6 +10,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/middleware"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )
@@ -106,9 +107,13 @@ func TestAccRegistryKeepsContentType(t *testing.T) {
 		"/artifactory/api/repositories/r":               "application/json",
 	} {
 		var got string
-		h := normalizeContentType(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-			got = r.Header.Get("Content-Type")
-		}))
+		h := middleware.NormalizeContentType(
+			keepContentType,
+		)(
+			http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+				got = r.Header.Get("Content-Type")
+			}),
+		)
 		do(t, h, http.MethodPut, path, map[string]string{"Content-Type": manifest}, "{}")
 		if got != want {
 			t.Errorf("%s: Content-Type %q, want %q", path, got, want)

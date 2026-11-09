@@ -1015,3 +1015,10 @@ func (s accessService) DeletePermissionResource(
 	}
 	return accessgen.DeletePermissionResource204Response{}, nil
 }
+
+// keepsPermissionBody reports an Access v2 permission create, whose raw
+// body requestDetails keeps: the generated Access type drops the
+// destination and pipeline_source sections.
+func keepsPermissionBody(r *http.Request) bool {
+	return r.Method == http.MethodPost && r.URL.Path == "/access/api/v2/permissions"
+}

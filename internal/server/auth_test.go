@@ -25,11 +25,15 @@ func TestAccAuthenticatePrincipal(t *testing.T) {
 		t.Fatal(err)
 	}
 	var got *kernel.Principal
-	h := authenticate(a, nil, nil)(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-		if p, ok := kernel.FromContext(r.Context()); ok {
-			got = &p
-		}
-	}))
+	h := authenticate(
+		newAuthnOptions(a, nil),
+	)(
+		http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+			if p, ok := kernel.FromContext(r.Context()); ok {
+				got = &p
+			}
+		}),
+	)
 	serve := func(headers map[string]string) {
 		got = nil
 		do(t, h, "GET", "/artifactory/api/system/ping", headers, "")
@@ -85,11 +89,15 @@ func TestAccAuthenticateAttachesDecider(t *testing.T) {
 		stored  bool
 		d       accessapi.Decider
 	)
-	h := authenticate(a, db, skip)(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-		reached = true
-		p, stored = kernel.FromContext(r.Context())
-		d, _ = accessapi.DeciderFrom(r.Context())
-	}))
+	h := authenticate(
+		newAuthnOptions(a, db, skip),
+	)(
+		http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+			reached = true
+			p, stored = kernel.FromContext(r.Context())
+			d, _ = accessapi.DeciderFrom(r.Context())
+		}),
+	)
 	check := func(name, path string, headers map[string]string, authorised bool) {
 		t.Helper()
 		reached, p, stored, d = false, kernel.Principal{}, false, nil
@@ -142,9 +150,13 @@ func TestAccAuthenticateStoreFailures(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := authenticate(a, nil, nil)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
-		t.Error("the request reached the handler")
-	}))
+	h := authenticate(
+		newAuthnOptions(a, nil),
+	)(
+		http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			t.Error("the request reached the handler")
+		}),
+	)
 	for name, headers := range map[string]map[string]string{
 		"credentials": basic("admin", "pw"),
 		"none":        nil,

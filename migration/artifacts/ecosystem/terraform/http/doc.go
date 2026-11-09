@@ -34,6 +34,8 @@
 //
 //   - Protocol and Options: the routes, the source of each repository
 //     class and the Terraform registry error profile.
+//   - IsTerraformReindex: the JFrog reindex operation beside the registry,
+//     which the server's error profile rules give Artifactory's envelope.
 //   - Answers: the discovery document; a module's versions and its
 //     download location; a provider's versions and its download metadata
 //     with the signing keys; the network mirror's index and version

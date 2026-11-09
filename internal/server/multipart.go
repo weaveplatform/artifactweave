@@ -28,6 +28,19 @@ const (
 	uploadsAbort    = "/artifactory/api/v1/uploads/abort"
 )
 
+// selfAuthenticated routes verify their own credential, so the middleware
+// passes them untouched: the multipart upload calls carry the upload token
+// as a Bearer token, which only the multipart service can verify until
+// access tokens arrive (P4), and a part PUT carries a signed URL and no
+// credentials at all, as the CLI sends it.
+var selfAuthenticated = map[string]bool{
+	"POST " + uploadsURLPart:  true,
+	"PUT " + uploadsPart:      true,
+	"POST " + uploadsComplete: true,
+	"POST " + uploadsStatus:   true,
+	"POST " + uploadsAbort:    true,
+}
+
 func (s artifactoryService) registerMultipartRoutes(r chi.Router) {
 	r.With(middleware.BodyLimit(managementBodyLimit)).Post(uploadsCreate, s.createMultipart)
 	r.With(middleware.BodyLimit(managementBodyLimit)).Post(uploadsURLPart, s.multipartPartURL)

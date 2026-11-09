@@ -610,3 +610,11 @@ func buildInfoProject(repoKey string) (string, bool) {
 	p, ok := strings.CutSuffix(repoKey, "-build-info")
 	return p, ok && p != ""
 }
+
+// keepsBuildBody reports a build-info publish or append, whose raw body
+// requestDetails keeps because the document is stored as published
+// (decision 0014).
+func keepsBuildBody(r *http.Request) bool {
+	return r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, buildsPath+"/append/") ||
+		r.Method == http.MethodPut && r.URL.Path == buildsPath
+}

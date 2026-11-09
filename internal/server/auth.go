@@ -5,12 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authz"
-	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -18,29 +18,14 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// publicRoutes answer without credentials even when anonymous access is off:
-// the probes clients make before they authenticate, the Access version, and
-// the telemetry sinks every jf command posts to (research 05).
-//
-// GET /artifactory/api/system/version is deliberately absent: Artifactory
-// requires a valid user for it and has refused anonymous callers since
-// 7.35.1 (RTFACT-26414), so it answers as any other route does, anonymous
-// only while anonymous access is on (research 01). The JFrog CLI and the
-// Terraform providers send their credentials with it; the CLI's usage
-// report, which sends none when none are configured, only logs the 401.
-var publicRoutes = map[string]bool{
-	"GET /artifactory/api/system/ping":              true,
-	"GET /artifactory/api/v1/system/readiness":      true,
-	"GET /artifactory/api/v1/system/liveness":       true,
-	"GET /access/api/v1/system/ping":                true,
-	"GET /access/api/v1/system/version":             true,
-	"GET /router/api/v1/system/health":              true,
-	"GET /router/api/v1/system/readiness":           true,
-	"GET /router/api/v1/system/liveness":            true,
-	"GET /access/api/v1/system/readiness":           true,
-	"GET /access/api/v1/system/liveness":            true,
-	"POST /artifactory/api/system/usage":            true,
-	"POST /jfconnect/api/v1/backoffice/metrics/log": true,
+// accessPublicRoutes are Access's routes that answer without credentials
+// even when anonymous access is off: its probes, which clients make before
+// they authenticate, its version, token creation and the OIDC exchange.
+var accessPublicRoutes = map[string]bool{
+	"GET /access/api/v1/system/ping":      true,
+	"GET /access/api/v1/system/version":   true,
+	"GET /access/api/v1/system/readiness": true,
+	"GET /access/api/v1/system/liveness":  true,
 	// Token creation, because a refresh grant carries its own credential,
 	// the refresh token; the handlers require a user for every other grant.
 	"POST /access/api/v1/tokens":           true,
@@ -49,67 +34,96 @@ var publicRoutes = map[string]bool{
 	oidcTokenRoute: true,
 }
 
-// selfAuthenticated routes verify their own credential, so the middleware
-// passes them untouched: the multipart upload calls carry the upload token
-// as a Bearer token, which only the multipart service can verify until
-// access tokens arrive (P4), and a part PUT carries a signed URL and no
-// credentials at all, as the CLI sends it.
-var selfAuthenticated = map[string]bool{
-	"POST " + uploadsURLPart:  true,
-	"PUT " + uploadsPart:      true,
-	"POST " + uploadsComplete: true,
-	"POST " + uploadsStatus:   true,
-	"POST " + uploadsAbort:    true,
-}
-
 // refreshRoute is the one route an expired access token reaches.
 const refreshRoute = "POST /access/api/v1/tokens"
 
-// authenticate puts the request's principal in its context. Credentials
-// that do not verify answer 401 at once, even on a public route, as
-// Artifactory does: a client with a wrong password learns it on its first
-// call. The exception is an expired Bearer access token on refreshRoute
-// (expiredRefresh). Without credentials the request acts as anonymous when
-// anonymous access is on, except on the registry (decision 0031); otherwise
-// only public routes answer. Every
-// principal is then authorised once (authn.Authorize): its permissions are
-// evaluated for the request, and the principal is stored with that
-// evaluator (authn.WithAuthorized), which handlers ask every question
-// through authn.DeciderFrom. The principal's name goes to the access log
-// (httpkit.NoteUser). A request skip reports passes untouched, credentials or not: a
-// protocol's absent path, such as Go's checksum database, which its router
-// answers 404 whoever asks, a host route served to anyone, such as
-// Terraform's discovery document, and a signed URL, such as Terraform's
-// downloads, whose handler checks the signature
-// (pkgroute.Protocol.SkipsAuthentication). So do npm's login and logout,
-// which check the password and the token they carry themselves
-// (npmUserPath).
-func authenticate(
-	a *authn.Authenticator,
-	st store.Store,
-	skip func(r *http.Request) bool,
-) func(http.Handler) http.Handler {
+// authnOptions are the values authenticate takes from the modules, which
+// the router composes. Credential parsing (credentials) is not among them:
+// every credential form is accepted the same way on every route.
+type authnOptions struct {
+	// Auth verifies credentials and answers whether anonymous access is on.
+	Auth *authn.Authenticator
+	// Store holds the permissions each principal is authorised with.
+	Store store.Store
+	// SelfAuthenticated holds "METHOD path" of the routes that verify their
+	// own credential, which pass untouched.
+	SelfAuthenticated map[string]bool
+	// Skip reports the requests that pass untouched, credentials or not,
+	// asked in order.
+	Skip []func(*http.Request) bool
+	// RegistryPath reports whether path is the registry's, the only place a
+	// registry token is good.
+	RegistryPath func(path string) bool
+	// ChallengeAnonymous reports whether a request to path without
+	// credentials is challenged even while anonymous access is on.
+	ChallengeAnonymous func(path string) bool
+	// CredentialKeepers each return the context an authenticated request
+	// goes on with, in order: the hook for the operations that need the
+	// credential itself, which no other request carries further than here.
+	CredentialKeepers []func(context.Context, *http.Request, kernel.Principal) context.Context
+	// PublicRoutes holds "METHOD path" of the routes that answer without
+	// credentials while anonymous access is off.
+	PublicRoutes map[string]bool
+}
+
+// authenticate puts the request's principal in its context. It decides in
+// this order, and the order matters:
+//
+//  1. A self-authenticated route passes untouched.
+//  2. So does a request a skip reports, credentials or not, the skips asked
+//     in order. npm's login and logout come first (npmUserPath): they check
+//     the password and the token they carry themselves, and a stale
+//     credential read there could suspend the very login that replaces it.
+//     Then a protocol's absent path, such as Go's checksum database, which
+//     its router answers 404 whoever asks, a host route served to anyone,
+//     such as Terraform's discovery document, and a signed URL, such as
+//     Terraform's downloads, whose handler checks the signature
+//     (pkgroute.Protocol.SkipsAuthentication).
+//  3. Credentials that do not verify answer 401 at once, even on a public
+//     route, as Artifactory does: a client with a wrong password learns it
+//     on its first call. An expired password may still change itself
+//     (ownPasswordChange), and a registry token is good for the registry
+//     alone (decision 0005).
+//  4. The exception is an expired Bearer access token on refreshRoute
+//     (expiredRefresh).
+//  5. A principal that verified is authorised once (authn.Authorize): its
+//     permissions are evaluated for the request, and the principal is
+//     stored with that evaluator (authn.WithAuthorized), which handlers ask
+//     every question through authn.DeciderFrom. The credential keepers add
+//     to its context first, in order. The principal's name goes to the
+//     access log (httpkit.NoteUser).
+//  6. Without credentials, a path that challenges anonymous requests
+//     answers 401 even while anonymous access is on (decision 0031).
+//  7. Otherwise the request acts as anonymous, authorised the same way,
+//     when anonymous access is on.
+//  8. With anonymous access off, only public routes answer.
+func authenticate(o authnOptions) func(http.Handler) http.Handler {
+	skipped := func(r *http.Request) bool {
+		return slices.ContainsFunc(
+			o.Skip,
+			func(skip func(*http.Request) bool) bool { return skip(r) },
+		)
+	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
-			if selfAuthenticated[r.Method+" "+r.URL.Path] || npmUserPath(r.URL.EscapedPath()) ||
-				skip != nil && skip(r) {
+			if o.SelfAuthenticated[r.Method+" "+r.URL.Path] || skipped(r) {
 				next.ServeHTTP(w, r)
 				return
 			}
-			if p, presented, err := credentials(ctx, a, r); presented {
+			if p, presented, err := credentials(ctx, o.Auth, r); presented {
 				if errors.Is(err, kernel.ErrPasswordExpired) && ownPasswordChange(r, p.Name) {
 					err = nil
 				}
-				if err == nil && p.Registry != nil && !dockerhttp.IsRegistryPath(r.URL.Path) {
+				if err == nil && p.Registry != nil && !o.RegistryPath(r.URL.Path) {
 					// A registry token is good for the registry alone
 					// (decision 0005).
 					err = kernel.ErrBadCredentials
 				}
 				var d *authz.Decider
 				if err == nil {
-					p, d, err = authorize(ctx, st, p, p.Anonymous)
-				} else if who, ok := expiredRefresh(ctx, a, r, err); ok {
+					p, d, err = authorize(ctx, o.Store, p, p.Anonymous)
+				} else if who, ok := expiredRefresh(ctx, o.Auth, r, err); ok {
 					next.ServeHTTP(w, r.WithContext(authn.WithExpiredToken(ctx, who)))
 					return
 				}
@@ -118,13 +132,14 @@ func authenticate(
 					return
 				}
 				httpkit.NoteUser(ctx, p.Name)
-				next.ServeHTTP(
-					w,
-					r.WithContext(authn.WithAuthorized(keepNPMCredential(ctx, r, p), p, d)),
-				)
+				kept := ctx
+				for _, keep := range o.CredentialKeepers {
+					kept = keep(kept, r, p)
+				}
+				next.ServeHTTP(w, r.WithContext(authn.WithAuthorized(kept, p, d)))
 				return
 			}
-			if dockerhttp.ChallengesAnonymous(r.URL.Path) {
+			if o.ChallengeAnonymous(r.URL.Path) {
 				// The registry challenges a request without credentials even
 				// while anonymous access is on: an anonymous client then
 				// fetches an anonymous token and pulls with it, and one with
@@ -132,21 +147,21 @@ func authenticate(
 				apierror.Write(w, apierror.ProfileOCI, kernel.ErrUnauthenticated)
 				return
 			}
-			anonymous, err := a.AnonymousAllowed(ctx)
+			anonymous, err := o.Auth.AnonymousAllowed(ctx)
 			if err != nil {
 				httpkit.WriteErr(w, r, err)
 				return
 			}
 			switch {
 			case anonymous:
-				p, d, err := authorize(ctx, st, kernel.Anonymous, true)
+				p, d, err := authorize(ctx, o.Store, kernel.Anonymous, true)
 				if err != nil {
 					httpkit.WriteErr(w, r, err)
 					return
 				}
 				httpkit.NoteUser(ctx, p.Name)
 				next.ServeHTTP(w, r.WithContext(authn.WithAuthorized(ctx, p, d)))
-			case publicRoutes[r.Method+" "+r.URL.Path]:
+			case o.PublicRoutes[r.Method+" "+r.URL.Path]:
 				next.ServeHTTP(w, r)
 			default:
 				apierror.Write(w, errorProfileFor(r.URL.Path), kernel.ErrUnauthenticated)

@@ -763,6 +763,15 @@ var policyPaths = map[string]bool{
 	"/artifactory/api/security/configuration/passwordExpirationPolicy": true,
 }
 
+// rewritePolicyBody is requestDetails' rewrite of a policy PUT
+// (normalizePolicyBody); any other request passes unchanged.
+func rewritePolicyBody(r *http.Request) error {
+	if r.Method != http.MethodPut || !policyPaths[r.URL.Path] {
+		return nil
+	}
+	return normalizePolicyBody(r)
+}
+
 // normalizePolicyBody rewrites string-spelled booleans and integers in a
 // policy body's top-level fields into JSON types before the generated
 // decoder sees them. A body that is not a JSON object passes through for

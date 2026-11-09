@@ -291,3 +291,18 @@ func writeJSON(w http.ResponseWriter, body any) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(body)
 }
+
+// RedactAPIKey returns path as a log may record it: the upload API names
+// the uploader's API key in its paths (api/1/{key}/...), and that key is a
+// credential, so it is replaced by [redacted]. Any other path comes back
+// unchanged.
+func RedactAPIKey(path string) string {
+	if rest, ok := strings.CutPrefix(path, "/artifactory/api/luarocks/"); ok {
+		parts := strings.Split(rest, "/")
+		if len(parts) >= 5 && parts[1] == "api" && parts[2] == "1" {
+			parts[3] = "[redacted]"
+			return "/artifactory/api/luarocks/" + strings.Join(parts, "/")
+		}
+	}
+	return path
+}

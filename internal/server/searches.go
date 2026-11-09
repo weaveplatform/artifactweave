@@ -833,3 +833,11 @@ func (s artifactoryService) SearchPattern(
 		"files":         paths,
 	}), nil
 }
+
+// keepsSearchQuery reports the searches whose raw query requestDetails
+// keeps: the property search, whose parameters are property keys, and the
+// GAVC search, whose older callers send remote=0/1 (gavcRemote). The
+// generated binding drops both.
+func keepsSearchQuery(r *http.Request) bool {
+	return r.URL.Path == propertySearchPath || r.URL.Path == "/artifactory/api/search/gavc"
+}

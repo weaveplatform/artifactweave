@@ -1005,3 +1005,16 @@ func setIf[T any](dst *T, v *T) {
 		*dst = *v
 	}
 }
+
+// isGroupUpdate matches PATCH /access/api/v2/groups/{name}, whose raw body
+// tells a field left out from one sent with its stored value.
+func isGroupUpdate(path string) bool {
+	name, ok := strings.CutPrefix(path, accessGroups)
+	return ok && name != "" && !strings.Contains(name, "/")
+}
+
+// keepsGroupUpdateBody reports an Access v2 group update, whose raw body
+// requestDetails keeps (isGroupUpdate).
+func keepsGroupUpdateBody(r *http.Request) bool {
+	return r.Method == http.MethodPatch && isGroupUpdate(r.URL.Path)
+}

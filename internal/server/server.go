@@ -8,6 +8,7 @@ import (
 	"cmp"
 	"context"
 	"log/slog"
+	"maps"
 	"net/http"
 	"slices"
 	"strings"
@@ -452,20 +453,21 @@ func New(cfg Config) http.Handler {
 	r.Use(
 		httpkit.ErrorProfiles(errorProfileRules),
 		middleware.RequestID,
-		middleware.RecoverPanic(logger, loggedPath),
-		middleware.AccessLog(logger, loggedPath),
+		middleware.RecoverPanic(logger, redactLoggedPath),
+		middleware.AccessLog(logger, redactLoggedPath),
 		baseurl.Middleware(cfg.BaseURL),
 		smart.SmartTrace,
 		dockerhttp.APIVersion,
 		registry.Challenge,
-		normalizeContentType,
+		middleware.NormalizeContentType(keepContentType),
 		middleware.CollectionSlash(slashCollections),
 		plusAsSpace,
 		idempotencyRoutes,
 		apiRecoveryContext,
 	)
+	limits := newLimitOptions(cfg.RequestLimits)
 	if cfg.RequestLimits != nil {
-		r.Use(artSvc.limitIngress)
+		r.Use(artSvc.limitIngress(limits))
 	}
 	mounted := make([]pkgroute.Protocol, 0, len(protocols)+len(cfg.Protocols))
 	for _, p := range protocols {
@@ -473,14 +475,14 @@ func New(cfg Config) http.Handler {
 	}
 	mounted = append(mounted, cfg.Protocols...)
 	if cfg.Auth != nil {
-		r.Use(authenticate(cfg.Auth, cfg.Store, func(req *http.Request) bool {
+		r.Use(authenticate(newAuthnOptions(cfg.Auth, cfg.Store, func(req *http.Request) bool {
 			if terraformbackendhttp.IsPath(req.URL.Path) {
 				return terraformbackendhttp.SkipsAuthentication(req)
 			}
 			return slices.ContainsFunc(mounted, func(p pkgroute.Protocol) bool {
 				return p.SkipsAuthentication(req)
 			})
-		}))
+		})))
 	}
 	// After authentication, which it needs, and ahead of routing, which
 	// cannot match it (helmPartialReindex).
@@ -488,7 +490,7 @@ func New(cfg Config) http.Handler {
 		r.Use(artSvc.checkAPIRestriction)
 	}
 	if cfg.RequestLimits != nil {
-		r.Use(artSvc.limitPrincipal)
+		r.Use(artSvc.limitPrincipal(limits))
 	}
 	r.Use(artSvc.helmPartialReindex)
 	r.NotFound(notFound)
@@ -556,7 +558,7 @@ func New(cfg Config) http.Handler {
 	// Generated strict servers, one per spec, each under its service prefix
 	// with the management body limit.
 	r.Group(func(g chi.Router) {
-		g.Use(middleware.BodyLimit(managementBodyLimit), requestDetails)
+		g.Use(middleware.BodyLimit(managementBodyLimit), requestDetails(newDetailOptions()))
 		strictOpts := artgen.StrictHTTPServerOptions{
 			RequestErrorHandlerFunc:  middleware.BindingError(http.StatusBadRequest),
 			ResponseErrorHandlerFunc: middleware.BindingError(http.StatusInternalServerError),
@@ -657,15 +659,70 @@ func New(cfg Config) http.Handler {
 	return r
 }
 
-// normalizeContentType is the content-type middleware with the requests
-// that keep their vendor media type: registry requests, whose manifest
+// keepContentType reports the requests that keep their vendor media type
+// (middleware.NormalizeContentType): registry requests, whose manifest
 // media type is part of the content they store and serve back, and Git LFS
 // protocol requests, whose media type is the protocol's.
-func normalizeContentType(next http.Handler) http.Handler {
-	return middleware.NormalizeContentType(keepContentType)(next)
-}
-
 func keepContentType(r *http.Request) bool {
 	return dockerhttp.IsRegistryPath(r.URL.Path) ||
 		strings.HasPrefix(r.URL.Path, "/artifactory/api/lfs/")
+}
+
+// redactLoggedPath is a path as the access and panic logs record it, with
+// the credentials that LuaRocks's upload paths and npm's logout paths name
+// replaced. Each redactor leaves a path outside its protocol unchanged.
+func redactLoggedPath(path string) string {
+	return npmLoggedPath(luarockshttp.RedactAPIKey(path))
+}
+
+// newAuthnOptions returns authenticate's options as the router composes
+// them: the multipart calls verify themselves, npm's login and logout are
+// skipped before the skips the caller adds, the registry decides where a
+// registry token is good and which paths challenge anonymous requests,
+// npm's configuration operations keep their credential, and Access's and
+// the system's public routes answer anyone.
+func newAuthnOptions(
+	a *authn.Authenticator,
+	st store.Store,
+	skip ...func(*http.Request) bool,
+) authnOptions {
+	public := maps.Clone(accessPublicRoutes)
+	maps.Copy(public, systemPublicRoutes)
+	return authnOptions{
+		Auth:               a,
+		Store:              st,
+		SelfAuthenticated:  selfAuthenticated,
+		Skip:               append([]func(*http.Request) bool{npmUserRequest}, skip...),
+		RegistryPath:       dockerhttp.IsRegistryPath,
+		ChallengeAnonymous: dockerhttp.ChallengesAnonymous,
+		CredentialKeepers: []func(context.Context, *http.Request, kernel.Principal) context.Context{
+			keepNPMCredential,
+		},
+		PublicRoutes: public,
+	}
+}
+
+// newLimitOptions returns the request-limit middleware's options as the
+// router composes them: the probes (healthRequest) and the recovery API
+// (apiRecoveryRequest) pass the shared limits.
+func newLimitOptions(limits *apilimit.Service) limitOptions {
+	return limitOptions{Health: healthRequest, Recovery: apiRecoveryRequest, Limits: limits}
+}
+
+// newDetailOptions returns requestDetails' options as the router composes
+// them, from the contributions beside each handler: the property and GAVC
+// searches' raw queries, the policy body rewrite, and the raw bodies of
+// repository updates, permission creates, build-info publishes and
+// appends, and group updates.
+func newDetailOptions() detailOptions {
+	return detailOptions{
+		SearchQuery: []func(*http.Request) bool{keepsSearchQuery},
+		Rewrite:     []func(*http.Request) error{rewritePolicyBody},
+		RawBody: []func(*http.Request) bool{
+			keepsRepositoryBody,
+			keepsPermissionBody,
+			keepsBuildBody,
+			keepsGroupUpdateBody,
+		},
+	}
 }

@@ -248,7 +248,8 @@ func refuse(p matrixPrincipal) int {
 	return http.StatusForbidden
 }
 
-// noCredentials: anyone, credentials or not, as publicRoutes lists.
+// noCredentials: anyone, credentials or not, as the public routes list
+// (accessPublicRoutes and systemPublicRoutes).
 func noCredentials(matrixPrincipal) int { return 0 }
 
 // anyone: any caller, anonymous only while anonymous access is on; what it

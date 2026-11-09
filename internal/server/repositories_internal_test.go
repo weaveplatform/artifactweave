@@ -37,9 +37,13 @@ func TestAccRepositoriesWithoutStore(t *testing.T) {
 }
 
 func TestAccRequestDetailsReadFailure(t *testing.T) {
-	h := requestDetails(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
-		t.Fatal("reached the handler")
-	}))
+	h := requestDetails(
+		newDetailOptions(),
+	)(
+		http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			t.Fatal("reached the handler")
+		}),
+	)
 	req := httptest.NewRequest(
 		"POST",
 		"/artifactory/api/repositories/x",

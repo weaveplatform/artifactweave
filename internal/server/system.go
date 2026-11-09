@@ -234,6 +234,28 @@ func sinkHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// systemPublicRoutes answer without credentials even when anonymous access
+// is off: the Artifactory and router probes clients make before they
+// authenticate, and the telemetry sinks every jf command posts to
+// (research 05).
+//
+// GET /artifactory/api/system/version is deliberately absent: Artifactory
+// requires a valid user for it and has refused anonymous callers since
+// 7.35.1 (RTFACT-26414), so it answers as any other route does, anonymous
+// only while anonymous access is on (research 01). The JFrog CLI and the
+// Terraform providers send their credentials with it; the CLI's usage
+// report, which sends none when none are configured, only logs the 401.
+var systemPublicRoutes = map[string]bool{
+	"GET /artifactory/api/system/ping":              true,
+	"GET /artifactory/api/v1/system/readiness":      true,
+	"GET /artifactory/api/v1/system/liveness":       true,
+	"GET /router/api/v1/system/health":              true,
+	"GET /router/api/v1/system/readiness":           true,
+	"GET /router/api/v1/system/liveness":            true,
+	"POST /artifactory/api/system/usage":            true,
+	"POST /jfconnect/api/v1/backoffice/metrics/log": true,
+}
+
 // Router health states. A service whose probe fails is UNHEALTHY, and the
 // router, which works itself, is UNHEALTHY_PEER while any of its services
 // is not healthy.

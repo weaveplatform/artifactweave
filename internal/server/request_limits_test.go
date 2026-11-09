@@ -124,7 +124,7 @@ func TestAccAPIConcurrencyCancellation(t *testing.T) {
 	}
 	s := artifactoryService{cfg: Config{Store: st, RequestLimits: limits}}
 	router := chi.NewRouter()
-	router.Use(s.limitIngress, s.limitPrincipal)
+	router.Use(s.limitIngress(newLimitOptions(limits)), s.limitPrincipal(newLimitOptions(limits)))
 	entered := make(chan string, 4)
 	releaseBob := make(chan struct{})
 	router.Post("/artifactory/api/search/aql", func(w http.ResponseWriter, r *http.Request) {

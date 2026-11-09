@@ -8,7 +8,7 @@
   "docs/research/39-vcs-legacy.md": "80f1ab4297ddb503ba6d08a26ff30229528c931f734f450111c7d58c29d82777",
   "go.mod": "2993b4c1c9d9bc43cbd699052c4453034ac7e573c916f53dbc96cb9d2c162923",
   "internal/app/conan_client_test.go": "7a6f63d1fb25ee2b4678e00baae4ebd0d4a5592557cf94f634d65f60eec28ae6",
-  "internal/server/auth.go": "835ad12858e7f80d2ec61c7737f1b16764b2bdb5e33a1caaccdc6371286cc76f",
+  "internal/server/auth.go": "2b07ea53309f2e0f7c45a72d1927d3b3514f2309d5262e84273ceb1972fbfed9",
   "migration/access/core/authn/token.go": "babe0157048fb63ffe7758df90769a88538e07364c54783f57c3f25559aab4a3",
   "migration/access/core/authn/token_test.go": "2d7c3c2cb63e8b2a9a0e89ec474d1f86c88c86318973be7f835659f28cb8820e",
   "migration/artifacts/ecosystem/bazelmodules/http/bazelmodules_test.go": "7167ca713183ec2237f3e5107d4811185cbf66d6d5a6b661d47f827d2f98d84d",
