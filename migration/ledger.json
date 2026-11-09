@@ -11,7 +11,7 @@
         {"from":"internal/auth/idtoken","action":"move","to":"access/core/idtoken","ticket":"ACC-14"},
         {"from":"internal/auth/idtoken/idtokentest","action":"move","to":"access/core/idtoken/idtokentest","ticket":"ACC-14"},
         {"from":"internal/auth/token","action":"move","to":"access/core/token","ticket":"ACC-12"},
-        {"from":"internal/authz","action":"split","ticket":"ACC-11"},
+        {"from":"internal/authz","action":"move","to":"access/core/authz","ticket":"ACC-11"},
         {"from":"internal/buildinfo","action":"move","to":"platform/buildinfo","ticket":"PLT-06"},
         {"from":"internal/config","action":"move","to":"app/config","ticket":"WEB-18"},
         {"from":"internal/crypt","action":"move","to":"platform/crypt","ticket":"PLT-07"},
