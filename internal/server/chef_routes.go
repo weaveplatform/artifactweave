@@ -15,7 +15,7 @@ func (s artifactoryService) registerChefReindex(r chi.Router) {
 			apierror.Write(
 				w,
 				apierror.ProfileArtifactory,
-				badRequestf("Chef reindex does not accept query parameters"),
+				BadRequestf("Chef reindex does not accept query parameters"),
 			)
 			return
 		}

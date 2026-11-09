@@ -19,10 +19,10 @@ import (
 
 // roleService checks the caller is an administrator and returns the service.
 func (s accessService) roleService(ctx context.Context) (roles.Service, error) {
-	if err := adminOnly(ctx); err != nil {
+	if err := AdminOnly(ctx); err != nil {
 		return roles.Service{}, err
 	}
-	st, err := artifactoryService{cfg: s.cfg}.content()
+	st, err := s.content()
 	if err != nil {
 		return roles.Service{}, err
 	}
@@ -46,7 +46,7 @@ func (s accessService) roleError(ctx context.Context, op string, err error, take
 		errors.Is(err, roles.ErrInUse):
 		return apierror.New(http.StatusBadRequest, err.Error())
 	default:
-		return artifactoryService{cfg: s.cfg}.internalError(ctx, op, err)
+		return s.internalError(ctx, op, err)
 	}
 }
 
@@ -78,7 +78,7 @@ func (s accessService) CreateGlobalEnvironment(
 		return nil, err
 	}
 	if req.Body == nil {
-		return nil, badRequestf("a body with the environment name is required")
+		return nil, BadRequestf("a body with the environment name is required")
 	}
 	if err := svc.CreateEnvironment(ctx, req.Body.Name); err != nil {
 		return nil, s.roleError(ctx, "create environment", err, http.StatusConflict)
@@ -95,7 +95,7 @@ func (s accessService) RenameGlobalEnvironment(
 		return nil, err
 	}
 	if req.Body == nil {
-		return nil, badRequestf("a body with new_name is required")
+		return nil, BadRequestf("a body with new_name is required")
 	}
 	err = svc.RenameEnvironment(ctx, string(req.EnvironmentName), req.Body.NewName)
 	if err != nil {
@@ -167,7 +167,7 @@ func (s accessService) CreateGlobalRole(
 		return nil, err
 	}
 	if req.Body == nil {
-		return nil, badRequestf("a body with the role is required")
+		return nil, BadRequestf("a body with the role is required")
 	}
 	b := req.Body
 	r := types.Role{
@@ -192,7 +192,7 @@ func (s accessService) UpdateGlobalRole(
 		return nil, err
 	}
 	if req.Body == nil {
-		return nil, badRequestf("a body with the role is required")
+		return nil, BadRequestf("a body with the role is required")
 	}
 	b := req.Body
 	r := types.Role{

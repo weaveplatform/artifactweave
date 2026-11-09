@@ -37,7 +37,7 @@ func (s artifactoryService) registerPuppetMetadataRoutes(r chi.Router) {
 				apierror.Write(
 					w,
 					apierror.ProfileArtifactory,
-					badRequestf("Puppet reindex does not accept query parameters"),
+					BadRequestf("Puppet reindex does not accept query parameters"),
 				)
 				return
 			}

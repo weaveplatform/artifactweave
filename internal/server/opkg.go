@@ -85,7 +85,7 @@ func (s artifactoryService) serveOpkgIndex(
 	if !acc.folder(c, req.path, types.ActionRead) ||
 		!acc.file(c, req.path, types.ActionRead) ||
 		generic.CheckDownload(c, req.path, false) != nil {
-		httpkit.WriteErr(w, r, denied(p))
+		httpkit.WriteErr(w, r, Denied(p))
 		return
 	}
 	var body []byte
@@ -133,7 +133,7 @@ func (s artifactoryService) serveOpkgIndex(
 				return
 			}
 			if !allowed {
-				httpkit.WriteErr(w, r, denied(p))
+				httpkit.WriteErr(w, r, Denied(p))
 				return
 			}
 		}
@@ -324,7 +324,7 @@ func (s artifactoryService) serveOpkgPackage(
 	}
 	if !acc.file(c, req.path, types.ActionRead) ||
 		generic.CheckDownload(c, req.path, false) != nil {
-		httpkit.WriteErr(w, r, denied(p))
+		httpkit.WriteErr(w, r, Denied(p))
 		return
 	}
 	indexPath := opkg.IndexPath(opkg.Feed(req.path), opkg.PackagesName)

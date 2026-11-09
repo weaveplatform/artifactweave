@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -12,14 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth/idtoken"
-	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
-	distributiongen "github.com/weaveplatform/artifactweave/migration/platform/gen/distribution"
-	eventgen "github.com/weaveplatform/artifactweave/migration/platform/gen/event"
-	gridgen "github.com/weaveplatform/artifactweave/migration/platform/gen/grid"
-	pfedgen "github.com/weaveplatform/artifactweave/migration/platform/gen/pfed"
-	workergen "github.com/weaveplatform/artifactweave/migration/platform/gen/worker"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/middleware"
@@ -30,14 +24,10 @@ import (
 // document; clients that send it in Accept get it back.
 const versionMediaType = "application/vnd.org.jfrog.artifactory.system.Version+json"
 
-// artifactoryService and accessService implement the generated strict
-// interfaces. Each embeds its generated UnimplementedStrict so an operation
-// that exists in the spec but has no implementation yet answers 501 instead
-// of breaking the build; services override what they implement. The
-// compatibility version drives client behaviour (decision 0005), so it is
-// configuration, not the build version.
+// artifactoryService implements the artifacts operations of the artifactory
+// spec; the composite strict server (composites.go) adds the security and
+// system partials and the generated stubs.
 type artifactoryService struct {
-	artgen.UnimplementedStrict
 	cfg Config
 	// signWarn throttles the log line for a failing download-redirect
 	// signer; nil, in services built only to reach the store, logs each.
@@ -45,42 +35,36 @@ type artifactoryService struct {
 	// folderSlots holds a token for each folder archive download running;
 	// nil, in services built only to reach the store, limits nothing.
 	folderSlots chan struct{}
+}
+
+// systemAPI implements the artifactory spec's system operations (version,
+// license, service id, readiness and liveness) and the reverse proxy
+// configuration, and serves the probes the router mounts beside them. The
+// compatibility version drives client behaviour (decision 0005), so it is
+// configuration, not the build version.
+type systemAPI struct {
+	cfg Config
 	// instanceID holds the instance id the database last gave the health
-	// probes; nil, in services built only to reach the store, keeps none.
+	// probes; nil, in values built only to reach the store, keeps none.
 	instanceID *atomic.Pointer[string]
 }
 
-type accessService struct {
-	accessgen.UnimplementedStrict
-	cfg Config
-	// idTokens verifies the subject tokens of the OIDC token exchange and
-	// caches each provider's signing keys for the life of the handler.
-	idTokens *idtoken.Verifier
+// internalError logs err and returns a 500 that names nothing internal.
+func (s systemAPI) internalError(ctx context.Context, op string, err error) error {
+	s.log().ErrorContext(ctx, op, "request_id", httpkit.RequestIDFrom(ctx), "error", err)
+	return apierror.New(http.StatusInternalServerError, "internal error")
 }
 
-// eventService serves /event (webhook subscriptions). Nothing is implemented
-// until the webhooks phase; the embedded stub answers 501 for every operation.
-type eventService struct {
-	eventgen.UnimplementedStrict
-}
-
-// The services brought into scope in P1b (research 16) start with every
-// operation stubbed; their phases replace the stubs.
-type (
-	distributionService struct {
-		distributiongen.UnimplementedStrict
+// log is the configured logger, or slog's default for values built
+// without one in tests.
+func (s systemAPI) log() *slog.Logger {
+	if s.cfg.Logger == nil {
+		return slog.Default()
 	}
-	workerService struct{ workergen.UnimplementedStrict }
-	pfedService   struct{ pfedgen.UnimplementedStrict }
-	gridService   struct{ gridgen.UnimplementedStrict }
-)
+	return s.cfg.Logger
+}
 
-var (
-	_ artgen.StrictServerInterface    = artifactoryService{}
-	_ accessgen.StrictServerInterface = accessService{}
-)
-
-func (s artifactoryService) GetSystemVersion(
+func (s systemAPI) GetSystemVersion(
 	_ context.Context,
 	req artgen.GetSystemVersionRequestObject,
 ) (artgen.GetSystemVersionResponseObject, error) {
@@ -101,11 +85,11 @@ func (s artifactoryService) GetSystemVersion(
 
 // GetSystemLicense answers administrators only, as documented
 // (getlicenseinfo.json).
-func (artifactoryService) GetSystemLicense(
+func (systemAPI) GetSystemLicense(
 	ctx context.Context,
 	_ artgen.GetSystemLicenseRequestObject,
 ) (artgen.GetSystemLicenseResponseObject, error) {
-	if err := adminOnly(ctx); err != nil {
+	if err := AdminOnly(ctx); err != nil {
 		return nil, err
 	}
 	return artgen.GetSystemLicense200JSONResponse{
@@ -119,11 +103,11 @@ func (artifactoryService) GetSystemLicense(
 // (getserviceid-1.md), with the stored instance id. The token service
 // derives its jfac@ issuer from the same record, so the jfrt@<id>:admin
 // scope jf rt atc --grant-admin builds from this body names this instance.
-func (s artifactoryService) GetServiceId(
+func (s systemAPI) GetServiceId(
 	ctx context.Context,
 	_ artgen.GetServiceIdRequestObject,
 ) (artgen.GetServiceIdResponseObject, error) {
-	if err := adminOnly(ctx); err != nil {
+	if err := AdminOnly(ctx); err != nil {
 		return nil, err
 	}
 	id, err := s.cfg.Store.Instance().Get(ctx)
@@ -138,7 +122,7 @@ func (s artifactoryService) GetServiceId(
 // GetSystemReadiness answers OK while the database and the binary store
 // answer, and 500 with the reason otherwise (getreadinessprobe.md:
 // "Returns HTTP error code with reason if not working properly").
-func (s artifactoryService) GetSystemReadiness(
+func (s systemAPI) GetSystemReadiness(
 	ctx context.Context,
 	_ artgen.GetSystemReadinessRequestObject,
 ) (artgen.GetSystemReadinessResponseObject, error) {
@@ -151,34 +135,24 @@ func (s artifactoryService) GetSystemReadiness(
 // GetSystemLiveness answers OK while the process serves requests. It
 // probes neither store: an orchestrator restarts a container whose
 // liveness fails, and a restart brings back no database or bucket.
-func (artifactoryService) GetSystemLiveness(
+func (systemAPI) GetSystemLiveness(
 	context.Context,
 	artgen.GetSystemLivenessRequestObject,
 ) (artgen.GetSystemLivenessResponseObject, error) {
 	return artgen.GetSystemLiveness200JSONResponse{Code: "OK"}, nil
 }
 
-func (s accessService) GetAccessVersion(
-	context.Context,
-	accessgen.GetAccessVersionRequestObject,
-) (accessgen.GetAccessVersionResponseObject, error) {
-	return accessgen.GetAccessVersion200JSONResponse{
-		Name:    s.cfg.CompatVersion,
-		Version: s.cfg.CompatVersion,
-	}, nil
-}
-
 // Hand-written system routes. They are plain text or body sinks that a strict
 // JSON server cannot express well, and the spec marks them x-handwritten.
 
 // probeFunc probes the stores one service needs.
-type probeFunc func(artifactoryService, context.Context) *probeError
+type probeFunc func(systemAPI, context.Context) *probeError
 
 // ping answers the plain text OK while probe passes, and 500 with the
 // reason as plain text otherwise, as the 6.20 PingResource answers a failed
 // storage or Access check. Artifactory's ping probes the database and the
 // binary store, Access's the database alone.
-func (s artifactoryService) ping(probe probeFunc) http.HandlerFunc {
+func (s systemAPI) ping(probe probeFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		if err := probe(s, r.Context()); err != nil {
@@ -193,7 +167,7 @@ func (s artifactoryService) ping(probe probeFunc) http.HandlerFunc {
 // readiness answers the router's and Access's readiness probes as
 // Artifactory's readiness answers: {"code":"OK"} while probe passes, and 500
 // with the reason in the path's error envelope otherwise.
-func (s artifactoryService) readiness(probe probeFunc) http.HandlerFunc {
+func (s systemAPI) readiness(probe probeFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := probe(s, r.Context()); err != nil {
 			apierror.Write(w, errorProfileFor(r.URL.Path), s.probeFailed(r.Context(), err))
@@ -279,7 +253,7 @@ type healthEntry struct {
 // while both services are healthy, 503 otherwise. One process is the
 // router and both services, so all three share a node. Access (jfac) needs
 // the database; Artifactory (jfrt) needs the database and the binary store.
-func (s artifactoryService) routerHealth(w http.ResponseWriter, r *http.Request) {
+func (s systemAPI) routerHealth(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	node := nodeID()
 	router := healthEntry{NodeID: node, State: stateHealthy, Message: healthyMessage}
@@ -348,14 +322,14 @@ func (e *probeError) Unwrap() error { return e.cause }
 
 // probeFailed leaves err's cause for the access log and returns the 500 a
 // caller gets, which carries the reason alone.
-func (artifactoryService) probeFailed(ctx context.Context, err *probeError) *apierror.Error {
+func (systemAPI) probeFailed(ctx context.Context, err *probeError) *apierror.Error {
 	httpkit.NoteCause(ctx, err)
 	return apierror.New(http.StatusInternalServerError, err.reason)
 }
 
 // probeArtifactory probes what Artifactory needs: the database, then the
 // binary store.
-func (s artifactoryService) probeArtifactory(ctx context.Context) *probeError {
+func (s systemAPI) probeArtifactory(ctx context.Context) *probeError {
 	if _, err := s.probeDatabase(ctx); err != nil {
 		return err
 	}
@@ -363,7 +337,7 @@ func (s artifactoryService) probeArtifactory(ctx context.Context) *probeError {
 }
 
 // probeAccess probes what Access needs: the database.
-func (s artifactoryService) probeAccess(ctx context.Context) *probeError {
+func (s systemAPI) probeAccess(ctx context.Context) *probeError {
 	_, err := s.probeDatabase(ctx)
 	return err
 }
@@ -372,7 +346,7 @@ func (s artifactoryService) probeAccess(ctx context.Context) *probeError {
 // call relies on, and returns its id. A store without one has still
 // answered. A handler built without a store, as only tests build one, has
 // nothing to probe.
-func (s artifactoryService) probeDatabase(ctx context.Context) (string, *probeError) {
+func (s systemAPI) probeDatabase(ctx context.Context) (string, *probeError) {
 	if s.cfg.Store == nil {
 		return "", nil
 	}
@@ -392,7 +366,7 @@ func (s artifactoryService) probeDatabase(ctx context.Context) (string, *probeEr
 }
 
 // probeBinaries asks the hot binary store for one blob.
-func (s artifactoryService) probeBinaries(ctx context.Context) *probeError {
+func (s systemAPI) probeBinaries(ctx context.Context) *probeError {
 	if s.cfg.Blobs == nil {
 		return nil
 	}
@@ -407,7 +381,7 @@ func (s artifactoryService) probeBinaries(ctx context.Context) *probeError {
 // lastInstanceID is the id the database last gave a probe, or "" before it
 // has given one. The id never changes once created, so router health
 // names the services by it while the database is down.
-func (s artifactoryService) lastInstanceID() string {
+func (s systemAPI) lastInstanceID() string {
 	if s.instanceID == nil {
 		return ""
 	}

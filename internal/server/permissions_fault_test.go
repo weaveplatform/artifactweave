@@ -330,13 +330,13 @@ func TestAccPermissionCallerWithoutMiddleware(t *testing.T) {
 	f := &permFault{op: "forprincipal"}
 	cfg := withAccess(Config{Store: permFaultStore{Store: db, f: f}})
 	ctx := kernel.WithPrincipal(context.Background(), kernel.Principal{Name: "admin", Admin: true})
-	_, err := permissionCaller(ctx, cfg)
+	_, err := permissionCaller(ctx, accessState{cfg: cfg})
 	var ae *apierror.Error
 	if !errors.As(err, &ae) || ae.Status != http.StatusInternalServerError {
 		t.Fatalf("failing evaluation: %v", err)
 	}
 	*f = permFault{}
-	c, err := permissionCaller(ctx, cfg)
+	c, err := permissionCaller(ctx, accessState{cfg: cfg})
 	if err != nil || !c.dec.IsAdmin() {
 		t.Fatalf("caller = %+v, %v", c, err)
 	}

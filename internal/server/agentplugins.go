@@ -65,7 +65,7 @@ func (s artifactoryService) serveAgentMarketplace(
 		return
 	}
 	if !acc.folder(c, "", types.ActionRead) {
-		httpkit.WriteErr(w, r, denied(p))
+		httpkit.WriteErr(w, r, Denied(p))
 		return
 	}
 	data, err := agentplugins.Marketplace(r.Context(), st, c.Key, name, func(path string) bool {

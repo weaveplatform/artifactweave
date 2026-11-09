@@ -25,14 +25,14 @@ const oidcTokenRoute = "POST /access/api/v1/oidc/token"
 
 // oidcService checks the caller is an administrator and returns the service.
 func (s accessService) oidcService(ctx context.Context) (oidc.Service, error) {
-	if err := adminOnly(ctx); err != nil {
+	if err := AdminOnly(ctx); err != nil {
 		return oidc.Service{}, err
 	}
 	return s.oidc()
 }
 
 func (s accessService) oidc() (oidc.Service, error) {
-	st, err := artifactoryService{cfg: s.cfg}.content()
+	st, err := s.content()
 	if err != nil {
 		return oidc.Service{}, err
 	}
@@ -52,12 +52,12 @@ func (s accessService) oidcError(ctx context.Context, op string, err error) erro
 		return apierror.New(http.StatusBadRequest, err.Error())
 	case errors.Is(err, oidc.ErrUnverified):
 		if errors.Is(err, idtoken.ErrKeys) {
-			artifactoryService{cfg: s.cfg}.log().WarnContext(ctx, op,
+			s.log().WarnContext(ctx, op,
 				"request_id", httpkit.RequestIDFrom(ctx), "error", err)
 		}
 		return apierror.New(http.StatusUnauthorized, err.Error())
 	default:
-		return artifactoryService{cfg: s.cfg}.internalError(ctx, op, err)
+		return s.internalError(ctx, op, err)
 	}
 }
 
@@ -78,14 +78,14 @@ func recode[T any](v any) (T, error) {
 // provider decodes a request body; a missing one is a bad request.
 func providerBody(b *accessgen.OidcConfiguration) (oidc.Provider, error) {
 	if b == nil {
-		return oidc.Provider{}, badRequestf("a body with the OIDC provider is required")
+		return oidc.Provider{}, BadRequestf("a body with the OIDC provider is required")
 	}
 	return recode[oidc.Provider](b)
 }
 
 func mappingBody(b *accessgen.OidcIdentityMapping) (oidc.Mapping, error) {
 	if b == nil {
-		return oidc.Mapping{}, badRequestf("a body with the identity mapping is required")
+		return oidc.Mapping{}, BadRequestf("a body with the identity mapping is required")
 	}
 	return recode[oidc.Mapping](b)
 }
@@ -306,7 +306,7 @@ func (s accessService) OidcTokenExchange(
 	}
 	b := req.Body
 	if b == nil {
-		return nil, badRequestf("a body with the token exchange is required")
+		return nil, BadRequestf("a body with the token exchange is required")
 	}
 	got, err := svc.Exchange(ctx, oidc.ExchangeRequest{
 		GrantType:        httpkit.Deref(b.GrantType),

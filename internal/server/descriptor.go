@@ -18,7 +18,7 @@ import (
 func (s artifactoryService) patchConfiguration(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	fail := func(err error) { httpkit.WriteErr(w, r, err) }
-	if err := adminOnly(ctx); err != nil {
+	if err := AdminOnly(ctx); err != nil {
 		fail(err)
 		return
 	}
@@ -34,13 +34,13 @@ func (s artifactoryService) patchConfiguration(w http.ResponseWriter, r *http.Re
 			fail(apierror.New(http.StatusRequestEntityTooLarge, "request body is too large"))
 			return
 		}
-		fail(badRequestf("Cannot read the request body"))
+		fail(BadRequestf("Cannot read the request body"))
 		return
 	}
 	// ${NAME} references resolve from the server's own environment.
 	p, err := descriptor.Parse(body, os.LookupEnv)
 	if err != nil {
-		fail(badRequestf("%s", err.Error()))
+		fail(BadRequestf("%s", err.Error()))
 		return
 	}
 	res, err := descriptor.Apply(ctx, st, descriptor.Access{
@@ -50,7 +50,7 @@ func (s artifactoryService) patchConfiguration(w http.ResponseWriter, r *http.Re
 	}, p, time.Now(), false)
 	switch {
 	case errors.Is(err, descriptor.ErrInvalid):
-		fail(badRequestf("%s", err.Error()))
+		fail(BadRequestf("%s", err.Error()))
 		return
 	case err != nil:
 		fail(s.internalError(ctx, "apply configuration", err))

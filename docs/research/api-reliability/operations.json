@@ -925,7 +925,7 @@
     "operation_id": "ClearAPIRestriction",
     "state": "implemented",
     "contract": "Requires an administrator. Records a durable clear event even if already inactive. This recovery route remains available to restricted administrators; each retry appends another audit entry.",
-    "handler": "internal/server/api_restrictions.go: artifactoryService.ClearAPIRestriction",
+    "handler": "internal/server/api_restrictions.go: securityAPI.ClearAPIRestriction",
     "direct_calls": [
       "s.cfg.Store.APIRestrictions",
       "s.cfg.Store.APIRestrictions().Put",
@@ -1538,7 +1538,7 @@
     "operation_id": "revokeApiKey",
     "state": "implemented",
     "contract": "Revokes the caller's key, or every key when deleteAll=1 and the caller is an admin. There are no keys to revoke, so the operation always answers 200 with an informational message.",
-    "handler": "internal/server/security.go: artifactoryService.RevokeApiKey",
+    "handler": "internal/server/security.go: securityAPI.RevokeApiKey",
     "direct_calls": [
       "kernel.RequireAuthenticated"
     ],
@@ -1564,7 +1564,7 @@
     "operation_id": "revokeUserApiKey",
     "state": "implemented",
     "contract": "Admin-only revocation of a named user's key. Answers 200 with an informational message when the user exists and 404 when it does not; there is never a key to remove.",
-    "handler": "internal/server/security.go: artifactoryService.RevokeUserApiKey",
+    "handler": "internal/server/security.go: securityAPI.RevokeUserApiKey",
     "direct_calls": [
       "s.adminStore",
       "s.identity",
@@ -1593,7 +1593,7 @@
     "operation_id": "deleteGroup",
     "state": "implemented",
     "contract": "Removes the group and its grants. Admin only. The seeded readers group cannot be deleted (400).",
-    "handler": "internal/server/security.go: artifactoryService.DeleteGroup",
+    "handler": "internal/server/security.go: securityAPI.DeleteGroup",
     "direct_calls": [
       "artgen.DeleteGroup200TextResponse",
       "fmt.Sprintf",
@@ -1624,7 +1624,7 @@
     "operation_id": "deleteKeyPair",
     "state": "implemented",
     "contract": "Removes the pair. Admin only. A pair that repositories still use is removed all the same, and each of those repositories loses its primaryKeyPairRef or secondaryKeyPairRef to it in the same change.",
-    "handler": "internal/server/keypairs.go: artifactoryService.DeleteKeyPair",
+    "handler": "internal/server/keypairs.go: securityAPI.DeleteKeyPair",
     "direct_calls": [
       "artgen.DeleteKeyPair200TextResponse",
       "errors.Is",
@@ -1675,7 +1675,7 @@
     "operation_id": "deletePermissionTarget",
     "state": "implemented",
     "contract": "Removes the whole target, every section included. Admins and Manage Resources holders only. The seeded `Anything` and `Any Remote` targets can be deleted. Deprecated in favour of `DELETE /access/api/v2/permissions/{name}`.",
-    "handler": "internal/server/permissions.go: artifactoryService.DeletePermissionTarget",
+    "handler": "internal/server/permissions.go: securityAPI.DeletePermissionTarget",
     "direct_calls": [
       "artgen.DeletePermissionTarget200TextResponse",
       "c.admin",
@@ -1705,7 +1705,7 @@
     "operation_id": "deleteUser",
     "state": "implemented",
     "contract": "Removes the user and its tokens and membership. Admin only. The seeded admin and anonymous users cannot be deleted (400).",
-    "handler": "internal/server/security.go: artifactoryService.DeleteUser",
+    "handler": "internal/server/security.go: securityAPI.DeleteUser",
     "direct_calls": [
       "artgen.DeleteUser200TextResponse",
       "fmt.Sprintf",
@@ -1830,7 +1830,7 @@
     "operation_id": "deleteCertificate",
     "state": "implemented",
     "contract": "Removes the certificate. Admin only. A certificate still referenced by a remote repository is refused with 400.",
-    "handler": "internal/server/keypairs.go: artifactoryService.DeleteCertificate",
+    "handler": "internal/server/keypairs.go: securityAPI.DeleteCertificate",
     "direct_calls": [
       "errors.Is",
       "fmt.Sprintf",
@@ -2112,7 +2112,7 @@
     "operation_id": "deletePermissionTargetV2",
     "state": "implemented",
     "contract": "Removes the target and every section. Answers 200 with no body. Admins and Manage Resources holders may call it.",
-    "handler": "internal/server/permissions.go: artifactoryService.DeletePermissionTargetV2",
+    "handler": "internal/server/permissions.go: securityAPI.DeletePermissionTargetV2",
     "direct_calls": [
       "c.admin",
       "c.svc.Delete",
@@ -2631,7 +2631,7 @@
     "handler": "internal/server/tokens.go: accessService.GetTokenDefaultExpiry",
     "direct_calls": [
       "errors.Is",
-      "expression.content",
+      "s.content",
       "s.tokenAPI",
       "st.Settings",
       "st.Settings().Get",
@@ -3515,7 +3515,7 @@
     "operation_id": "getAccessVersion",
     "state": "implemented",
     "contract": "Returns the compatibility version in name and version, the same value as /artifactory/api/system/version reports.",
-    "handler": "internal/server/system.go: accessService.GetAccessVersion",
+    "handler": "internal/server/access_version.go: accessService.GetAccessVersion",
     "review_family": "identity",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -4174,7 +4174,7 @@
     "operation_id": "GetAPIRestrictionAudit",
     "state": "implemented",
     "contract": "Requires an administrator. Returns retained changes even after user deletion. New changes appear before the current page and do not shift its continuation. A changed filter or administrator invalidates the cursor.",
-    "handler": "internal/server/api_restrictions.go: artifactoryService.GetAPIRestrictionAudit",
+    "handler": "internal/server/api_restrictions.go: securityAPI.GetAPIRestrictionAudit",
     "direct_calls": [
       "apierror.New",
       "artgen.GetAPIRestrictionAudit200JSONResponse",
@@ -4213,7 +4213,7 @@
     "operation_id": "GetAPIRestriction",
     "state": "implemented",
     "contract": "Requires an administrator. This recovery route remains available to restricted administrators and has a separate bounded admission allowance.",
-    "handler": "internal/server/api_restrictions.go: artifactoryService.GetAPIRestriction",
+    "handler": "internal/server/api_restrictions.go: securityAPI.GetAPIRestriction",
     "direct_calls": [
       "artgen.GetAPIRestriction200JSONResponse",
       "errors.Is",
@@ -7944,7 +7944,7 @@
     "operation_id": "getApiKey",
     "state": "implemented",
     "contract": "Returns the caller's API key. No keys are ever issued, so the operation always answers 404, the response for a user without a key.",
-    "handler": "internal/server/security.go: artifactoryService.GetApiKey",
+    "handler": "internal/server/security.go: securityAPI.GetApiKey",
     "direct_calls": [
       "apierror.New",
       "kernel.RequireAuthenticated"
@@ -7971,7 +7971,7 @@
     "operation_id": "getPasswordExpirationPolicy",
     "state": "implemented",
     "contract": "Returns the platform-wide password expiry settings. Admin only. The same policy is visible in the security section of the YAML descriptor. Deprecated in favour of GET /api/security/userLockPolicy.",
-    "handler": "internal/server/security.go: artifactoryService.GetPasswordExpirationPolicy",
+    "handler": "internal/server/security.go: securityAPI.GetPasswordExpirationPolicy",
     "direct_calls": [
       "artgen.GetPasswordExpirationPolicy200JSONResponse",
       "s.adminStore",
@@ -8001,7 +8001,7 @@
     "operation_id": "getUserEncryptedPassword",
     "state": "implemented",
     "contract": "Returns a reference token bound to the caller, usable in place of the clear-text password wherever an encrypted password is accepted. The caller must authenticate with Basic credentials; token authentication is a 400.",
-    "handler": "internal/server/tokens.go: artifactoryService.GetUserEncryptedPassword",
+    "handler": "internal/server/tokens.go: securityAPI.GetUserEncryptedPassword",
     "direct_calls": [
       "artgen.GetUserEncryptedPassword200TextResponse",
       "fmt.Errorf",
@@ -8032,7 +8032,7 @@
     "operation_id": "getGroups",
     "state": "implemented",
     "contract": "Lists every group with its detail URL. Admin only. Deprecated in favour of GET /access/api/v2/groups.",
-    "handler": "internal/server/security.go: artifactoryService.GetGroups",
+    "handler": "internal/server/security.go: securityAPI.GetGroups",
     "direct_calls": [
       "baseurl.From",
       "s.adminStore",
@@ -8066,7 +8066,7 @@
     "operation_id": "getGroupDetails",
     "state": "implemented",
     "contract": "Returns the legacy group document. Admin only. Members are included only when includeUsers=true.",
-    "handler": "internal/server/security.go: artifactoryService.GetGroupDetails",
+    "handler": "internal/server/security.go: securityAPI.GetGroupDetails",
     "direct_calls": [
       "s.adminStore",
       "s.identity",
@@ -8101,7 +8101,7 @@
     "operation_id": "getAllKeyPairs",
     "state": "implemented",
     "contract": "Lists every key pair without private material. Admin only.",
-    "handler": "internal/server/keypairs.go: artifactoryService.GetAllKeyPairs",
+    "handler": "internal/server/keypairs.go: securityAPI.GetAllKeyPairs",
     "direct_calls": [
       "s.adminStore",
       "s.internalError",
@@ -8133,7 +8133,7 @@
     "operation_id": "getKeyPairPublicKeyPerRepository",
     "state": "implemented",
     "contract": "Returns the public half of the repository's signing key pair, which package clients fetch to verify signed metadata. Alpine virtual repositories use their keyPair; other repositories use the primary key pair. Any authenticated caller may read it, with no permission on the repository. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled. 404 when the repository does not exist or has no pair assigned.",
-    "handler": "internal/server/keypairs.go: artifactoryService.GetKeyPairPublicKeyPerRepository",
+    "handler": "internal/server/keypairs.go: securityAPI.GetKeyPairPublicKeyPerRepository",
     "direct_calls": [
       "apierror.New",
       "errors.Is",
@@ -8168,7 +8168,7 @@
     "operation_id": "getKeyPair",
     "state": "implemented",
     "contract": "Returns the readable projection of one pair, which never includes the private key or the passphrase. Any authenticated caller may read it. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled.",
-    "handler": "internal/server/keypairs.go: artifactoryService.GetKeyPair",
+    "handler": "internal/server/keypairs.go: securityAPI.GetKeyPair",
     "direct_calls": [
       "artgen.GetKeyPair200JSONResponse",
       "errors.Is",
@@ -8219,7 +8219,7 @@
     "operation_id": "getLockedOutUsers",
     "state": "implemented",
     "contract": "Returns the names of users locked by the user lock policy. Admin only.",
-    "handler": "internal/server/security.go: artifactoryService.GetLockedOutUsers",
+    "handler": "internal/server/security.go: securityAPI.GetLockedOutUsers",
     "direct_calls": [
       "artgen.GetLockedOutUsers200JSONResponse",
       "s.adminStore",
@@ -8252,7 +8252,7 @@
     "operation_id": "getPermissionTargets",
     "state": "implemented",
     "contract": "Lists every target by name and detail URL, including targets created through the v2 or Access APIs. Admins and Manage Resources holders only. Deprecated in favour of GET /access/api/v2/permissions.",
-    "handler": "internal/server/permissions.go: artifactoryService.GetPermissionTargets",
+    "handler": "internal/server/permissions.go: securityAPI.GetPermissionTargets",
     "direct_calls": [
       "artgen.GetPermissionTargets200JSONResponse",
       "c.admin",
@@ -8285,7 +8285,7 @@
     "operation_id": "getPermissionTargetDetails",
     "state": "implemented",
     "contract": "Returns the target projected to the v1 shape: only its repository section, with action names mapped back to the single-letter codes. Admins and Manage Resources holders only. Deprecated in favour of GET /access/api/v2/permissions/{name}.",
-    "handler": "internal/server/permissions.go: artifactoryService.GetPermissionTargetDetails",
+    "handler": "internal/server/permissions.go: securityAPI.GetPermissionTargetDetails",
     "direct_calls": [
       "c.admin",
       "c.svc.Get",
@@ -8319,11 +8319,11 @@
     "operation_id": "getLegacyTokens",
     "state": "implemented",
     "contract": "Lists every user's revocable, unexpired tokens in the legacy shape. Admin only.",
-    "handler": "internal/server/tokens.go: artifactoryService.GetLegacyTokens",
+    "handler": "internal/server/tokens.go: securityAPI.GetLegacyTokens",
     "direct_calls": [
-      "expression.visible",
       "fmt.Errorf",
-      "kernel.RequireAdmin"
+      "kernel.RequireAdmin",
+      "tokenAPI().visible"
     ],
     "review_family": "identity",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
@@ -8350,7 +8350,7 @@
     "operation_id": "getUserLockPolicy",
     "state": "implemented",
     "contract": "Returns the lockout settings. Admin only.",
-    "handler": "internal/server/security.go: artifactoryService.GetUserLockPolicy",
+    "handler": "internal/server/security.go: securityAPI.GetUserLockPolicy",
     "direct_calls": [
       "s.adminStore",
       "s.identity",
@@ -8379,7 +8379,7 @@
     "operation_id": "getUsers",
     "state": "implemented",
     "contract": "Lists every user with its detail URL and realm. Admin only. Deprecated in favour of GET /access/api/v2/users.",
-    "handler": "internal/server/security.go: artifactoryService.GetUsers",
+    "handler": "internal/server/security.go: securityAPI.GetUsers",
     "direct_calls": [
       "baseurl.From",
       "s.adminStore",
@@ -8413,7 +8413,7 @@
     "operation_id": "getUserDetails",
     "state": "implemented",
     "contract": "Returns the legacy user document without the password. Admin only. The seeded anonymous user is readable here. Deprecated in favour of GET /access/api/v2/users/{username}.",
-    "handler": "internal/server/security.go: artifactoryService.GetUserDetails",
+    "handler": "internal/server/security.go: securityAPI.GetUserDetails",
     "direct_calls": [
       "s.adminStore",
       "s.identity",
@@ -8851,7 +8851,7 @@
     "operation_id": "getReverseProxyConfiguration",
     "state": "implemented",
     "contract": "Returns the reverse proxy settings. Without stored settings, the response describes this server. dockerReverseProxyMethod is SUBDOMAIN when docker.subdomain_match is on and REPOPATHPREFIX otherwise, serverName is the base URL's host and, with subdomains, serverNameExpression is its wildcard. Stored settings return both sslPort and httpsPort with the same value. An administrator gets every field; any other signed-in user gets dockerReverseProxyMethod and the port fields (artifactoryPort, httpPort, httpsPort, sslPort, useHttp, useHttps) that are set, and nothing else. Anonymous callers are refused.",
-    "handler": "internal/server/reverseproxy.go: artifactoryService.GetReverseProxyConfiguration",
+    "handler": "internal/server/reverseproxy.go: systemAPI.GetReverseProxyConfiguration",
     "direct_calls": [
       "fmt.Errorf",
       "kernel.RequireAuthenticated",
@@ -8895,7 +8895,7 @@
     "operation_id": "getSystemLicense",
     "state": "implemented",
     "contract": "Returns the licence details of this server, which has no licence tiers. Admin only.",
-    "handler": "internal/server/system.go: artifactoryService.GetSystemLicense",
+    "handler": "internal/server/system.go: systemAPI.GetSystemLicense",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -9055,7 +9055,7 @@
     "operation_id": "getCertificates",
     "state": "implemented",
     "contract": "Lists the client certificates remote repositories can present to upstreams. Admin only.",
-    "handler": "internal/server/keypairs.go: artifactoryService.GetCertificates",
+    "handler": "internal/server/keypairs.go: securityAPI.GetCertificates",
     "direct_calls": [
       "s.adminStore",
       "s.internalError",
@@ -9086,7 +9086,7 @@
     "operation_id": "getServiceId",
     "state": "implemented",
     "contract": "Returns this instance's service id as plain text, `jfrt@` followed by a UUID, with no trailing newline. The UUID is generated when the instance first starts and never changes; the access tokens the instance issues carry it after `jfac@` in their issuer and subject, and `POST /api/security/token` accepts the scope `\u003cservice id\u003e:admin` for administrator permissions. Admin only.",
-    "handler": "internal/server/system.go: artifactoryService.GetServiceId",
+    "handler": "internal/server/system.go: systemAPI.GetServiceId",
     "direct_calls": [
       "artgen.GetServiceId200TextResponse",
       "s.cfg.Store.Instance",
@@ -9185,7 +9185,7 @@
     "operation_id": "getSystemVersion",
     "state": "implemented",
     "contract": "Reports the compatibility version in version, the server build in revision, and the installed add-ons. Any authenticated caller may read it. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled.",
-    "handler": "internal/server/system.go: artifactoryService.GetSystemVersion",
+    "handler": "internal/server/system.go: systemAPI.GetSystemVersion",
     "direct_calls": [
       "artgen.GetSystemVersion200ApplicationVndOrgJfrogArtifactorySystemVersionPlusJSONResponse",
       "artgen.GetSystemVersion200JSONResponse",
@@ -9556,7 +9556,7 @@
     "operation_id": "getSystemLiveness",
     "state": "implemented",
     "contract": "Returns OK while the process serves requests. It probes no store. Answers without credentials.",
-    "handler": "internal/server/system.go: artifactoryService.GetSystemLiveness",
+    "handler": "internal/server/system.go: systemAPI.GetSystemLiveness",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -9578,7 +9578,7 @@
     "operation_id": "getSystemReadiness",
     "state": "implemented",
     "contract": "Returns OK while the database and the binary store answer. Answers without credentials.",
-    "handler": "internal/server/system.go: artifactoryService.GetSystemReadiness",
+    "handler": "internal/server/system.go: systemAPI.GetSystemReadiness",
     "direct_calls": [
       "s.probeArtifactory",
       "s.probeFailed"
@@ -9760,7 +9760,7 @@
     "operation_id": "getPermissionTargetsV2",
     "state": "implemented",
     "contract": "Lists every target by name and detail URL. Admins and holders of the Manage Resources role see all; other users see the targets they hold Manage on.",
-    "handler": "internal/server/permissions.go: artifactoryService.GetPermissionTargetsV2",
+    "handler": "internal/server/permissions.go: securityAPI.GetPermissionTargetsV2",
     "direct_calls": [
       "artgen.GetPermissionTargetsV2200JSONResponse",
       "c.manages",
@@ -9793,7 +9793,7 @@
     "operation_id": "getPermissionTargetsByGroupV2",
     "state": "implemented",
     "contract": "Returns every target in which the group appears in any section's actions. Admins and Manage Resources holders see every match; other users see the matches they hold Manage on.",
-    "handler": "internal/server/permissions.go: artifactoryService.GetPermissionTargetsByGroupV2",
+    "handler": "internal/server/permissions.go: securityAPI.GetPermissionTargetsByGroupV2",
     "direct_calls": [
       "artgen.GetPermissionTargetsByGroupV2200JSONResponse",
       "s.granting"
@@ -9822,7 +9822,7 @@
     "operation_id": "getPermissionTargetsByUserV2",
     "state": "implemented",
     "contract": "Returns every target in which the user appears directly in any section's actions; grants inherited through groups are not expanded. Admins and Manage Resources holders see every match; other users see the matches they hold Manage on.",
-    "handler": "internal/server/permissions.go: artifactoryService.GetPermissionTargetsByUserV2",
+    "handler": "internal/server/permissions.go: securityAPI.GetPermissionTargetsByUserV2",
     "direct_calls": [
       "artgen.GetPermissionTargetsByUserV2200JSONResponse",
       "s.granting"
@@ -9851,7 +9851,7 @@
     "operation_id": "getPermissionTargetDetailsV2",
     "state": "implemented",
     "contract": "Returns the target with every section. Admins, Manage Resources holders and holders of Manage on the target may read it.",
-    "handler": "internal/server/permissions.go: artifactoryService.GetPermissionTargetDetailsV2",
+    "handler": "internal/server/permissions.go: securityAPI.GetPermissionTargetDetailsV2",
     "direct_calls": [
       "c.lookup",
       "s.internalError",
@@ -11392,7 +11392,7 @@
   {
     "route": "GET /router/api/v1/system/health",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.routerHealth-fm",
+    "handler": "internal/server/server.go: internal/server.systemAPI.routerHealth-fm",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -11430,7 +11430,7 @@
   {
     "route": "GET /router/api/v1/system/readiness",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/system.go: internal/server.artifactoryService.readiness.func1",
+    "handler": "internal/server/system.go: internal/server.systemAPI.readiness.func1",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12903,7 +12903,7 @@
     "operation_id": "permissionTargetExistenceCheckV2",
     "state": "implemented",
     "contract": "200 when the target exists, 404 when it does not, with no body.",
-    "handler": "internal/server/permissions.go: artifactoryService.PermissionTargetExistenceCheckV2",
+    "handler": "internal/server/permissions.go: securityAPI.PermissionTargetExistenceCheckV2",
     "direct_calls": [
       "c.lookup",
       "s.permissionError"
@@ -17480,7 +17480,7 @@
     "operation_id": "createApiKey",
     "state": "implemented",
     "contract": "Legacy API-key creation, which is disabled. Always answers 400 with the message \"API key creation is disabled\". Use an access token or a reference token from /access/api/v1/tokens instead.",
-    "handler": "internal/server/security.go: artifactoryService.CreateApiKey",
+    "handler": "internal/server/security.go: securityAPI.CreateApiKey",
     "direct_calls": [
       "kernel.RequireAuthenticated"
     ],
@@ -17506,7 +17506,7 @@
     "operation_id": "updateGroup",
     "state": "implemented",
     "contract": "Changes only the fields present in the body; userNames, when present, replaces the membership. Admin only.",
-    "handler": "internal/server/security.go: artifactoryService.UpdateGroup",
+    "handler": "internal/server/security.go: securityAPI.UpdateGroup",
     "direct_calls": [
       "s.adminStore",
       "s.identity",
@@ -17535,7 +17535,7 @@
     "operation_id": "createKeyPair",
     "state": "implemented",
     "contract": "Stores a key pair, replacing any pair of the same name. Admin only. The private and public keys must match (400). Repositories that reference a replaced pair by name use its new material from the next request. Answers 201 with an empty object.",
-    "handler": "internal/server/keypairs.go: artifactoryService.CreateKeyPair",
+    "handler": "internal/server/keypairs.go: securityAPI.CreateKeyPair",
     "direct_calls": [
       "s.adminStore",
       "s.internalError",
@@ -17563,7 +17563,7 @@
     "operation_id": "verifyKeyPair",
     "state": "implemented",
     "contract": "Checks that the private and public keys in the body belong together and that the passphrase, if given, unlocks the private key. Nothing is stored. Admin only. A mismatch is a 400 whose message names the problem.",
-    "handler": "internal/server/keypairs.go: artifactoryService.VerifyKeyPair",
+    "handler": "internal/server/keypairs.go: securityAPI.VerifyKeyPair",
     "direct_calls": [
       "artgen.VerifyKeyPair200TextResponse"
     ],
@@ -17652,7 +17652,7 @@
     "operation_id": "unlockAllLockedOutUsers",
     "state": "implemented",
     "contract": "Clears every account lock. Admin only.",
-    "handler": "internal/server/security.go: artifactoryService.UnlockAllLockedOutUsers",
+    "handler": "internal/server/security.go: securityAPI.UnlockAllLockedOutUsers",
     "direct_calls": [
       "artgen.UnlockAllLockedOutUsers200TextResponse",
       "s.adminStore",
@@ -17682,7 +17682,7 @@
     "operation_id": "unlockLockedOutUsers",
     "state": "partial: handler enforces the contract's limitations",
     "contract": "Clears the lock on each named user. Admin only. Unknown names are ignored so a stale list does not fail the whole call; an empty array is a 400.",
-    "handler": "internal/server/security.go: artifactoryService.UnlockLockedOutUsers",
+    "handler": "internal/server/security.go: securityAPI.UnlockLockedOutUsers",
     "direct_calls": [
       "artgen.UnlockLockedOutUsers200TextResponse",
       "s.adminStore",
@@ -17712,7 +17712,7 @@
     "operation_id": "unlockLockedOutUser",
     "state": "implemented",
     "contract": "The older form, with the user in the path and no body. Behaves like the array form for one user.",
-    "handler": "internal/server/security.go: artifactoryService.UnlockLockedOutUser",
+    "handler": "internal/server/security.go: securityAPI.UnlockLockedOutUser",
     "direct_calls": [
       "artgen.UnlockLockedOutUser200TextResponse",
       "fmt.Sprintf",
@@ -17744,7 +17744,7 @@
     "operation_id": "changePassword",
     "state": "implemented",
     "contract": "Replaces the internal password of the user the body names. An administrator may name any user; any other caller only itself, and not with an access token scoped more narrowly than its user (403). oldPassword must verify for every caller, and a wrong one counts as a failed login under the user lock policy. A caller whose password has expired may make this call for itself with that password. Deprecated in favour of PUT /access/api/v2/users/{username}/password.",
-    "handler": "internal/server/security.go: artifactoryService.ChangePassword",
+    "handler": "internal/server/security.go: securityAPI.ChangePassword",
     "direct_calls": [
       "artgen.ChangePassword200TextResponse",
       "kernel.RequireAuthenticated",
@@ -17775,7 +17775,7 @@
     "operation_id": "expirePasswordForMultipleUsers",
     "state": "implemented",
     "contract": "Forces each named user to change their password at the next login. Admin only. Unknown users are reported in the message rather than failing the call.",
-    "handler": "internal/server/security.go: artifactoryService.ExpirePasswordForMultipleUsers",
+    "handler": "internal/server/security.go: securityAPI.ExpirePasswordForMultipleUsers",
     "direct_calls": [
       "s.adminStore",
       "s.identity",
@@ -17805,7 +17805,7 @@
     "operation_id": "expirePasswordForSingleUser",
     "state": "implemented",
     "contract": "Forces the user to set a new password, whether or not the password expiration policy is enabled. Until then, requests that authenticate with the expired password answer 403, except the caller's own password change. Admin only. Deprecated in favour of POST /access/api/v2/users/{username}/password/expire.",
-    "handler": "internal/server/security.go: artifactoryService.ExpirePasswordForSingleUser",
+    "handler": "internal/server/security.go: securityAPI.ExpirePasswordForSingleUser",
     "direct_calls": [
       "apierror.New",
       "artgen.ExpirePasswordForSingleUser200TextResponse",
@@ -17837,7 +17837,7 @@
     "operation_id": "expirePasswordForAllUsers",
     "state": "implemented",
     "contract": "Forces every user with an internal password, the caller included, to set a new one; users whose internal password is disabled are unaffected. Until then, requests that authenticate with an expired password answer 403, except the caller's own password change. Admin only. Deprecated in favour of POST /access/api/v2/users/expire_password_for_all_users.",
-    "handler": "internal/server/security.go: artifactoryService.ExpirePasswordForAllUsers",
+    "handler": "internal/server/security.go: securityAPI.ExpirePasswordForAllUsers",
     "direct_calls": [
       "artgen.ExpirePasswordForAllUsers200TextResponse",
       "s.adminStore",
@@ -17867,7 +17867,7 @@
     "operation_id": "unexpirePasswordForSingleUser",
     "state": "implemented",
     "contract": "Clears the forced password change for one user. Admin only.",
-    "handler": "internal/server/security.go: artifactoryService.UnexpirePasswordForSingleUser",
+    "handler": "internal/server/security.go: securityAPI.UnexpirePasswordForSingleUser",
     "direct_calls": [
       "artgen.UnexpirePasswordForSingleUser200TextResponse",
       "fmt.Sprintf",
@@ -17898,7 +17898,7 @@
     "operation_id": "updateUser",
     "state": "implemented",
     "contract": "Changes only the fields present in the body. Admin only. groups, when present, replaces the membership. Deprecated in favour of PATCH /access/api/v2/users/{name}.",
-    "handler": "internal/server/security.go: artifactoryService.UpdateUser",
+    "handler": "internal/server/security.go: securityAPI.UpdateUser",
     "direct_calls": [
       "s.adminStore",
       "s.identity",
@@ -18214,7 +18214,7 @@
     "operation_id": "addCertificate",
     "state": "implemented",
     "contract": "Stores a PEM bundle holding the certificate and its private key under the alias. Admin only. The private key is sealed at rest. A bundle without a private key or with a mismatched pair is a 400; an existing alias is replaced. The request media type is application/text; text/plain is accepted as well.",
-    "handler": "internal/server/keypairs.go: artifactoryService.AddCertificate",
+    "handler": "internal/server/keypairs.go: securityAPI.AddCertificate",
     "direct_calls": [
       "err.Error",
       "fmt.Sprintf",
@@ -19008,7 +19008,7 @@
     "operation_id": "createPermissionTargetV2",
     "state": "implemented",
     "contract": "Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admins and Manage Resources holders may call it. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.",
-    "handler": "internal/server/permissions.go: artifactoryService.CreatePermissionTargetV2",
+    "handler": "internal/server/permissions.go: securityAPI.CreatePermissionTargetV2",
     "direct_calls": [
       "c.admin",
       "c.svc.Create",
@@ -19902,7 +19902,7 @@
     "contract": "Changes the lifetime given to access tokens created without expires_in. Tokens already issued keep their expiry. Returns 200 with no body. Requires a platform admin.",
     "handler": "internal/server/tokens.go: accessService.SetTokenDefaultExpiry",
     "direct_calls": [
-      "expression.content",
+      "s.content",
       "s.tokenAPI",
       "st.Settings",
       "st.Settings().Put",
@@ -20513,7 +20513,7 @@
     "operation_id": "SetAPIRestriction",
     "state": "implemented",
     "contract": "Requires an administrator. Each accepted change replaces current state and appends a durable audit entry. It affects subsequent authenticated calls and credential rechecks; already running work is not forcibly stopped. Retries append another audit entry.",
-    "handler": "internal/server/api_restrictions.go: artifactoryService.SetAPIRestriction",
+    "handler": "internal/server/api_restrictions.go: securityAPI.SetAPIRestriction",
     "direct_calls": [
       "artgen.SetAPIRestriction200JSONResponse",
       "now.Add",
@@ -21441,7 +21441,7 @@
     "operation_id": "regenerateApiKey",
     "state": "implemented",
     "contract": "Legacy key rotation, which is disabled. Always answers 400 \"API key creation is disabled\"; no user holds a key.",
-    "handler": "internal/server/security.go: artifactoryService.RegenerateApiKey",
+    "handler": "internal/server/security.go: securityAPI.RegenerateApiKey",
     "direct_calls": [
       "kernel.RequireAuthenticated"
     ],
@@ -21467,7 +21467,7 @@
     "operation_id": "setPasswordExpirationPolicy",
     "state": "implemented",
     "contract": "Replaces the policy. Admin only. The body is the whole policy, so omitted fields take their defaults, not their previous values. Returns the stored policy with JSON boolean and integer types. Deprecated in favour of PUT /api/security/userLockPolicy.",
-    "handler": "internal/server/security.go: artifactoryService.SetPasswordExpirationPolicy",
+    "handler": "internal/server/security.go: securityAPI.SetPasswordExpirationPolicy",
     "direct_calls": [
       "artgen.SetPasswordExpirationPolicy200JSONResponse",
       "s.adminStore",
@@ -21498,7 +21498,7 @@
     "operation_id": "createOrReplaceGroup",
     "state": "implemented",
     "contract": "Creates the group or replaces every field of an existing one, including the membership when userNames is present. Admin only. Always answers 201, both on create and on replace.",
-    "handler": "internal/server/security.go: artifactoryService.CreateOrReplaceGroup",
+    "handler": "internal/server/security.go: securityAPI.CreateOrReplaceGroup",
     "direct_calls": [
       "s.adminStore",
       "s.identity",
@@ -21528,7 +21528,7 @@
     "operation_id": "updateKeyPair",
     "state": "implemented",
     "contract": "Replaces the pair named by pairName in the body. Admin only. The pair must exist (404) and the keys must match (400). Repositories referencing the pair pick up the new material immediately.",
-    "handler": "internal/server/keypairs.go: artifactoryService.UpdateKeyPair",
+    "handler": "internal/server/keypairs.go: securityAPI.UpdateKeyPair",
     "direct_calls": [
       "artgen.UpdateKeyPair200JSONResponse",
       "errors.Is",
@@ -21559,7 +21559,7 @@
     "operation_id": "createOrReplacePermissionTarget",
     "state": "implemented",
     "contract": "Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admins and Manage Resources holders only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.",
-    "handler": "internal/server/permissions.go: artifactoryService.CreateOrReplacePermissionTarget",
+    "handler": "internal/server/permissions.go: securityAPI.CreateOrReplacePermissionTarget",
     "direct_calls": [
       "c.admin",
       "c.svc.PutResource",
@@ -21590,7 +21590,7 @@
     "operation_id": "configureUserLockPolicy",
     "state": "implemented",
     "contract": "Replaces the lockout settings. Admin only. Disabling the policy also clears existing locks.",
-    "handler": "internal/server/security.go: artifactoryService.ConfigureUserLockPolicy",
+    "handler": "internal/server/security.go: securityAPI.ConfigureUserLockPolicy",
     "direct_calls": [
       "artgen.ConfigureUserLockPolicy200TextResponse",
       "s.adminStore",
@@ -21621,7 +21621,7 @@
     "operation_id": "createOrReplaceUser",
     "state": "implemented",
     "contract": "Creates the user, or replaces every field of an existing one. Admin only. name, email and password are required (password may be omitted only with internalPasswordDisabled true). Answers 201 whether the user was created or replaced. Deprecated in favour of POST /access/api/v2/users.",
-    "handler": "internal/server/security.go: artifactoryService.CreateOrReplaceUser",
+    "handler": "internal/server/security.go: securityAPI.CreateOrReplaceUser",
     "direct_calls": [
       "s.adminStore",
       "s.identity",
@@ -21893,7 +21893,7 @@
     "operation_id": "createOrReplacePermissionTargetV2",
     "state": "implemented",
     "contract": "Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and Manage Resources holders may create or change anything; holders of Manage on an existing target may call it too. A holder of Manage who is neither may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself. It may not change its own user entry or the entry of a group it belongs to. Any other change answers 403. Validation is the same as for create.",
-    "handler": "internal/server/permissions.go: artifactoryService.CreateOrReplacePermissionTargetV2",
+    "handler": "internal/server/permissions.go: securityAPI.CreateOrReplacePermissionTargetV2",
     "direct_calls": [
       "c.admin",
       "c.manages",

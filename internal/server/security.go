@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -35,28 +34,8 @@ const (
 	infoNoAPIKeys     = "No API key was revoked: API keys are retired, use access tokens" //nolint:gosec // a message, not a credential
 )
 
-func (s artifactoryService) identity(st store.Store) *identity.Service {
+func (s securityAPI) identity(st store.Store) *identity.Service {
 	return &identity.Service{Store: st, Hash: s.cfg.PasswordHash}
-}
-
-// identityErr maps the identity service's errors: ErrInvalid is a 400 with
-// its message, ErrNotFound a 404 with notFound, anything else a 500.
-func (s artifactoryService) identityErr(ctx context.Context, op, notFound string, err error) error {
-	switch {
-	case err == nil:
-		return nil
-	case errors.Is(err, identity.ErrInvalid):
-		// The message is what follows the sentinel, whatever wraps it.
-		msg := err.Error()
-		if _, after, ok := strings.Cut(msg, identity.ErrInvalid.Error()+": "); ok {
-			msg = after
-		}
-		return badRequestf("%s", msg)
-	case errors.Is(err, store.ErrNotFound) && notFound != "":
-		return apierror.New(http.StatusNotFound, notFound)
-	default:
-		return s.internalError(ctx, op, err)
-	}
 }
 
 // plusPrefixes are the security API paths whose user, group and permission
@@ -116,7 +95,7 @@ func strPtr(s string) *string { return &s }
 // --- Users -----------------------------------------------------------------
 
 // GetUsers lists users with their detail URLs.
-func (s artifactoryService) GetUsers(
+func (s securityAPI) GetUsers(
 	ctx context.Context,
 	_ artgen.GetUsersRequestObject,
 ) (artgen.GetUsersResponseObject, error) {
@@ -143,7 +122,7 @@ func (s artifactoryService) GetUsers(
 }
 
 // GetUserDetails returns the legacy user document, without the password.
-func (s artifactoryService) GetUserDetails(
+func (s securityAPI) GetUserDetails(
 	ctx context.Context,
 	req artgen.GetUserDetailsRequestObject,
 ) (artgen.GetUserDetailsResponseObject, error) {
@@ -169,16 +148,16 @@ func userBody(name string, bodies ...*artgen.UserConfiguration) (*artgen.UserCon
 			continue
 		}
 		if b.Name != nil && *b.Name != name {
-			return nil, badRequestf("the user name in the body must match the path")
+			return nil, BadRequestf("the user name in the body must match the path")
 		}
 		return b, nil
 	}
-	return nil, badRequestf("a user document is required")
+	return nil, BadRequestf("a user document is required")
 }
 
 // CreateOrReplaceUser creates the user or replaces its fields. It answers
 // 201 either way, which the artifactory_user resource relies on.
-func (s artifactoryService) CreateOrReplaceUser(
+func (s securityAPI) CreateOrReplaceUser(
 	ctx context.Context,
 	req artgen.CreateOrReplaceUserRequestObject,
 ) (artgen.CreateOrReplaceUserResponseObject, error) {
@@ -193,13 +172,13 @@ func (s artifactoryService) CreateOrReplaceUser(
 	}
 	w, err := convert[wire.LegacyUser](body)
 	if err != nil {
-		return nil, badRequestf("%v", err)
+		return nil, BadRequestf("%v", err)
 	}
 	// Server-owned fields are ignored on write.
 	w.Name, w.Status, w.LastLoggedIn, w.Realm, w.MFAStatus = req.UserName, "", "", "", ""
 	u, err := types.UserFromLegacy(w)
 	if err != nil {
-		return nil, badRequestf("%v", err)
+		return nil, BadRequestf("%v", err)
 	}
 	if _, err := s.identity(st).PutUser(ctx, u, w.Password); err != nil {
 		return nil, s.identityErr(ctx, "put user", "", err)
@@ -208,7 +187,7 @@ func (s artifactoryService) CreateOrReplaceUser(
 }
 
 // UpdateUser changes the fields the body carries.
-func (s artifactoryService) UpdateUser(
+func (s securityAPI) UpdateUser(
 	ctx context.Context,
 	req artgen.UpdateUserRequestObject,
 ) (artgen.UpdateUserResponseObject, error) {
@@ -234,7 +213,7 @@ func (s artifactoryService) UpdateUser(
 }
 
 // DeleteUser removes the user, its memberships and its tokens.
-func (s artifactoryService) DeleteUser(
+func (s securityAPI) DeleteUser(
 	ctx context.Context,
 	req artgen.DeleteUserRequestObject,
 ) (artgen.DeleteUserResponseObject, error) {
@@ -252,7 +231,7 @@ func (s artifactoryService) DeleteUser(
 // --- Groups ----------------------------------------------------------------
 
 // GetGroups lists groups with their detail URLs.
-func (s artifactoryService) GetGroups(
+func (s securityAPI) GetGroups(
 	ctx context.Context,
 	_ artgen.GetGroupsRequestObject,
 ) (artgen.GetGroupsResponseObject, error) {
@@ -276,7 +255,7 @@ func (s artifactoryService) GetGroups(
 
 // GetGroupDetails returns the legacy group document; members only with
 // includeUsers=true.
-func (s artifactoryService) GetGroupDetails(
+func (s securityAPI) GetGroupDetails(
 	ctx context.Context,
 	req artgen.GetGroupDetailsRequestObject,
 ) (artgen.GetGroupDetailsResponseObject, error) {
@@ -310,16 +289,16 @@ func groupBody(
 			continue
 		}
 		if b.Name != nil && *b.Name != name {
-			return nil, badRequestf("the group name in the body must match the path")
+			return nil, BadRequestf("the group name in the body must match the path")
 		}
 		return b, nil
 	}
-	return nil, badRequestf("a group document is required")
+	return nil, BadRequestf("a group document is required")
 }
 
 // CreateOrReplaceGroup creates the group or replaces its fields. It answers
 // 201 either way, which the artifactory_group resource requires.
-func (s artifactoryService) CreateOrReplaceGroup(
+func (s securityAPI) CreateOrReplaceGroup(
 	ctx context.Context,
 	req artgen.CreateOrReplaceGroupRequestObject,
 ) (artgen.CreateOrReplaceGroupResponseObject, error) {
@@ -334,7 +313,7 @@ func (s artifactoryService) CreateOrReplaceGroup(
 	}
 	w, err := convert[wire.LegacyGroup](b)
 	if err != nil {
-		return nil, badRequestf("%v", err)
+		return nil, BadRequestf("%v", err)
 	}
 	w.Name, w.Realm, w.RealmAttributes = req.GroupName, "", ""
 	if _, err := s.identity(st).PutGroup(ctx, types.GroupFromLegacy(w), b.UserNames); err != nil {
@@ -344,7 +323,7 @@ func (s artifactoryService) CreateOrReplaceGroup(
 }
 
 // UpdateGroup changes the fields the body carries.
-func (s artifactoryService) UpdateGroup(
+func (s securityAPI) UpdateGroup(
 	ctx context.Context,
 	req artgen.UpdateGroupRequestObject,
 ) (artgen.UpdateGroupResponseObject, error) {
@@ -369,7 +348,7 @@ func (s artifactoryService) UpdateGroup(
 }
 
 // DeleteGroup removes the group and its memberships.
-func (s artifactoryService) DeleteGroup(
+func (s securityAPI) DeleteGroup(
 	ctx context.Context,
 	req artgen.DeleteGroupRequestObject,
 ) (artgen.DeleteGroupResponseObject, error) {
@@ -387,7 +366,7 @@ func (s artifactoryService) DeleteGroup(
 // --- Locks and passwords ---------------------------------------------------
 
 // GetLockedOutUsers lists the users the lock policy locked.
-func (s artifactoryService) GetLockedOutUsers(
+func (s securityAPI) GetLockedOutUsers(
 	ctx context.Context,
 	_ artgen.GetLockedOutUsersRequestObject,
 ) (artgen.GetLockedOutUsersResponseObject, error) {
@@ -403,7 +382,7 @@ func (s artifactoryService) GetLockedOutUsers(
 }
 
 // UnlockAllLockedOutUsers clears every lock.
-func (s artifactoryService) UnlockAllLockedOutUsers(
+func (s securityAPI) UnlockAllLockedOutUsers(
 	ctx context.Context,
 	_ artgen.UnlockAllLockedOutUsersRequestObject,
 ) (artgen.UnlockAllLockedOutUsersResponseObject, error) {
@@ -418,7 +397,7 @@ func (s artifactoryService) UnlockAllLockedOutUsers(
 }
 
 // UnlockLockedOutUsers clears the named users' locks.
-func (s artifactoryService) UnlockLockedOutUsers(
+func (s securityAPI) UnlockLockedOutUsers(
 	ctx context.Context,
 	req artgen.UnlockLockedOutUsersRequestObject,
 ) (artgen.UnlockLockedOutUsersResponseObject, error) {
@@ -437,7 +416,7 @@ func (s artifactoryService) UnlockLockedOutUsers(
 }
 
 // UnlockLockedOutUser is the path form the JFrog CLI sends for one user.
-func (s artifactoryService) UnlockLockedOutUser(
+func (s securityAPI) UnlockLockedOutUser(
 	ctx context.Context,
 	req artgen.UnlockLockedOutUserRequestObject,
 ) (artgen.UnlockLockedOutUserResponseObject, error) {
@@ -457,7 +436,7 @@ func (s artifactoryService) UnlockLockedOutUser(
 }
 
 // GetUserLockPolicy returns the lockout settings.
-func (s artifactoryService) GetUserLockPolicy(
+func (s securityAPI) GetUserLockPolicy(
 	ctx context.Context,
 	_ artgen.GetUserLockPolicyRequestObject,
 ) (artgen.GetUserLockPolicyResponseObject, error) {
@@ -477,7 +456,7 @@ func (s artifactoryService) GetUserLockPolicy(
 
 // ConfigureUserLockPolicy replaces the lockout settings; omitted fields take
 // their defaults. Disabling the policy also clears every lock.
-func (s artifactoryService) ConfigureUserLockPolicy(
+func (s securityAPI) ConfigureUserLockPolicy(
 	ctx context.Context,
 	req artgen.ConfigureUserLockPolicyRequestObject,
 ) (artgen.ConfigureUserLockPolicyResponseObject, error) {
@@ -486,7 +465,7 @@ func (s artifactoryService) ConfigureUserLockPolicy(
 		return nil, err
 	}
 	if req.Body == nil {
-		return nil, badRequestf("a user lock policy is required")
+		return nil, BadRequestf("a user lock policy is required")
 	}
 	p := types.UserLockPolicy{
 		Enabled:       req.Body.Enabled != nil && *req.Body.Enabled,
@@ -494,7 +473,7 @@ func (s artifactoryService) ConfigureUserLockPolicy(
 	}
 	if req.Body.LoginAttempts != nil {
 		if p.LoginAttempts = *req.Body.LoginAttempts; p.LoginAttempts < 1 {
-			return nil, badRequestf("loginAttempts must be at least 1")
+			return nil, BadRequestf("loginAttempts must be at least 1")
 		}
 	}
 	if err := s.identity(st).SetLockPolicy(ctx, p); err != nil {
@@ -505,7 +484,7 @@ func (s artifactoryService) ConfigureUserLockPolicy(
 }
 
 // GetPasswordExpirationPolicy returns the password expiry settings.
-func (s artifactoryService) GetPasswordExpirationPolicy(
+func (s securityAPI) GetPasswordExpirationPolicy(
 	ctx context.Context,
 	_ artgen.GetPasswordExpirationPolicyRequestObject,
 ) (artgen.GetPasswordExpirationPolicyResponseObject, error) {
@@ -528,7 +507,7 @@ func expirationDoc(p types.PasswordExpirationPolicy) artgen.PasswordExpirationPo
 
 // SetPasswordExpirationPolicy replaces the policy: omitted fields take their
 // defaults, not their previous values, as in Artifactory.
-func (s artifactoryService) SetPasswordExpirationPolicy(
+func (s securityAPI) SetPasswordExpirationPolicy(
 	ctx context.Context,
 	req artgen.SetPasswordExpirationPolicyRequestObject,
 ) (artgen.SetPasswordExpirationPolicyResponseObject, error) {
@@ -537,7 +516,7 @@ func (s artifactoryService) SetPasswordExpirationPolicy(
 		return nil, err
 	}
 	if req.Body == nil {
-		return nil, badRequestf("a password expiration policy is required")
+		return nil, BadRequestf("a password expiration policy is required")
 	}
 	p := types.PasswordExpirationPolicy{
 		MaxAgeDays:    authn.DefaultPasswordMaxAgeDays,
@@ -561,7 +540,7 @@ func (s artifactoryService) SetPasswordExpirationPolicy(
 }
 
 // forgetPolicies makes a policy change apply to this instance's next login.
-func (s artifactoryService) forgetPolicies() {
+func (s securityAPI) forgetPolicies() {
 	if s.cfg.Auth != nil {
 		s.cfg.Auth.ForgetPolicies()
 	}
@@ -569,7 +548,7 @@ func (s artifactoryService) forgetPolicies() {
 
 // ExpirePasswordForMultipleUsers forces the named users to change their
 // passwords; unknown names are reported, not refused.
-func (s artifactoryService) ExpirePasswordForMultipleUsers(
+func (s securityAPI) ExpirePasswordForMultipleUsers(
 	ctx context.Context,
 	req artgen.ExpirePasswordForMultipleUsersRequestObject,
 ) (artgen.ExpirePasswordForMultipleUsersResponseObject, error) {
@@ -578,7 +557,7 @@ func (s artifactoryService) ExpirePasswordForMultipleUsers(
 		return nil, err
 	}
 	if req.Body == nil || len(*req.Body) == 0 {
-		return nil, badRequestf("name at least one user")
+		return nil, BadRequestf("name at least one user")
 	}
 	unknown, err := s.identity(st).ExpirePasswords(ctx, *req.Body)
 	if err != nil {
@@ -594,7 +573,7 @@ func (s artifactoryService) ExpirePasswordForMultipleUsers(
 }
 
 // UnexpirePasswordForSingleUser clears a forced password change.
-func (s artifactoryService) UnexpirePasswordForSingleUser(
+func (s securityAPI) UnexpirePasswordForSingleUser(
 	ctx context.Context,
 	req artgen.UnexpirePasswordForSingleUserRequestObject,
 ) (artgen.UnexpirePasswordForSingleUserResponseObject, error) {
@@ -611,7 +590,7 @@ func (s artifactoryService) UnexpirePasswordForSingleUser(
 
 // ExpirePasswordForSingleUser is the deprecated path form of the expiry, for
 // one user; an unknown user is 404, as the unexpire form answers.
-func (s artifactoryService) ExpirePasswordForSingleUser(
+func (s securityAPI) ExpirePasswordForSingleUser(
 	ctx context.Context,
 	req artgen.ExpirePasswordForSingleUserRequestObject,
 ) (artgen.ExpirePasswordForSingleUserResponseObject, error) {
@@ -632,7 +611,7 @@ func (s artifactoryService) ExpirePasswordForSingleUser(
 
 // ExpirePasswordForAllUsers expires every internal password, the caller's
 // included.
-func (s artifactoryService) ExpirePasswordForAllUsers(
+func (s securityAPI) ExpirePasswordForAllUsers(
 	ctx context.Context,
 	_ artgen.ExpirePasswordForAllUsersRequestObject,
 ) (artgen.ExpirePasswordForAllUsersResponseObject, error) {
@@ -654,7 +633,7 @@ func (s artifactoryService) ExpirePasswordForAllUsers(
 // as the Access v2 change refuses one. An expired password reaches here
 // (ownPasswordChange) with its administrator rights intact, so it is held to
 // its own name.
-func (s artifactoryService) ChangePassword(
+func (s securityAPI) ChangePassword(
 	ctx context.Context,
 	req artgen.ChangePasswordRequestObject,
 ) (artgen.ChangePasswordResponseObject, error) {
@@ -663,7 +642,7 @@ func (s artifactoryService) ChangePassword(
 		return nil, err //nolint:wrapcheck // typed for the response
 	}
 	if req.Body == nil || req.Body.UserName == "" {
-		return nil, badRequestf("userName is required")
+		return nil, BadRequestf("userName is required")
 	}
 	b := req.Body
 	self := p.Name == b.UserName && !narrowedToken(p)
@@ -685,30 +664,30 @@ func (s artifactoryService) ChangePassword(
 // --- Retired API keys --------------------------------------------------------
 
 // CreateApiKey refuses: API keys are retired (decision 0005).
-func (s artifactoryService) CreateApiKey(
+func (s securityAPI) CreateApiKey(
 	ctx context.Context,
 	_ artgen.CreateApiKeyRequestObject,
 ) (artgen.CreateApiKeyResponseObject, error) {
 	if _, err := kernel.RequireAuthenticated(ctx); err != nil {
 		return nil, err //nolint:wrapcheck // typed for the response
 	}
-	return nil, badRequestf(errAPIKeysRetired)
+	return nil, BadRequestf(errAPIKeysRetired)
 }
 
 // RegenerateApiKey refuses: no user holds a key to rotate.
-func (s artifactoryService) RegenerateApiKey(
+func (s securityAPI) RegenerateApiKey(
 	ctx context.Context,
 	_ artgen.RegenerateApiKeyRequestObject,
 ) (artgen.RegenerateApiKeyResponseObject, error) {
 	if _, err := kernel.RequireAuthenticated(ctx); err != nil {
 		return nil, err //nolint:wrapcheck // typed for the response
 	}
-	return nil, badRequestf(errAPIKeysRetired)
+	return nil, BadRequestf(errAPIKeysRetired)
 }
 
 // GetApiKey answers 404, the documented answer when no key exists; the
 // JFrog CLI reads it as "no key".
-func (s artifactoryService) GetApiKey(
+func (s securityAPI) GetApiKey(
 	ctx context.Context,
 	_ artgen.GetApiKeyRequestObject,
 ) (artgen.GetApiKeyResponseObject, error) {
@@ -720,13 +699,13 @@ func (s artifactoryService) GetApiKey(
 
 // RevokeApiKey answers 200 with nothing revoked, for scripts that revoke
 // unconditionally. deleteAll=1 needs an administrator.
-func (s artifactoryService) RevokeApiKey(
+func (s securityAPI) RevokeApiKey(
 	ctx context.Context,
 	req artgen.RevokeApiKeyRequestObject,
 ) (artgen.RevokeApiKeyResponseObject, error) {
 	if req.Params.DeleteAll != nil &&
 		*req.Params.DeleteAll == artgen.RevokeApiKeyParamsDeleteAllN1 {
-		if err := adminOnly(ctx); err != nil {
+		if err := AdminOnly(ctx); err != nil {
 			return nil, err
 		}
 	} else if _, err := kernel.RequireAuthenticated(
@@ -739,7 +718,7 @@ func (s artifactoryService) RevokeApiKey(
 
 // RevokeUserApiKey answers 200 for an existing user and 404 otherwise; there
 // is never a key to remove.
-func (s artifactoryService) RevokeUserApiKey(
+func (s securityAPI) RevokeUserApiKey(
 	ctx context.Context,
 	req artgen.RevokeUserApiKeyRequestObject,
 ) (artgen.RevokeUserApiKeyResponseObject, error) {

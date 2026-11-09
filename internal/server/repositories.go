@@ -165,39 +165,6 @@ func (s artifactoryService) log() *slog.Logger {
 	return s.cfg.Logger
 }
 
-// adminOnly refuses a caller who is not an administrator (kernel.RequireAdmin).
-// The wrap keeps the typed error, so the response carries its status.
-func adminOnly(ctx context.Context) error {
-	if _, err := kernel.RequireAdmin(ctx); err != nil {
-		return fmt.Errorf("repositories: %w", err)
-	}
-	return nil
-}
-
-// principal returns the caller of a read. The middleware lets a request
-// without one through only to public routes, so none here means a router
-// built without authentication, which is refused as unauthenticated.
-func principal(ctx context.Context) (kernel.Principal, error) {
-	p, ok := kernel.FromContext(ctx)
-	if !ok {
-		return p, kernel.ErrUnauthenticated
-	}
-	return p, nil
-}
-
-// denied refuses a read: anonymous is told to authenticate, a user that
-// they lack the right.
-func denied(p kernel.Principal) error {
-	if p.Anonymous {
-		return kernel.ErrUnauthenticated
-	}
-	return kernel.ErrForbidden
-}
-
-func badRequestf(format string, a ...any) error {
-	return apierror.New(http.StatusBadRequest, fmt.Sprintf(format, a...))
-}
-
 func notFoundRepo(key string) error {
 	return apierror.New(http.StatusNotFound, fmt.Sprintf("Repository '%s' does not exist", key))
 }
@@ -207,7 +174,7 @@ func (s artifactoryService) readerFor(
 	ctx context.Context,
 	st store.Store,
 ) (kernel.Principal, func(repo.Config) bool, error) {
-	p, err := principal(ctx)
+	p, err := Principal(ctx)
 	if err != nil {
 		return p, nil, err
 	}
@@ -290,7 +257,7 @@ func (s artifactoryService) GetAllRepositoryConfigurations(
 	ctx context.Context,
 	req artgen.GetAllRepositoryConfigurationsRequestObject,
 ) (artgen.GetAllRepositoryConfigurationsResponseObject, error) {
-	if err := adminOnly(ctx); err != nil {
+	if err := AdminOnly(ctx); err != nil {
 		return nil, err
 	}
 	st, err := s.content()
@@ -357,7 +324,7 @@ func (s artifactoryService) CheckIfRepositoryExists(
 	ctx context.Context,
 	req artgen.CheckIfRepositoryExistsRequestObject,
 ) (artgen.CheckIfRepositoryExistsResponseObject, error) {
-	if err := adminOnly(ctx); err != nil {
+	if err := AdminOnly(ctx); err != nil {
 		return nil, err
 	}
 	st, err := s.content()
@@ -423,7 +390,7 @@ func (s artifactoryService) readOne(
 	case err != nil:
 		return p, repo.Config{}, s.internalError(ctx, "get repository", err)
 	case !can(c):
-		return p, repo.Config{}, denied(p)
+		return p, repo.Config{}, Denied(p)
 	}
 	return p, view(p, c), nil
 }
@@ -512,12 +479,12 @@ func (s artifactoryService) GetRemoteRepositoryConfiguration(
 	if err != nil {
 		return nil, err
 	}
-	p, err := principal(ctx)
+	p, err := Principal(ctx)
 	if err != nil {
 		return nil, err
 	}
 	if p.Anonymous {
-		return nil, denied(p)
+		return nil, Denied(p)
 	}
 	key := string(req.RemoteRepoName)
 	c, err := st.Repos().Get(ctx, key)
@@ -528,7 +495,7 @@ func (s artifactoryService) GetRemoteRepositoryConfiguration(
 	case err != nil:
 		return nil, s.internalError(ctx, "get repository", err)
 	case !p.Admin && (c.ShareConfiguration == nil || !*c.ShareConfiguration):
-		return nil, denied(p)
+		return nil, Denied(p)
 	}
 	doc, err := json.Marshal(repo.Masked(c))
 	if err != nil {
@@ -591,9 +558,9 @@ func (s artifactoryService) GetBatchOfRepositoriesByName(
 	}
 	switch {
 	case len(names) == 0:
-		return nil, badRequestf("No repository names were given")
+		return nil, BadRequestf("No repository names were given")
 	case len(names) > repoBatchLimit:
-		return nil, badRequestf("At most %d repositories can be read at once", repoBatchLimit)
+		return nil, BadRequestf("At most %d repositories can be read at once", repoBatchLimit)
 	}
 	out := artgen.GetBatchOfRepositoriesByName200JSONResponse{}
 	for _, key := range names {
@@ -635,7 +602,7 @@ func (s artifactoryService) CreateRepository(
 	ctx context.Context,
 	req artgen.CreateRepositoryRequestObject,
 ) (artgen.CreateRepositoryResponseObject, error) {
-	if err := adminOnly(ctx); err != nil {
+	if err := AdminOnly(ctx); err != nil {
 		return nil, err
 	}
 	st, err := s.content()
@@ -650,7 +617,7 @@ func (s artifactoryService) CreateRepository(
 		req.ApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBody,
 	)
 	if body == nil {
-		return nil, badRequestf("A repository configuration is required")
+		return nil, BadRequestf("A repository configuration is required")
 	}
 	c := *body
 	// The key in the path wins over the body (research 03).
@@ -673,7 +640,7 @@ func (s artifactoryService) CreateRepository(
 	}
 	switch err := st.Repos().Create(ctx, c); {
 	case errors.Is(err, store.ErrConflict):
-		return nil, badRequestf(msgKeyExists)
+		return nil, BadRequestf(msgKeyExists)
 	case err != nil:
 		return nil, s.internalError(ctx, "create repository", err)
 	}
@@ -686,7 +653,7 @@ func (s artifactoryService) CreateMultipleRepositories(
 	ctx context.Context,
 	req artgen.CreateMultipleRepositoriesRequestObject,
 ) (artgen.CreateMultipleRepositoriesResponseObject, error) {
-	if err := adminOnly(ctx); err != nil {
+	if err := AdminOnly(ctx); err != nil {
 		return nil, err
 	}
 	st, err := s.content()
@@ -712,7 +679,7 @@ func (s artifactoryService) CreateMultipleRepositories(
 	prepared := make([]repo.Config, 0, len(batch))
 	for i, c := range batch {
 		if c.Key == "" {
-			return nil, badRequestf("Repository %d of the batch has no key", i+1)
+			return nil, BadRequestf("Repository %d of the batch has no key", i+1)
 		}
 		if slices.ContainsFunc(
 			known,
@@ -763,9 +730,9 @@ func (s artifactoryService) CreateMultipleRepositories(
 func batchSize(n int) error {
 	switch {
 	case n == 0:
-		return badRequestf("No repositories were given")
+		return BadRequestf("No repositories were given")
 	case n > repoBatchLimit:
-		return badRequestf("At most %d repositories can be changed at once", repoBatchLimit)
+		return BadRequestf("At most %d repositories can be changed at once", repoBatchLimit)
 	}
 	return nil
 }
@@ -789,7 +756,7 @@ func (s artifactoryService) UpdateRepositoryConfiguration(
 	ctx context.Context,
 	req artgen.UpdateRepositoryConfigurationRequestObject,
 ) (artgen.UpdateRepositoryConfigurationResponseObject, error) {
-	if err := adminOnly(ctx); err != nil {
+	if err := AdminOnly(ctx); err != nil {
 		return nil, err
 	}
 	st, err := s.content()
@@ -816,7 +783,7 @@ func (s artifactoryService) UpdateRepositoryConfiguration(
 	}
 	var patch map[string]json.RawMessage
 	if err := json.Unmarshal(body, &patch); err != nil || patch == nil {
-		return nil, badRequestf("A repository configuration object is required")
+		return nil, BadRequestf("A repository configuration object is required")
 	}
 	updated, err := repos.Merge(stored, patch)
 	if err != nil {
@@ -843,7 +810,7 @@ func (s artifactoryService) writeUpdates(
 	stored, updated []repo.Config,
 ) error {
 	var by string
-	if p, err := principal(ctx); err == nil {
+	if p, err := Principal(ctx); err == nil {
 		by = p.Name
 	}
 	err := st.Tx(ctx, func(ctx context.Context) error {
@@ -896,7 +863,7 @@ func (s artifactoryService) UpdateMultipleRepositories(
 	ctx context.Context,
 	req artgen.UpdateMultipleRepositoriesRequestObject,
 ) (artgen.UpdateMultipleRepositoriesResponseObject, error) {
-	if err := adminOnly(ctx); err != nil {
+	if err := AdminOnly(ctx); err != nil {
 		return nil, err
 	}
 	st, err := s.content()
@@ -915,7 +882,7 @@ func (s artifactoryService) UpdateMultipleRepositories(
 	}
 	var patches []map[string]json.RawMessage
 	if err := json.Unmarshal(body, &patches); err != nil {
-		return nil, badRequestf("A list of repository configurations is required")
+		return nil, BadRequestf("A list of repository configurations is required")
 	}
 	if err := batchSize(len(patches)); err != nil {
 		return nil, err
@@ -928,7 +895,7 @@ func (s artifactoryService) UpdateMultipleRepositories(
 			_ = json.Unmarshal(raw, &key)
 		}
 		if key == "" {
-			return nil, badRequestf("Repository %d of the batch has no key", i+1)
+			return nil, BadRequestf("Repository %d of the batch has no key", i+1)
 		}
 		stored, err := st.Repos().Get(ctx, key)
 		switch {

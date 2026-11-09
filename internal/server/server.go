@@ -446,8 +446,12 @@ func New(cfg Config) http.Handler {
 			chan struct{},
 			cmp.Or(cfg.FolderDownloadMaxConcurrent, defaultFolderSlots),
 		),
-		instanceID: new(atomic.Pointer[string]),
 	}
+	sysAPI := systemAPI{cfg: cfg, instanceID: new(atomic.Pointer[string])}
+	// One verifier per handler, so providers' keys stay cached between
+	// exchanges. The access spec's server and the security partial share it.
+	access := accessState{cfg: cfg, idTokens: idtoken.New(idtoken.Options{})}
+	accSvc, secAPI := accessService{access}, securityAPI{access}
 	// The registry exists before the middleware, whose challenge it writes.
 	registry := newRegistry(cfg, artSvc)
 	r.Use(
@@ -487,7 +491,7 @@ func New(cfg Config) http.Handler {
 	// After authentication, which it needs, and ahead of routing, which
 	// cannot match it (helmPartialReindex).
 	if cfg.Store != nil {
-		r.Use(artSvc.checkAPIRestriction)
+		r.Use(secAPI.checkAPIRestriction)
 	}
 	if cfg.RequestLimits != nil {
 		r.Use(artSvc.limitPrincipal(limits))
@@ -496,25 +500,21 @@ func New(cfg Config) http.Handler {
 	r.NotFound(notFound)
 	r.MethodNotAllowed(methodNotAllowed)
 
-	// One verifier per handler, so providers' keys stay cached between
-	// exchanges.
-	accSvc := accessService{cfg: cfg, idTokens: idtoken.New(idtoken.Options{})}
-
 	// Hand-written routes go first so they win over anything a generated mux
 	// might later claim for the same prefix.
-	r.Get("/artifactory/api/system/ping", artSvc.ping(artifactoryService.probeArtifactory))
+	r.Get("/artifactory/api/system/ping", sysAPI.ping(systemAPI.probeArtifactory))
 	r.With(middleware.BodyLimit(sinkBodyLimit)).Post("/artifactory/api/system/usage", sinkHandler)
 	r.With(middleware.BodyLimit(sinkBodyLimit)).
 		Post("/jfconnect/api/v1/backoffice/metrics/log", sinkHandler)
-	r.Get("/access/api/v1/system/ping", artSvc.ping(artifactoryService.probeAccess))
+	r.Get("/access/api/v1/system/ping", sysAPI.ping(systemAPI.probeAccess))
 	// Access's and the router's own probes, which JFrog's Helm charts and
 	// secret rotator poll through the public URL. The router is ready when
 	// the services behind it are.
-	r.Get("/access/api/v1/system/readiness", artSvc.readiness(artifactoryService.probeAccess))
+	r.Get("/access/api/v1/system/readiness", sysAPI.readiness(systemAPI.probeAccess))
 	r.Get("/access/api/v1/system/liveness", liveness)
-	r.Get("/router/api/v1/system/readiness", artSvc.readiness(artifactoryService.probeArtifactory))
+	r.Get("/router/api/v1/system/readiness", sysAPI.readiness(systemAPI.probeArtifactory))
 	r.Get("/router/api/v1/system/liveness", liveness)
-	r.Get("/router/api/v1/system/health", artSvc.routerHealth)
+	r.Get("/router/api/v1/system/health", sysAPI.routerHealth)
 	r.Get("/artifactory/api/artifactweave/remote-status/{repoKey}", artSvc.smartStatus)
 	r.With(middleware.BodyLimit(managementBodyLimit)).
 		Patch("/artifactory/api/system/configuration", artSvc.patchConfiguration)
@@ -522,7 +522,7 @@ func New(cfg Config) http.Handler {
 	artSvc.registerStorageRoutes(r)
 	artSvc.registerTrashRoutes(r)
 	artSvc.registerMultipartRoutes(r)
-	artSvc.registerTokenRoutes(r)
+	secAPI.registerTokenRoutes(r)
 	artSvc.registerSearchRoutes(r)
 	artSvc.registerMavenRoutes(r)
 	// GitLab subgroup owners span path segments; the generated VCS routes
@@ -564,7 +564,11 @@ func New(cfg Config) http.Handler {
 			ResponseErrorHandlerFunc: middleware.BindingError(http.StatusInternalServerError),
 		}
 		artgen.HandlerWithOptions(
-			artgen.NewStrictHandlerWithOptions(artSvc, nil, strictOpts),
+			artgen.NewStrictHandlerWithOptions(artifactoryServer{
+				securityAPI:        &secAPI,
+				systemAPI:          &sysAPI,
+				artifactoryService: &artSvc,
+			}, nil, strictOpts),
 			artgen.ChiServerOptions{
 				BaseURL:          "/artifactory",
 				BaseRouter:       g,
@@ -576,7 +580,11 @@ func New(cfg Config) http.Handler {
 			ResponseErrorHandlerFunc: middleware.BindingError(http.StatusInternalServerError),
 		}
 		accessgen.HandlerWithOptions(
-			accessgen.NewStrictHandlerWithOptions(accSvc, nil, accessOpts),
+			accessgen.NewStrictHandlerWithOptions(
+				accessServer{accessService: &accSvc},
+				nil,
+				accessOpts,
+			),
 			accessgen.ChiServerOptions{
 				BaseURL:          "/access",
 				BaseRouter:       g,

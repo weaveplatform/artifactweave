@@ -53,12 +53,12 @@ type permCaller struct {
 	canManageResources bool
 }
 
-func permissionCaller(ctx context.Context, cfg Config) (permCaller, error) {
+func permissionCaller(ctx context.Context, s accessState) (permCaller, error) {
 	p, err := kernel.RequireAuthenticated(ctx)
 	if err != nil {
 		return permCaller{}, fmt.Errorf("permissions: %w", err)
 	}
-	st, err := artifactoryService{cfg: cfg}.content()
+	st, err := s.content()
 	if err != nil {
 		return permCaller{}, err
 	}
@@ -66,11 +66,9 @@ func permissionCaller(ctx context.Context, cfg Config) (permCaller, error) {
 	// its token scope; accessFor only evaluates them for a principal it did
 	// not see.
 	d, _ := accessapi.DeciderFrom(ctx)
-	a, err := accessFor(ctx, cfg.Access.Authorizer, p, d)
+	a, err := accessFor(ctx, s.cfg.Access.Authorizer, p, d)
 	if err != nil {
-		return permCaller{}, artifactoryService{
-			cfg: cfg,
-		}.internalError(
+		return permCaller{}, s.internalError(
 			ctx,
 			"permission caller",
 			err,
@@ -83,9 +81,7 @@ func permissionCaller(ctx context.Context, cfg Config) (permCaller, error) {
 	dec, _ := authz.FromAPI(a.d)
 	resources, err := dec.ManagesResources(ctx, st.Users(), st.Groups())
 	if err != nil {
-		return permCaller{}, artifactoryService{
-			cfg: cfg,
-		}.internalError(
+		return permCaller{}, s.internalError(
 			ctx,
 			"permission caller",
 			err,
@@ -94,7 +90,7 @@ func permissionCaller(ctx context.Context, cfg Config) (permCaller, error) {
 	return permCaller{
 		svc: permission.Service{
 			Store:        st,
-			Repositories: repos.NewRepositories(st, cfg.Access.Keys, cfg.Access.Projects),
+			Repositories: repos.NewRepositories(st, s.cfg.Access.Keys, s.cfg.Access.Projects),
 		},
 		dec:                dec,
 		canManageResources: resources,
@@ -162,29 +158,6 @@ func (c permCaller) lookup(
 	return p, nil
 }
 
-// permissionError maps the service's errors: 400 for a document to fix,
-// 404 and 409 for names, and 500 for anything else. auth and apierror
-// errors pass through.
-func (s artifactoryService) permissionError(ctx context.Context, op string, err error) error {
-	var ae *apierror.Error
-	switch {
-	case errors.As(err, &ae):
-		return err
-	case errors.Is(err, permission.ErrInvalid):
-		return badRequestf("%s", after(err, permission.ErrInvalid))
-	case errors.Is(err, types.ErrLossyProjection):
-		return badRequestf("%s; read it through /access/api/v2/permissions", err)
-	case errors.Is(err, permission.ErrNotFound):
-		return apierror.New(http.StatusNotFound, after(err, permission.ErrNotFound))
-	case errors.Is(err, permission.ErrConflict):
-		return apierror.New(http.StatusConflict, after(err, permission.ErrConflict))
-	case errors.Is(err, permission.ErrForbidden):
-		return apierror.New(http.StatusForbidden, after(err, permission.ErrForbidden))
-	default:
-		return s.internalError(ctx, op, err)
-	}
-}
-
 // after is the message following sentinel, whatever wraps it.
 func after(err, sentinel error) string {
 	msg := err.Error()
@@ -204,7 +177,7 @@ func invalidDoc(err error) error {
 // wins over a body name that agrees; a disagreeing body name is a 400.
 func bodyName(path string, body *string) (string, error) {
 	if body != nil && *body != "" && *body != path {
-		return "", badRequestf(
+		return "", BadRequestf(
 			"the name in the body (%s) does not match the path (%s)",
 			*body,
 			path,
@@ -216,11 +189,11 @@ func bodyName(path string, body *string) (string, error) {
 // --- v1 permission targets ------------------------------------------------
 
 // GetPermissionTargets lists every permission with its v1 detail URL.
-func (s artifactoryService) GetPermissionTargets(
+func (s securityAPI) GetPermissionTargets(
 	ctx context.Context,
 	_ artgen.GetPermissionTargetsRequestObject,
 ) (artgen.GetPermissionTargetsResponseObject, error) {
-	c, err := permissionCaller(ctx, s.cfg)
+	c, err := permissionCaller(ctx, s.accessState)
 	if err == nil {
 		err = c.admin()
 	}
@@ -251,11 +224,11 @@ func listItems(
 
 // GetPermissionTargetDetails returns the v1 view: the repository section
 // with action letters.
-func (s artifactoryService) GetPermissionTargetDetails(
+func (s securityAPI) GetPermissionTargetDetails(
 	ctx context.Context,
 	req artgen.GetPermissionTargetDetailsRequestObject,
 ) (artgen.GetPermissionTargetDetailsResponseObject, error) {
-	c, err := permissionCaller(ctx, s.cfg)
+	c, err := permissionCaller(ctx, s.accessState)
 	if err == nil {
 		err = c.admin()
 	}
@@ -280,11 +253,11 @@ func (s artifactoryService) GetPermissionTargetDetails(
 // CreateOrReplacePermissionTarget creates the permission or replaces its
 // repository section; build and release bundle sections set through v2 or
 // Access stay.
-func (s artifactoryService) CreateOrReplacePermissionTarget(
+func (s securityAPI) CreateOrReplacePermissionTarget(
 	ctx context.Context,
 	req artgen.CreateOrReplacePermissionTargetRequestObject,
 ) (artgen.CreateOrReplacePermissionTargetResponseObject, error) {
-	c, err := permissionCaller(ctx, s.cfg)
+	c, err := permissionCaller(ctx, s.accessState)
 	if err == nil {
 		err = c.admin()
 	}
@@ -298,7 +271,7 @@ func (s artifactoryService) CreateOrReplacePermissionTarget(
 		)
 	}
 	if body == nil {
-		return nil, badRequestf("a permission target body is required")
+		return nil, BadRequestf("a permission target body is required")
 	}
 	name, err := bodyName(req.PermissionTargetName, body.Name)
 	if err != nil {
@@ -328,11 +301,11 @@ func (s artifactoryService) CreateOrReplacePermissionTarget(
 }
 
 // DeletePermissionTarget removes the whole permission.
-func (s artifactoryService) DeletePermissionTarget(
+func (s securityAPI) DeletePermissionTarget(
 	ctx context.Context,
 	req artgen.DeletePermissionTargetRequestObject,
 ) (artgen.DeletePermissionTargetResponseObject, error) {
-	c, err := permissionCaller(ctx, s.cfg)
+	c, err := permissionCaller(ctx, s.accessState)
 	if err == nil {
 		err = c.admin()
 	}
@@ -351,11 +324,11 @@ func (s artifactoryService) DeletePermissionTarget(
 // GetPermissionTargetsV2 lists what the caller may manage: every permission
 // for an administrator or a Manage Resources holder, otherwise those it
 // holds MANAGE on.
-func (s artifactoryService) GetPermissionTargetsV2(
+func (s securityAPI) GetPermissionTargetsV2(
 	ctx context.Context,
 	_ artgen.GetPermissionTargetsV2RequestObject,
 ) (artgen.GetPermissionTargetsV2ResponseObject, error) {
-	c, err := permissionCaller(ctx, s.cfg)
+	c, err := permissionCaller(ctx, s.accessState)
 	if err != nil {
 		return nil, err
 	}
@@ -391,11 +364,11 @@ func v2Views(ps []types.Permission) ([]artgen.PermissionTargetV2, error) {
 
 // granting lists, for the by-user and by-group views, the permissions
 // naming one principal directly; an unknown principal has none.
-func (s artifactoryService) granting(
+func (s securityAPI) granting(
 	ctx context.Context,
 	users, groups []string,
 ) ([]artgen.PermissionTargetV2, error) {
-	c, err := permissionCaller(ctx, s.cfg)
+	c, err := permissionCaller(ctx, s.accessState)
 	if err != nil {
 		return nil, err
 	}
@@ -418,7 +391,7 @@ func (s artifactoryService) granting(
 }
 
 // GetPermissionTargetsByGroupV2 returns the permissions granting the group.
-func (s artifactoryService) GetPermissionTargetsByGroupV2(
+func (s securityAPI) GetPermissionTargetsByGroupV2(
 	ctx context.Context,
 	req artgen.GetPermissionTargetsByGroupV2RequestObject,
 ) (artgen.GetPermissionTargetsByGroupV2ResponseObject, error) {
@@ -431,7 +404,7 @@ func (s artifactoryService) GetPermissionTargetsByGroupV2(
 
 // GetPermissionTargetsByUserV2 returns the permissions granting the user
 // directly; grants through its groups are not expanded.
-func (s artifactoryService) GetPermissionTargetsByUserV2(
+func (s securityAPI) GetPermissionTargetsByUserV2(
 	ctx context.Context,
 	req artgen.GetPermissionTargetsByUserV2RequestObject,
 ) (artgen.GetPermissionTargetsByUserV2ResponseObject, error) {
@@ -443,11 +416,11 @@ func (s artifactoryService) GetPermissionTargetsByUserV2(
 }
 
 // GetPermissionTargetDetailsV2 returns every v2 section.
-func (s artifactoryService) GetPermissionTargetDetailsV2(
+func (s securityAPI) GetPermissionTargetDetailsV2(
 	ctx context.Context,
 	req artgen.GetPermissionTargetDetailsV2RequestObject,
 ) (artgen.GetPermissionTargetDetailsV2ResponseObject, error) {
-	c, err := permissionCaller(ctx, s.cfg)
+	c, err := permissionCaller(ctx, s.accessState)
 	if err != nil {
 		return nil, err
 	}
@@ -467,11 +440,11 @@ func (s artifactoryService) GetPermissionTargetDetailsV2(
 }
 
 // PermissionTargetExistenceCheckV2 answers 200 or 404 with no body.
-func (s artifactoryService) PermissionTargetExistenceCheckV2(
+func (s securityAPI) PermissionTargetExistenceCheckV2(
 	ctx context.Context,
 	req artgen.PermissionTargetExistenceCheckV2RequestObject,
 ) (artgen.PermissionTargetExistenceCheckV2ResponseObject, error) {
-	c, err := permissionCaller(ctx, s.cfg)
+	c, err := permissionCaller(ctx, s.accessState)
 	if err != nil {
 		return nil, err
 	}
@@ -490,12 +463,12 @@ func v2Body(
 		json = vendor
 	}
 	if json == nil {
-		return nil, badRequestf("a permission target body is required")
+		return nil, BadRequestf("a permission target body is required")
 	}
 	return json, nil
 }
 
-func (s artifactoryService) readV2(
+func (s securityAPI) readV2(
 	ctx context.Context,
 	path string,
 	body *artgen.PermissionTargetV2,
@@ -518,11 +491,11 @@ func (s artifactoryService) readV2(
 
 // CreatePermissionTargetV2 creates the permission; 409 when the name is
 // taken, which jfrog-client-go reads as "already exists".
-func (s artifactoryService) CreatePermissionTargetV2(
+func (s securityAPI) CreatePermissionTargetV2(
 	ctx context.Context,
 	req artgen.CreatePermissionTargetV2RequestObject,
 ) (artgen.CreatePermissionTargetV2ResponseObject, error) {
-	c, err := permissionCaller(ctx, s.cfg)
+	c, err := permissionCaller(ctx, s.accessState)
 	if err == nil {
 		err = c.admin()
 	}
@@ -561,11 +534,11 @@ var v2Sections = []types.ResourceType{
 // actions they hold and never MANAGE, and leaving their own entries and
 // their groups' as they are (createorreplacepermissiontargetv2.json,
 // decision 0006).
-func (s artifactoryService) CreateOrReplacePermissionTargetV2(
+func (s securityAPI) CreateOrReplacePermissionTargetV2(
 	ctx context.Context,
 	req artgen.CreateOrReplacePermissionTargetV2RequestObject,
 ) (artgen.CreateOrReplacePermissionTargetV2ResponseObject, error) {
-	c, err := permissionCaller(ctx, s.cfg)
+	c, err := permissionCaller(ctx, s.accessState)
 	if err != nil {
 		return nil, err
 	}
@@ -614,11 +587,11 @@ func (s artifactoryService) CreateOrReplacePermissionTargetV2(
 // DeletePermissionTargetV2 removes the permission. Unlike a read or a
 // replace, it needs an administrator (deletepermissiontargetv2.json) or a
 // Manage Resources holder.
-func (s artifactoryService) DeletePermissionTargetV2(
+func (s securityAPI) DeletePermissionTargetV2(
 	ctx context.Context,
 	req artgen.DeletePermissionTargetV2RequestObject,
 ) (artgen.DeletePermissionTargetV2ResponseObject, error) {
-	c, err := permissionCaller(ctx, s.cfg)
+	c, err := permissionCaller(ctx, s.accessState)
 	if err == nil {
 		err = c.admin()
 	}
@@ -665,11 +638,11 @@ func (r accessJSON) VisitGetPermissionsResponse(w http.ResponseWriter) error { r
 
 // accessCaller is permissionCaller for the Access service.
 func (s accessService) caller(ctx context.Context) (permCaller, error) {
-	return permissionCaller(ctx, s.cfg)
+	return permissionCaller(ctx, s.accessState)
 }
 
 func (s accessService) errOf(ctx context.Context, op string, err error) error {
-	return artifactoryService{cfg: s.cfg}.permissionError(ctx, op, err)
+	return s.permissionError(ctx, op, err)
 }
 
 // GetPermissions pages through the permissions, optionally only those
@@ -703,9 +676,9 @@ func (s accessService) GetPermissions(
 	expand := q.Expand != nil && *q.Expand
 	switch {
 	case limit < 1 || limit > permPageMax:
-		return nil, badRequestf("limit must be between 1 and %d", permPageMax)
+		return nil, BadRequestf("limit must be between 1 and %d", permPageMax)
 	case expand && !filtered:
-		return nil, badRequestf("expand requires a user or group filter")
+		return nil, BadRequestf("expand requires a user or group filter")
 	}
 	var (
 		ps []types.Permission
@@ -783,7 +756,7 @@ func readAccess(ctx context.Context, body any) (wire.AccessPermission, error) {
 	var w wire.AccessPermission
 	if raw := httpkit.RawBody(ctx); raw != nil {
 		if err := json.Unmarshal(raw, &w); err != nil {
-			return w, badRequestf("the permission is not valid JSON: %v", err)
+			return w, BadRequestf("the permission is not valid JSON: %v", err)
 		}
 		return w, nil
 	}

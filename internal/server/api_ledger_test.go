@@ -222,6 +222,14 @@ func apiReviewHandlers(t *testing.T) map[string]apiReviewHandler {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The artifactory spec's operations are split over partials
+	// (composites.go); each receiver keys its handlers by its spec.
+	specOf := map[string]string{
+		"artifactoryService": "artifactory",
+		"securityAPI":        "artifactory",
+		"systemAPI":          "artifactory",
+		"accessService":      "access",
+	}
 	out := map[string]apiReviewHandler{}
 	for _, file := range files {
 		if strings.HasSuffix(file, "_test.go") {
@@ -238,7 +246,11 @@ func apiReviewHandlers(t *testing.T) map[string]apiReviewHandler {
 				continue
 			}
 			receiver, ok := fn.Recv.List[0].Type.(*ast.Ident)
-			if !ok || receiver.Name != "artifactoryService" && receiver.Name != "accessService" {
+			if !ok {
+				continue
+			}
+			spec, ok := specOf[receiver.Name]
+			if !ok {
 				continue
 			}
 			var calls []string
@@ -250,7 +262,7 @@ func apiReviewHandlers(t *testing.T) map[string]apiReviewHandler {
 				}
 				return true
 			})
-			out[strings.TrimSuffix(receiver.Name, "Service")+":"+strings.ToLower(fn.Name.Name)] = apiReviewHandler{
+			out[spec+":"+strings.ToLower(fn.Name.Name)] = apiReviewHandler{
 				Source: "internal/server/" + file + ": " + receiver.Name + "." + fn.Name.Name,
 				Calls:  sortedReview(calls),
 			}

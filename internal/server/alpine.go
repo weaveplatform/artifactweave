@@ -83,7 +83,7 @@ func (s artifactoryService) serveAlpineIndex(
 	if !acc.folder(c, req.path, types.ActionRead) ||
 		!acc.file(c, req.path, types.ActionRead) ||
 		generic.CheckDownload(c, req.path, false) != nil {
-		httpkit.WriteErr(w, r, denied(p))
+		httpkit.WriteErr(w, r, Denied(p))
 		return
 	}
 	if cached && c.Class != repo.Remote {
@@ -132,7 +132,7 @@ func (s artifactoryService) serveAlpineIndex(
 				return
 			}
 			if !allowed {
-				httpkit.WriteErr(w, r, denied(p))
+				httpkit.WriteErr(w, r, Denied(p))
 				return
 			}
 		}
@@ -328,7 +328,7 @@ func (s artifactoryService) serveVirtualAlpinePackage(
 	}
 	if !acc.file(c, req.path, types.ActionRead) ||
 		generic.CheckDownload(c, req.path, false) != nil {
-		httpkit.WriteErr(w, r, denied(p))
+		httpkit.WriteErr(w, r, Denied(p))
 		return
 	}
 	indexPath := req.path[:strings.LastIndexByte(req.path, '/')+1] + alpine.IndexName

@@ -49,7 +49,7 @@ func apiRecoveryContext(next http.Handler) http.Handler {
 // This also covers embedders with a custom Authenticator. The application
 // supplies the policy to Authenticator as well, for native self-authentication
 // and subsequent Current credential checks.
-func (s artifactoryService) checkAPIRestriction(next http.Handler) http.Handler {
+func (s securityAPI) checkAPIRestriction(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p, ok := kernel.FromContext(r.Context())
 		if ok && !p.Anonymous && !healthRequest(r) && !apiRecoveryRequest(r) {
@@ -69,7 +69,7 @@ func (s artifactoryService) checkAPIRestriction(next http.Handler) http.Handler 
 	})
 }
 
-func (s artifactoryService) restrictionCaller(
+func (s securityAPI) restrictionCaller(
 	ctx context.Context,
 	user string,
 ) (kernel.Principal, error) {
@@ -84,7 +84,7 @@ func (s artifactoryService) restrictionCaller(
 		)
 	}
 	if user == "anonymous" || user == "" {
-		return p, badRequestf("A managed user name is required")
+		return p, BadRequestf("A managed user name is required")
 	}
 	if _, err := s.cfg.Store.Users().Get(ctx, user); err != nil {
 		return p, restrictionStoreError(err)
@@ -124,7 +124,7 @@ func restrictionDocument(r store.APIRestriction) artgen.APIRestriction {
 	return out
 }
 
-func (s artifactoryService) GetAPIRestriction(
+func (s securityAPI) GetAPIRestriction(
 	ctx context.Context,
 	req artgen.GetAPIRestrictionRequestObject,
 ) (artgen.GetAPIRestrictionResponseObject, error) {
@@ -141,7 +141,7 @@ func (s artifactoryService) GetAPIRestriction(
 	return artgen.GetAPIRestriction200JSONResponse(restrictionDocument(r)), nil
 }
 
-func (s artifactoryService) SetAPIRestriction(
+func (s securityAPI) SetAPIRestriction(
 	ctx context.Context,
 	req artgen.SetAPIRestrictionRequestObject,
 ) (artgen.SetAPIRestrictionResponseObject, error) {
@@ -154,7 +154,7 @@ func (s artifactoryService) SetAPIRestriction(
 		req.Body.Until.After(now.Add(7*24*time.Hour)) ||
 		strings.TrimSpace(req.Body.Reason) == "" ||
 		len(strings.TrimSpace(req.Body.Reason)) > 1024 {
-		return nil, badRequestf(
+		return nil, BadRequestf(
 			"Supply a reason of 1 to 1024 bytes and an expiry within the next seven days",
 		)
 	}
@@ -168,7 +168,7 @@ func (s artifactoryService) SetAPIRestriction(
 	return artgen.SetAPIRestriction200JSONResponse(restrictionDocument(r)), nil
 }
 
-func (s artifactoryService) ClearAPIRestriction(
+func (s securityAPI) ClearAPIRestriction(
 	ctx context.Context,
 	req artgen.ClearAPIRestrictionRequestObject,
 ) (artgen.ClearAPIRestrictionResponseObject, error) {
@@ -186,7 +186,7 @@ func (s artifactoryService) ClearAPIRestriction(
 	return artgen.ClearAPIRestriction204Response{}, nil
 }
 
-func (s artifactoryService) GetAPIRestrictionAudit(
+func (s securityAPI) GetAPIRestrictionAudit(
 	ctx context.Context,
 	req artgen.GetAPIRestrictionAuditRequestObject,
 ) (artgen.GetAPIRestrictionAuditResponseObject, error) {
@@ -206,20 +206,20 @@ func (s artifactoryService) GetAPIRestrictionAudit(
 		limit = *req.Params.Limit
 	}
 	if limit < 1 || limit > 1000 {
-		return nil, badRequestf("limit must be between 1 and 1000")
+		return nil, BadRequestf("limit must be between 1 and 1000")
 	}
 	page := store.Page{Limit: limit}
 	if raw := httpkit.Deref(req.Params.Cursor); raw != "" {
 		parts, err := (store.Page{After: raw}).Key(4)
 		if err != nil || len(parts) != 4 || parts[0] != "v1" || parts[1] != user ||
 			parts[2] != p.Name {
-			return nil, badRequestf("Invalid audit cursor for this filter and administrator")
+			return nil, BadRequestf("Invalid audit cursor for this filter and administrator")
 		}
 		page.After = parts[3]
 	}
 	rows, next, err := s.cfg.Store.APIRestrictions().History(ctx, user, page)
 	if errors.Is(err, store.ErrInvalidCursor) {
-		return nil, badRequestf("Invalid audit cursor")
+		return nil, BadRequestf("Invalid audit cursor")
 	}
 	if err != nil {
 		return nil, restrictionStoreError(err)

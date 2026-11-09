@@ -80,7 +80,7 @@ func (s artifactoryService) serveP2Archive(w http.ResponseWriter, r *http.Reques
 ) {
 	if !acc.file(c, req.path, types.ActionRead) ||
 		generic.CheckDownload(c, req.path, false) != nil {
-		httpkit.WriteErr(w, r, denied(p))
+		httpkit.WriteErr(w, r, Denied(p))
 		return
 	}
 	if s.cfg.RemoteSources == nil {
@@ -164,7 +164,7 @@ func (s artifactoryService) serveP2Virtual(w http.ResponseWriter, r *http.Reques
 	if !acc.folder(c, req.path, types.ActionRead) ||
 		!acc.file(c, req.path, types.ActionRead) ||
 		generic.CheckDownload(c, req.path, false) != nil {
-		httpkit.WriteErr(w, r, denied(p))
+		httpkit.WriteErr(w, r, Denied(p))
 		return
 	}
 	members, err := p2Members(r.Context(), st, c, acc, map[string]bool{})
@@ -186,7 +186,7 @@ func (s artifactoryService) serveP2Virtual(w http.ResponseWriter, r *http.Reques
 		member := members[i]
 		if !acc.file(member, parts[1], types.ActionRead) ||
 			generic.CheckDownload(member, parts[1], false) != nil {
-			httpkit.WriteErr(w, r, denied(p))
+			httpkit.WriteErr(w, r, Denied(p))
 			return
 		}
 		// The cloned request retains the authenticated principal. The ordinary

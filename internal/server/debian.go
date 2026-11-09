@@ -70,7 +70,7 @@ func (s artifactoryService) serveDebianIndex(
 	if !acc.folder(c, req.path, types.ActionRead) ||
 		!acc.file(c, req.path, types.ActionRead) ||
 		generic.CheckDownload(c, req.path, false) != nil {
-		httpkit.WriteErr(w, r, denied(p))
+		httpkit.WriteErr(w, r, Denied(p))
 		return
 	}
 	if cached && c.Class != repo.Remote {
@@ -144,13 +144,13 @@ func (s artifactoryService) serveDebianIndex(
 	for _, path := range paths {
 		if !acc.file(c, path, types.ActionRead) ||
 			generic.CheckDownload(c, path, false) != nil {
-			httpkit.WriteErr(w, r, denied(p))
+			httpkit.WriteErr(w, r, Denied(p))
 			return
 		}
 		if checkRead != nil {
 			if err := checkRead(ctx, path); err != nil {
 				if errors.Is(err, source.ErrDenied) {
-					httpkit.WriteErr(w, r, denied(p))
+					httpkit.WriteErr(w, r, Denied(p))
 				} else {
 					httpkit.WriteErr(w, r, s.itemError(ctx, "Debian package read authority", err))
 				}

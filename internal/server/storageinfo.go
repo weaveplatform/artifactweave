@@ -63,7 +63,7 @@ func (s artifactoryService) OptimizeSystemStorage(
 	ctx context.Context,
 	_ artgen.OptimizeSystemStorageRequestObject,
 ) (artgen.OptimizeSystemStorageResponseObject, error) {
-	if err := adminOnly(ctx); err != nil {
+	if err := AdminOnly(ctx); err != nil {
 		return nil, err
 	}
 	if s.cfg.Mirrors == nil {
@@ -143,7 +143,7 @@ func (artifactoryService) RefreshStorageSummaryInfo(
 	ctx context.Context,
 	_ artgen.RefreshStorageSummaryInfoRequestObject,
 ) (artgen.RefreshStorageSummaryInfoResponseObject, error) {
-	if err := adminOnly(ctx); err != nil {
+	if err := AdminOnly(ctx); err != nil {
 		return nil, err
 	}
 	return artgen.RefreshStorageSummaryInfo202TextResponse("Storage summary calculated"), nil

@@ -41,7 +41,7 @@ func keypairSummary(k types.Keypair) artgen.KeyPairSummary {
 // halves that belong together.
 func keypairFrom(in *artgen.KeyPairInput) (types.Keypair, error) {
 	if in == nil {
-		return types.Keypair{}, badRequestf("A key pair body is required")
+		return types.Keypair{}, BadRequestf("A key pair body is required")
 	}
 	priv, pass := "", ""
 	if in.PrivateKey != nil {
@@ -51,18 +51,18 @@ func keypairFrom(in *artgen.KeyPairInput) (types.Keypair, error) {
 		pass = *in.Passphrase
 	}
 	if in.VaultKey != nil && *in.VaultKey != "" && priv == "" {
-		return types.Keypair{}, badRequestf("Vault keys are not supported; supply privateKey")
+		return types.Keypair{}, BadRequestf("Vault keys are not supported; supply privateKey")
 	}
 	for field, value := range map[string]string{
 		"pairName": in.PairName, "pairType": string(in.PairType), "alias": in.Alias,
 		"privateKey": priv, "publicKey": in.PublicKey,
 	} {
 		if strings.TrimSpace(value) == "" {
-			return types.Keypair{}, badRequestf("'%s' is required", field)
+			return types.Keypair{}, BadRequestf("'%s' is required", field)
 		}
 	}
 	if err := keymaterial.CheckPair(string(in.PairType), priv, in.PublicKey, pass); err != nil {
-		return types.Keypair{}, badRequestf("%s", err.Error())
+		return types.Keypair{}, BadRequestf("%s", err.Error())
 	}
 	return types.Keypair{
 		Name: in.PairName, Type: types.KeypairType(in.PairType), Alias: in.Alias,
@@ -71,15 +71,15 @@ func keypairFrom(in *artgen.KeyPairInput) (types.Keypair, error) {
 }
 
 // adminStore is the store of an admin-only operation.
-func (s artifactoryService) adminStore(ctx context.Context) (store.Store, error) {
-	if err := adminOnly(ctx); err != nil {
+func (s securityAPI) adminStore(ctx context.Context) (store.Store, error) {
+	if err := AdminOnly(ctx); err != nil {
 		return nil, err
 	}
 	return s.content()
 }
 
 // GetAllKeyPairs lists every key pair without private material.
-func (s artifactoryService) GetAllKeyPairs(
+func (s securityAPI) GetAllKeyPairs(
 	ctx context.Context,
 	_ artgen.GetAllKeyPairsRequestObject,
 ) (artgen.GetAllKeyPairsResponseObject, error) {
@@ -102,7 +102,7 @@ func (s artifactoryService) GetAllKeyPairs(
 // (createkeypair). Repositories refer to a pair by name, so those using a
 // replaced pair sign with the new material from the next request. The
 // Terraform provider requires 201 with an empty object either way.
-func (s artifactoryService) CreateKeyPair(
+func (s securityAPI) CreateKeyPair(
 	ctx context.Context,
 	req artgen.CreateKeyPairRequestObject,
 ) (artgen.CreateKeyPairResponseObject, error) {
@@ -139,7 +139,7 @@ func putKeypair(ctx context.Context, keys store.KeyStore, k types.Keypair) error
 
 // UpdateKeyPair replaces the pair named in the body; repositories that
 // reference it sign with the new material from the next request.
-func (s artifactoryService) UpdateKeyPair(
+func (s securityAPI) UpdateKeyPair(
 	ctx context.Context,
 	req artgen.UpdateKeyPairRequestObject,
 ) (artgen.UpdateKeyPairResponseObject, error) {
@@ -161,11 +161,11 @@ func (s artifactoryService) UpdateKeyPair(
 }
 
 // VerifyKeyPair checks a pair without storing it.
-func (s artifactoryService) VerifyKeyPair(
+func (s securityAPI) VerifyKeyPair(
 	ctx context.Context,
 	req artgen.VerifyKeyPairRequestObject,
 ) (artgen.VerifyKeyPairResponseObject, error) {
-	if err := adminOnly(ctx); err != nil {
+	if err := AdminOnly(ctx); err != nil {
 		return nil, err
 	}
 	if _, err := keypairFrom(req.Body); err != nil {
@@ -180,7 +180,7 @@ func (s artifactoryService) VerifyKeyPair(
 // anonymous access is on (getkeypair). That is safe only because the
 // projection carries the public half alone: keypairSummary must never gain
 // the private key or the passphrase.
-func (s artifactoryService) GetKeyPair(
+func (s securityAPI) GetKeyPair(
 	ctx context.Context,
 	req artgen.GetKeyPairRequestObject,
 ) (artgen.GetKeyPairResponseObject, error) {
@@ -204,7 +204,7 @@ func (s artifactoryService) GetKeyPair(
 // it. Those repositories lose their reference in the same transaction.
 // Left behind, it would name a pair that does not exist, which every later
 // update of the repository would then be refused for (repos.CheckKeypairs).
-func (s artifactoryService) DeleteKeyPair(
+func (s securityAPI) DeleteKeyPair(
 	ctx context.Context,
 	req artgen.DeleteKeyPairRequestObject,
 ) (artgen.DeleteKeyPairResponseObject, error) {
@@ -270,7 +270,7 @@ func publicKeyFile(k types.Keypair) string {
 // (getkeypairpublickeyperrepository), and no read
 // permission on the repository, so a caller that may not read a repository
 // still learns whether it exists and which key signs it.
-func (s artifactoryService) GetKeyPairPublicKeyPerRepository(
+func (s securityAPI) GetKeyPairPublicKeyPerRepository(
 	ctx context.Context,
 	req artgen.GetKeyPairPublicKeyPerRepositoryRequestObject,
 ) (artgen.GetKeyPairPublicKeyPerRepositoryResponseObject, error) {
@@ -317,7 +317,7 @@ func (s artifactoryService) GetKeyPairPublicKeyPerRepository(
 
 // GetCertificates lists the client certificates remote repositories may
 // present to upstreams.
-func (s artifactoryService) GetCertificates(
+func (s securityAPI) GetCertificates(
 	ctx context.Context,
 	_ artgen.GetCertificatesRequestObject,
 ) (artgen.GetCertificatesResponseObject, error) {
@@ -342,7 +342,7 @@ func (s artifactoryService) GetCertificates(
 
 // AddCertificate stores a PEM bundle of a certificate and its private key
 // under the alias, replacing any certificate already there.
-func (s artifactoryService) AddCertificate(
+func (s securityAPI) AddCertificate(
 	ctx context.Context,
 	req artgen.AddCertificateRequestObject,
 ) (artgen.AddCertificateResponseObject, error) {
@@ -352,24 +352,24 @@ func (s artifactoryService) AddCertificate(
 	}
 	alias := strings.TrimSpace(req.CertificateAlias)
 	if alias == "" {
-		return nil, badRequestf("A certificate alias is required")
+		return nil, BadRequestf("A certificate alias is required")
 	}
 	if req.Body == nil {
-		return nil, badRequestf("A PEM certificate bundle is required")
+		return nil, BadRequestf("A PEM certificate bundle is required")
 	}
 	data, err := io.ReadAll(io.LimitReader(req.Body, maxCertificateBundle+1))
 	switch {
 	case err != nil:
-		return nil, badRequestf("Cannot read the certificate bundle")
+		return nil, BadRequestf("Cannot read the certificate bundle")
 	case len(data) > maxCertificateBundle:
-		return nil, badRequestf(
+		return nil, BadRequestf(
 			"The certificate bundle is larger than %d bytes",
 			maxCertificateBundle,
 		)
 	}
 	b, err := keymaterial.ParseBundle(data)
 	if err != nil {
-		return nil, badRequestf("%s", err.Error())
+		return nil, BadRequestf("%s", err.Error())
 	}
 	if err := st.Keys().PutCertificate(ctx, types.Certificate{
 		Alias: alias, PEM: b.Certificates, PrivateKey: b.PrivateKey,
@@ -384,7 +384,7 @@ func (s artifactoryService) AddCertificate(
 }
 
 // DeleteCertificate removes a certificate no remote repository presents.
-func (s artifactoryService) DeleteCertificate(
+func (s securityAPI) DeleteCertificate(
 	ctx context.Context,
 	req artgen.DeleteCertificateRequestObject,
 ) (artgen.DeleteCertificateResponseObject, error) {
@@ -404,7 +404,7 @@ func (s artifactoryService) DeleteCertificate(
 		}
 	}
 	if len(using) > 0 {
-		return nil, badRequestf(
+		return nil, BadRequestf(
 			"Certificate '%s' is used by repositories: %s",
 			alias,
 			strings.Join(using, ", "),
