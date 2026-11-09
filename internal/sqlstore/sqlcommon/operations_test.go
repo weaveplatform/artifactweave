@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
@@ -26,8 +25,8 @@ func opsFail(event, table string) string {
 func opsDrop(table string) string { return "DROP TABLE " + table }
 
 // opsStore opens a sealed SQLite store at a fresh path, loaded with one of
-// every operations record, and returns it with its path.
-func opsStore(t *testing.T) (*sqlcommon.Store, string) {
+// every project record.
+func opsStore(t *testing.T) *sqlcommon.Store {
 	t.Helper()
 	ctx := context.Background()
 	k, err := crypt.New([]byte("0123456789abcdef0123456789abcdef"))
@@ -50,14 +49,12 @@ func opsStore(t *testing.T) (*sqlcommon.Store, string) {
 		ps.PutAssignment(ctx, types.RepositoryAssignment{
 			RepoKey: "repo-a", ProjectKey: "p1", Environments: []string{"p1-E"}, SharedWith: []string{"p2"},
 		}),
-		s.Replications().Put(ctx, types.Replication{Key: "k1", RepoKey: "repo-a", Password: "pw"}),
-		s.Replications().PutRun(ctx, types.ReplicationRun{ReplicationKey: "k1", Started: time.Unix(1, 0)}),
 	} {
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
-	return s, path
+	return s
 }
 
 // TestAccOperationsFaults injects a failure into the statement after a
@@ -175,34 +172,6 @@ func TestAccOperationsFaults(t *testing.T) {
 			func(ctx context.Context, s store.Store) error { return ps(s).DeleteAssignment(ctx, "repo-a") },
 		},
 		{
-			"delete replication runs",
-			[]string{opsDrop("replication_runs")},
-			func(ctx context.Context, s store.Store) error { return s.Replications().Delete(ctx, "k1") },
-		},
-		{
-			"delete replication",
-			[]string{opsFail("DELETE", "replications")},
-			func(ctx context.Context, s store.Store) error { return s.Replications().Delete(ctx, "k1") },
-		},
-		{
-			"delete repo replication runs",
-			[]string{opsDrop("replication_runs")},
-			func(ctx context.Context, s store.Store) error { return s.Replications().DeleteForRepo(ctx, "repo-a") },
-		},
-		{
-			"delete repo replications",
-			[]string{opsFail("DELETE", "replications")},
-			func(ctx context.Context, s store.Store) error { return s.Replications().DeleteForRepo(ctx, "repo-a") },
-		},
-		{
-			"put replication run",
-			[]string{opsFail("INSERT", "replication_runs")},
-			func(ctx context.Context, s store.Store) error {
-				return s.Replications().
-					PutRun(ctx, types.ReplicationRun{ReplicationKey: "k1", Started: time.Unix(9, 0)})
-			},
-		},
-		{
 			"corrupt role document",
 			[]string{"UPDATE roles SET environments = 'not json'"},
 			func(ctx context.Context, s store.Store) error {
@@ -214,7 +183,7 @@ func TestAccOperationsFaults(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			ctx := context.Background()
-			s, _ := opsStore(t)
+			s := opsStore(t)
 			for _, stmt := range c.inject {
 				if _, err := s.DB().ExecContext(ctx, stmt); err != nil {
 					t.Fatal(err)
@@ -224,33 +193,6 @@ func TestAccOperationsFaults(t *testing.T) {
 				t.Fatalf("want an injected failure, got %v", err)
 			}
 		})
-	}
-}
-
-// TestAccOperationsSealed reads sealed operations columns without the keyring
-// that sealed them: every read must refuse rather than return ciphertext.
-func TestAccOperationsSealed(t *testing.T) {
-	ctx := context.Background()
-	_, path := opsStore(t)
-	s, err := sqlite.Open(ctx, path, sqlite.Options{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = s.Close() }()
-	for name, op := range map[string]func() error{
-		"replication": func() error { _, err := s.Replications().Get(ctx, "k1"); return err },
-	} {
-		if err := op(); !errors.Is(err, sqlcommon.ErrNoKeyring) {
-			t.Errorf("%s: want ErrNoKeyring, got %v", name, err)
-		}
-	}
-	// Without a keyring a new value is stored in plain text and reads back.
-	if err := s.Replications().
-		Put(ctx, types.Replication{Key: "plain", Password: "pw"}); err != nil {
-		t.Fatal(err)
-	}
-	if got, err := s.Replications().Get(ctx, "plain"); err != nil || got.Password != "pw" {
-		t.Fatalf("plain replication = %+v, %v", got, err)
 	}
 }
 
@@ -265,8 +207,7 @@ func TestAccOperationsUnmigrated(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = s.Close() }()
-	ps, rs := s.Projects(), s.Replications()
-	now := time.Unix(100, 0)
+	ps := s.Projects()
 	errOf := func(_ any, err error) error { return err }
 	ops := map[string]error{
 		"project create":     ps.Create(ctx, types.Project{Key: "p"}),
@@ -291,17 +232,6 @@ func TestAccOperationsUnmigrated(t *testing.T) {
 		"assignment":         errOf(ps.Assignment(ctx, "r")),
 		"assignments":        errOf(ps.Assignments(ctx, "p")),
 		"delete assignment":  ps.DeleteAssignment(ctx, "r"),
-		"put replication":    rs.Put(ctx, types.Replication{Key: "k"}),
-		"get replication":    errOf(rs.Get(ctx, "k")),
-		"repo replications":  errOf(rs.ForRepo(ctx, "r")),
-		"list replications":  errOf(rs.List(ctx)),
-		"delete replication": rs.Delete(ctx, "k"),
-		"delete for repo":    rs.DeleteForRepo(ctx, "r"),
-		"put replication run": rs.PutRun(
-			ctx,
-			types.ReplicationRun{ReplicationKey: "k", Started: now},
-		),
-		"last replication": errOf(rs.LastRun(ctx, "k")),
 	}
 	for name, err := range ops {
 		if err == nil || errors.Is(err, store.ErrNotFound) {
