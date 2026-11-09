@@ -7,7 +7,13 @@ package storetest
 import (
 	"testing"
 
+	ntfstoretest "github.com/weaveplatform/artifactweave/migration/notifications/adapters/storetest"
+	ntfport "github.com/weaveplatform/artifactweave/migration/notifications/core/port"
 	platstoretest "github.com/weaveplatform/artifactweave/migration/platform/store/storetest"
+	retstoretest "github.com/weaveplatform/artifactweave/migration/retention/adapters/storetest"
+	retport "github.com/weaveplatform/artifactweave/migration/retention/core/port"
+	wrkstoretest "github.com/weaveplatform/artifactweave/migration/workers/adapters/storetest"
+	wrkport "github.com/weaveplatform/artifactweave/migration/workers/core/port"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
@@ -27,8 +33,8 @@ func Run(t *testing.T, newStore Factory) {
 	runRemoteCache(t, newStore)
 	runIdentity(t, newStore)
 	runProjects(t, newStore)
-	runWebhooks(t, newStore)
-	runCleanup(t, newStore)
+	ntfstoretest.Run(t, func(t *testing.T) ntfport.Store { return newStore(t) })
+	retstoretest.Run(t, func(t *testing.T) retport.Store { return newStore(t) })
 	runReplications(t, newStore)
 	platstoretest.RunWithoutWatches(
 		t,
@@ -36,9 +42,8 @@ func Run(t *testing.T, newStore Factory) {
 	)
 	runPeers(t, newStore)
 	runBundles(t, newStore)
-	runArchive(t, newStore)
 	runArchivedItems(t, newStore)
-	runWorkers(t, newStore)
+	wrkstoretest.Run(t, func(t *testing.T) wrkport.Store { return newStore(t) })
 	runBuilds(t, newStore)
 	runBuildRowLock(t, newStore)
 	runAPIRestrictions(t, newStore)

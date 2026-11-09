@@ -21,22 +21,28 @@ import (
 	"database/sql"
 	"fmt"
 
+	ntfsql "github.com/weaveplatform/artifactweave/migration/notifications/adapters/sql"
 	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	platsql "github.com/weaveplatform/artifactweave/migration/platform/store/sql"
+	retsql "github.com/weaveplatform/artifactweave/migration/retention/adapters/sql"
+	wrksql "github.com/weaveplatform/artifactweave/migration/workers/adapters/sql"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // Store implements store.Store over database/sql for one Dialect. The
 // embedded dialect store holds the pool, the dialect and the keyring and
 // runs the unit of work; Store adds the aggregate's accessors. The
-// platform's stores are a field over the same dialect store rather than
-// embedded, so none of their methods is promoted onto Store, where it could
-// shadow an accessor without a compile error.
+// platform's and the modules' stores are fields over the same dialect store
+// rather than embedded, so none of their methods is promoted onto Store,
+// where it could shadow an accessor without a compile error.
 type Store struct {
 	*dialect.Store
-	platform *platsql.Store
+	platform      *platsql.Store
+	notifications *ntfsql.Store
+	retention     *retsql.Store
+	workers       *wrksql.Store
 }
 
 var _ store.Store = (*Store)(nil)
@@ -93,6 +99,9 @@ func New(db *sql.DB, d Dialect, keys *crypt.Keyring) *Store {
 			return store.FenceLayoutSources(ctx, s, remoteRecords{s}, key)
 		},
 	})
+	s.notifications = ntfsql.New(s.Store)
+	s.retention = retsql.New(s.Store)
+	s.workers = wrksql.New(s.Store)
 	return s
 }
 
@@ -124,3 +133,16 @@ func (s *Store) Replays() store.ReplayStore { return s.platform.Replays() }
 // RequestBudgets implements store.Store with the platform's request budget
 // store.
 func (s *Store) RequestBudgets() store.RequestBudgetStore { return s.platform.RequestBudgets() }
+
+// Webhooks implements store.Store with the notifications module's webhook
+// store.
+func (s *Store) Webhooks() store.WebhookStore { return s.notifications.Webhooks() }
+
+// Cleanup implements store.Store with the retention module's cleanup store.
+func (s *Store) Cleanup() store.CleanupStore { return s.retention.Cleanup() }
+
+// Archive implements store.Store with the retention module's archive store.
+func (s *Store) Archive() store.ArchiveStore { return s.retention.Archive() }
+
+// Workers implements store.Store with the workers module's worker store.
+func (s *Store) Workers() store.WorkerStore { return s.workers.Workers() }

@@ -6,26 +6,34 @@
 // the transactions with their snapshots, the row copies and the paging are
 // memtx's, and so are Tx, AfterCommit and Close. Each entity store here keeps
 // its rows in memtx tables and makes every call through Do; the platform's
-// stores are migration/platform/store/inmem's, over the same memtx.Store. It
-// serves unit tests and embedders that need no durability.
+// stores are migration/platform/store/inmem's, and the notifications,
+// retention and workers stores are those modules' adapters/inmem's, all over
+// the same memtx.Store. It serves unit tests and embedders that need no
+// durability.
 package inmem
 
 import (
 	"context"
 
+	ntfinmem "github.com/weaveplatform/artifactweave/migration/notifications/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
 	platinmem "github.com/weaveplatform/artifactweave/migration/platform/store/inmem"
 	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
+	retinmem "github.com/weaveplatform/artifactweave/migration/retention/adapters/inmem"
+	wrkinmem "github.com/weaveplatform/artifactweave/migration/workers/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // Store is an in-memory store.Store. The zero value is not usable; call New.
-// The platform's stores are a field over the same memtx.Store rather than
-// embedded, so none of their methods is promoted onto Store, where it could
-// shadow an accessor without a compile error.
+// The platform's and the modules' stores are fields over the same
+// memtx.Store rather than embedded, so none of their methods is promoted
+// onto Store, where it could shadow an accessor without a compile error.
 type Store struct {
 	*memtx.Store
-	platform *platinmem.Store
+	platform      *platinmem.Store
+	notifications *ntfinmem.Store
+	retention     *retinmem.Store
+	workers       *wrkinmem.Store
 }
 
 var _ store.Store = (*Store)(nil)
@@ -42,6 +50,9 @@ func New() *Store {
 			return store.FenceLayoutSources(ctx, s, remoteRecords{s}, key)
 		},
 	})
+	s.notifications = ntfinmem.New(s.Store)
+	s.retention = retinmem.New(s.Store)
+	s.workers = wrkinmem.New(s.Store)
 	return s
 }
 
@@ -73,3 +84,16 @@ func (s *Store) Replays() store.ReplayStore { return s.platform.Replays() }
 // RequestBudgets implements store.Store with the platform's request budget
 // store.
 func (s *Store) RequestBudgets() store.RequestBudgetStore { return s.platform.RequestBudgets() }
+
+// Webhooks implements store.Store with the notifications module's webhook
+// store.
+func (s *Store) Webhooks() store.WebhookStore { return s.notifications.Webhooks() }
+
+// Cleanup implements store.Store with the retention module's cleanup store.
+func (s *Store) Cleanup() store.CleanupStore { return s.retention.Cleanup() }
+
+// Archive implements store.Store with the retention module's archive store.
+func (s *Store) Archive() store.ArchiveStore { return s.retention.Archive() }
+
+// Workers implements store.Store with the workers module's worker store.
+func (s *Store) Workers() store.WorkerStore { return s.workers.Workers() }
