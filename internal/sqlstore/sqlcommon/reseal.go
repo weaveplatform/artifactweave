@@ -2,10 +2,9 @@ package sqlcommon
 
 import (
 	"context"
-	"strconv"
 
 	accsql "github.com/weaveplatform/artifactweave/migration/access/adapters/sql"
-	artmigrations "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/sql/migrations"
+	artsql "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/sql"
 	fedsql "github.com/weaveplatform/artifactweave/migration/federation/adapters/sql"
 	ntfsql "github.com/weaveplatform/artifactweave/migration/notifications/adapters/sql"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
@@ -29,36 +28,7 @@ import (
 func Modules() []dialect.Module {
 	return []dialect.Module{
 		platsql.Module,
-		{
-			Name:       "artifacts",
-			Migrations: artmigrations.FS,
-			// The backfill moves the sensitive headers still held in legacy
-			// repository documents into sealed rows, and counts them, before
-			// the module's columns are re-sealed.
-			BeforeReseal: func(ctx context.Context, s *dialect.Store) (int, error) {
-				return (&Store{Store: s}).backfillRepositoryHeaders(ctx)
-			},
-			// The same backfill runs at every open, with the configured
-			// keyring, because DDL never sees key material (decision 0017).
-			AfterMigrate: func(ctx context.Context, s *dialect.Store) error {
-				_, err := (&Store{Store: s}).backfillRepositoryHeaders(ctx)
-				return err
-			},
-			Sealed: []dialect.SealedColumn{
-				{
-					Table: "repository_secrets", Column: "password", Purpose: purposeRepoPassword,
-					Keys: []string{"repo_key"}, RowID: dialect.FirstKey,
-				},
-				{
-					Table: "repository_header_secrets", Column: "value", Purpose: purposeRepoHeader,
-					Keys: []string{"repo_key", "position", "name"},
-					RowID: func(k []string) string {
-						index, _ := strconv.Atoi(k[1])
-						return repositoryHeaderID(k[0], index, k[2])
-					},
-				},
-			},
-		},
+		artsql.Module,
 		accsql.Module,
 		ntfsql.Module,
 		retsql.Module,

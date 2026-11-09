@@ -5,18 +5,21 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 )
 
-// BowerRegistrations implements store.Store.
-func (s *Store) BowerRegistrations() store.BowerRegistrationStore { return bowerRegistrations{s} }
+// BowerRegistrations returns the Bower registration store: the immutable
+// name-to-Git-URL registrations of Bower repositories.
+func (s *Store) BowerRegistrations() port.BowerRegistrationStore { return bowerRegistrations{s} }
 
 type bowerRegistrations struct{ s *Store }
 
-func (b bowerRegistrations) Create(ctx context.Context, v types.BowerRegistration) error {
+func (b bowerRegistrations) Create(ctx context.Context, v model.BowerRegistration) error {
 	if v.RepoKey == "" || v.Name == "" || v.URL == "" {
-		return fmt.Errorf("create Bower registration: %w", store.ErrInvalid)
+		return fmt.Errorf("create Bower registration: %w", kernel.ErrInvalid)
 	}
 	if _, err := b.s.Repos().Get(ctx, v.RepoKey); err != nil {
 		return fmt.Errorf("create Bower registration: %w", err)
@@ -24,7 +27,7 @@ func (b bowerRegistrations) Create(ctx context.Context, v types.BowerRegistratio
 	_, err := b.s.Exec(
 		ctx,
 		"create Bower registration",
-		Insert("bower_registrations", []string{"repo_key", "name", "url"}),
+		dialect.Insert("bower_registrations", []string{"repo_key", "name", "url"}),
 		v.RepoKey,
 		v.Name,
 		v.URL,
@@ -35,8 +38,8 @@ func (b bowerRegistrations) Create(ctx context.Context, v types.BowerRegistratio
 func (b bowerRegistrations) Get(
 	ctx context.Context,
 	repoKey, name string,
-) (types.BowerRegistration, error) {
-	out := types.BowerRegistration{RepoKey: repoKey, Name: name}
+) (model.BowerRegistration, error) {
+	out := model.BowerRegistration{RepoKey: repoKey, Name: name}
 	err := b.s.Q(ctx).
 		QueryRowContext(ctx, b.s.Dialect().Rebind("SELECT url FROM bower_registrations WHERE repo_key = ? AND name = ?"), repoKey, name).
 		Scan(&out.URL)
@@ -46,10 +49,10 @@ func (b bowerRegistrations) Get(
 func (b bowerRegistrations) List(
 	ctx context.Context,
 	repoKey string,
-	p store.Page,
-) ([]types.BowerRegistration, string, error) {
+	p kernel.Page,
+) ([]model.BowerRegistration, string, error) {
 	if repoKey == "" {
-		return nil, "", fmt.Errorf("list Bower registrations: %w", store.ErrInvalid)
+		return nil, "", fmt.Errorf("list Bower registrations: %w", kernel.ErrInvalid)
 	}
 	p, err := p.Normalize()
 	if err != nil {
@@ -65,14 +68,14 @@ func (b bowerRegistrations) List(
 		where += " AND name > ?"
 		args = append(args, cursor[0])
 	}
-	var out []types.BowerRegistration
+	var out []model.BowerRegistration
 	err = b.s.Rows(
 		ctx,
 		"list Bower registrations",
 		"SELECT name, url FROM bower_registrations"+where+" ORDER BY name LIMIT ?",
 		append(args, p.Limit+1),
 		func(r *sql.Rows) error {
-			v := types.BowerRegistration{RepoKey: repoKey}
+			v := model.BowerRegistration{RepoKey: repoKey}
 			if err := r.Scan(&v.Name, &v.URL); err != nil {
 				return fmt.Errorf("scan Bower registration: %w", err)
 			}
@@ -83,10 +86,10 @@ func (b bowerRegistrations) List(
 	if err != nil {
 		return nil, "", err
 	}
-	out, next := store.Trim(
+	out, next := kernel.Trim(
 		out,
 		p.Limit,
-		func(v types.BowerRegistration) []string { return []string{v.Name} },
+		func(v model.BowerRegistration) []string { return []string{v.Name} },
 	)
 	return out, next, nil
 }

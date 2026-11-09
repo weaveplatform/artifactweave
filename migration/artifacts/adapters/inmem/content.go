@@ -9,13 +9,18 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// Repos implements store.Store.
-func (s *Store) Repos() store.RepoStore { return repos{s} }
+// Repos returns the repository store: repository configurations and each
+// remote repository's source record, which Create, Update and Delete change
+// in the same transaction (decisions 0003 and 0007). Delete also removes
+// the repository's Git LFS locks, Bower registrations and remote cache
+// entries, as the SQL tables' foreign keys do.
+func (s *Store) Repos() port.RepoStore { return repos{s} }
 
 type repos struct{ s *Store }
 
@@ -25,17 +30,17 @@ func (r repos) t() *memtx.Table[string, repo.Config] {
 
 func (r repos) Create(ctx context.Context, c repo.Config) error {
 	if c.Key == "" {
-		return fmt.Errorf("create repository: key is required: %w", store.ErrInvalid)
+		return fmt.Errorf("create repository: key is required: %w", kernel.ErrInvalid)
 	}
 	return r.s.Tx(ctx, func(ctx context.Context) error {
 		if r.t().Has(c.Key) {
 			return memtx.Conflict("repository", c.Key)
 		}
 		r.t().Put(c.Key, c)
-		return (remoteRecords{r.s}).PutSource(
+		return remoteRecords(r).PutSource(
 			ctx,
 			c.Key,
-			types.RemoteSourceState{Source: store.NewRemoteSource(c.Key)},
+			model.RemoteSourceState{Source: port.NewRemoteSource(c.Key)},
 		)
 	})
 }
@@ -58,20 +63,20 @@ func (r repos) Update(ctx context.Context, c repo.Config) error {
 			return memtx.NotFound("repository", c.Key)
 		}
 		old, _ := r.t().Get(c.Key)
-		if store.RemotePolicyChanged(old, c) {
-			state, err := (remoteRecords{r.s}).Source(ctx, c.Key)
+		if port.RemotePolicyChanged(old, c) {
+			state, err := remoteRecords(r).Source(ctx, c.Key)
 			if err != nil {
 				return err
 			}
-			if store.RemoteConfigChanged(old, c) {
-				state.Source.Generation = types.SourceGeneration(rand.Text())
+			if port.RemoteConfigChanged(old, c) {
+				state.Source.Generation = model.SourceGeneration(rand.Text())
 				state.ConnectionFailures = 0
 				state.OfflineUntil = time.Time{}
 				state.RetryAfterUntil = time.Time{}
 			}
 			state.PolicyRevision++
 			state.Revision++
-			if err := (remoteRecords{r.s}).PutSource(ctx, c.Key, state); err != nil {
+			if err := remoteRecords(r).PutSource(ctx, c.Key, state); err != nil {
 				return err
 			}
 		}
@@ -86,26 +91,26 @@ func (r repos) Delete(ctx context.Context, key string) error {
 			return memtx.NotFound("repository", key)
 		}
 		if _, err := r.s.RemoteCache().Invalidate(ctx, key, "", false); err != nil {
-			return err
+			return err //nolint:wrapcheck // the remote cache names the operation
 		}
 		r.t().Del(key)
-		(gitLFSLocks{r.s}).rows().DeleteWhere(func(_ string, v types.GitLFSLock) bool {
+		gitLFSLocks(r).rows().DeleteWhere(func(_ string, v model.GitLFSLock) bool {
 			return v.RepoKey == key
 		})
-		(bowerRegistrations{r.s}).rows().
-			DeleteWhere(func(_ string, v types.BowerRegistration) bool {
+		bowerRegistrations(r).rows().
+			DeleteWhere(func(_ string, v model.BowerRegistration) bool {
 				return v.RepoKey == key
 			})
-		(remoteRecords{r.s}).sources().Del(key)
-		(remoteRecords{r.s}).entries().
-			DeleteWhere(func(_ string, e types.RemoteCacheEntry) bool { return e.Token.Key.RepoKey == key })
+		remoteRecords(r).sources().Del(key)
+		remoteRecords(r).entries().
+			DeleteWhere(func(_ string, e model.RemoteCacheEntry) bool { return e.Token.Key.RepoKey == key })
 		return nil
 	})
 }
 
 func compareRepos(a, b repo.Config) int { return cmp.Compare(a.Key, b.Key) }
 
-func (r repos) List(ctx context.Context, f store.RepoFilter) ([]repo.Config, error) {
+func (r repos) List(ctx context.Context, f port.RepoFilter) ([]repo.Config, error) {
 	var out []repo.Config
 	err := r.s.Do(ctx, func() error {
 		out = r.t().All(func(_ string, c repo.Config) bool {

@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // buildRunCols are the run columns a search returns: buildCols but the
@@ -25,14 +25,14 @@ func qualified(table string, cols []string) string {
 	return strings.Join(out, ", ")
 }
 
-// Search implements store.BuildStore with the SQL aql.Compile writes.
+// Search implements port.BuildStore with the SQL aql.Compile writes.
 func (b buildStore) Search(
 	ctx context.Context,
 	q *aql.Query,
 	o aql.Options,
 ) ([]aql.BuildHit, error) {
 	if q.Domain == aql.DomainItems {
-		return nil, fmt.Errorf("search builds: an %s query: %w", q.Domain, store.ErrInvalid)
+		return nil, fmt.Errorf("search builds: an %s query: %w", q.Domain, kernel.ErrInvalid)
 	}
 	d := aql.SQLite
 	if b.s.Dialect().Name == "postgres" {
@@ -64,7 +64,7 @@ func (b buildStore) Search(
 func scanBuildHit(r *sql.Rows, promoted bool) (aql.BuildHit, error) {
 	var (
 		h                 aql.BuildHit
-		p                 types.BuildPromotion
+		p                 model.BuildPromotion
 		started           int64
 		created, modified sql.NullInt64
 		promotedAt        sql.NullInt64

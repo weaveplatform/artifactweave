@@ -7,19 +7,22 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 )
 
-// GitLFSLocks implements store.Store.
-func (s *Store) GitLFSLocks() store.GitLFSLockStore { return gitLFSLocks{s} }
+// GitLFSLocks returns the Git LFS lock store: the file locks of Git LFS
+// repositories, kept apart from the LFS objects.
+func (s *Store) GitLFSLocks() port.GitLFSLockStore { return gitLFSLocks{s} }
 
 type gitLFSLocks struct{ s *Store }
 
 const gitLFSLockCols = "id, repo_key, path, owner, locked_at"
 
-func scanGitLFSLock(row interface{ Scan(...any) error }) (types.GitLFSLock, error) {
-	var out types.GitLFSLock
+func scanGitLFSLock(row interface{ Scan(...any) error }) (model.GitLFSLock, error) {
+	var out model.GitLFSLock
 	var stamp int64
 	if err := row.Scan(&out.ID, &out.RepoKey, &out.Path, &out.Owner, &stamp); err != nil {
 		return out, err //nolint:wrapcheck // caller names operation
@@ -28,20 +31,20 @@ func scanGitLFSLock(row interface{ Scan(...any) error }) (types.GitLFSLock, erro
 	return out, nil
 }
 
-func (l gitLFSLocks) Create(ctx context.Context, v types.GitLFSLock) error {
+func (l gitLFSLocks) Create(ctx context.Context, v model.GitLFSLock) error {
 	if v.ID == "" || v.RepoKey == "" || v.Path == "" || v.Owner == "" || v.LockedAt.IsZero() {
-		return fmt.Errorf("create git lfs lock: %w", store.ErrInvalid)
+		return fmt.Errorf("create git lfs lock: %w", kernel.ErrInvalid)
 	}
 	if _, err := l.s.Repos().Get(ctx, v.RepoKey); err != nil {
 		return fmt.Errorf("create git lfs lock %s: %w", v.ID, err)
 	}
 	_, err := l.s.Exec(ctx, "create Git LFS lock "+v.ID,
-		Insert("gitlfs_locks", strings.Split(gitLFSLockCols, ", ")),
-		v.ID, v.RepoKey, v.Path, v.Owner, store.Normalise(v.LockedAt).UnixMicro())
+		dialect.Insert("gitlfs_locks", strings.Split(gitLFSLockCols, ", ")),
+		v.ID, v.RepoKey, v.Path, v.Owner, kernel.Normalise(v.LockedAt).UnixMicro())
 	return err
 }
 
-func (l gitLFSLocks) Get(ctx context.Context, repoKey, id string) (types.GitLFSLock, error) {
+func (l gitLFSLocks) Get(ctx context.Context, repoKey, id string) (model.GitLFSLock, error) {
 	out, err := scanGitLFSLock(l.s.Q(ctx).QueryRowContext(ctx,
 		l.s.Dialect().
 			Rebind("SELECT "+gitLFSLockCols+" FROM gitlfs_locks WHERE repo_key = ? AND id = ?"),
@@ -51,10 +54,10 @@ func (l gitLFSLocks) Get(ctx context.Context, repoKey, id string) (types.GitLFSL
 }
 
 func (l gitLFSLocks) List(
-	ctx context.Context, f store.GitLFSLockFilter, p store.Page,
-) ([]types.GitLFSLock, string, error) {
+	ctx context.Context, f port.GitLFSLockFilter, p kernel.Page,
+) ([]model.GitLFSLock, string, error) {
 	if f.RepoKey == "" {
-		return nil, "", fmt.Errorf("list git lfs locks: %w", store.ErrInvalid)
+		return nil, "", fmt.Errorf("list git lfs locks: %w", kernel.ErrInvalid)
 	}
 	p, err := p.Normalize()
 	if err != nil {
@@ -78,7 +81,7 @@ func (l gitLFSLocks) List(
 		where += " AND path > ?"
 		args = append(args, cursor[0])
 	}
-	var out []types.GitLFSLock
+	var out []model.GitLFSLock
 	err = l.s.Rows(ctx, "list Git LFS locks",
 		"SELECT "+gitLFSLockCols+" FROM gitlfs_locks"+where+" ORDER BY path LIMIT ?",
 		append(args, p.Limit+1), func(r *sql.Rows) error {
@@ -89,14 +92,14 @@ func (l gitLFSLocks) List(
 	if err != nil {
 		return nil, "", err
 	}
-	out, next := store.Trim(out, p.Limit, func(v types.GitLFSLock) []string {
+	out, next := kernel.Trim(out, p.Limit, func(v model.GitLFSLock) []string {
 		return []string{v.Path}
 	})
 	return out, next, nil
 }
 
-func (l gitLFSLocks) Delete(ctx context.Context, repoKey, id string) (types.GitLFSLock, error) {
-	var out types.GitLFSLock
+func (l gitLFSLocks) Delete(ctx context.Context, repoKey, id string) (model.GitLFSLock, error) {
+	var out model.GitLFSLock
 	err := l.s.Tx(ctx, func(ctx context.Context) error {
 		var err error
 		out, err = l.Get(ctx, repoKey, id)

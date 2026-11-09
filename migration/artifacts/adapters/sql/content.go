@@ -10,22 +10,28 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 )
 
 // purposeRepoPassword is the sealing purpose of a remote repository's
 // password; the row id is the repository key.
 const purposeRepoPassword = "repositories.password" // #nosec G101 -- a column name, not a credential
 
-// Repos implements store.Store.
-func (s *Store) Repos() store.RepoStore { return repos{s} }
+// Repos returns the repository store: repository configurations, with
+// remote passwords and sensitive header values sealed in rows of their own
+// (decisions 0003 and 0017), and each remote repository's source record,
+// which Create, Update and Delete change in the same transaction (decision
+// 0007).
+func (s *Store) Repos() port.RepoStore { return repos{s} }
 
 type repos struct{ s *Store }
 
 func (r repos) Create(ctx context.Context, c repo.Config) error {
 	if c.Key == "" {
-		return fmt.Errorf("create repository: key is required: %w", store.ErrInvalid)
+		return fmt.Errorf("create repository: key is required: %w", kernel.ErrInvalid)
 	}
 	return r.s.Tx(ctx, func(ctx context.Context) error {
 		doc, err := repoDoc(c)
@@ -36,7 +42,7 @@ func (r repos) Create(ctx context.Context, c repo.Config) error {
 		if _, err := r.s.Exec(
 			ctx,
 			"create repository "+c.Key,
-			Insert(
+			dialect.Insert(
 				"repositories",
 				[]string{
 					"key",
@@ -65,7 +71,7 @@ func (r repos) Create(ctx context.Context, c repo.Config) error {
 		}
 		return remoteRecords(
 			r,
-		).PutSource(ctx, c.Key, types.RemoteSourceState{Source: store.NewRemoteSource(c.Key)})
+		).PutSource(ctx, c.Key, model.RemoteSourceState{Source: port.NewRemoteSource(c.Key)})
 	})
 }
 
@@ -105,7 +111,7 @@ func (r repos) writeChildren(ctx context.Context, c repo.Config) error {
 		if _, err := r.s.Exec(
 			ctx,
 			"store repository password",
-			Insert(
+			dialect.Insert(
 				"repository_secrets",
 				[]string{"repo_key", "password"},
 			),
@@ -120,21 +126,29 @@ func (r repos) writeChildren(ctx context.Context, c repo.Config) error {
 	}
 	if c.Class == repo.Virtual {
 		for i, m := range c.Repositories {
-			if _, err := r.s.Exec(ctx, "store repository member",
-				Insert("repository_members", []string{"virtual_key", "member_key", "position"}),
-				c.Key, m, i); err != nil {
+			if _, err := r.s.Exec(
+				ctx,
+				"store repository member",
+				dialect.Insert(
+					"repository_members",
+					[]string{"virtual_key", "member_key", "position"},
+				),
+				c.Key,
+				m,
+				i,
+			); err != nil {
 				return err
 			}
 		}
 	}
-	for role, name := range map[types.KeypairRole]string{
-		types.KeypairPrimary: c.PrimaryKeyPairRef, types.KeypairSecondary: c.SecondaryKeyPairRef,
+	for role, name := range map[model.KeypairRole]string{
+		model.KeypairPrimary: c.PrimaryKeyPairRef, model.KeypairSecondary: c.SecondaryKeyPairRef,
 	} {
 		if name == "" {
 			continue
 		}
 		if _, err := r.s.Exec(ctx, "store repository key pair",
-			Insert("repository_keypairs", []string{"repo_key", "role", "keypair_name"}),
+			dialect.Insert("repository_keypairs", []string{"repo_key", "role", "keypair_name"}),
 			c.Key, string(role), name); err != nil {
 			return err
 		}
@@ -148,7 +162,7 @@ func (r repos) Get(ctx context.Context, key string) (repo.Config, error) {
 		return repo.Config{}, err
 	}
 	if len(configs) == 0 {
-		return repo.Config{}, fmt.Errorf("get repository %s: %w", key, store.ErrNotFound)
+		return repo.Config{}, fmt.Errorf("get repository %s: %w", key, kernel.ErrNotFound)
 	}
 	return configs[0], nil
 }
@@ -193,9 +207,9 @@ func (r repos) Update(ctx context.Context, c repo.Config) error {
 		if err := r.writeChildren(ctx, c); err != nil {
 			return err
 		}
-		if store.RemotePolicyChanged(old, c) {
-			if store.RemoteConfigChanged(old, c) {
-				state.Source.Generation = types.SourceGeneration(rand.Text())
+		if port.RemotePolicyChanged(old, c) {
+			if port.RemoteConfigChanged(old, c) {
+				state.Source.Generation = model.SourceGeneration(rand.Text())
 				state.ConnectionFailures = 0
 				state.OfflineUntil = time.Time{}
 				state.RetryAfterUntil = time.Time{}
@@ -222,7 +236,7 @@ func (r repos) Delete(ctx context.Context, key string) error {
 	})
 }
 
-func (r repos) List(ctx context.Context, f store.RepoFilter) ([]repo.Config, error) {
+func (r repos) List(ctx context.Context, f port.RepoFilter) ([]repo.Config, error) {
 	where := "1 = 1"
 	var args []any
 	for col, v := range map[string]string{"r.rclass": string(f.Class), "r.package_type": string(f.PackageType), "r.project_key": f.ProjectKey} {

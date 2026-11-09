@@ -5,23 +5,25 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// GitLFSLocks implements store.Store.
-func (s *Store) GitLFSLocks() store.GitLFSLockStore { return gitLFSLocks{s} }
+// GitLFSLocks returns the Git LFS lock store: the file locks of Git LFS
+// repositories, kept apart from the LFS objects.
+func (s *Store) GitLFSLocks() port.GitLFSLockStore { return gitLFSLocks{s} }
 
 type gitLFSLocks struct{ s *Store }
 
-func (l gitLFSLocks) rows() *memtx.Table[string, types.GitLFSLock] {
-	return memtx.TableOf[string, types.GitLFSLock](l.s.Store, "gitlfs_locks")
+func (l gitLFSLocks) rows() *memtx.Table[string, model.GitLFSLock] {
+	return memtx.TableOf[string, model.GitLFSLock](l.s.Store, "gitlfs_locks")
 }
 
-func (l gitLFSLocks) Create(ctx context.Context, v types.GitLFSLock) error {
+func (l gitLFSLocks) Create(ctx context.Context, v model.GitLFSLock) error {
 	if v.ID == "" || v.RepoKey == "" || v.Path == "" || v.Owner == "" || v.LockedAt.IsZero() {
-		return fmt.Errorf("create Git LFS lock: %w", store.ErrInvalid)
+		return fmt.Errorf("create Git LFS lock: %w", kernel.ErrInvalid)
 	}
 	return l.s.Do(ctx, func() error {
 		if !l.s.Repos().(repos).t().Has(v.RepoKey) {
@@ -35,13 +37,13 @@ func (l gitLFSLocks) Create(ctx context.Context, v types.GitLFSLock) error {
 				return memtx.Conflict("Git LFS lock path", v.Path)
 			}
 		}
-		l.rows().Put(v.ID, store.Normalise(v))
+		l.rows().Put(v.ID, kernel.Normalise(v))
 		return nil
 	})
 }
 
-func (l gitLFSLocks) Get(ctx context.Context, repoKey, id string) (types.GitLFSLock, error) {
-	var out types.GitLFSLock
+func (l gitLFSLocks) Get(ctx context.Context, repoKey, id string) (model.GitLFSLock, error) {
+	var out model.GitLFSLock
 	err := l.s.Do(ctx, func() error {
 		var ok bool
 		out, ok = l.rows().Get(id)
@@ -54,29 +56,29 @@ func (l gitLFSLocks) Get(ctx context.Context, repoKey, id string) (types.GitLFSL
 }
 
 func (l gitLFSLocks) List(
-	ctx context.Context, f store.GitLFSLockFilter, p store.Page,
-) ([]types.GitLFSLock, string, error) {
+	ctx context.Context, f port.GitLFSLockFilter, p kernel.Page,
+) ([]model.GitLFSLock, string, error) {
 	if f.RepoKey == "" {
-		return nil, "", fmt.Errorf("list Git LFS locks: %w", store.ErrInvalid)
+		return nil, "", fmt.Errorf("list Git LFS locks: %w", kernel.ErrInvalid)
 	}
-	var out []types.GitLFSLock
+	var out []model.GitLFSLock
 	var next string
 	err := l.s.Do(ctx, func() error {
-		rows := l.rows().All(func(_ string, v types.GitLFSLock) bool {
+		rows := l.rows().All(func(_ string, v model.GitLFSLock) bool {
 			return v.RepoKey == f.RepoKey && (f.Path == "" || v.Path == f.Path) &&
 				(f.ID == "" || v.ID == f.ID)
-		}, func(a, b types.GitLFSLock) int { return cmp.Compare(a.Path, b.Path) })
+		}, func(a, b model.GitLFSLock) int { return cmp.Compare(a.Path, b.Path) })
 		var err error
-		out, next, err = memtx.Paginate(rows, p, false, func(v types.GitLFSLock) []any {
+		out, next, err = memtx.Paginate(rows, p, false, func(v model.GitLFSLock) []any {
 			return []any{v.Path}
 		})
-		return err
+		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
 	})
 	return out, next, err
 }
 
-func (l gitLFSLocks) Delete(ctx context.Context, repoKey, id string) (types.GitLFSLock, error) {
-	var out types.GitLFSLock
+func (l gitLFSLocks) Delete(ctx context.Context, repoKey, id string) (model.GitLFSLock, error) {
+	var out model.GitLFSLock
 	err := l.s.Do(ctx, func() error {
 		var ok bool
 		out, ok = l.rows().Get(id)

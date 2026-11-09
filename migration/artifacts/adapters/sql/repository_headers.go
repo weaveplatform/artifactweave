@@ -46,7 +46,10 @@ func (r repos) writeHeaderSecrets(ctx context.Context, c repo.Config) error {
 		if _, err = r.s.Exec(
 			ctx,
 			"store repository header secret",
-			Insert("repository_header_secrets", []string{"repo_key", "position", "name", "value"}),
+			dialect.Insert(
+				"repository_header_secrets",
+				[]string{"repo_key", "position", "name", "value"},
+			),
 			c.Key,
 			i,
 			h.Name,
