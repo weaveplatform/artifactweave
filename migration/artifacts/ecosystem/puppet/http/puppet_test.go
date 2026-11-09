@@ -1,4 +1,4 @@
-package puppet_test
+package puppethttp_test
 
 import (
 	"archive/tar"
@@ -20,13 +20,13 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
-	"github.com/weaveplatform/artifactweave/internal/server/puppet"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	puppethttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/puppet/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/blobtest"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
@@ -95,7 +95,7 @@ func newFixtureStore(
 		name := r.Header.Get("X-User")
 		return kernel.Principal{Name: name, Admin: name == "admin", Anonymous: name == ""}
 	}))
-	p := puppet.Protocol(puppet.Options{Blobs: blobs})
+	p := puppethttp.Protocol(puppethttp.Options{Blobs: blobs})
 	if tune != nil {
 		tune(&p)
 	}

@@ -1,4 +1,4 @@
-package puppet
+package puppethttp
 
 import (
 	"context"
@@ -10,10 +10,10 @@ import (
 	"strings"
 	"testing"
 
-	puppetfmt "github.com/weaveplatform/artifactweave/internal/format/puppet"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	puppetfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/puppet"
 )
 
 func TestUnitRemoteDocumentValidation(t *testing.T) {

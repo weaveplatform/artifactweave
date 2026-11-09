@@ -28,7 +28,7 @@ var formats = map[string]formatImpact{
 		"@aieditorextensions",
 		[]string{"vscode"},
 	},
-	"chef":    {"./internal/format/chef/...", "@chef", []string{"chef"}},
+	"chef":    {"./migration/artifacts/ecosystem/chef/...", "@chef", []string{"chef"}},
 	"ansible": {"./internal/format/ansible/...", "@ansible", []string{"ansible"}},
 	"alpine":  {"./migration/artifacts/ecosystem/alpine/...", "@alpine", []string{"alpine"}},
 	"bazelmodules": {
@@ -44,7 +44,7 @@ var formats = map[string]formatImpact{
 	"conda":         {"./migration/artifacts/ecosystem/conda/...", "@conda", []string{"conda"}},
 	"cran":          {"./migration/artifacts/ecosystem/cran/...", "@cran", []string{"r"}},
 	"nix":           {"./migration/artifacts/ecosystem/nix/...", "@nix", []string{"nix"}},
-	"puppet":        {"./internal/format/puppet/...", "@puppet", []string{"puppet"}},
+	"puppet":        {"./migration/artifacts/ecosystem/puppet/...", "@puppet", []string{"puppet"}},
 	"pub":           {"./internal/format/pub/...", "@pub", []string{"dart"}},
 	"agentpackages": {"./internal/format/agentpackages/...", "@apm", []string{"apm"}},
 	"bower":         {"./migration/artifacts/ecosystem/bower/...", "@bower", []string{"bower"}},

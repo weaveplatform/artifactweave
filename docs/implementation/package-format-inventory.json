@@ -81,7 +81,7 @@
       "owner_issue": 783,
       "evidence": "test/acceptance/features/chef.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/chef-repositories",
-      "route_file": "internal/server/chef/chef.go",
+      "route_file": "migration/artifacts/ecosystem/chef/http/chef.go",
       "p9c": true
     },
     {
@@ -417,7 +417,7 @@
       "owner_issue": 784,
       "evidence": "test/acceptance/features/puppet.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/puppet-repositories",
-      "route_file": "internal/server/puppet/puppet.go",
+      "route_file": "migration/artifacts/ecosystem/puppet/http/puppet.go",
       "p9c": true
     },
     {

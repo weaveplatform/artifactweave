@@ -1,4 +1,4 @@
-package puppet_test
+package chef_test
 
 import (
 	"archive/tar"
@@ -7,15 +7,15 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/format/puppet"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/formattest"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/chef"
 )
 
 func TestAccFormatLifecycle(t *testing.T) {
 	formattest.Run(
 		t,
-		formattest.Format{Type: repo.Puppet, Version: func(p, v string, n int) formattest.Version {
+		formattest.Format{Type: repo.Chef, Version: func(p, v string, n int) formattest.Version {
 			name, version := "acme-"+p, v+".0"
 			var out bytes.Buffer
 			gz := gzip.NewWriter(&out)
@@ -23,14 +23,14 @@ func TestAccFormatLifecycle(t *testing.T) {
 			files := []struct{ name, body string }{
 				{
 					"metadata.json",
-					fmt.Sprintf(`{"name":%q,"version":%q,"dependencies":[]}`, name, version),
+					fmt.Sprintf(`{"name":%q,"version":%q,"dependencies":{}}`, name, version),
 				},
-				{"manifests/init.pp", fmt.Sprintf("# deployment %d", n)},
+				{"recipes/default.rb", fmt.Sprintf("# deployment %d", n)},
 			}
 			for _, f := range files {
 				if err := tw.WriteHeader(
 					&tar.Header{
-						Name: name + "-" + version + "/" + f.name,
+						Name: name + "/" + f.name,
 						Mode: 0o644,
 						Size: int64(len(f.body)),
 					},
@@ -50,7 +50,7 @@ func TestAccFormatLifecycle(t *testing.T) {
 			return formattest.Version{
 				Package: name,
 				Version: version,
-				Files:   []formattest.File{{Path: puppet.Path(name, version), Body: out.Bytes()}},
+				Files:   []formattest.File{{Path: chef.Path(name, version), Body: out.Bytes()}},
 			}
 		}},
 	)

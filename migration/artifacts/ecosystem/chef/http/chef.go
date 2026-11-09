@@ -1,5 +1,5 @@
-// Package chef serves the Chef Supermarket cookbook protocol.
-package chef
+// Package chefhttp serves the Chef Supermarket cookbook protocol.
+package chefhttp
 
 import (
 	"context"
@@ -15,10 +15,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	"golang.org/x/mod/semver"
 
-	cheffmt "github.com/weaveplatform/artifactweave/internal/format/chef"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	cheffmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/chef"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"

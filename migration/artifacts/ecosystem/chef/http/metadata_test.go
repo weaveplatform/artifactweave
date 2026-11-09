@@ -1,4 +1,4 @@
-package chef
+package chefhttp
 
 import (
 	"encoding/json"
@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	cheffmt "github.com/weaveplatform/artifactweave/internal/format/chef"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	cheffmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/chef"
 )
 
 func TestUnitUpstreamVersionIdentityAndURLBoundaries(t *testing.T) {

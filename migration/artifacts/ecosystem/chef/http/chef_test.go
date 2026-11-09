@@ -1,4 +1,4 @@
-package chef_test
+package chefhttp_test
 
 import (
 	"archive/tar"
@@ -19,7 +19,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/server/chef"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -27,6 +26,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	chefhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/chef/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -93,7 +93,7 @@ func newFixtureStore(
 		name := r.Header.Get("X-User")
 		return kernel.Principal{Name: name, Admin: name == "admin", Anonymous: name == ""}
 	}))
-	p := chef.Protocol(nil)
+	p := chefhttp.Protocol(nil)
 	if tune != nil {
 		tune(&p)
 	}
