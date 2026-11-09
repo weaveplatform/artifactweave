@@ -33,7 +33,7 @@
       "owner_issue": 762,
       "evidence": "test/acceptance/features/cargo.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/cargo-repositories",
-      "route_file": "internal/server/cargo/cargo.go",
+      "route_file": "migration/artifacts/ecosystem/cargo/http/cargo.go",
       "p9c": true
     },
     {
@@ -49,7 +49,7 @@
       "owner_issue": 763,
       "evidence": "test/acceptance/features/composer.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/php-composer-repositories",
-      "route_file": "internal/server/composer/composer.go",
+      "route_file": "migration/artifacts/ecosystem/composer/http/composer.go",
       "p9c": true
     },
     {

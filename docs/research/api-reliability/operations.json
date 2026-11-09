@@ -997,7 +997,7 @@
   {
     "route": "DELETE /artifactory/api/cargo/{repoKey}/api/v1/crates/{name}/{version}/yank",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/cargo.handler.yank-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/cargo/http.handler.yank-fm",
     "review_family": "native-cargo",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -4534,7 +4534,7 @@
   {
     "route": "GET /artifactory/api/cargo/{repoKey}/api/v1/crates/{name}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/cargo.handler.versions-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/cargo/http.handler.versions-fm",
     "review_family": "native-cargo",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -4553,7 +4553,7 @@
   {
     "route": "GET /artifactory/api/cargo/{repoKey}/api/v1/crates/{name}/{version}/download",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/cargo.handler.download-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/cargo/http.handler.download-fm",
     "review_family": "native-cargo",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -4572,7 +4572,7 @@
   {
     "route": "GET /artifactory/api/cargo/{repoKey}/index/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/cargo.handler.index-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/cargo/http.handler.index-fm",
     "review_family": "native-cargo",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -11930,7 +11930,7 @@
   {
     "route": "HEAD /artifactory/api/cargo/{repoKey}/api/v1/crates/{name}/{version}/download",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/cargo.handler.download-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/cargo/http.handler.download-fm",
     "review_family": "native-cargo",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -11949,7 +11949,7 @@
   {
     "route": "HEAD /artifactory/api/cargo/{repoKey}/index/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/cargo.handler.index-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/cargo/http.handler.index-fm",
     "review_family": "native-cargo",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -11968,7 +11968,7 @@
   {
     "route": "HEAD /artifactory/api/cargo/{repoKey}/index/config.json",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/cargo.handler.config-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/cargo/http.handler.config-fm",
     "review_family": "native-cargo",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -20570,7 +20570,7 @@
   {
     "route": "PUT /artifactory/api/cargo/{repoKey}/api/v1/crates/{name}/{version}/unyank",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/cargo.handler.yank-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/cargo/http.handler.yank-fm",
     "review_family": "native-cargo",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",

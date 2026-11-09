@@ -36,7 +36,7 @@ var formats = map[string]formatImpact{
 		"@bazelmodules",
 		[]string{"bazel"},
 	},
-	"cargo":         {"./internal/format/cargo/...", "@cargo", []string{"cargo"}},
+	"cargo":         {"./migration/artifacts/ecosystem/cargo/...", "@cargo", []string{"cargo"}},
 	"conan":         {"./migration/artifacts/ecosystem/conan/...", "@conan", []string{"conan"}},
 	"rpm":           {"./migration/artifacts/ecosystem/rpm/...", "@rpm", []string{"fedora"}},
 	"opkg":          {"./migration/artifacts/ecosystem/opkg/...", "@opkg", []string{"opkg"}},
@@ -82,7 +82,11 @@ var formats = map[string]formatImpact{
 	},
 	"huggingface": {"./migration/artifacts/ecosystem/huggingface/...", "@huggingface", nil},
 	"luarocks":    {"./internal/format/luarocks/...", "@luarocks", []string{"luarocks", "jf"}},
-	"composer":    {"./internal/format/composer/...", "@composer", []string{"composer"}},
+	"composer": {
+		"./migration/artifacts/ecosystem/composer/...",
+		"@composer",
+		[]string{"composer"},
+	},
 	"maven": {
 		"./migration/artifacts/ecosystem/maven/...",
 		"@maven&&~@gradle,@package_wiring&&~@gradle",

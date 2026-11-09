@@ -1,4 +1,4 @@
-package cargo_test
+package cargohttp_test
 
 import (
 	"archive/tar"
@@ -16,7 +16,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	cargoserver "github.com/weaveplatform/artifactweave/internal/server/cargo"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -24,6 +23,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	cargoserver "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cargo/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"

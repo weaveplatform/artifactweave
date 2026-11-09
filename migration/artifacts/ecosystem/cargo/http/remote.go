@@ -1,4 +1,4 @@
-package cargo
+package cargohttp
 
 import (
 	"bytes"
@@ -12,8 +12,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/format/cargo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cargo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 

@@ -1,4 +1,4 @@
-package cargo_test
+package cargohttp_test
 
 import (
 	"bytes"

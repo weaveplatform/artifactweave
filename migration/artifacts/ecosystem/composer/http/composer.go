@@ -1,6 +1,6 @@
-// Package composer serves Composer 1 local catalogs and Composer 2 metadata
+// Package composerhttp serves Composer 1 local catalogs and Composer 2 metadata
 // through the native Artifactory Composer URL.
-package composer
+package composerhttp
 
 import (
 	"bytes"
@@ -18,10 +18,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/format/composer"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/composer"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"

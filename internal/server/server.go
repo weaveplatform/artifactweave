@@ -20,8 +20,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	"github.com/weaveplatform/artifactweave/internal/server/aieditorextensions"
 	"github.com/weaveplatform/artifactweave/internal/server/ansible"
-	"github.com/weaveplatform/artifactweave/internal/server/cargo"
-	"github.com/weaveplatform/artifactweave/internal/server/composer"
 	"github.com/weaveplatform/artifactweave/internal/server/gems"
 	"github.com/weaveplatform/artifactweave/internal/server/gitlfs"
 	"github.com/weaveplatform/artifactweave/internal/server/luarocks"
@@ -45,8 +43,10 @@ import (
 	agentpackageshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/agentpackages/http"
 	bazelmoduleshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bazelmodules/http"
 	bowerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bower/http"
+	cargohttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cargo/http"
 	chefhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/chef/http"
 	cocoapodshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods/http"
+	composerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/composer/http"
 	conanhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conan/http"
 	condahttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conda/http"
 	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
@@ -283,10 +283,10 @@ var protocols = []func(Config) pkgroute.Protocol{
 	func(cfg Config) pkgroute.Protocol {
 		return luarocks.Protocol(luarocks.Options{RemoteSources: cfg.RemoteSources})
 	},
-	func(cfg Config) pkgroute.Protocol { return cargo.Protocol(cfg.RemoteSources) },
+	func(cfg Config) pkgroute.Protocol { return cargohttp.Protocol(cfg.RemoteSources) },
 	func(cfg Config) pkgroute.Protocol {
-		return composer.Protocol(
-			composer.Options{Blobs: cfg.Blobs, RemoteSources: cfg.RemoteSources},
+		return composerhttp.Protocol(
+			composerhttp.Options{Blobs: cfg.Blobs, RemoteSources: cfg.RemoteSources},
 		)
 	},
 	func(cfg Config) pkgroute.Protocol {
