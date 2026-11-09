@@ -89,7 +89,7 @@ func entSeed(t *testing.T, s store.Store) (tracker, execution, archived int64) {
 	ex, err := s.Archive().
 		CreateExecution(ctx, types.ArchiveExecution{Kind: types.ExecutionArchive})
 	must(err)
-	it, err := s.Archive().AddItem(ctx, types.ArchivedItem{
+	it, err := s.ArchivedItems().AddItem(ctx, types.ArchivedItem{
 		Item: types.Item{RepoKey: "libs", Path: ".", Name: "a.jar"}, ExpiresAt: now,
 	})
 	must(err)
@@ -109,6 +109,7 @@ func TestAccEnterpriseClosedDatabase(t *testing.T) {
 	}
 	ctx := context.Background()
 	b, d, a, w := s.Bundles(), s.Distribution(), s.Archive(), s.Workers()
+	ai := s.ArchivedItems()
 	rb := types.ReleaseBundle{Name: "app", Version: "1"}
 	tr := types.DistributionTracker{ID: 1}
 	ex := types.ArchiveExecution{ID: 1}
@@ -148,12 +149,12 @@ func TestAccEnterpriseClosedDatabase(t *testing.T) {
 		"Archive.Executions": entErr3(
 			a.Executions(ctx, store.ExecutionFilter{}, store.Page{}),
 		),
-		"Archive.AddItem":      entErr(a.AddItem(ctx, item)),
-		"Archive.Item":         entErr(a.Item(ctx, 1)),
-		"Archive.FindItems":    entErr(a.FindItems(ctx, "r", "n")),
-		"Archive.Items":        entErr3(a.Items(ctx, store.ArchivedFilter{}, store.Page{})),
-		"Archive.DeleteItem":   a.DeleteItem(ctx, 1),
-		"Archive.ExpiredItems": entErr(a.ExpiredItems(ctx, time.Now(), 0)),
+		"Archive.AddItem":      entErr(ai.AddItem(ctx, item)),
+		"Archive.Item":         entErr(ai.Item(ctx, 1)),
+		"Archive.FindItems":    entErr(ai.FindItems(ctx, "r", "n")),
+		"Archive.Items":        entErr3(ai.Items(ctx, store.ArchivedFilter{}, store.Page{})),
+		"Archive.DeleteItem":   ai.DeleteItem(ctx, 1),
+		"Archive.ExpiredItems": entErr(ai.ExpiredItems(ctx, time.Now(), 0)),
 		"Workers.Create":       w.Create(ctx, types.Worker{Key: "w"}),
 		"Workers.Get":          entErr(w.Get(ctx, "w")),
 		"Workers.Update":       w.Update(ctx, types.Worker{Key: "w"}),
@@ -180,6 +181,7 @@ func TestAccEnterpriseCorruptRows(t *testing.T) {
 	ctx := context.Background()
 	tracker, execution, archived := entSeed(t, s)
 	b, d, a, w := s.Bundles(), s.Distribution(), s.Archive(), s.Workers()
+	ai := s.ArchivedItems()
 	if err := w.PutSecret(ctx, "w", "other", "x"); err != nil {
 		t.Fatal(err)
 	}
@@ -212,9 +214,9 @@ func TestAccEnterpriseCorruptRows(t *testing.T) {
 		"Archive.Policies":      entErr(a.Policies(ctx, "")),
 		"Archive.Execution":     entErr(a.Execution(ctx, execution)),
 		"Archive.Executions":    entErr3(a.Executions(ctx, store.ExecutionFilter{}, store.Page{})),
-		"Archive.Item":          entErr(a.Item(ctx, archived)),
-		"Archive.Items":         entErr3(a.Items(ctx, store.ArchivedFilter{}, store.Page{})),
-		"Archive.ExpiredItems":  entErr(a.ExpiredItems(ctx, later, 0)),
+		"Archive.Item":          entErr(ai.Item(ctx, archived)),
+		"Archive.Items":         entErr3(ai.Items(ctx, store.ArchivedFilter{}, store.Page{})),
+		"Archive.ExpiredItems":  entErr(ai.ExpiredItems(ctx, later, 0)),
 		"Workers.Get":           entErr(w.Get(ctx, "w")),
 		"Workers.List":          entErr(w.List(ctx, store.WorkerFilter{})),
 		"Workers.Secrets":       entErr(w.Secrets(ctx, "w")),
@@ -228,7 +230,7 @@ func TestAccEnterpriseCorruptRows(t *testing.T) {
 		"UPDATE bundle_artifacts SET props = NULL, size = 'x'",
 	)
 	entFails(t, map[string]error{
-		"Archive.FindItems": entErr(a.FindItems(ctx, "libs", "a.jar")),
+		"Archive.FindItems": entErr(ai.FindItems(ctx, "libs", "a.jar")),
 		"Bundles.Artifacts": entErr(b.Artifacts(ctx, "app", "1")),
 	})
 }

@@ -15,13 +15,13 @@ func runReplicas(t *testing.T, newStore Factory) {
 	t.Run("Replicas", func(t *testing.T) { testReplicas(t, newStore(t).Replicas()) })
 	t.Run(
 		"ColdReplicas",
-		func(t *testing.T) { testReplicas(t, newStore(t).Archive().ColdReplicas()) },
+		func(t *testing.T) { testReplicas(t, newStore(t).ColdReplicas()) },
 	)
 	t.Run("ReplicaTiersSeparate", func(t *testing.T) {
 		s := newStore(t)
 		ctx := context.Background()
 		storekit.Must(t, s.Replicas().Put(ctx, replica(1, "aws", types.ReplicaPresent, 1)))
-		_, err := s.Archive().ColdReplicas().Get(ctx, replica(1, "aws", "", 0).SHA256, "aws")
+		_, err := s.ColdReplicas().Get(ctx, replica(1, "aws", "", 0).SHA256, "aws")
 		storekit.WantErr(t, err, store.ErrNotFound)
 	})
 }

@@ -59,7 +59,7 @@ func fxArchived(repoKey, full string, i int) types.ArchivedItem {
 
 func testArchivedItems(t *testing.T, s store.Store) {
 	ctx := context.Background()
-	as := s.Archive()
+	as := s.ArchivedItems()
 	var added []types.ArchivedItem
 	add := func(a types.ArchivedItem) types.ArchivedItem {
 		t.Helper()

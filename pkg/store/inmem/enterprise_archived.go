@@ -11,16 +11,21 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func (a archiveStore) items() *memtx.Table[int64, types.ArchivedItem] {
-	return memtx.TableOf[int64, types.ArchivedItem](a.s.Store, "archived_items")
+// ArchivedItems implements store.Store.
+func (s *Store) ArchivedItems() store.ArchivedItemStore { return archivedItemStore{s} }
+
+// ColdBlobs implements store.Store.
+func (s *Store) ColdBlobs() store.BlobIndex { return blobIndex{s: s, table: "cold_blobs"} }
+
+// ColdReplicas implements store.Store.
+func (s *Store) ColdReplicas() store.ReplicaIndex {
+	return replicaIndex{s: s, table: "cold_blob_replicas"}
 }
 
-// ColdBlobs implements store.ArchiveStore.
-func (a archiveStore) ColdBlobs() store.BlobIndex { return blobIndex{s: a.s, table: "cold_blobs"} }
+type archivedItemStore struct{ s *Store }
 
-// ColdReplicas implements store.ArchiveStore.
-func (a archiveStore) ColdReplicas() store.ReplicaIndex {
-	return replicaIndex{s: a.s, table: "cold_blob_replicas"}
+func (a archivedItemStore) items() *memtx.Table[int64, types.ArchivedItem] {
+	return memtx.TableOf[int64, types.ArchivedItem](a.s.Store, "archived_items")
 }
 
 // archivedLocation is the canonical (parent, name) of an archived item's
@@ -33,7 +38,7 @@ func archivedLocation(it types.Item) (parent, name string, err error) {
 	return parent, name, nil
 }
 
-func (a archiveStore) AddItem(
+func (a archivedItemStore) AddItem(
 	ctx context.Context,
 	it types.ArchivedItem,
 ) (types.ArchivedItem, error) {
@@ -50,7 +55,7 @@ func (a archiveStore) AddItem(
 	return out, err
 }
 
-func (a archiveStore) Item(ctx context.Context, id int64) (types.ArchivedItem, error) {
+func (a archivedItemStore) Item(ctx context.Context, id int64) (types.ArchivedItem, error) {
 	var out types.ArchivedItem
 	err := a.s.Do(ctx, func() error {
 		var ok bool
@@ -62,7 +67,7 @@ func (a archiveStore) Item(ctx context.Context, id int64) (types.ArchivedItem, e
 	return out, err
 }
 
-func (a archiveStore) FindItems(
+func (a archivedItemStore) FindItems(
 	ctx context.Context,
 	repoKey, fullPath string,
 ) ([]types.ArchivedItem, error) {
@@ -81,7 +86,7 @@ func (a archiveStore) FindItems(
 	return out, err
 }
 
-func (a archiveStore) Items(
+func (a archivedItemStore) Items(
 	ctx context.Context, f store.ArchivedFilter, p store.Page,
 ) ([]types.ArchivedItem, string, error) {
 	var (
@@ -106,7 +111,7 @@ func (a archiveStore) Items(
 	return out, next, err
 }
 
-func (a archiveStore) DeleteItem(ctx context.Context, id int64) error {
+func (a archivedItemStore) DeleteItem(ctx context.Context, id int64) error {
 	return a.s.Do(ctx, func() error {
 		if !a.items().Del(id) {
 			return memtx.NotFound("archived item", id)
@@ -115,7 +120,7 @@ func (a archiveStore) DeleteItem(ctx context.Context, id int64) error {
 	})
 }
 
-func (a archiveStore) ExpiredItems(
+func (a archivedItemStore) ExpiredItems(
 	ctx context.Context,
 	before time.Time,
 	limit int,
