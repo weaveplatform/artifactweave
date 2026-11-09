@@ -192,9 +192,9 @@ Entries change when the plan changes, never to record progress:
 
 ## Bridges
 
-A declaration that leaves a legacy split package, such as `pkg/types`, `pkg/store` or
-`internal/auth`, leaves a type alias at its old path while its users are re-pointed
-(Go's gradual code repair):
+A declaration that leaves a legacy package, split like `pkg/types` and `pkg/store` or
+moved like `internal/auth`, leaves a type alias at its old path while its users are
+re-pointed (Go's gradual code repair):
 
 - one `bridge_<target>.go` per target, headed `// Bridge (P9d): declared in <path>; PRO-02 deletes it.`;
 - never marked `Deprecated:`, because staticcheck SA1019 would then fail lint at every

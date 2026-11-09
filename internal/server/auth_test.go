@@ -57,7 +57,7 @@ func TestAccAuthenticatePrincipal(t *testing.T) {
 }
 
 // The middleware stores every principal it authorises with the decider that
-// authorised it, which handlers reach through auth.DeciderFrom; a request it
+// authorised it, which handlers reach through authn.DeciderFrom; a request it
 // lets through without authorising a principal carries no decider.
 func TestAccAuthenticateAttachesDecider(t *testing.T) {
 	ctx := t.Context()

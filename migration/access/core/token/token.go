@@ -1,7 +1,3 @@
-// Package token issues and verifies Access tokens (decision 0005): RS256
-// JWTs signed with a per-instance key, reference tokens and refresh tokens.
-// Only digests of tokens are stored; the store record (token_id, subject,
-// scope, expiry) is what revocation removes.
 package token
 
 import (
@@ -73,10 +69,17 @@ type Options struct {
 // passes its store as it is.
 type Store interface {
 	tx.Runner
+	// Instance holds the instance identity, whose id the issuer names.
 	Instance() instance.InstanceStore
+	// Settings holds token.default_expiry and the signing key state.
 	Settings() settings.SettingsStore
+	// Tokens holds the token records, which keep digests of the tokens,
+	// never the tokens themselves.
 	Tokens() port.TokenStore
+	// Keys holds the signing keys.
 	Keys() port.KeyStore
+	// APIRestrictions holds the API restrictions that issuance and refresh
+	// check.
 	APIRestrictions() port.APIRestrictionStore
 }
 
@@ -136,17 +139,28 @@ func (s *Service) reload(ctx context.Context) error {
 
 // Request asks for a token for a user.
 type Request struct {
+	// Username names the token's user, the subject's last part; it may not
+	// be empty or contain a slash.
 	Username string
 	// Scope defaults to applied-permissions/user.
 	Scope kernel.Scope
 	// ExpiresIn defaults to token.default_expiry (model.DefaultTokenExpiry
 	// when unset); zero means never and needs ByAdmin.
-	ExpiresIn      *time.Duration
-	Refreshable    bool
+	ExpiresIn *time.Duration
+	// Refreshable also issues a refresh token, and makes the token
+	// revocable.
+	Refreshable bool
+	// ForceRevocable makes the token revocable whatever its lifetime;
+	// without it, one that expires within model.DefaultRevocableThreshold
+	// and is not refreshable is not revocable (model.Revocable).
 	ForceRevocable bool
-	Audience       string
-	Description    string
-	ProjectKey     string
+	// Audience defaults to DefaultAudience.
+	Audience string
+	// Description is stored with the token and returned with it.
+	Description string
+	// ProjectKey is stored with the token: the project it was issued for,
+	// empty for none.
+	ProjectKey string
 	// IncludeReference also issues a reference token.
 	IncludeReference bool
 	// ByAdmin is whether the caller is an administrator.
@@ -170,9 +184,15 @@ type Request struct {
 // Issued is a new token and its secrets, which are never stored and so
 // cannot be shown again.
 type Issued struct {
-	Record         model.Token
-	AccessToken    string
-	RefreshToken   string
+	// Record is what was stored: the token's id, subject, scope, lifetime
+	// and digests.
+	Record model.Token
+	// AccessToken is the signed JWT.
+	AccessToken string
+	// RefreshToken is set when the request asked for a refreshable token.
+	RefreshToken string
+	// ReferenceToken is set when the request asked for one or gave a
+	// purpose.
 	ReferenceToken string
 	// ExpiresIn is the lifetime in seconds; zero means never.
 	ExpiresIn int64
@@ -268,11 +288,13 @@ func (s *Service) Issue(ctx context.Context, r Request) (Issued, error) {
 
 // RegistryRequest asks for a registry token (decision 0005).
 type RegistryRequest struct {
+	// Username names the token's user, as Request's does.
 	Username string
 	// ExpiresIn is the lifetime; it must be positive, and at most
 	// model.RegistryTokenExpiry.
 	ExpiresIn time.Duration
-	Access    kernel.RegistryAccess
+	// Access is what the token grants, which its registry claim carries.
+	Access kernel.RegistryAccess
 	// Scope is the scope of the credential that obtained the token, which
 	// the token keeps so it never acts more broadly; it defaults to
 	// applied-permissions/user, a password's.
@@ -365,7 +387,7 @@ func (s *Service) expiresIn(ctx context.Context, req *time.Duration) (time.Durat
 // Verify resolves an access token (a JWT) or a reference token to its
 // record. A token that is malformed, badly signed, signed by an unknown or
 // retired key, expired, or revoked (no record) fails with an error wrapping
-// auth.ErrInvalidToken.
+// authn.ErrInvalidToken.
 func (s *Service) Verify(ctx context.Context, raw string) (model.Token, error) {
 	var rec model.Token
 	var err error

@@ -20,13 +20,12 @@
 //   - Driven: the router kit (pkgroute.Kit), which resolves the repository
 //     and the caller, checks permissions, stages content and stores items
 //     through the item service, where the format's hooks admit them, reads
-//     items, properties and blobs, runs a commit in one metadata
-//     transaction and writes errors; the request's base URL
-//     (platform/httpkit/baseurl), onto which download URLs point; the
-//     caller's principal (migration/access/core/authn, through its kernel bridge), who
-//     owns a transaction; and the format package, which checks identities,
-//     decodes, reads and verifies manifests, rechecks a transaction's owner
-//     and expiry and rebuilds the index.
+//     items, properties and blobs, runs a commit in one metadata transaction
+//     and writes errors; the request's base URL (platform/httpkit/baseurl),
+//     onto which download URLs point; the caller's principal (the kernel),
+//     who owns a transaction; and the format package, which checks
+//     identities, decodes, reads and verifies manifests, rechecks a
+//     transaction's owner and expiry and rebuilds the index.
 //   - Settings: none.
 //
 // # Outputs

@@ -185,7 +185,7 @@ func (k *Kit) API() accessapi.API { return k.api }
 // returns ctx carrying the principal that evaluation returned, with admin and
 // groups as evaluated, and its decider, stored together with
 // accessapi.WithCaller, so that kernel.FromContext, accessapi.DeciderFrom and
-// auth.DeciderFrom read them as a handler behind the server would. On error
+// authn.DeciderFrom read them as a handler behind the server would. On error
 // it returns ctx unchanged and the binding's error, unwrapped, whose text
 // starts "auth: permissions:" as the server's does.
 func (k *Kit) Authorize(
@@ -244,7 +244,7 @@ func (k *Kit) Middleware(
 // description, scope, lifetime, revocability, registry grants and parent. It
 // is the service's own Verify, so it records the token's last use as a
 // request presenting it would, and its errors are the service's, unwrapped: a
-// token that does not verify matches auth.ErrInvalidToken. On a kit built
+// token that does not verify matches authn.ErrInvalidToken. On a kit built
 // without WithTokens there is no service to ask, and Verify fails the kit's
 // test with Fatal, so it must then be called from the goroutine running that
 // test.

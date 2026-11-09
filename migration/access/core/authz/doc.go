@@ -48,7 +48,8 @@
 //   - A permission target naming a repository that no longer exists never
 //     matches, as Artifactory keeps such targets and ignores them, and a
 //     key "<remote>-cache" is judged as its remote.
-//   - The error texts are those the evaluator had in internal/authz.
+//   - Every error starts "authz: " and names the read that failed: the
+//     subject's permissions, a user or a group.
 //
 // # References
 //

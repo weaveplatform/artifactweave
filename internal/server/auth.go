@@ -71,10 +71,10 @@ const refreshRoute = "POST /access/api/v1/tokens"
 // (expiredRefresh). Without credentials the request acts as anonymous when
 // anonymous access is on, except on the registry (decision 0031); otherwise
 // only public routes answer. Every
-// principal is then authorised once (auth.Authorize): its permissions are
+// principal is then authorised once (authn.Authorize): its permissions are
 // evaluated for the request, and the principal is stored with that
-// evaluator (auth.WithAuthorized), which handlers ask every question
-// through auth.DeciderFrom. The principal's name goes to the access log
+// evaluator (authn.WithAuthorized), which handlers ask every question
+// through authn.DeciderFrom. The principal's name goes to the access log
 // (noteUser). A request skip reports passes untouched, credentials or not: a
 // protocol's absent path, such as Go's checksum database, which its router
 // answers 404 whoever asks, a host route served to anyone, such as
@@ -288,7 +288,7 @@ func expiredRefresh(
 }
 
 // authorize evaluates p's permissions for the request, returning p and its
-// decider as auth.Authorize does. A handler built without a store (tests of
+// decider as authn.Authorize does. A handler built without a store (tests of
 // the system endpoints) has nothing to evaluate, and p passes through
 // without a decider.
 func authorize(

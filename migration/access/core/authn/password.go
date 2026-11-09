@@ -1,7 +1,3 @@
-// Package authn authenticates requests and seeds the built-in principals
-// (decision 0005). Passwords are Argon2id hashes in PHC string form, so the
-// cost parameters travel with each hash and can be raised without breaking
-// the hashes already stored.
 package authn
 
 import (
@@ -25,9 +21,12 @@ var ErrHashFormat = errors.New("auth: unsupported password hash")
 // set them: verification reads the cost from each stored hash, so a cheap
 // hash only ever comes from code that asked for one.
 type HashParams struct {
+	// MemoryKiB is the memory each hash uses, in KiB.
 	MemoryKiB uint32
-	Time      uint32
-	Threads   uint8
+	// Time is the number of passes over that memory.
+	Time uint32
+	// Threads is the number of lanes computed in parallel.
+	Threads uint8
 }
 
 // productionParams is RFC 9106's second recommended option (64 MiB, three

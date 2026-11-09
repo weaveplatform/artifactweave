@@ -16,7 +16,11 @@ import (
 
 // The policies' defaults when nothing is stored, as Artifactory ships them.
 const (
-	DefaultLoginAttempts      = 5
+	// DefaultLoginAttempts is how many failed logins lock an account while
+	// the user lock policy is on.
+	DefaultLoginAttempts = 5
+	// DefaultPasswordMaxAgeDays is how many days an internal password lasts
+	// while the password expiration policy is on.
 	DefaultPasswordMaxAgeDays = 60
 )
 

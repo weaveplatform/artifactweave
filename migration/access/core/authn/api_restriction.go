@@ -13,8 +13,9 @@ import (
 type apiRecoveryKey struct{}
 
 // WithAPIRecovery permits credential verification for the narrowly mounted
-// administrator recovery routes. Those routes must still call RequireAdmin;
-// this context flag grants no identity or administrative authority.
+// administrator recovery routes. Those routes must still call
+// kernel.RequireAdmin; this context flag grants no identity or
+// administrative authority.
 func WithAPIRecovery(ctx context.Context) context.Context {
 	return context.WithValue(ctx, apiRecoveryKey{}, true)
 }

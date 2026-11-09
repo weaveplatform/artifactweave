@@ -13,18 +13,23 @@ import (
 
 // ErrInvalidToken reports a token that does not verify: malformed, badly
 // signed, expired, revoked, or of a subject that is not a user. Verifiers
-// wrap it; the request answers ErrBadCredentials.
+// wrap it; the request answers kernel.ErrBadCredentials.
 var ErrInvalidToken = errors.New("auth: invalid token")
 
 // TokenVerifier resolves an access token (a JWT) or a reference token to its
 // stored record. migration/access/core/token implements it.
 type TokenVerifier interface {
+	// Verify returns the stored record of the access or reference token
+	// raw. An error wrapping ErrInvalidToken means raw does not verify; any
+	// other means it could not be checked.
 	Verify(ctx context.Context, raw string) (model.Token, error)
 }
 
 // ExpiredVerifier is a TokenVerifier that also verifies an access token
 // whose only fault is its expiry. migration/access/core/token implements it.
 type ExpiredVerifier interface {
+	// VerifyExpired is Verify for an access token, accepting one whose
+	// expiry has passed.
 	VerifyExpired(ctx context.Context, raw string) (model.Token, error)
 }
 
@@ -78,7 +83,9 @@ func (a *Authenticator) Token(ctx context.Context, raw, user string) (kernel.Pri
 // Refresher is the access token a refresh presents for the token it
 // replaces, and that token's user.
 type Refresher struct {
-	User    string
+	// User is the name of the token's user.
+	User string
+	// TokenID is the id of the token the refresh replaces.
 	TokenID string
 }
 

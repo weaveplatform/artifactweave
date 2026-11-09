@@ -17,8 +17,13 @@ import (
 
 // Names of the built-in principals Artifactory ships (research 05).
 const (
-	AdminUser          = "admin"
-	ReadersGroup       = "readers"
+	// AdminUser is the administrator the seed creates, with the password
+	// Seed is given.
+	AdminUser = "admin"
+	// ReadersGroup is the group the seed creates, which every new user
+	// joins automatically.
+	ReadersGroup = "readers"
+	// AnythingPermission grants ReadersGroup read on every repository.
 	AnythingPermission = "Anything"
 	// AnyRemotePermission covers every remote repository and grants no one
 	// anything. Artifactory has shipped it without anonymous since 7.84.3, so

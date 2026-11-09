@@ -239,7 +239,7 @@ func TestUnitAuthorizerBinding(t *testing.T) {
 	src := authz.Sources{Permissions: w.st.Permissions(), Groups: w.st.Groups()}
 	ann := kernel.Principal{Name: "ann", Groups: []string{"readers"}, Password: true}
 
-	// Authorize is auth.Authorize, with the evaluator itself as the Decider.
+	// Authorize is authn.Authorize, with the evaluator itself as the Decider.
 	p, d, err := az.Authorize(ctx, ann, false)
 	wantP, _, wantErr := authn.Authorize(ctx, src, ann)
 	if err != nil || wantErr != nil || !reflect.DeepEqual(p, wantP) {

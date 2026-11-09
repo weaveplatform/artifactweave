@@ -33,7 +33,7 @@ func (b authorizer) Authorize(
 	anonymousEnabled bool,
 ) (kernel.Principal, accessapi.Decider, error) {
 	p, d, err := authn.Authorize(ctx, b.sources(anonymousEnabled), p)
-	//nolint:wrapcheck // auth.Authorize wraps its own as "auth: permissions: %w"
+	//nolint:wrapcheck // authn.Authorize wraps its own as "auth: permissions: %w"
 	return p, authz.AsAPI(d), err
 }
 

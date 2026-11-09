@@ -14,8 +14,9 @@ import (
 // errNoStore refuses Deps without a store, which every binding reads.
 var errNoStore = errors.New("access: Deps.Store is required")
 
-// Deps is what app passes New. The authenticator and the token service are
-// built by app, over the same store, until access core builds them itself.
+// Deps is what app passes New. The authenticator and the token service of
+// access core are built by app, over the same store, until the module builds
+// them itself.
 type Deps struct {
 	// Store holds the users, groups, permissions, tokens, keys, projects,
 	// settings and API restrictions that the bindings read and write. It is

@@ -30,8 +30,12 @@ const (
 
 // Options configures NewAuthenticator.
 type Options struct {
+	// CacheSize bounds how many verified passwords the cache holds; zero or
+	// less means DefaultCacheSize.
 	CacheSize int
-	CacheTTL  time.Duration
+	// CacheTTL is how long a verified password skips the hash; zero or less
+	// means DefaultCacheTTL.
+	CacheTTL time.Duration
 	// Concurrency bounds the password hashes computed at once; zero means
 	// GOMAXPROCS. Each costs the hash's memory parameter, so without a bound
 	// a flood of wrong passwords could exhaust memory.
@@ -104,10 +108,11 @@ func NewAuthenticator(
 
 // Basic verifies a user name and password. Wrong credentials, an unknown or
 // disabled user, and a user without an internal password all answer
-// ErrBadCredentials alike; while basic authentication is switched off,
-// every password answers ErrBasicAuthDisabled. A locked account answers
-// ErrAccountLocked whatever the password. A correct but expired password
-// answers ErrPasswordExpired with the principal, marked PasswordExpired.
+// kernel.ErrBadCredentials alike; while basic authentication is switched
+// off, every password answers ErrBasicAuthDisabled. A locked account
+// answers kernel.ErrAccountLocked whatever the password. A correct but
+// expired password answers kernel.ErrPasswordExpired with the principal,
+// marked PasswordExpired.
 // While the name is temporarily suspended after failed logins, every
 // password answers ErrLoginSuspended (suspension.go).
 func (a *Authenticator) Basic(
