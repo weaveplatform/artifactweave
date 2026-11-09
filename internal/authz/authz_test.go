@@ -7,68 +7,71 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/adapters/inmem"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
 )
 
 const (
-	r = types.ActionRead
-	w = types.ActionWrite
-	d = types.ActionDelete
-	m = types.ActionManage
+	r = accessapi.ActionRead
+	w = accessapi.ActionWrite
+	d = accessapi.ActionDelete
+	m = accessapi.ActionManage
 )
 
-func target(include, exclude []string) types.Target {
-	return types.Target{Include: include, Exclude: exclude}
+func target(include, exclude []string) model.Target {
+	return model.Target{Include: include, Exclude: exclude}
 }
 
 // world is a permission set covering every evaluation rule.
 func world(t *testing.T) *inmem.Store {
 	t.Helper()
 	ctx := context.Background()
-	db := inmem.New()
-	for _, g := range []types.Group{
+	db := inmem.New(memtx.New())
+	for _, g := range []model.Group{
 		{Name: "devs"}, {Name: "readers"}, {Name: "admins", AdminPrivileges: true},
 	} {
 		if err := db.Groups().Create(ctx, g); err != nil {
 			t.Fatal(err)
 		}
 	}
-	for _, p := range []types.Permission{
-		{Name: "dev-local", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Actions: types.Grants{Groups: map[string]types.Actions{"devs": r | w}},
-				Targets: map[string]types.Target{"libs-local": target([]string{"org/acme/**"}, []string{"org/acme/secret/**"})},
+	for _, p := range []model.Permission{
+		{Name: "dev-local", Resources: map[accessapi.ResourceType]model.Resource{
+			accessapi.ResourceArtifact: {
+				Actions: model.Grants{Groups: map[string]accessapi.Actions{"devs": r | w}},
+				Targets: map[string]model.Target{"libs-local": target([]string{"org/acme/**"}, []string{"org/acme/secret/**"})},
 			},
-			types.ResourceBuild: {
-				Actions: types.Grants{Groups: map[string]types.Actions{"devs": r}},
-				Targets: map[string]types.Target{types.BuildInfoRepository: target([]string{"app/**"}, nil)},
-			},
-		}},
-		{Name: "anything", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Actions: types.Grants{Groups: map[string]types.Actions{"readers": r}},
-				Targets: map[string]types.Target{types.TargetAny: target(nil, nil)},
+			accessapi.ResourceBuild: {
+				Actions: model.Grants{Groups: map[string]accessapi.Actions{"devs": r}},
+				Targets: map[string]model.Target{accessapi.BuildInfoRepository: target([]string{"app/**"}, nil)},
 			},
 		}},
-		{Name: "any-remote", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{"anonymous": r | w}},
-				Targets: map[string]types.Target{types.TargetAnyRemote: target([]string{"**"}, nil)},
+		{Name: "anything", Resources: map[accessapi.ResourceType]model.Resource{
+			accessapi.ResourceArtifact: {
+				Actions: model.Grants{Groups: map[string]accessapi.Actions{"readers": r}},
+				Targets: map[string]model.Target{accessapi.TargetAny: target(nil, nil)},
 			},
 		}},
-		{Name: "bob-jars", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{"bob": d}},
-				Targets: map[string]types.Target{"libs-local": target([]string{"**/*.jar"}, []string{""})},
+		{Name: "any-remote", Resources: map[accessapi.ResourceType]model.Resource{
+			accessapi.ResourceArtifact: {
+				Actions: model.Grants{Users: map[string]accessapi.Actions{"anonymous": r | w}},
+				Targets: map[string]model.Target{accessapi.TargetAnyRemote: target([]string{"**"}, nil)},
 			},
 		}},
-		{Name: "deleted-repo", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{"bob": m}},
-				Targets: map[string]types.Target{"gone-local": target(nil, nil)},
+		{Name: "bob-jars", Resources: map[accessapi.ResourceType]model.Resource{
+			accessapi.ResourceArtifact: {
+				Actions: model.Grants{Users: map[string]accessapi.Actions{"bob": d}},
+				Targets: map[string]model.Target{"libs-local": target([]string{"**/*.jar"}, []string{""})},
+			},
+		}},
+		{Name: "deleted-repo", Resources: map[accessapi.ResourceType]model.Resource{
+			accessapi.ResourceArtifact: {
+				Actions: model.Grants{Users: map[string]accessapi.Actions{"bob": m}},
+				Targets: map[string]model.Target{"gone-local": target(nil, nil)},
 			},
 		}},
 	} {
@@ -79,9 +82,9 @@ func world(t *testing.T) *inmem.Store {
 	return db
 }
 
-func scope(t *testing.T, s string) *types.Scope {
+func scope(t *testing.T, s string) *kernel.Scope {
 	t.Helper()
-	sc, err := types.ParseScope(s)
+	sc, err := kernel.ParseScope(s)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,47 +92,47 @@ func scope(t *testing.T, s string) *types.Scope {
 }
 
 var (
-	libs    = Repo{Key: "libs-local", Class: "local"}
-	ext     = Repo{Key: "ext-local", Class: "local"}
-	virt    = Repo{Key: "all", Class: "virtual"}
-	jcenter = Repo{Key: "jcenter", Class: "remote"}
-	cache   = Repo{Key: "jcenter-cache", Class: "remote"}
-	builds  = Repo{Key: types.BuildInfoRepository}
+	libs    = accessapi.Repo{Key: "libs-local", Class: "local"}
+	ext     = accessapi.Repo{Key: "ext-local", Class: "local"}
+	virt    = accessapi.Repo{Key: "all", Class: "virtual"}
+	jcenter = accessapi.Repo{Key: "jcenter", Class: "remote"}
+	cache   = accessapi.Repo{Key: "jcenter-cache", Class: "remote"}
+	builds  = accessapi.Repo{Key: accessapi.BuildInfoRepository}
 )
 
 type check struct {
-	rt       types.ResourceType
-	repo     Repo
+	rt       accessapi.ResourceType
+	repo     accessapi.Repo
 	path     string
 	folder   bool
-	expected types.Actions
+	expected accessapi.Actions
 	ok       bool
 }
 
-func art(repo Repo, path string, want types.Actions, ok bool) check {
-	return check{types.ResourceArtifact, repo, path, false, want, ok}
+func art(repo accessapi.Repo, path string, want accessapi.Actions, ok bool) check {
+	return check{accessapi.ResourceArtifact, repo, path, false, want, ok}
 }
 
-func dir(repo Repo, path string, want types.Actions, ok bool) check {
-	return check{types.ResourceArtifact, repo, path, true, want, ok}
+func dir(repo accessapi.Repo, path string, want accessapi.Actions, ok bool) check {
+	return check{accessapi.ResourceArtifact, repo, path, true, want, ok}
 }
 
 func TestUnitEvaluation(t *testing.T) {
 	ctx := context.Background()
 	db := world(t)
-	bob := Subject{Name: "bob", Groups: []string{"devs"}}
+	bob := accessapi.Subject{Name: "bob", Groups: []string{"devs"}}
 	for _, c := range []struct {
 		name      string
-		subject   Subject
+		subject   accessapi.Subject
 		anonymous bool
 		admin     bool
 		checks    []check
 	}{
-		{"admin user", Subject{Name: "root", Admin: true}, false, true, []check{
+		{"admin user", accessapi.Subject{Name: "root", Admin: true}, false, true, []check{
 			art(ext, "any/thing", r|w|d|m, true),
-			{types.ResourceBuild, builds, "x/1", false, r | m, true},
+			{accessapi.ResourceBuild, builds, "x/1", false, r | m, true},
 		}},
-		{"admin through a group", Subject{Name: "carol", Groups: []string{"admins"}}, false, true, []check{
+		{"admin through a group", accessapi.Subject{Name: "carol", Groups: []string{"admins"}}, false, true, []check{
 			art(ext, "a", d, true),
 		}},
 		{"group grant with include and exclude", bob, false, false, []check{
@@ -154,84 +157,84 @@ func TestUnitEvaluation(t *testing.T) {
 		}},
 		{"a target naming a deleted repository grants nothing elsewhere", bob, false, false, []check{
 			art(libs, "org/acme/a.txt", m, false),
-			art(Repo{Key: "gone-local", Class: "local"}, "x", m, true),
+			art(accessapi.Repo{Key: "gone-local", Class: "local"}, "x", m, true),
 		}},
 		{"build resource", bob, false, false, []check{
-			{types.ResourceBuild, builds, "app/42", false, r, true},
-			{types.ResourceBuild, builds, "lib/1", false, r, false},
-			{types.ResourceReleaseBundle, builds, "app/42", false, r, false},
+			{accessapi.ResourceBuild, builds, "app/42", false, r, true},
+			{accessapi.ResourceBuild, builds, "lib/1", false, r, false},
+			{accessapi.ResourceReleaseBundle, builds, "app/42", false, r, false},
 		}},
-		{"any covers every class", Subject{Name: "dave", Groups: []string{"readers"}}, false, false, []check{
+		{"any covers every class", accessapi.Subject{Name: "dave", Groups: []string{"readers"}}, false, false, []check{
 			art(libs, "x", r, true), art(virt, "x", r, true), art(jcenter, "x", r, true),
 			art(libs, "x", w, false),
 		}},
-		{"anonymous off grants nothing", Subject{Name: "anonymous", Anonymous: true}, false, false, []check{
+		{"anonymous off grants nothing", accessapi.Subject{Name: "anonymous", Anonymous: true}, false, false, []check{
 			art(jcenter, "x", r, false),
 		}},
-		{"anonymous on: its grants and the remote cache", Subject{Name: "anonymous", Anonymous: true}, true, false, []check{
+		{"anonymous on: its grants and the remote cache", accessapi.Subject{Name: "anonymous", Anonymous: true}, true, false, []check{
 			art(jcenter, "x", r|w, true), art(cache, "x", r, true), art(libs, "x", r, false),
 		}},
 		{"want of nothing is never allowed", bob, false, false, []check{
 			art(libs, "org/acme/a.txt", 0, false),
 		}},
-		{"applied-permissions/user is the user", Subject{Name: "bob", Groups: []string{"devs"}, Scope: scope(t, "applied-permissions/user")}, false, false, []check{
+		{"applied-permissions/user is the user", accessapi.Subject{Name: "bob", Groups: []string{"devs"}, Scope: scope(t, "applied-permissions/user")}, false, false, []check{
 			art(libs, "org/acme/a.txt", r|w, true), art(libs, "x.jar", d, true),
 		}},
-		{"groups scope drops the user's own grants", Subject{Name: "bob", Groups: []string{"devs"}, Scope: scope(t, "applied-permissions/groups:devs")}, false, false, []check{
+		{"groups scope drops the user's own grants", accessapi.Subject{Name: "bob", Groups: []string{"devs"}, Scope: scope(t, "applied-permissions/groups:devs")}, false, false, []check{
 			art(libs, "org/acme/a.txt", r|w, true), art(libs, "x.jar", d, false),
 		}},
-		{"groups scope never adds a group", Subject{Name: "bob", Groups: []string{"devs"}, Scope: scope(t, "applied-permissions/groups:readers")}, false, false, []check{
+		{"groups scope never adds a group", accessapi.Subject{Name: "bob", Groups: []string{"devs"}, Scope: scope(t, "applied-permissions/groups:readers")}, false, false, []check{
 			art(libs, "org/acme/a.txt", r, false), art(ext, "x", r, false),
 		}},
-		{"artifact scope intersects", Subject{Name: "bob", Groups: []string{"devs"}, Scope: scope(t, "artifact:libs-local/org/acme/**:r")}, false, false, []check{
+		{"artifact scope intersects", accessapi.Subject{Name: "bob", Groups: []string{"devs"}, Scope: scope(t, "artifact:libs-local/org/acme/**:r")}, false, false, []check{
 			art(libs, "org/acme/a.txt", r, true),
 			art(libs, "org/acme/a.txt", w, false),
 			dir(libs, "org", r, true),
 			art(libs, "org/acme/lib/x.jar", d, false),
-			{types.ResourceBuild, builds, "app/1", false, r, false},
+			{accessapi.ResourceBuild, builds, "app/1", false, r, false},
 		}},
-		{"artifact scope on top of applied permissions", Subject{Name: "bob", Groups: []string{"devs"}, Scope: scope(t, "applied-permissions/user artifact:*:r,w")}, false, false, []check{
+		{"artifact scope on top of applied permissions", accessapi.Subject{Name: "bob", Groups: []string{"devs"}, Scope: scope(t, "applied-permissions/user artifact:*:r,w")}, false, false, []check{
 			art(libs, "org/acme/a.txt", r|w, true),
 			art(libs, "x.jar", d, false),
-			{types.ResourceBuild, builds, "app/1", false, r, true},
+			{accessapi.ResourceBuild, builds, "app/1", false, r, true},
 		}},
-		{"build scope intersects", Subject{Name: "bob", Groups: []string{"devs"}, Scope: scope(t, "build:"+types.BuildInfoRepository+"/app/4*:r")}, false, false, []check{
-			{types.ResourceBuild, builds, "app/42", false, r, true},
-			{types.ResourceBuild, builds, "app/1", false, r, false},
-			{types.ResourceBuild, builds, "lib/4", false, r, false},
-			{types.ResourceBuild, builds, "app/42", false, w, false},
+		{"build scope intersects", accessapi.Subject{Name: "bob", Groups: []string{"devs"}, Scope: scope(t, "build:"+accessapi.BuildInfoRepository+"/app/4*:r")}, false, false, []check{
+			{accessapi.ResourceBuild, builds, "app/42", false, r, true},
+			{accessapi.ResourceBuild, builds, "app/1", false, r, false},
+			{accessapi.ResourceBuild, builds, "lib/4", false, r, false},
+			{accessapi.ResourceBuild, builds, "app/42", false, w, false},
 			art(libs, "org/acme/a.txt", r, false),
 		}},
-		{"build scope on top of applied permissions", Subject{Name: "bob", Groups: []string{"devs"}, Scope: scope(t, "applied-permissions/user build:*:r")}, false, false, []check{
-			{types.ResourceBuild, builds, "app/1", false, r, true},
-			{types.ResourceBuild, builds, "lib/1", false, r, false},
+		{"build scope on top of applied permissions", accessapi.Subject{Name: "bob", Groups: []string{"devs"}, Scope: scope(t, "applied-permissions/user build:*:r")}, false, false, []check{
+			{accessapi.ResourceBuild, builds, "app/1", false, r, true},
+			{accessapi.ResourceBuild, builds, "lib/1", false, r, false},
 			art(libs, "org/acme/a.txt", r, true),
 		}},
-		{"a repo scope reaches no artifact", Subject{Name: "bob", Groups: []string{"devs"}, Scope: scope(t, "repo:libs-local:r")}, false, false, []check{
+		{"a repo scope reaches no artifact", accessapi.Subject{Name: "bob", Groups: []string{"devs"}, Scope: scope(t, "repo:libs-local:r")}, false, false, []check{
 			art(libs, "org/acme/a.txt", r, false),
 		}},
-		{"an admin's resource-only token keeps content, loses admin", Subject{Name: "root", Admin: true, Scope: scope(t, "artifact:ext-local:r")}, false, false, []check{
+		{"an admin's resource-only token keeps content, loses admin", accessapi.Subject{Name: "root", Admin: true, Scope: scope(t, "artifact:ext-local:r")}, false, false, []check{
 			art(ext, "x/y", r, true), art(ext, "x/y", w, false), art(libs, "x", r, false),
 		}},
-		{"an admin's groups token is not admin", Subject{Name: "root", Admin: true, Groups: []string{"devs"}, Scope: scope(t, "applied-permissions/groups:devs")}, false, false, []check{
+		{"an admin's groups token is not admin", accessapi.Subject{Name: "root", Admin: true, Groups: []string{"devs"}, Scope: scope(t, "applied-permissions/groups:devs")}, false, false, []check{
 			art(libs, "org/acme/a.txt", r, true), art(ext, "x", r, false),
 		}},
-		{"a groups token through an admin group is admin", Subject{Name: "svc", Groups: []string{"admins"}, Scope: scope(t, "applied-permissions/groups:admins")}, false, true, []check{
+		{"a groups token through an admin group is admin", accessapi.Subject{Name: "svc", Groups: []string{"admins"}, Scope: scope(t, "applied-permissions/groups:admins")}, false, true, []check{
 			art(ext, "x", d, true),
 		}},
-		{"roles scope grants nothing until projects", Subject{Name: "bob", Groups: []string{"devs"}, Scope: scope(t, "applied-permissions/roles:proj:developer")}, false, false, []check{
+		{"roles scope grants nothing until projects", accessapi.Subject{Name: "bob", Groups: []string{"devs"}, Scope: scope(t, "applied-permissions/roles:proj:developer")}, false, false, []check{
 			art(libs, "org/acme/a.txt", r, false),
 		}},
 		// applied-permissions/admin is an admin token whatever its subject
 		// (create-scoped-token): a user who is no administrator, and one
 		// who does not exist at all.
-		{"admin scope makes a non-admin an admin", Subject{Name: "bob", Groups: []string{"devs"}, Scope: scope(t, "applied-permissions/admin")}, false, true, []check{
+		{"admin scope makes a non-admin an admin", accessapi.Subject{Name: "bob", Groups: []string{"devs"}, Scope: scope(t, "applied-permissions/admin")}, false, true, []check{
 			art(ext, "x", r|w|d|m, true), art(libs, "org/acme/a.txt", r, true),
 		}},
-		{"admin scope makes an unknown user an admin", Subject{Name: "ghost", Scope: scope(t, "applied-permissions/admin")}, false, true, []check{
-			art(ext, "x", r|w|d|m, true), {types.ResourceBuild, builds, "lib/1", false, d, true},
+		{"admin scope makes an unknown user an admin", accessapi.Subject{Name: "ghost", Scope: scope(t, "applied-permissions/admin")}, false, true, []check{
+			art(ext, "x", r|w|d|m, true), {accessapi.ResourceBuild, builds, "lib/1", false, d, true},
 		}},
-		{"a membership in a deleted group", Subject{Name: "eve", Groups: []string{"ghosts", "devs"}}, false, false, []check{
+		{"a membership in a deleted group", accessapi.Subject{Name: "eve", Groups: []string{"ghosts", "devs"}}, false, false, []check{
 			art(libs, "org/acme/a.txt", r, true),
 		}},
 	} {
@@ -280,7 +283,7 @@ func TestUnitScopedConfigurationAndSystem(t *testing.T) {
 	src := Sources{Permissions: db.Permissions(), Groups: db.Groups()}
 	mk := func(s string, admin bool) *Decider {
 		t.Helper()
-		sub := Subject{Name: "bob", Groups: []string{"devs"}, Admin: admin}
+		sub := accessapi.Subject{Name: "bob", Groups: []string{"devs"}, Admin: admin}
 		if s != "" {
 			sub.Scope = scope(t, s)
 		}
@@ -297,18 +300,18 @@ func TestUnitScopedConfigurationAndSystem(t *testing.T) {
 		config        bool
 		area          string
 		system        bool
-		systemActions types.ScopeActions
+		systemActions kernel.ScopeActions
 	}{
-		{"", false, "libs-local", true, "info", false, types.ScopeRead},
-		{"", true, "libs-local", true, "metrics", true, types.ScopeRead},
-		{"applied-permissions/user", false, "ext-local", true, "info", false, types.ScopeRead},
-		{"repo:libs-local:r", false, "libs-local", true, "info", false, types.ScopeRead},
-		{"repo:libs-local:r", false, "ext-local", false, "info", false, types.ScopeRead},
-		{"applied-permissions/user repo:*:r", false, "ext-local", true, "info", false, types.ScopeRead},
-		{"artifact:libs-local:r", false, "libs-local", false, "info", false, types.ScopeRead},
-		{"system:info:r", false, "libs-local", false, "info/storage", true, types.ScopeRead},
-		{"system:info:r", false, "libs-local", false, "info", false, types.ScopeWrite},
-		{"system:info:r", false, "libs-local", false, "metrics", false, types.ScopeRead},
+		{"", false, "libs-local", true, "info", false, kernel.ScopeRead},
+		{"", true, "libs-local", true, "metrics", true, kernel.ScopeRead},
+		{"applied-permissions/user", false, "ext-local", true, "info", false, kernel.ScopeRead},
+		{"repo:libs-local:r", false, "libs-local", true, "info", false, kernel.ScopeRead},
+		{"repo:libs-local:r", false, "ext-local", false, "info", false, kernel.ScopeRead},
+		{"applied-permissions/user repo:*:r", false, "ext-local", true, "info", false, kernel.ScopeRead},
+		{"artifact:libs-local:r", false, "libs-local", false, "info", false, kernel.ScopeRead},
+		{"system:info:r", false, "libs-local", false, "info/storage", true, kernel.ScopeRead},
+		{"system:info:r", false, "libs-local", false, "info", false, kernel.ScopeWrite},
+		{"system:info:r", false, "libs-local", false, "metrics", false, kernel.ScopeRead},
 	} {
 		dec := mk(c.scope, c.admin)
 		if got := dec.RepoConfig(c.repo); got != c.config {
@@ -330,18 +333,18 @@ func TestUnitScopedConfigurationAndSystem(t *testing.T) {
 func TestUnitScopeLettersMapToActions(t *testing.T) {
 	for _, c := range []struct {
 		letters  string
-		expected types.Actions
+		expected accessapi.Actions
 	}{
 		{"r", r},
 		{"w", w},
 		{"d", d},
 		{"m", m},
-		{"a", types.ActionAnnotate},
-		{"x", types.ActionExecute},
-		{"s", types.ActionScan},
+		{"a", accessapi.ActionAnnotate},
+		{"x", accessapi.ActionExecute},
+		{"s", accessapi.ActionScan},
 		{"*", allActions},
 	} {
-		sc, err := types.ParseScope("artifact:x:" + c.letters)
+		sc, err := kernel.ParseScope("artifact:x:" + c.letters)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -353,26 +356,26 @@ func TestUnitScopeLettersMapToActions(t *testing.T) {
 
 var errBoom = errors.New("boom")
 
-type failingPermissions struct{ store.PermissionStore }
+type failingPermissions struct{ port.PermissionStore }
 
 func (failingPermissions) ForPrincipal(
 	context.Context,
 	string,
 	[]string,
-) ([]types.Permission, error) {
+) ([]model.Permission, error) {
 	return nil, errBoom
 }
 
-type failingGroups struct{ store.GroupStore }
+type failingGroups struct{ port.GroupStore }
 
-func (failingGroups) Get(context.Context, string) (types.Group, error) {
-	return types.Group{}, errBoom
+func (failingGroups) Get(context.Context, string) (model.Group, error) {
+	return model.Group{}, errBoom
 }
 
 func TestUnitNewReportsStoreFailures(t *testing.T) {
 	ctx := context.Background()
 	db := world(t)
-	sub := Subject{Name: "bob", Groups: []string{"devs"}}
+	sub := accessapi.Subject{Name: "bob", Groups: []string{"devs"}}
 	if _, err := New(
 		ctx,
 		Sources{Permissions: failingPermissions{}, Groups: db.Groups()},
@@ -409,48 +412,48 @@ func TestUnitWireFormsEvaluateAlike(t *testing.T) {
 		"actions":{"users":{"bob":["READ","WRITE"]},"groups":{"devs":["READ"]}},
 		"targets":{"libs-local":{"include_patterns":["org/**"],"exclude_patterns":["org/secret/**"]},
 		           "ANY REMOTE":{"include_patterns":["org/**"],"exclude_patterns":["org/secret/**"]}}}}}`
-	decisions := map[string][]types.Actions{}
-	for name, convert := range map[string]func() (types.Permission, error){
-		"v1": func() (types.Permission, error) {
+	decisions := map[string][]accessapi.Actions{}
+	for name, convert := range map[string]func() (model.Permission, error){
+		"v1": func() (model.Permission, error) {
 			var w wire.PermissionTargetV1
 			if err := json.Unmarshal([]byte(v1), &w); err != nil {
-				return types.Permission{}, err
+				return model.Permission{}, err
 			}
-			return types.PermissionFromV1(w)
+			return model.PermissionFromV1(w)
 		},
-		"v2": func() (types.Permission, error) {
+		"v2": func() (model.Permission, error) {
 			var w wire.PermissionTargetV2
 			if err := json.Unmarshal([]byte(v2), &w); err != nil {
-				return types.Permission{}, err
+				return model.Permission{}, err
 			}
-			return types.PermissionFromV2(w)
+			return model.PermissionFromV2(w)
 		},
-		"access": func() (types.Permission, error) {
+		"access": func() (model.Permission, error) {
 			var w wire.AccessPermission
 			if err := json.Unmarshal([]byte(access), &w); err != nil {
-				return types.Permission{}, err
+				return model.Permission{}, err
 			}
-			return types.PermissionFromAccess(w)
+			return model.PermissionFromAccess(w)
 		},
 	} {
 		p, err := convert()
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
-		db := inmem.New()
-		if err := db.Groups().Create(ctx, types.Group{Name: "devs"}); err != nil {
+		db := inmem.New(memtx.New())
+		if err := db.Groups().Create(ctx, model.Group{Name: "devs"}); err != nil {
 			t.Fatal(err)
 		}
 		if err := db.Permissions().Create(ctx, p); err != nil {
 			t.Fatal(err)
 		}
-		for _, sub := range []Subject{{Name: "bob"}, {Name: "carol", Groups: []string{"devs"}}} {
+		for _, sub := range []accessapi.Subject{{Name: "bob"}, {Name: "carol", Groups: []string{"devs"}}} {
 			dec, err := New(ctx, Sources{Permissions: db.Permissions(), Groups: db.Groups()}, sub)
 			if err != nil {
 				t.Fatal(err)
 			}
 			for _, k := range []struct {
-				repo Repo
+				repo accessapi.Repo
 				path string
 			}{
 				{libs, "org/a.txt"},
@@ -462,7 +465,7 @@ func TestUnitWireFormsEvaluateAlike(t *testing.T) {
 			} {
 				decisions[name] = append(
 					decisions[name],
-					dec.Actions(types.ResourceArtifact, k.repo, k.path, false),
+					dec.Actions(accessapi.ResourceArtifact, k.repo, k.path, false),
 				)
 			}
 		}
@@ -470,7 +473,7 @@ func TestUnitWireFormsEvaluateAlike(t *testing.T) {
 	// bob: read and write on libs-local/org and the remote and its cache;
 	// carol through devs: read on the same; nothing under org/secret, com
 	// or in other repositories.
-	want := []types.Actions{r | w, 0, 0, r | w, r | w, 0, r, 0, 0, r, r, 0}
+	want := []accessapi.Actions{r | w, 0, 0, r | w, r | w, 0, r, 0, 0, r, r, 0}
 	for name, got := range decisions {
 		if !slices.Equal(got, want) {
 			t.Errorf("%s decides %v, want %v", name, got, want)
@@ -484,7 +487,7 @@ func TestUnitRepoVisibleAndGroups(t *testing.T) {
 	src := Sources{Permissions: db.Permissions(), Groups: db.Groups()}
 	mk := func(s string, admin bool, groups ...string) *Decider {
 		t.Helper()
-		sub := Subject{Name: "bob", Groups: groups, Admin: admin}
+		sub := accessapi.Subject{Name: "bob", Groups: groups, Admin: admin}
 		if s != "" {
 			sub.Scope = scope(t, s)
 		}
@@ -497,7 +500,7 @@ func TestUnitRepoVisibleAndGroups(t *testing.T) {
 	for _, c := range []struct {
 		scope   string
 		admin   bool
-		repo    Repo
+		repo    accessapi.Repo
 		visible bool
 	}{
 		// devs read only org/acme/** in libs-local: the root leads there.
@@ -560,7 +563,7 @@ func TestUnitTargetAllows(t *testing.T) {
 			t.Errorf("TargetAllows(%q, folder=%v) = %v, want %v", c.path, c.folder, got, c.expected)
 		}
 	}
-	if !TargetAllows(types.Target{}, "anything", false) {
+	if !TargetAllows(model.Target{}, "anything", false) {
 		t.Error("an empty include list admits everything")
 	}
 }
@@ -568,22 +571,22 @@ func TestUnitTargetAllows(t *testing.T) {
 func TestUnitHolds(t *testing.T) {
 	ctx := context.Background()
 	db := world(t)
-	grants := types.Grants{
-		Users:  map[string]types.Actions{"bob": m},
-		Groups: map[string]types.Actions{"devs": r | m},
+	grants := model.Grants{
+		Users:  map[string]accessapi.Actions{"bob": m},
+		Groups: map[string]accessapi.Actions{"devs": r | m},
 	}
 	for _, c := range []struct {
 		name     string
-		sub      Subject
+		sub      accessapi.Subject
 		expected bool
 	}{
-		{"direct grant", Subject{Name: "bob"}, true},
-		{"through a group", Subject{Name: "carol", Groups: []string{"devs"}}, true},
-		{"no grant", Subject{Name: "carol", Groups: []string{"readers"}}, false},
-		{"a groups scope drops the user's own grant", Subject{
+		{"direct grant", accessapi.Subject{Name: "bob"}, true},
+		{"through a group", accessapi.Subject{Name: "carol", Groups: []string{"devs"}}, true},
+		{"no grant", accessapi.Subject{Name: "carol", Groups: []string{"readers"}}, false},
+		{"a groups scope drops the user's own grant", accessapi.Subject{
 			Name: "bob", Scope: scope(t, "applied-permissions/groups:readers"),
 		}, false},
-		{"anonymous while anonymous access is off", Subject{Name: "bob", Anonymous: true}, false},
+		{"anonymous while anonymous access is off", accessapi.Subject{Name: "bob", Anonymous: true}, false},
 	} {
 		dec, err := New(ctx, Sources{Permissions: db.Permissions(), Groups: db.Groups()}, c.sub)
 		if err != nil {
@@ -601,25 +604,25 @@ func TestUnitHolds(t *testing.T) {
 func TestUnitGrantable(t *testing.T) {
 	ctx := context.Background()
 	db := world(t)
-	grants := types.Grants{
-		Users:  map[string]types.Actions{"bob": r | w | m, "dave": r | w | d},
-		Groups: map[string]types.Actions{"devs": r | m},
+	grants := model.Grants{
+		Users:  map[string]accessapi.Actions{"bob": r | w | m, "dave": r | w | d},
+		Groups: map[string]accessapi.Actions{"devs": r | m},
 	}
 	for _, c := range []struct {
 		name     string
-		sub      Subject
-		expected types.Actions
+		sub      accessapi.Subject
+		expected accessapi.Actions
 	}{
-		{"an administrator", Subject{Name: "root", Admin: true}, allActions},
-		{"an administrator through a group", Subject{Name: "eve", Groups: []string{"admins"}}, allActions},
-		{"a direct holder keeps what it holds but manage", Subject{Name: "bob"}, r | w},
-		{"a holder through a group", Subject{Name: "carol", Groups: []string{"devs"}}, r},
-		{"direct and group grants add up", Subject{Name: "bob", Groups: []string{"devs"}}, r | w},
-		{"actions without manage grant nothing", Subject{Name: "dave"}, 0},
-		{"a groups scope drops the user's own manage", Subject{
+		{"an administrator", accessapi.Subject{Name: "root", Admin: true}, allActions},
+		{"an administrator through a group", accessapi.Subject{Name: "eve", Groups: []string{"admins"}}, allActions},
+		{"a direct holder keeps what it holds but manage", accessapi.Subject{Name: "bob"}, r | w},
+		{"a holder through a group", accessapi.Subject{Name: "carol", Groups: []string{"devs"}}, r},
+		{"direct and group grants add up", accessapi.Subject{Name: "bob", Groups: []string{"devs"}}, r | w},
+		{"actions without manage grant nothing", accessapi.Subject{Name: "dave"}, 0},
+		{"a groups scope drops the user's own manage", accessapi.Subject{
 			Name: "bob", Scope: scope(t, "applied-permissions/groups:readers"),
 		}, 0},
-		{"an administrator's token without applied permissions", Subject{
+		{"an administrator's token without applied permissions", accessapi.Subject{
 			Name: "root", Admin: true, Scope: scope(t, "artifact:libs-local:*"),
 		}, 0},
 	} {
@@ -645,16 +648,16 @@ func TestUnitSelf(t *testing.T) {
 	db := world(t)
 	for _, c := range []struct {
 		name   string
-		sub    Subject
+		sub    accessapi.Subject
 		user   string
 		groups []string
 	}{
-		{"a password caller", Subject{Name: "bob", Groups: []string{"devs"}}, "bob", []string{"devs"}},
-		{"a groups scope keeps the user and every group", Subject{
+		{"a password caller", accessapi.Subject{Name: "bob", Groups: []string{"devs"}}, "bob", []string{"devs"}},
+		{"a groups scope keeps the user and every group", accessapi.Subject{
 			Name: "bob", Groups: []string{"devs", "readers"},
 			Scope: scope(t, "applied-permissions/groups:readers"),
 		}, "bob", []string{"devs", "readers"}},
-		{"anonymous while anonymous access is off", Subject{Name: "anonymous", Anonymous: true}, "", nil},
+		{"anonymous while anonymous access is off", accessapi.Subject{Name: "anonymous", Anonymous: true}, "", nil},
 	} {
 		dec, err := New(ctx, Sources{Permissions: db.Permissions(), Groups: db.Groups()}, c.sub)
 		if err != nil {
@@ -671,10 +674,10 @@ func TestUnitSelf(t *testing.T) {
 }
 
 // failingUsers fails every read.
-type failingUsers struct{ store.UserStore }
+type failingUsers struct{ port.UserStore }
 
-func (failingUsers) Get(context.Context, string) (types.User, error) {
-	return types.User{}, errBoom
+func (failingUsers) Get(context.Context, string) (model.User, error) {
+	return model.User{}, errBoom
 }
 
 // TestUnitManagesResources checks the Manage Resources role follows the
@@ -684,15 +687,15 @@ func (failingUsers) Get(context.Context, string) (types.User, error) {
 func TestUnitManagesResources(t *testing.T) {
 	ctx := context.Background()
 	db := world(t)
-	for _, g := range []types.Group{
-		{Name: "resmgrs", Roles: types.RoleFlags{ResourcesManager: true}},
+	for _, g := range []model.Group{
+		{Name: "resmgrs", Roles: model.RoleFlags{ResourcesManager: true}},
 	} {
 		if err := db.Groups().Create(ctx, g); err != nil {
 			t.Fatal(err)
 		}
 	}
-	for _, u := range []types.User{
-		{Name: "rita", Roles: types.RoleFlags{ResourcesManager: true}},
+	for _, u := range []model.User{
+		{Name: "rita", Roles: model.RoleFlags{ResourcesManager: true}},
 		{Name: "gil", Groups: []string{"resmgrs", "devs"}},
 		{Name: "bob", Groups: []string{"devs"}},
 	} {
@@ -703,34 +706,34 @@ func TestUnitManagesResources(t *testing.T) {
 	src := Sources{Permissions: db.Permissions(), Groups: db.Groups()}
 	for _, c := range []struct {
 		name     string
-		sub      Subject
+		sub      accessapi.Subject
 		expected bool
 	}{
-		{"the user's flag", Subject{Name: "rita"}, true},
-		{"a group's flag", Subject{Name: "gil", Groups: []string{"resmgrs", "devs"}}, true},
-		{"neither", Subject{Name: "bob", Groups: []string{"devs"}}, false},
-		{"a user scope keeps the user's", Subject{
+		{"the user's flag", accessapi.Subject{Name: "rita"}, true},
+		{"a group's flag", accessapi.Subject{Name: "gil", Groups: []string{"resmgrs", "devs"}}, true},
+		{"neither", accessapi.Subject{Name: "bob", Groups: []string{"devs"}}, false},
+		{"a user scope keeps the user's", accessapi.Subject{
 			Name: "rita", Scope: scope(t, "applied-permissions/user"),
 		}, true},
-		{"a groups scope drops the user's", Subject{
+		{"a groups scope drops the user's", accessapi.Subject{
 			Name: "rita", Groups: []string{"devs"}, Scope: scope(t, "applied-permissions/groups:devs"),
 		}, false},
-		{"a groups scope keeps a named group's", Subject{
+		{"a groups scope keeps a named group's", accessapi.Subject{
 			Name:   "gil",
 			Groups: []string{"resmgrs", "devs"},
 			Scope:  scope(t, "applied-permissions/groups:resmgrs"),
 		}, true},
-		{"a groups scope drops an unnamed group's", Subject{
+		{"a groups scope drops an unnamed group's", accessapi.Subject{
 			Name: "gil", Groups: []string{"resmgrs", "devs"}, Scope: scope(t, "applied-permissions/groups:devs"),
 		}, false},
-		{"resource entries keep no role", Subject{
+		{"resource entries keep no role", accessapi.Subject{
 			Name: "rita", Scope: scope(t, "artifact:libs-local:r"),
 		}, false},
-		{"a system scope keeps no role", Subject{
+		{"a system scope keeps no role", accessapi.Subject{
 			Name: "rita", Scope: scope(t, "system:permissions:r"),
 		}, false},
-		{"a user that is not stored", Subject{Name: "transient"}, false},
-		{"a group that is gone", Subject{Name: "bob", Groups: []string{"gone"}}, false},
+		{"a user that is not stored", accessapi.Subject{Name: "transient"}, false},
+		{"a group that is gone", accessapi.Subject{Name: "bob", Groups: []string{"gone"}}, false},
 	} {
 		d, err := New(ctx, src, c.sub)
 		if err != nil {
@@ -741,7 +744,7 @@ func TestUnitManagesResources(t *testing.T) {
 			t.Errorf("%s: %v, %v; want %v", c.name, got, err, c.expected)
 		}
 	}
-	d, err := New(ctx, src, Subject{Name: "bob", Groups: []string{"devs"}})
+	d, err := New(ctx, src, accessapi.Subject{Name: "bob", Groups: []string{"devs"}})
 	if err != nil {
 		t.Fatal(err)
 	}

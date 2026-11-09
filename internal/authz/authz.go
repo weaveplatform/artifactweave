@@ -14,15 +14,18 @@ import (
 	"slices"
 	"strings"
 
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/kernel/antpath"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Sources is what a Decider reads once per request.
 type Sources struct {
-	Permissions store.PermissionStore
-	Groups      store.GroupStore
+	Permissions port.PermissionStore
+	Groups      port.GroupStore
 	// AnonymousEnabled is the security.anonymous_access setting; the
 	// anonymous user's grants apply only while it is on.
 	AnonymousEnabled bool
@@ -32,7 +35,7 @@ type rule struct {
 	target  string
 	include []antpath.Pattern
 	exclude []antpath.Pattern
-	actions types.Actions
+	actions accessapi.Actions
 }
 
 // Decider answers permission questions for one subject from one snapshot
@@ -43,16 +46,16 @@ type Decider struct {
 	// under a token scoped to resources while losing admin endpoints.
 	isAdmin        bool
 	hasEveryAction bool
-	rules          map[types.ResourceType][]rule
+	rules          map[accessapi.ResourceType][]rule
 	// hasAppliedPermissions is false when a token scope grants no applied permissions
 	// (resource scopes only), so only its artifact entries can grant.
 	hasAppliedPermissions bool
 	// filter, when set, limits artifact actions to what the scope's
 	// artifact entries allow; builds, when set, limits build actions to
 	// what its build entries allow.
-	filter []types.ScopeEntry
-	builds []types.ScopeEntry
-	scope  *types.Scope
+	filter []kernel.ScopeEntry
+	builds []kernel.ScopeEntry
+	scope  *kernel.Scope
 	// user and groups are the identities the subject's grants are read
 	// for, after a token scope narrowed them: user is empty when the scope
 	// does not act as the user, and groups are those it acts through.
@@ -66,7 +69,7 @@ type Decider struct {
 }
 
 // New reads the permissions that apply to s and returns its Decider.
-func New(ctx context.Context, src Sources, s Subject) (*Decider, error) {
+func New(ctx context.Context, src Sources, s accessapi.Subject) (*Decider, error) {
 	if s.Anonymous && !src.AnonymousEnabled {
 		return &Decider{}, nil
 	}
@@ -74,7 +77,7 @@ func New(ctx context.Context, src Sources, s Subject) (*Decider, error) {
 	d := &Decider{
 		hasAppliedPermissions: sc.hasAppliedPermissions,
 		scope:                 s.Scope,
-		rules:                 map[types.ResourceType][]rule{},
+		rules:                 map[accessapi.ResourceType][]rule{},
 		self:                  s.Name,
 		member:                slices.Clone(s.Groups),
 	}
@@ -83,7 +86,7 @@ func New(ctx context.Context, src Sources, s Subject) (*Decider, error) {
 		if d.filter == nil {
 			// Resource entries alone, none of them for artifacts: a build
 			// or repo scope reaches no artifact.
-			d.filter = []types.ScopeEntry{}
+			d.filter = []kernel.ScopeEntry{}
 		}
 	}
 	d.builds = sc.build
@@ -136,25 +139,25 @@ func (d *Decider) Groups() []string { return slices.Clone(d.groups) }
 // token scope with repo entries sees exactly the repositories they name.
 // Otherwise the subject sees a repository it may read anywhere in, and every
 // repository through the system:info:r scope.
-func (d *Decider) IsRepoVisible(repo Repo) bool {
+func (d *Decider) IsRepoVisible(repo accessapi.Repo) bool {
 	if d.isAdmin {
 		return true
 	}
 	if d.scope != nil {
 		for _, e := range d.scope.Entries {
-			if e.Kind == types.ScopeRepo {
+			if e.Kind == kernel.ScopeRepo {
 				return d.RepoConfig(repo.Key)
 			}
 		}
 	}
-	return d.AllowsFolder(types.ResourceArtifact, repo, "", types.ActionRead) ||
-		d.System("info", types.ScopeRead)
+	return d.AllowsFolder(accessapi.ResourceArtifact, repo, "", accessapi.ActionRead) ||
+		d.System("info", kernel.ScopeRead)
 }
 
 // Holds reports whether g grants every action in want to the subject,
 // directly or through a group it acts as. It answers questions about a
 // permission document itself (who may manage it), not about content.
-func (d *Decider) Holds(g types.Grants, want types.Actions) bool {
+func (d *Decider) Holds(g model.Grants, want accessapi.Actions) bool {
 	return heldBy(g, d.user, d.groups).Has(want)
 }
 
@@ -165,15 +168,15 @@ func (d *Decider) Holds(g types.Grants, want types.Actions) bool {
 // could hand out rights it lacks, or appoint and remove other managers
 // (decision 0006). Anyone else may change none, so a holder of MANAGE in
 // one section changes nothing in another.
-func (d *Decider) Grantable(g types.Grants) types.Actions {
+func (d *Decider) Grantable(g model.Grants) accessapi.Actions {
 	if d.isAdmin {
 		return allActions
 	}
 	held := heldBy(g, d.user, d.groups)
-	if !held.Has(types.ActionManage) {
+	if !held.Has(accessapi.ActionManage) {
 		return 0
 	}
-	return held &^ types.ActionManage
+	return held &^ accessapi.ActionManage
 }
 
 // Self returns the user the subject is and the groups it belongs to or acts
@@ -189,12 +192,12 @@ func (d *Decider) Self() (user string, groups []string) {
 // resource. folder is true for a folder, which is also visible when a
 // permitted path lies below it.
 func (d *Decider) Actions(
-	rt types.ResourceType,
-	repo Repo,
+	rt accessapi.ResourceType,
+	repo accessapi.Repo,
 	path string,
 	folder bool,
-) types.Actions {
-	var have types.Actions
+) accessapi.Actions {
+	var have accessapi.Actions
 	if d.hasEveryAction {
 		have = allActions
 	} else {
@@ -205,11 +208,11 @@ func (d *Decider) Actions(
 		}
 	}
 	switch {
-	case rt == types.ResourceArtifact && d.filter != nil:
+	case rt == accessapi.ResourceArtifact && d.filter != nil:
 		have &= scopeActions(d.filter, repo, path, folder)
-	case rt == types.ResourceBuild && d.builds != nil:
+	case rt == accessapi.ResourceBuild && d.builds != nil:
 		have &= scopeActions(d.builds, repo, path, folder)
-	case rt != types.ResourceArtifact && !d.hasAppliedPermissions:
+	case rt != accessapi.ResourceArtifact && !d.hasAppliedPermissions:
 		have = 0
 	}
 	return have
@@ -217,16 +220,21 @@ func (d *Decider) Actions(
 
 // Allows reports whether the subject holds every action in want on a file
 // at path.
-func (d *Decider) Allows(rt types.ResourceType, repo Repo, path string, want types.Actions) bool {
+func (d *Decider) Allows(
+	rt accessapi.ResourceType,
+	repo accessapi.Repo,
+	path string,
+	want accessapi.Actions,
+) bool {
 	return want != 0 && d.Actions(rt, repo, path, false).Has(want)
 }
 
 // AllowsFolder is Allows for a folder.
 func (d *Decider) AllowsFolder(
-	rt types.ResourceType,
-	repo Repo,
+	rt accessapi.ResourceType,
+	repo accessapi.Repo,
 	path string,
-	want types.Actions,
+	want accessapi.Actions,
 ) bool {
 	return want != 0 && d.Actions(rt, repo, path, true).Has(want)
 }
@@ -241,11 +249,11 @@ func (d *Decider) RepoConfig(key string) bool {
 	}
 	var named bool
 	for _, e := range d.scope.Entries {
-		if e.Kind != types.ScopeRepo {
+		if e.Kind != kernel.ScopeRepo {
 			continue
 		}
 		named = true
-		if (e.Target == "*" || e.Target == key) && e.Actions.Covers(types.ScopeRead) {
+		if (e.Target == "*" || e.Target == key) && e.Actions.Covers(kernel.ScopeRead) {
 			return true
 		}
 	}
@@ -255,7 +263,7 @@ func (d *Decider) RepoConfig(key string) bool {
 // System reports whether the subject may use a system capability (an area
 // such as "info", "metrics" or "identities"): administrators may; anyone
 // else only through a token's system scope covering the area and actions.
-func (d *Decider) System(area string, want types.ScopeActions) bool {
+func (d *Decider) System(area string, want kernel.ScopeActions) bool {
 	if d.isAdmin {
 		return true
 	}
@@ -263,7 +271,7 @@ func (d *Decider) System(area string, want types.ScopeActions) bool {
 		return false
 	}
 	for _, e := range d.scope.Entries {
-		if e.Kind == types.ScopeSystem && areaCovers(e.Target, area) && e.Actions.Covers(want) {
+		if e.Kind == kernel.ScopeSystem && areaCovers(e.Target, area) && e.Actions.Covers(want) {
 			return true
 		}
 	}
@@ -280,8 +288,8 @@ func (d *Decider) System(area string, want types.ScopeActions) bool {
 // ask.
 func (d *Decider) ManagesResources(
 	ctx context.Context,
-	users store.UserStore,
-	groups store.GroupStore,
+	users port.UserStore,
+	groups port.GroupStore,
 ) (bool, error) {
 	if !d.hasAppliedPermissions {
 		return false, nil
@@ -291,7 +299,7 @@ func (d *Decider) ManagesResources(
 		switch {
 		case err == nil && u.Roles.ResourcesManager:
 			return true, nil
-		case err != nil && !errors.Is(err, store.ErrNotFound):
+		case err != nil && !errors.Is(err, kernel.ErrNotFound):
 			// A transient user from an OIDC token is not stored; it has no
 			// flag of its own.
 			return false, fmt.Errorf("authz: user %s: %w", d.user, err)
@@ -299,7 +307,7 @@ func (d *Decider) ManagesResources(
 	}
 	for _, name := range d.groups {
 		g, err := groups.Get(ctx, name)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -312,8 +320,8 @@ func (d *Decider) ManagesResources(
 	return false, nil
 }
 
-const allActions = types.ActionRead | types.ActionAnnotate | types.ActionWrite |
-	types.ActionDelete | types.ActionManage | types.ActionScan | types.ActionExecute
+const allActions = accessapi.ActionRead | accessapi.ActionAnnotate | accessapi.ActionWrite |
+	accessapi.ActionDelete | accessapi.ActionManage | accessapi.ActionScan | accessapi.ActionExecute
 
 func (r rule) allows(path string, folder bool) bool {
 	for _, x := range r.exclude {
@@ -332,18 +340,18 @@ func (r rule) allows(path string, folder bool) bool {
 // covers reports whether a permission target names repo. A target naming a
 // repository that no longer exists simply never matches, as Artifactory
 // keeps such targets and ignores them.
-func covers(target string, repo Repo) bool {
+func covers(target string, repo accessapi.Repo) bool {
 	key, cached := types.ResolveRepoKey(repo.Key)
 	class := repo.Class
 	if cached {
 		class = "remote"
 	}
-	return types.MatchesRepository(target, key, class)
+	return model.MatchesRepository(target, key, class)
 }
 
 // TargetAllows reports whether a permission target's include and exclude
 // patterns admit path, a folder admitting what lies below it.
-func TargetAllows(t types.Target, path string, folder bool) bool {
+func TargetAllows(t model.Target, path string, folder bool) bool {
 	return rule{include: compileAll(t.Include, "**"), exclude: compileAll(t.Exclude, "")}.
 		allows(path, folder)
 }
@@ -363,8 +371,8 @@ func compileAll(patterns []string, fallback string) []antpath.Pattern {
 	return out
 }
 
-func heldBy(g types.Grants, user string, groups []string) types.Actions {
-	var a types.Actions
+func heldBy(g model.Grants, user string, groups []string) accessapi.Actions {
+	var a accessapi.Actions
 	if user != "" {
 		a = g.Users[user]
 	}
@@ -374,10 +382,10 @@ func heldBy(g types.Grants, user string, groups []string) types.Actions {
 	return a
 }
 
-func groupAdmin(ctx context.Context, gs store.GroupStore, groups []string) (bool, error) {
+func groupAdmin(ctx context.Context, gs port.GroupStore, groups []string) (bool, error) {
 	for _, name := range groups {
 		g, err := gs.Get(ctx, name)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			// A membership can outlive its group; it grants nothing.
 			continue
 		}
@@ -412,11 +420,11 @@ type scopeShape struct {
 	named             []string
 	canUseAllGroups   bool
 	hasArtifactFilter bool
-	artifact          []types.ScopeEntry
-	build             []types.ScopeEntry
+	artifact          []kernel.ScopeEntry
+	build             []kernel.ScopeEntry
 }
 
-func analyse(s *types.Scope) scopeShape {
+func analyse(s *kernel.Scope) scopeShape {
 	if s == nil {
 		return scopeShape{
 			canUseUserGrants:      true,
@@ -429,20 +437,20 @@ func analyse(s *types.Scope) scopeShape {
 	var applied bool
 	for _, e := range s.Entries {
 		switch e.Kind {
-		case types.ScopeUser:
+		case kernel.ScopeUser:
 			sh.canUseUserGrants, sh.canActAsAdmin, sh.canUseAllGroups, applied = true, true, true, true
-		case types.ScopeAdmin:
+		case kernel.ScopeAdmin:
 			sh.canUseUserGrants, sh.canActAsAdmin, sh.canUseAllGroups, applied = true, true, true, true
 			sh.isAdmin = true
-		case types.ScopeGroups:
+		case kernel.ScopeGroups:
 			sh.named = append(sh.named, e.Names...)
 			applied = true
-		case types.ScopeRoles:
+		case kernel.ScopeRoles:
 			// Project roles are P11; a roles scope grants nothing yet.
 			applied = true
-		case types.ScopeArtifact:
+		case kernel.ScopeArtifact:
 			sh.artifact = append(sh.artifact, e)
-		case types.ScopeBuild:
+		case kernel.ScopeBuild:
 			sh.build = append(sh.build, e)
 		}
 	}
@@ -476,23 +484,23 @@ func (sh scopeShape) groups(member []string) []string {
 }
 
 var scopeLetterActions = []struct {
-	scope   types.ScopeActions
-	actions types.Actions
+	scope   kernel.ScopeActions
+	actions accessapi.Actions
 }{
-	{types.ScopeRead, types.ActionRead},
-	{types.ScopeWrite, types.ActionWrite},
-	{types.ScopeDelete, types.ActionDelete},
-	{types.ScopeAnnotate, types.ActionAnnotate},
-	{types.ScopeExecute, types.ActionExecute},
-	{types.ScopeScan, types.ActionScan},
-	{types.ScopeManage, types.ActionManage},
+	{kernel.ScopeRead, accessapi.ActionRead},
+	{kernel.ScopeWrite, accessapi.ActionWrite},
+	{kernel.ScopeDelete, accessapi.ActionDelete},
+	{kernel.ScopeAnnotate, accessapi.ActionAnnotate},
+	{kernel.ScopeExecute, accessapi.ActionExecute},
+	{kernel.ScopeScan, accessapi.ActionScan},
+	{kernel.ScopeManage, accessapi.ActionManage},
 }
 
-func toActions(s types.ScopeActions) types.Actions {
-	if s.Covers(types.ScopeAll) {
+func toActions(s kernel.ScopeActions) accessapi.Actions {
+	if s.Covers(kernel.ScopeAll) {
 		return allActions
 	}
-	var a types.Actions
+	var a accessapi.Actions
 	for _, m := range scopeLetterActions {
 		if s&m.scope != 0 {
 			a |= m.actions
@@ -503,9 +511,14 @@ func toActions(s types.ScopeActions) types.Actions {
 
 // scopeActions is what a token's artifact or build entries allow at path in
 // repo.
-func scopeActions(entries []types.ScopeEntry, repo Repo, path string, folder bool) types.Actions {
+func scopeActions(
+	entries []kernel.ScopeEntry,
+	repo accessapi.Repo,
+	path string,
+	folder bool,
+) accessapi.Actions {
 	key, _ := types.ResolveRepoKey(repo.Key)
-	var a types.Actions
+	var a accessapi.Actions
 	for _, e := range entries {
 		if e.Target != "*" && e.Target != key {
 			continue

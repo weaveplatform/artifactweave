@@ -28,7 +28,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -555,7 +555,7 @@ func can(r *http.Request, c repo.Config, path string, want types.Actions) bool {
 	if d == nil {
 		return false
 	}
-	return d.Allows(types.ResourceArtifact, authz.Repo{
+	return d.Allows(types.ResourceArtifact, accessapi.Repo{
 		Key: c.Key, Class: string(c.Class),
 	}, path, want)
 }
@@ -603,7 +603,7 @@ func (k *Kit) CanFolder(r *http.Request, path string, want types.Actions) bool {
 		return false
 	}
 	c := RequestFrom(r).Repo
-	return d.AllowsFolder(types.ResourceArtifact, authz.Repo{
+	return d.AllowsFolder(types.ResourceArtifact, accessapi.Repo{
 		Key: c.Key, Class: string(c.Class),
 	}, path, want)
 }

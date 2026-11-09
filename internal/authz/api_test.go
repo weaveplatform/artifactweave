@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // otherDecider is an access/api Decider that is not the evaluator, as a
@@ -20,15 +19,20 @@ func TestUnitAsAPIAndFromAPI(t *testing.T) {
 	d, err := New(
 		context.Background(),
 		Sources{Permissions: db.Permissions(), Groups: db.Groups()},
-		Subject{Name: "dev", Groups: []string{"devs"}},
+		accessapi.Subject{Name: "dev", Groups: []string{"devs"}},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	view := AsAPI(d)
-	libs := Repo{Key: "libs-local", Class: "local"}
-	if !view.Allows(types.ResourceArtifact, libs, "org/acme/a.jar", types.ActionRead) ||
-		view.Allows(types.ResourceArtifact, libs, "org/acme/secret/a.jar", types.ActionRead) {
+	libs := accessapi.Repo{Key: "libs-local", Class: "local"}
+	if !view.Allows(accessapi.ResourceArtifact, libs, "org/acme/a.jar", accessapi.ActionRead) ||
+		view.Allows(
+			accessapi.ResourceArtifact,
+			libs,
+			"org/acme/secret/a.jar",
+			accessapi.ActionRead,
+		) {
 		t.Error("the access/api view answers differently from the evaluator")
 	}
 	if back, ok := FromAPI(view); !ok || back != d {
