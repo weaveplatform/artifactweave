@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -163,6 +164,10 @@ type ItemStore interface {
 	// PutStats replaces the statistics, for import and federation sync.
 	PutStats(ctx context.Context, id int64, s types.ItemStats) error
 }
+
+// ErrDeleting reports a blob whose content garbage collection is
+// removing: it cannot be referenced until the removal has finished.
+var ErrDeleting = errors.New("store: blob is being deleted")
 
 // BlobIndex is the content-addressed blob index (the blobs table, and the
 // cold_blobs table for the archive tier). Rows are keyed by sha256 and

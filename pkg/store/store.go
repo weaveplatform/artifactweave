@@ -40,15 +40,7 @@
 //   - Research 15 section 4: docs/research/15-data-model.md
 package store
 
-import (
-	"errors"
-
-	"github.com/weaveplatform/artifactweave/migration/platform/tx"
-)
-
-// ErrDeleting reports a blob whose content garbage collection is
-// removing: it cannot be referenced until the removal has finished.
-var ErrDeleting = errors.New("store: blob is being deleted")
+import "github.com/weaveplatform/artifactweave/migration/platform/tx"
 
 // Store is the complete metadata persistence surface.
 type Store interface {
