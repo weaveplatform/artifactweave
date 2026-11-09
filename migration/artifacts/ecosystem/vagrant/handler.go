@@ -15,9 +15,15 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// Serves reports whether t is the Vagrant package type.
 func Serves(t repo.PackageType) bool { return t == repo.Vagrant }
 
 type (
+	// Handler is the Vagrant format's hooks: it admits a box only with a
+	// valid identity whose provider its metadata.json confirms, records the
+	// box's metadata as derived properties, and indexes each box as a
+	// version of its box_name from those properties alone. It embeds the
+	// generic hooks, so every path is classed as generic content is.
 	Handler    struct{ generic.Handler }
 	inspection struct {
 		sha string
@@ -25,6 +31,11 @@ type (
 	}
 )
 
+// Inspect reads and validates the stored box of a write to a .box path
+// before the write's transaction, and returns its metadata for Admit and
+// Deployed, so a box is read once per write. A checksum deploy and any
+// other path inspect nothing. An invalid box is refused with 400; one that
+// cannot be opened fails the write.
 func (Handler) Inspect(
 	ctx context.Context,
 	env format.Env,
@@ -38,6 +49,13 @@ func (Handler) Inspect(
 	return inspection{sha: w.Checksums.SHA256, box: b}, err
 }
 
+// Admit applies the generic deploy policy, wrapping its refusal, then
+// passes a checksum deploy. Any other write must be to a local or
+// federated repository (400), at a .box path (400), with exactly one valid
+// box_name, box_provider and box_version property (400), and of a valid
+// box (400) whose metadata.json names the provider box_provider does
+// (400). It reuses Inspect's reading when it covers the same content, and
+// reads the stored box itself otherwise.
 func (Handler) Admit(
 	ctx context.Context,
 	env format.Env,
@@ -77,6 +95,11 @@ func (Handler) Admit(
 	return w, nil
 }
 
+// Deployed records a stored box's provider, architecture and SHA-256 as
+// its derived vagrant.* properties, then rebuilds the package index from
+// every box's properties. Folders, a remote's cached items and files at
+// other paths change nothing; a box that no longer reads as valid fails
+// with 400.
 func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
 	if it.Folder || it.Cached || !strings.HasSuffix(it.FullPath(), ".box") {
 		return nil
@@ -90,11 +113,19 @@ func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it
 	}
 	return rebuild(ctx, env, c)
 }
+
+// Deleting does nothing: Deleted rebuilds the index once the box is gone.
 func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error { return nil }
+
+// Deleted rebuilds the package index from the properties of the boxes
+// left.
 func (Handler) Deleted(ctx context.Context, env format.Env, c repo.Config, _ []types.Item) error {
 	return rebuild(ctx, env, c)
 }
 
+// AdmitAnnotation refuses (400) a property change that sets or removes a
+// derived property (vagrant.provider, vagrant.architecture or
+// vagrant.sha256), which only the hooks write; any other change passes.
 func (Handler) AdmitAnnotation(
 	_ context.Context,
 	_ format.Env,
@@ -110,6 +141,10 @@ func (Handler) AdmitAnnotation(
 	return nil
 }
 
+// Annotated rebuilds the package index when a change to a stored box sets
+// or removes box_name, box_provider or box_version, which place the box in
+// the index. Folders, a remote's cached items and other changes leave the
+// index as it is.
 func (Handler) Annotated(
 	ctx context.Context,
 	env format.Env,
@@ -128,6 +163,10 @@ func (Handler) Annotated(
 	return nil
 }
 
+// Reindex reads every stored box at a .box path again and records its
+// derived properties, then rebuilds the package index from every box's
+// properties. A box that does not read as valid fails the reindex with
+// 400.
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	if err := eachItem(ctx, env.Store, c.Key, func(it types.Item) error {
 		b, err := readStored(ctx, env, it.Actual.SHA256)

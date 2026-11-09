@@ -1,4 +1,3 @@
-// Package vagrant validates Vagrant boxes and indexes their deployment properties.
 package vagrant
 
 import (
@@ -20,16 +19,26 @@ import (
 )
 
 const (
+	// MaxArchiveBytes bounds a box at 16 GiB compressed, and its content at
+	// 64 GiB expanded; a box's VM disk is streamed through the checks, never
+	// held in memory.
 	MaxArchiveBytes  int64 = 16 << 30
 	maxExpandedBytes int64 = 64 << 30
 	maxMetadataBytes       = 64 << 10
 	maxEntries             = 100000
-	PropName               = "box_name"
-	PropProvider           = "box_provider"
-	PropVersion            = "box_version"
-	propProvider           = "vagrant.provider"
-	propArchitecture       = "vagrant.architecture"
-	propDigest             = "vagrant.sha256"
+	// PropName is the property that names a box, <name> or
+	// <namespace>/<name>. The items keep this name, PropProvider's,
+	// PropVersion's and the derived vagrant.* names below, so they never
+	// change.
+	PropName = "box_name"
+	// PropProvider is the property that names a box's provider, which its
+	// metadata.json must confirm.
+	PropProvider = "box_provider"
+	// PropVersion is the property that holds a box's version.
+	PropVersion      = "box_version"
+	propProvider     = "vagrant.provider"
+	propArchitecture = "vagrant.architecture"
+	propDigest       = "vagrant.sha256"
 )
 
 var (
@@ -41,14 +50,24 @@ var (
 )
 
 type (
+	// Identity is a box's identity as its properties give it: the box_name,
+	// box_provider and box_version a client deploys it with.
 	Identity struct{ Name, Provider, Version string }
-	Box      struct {
+	// Box is what a box's root metadata.json says of it: the provider it
+	// runs on and, optionally, its architecture.
+	Box struct {
 		Provider     string `json:"provider"`
 		Architecture string `json:"architecture,omitempty"`
 	}
 )
 
+// ValidComponent reports whether s is one part of a box name, or a
+// provider or architecture: at most 128 letters, digits, dots, underscores
+// and hyphens, starting with a letter or digit.
 func ValidComponent(s string) bool { return len(s) <= 128 && component.MatchString(s) }
+
+// ValidName reports whether s is a box name: one valid component, or two
+// joined by a slash (<namespace>/<name>).
 func ValidName(s string) bool {
 	parts := strings.Split(s, "/")
 	if len(parts) > 2 {
@@ -62,6 +81,11 @@ func ValidName(s string) bool {
 	return true
 }
 
+// Properties returns the identity p gives a box and reports whether it is
+// complete and valid: exactly one value each for box_name, box_provider and
+// box_version, a valid name (ValidName) and provider (ValidComponent), and
+// a dotted version of at most 128 bytes with an optional hyphenated
+// pre-release.
 func Properties(p types.Properties) (Identity, bool) {
 	var id Identity
 	for key, dst := range map[string]*string{PropName: &id.Name, PropProvider: &id.Provider, PropVersion: &id.Version} {
@@ -74,6 +98,12 @@ func Properties(p types.Properties) (Identity, bool) {
 		versionPattern.MatchString(id.Version)
 }
 
+// Verified returns the identity and the recorded box that p gives a stored
+// box whose content has the SHA-256 sha, and reports whether they agree:
+// the identity is valid (Properties), the recorded vagrant.sha256 is sha,
+// the recorded vagrant.provider is box_provider, and any recorded
+// architecture is valid. The index and the catalog take a box only when
+// they do.
 func Verified(p types.Properties, sha string) (Identity, Box, bool) {
 	id, ok := Properties(p)
 	b := Box{Provider: single(p[propProvider]), Architecture: single(p[propArchitecture])}

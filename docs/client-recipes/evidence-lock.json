@@ -130,7 +130,7 @@
   "test/acceptance/features/vcs.feature": "23cfe54719f62a219e15e3a46db8e89433d2834b45b70765e1161e3e62f59d71",
   "test/acceptance/features/vcs_legacy.feature": "43b961e1f43b609a032493aaec299bdf6ace18d1aa8e8a28dc67aa8009058878",
   "test/acceptance/features/vcs_recipes.feature": "ee49c237f16c6edda9d02d3819ff74ec371e84c00fb62eb249139ba9a823c2a6",
-  "test/acceptance/gems_steps_test.go": "050fb5e061412527c6ac723401ffaeb2c5f5fd84361b56c871922f3f95c45862",
+  "test/acceptance/gems_steps_test.go": "95ca3d1b0cf43477a218a864ee3844c0c5ff56dbd7865246d44f4d340e99e219",
   "test/acceptance/gitlfs_steps_test.go": "4e8e9ee69de5b4048277cacd5d4b5fdd6f8bfbc8b6c87ea0105e26eee9472948",
   "test/acceptance/hex_steps_test.go": "3daa1890842bc40337d3fd32dcc0c4d48533b3ac96deba150b8f28e883efc21b",
   "test/acceptance/huggingface_steps_test.go": "ec0d3d56761c351183913869dbeb91f894d6771971a28a1fe33e173814a883e7",

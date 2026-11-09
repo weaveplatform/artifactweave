@@ -17,6 +17,9 @@ import (
 )
 
 const (
+	// MaxGemBytes bounds a gem at 256 MiB, however it arrives: a push, an
+	// item write or a remote's fetch. Its unpacked data may reach four
+	// times as much.
 	MaxGemBytes      = 256 << 20
 	maxMetadataBytes = 2 << 20
 )
@@ -30,19 +33,30 @@ var (
 
 func invalidGem(detail string) error { return fmt.Errorf("%w: %s", errInvalidGem, detail) }
 
+// ValidName reports whether name is a gem name: 1 to 128 letters, digits,
+// dots, underscores and hyphens, starting with a letter or digit, with no
+// "..".
 func ValidName(name string) bool {
 	return namePattern.MatchString(name) && !strings.Contains(name, "..")
 }
 
+// ValidVersion reports whether version is a gem version of at most 128
+// bytes: digits, then any dot-separated runs of letters and digits.
 func ValidVersion(version string) bool {
 	return len(version) <= 128 && canonicalVersionPattern.MatchString(version)
 }
 
+// Dependency is one runtime dependency of a gem: the gem it names and its
+// requirements, joined with ", " (">= 1.0, < 2").
 type Dependency struct {
 	Name        string `json:"name"`
 	Requirement string `json:"requirements"`
 }
 
+// Package is what a gem's gemspec and archive say of it: its name, version
+// and platform (ruby when the gemspec names none), the descriptive fields
+// the indexes serve, its ruby and rubygems requirements and runtime
+// dependencies, and the gem's path and SHA-256.
 type Package struct {
 	Name         string       `json:"name"`
 	Version      string       `json:"version"`
@@ -59,6 +73,9 @@ type Package struct {
 	SHA256       string       `json:"sha256"`
 }
 
+// Filename is the file name p's gem is stored under,
+// <name>-<version>[-<platform>].gem, with no platform when it is ruby or
+// empty.
 func Filename(p Package) string {
 	name := p.Name + "-" + p.Version
 	if p.Platform != "" && p.Platform != "ruby" {
@@ -67,6 +84,9 @@ func Filename(p Package) string {
 	return name + ".gem"
 }
 
+// ValidPath reports whether path is a gem's path, gems/<base>.gem one
+// level below gems/, where base is 1 to 128 letters, digits, dots,
+// underscores and hyphens, starting with a letter or digit, with no "..".
 func ValidPath(path string) bool {
 	if !strings.HasPrefix(path, "gems/") || strings.Count(path, "/") != 1 ||
 		!strings.HasSuffix(path, ".gem") {
@@ -76,6 +96,19 @@ func ValidPath(path string) bool {
 	return namePattern.MatchString(base) && !strings.Contains(base, "..")
 }
 
+// Read reads a whole gem of size bytes, at most MaxGemBytes, from r and
+// returns what its gemspec says, with the gem's SHA-256. The gem must be a
+// TAR holding metadata.gz and data.tar.gz, and optionally
+// checksums.yaml.gz, each a regular file once. The data must hold only
+// regular files, folders and symlinks, with no absolute or traversing path
+// or link target, of at most four times MaxGemBytes unpacked; the
+// checksums, when present, must give the SHA-256 of both other parts and
+// nothing else; and the gemspec, at most 2 MiB unpacked, must be a YAML
+// Gem::Specification whose name, version, platform and runtime dependency
+// names are valid and, when path is not empty, give path. Development
+// dependencies are dropped. A refusal names its fault; when ctx ends, the
+// error wraps ctx's.
+//
 //nolint:gocyclo // Bounded archive admission validates every tar, gzip, YAML and identity boundary.
 func Read(ctx context.Context, r io.Reader, size int64, path string) (Package, error) {
 	if size <= 0 || size > MaxGemBytes || (path != "" && !ValidPath(path)) {

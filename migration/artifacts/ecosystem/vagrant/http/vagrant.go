@@ -1,4 +1,3 @@
-// Package vagranthttp serves the native Vagrant box catalog at Artifactory's prefix.
 package vagranthttp
 
 import (
@@ -23,6 +22,12 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// Protocol returns the Vagrant box catalog for the router kit, under
+// /artifactory/api/vagrant/{repoKey}: GET and HEAD of a box name, <name> or
+// <namespace>/<name>, optionally with matrix parameters that filter the
+// boxes by their properties, answer the box's catalog JSON. Only local and
+// federated repositories have a source; a remote or virtual repository
+// answers 501.
 func Protocol() pkgroute.Protocol {
 	return pkgroute.Protocol{
 		Name:         "vagrant",

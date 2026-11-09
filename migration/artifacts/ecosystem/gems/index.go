@@ -10,6 +10,8 @@ import (
 	"strings"
 )
 
+// MaxIndexBytes bounds a compact index file, versions or info/<name>, at
+// 32 MiB, whether a parser reads it or a remote fetches it.
 const MaxIndexBytes = 32 << 20
 
 var errInvalidIndex = errors.New("gems: invalid rubygems index")
@@ -98,6 +100,8 @@ func canonicalVersionSegments(parts []string) []string {
 	return append(out, trimZeroes(parts[firstText:])...)
 }
 
+// CompactNames renders the compact index's names file: "---", then each
+// distinct gem name in packages, one a line, sorted.
 func CompactNames(packages []Package) []byte {
 	names := map[string]bool{}
 	for _, p := range packages {
@@ -111,6 +115,13 @@ func CompactNames(packages []Package) []byte {
 	return []byte("---\n" + strings.Join(keys, "\n") + "\n")
 }
 
+// CompactInfo renders the compact index's info file for the gem name from
+// the rows of packages that name it: "---", then a line per version and
+// platform, ordered by CompareVersions and then platform. A line is the
+// version token (VersionToken), the runtime dependencies as
+// name:requirements, then "|" and the gem's SHA-256 as checksum, with any
+// ruby and rubygems requirements; several requirements of one field are
+// joined with "&".
 func CompactInfo(name string, packages []Package) []byte {
 	var rows []Package
 	for _, p := range packages {
@@ -156,6 +167,11 @@ func CompactInfo(name string, packages []Package) []byte {
 	return []byte(b.String())
 }
 
+// CompactVersions renders the compact index's versions file: a fixed
+// created_at line, "---", then a line per gem name, sorted, of its
+// distinct version tokens (VersionToken), sorted, and the MD5 of its info
+// file (InfoMD5 of CompactInfo), which a client compares with the info
+// file it fetches.
 func CompactVersions(packages []Package) []byte {
 	names := map[string][]string{}
 	for _, p := range packages {
@@ -192,6 +208,8 @@ type CompactVersionEntry struct {
 	Versions map[string]bool
 }
 
+// VersionToken is p's token in the compact index: its version, followed by
+// -<platform> unless the platform is ruby or empty.
 func VersionToken(p Package) string {
 	if p.Platform != "" && p.Platform != "ruby" {
 		return p.Version + "-" + p.Platform
@@ -253,6 +271,14 @@ func ParseCompactVersions(b []byte) (map[string]CompactVersionEntry, error) {
 	return out, nil
 }
 
+// ParseCompactInfo parses an upstream's info file for the gem name, of at
+// most MaxIndexBytes, taking only complete, well-formed rows: a valid
+// version and platform, dependencies on valid names, a 64-digit
+// hexadecimal checksum, and no field after "|" but checksum, ruby,
+// rubygems and created_at. Each row becomes a Package with its Path set; a
+// row whose gem path is invalid or repeats an earlier one fails the whole
+// file.
+//
 //nolint:gocyclo // A single bounded row parser validates each wire field before returning packages.
 func ParseCompactInfo(name string, b []byte) ([]Package, error) {
 	if !ValidName(name) || len(b) > MaxIndexBytes || len(b) < 4 ||

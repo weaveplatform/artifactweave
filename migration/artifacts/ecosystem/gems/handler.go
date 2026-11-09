@@ -16,6 +16,12 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// Handler is the RubyGems format's hooks: it admits a gem only when it
+// reads as valid and its identity gives its path, keeps the generated
+// index paths out of local and federated repositories, and indexes each
+// stored gem as a version of its name. It embeds the generic hooks for
+// deletes, which need nothing more: the item service drops a deleted gem's
+// link and prunes a version left without files.
 type Handler struct{ generic.Handler }
 
 type inspection struct {
@@ -23,8 +29,15 @@ type inspection struct {
 	pkg       Package
 }
 
+// Serves reports whether t is the RubyGems package type.
 func Serves(t repo.PackageType) bool { return t == repo.Gems }
 
+// Inspect reads and validates the stored gem of a write to a .gem path
+// before the write's transaction, so Admit need not read it again. A
+// checksum deploy and any other path inspect nothing. A write without
+// content, or of a gem that does not read as valid or whose identity does
+// not give its path, is refused with 400; a gem that cannot be opened
+// fails the write.
 func (Handler) Inspect(
 	ctx context.Context,
 	env format.Env,
@@ -41,6 +54,14 @@ func (Handler) Inspect(
 	return inspection{sha: w.Checksums.SHA256, path: w.Path, pkg: p}, nil
 }
 
+// Admit applies the generic deploy policy, wrapping its refusal, then
+// passes a checksum deploy. In a local or federated repository, a write to
+// a generated index path (DerivedPath) is refused (409), since the protocol
+// renders those from the stored gems. Any other write passes unless it is
+// to a .gem path, which must be a valid gem path (400) holding a valid gem
+// whose identity gives that path (400). It reuses Inspect's reading when it
+// covers the same path and content, and reads the stored gem itself
+// otherwise.
 func (Handler) Admit(
 	ctx context.Context,
 	env format.Env,
@@ -72,6 +93,11 @@ func (Handler) Admit(
 	return w, nil
 }
 
+// Deployed links a stored gem at a valid gem path (ValidPath) to its
+// version in the package index, creating the package and version when they
+// are new, with the name and version read from the stored gem. Folders and
+// files at other paths change nothing; a gem that no longer reads as valid
+// fails with 400.
 func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
 	if it.Folder || !ValidPath(it.FullPath()) {
 		return nil
@@ -88,6 +114,11 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 	return nil
 }
 
+// Reindex rebuilds the package index from the stored gems Files finds: a
+// package per gem name, with a version per version string whose files are
+// its gems for every platform and whose creation time is the earliest of
+// theirs. Files at other paths are skipped, but a gem that does not read
+// as valid fails the reindex with 400.
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	items, err := Files(ctx, env.Store, c)
 	if err != nil {
@@ -137,6 +168,9 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 	return pkgindex.Reconcile(ctx, env.Store, c, wanted) //nolint:wrapcheck
 }
 
+// Classify classes the generated index paths (DerivedPath) as derived, so
+// replication and federation skip them and each side renders its own, and
+// every other path as unique content.
 func (Handler) Classify(_ repo.Config, p string) format.Class {
 	if DerivedPath(p) {
 		return format.ClassDerived
@@ -144,6 +178,9 @@ func (Handler) Classify(_ repo.Config, p string) format.Class {
 	return format.ClassUnique
 }
 
+// DerivedPath reports whether p is one of the index paths the protocol
+// generates: names, versions, specs.4.8.gz, latest_specs.4.8.gz,
+// prerelease_specs.4.8.gz, or a path under info/ or quick/Marshal.4.8/.
 func DerivedPath(p string) bool {
 	return p == "names" || p == "versions" || p == "specs.4.8.gz" || p == "latest_specs.4.8.gz" ||
 		p == "prerelease_specs.4.8.gz" ||
@@ -167,6 +204,9 @@ func stored(ctx context.Context, blobs format.Blobs, sha, path string) (Package,
 	return p, nil
 }
 
+// Files lists every file, gem or not, in the tree the package index reads
+// (pkgindex.Stored: a remote repository's cache, and any other
+// repository's own items), through one AQL search of the store.
 func Files(ctx context.Context, st store.Store, c repo.Config) ([]types.Item, error) {
 	hits, err := st.Items().Search(ctx, &aql.Query{Criteria: aql.And{
 		aql.RepoSet{Refs: []aql.RepoRef{pkgindex.Stored(c)}},

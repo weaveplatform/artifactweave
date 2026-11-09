@@ -1,4 +1,3 @@
-// Package gemshttp serves RubyGems and Bundler's native repository protocol.
 package gemshttp
 
 import (
@@ -30,6 +29,9 @@ import (
 const maxPackages = 10000
 
 type (
+	// Options configures the RubyGems protocol. RemoteSources serves remote
+	// repositories and fetches through them; nil leaves the remote class
+	// without a source, so a remote repository answers 501.
 	Options       struct{ RemoteSources *source.Service }
 	virtualSource struct{}
 )
@@ -43,6 +45,21 @@ func (virtualSource) Item(
 	return pkgroute.Found{}, source.ErrUnsupported
 }
 
+// Protocol returns the RubyGems and Bundler protocol for the router kit,
+// under /artifactory/api/gems/{repoKey}: POST of a gem to api/v1/gems to
+// push it and DELETE of api/v1/yank or api/v1/gems/yank to yank one, on
+// local and federated repositories; and GET and HEAD of a gem
+// (gems/<file>.gem), the compact index (names, versions and info/<name>),
+// the Marshal indexes (specs.4.8.gz, latest_specs.4.8.gz,
+// prerelease_specs.4.8.gz and quick/Marshal.4.8/<file>.gemspec.rz) and the
+// api/v1 gem, versions and search JSON. Local and federated repositories
+// are served from their stored gems, virtual ones from their members in
+// order, and remote ones through o.RemoteSources when it is set; a class
+// without a source answers 501. The virtual class's source supports no
+// single-item lookup, because the protocol reads a virtual repository's
+// members itself. {repoKey}/reindex and {repoKey}/updateIndex are
+// reserved, so neither is read as a package path; the server serves
+// JFrog's reindex operation beside the protocol.
 func Protocol(o Options) pkgroute.Protocol {
 	sources := map[repo.Class]pkgroute.Source{
 		repo.Local:     pkgroute.Local{},

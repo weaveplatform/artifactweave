@@ -173,6 +173,11 @@ func requirementPairs(s string) []any {
 	return out
 }
 
+// Marshal encodes v in Ruby's Marshal 4.8 format, which the legacy
+// indexes carry. It supports nil, bool, int, string, []any, []string,
+// map[string]string and the Ruby objects this package builds
+// (Gem::Version, Gem::Requirement, Gem::Dependency and
+// Gem::Specification), and panics on any other type.
 func Marshal(
 	v any,
 ) []byte {
@@ -182,6 +187,8 @@ func Marshal(
 	return m.Bytes()
 }
 
+// GzipMarshal returns Marshal(v) compressed with gzip, the form of the
+// specs.4.8.gz indexes.
 func GzipMarshal(v any) ([]byte, error) {
 	var b bytes.Buffer
 	z := gzip.NewWriter(&b)
@@ -194,6 +201,12 @@ func GzipMarshal(v any) ([]byte, error) {
 	return b.Bytes(), nil
 }
 
+// Specs renders a legacy specs index of packages as gzip-compressed
+// Marshal 4.8: a [name, version, platform] row for each release, or for
+// each prerelease (a version holding a letter) when prerelease is true.
+// When latest is true, only the newest of each name and platform is kept.
+// The protocol serves specs.4.8.gz with neither, latest_specs.4.8.gz with
+// latest and prerelease_specs.4.8.gz with prerelease.
 func Specs(packages []Package, latest, prerelease bool) ([]byte, error) {
 	rows := make([]any, 0, len(packages))
 	for _, p := range packages {
@@ -229,6 +242,8 @@ func Specs(packages []Package, latest, prerelease bool) ([]byte, error) {
 	return GzipMarshal(rows)
 }
 
+// QuickSpec renders p as a quick/Marshal.4.8/<file>.gemspec.rz body: a
+// Marshal 4.8 Gem::Specification dated at, compressed with zlib.
 func QuickSpec(p Package, at time.Time) ([]byte, error) {
 	var b bytes.Buffer
 	z := zlib.NewWriter(&b)
