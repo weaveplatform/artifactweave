@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // ErrInvalidSubject reports a token subject that is not an Access subject.
@@ -43,7 +45,7 @@ const TokenPurposeEncryptedPassword = "encrypted_password"
 type Token struct {
 	ID              string
 	Subject         string
-	Scope           Scope
+	Scope           kernel.Scope
 	Audience        string
 	Description     string
 	ProjectKey      string
@@ -62,10 +64,10 @@ type Token struct {
 	// shown again; stores seal it. Empty for an ordinary token.
 	Secret string `json:"-"`
 	// Identity is how the subject resolves to a user.
-	Identity TokenIdentity
+	Identity kernel.TokenIdentity
 	// Registry is set on a registry token alone, which the Docker token
 	// endpoint issues and nothing stores (decision 0005): what it grants.
-	Registry *RegistryAccess `json:"-"`
+	Registry *kernel.RegistryAccess `json:"-"`
 	// Parent is, on a registry token obtained with a token, the stored
 	// token it descends from; revoking that token revokes it.
 	Parent string `json:"-"`

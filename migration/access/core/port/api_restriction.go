@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // APIRestriction is an administrator's temporary restriction of one managed
@@ -20,7 +22,7 @@ func (r APIRestriction) Validate() error {
 		len(
 			r.Reason,
 		) > 1024 || r.Changed.IsZero() || !r.Until.IsZero() && r.Until.UnixMicro() <= r.Changed.UnixMicro() {
-		return fmt.Errorf("invalid API restriction: %w", ErrInvalid)
+		return fmt.Errorf("invalid API restriction: %w", kernel.ErrInvalid)
 	}
 	return nil
 }
@@ -34,5 +36,5 @@ type APIRestrictionStore interface {
 	// The user must exist. The returned Sequence is assigned by the store.
 	Put(ctx context.Context, restriction APIRestriction) (APIRestriction, error)
 	// History pages newest first by Sequence; an empty user includes all users.
-	History(ctx context.Context, user string, page Page) ([]APIRestriction, string, error)
+	History(ctx context.Context, user string, page kernel.Page) ([]APIRestriction, string, error)
 }

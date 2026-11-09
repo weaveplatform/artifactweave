@@ -1,6 +1,9 @@
 package port
 
-import "github.com/weaveplatform/artifactweave/pkg/types"
+import (
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+)
 
 // IdentityFilter narrows a name-ordered identity listing before pagination.
 // NameContains is a literal, Unicode-lowercased substring, not a SQL pattern.
@@ -14,14 +17,14 @@ type IdentityFilter struct {
 
 // IdentityResource selects a permission resource and its exact target name.
 type IdentityResource struct {
-	Type types.ResourceType
+	Type api.ResourceType
 	Name string
 }
 
 // UserFilter adds account status and effective administrator selection.
 type UserFilter struct {
 	IdentityFilter
-	Status     types.UserStatus
+	Status     model.UserStatus
 	OnlyAdmins bool
 }
 
@@ -30,5 +33,5 @@ type UserFilter struct {
 type UserSummary struct {
 	Name   string
 	Realm  string
-	Status types.UserStatus
+	Status model.UserStatus
 }

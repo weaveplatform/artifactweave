@@ -8,35 +8,35 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func b(v bool) *bool { return &v }
 
 func TestUnitUserLegacyRoundTrip(t *testing.T) {
-	in := types.User{
+	in := model.User{
 		Name:             "davids",
 		Email:            "davids@example.com",
 		Admin:            true,
 		ProfileUpdatable: true,
 		Realm:            "ldap",
-		Status:           types.UserLocked,
-		MFA:              types.MFAEnabled,
+		Status:           model.UserLocked,
+		MFA:              model.MFAEnabled,
 		Groups:           []string{"readers"},
 		LastLoggedIn:     time.Date(2026, 1, 2, 3, 4, 5, 6_000_000, time.UTC),
-		Roles: types.RoleFlags{
+		Roles: model.RoleFlags{
 			PolicyViewer:   true,
 			WatchManager:   true,
 			ReportsManager: true,
 			PolicyManager:  true,
 		},
 	}
-	w := types.UserToLegacy(in)
+	w := model.UserToLegacy(in)
 	if w.LastLoggedIn != "2026-01-02T03:04:05.006Z" || w.Status != "LOCKED" {
 		t.Fatalf("legacy rendering: %+v", w)
 	}
-	out, err := types.UserFromLegacy(w)
+	out, err := model.UserFromLegacy(w)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,67 +46,67 @@ func TestUnitUserLegacyRoundTrip(t *testing.T) {
 }
 
 func TestUnitUserFromLegacyDefaults(t *testing.T) {
-	u, err := types.UserFromLegacy(wire.LegacyUser{Name: "n", Email: "e", Password: "secret"})
+	u, err := model.UserFromLegacy(wire.LegacyUser{Name: "n", Email: "e", Password: "secret"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := types.User{
-		Name: "n", Email: "e", ProfileUpdatable: true, Realm: types.RealmInternal,
-		Status: types.UserEnabled, MFA: types.MFANone,
+	want := model.User{
+		Name: "n", Email: "e", ProfileUpdatable: true, Realm: model.RealmInternal,
+		Status: model.UserEnabled, MFA: model.MFANone,
 	}
 	if diff := cmp.Diff(want, u); diff != "" {
 		t.Error(diff)
 	}
-	if _, err := types.UserFromLegacy(
+	if _, err := model.UserFromLegacy(
 		wire.LegacyUser{LastLoggedIn: "yesterday"},
 	); !errors.Is(
 		err,
-		types.ErrInvalidTimestamp,
+		model.ErrInvalidTimestamp,
 	) {
 		t.Errorf("want ErrInvalidTimestamp, got %v", err)
 	}
-	if _, err := types.UserFromLegacy(
+	if _, err := model.UserFromLegacy(
 		wire.LegacyUser{Status: "ASLEEP"},
 	); !errors.Is(
 		err,
-		types.ErrInvalidStatus,
+		model.ErrInvalidStatus,
 	) {
 		t.Errorf("want ErrInvalidStatus, got %v", err)
 	}
 }
 
 func TestUnitLegacyStatusMapping(t *testing.T) {
-	for status, want := range map[types.UserStatus]string{
-		types.UserEnabled: "ENABLED", types.UserDisabled: "DISABLED", types.UserLocked: "LOCKED",
-		types.UserInvited: "DISABLED", "": "",
+	for status, want := range map[model.UserStatus]string{
+		model.UserEnabled: "ENABLED", model.UserDisabled: "DISABLED", model.UserLocked: "LOCKED",
+		model.UserInvited: "DISABLED", "": "",
 	} {
-		if got := types.UserToLegacy(types.User{Status: status}).Status; got != want {
+		if got := model.UserToLegacy(model.User{Status: status}).Status; got != want {
 			t.Errorf("%q -> %q, want %q", status, got, want)
 		}
 	}
 }
 
 func TestUnitUserAccessRoundTrip(t *testing.T) {
-	in := types.User{
+	in := model.User{
 		Name:                     "alice",
 		Email:                    "a@example.com",
 		InternalPasswordDisabled: true,
 		DisableUIAccess:          true,
-		Realm:                    types.RealmInternal,
-		Status:                   types.UserInvited,
-		MFA:                      types.MFANone,
+		Realm:                    model.RealmInternal,
+		Status:                   model.UserInvited,
+		MFA:                      model.MFANone,
 		Groups:                   []string{"a", "b"},
 		LastLoggedIn:             time.Date(2026, 5, 6, 7, 8, 9, 123456789, time.UTC),
-		Roles: types.RoleFlags{
+		Roles: model.RoleFlags{
 			WatchManager: true, PolicyViewer: true, PolicyManager: true, ReportsManager: true,
 			ResourcesManager: true, ManageWebhook: true, PlatformAuditor: true,
 		},
 	}
-	w := types.UserToAccess(in, true)
+	w := model.UserToAccess(in, true)
 	if w.EffectiveAdmin == nil || !*w.EffectiveAdmin || w.Status != "invited" {
 		t.Fatalf("access rendering: %+v", w)
 	}
-	out, err := types.UserFromAccess(w)
+	out, err := model.UserFromAccess(w)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,19 +114,19 @@ func TestUnitUserAccessRoundTrip(t *testing.T) {
 		t.Errorf("round trip (-in +out):\n%s", diff)
 	}
 	bad := "x"
-	if _, err := types.UserFromAccess(
+	if _, err := model.UserFromAccess(
 		wire.AccessUser{LastLoggedIn: &bad},
 	); !errors.Is(
 		err,
-		types.ErrInvalidTimestamp,
+		model.ErrInvalidTimestamp,
 	) {
 		t.Errorf("want ErrInvalidTimestamp, got %v", err)
 	}
-	if _, err := types.UserFromAccess(
+	if _, err := model.UserFromAccess(
 		wire.AccessUser{Status: "gone"},
 	); !errors.Is(
 		err,
-		types.ErrInvalidStatus,
+		model.ErrInvalidStatus,
 	) {
 		t.Errorf("want ErrInvalidStatus, got %v", err)
 	}
@@ -138,7 +138,7 @@ func TestUnitGroupRoundTrips(t *testing.T) {
 		Realm: "ldap", RealmAttributes: "dn=x", UserNames: []string{"u1"},
 		WatchManager: b(true), PolicyManager: b(false), ReportsManager: b(true),
 	}
-	if diff := cmp.Diff(legacy, types.GroupToLegacy(types.GroupFromLegacy(legacy))); diff != "" {
+	if diff := cmp.Diff(legacy, model.GroupToLegacy(model.GroupFromLegacy(legacy))); diff != "" {
 		t.Errorf("legacy (-in +out):\n%s", diff)
 	}
 	access := wire.AccessGroup{
@@ -158,27 +158,27 @@ func TestUnitGroupRoundTrips(t *testing.T) {
 		ManageWebhook:   b(false),
 		Realm:           "internal",
 	}
-	if diff := cmp.Diff(access, types.GroupToAccess(types.GroupFromAccess(access))); diff != "" {
+	if diff := cmp.Diff(access, model.GroupToAccess(model.GroupFromAccess(access))); diff != "" {
 		t.Errorf("access (-in +out):\n%s", diff)
 	}
-	if g := types.GroupFromAccess(wire.AccessGroup{Name: "x"}); g.Realm != types.RealmInternal {
+	if g := model.GroupFromAccess(wire.AccessGroup{Name: "x"}); g.Realm != model.RealmInternal {
 		t.Errorf("default realm: %q", g.Realm)
 	}
 }
 
 func TestUnitEffectiveAdmin(t *testing.T) {
-	groups := []types.Group{{Name: "admins", AdminPrivileges: true}, {Name: "readers"}}
+	groups := []model.Group{{Name: "admins", AdminPrivileges: true}, {Name: "readers"}}
 	cases := []struct {
-		u    types.User
+		u    model.User
 		want bool
 	}{
-		{types.User{Admin: true}, true},
-		{types.User{Groups: []string{"admins"}}, true},
-		{types.User{Groups: []string{"readers"}}, false},
-		{types.User{}, false},
+		{model.User{Admin: true}, true},
+		{model.User{Groups: []string{"admins"}}, true},
+		{model.User{Groups: []string{"readers"}}, false},
+		{model.User{}, false},
 	}
 	for _, c := range cases {
-		if got := types.EffectiveAdmin(c.u, groups); got != c.want {
+		if got := model.EffectiveAdmin(c.u, groups); got != c.want {
 			t.Errorf("%+v = %v", c.u, got)
 		}
 	}
@@ -187,7 +187,7 @@ func TestUnitEffectiveAdmin(t *testing.T) {
 // A user who never logged in carries "last_logged_in": null in the Access v2
 // shape, as Artifactory answers since 7.98.7, and reads back as never.
 func TestUnitUserAccessNeverLoggedIn(t *testing.T) {
-	w := types.UserToAccess(types.User{Name: "bob", Status: types.UserEnabled}, false)
+	w := model.UserToAccess(model.User{Name: "bob", Status: model.UserEnabled}, false)
 	if w.LastLoggedIn != nil {
 		t.Fatalf("last_logged_in: %q", *w.LastLoggedIn)
 	}
@@ -202,7 +202,7 @@ func TestUnitUserAccessNeverLoggedIn(t *testing.T) {
 	if v, ok := doc["last_logged_in"]; !ok || v != nil {
 		t.Errorf("last_logged_in in %s", raw)
 	}
-	u, err := types.UserFromAccess(w)
+	u, err := model.UserFromAccess(w)
 	if err != nil || !u.LastLoggedIn.IsZero() {
 		t.Errorf("read back: %v %v", u.LastLoggedIn, err)
 	}

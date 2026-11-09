@@ -4,6 +4,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 )
 
 // GlobalRoleActions is the global role action vocabulary, in the order the
@@ -144,26 +146,26 @@ func BuiltinGlobalRole(name string) (Role, bool) {
 // roleActions maps the role actions that grant something in artifactweave
 // onto the permission model's actions.
 var roleActions = map[string]struct {
-	resource ResourceType
-	action   Actions
+	resource api.ResourceType
+	action   api.Actions
 }{
-	"READ_REPOSITORY":             {ResourceArtifact, ActionRead},
-	"ANNOTATE_REPOSITORY":         {ResourceArtifact, ActionAnnotate},
-	"DEPLOY_CACHE_REPOSITORY":     {ResourceArtifact, ActionWrite},
-	"DELETE_OVERWRITE_REPOSITORY": {ResourceArtifact, ActionDelete},
-	"MANAGE_XRAY_MD_REPOSITORY":   {ResourceArtifact, ActionScan},
-	"READ_BUILD":                  {ResourceBuild, ActionRead},
-	"ANNOTATE_BUILD":              {ResourceBuild, ActionAnnotate},
-	"DEPLOY_BUILD":                {ResourceBuild, ActionWrite},
-	"DELETE_BUILD":                {ResourceBuild, ActionDelete},
-	"MANAGE_XRAY_MD_BUILD":        {ResourceBuild, ActionScan},
+	"READ_REPOSITORY":             {api.ResourceArtifact, api.ActionRead},
+	"ANNOTATE_REPOSITORY":         {api.ResourceArtifact, api.ActionAnnotate},
+	"DEPLOY_CACHE_REPOSITORY":     {api.ResourceArtifact, api.ActionWrite},
+	"DELETE_OVERWRITE_REPOSITORY": {api.ResourceArtifact, api.ActionDelete},
+	"MANAGE_XRAY_MD_REPOSITORY":   {api.ResourceArtifact, api.ActionScan},
+	"READ_BUILD":                  {api.ResourceBuild, api.ActionRead},
+	"ANNOTATE_BUILD":              {api.ResourceBuild, api.ActionAnnotate},
+	"DEPLOY_BUILD":                {api.ResourceBuild, api.ActionWrite},
+	"DELETE_BUILD":                {api.ResourceBuild, api.ActionDelete},
+	"MANAGE_XRAY_MD_BUILD":        {api.ResourceBuild, api.ActionScan},
 }
 
 // RoleActions returns what a role's actions grant on one resource type. It is
 // how the permission evaluator reads a role: pipeline, Release Bundle and
 // security actions grant nothing here.
-func RoleActions(actions []string, resource ResourceType) Actions {
-	var out Actions
+func RoleActions(actions []string, resource api.ResourceType) api.Actions {
+	var out api.Actions
 	for _, a := range actions {
 		if m, ok := roleActions[a]; ok && m.resource == resource {
 			out |= m.action

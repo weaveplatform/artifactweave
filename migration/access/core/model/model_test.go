@@ -7,13 +7,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 )
 
+// t0 is the fixed instant of the domain tests in pkg/types, which keep their
+// own copy (domain_shared_test.go).
+var t0 = time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)
+
 func TestUnitToken(t *testing.T) {
-	tok := types.Token{ExpiresAt: t0}
+	tok := model.Token{ExpiresAt: t0}
 	if tok.Expired(t0.Add(-time.Second)) || !tok.Expired(t0) ||
-		(types.Token{}).Expired(t0.AddDate(100, 0, 0)) {
+		(model.Token{}).Expired(t0.AddDate(100, 0, 0)) {
 		t.Error("Expired")
 	}
 	cases := []struct {
@@ -28,21 +32,21 @@ func TestUnitToken(t *testing.T) {
 		{6 * time.Hour, false, false, true},
 	}
 	for _, c := range cases {
-		got := types.Revocable(c.in, types.DefaultRevocableThreshold, c.force, c.refreshable)
+		got := model.Revocable(c.in, model.DefaultRevocableThreshold, c.force, c.refreshable)
 		if got != c.want {
 			t.Errorf("Revocable(%v, %v, %v) = %v", c.in, c.force, c.refreshable, got)
 		}
 	}
-	if types.DefaultTokenExpiry != 31536000*time.Second {
-		t.Errorf("DefaultTokenExpiry = %v, want one year", types.DefaultTokenExpiry)
+	if model.DefaultTokenExpiry != 31536000*time.Second {
+		t.Errorf("DefaultTokenExpiry = %v, want one year", model.DefaultTokenExpiry)
 	}
-	s, err := types.ParseSubject("jfac@01abc/users/bob")
-	if err != nil || s != (types.Subject{ServiceID: "jfac@01abc", Kind: "users", Name: "bob"}) ||
+	s, err := model.ParseSubject("jfac@01abc/users/bob")
+	if err != nil || s != (model.Subject{ServiceID: "jfac@01abc", Kind: "users", Name: "bob"}) ||
 		s.String() != "jfac@01abc/users/bob" {
 		t.Errorf("%+v %v", s, err)
 	}
 	for _, bad := range []string{"bob", "jfac@x", "noat/users/bob", "jfac@x/users", "jfac@x//bob"} {
-		if _, err := types.ParseSubject(bad); !errors.Is(err, types.ErrInvalidSubject) {
+		if _, err := model.ParseSubject(bad); !errors.Is(err, model.ErrInvalidSubject) {
 			t.Errorf("%q: %v", bad, err)
 		}
 	}
@@ -50,27 +54,27 @@ func TestUnitToken(t *testing.T) {
 
 func TestUnitProject(t *testing.T) {
 	for _, ok := range []string{"ab", "my-proj", "a" + strings.Repeat("b", 31)} {
-		if err := types.ValidateProjectKey(ok); err != nil {
+		if err := model.ValidateProjectKey(ok); err != nil {
 			t.Errorf("%q: %v", ok, err)
 		}
 	}
 	for _, bad := range []string{"a", "1ab", "Ab", "a_b", "a" + strings.Repeat("b", 32)} {
-		if err := types.ValidateProjectKey(bad); !errors.Is(err, types.ErrInvalidProjectKey) {
+		if err := model.ValidateProjectKey(bad); !errors.Is(err, model.ErrInvalidProjectKey) {
 			t.Errorf("%q: %v", bad, err)
 		}
 	}
-	if types.ProjectRepoKey("p", "docker") != "p-docker" ||
-		types.ProjectRepoKey("p", "p-docker") != "p-docker" {
+	if model.ProjectRepoKey("p", "docker") != "p-docker" ||
+		model.ProjectRepoKey("p", "p-docker") != "p-docker" {
 		t.Error("ProjectRepoKey")
 	}
-	if !(types.Role{Type: types.RoleCustom}).Editable() ||
-		(types.Role{Type: types.RolePredefined}).Editable() {
+	if !(model.Role{Type: model.RoleCustom}).Editable() ||
+		(model.Role{Type: model.RolePredefined}).Editable() {
 		t.Error("Role.Editable")
 	}
 }
 
 func TestUnitSigningKeyJSON(t *testing.T) {
-	raw, err := json.Marshal(types.SigningKey{Alias: "k", PrivateKey: "secret", Passphrase: "pass"})
+	raw, err := json.Marshal(model.SigningKey{Alias: "k", PrivateKey: "secret", Passphrase: "pass"})
 	if err != nil || strings.Contains(string(raw), "secret") ||
 		strings.Contains(string(raw), "pass") {
 		t.Errorf("signing key secrets leaked: %s %v", raw, err)

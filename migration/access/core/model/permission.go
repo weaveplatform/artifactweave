@@ -4,12 +4,14 @@ import (
 	"maps"
 	"slices"
 	"time"
+
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 )
 
 // Grants map principal names to the actions they hold.
 type Grants struct {
-	Users  map[string]Actions `json:"users,omitempty"`
-	Groups map[string]Actions `json:"groups,omitempty"`
+	Users  map[string]api.Actions `json:"users,omitempty"`
+	Groups map[string]api.Actions `json:"groups,omitempty"`
 }
 
 // Target scopes a resource to paths inside one repository or special target.
@@ -31,13 +33,13 @@ type Resource struct {
 type Permission struct {
 	Name        string
 	Description string
-	Resources   map[ResourceType]Resource
+	Resources   map[api.ResourceType]Resource
 	Created     time.Time
 	Updated     time.Time
 }
 
 // ResourceTypes returns the permission's sections in a stable order.
-func (p Permission) ResourceTypes() []ResourceType {
+func (p Permission) ResourceTypes() []api.ResourceType {
 	return slices.Sorted(maps.Keys(p.Resources))
 }
 
@@ -45,13 +47,13 @@ func (p Permission) ResourceTypes() []ResourceType {
 // key and class (local, remote, virtual, federated, distribution).
 func MatchesRepository(target, key, class string) bool {
 	switch target {
-	case TargetAny:
+	case api.TargetAny:
 		return true
-	case TargetAnyLocal:
+	case api.TargetAnyLocal:
 		return class == "local" || class == "federated"
-	case TargetAnyRemote:
+	case api.TargetAnyRemote:
 		return class == "remote"
-	case TargetAnyDistribution:
+	case api.TargetAnyDistribution:
 		return class == "distribution"
 	default:
 		return target == key

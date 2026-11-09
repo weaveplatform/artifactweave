@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
 )
 
@@ -36,7 +37,7 @@ func splitPatterns(s string) []string { return cleanPatterns(strings.Split(s, ",
 
 func grantsFrom(
 	users, groups map[string][]string,
-	parse func([]string) (Actions, error),
+	parse func([]string) (api.Actions, error),
 ) (Grants, error) {
 	var g Grants
 	var err error
@@ -53,12 +54,12 @@ func grantsFrom(
 // turn an absent principal map into an empty one.
 func actionMap(
 	in map[string][]string,
-	parse func([]string) (Actions, error),
-) (map[string]Actions, error) {
-	var out map[string]Actions
+	parse func([]string) (api.Actions, error),
+) (map[string]api.Actions, error) {
+	var out map[string]api.Actions
 	for name, names := range in {
 		if out == nil {
-			out = make(map[string]Actions, len(in))
+			out = make(map[string]api.Actions, len(in))
 		}
 		a, err := parse(names)
 		if err != nil {
@@ -69,7 +70,7 @@ func actionMap(
 	return out, nil
 }
 
-func namesMap(in map[string]Actions, render func(Actions) []string) map[string][]string {
+func namesMap(in map[string]api.Actions, render func(api.Actions) []string) map[string][]string {
 	if len(in) == 0 {
 		return nil
 	}
@@ -117,13 +118,13 @@ func sharedPatterns(r Resource) (repos, include, exclude []string, err error) {
 // PermissionFromV1 reads a legacy v1 permission target. It covers
 // repositories only, so the result has just the artifact resource.
 func PermissionFromV1(w wire.PermissionTargetV1) (Permission, error) {
-	g, err := grantsFrom(w.Principals.Users, w.Principals.Groups, ParseLetters)
+	g, err := grantsFrom(w.Principals.Users, w.Principals.Groups, api.ParseLetters)
 	if err != nil {
 		return Permission{}, err
 	}
 	return Permission{
 		Name: w.Name,
-		Resources: map[ResourceType]Resource{ResourceArtifact: {
+		Resources: map[api.ResourceType]Resource{api.ResourceArtifact: {
 			Actions: g,
 			Targets: targetsFor(
 				w.Repositories,
@@ -137,7 +138,7 @@ func PermissionFromV1(w wire.PermissionTargetV1) (Permission, error) {
 // PermissionToV1 renders the legacy v1 view. Sections other than artifact
 // are left out, as Artifactory's v1 API does; patterns must be uniform.
 func PermissionToV1(p Permission) (wire.PermissionTargetV1, error) {
-	r := p.Resources[ResourceArtifact]
+	r := p.Resources[api.ResourceArtifact]
 	repos, include, exclude, err := sharedPatterns(r)
 	if err != nil {
 		return wire.PermissionTargetV1{}, err
@@ -151,8 +152,8 @@ func PermissionToV1(p Permission) (wire.PermissionTargetV1, error) {
 		ExcludesPattern: strings.Join(exclude, ","),
 		Repositories:    repos,
 		Principals: wire.PrincipalsV1{
-			Users:  namesMap(r.Actions.Users, Actions.Letters),
-			Groups: namesMap(r.Actions.Groups, Actions.Letters),
+			Users:  namesMap(r.Actions.Users, api.Actions.Letters),
+			Groups: namesMap(r.Actions.Groups, api.Actions.Letters),
 		},
 	}, nil
 }
@@ -162,32 +163,36 @@ func PermissionToV1(p Permission) (wire.PermissionTargetV1, error) {
 // build section always artifactory-build-info, which "cannot be changed",
 // and the release bundle section release-bundles.
 var v2Sections = []struct {
-	resource ResourceType
+	resource api.ResourceType
 	get      func(*wire.PermissionTargetV2) **wire.SectionV2
 	defaults []string
 }{
-	{ResourceArtifact, func(w *wire.PermissionTargetV2) **wire.SectionV2 { return &w.Repo }, nil},
 	{
-		ResourceBuild,
-		func(w *wire.PermissionTargetV2) **wire.SectionV2 { return &w.Build },
-		[]string{BuildInfoRepository},
+		api.ResourceArtifact,
+		func(w *wire.PermissionTargetV2) **wire.SectionV2 { return &w.Repo },
+		nil,
 	},
 	{
-		ResourceReleaseBundle,
+		api.ResourceBuild,
+		func(w *wire.PermissionTargetV2) **wire.SectionV2 { return &w.Build },
+		[]string{api.BuildInfoRepository},
+	},
+	{
+		api.ResourceReleaseBundle,
 		func(w *wire.PermissionTargetV2) **wire.SectionV2 { return &w.ReleaseBundle },
-		[]string{ReleaseBundlesRepository},
+		[]string{api.ReleaseBundlesRepository},
 	},
 }
 
 // PermissionFromV2 reads a legacy v2 permission target.
 func PermissionFromV2(w wire.PermissionTargetV2) (Permission, error) {
-	p := Permission{Name: w.Name, Resources: map[ResourceType]Resource{}}
+	p := Permission{Name: w.Name, Resources: map[api.ResourceType]Resource{}}
 	for _, s := range v2Sections {
 		sec := *s.get(&w)
 		if sec == nil {
 			continue
 		}
-		g, err := grantsFrom(sec.Actions.Users, sec.Actions.Groups, ParseLegacyActions)
+		g, err := grantsFrom(sec.Actions.Users, sec.Actions.Groups, api.ParseLegacyActions)
 		if err != nil {
 			return Permission{}, fmt.Errorf("section %s: %w", s.resource, err)
 		}
@@ -227,8 +232,8 @@ func PermissionToV2(p Permission) (wire.PermissionTargetV2, error) {
 			ExcludePatterns: exclude,
 			Repositories:    repos,
 			Actions: wire.ActionsV2{
-				Users:  namesMap(r.Actions.Users, Actions.LegacyNames),
-				Groups: namesMap(r.Actions.Groups, Actions.LegacyNames),
+				Users:  namesMap(r.Actions.Users, api.Actions.LegacyNames),
+				Groups: namesMap(r.Actions.Groups, api.Actions.LegacyNames),
 			},
 		}
 	}
@@ -241,10 +246,10 @@ func PermissionFromAccess(w wire.AccessPermission) (Permission, error) {
 	p := Permission{
 		Name:        w.Name,
 		Description: w.Description,
-		Resources:   map[ResourceType]Resource{},
+		Resources:   map[api.ResourceType]Resource{},
 	}
 	for name, r := range w.Resources {
-		g, err := grantsFrom(r.Actions.Users, r.Actions.Groups, ParseAccessActions)
+		g, err := grantsFrom(r.Actions.Users, r.Actions.Groups, api.ParseAccessActions)
 		if err != nil {
 			return Permission{}, fmt.Errorf("resource %s: %w", name, err)
 		}
@@ -255,7 +260,7 @@ func PermissionFromAccess(w wire.AccessPermission) (Permission, error) {
 				Exclude: cleanPatterns(pat.ExcludePatterns),
 			}
 		}
-		p.Resources[ResourceType(name)] = Resource{Actions: g, Targets: targets}
+		p.Resources[api.ResourceType(name)] = Resource{Actions: g, Targets: targets}
 	}
 	return p, nil
 }
@@ -277,8 +282,8 @@ func PermissionToAccess(p Permission) wire.AccessPermission {
 		}
 		w.Resources[string(t)] = wire.AccessResource{
 			Actions: wire.AccessActions{
-				Users:  namesMap(r.Actions.Users, Actions.AccessNames),
-				Groups: namesMap(r.Actions.Groups, Actions.AccessNames),
+				Users:  namesMap(r.Actions.Users, api.Actions.AccessNames),
+				Groups: namesMap(r.Actions.Groups, api.Actions.AccessNames),
 			},
 			Targets: targets,
 		}

@@ -3,6 +3,8 @@ package model
 import (
 	"slices"
 	"testing"
+
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 )
 
 func TestUnitGlobalRoleVocabulary(t *testing.T) {
@@ -63,18 +65,18 @@ func TestUnitRoleActions(t *testing.T) {
 		"DEPLOY_BUILD",
 		"TRIGGER_PIPELINE",
 	}
-	if got := RoleActions(actions, ResourceArtifact); got != ActionRead|ActionDelete {
+	if got := RoleActions(actions, api.ResourceArtifact); got != api.ActionRead|api.ActionDelete {
 		t.Errorf("artifact actions %v", got)
 	}
-	if got := RoleActions(actions, ResourceBuild); got != ActionWrite {
+	if got := RoleActions(actions, api.ResourceBuild); got != api.ActionWrite {
 		t.Errorf("build actions %v", got)
 	}
 	admin, _ := BuiltinGlobalRole("Project Admin")
-	want := ActionRead | ActionAnnotate | ActionWrite | ActionDelete | ActionScan
-	if got := RoleActions(admin.Actions, ResourceArtifact); got != want {
+	want := api.ActionRead | api.ActionAnnotate | api.ActionWrite | api.ActionDelete | api.ActionScan
+	if got := RoleActions(admin.Actions, api.ResourceArtifact); got != want {
 		t.Errorf("Project Admin on artifacts %v, want %v", got, want)
 	}
-	if got := RoleActions(slices.Clone(admin.Actions), ResourceReleaseBundle); got != 0 {
+	if got := RoleActions(slices.Clone(admin.Actions), api.ResourceReleaseBundle); got != 0 {
 		t.Errorf("Release Bundle actions grant nothing here: %v", got)
 	}
 }
@@ -88,14 +90,14 @@ func TestUnitDeveloperDefault(t *testing.T) {
 	}
 	if got := RoleActions(
 		dev.Actions,
-		ResourceArtifact,
-	); got != ActionRead|ActionAnnotate|ActionWrite {
+		api.ResourceArtifact,
+	); got != api.ActionRead|api.ActionAnnotate|api.ActionWrite {
 		t.Errorf("Developer on artifacts %v", got)
 	}
 	if got := RoleActions(
 		dev.Actions,
-		ResourceBuild,
-	); got != ActionRead|ActionAnnotate|ActionWrite {
+		api.ResourceBuild,
+	); got != api.ActionRead|api.ActionAnnotate|api.ActionWrite {
 		t.Errorf("Developer on builds %v", got)
 	}
 }
