@@ -70,8 +70,7 @@ gain a fictional replay guarantee. A timeout/500 is not proof of rollback, and a
 For the changed Access queries, retained SQLite/PostgreSQL tests seed 5000 users,
 compare first and late pages, inspect plans and cover Unicode/literal substring
 filters, reverse order, deleted cursor rows and changing permissions. See
-[SQLite tests](../../../internal/sqlstore/sqlite/identity_query_test.go),
-[PostgreSQL tests](../../../internal/sqlstore/postgres/identity_query_test.go) and
+[SQLite and PostgreSQL tests](../../../migration/access/adapters/sql/identity_query_test.go) and
 [shared contracts](../../../migration/access/adapters/storetest/identity_query.go). A cursor is
 not a snapshot: later inserts may appear, earlier inserts are not revisited and
 newly denied/deleted rows disappear. Filtered keysets are not universally constant

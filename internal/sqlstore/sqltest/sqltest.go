@@ -1,10 +1,10 @@
 // Package sqltest holds the suites that the SQLite and PostgreSQL store
 // packages run against the whole composite store: key rotation (Rotation,
 // with its Opener), repository headers and their migration, remote cache
-// persistence, identity paging, the replay of a crashed write, the refusal
-// of a legacy migration history, and the schema description that the golden
-// files and the stream checks compare (Schema, SchemaGolden). Reset empties
-// a composite store's database for the next test by rolling back, and
+// persistence, the replay of a crashed write, the refusal of a legacy
+// migration history, and the schema description that the golden files and
+// the stream checks compare (Schema, SchemaGolden). Reset empties a
+// composite store's database for the next test by rolling back, and
 // migrating again, every stream that sqlcommon.Modules lists. They stay here
 // until STO-19 moves the composite store's suites.
 //

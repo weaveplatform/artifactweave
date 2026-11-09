@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,6 +13,16 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
+
+// opsFail makes every row-level event (INSERT, UPDATE or DELETE) on a table
+// fail, so a test reaches the statement after a successful one.
+func opsFail(event, table string) string {
+	return "CREATE TRIGGER ops_fail_" + strings.ToLower(event) + "_" + table + " BEFORE " + event +
+		" ON " + table + " BEGIN SELECT RAISE(ABORT, 'injected'); END"
+}
+
+// opsDrop removes a table so the statements that touch it fail.
+func opsDrop(table string) string { return "DROP TABLE " + table }
 
 // buildRun is a run with a row in every build table.
 func buildRun(number string) types.Build {
