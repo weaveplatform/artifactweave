@@ -1,8 +1,3 @@
-// Package idtoken verifies ID tokens that an external OpenID Connect
-// provider, typically a CI system, signed: the subject tokens of the Access
-// OIDC token exchange (POST /access/api/v1/oidc/token, research 21). Signing
-// keys come from the provider's discovery document and JWKS, cached per
-// provider.
 package idtoken
 
 import (

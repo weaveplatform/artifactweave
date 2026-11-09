@@ -1,6 +1,3 @@
-// Package idtokentest is a fake OpenID Connect provider for tests: it serves
-// a discovery document and a JWKS, as GitHub Actions, GitLab and other CI
-// systems do, and mints ID tokens signed with its current key.
 package idtokentest
 
 import (

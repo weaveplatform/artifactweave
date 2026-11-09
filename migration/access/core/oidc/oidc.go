@@ -1,9 +1,3 @@
-// Package oidc is Access's OpenID Connect integration (research 21): the
-// providers whose ID tokens artifactweave trusts, the identity mappings that
-// turn a token's claims into an access token, and the token exchange that
-// CI systems call (POST /access/api/v1/oidc/token). Providers and mappings
-// are configuration documents (types.ConfigOIDC, types.ConfigOIDCMapping)
-// stored in their wire form, so they read back exactly as written.
 package oidc
 
 import (

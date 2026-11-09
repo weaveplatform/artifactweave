@@ -27,14 +27,15 @@ var accessInternals = []string{"internal/auth", "internal/auth/token"}
 // allowlistedInternals are the access internals that an allowlisted file may
 // import: the authenticator and the token service, which the server root,
 // the composition root and the server harnesses wire themselves, and the
-// roles service, which the server root's route and principal matrix creates
-// its principals' environments and roles with and whose errors the root's
-// role handler test maps. The evaluator is never one, and neither is a
-// legacy path of them.
+// roles and OIDC services, which the server root's route and principal
+// matrix creates its principals' environments, roles, providers and
+// mappings with, and whose errors the root's role handler test maps. The
+// evaluator is never one, and neither is a legacy path of them.
 var allowlistedInternals = []string{
 	root + "/access/core/authn",
 	root + "/access/core/token",
 	root + "/access/core/roles",
+	root + "/access/core/oidc",
 }
 
 // accessAllowance names files that may still import allowlistedInternals,
