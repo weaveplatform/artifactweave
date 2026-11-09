@@ -461,7 +461,7 @@ func (s artifactoryService) serveP2CompositeChild(w http.ResponseWriter, r *http
 	c repo.Config, cached bool, req itemRequest, p kernel.Principal, acc access,
 ) {
 	if !acc.file(c, req.path, types.ActionRead) {
-		httpkit.WriteErr(w, r, Denied(p))
+		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	var target *url.URL

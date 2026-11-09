@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -148,11 +149,11 @@ func userBody(name string, bodies ...*artgen.UserConfiguration) (*artgen.UserCon
 			continue
 		}
 		if b.Name != nil && *b.Name != name {
-			return nil, BadRequestf("the user name in the body must match the path")
+			return nil, httpkit.BadRequestf("the user name in the body must match the path")
 		}
 		return b, nil
 	}
-	return nil, BadRequestf("a user document is required")
+	return nil, httpkit.BadRequestf("a user document is required")
 }
 
 // CreateOrReplaceUser creates the user or replaces its fields. It answers
@@ -172,13 +173,13 @@ func (s securityAPI) CreateOrReplaceUser(
 	}
 	w, err := convert[wire.LegacyUser](body)
 	if err != nil {
-		return nil, BadRequestf("%v", err)
+		return nil, httpkit.BadRequestf("%v", err)
 	}
 	// Server-owned fields are ignored on write.
 	w.Name, w.Status, w.LastLoggedIn, w.Realm, w.MFAStatus = req.UserName, "", "", "", ""
 	u, err := types.UserFromLegacy(w)
 	if err != nil {
-		return nil, BadRequestf("%v", err)
+		return nil, httpkit.BadRequestf("%v", err)
 	}
 	if _, err := s.identity(st).PutUser(ctx, u, w.Password); err != nil {
 		return nil, s.identityErr(ctx, "put user", "", err)
@@ -289,11 +290,11 @@ func groupBody(
 			continue
 		}
 		if b.Name != nil && *b.Name != name {
-			return nil, BadRequestf("the group name in the body must match the path")
+			return nil, httpkit.BadRequestf("the group name in the body must match the path")
 		}
 		return b, nil
 	}
-	return nil, BadRequestf("a group document is required")
+	return nil, httpkit.BadRequestf("a group document is required")
 }
 
 // CreateOrReplaceGroup creates the group or replaces its fields. It answers
@@ -313,7 +314,7 @@ func (s securityAPI) CreateOrReplaceGroup(
 	}
 	w, err := convert[wire.LegacyGroup](b)
 	if err != nil {
-		return nil, BadRequestf("%v", err)
+		return nil, httpkit.BadRequestf("%v", err)
 	}
 	w.Name, w.Realm, w.RealmAttributes = req.GroupName, "", ""
 	if _, err := s.identity(st).PutGroup(ctx, types.GroupFromLegacy(w), b.UserNames); err != nil {
@@ -465,7 +466,7 @@ func (s securityAPI) ConfigureUserLockPolicy(
 		return nil, err
 	}
 	if req.Body == nil {
-		return nil, BadRequestf("a user lock policy is required")
+		return nil, httpkit.BadRequestf("a user lock policy is required")
 	}
 	p := types.UserLockPolicy{
 		Enabled:       req.Body.Enabled != nil && *req.Body.Enabled,
@@ -473,7 +474,7 @@ func (s securityAPI) ConfigureUserLockPolicy(
 	}
 	if req.Body.LoginAttempts != nil {
 		if p.LoginAttempts = *req.Body.LoginAttempts; p.LoginAttempts < 1 {
-			return nil, BadRequestf("loginAttempts must be at least 1")
+			return nil, httpkit.BadRequestf("loginAttempts must be at least 1")
 		}
 	}
 	if err := s.identity(st).SetLockPolicy(ctx, p); err != nil {
@@ -516,7 +517,7 @@ func (s securityAPI) SetPasswordExpirationPolicy(
 		return nil, err
 	}
 	if req.Body == nil {
-		return nil, BadRequestf("a password expiration policy is required")
+		return nil, httpkit.BadRequestf("a password expiration policy is required")
 	}
 	p := types.PasswordExpirationPolicy{
 		MaxAgeDays:    authn.DefaultPasswordMaxAgeDays,
@@ -557,7 +558,7 @@ func (s securityAPI) ExpirePasswordForMultipleUsers(
 		return nil, err
 	}
 	if req.Body == nil || len(*req.Body) == 0 {
-		return nil, BadRequestf("name at least one user")
+		return nil, httpkit.BadRequestf("name at least one user")
 	}
 	unknown, err := s.identity(st).ExpirePasswords(ctx, *req.Body)
 	if err != nil {
@@ -642,7 +643,7 @@ func (s securityAPI) ChangePassword(
 		return nil, err //nolint:wrapcheck // typed for the response
 	}
 	if req.Body == nil || req.Body.UserName == "" {
-		return nil, BadRequestf("userName is required")
+		return nil, httpkit.BadRequestf("userName is required")
 	}
 	b := req.Body
 	self := p.Name == b.UserName && !narrowedToken(p)
@@ -671,7 +672,7 @@ func (s securityAPI) CreateApiKey(
 	if _, err := kernel.RequireAuthenticated(ctx); err != nil {
 		return nil, err //nolint:wrapcheck // typed for the response
 	}
-	return nil, BadRequestf(errAPIKeysRetired)
+	return nil, httpkit.BadRequestf(errAPIKeysRetired)
 }
 
 // RegenerateApiKey refuses: no user holds a key to rotate.
@@ -682,7 +683,7 @@ func (s securityAPI) RegenerateApiKey(
 	if _, err := kernel.RequireAuthenticated(ctx); err != nil {
 		return nil, err //nolint:wrapcheck // typed for the response
 	}
-	return nil, BadRequestf(errAPIKeysRetired)
+	return nil, httpkit.BadRequestf(errAPIKeysRetired)
 }
 
 // GetApiKey answers 404, the documented answer when no key exists; the
@@ -705,7 +706,7 @@ func (s securityAPI) RevokeApiKey(
 ) (artgen.RevokeApiKeyResponseObject, error) {
 	if req.Params.DeleteAll != nil &&
 		*req.Params.DeleteAll == artgen.RevokeApiKeyParamsDeleteAllN1 {
-		if err := AdminOnly(ctx); err != nil {
+		if err := httpkit.AdminOnly(ctx); err != nil {
 			return nil, err
 		}
 	} else if _, err := kernel.RequireAuthenticated(

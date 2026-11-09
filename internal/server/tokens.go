@@ -85,7 +85,7 @@ func (t tokenAPI) mint(ctx context.Context, m mintRequest) (token.Issued, error)
 	case grantRefresh:
 		return t.refresh(ctx, svc, m)
 	default:
-		return token.Issued{}, BadRequestf("unsupported grant_type %q", m.grant)
+		return token.Issued{}, httpkit.BadRequestf("unsupported grant_type %q", m.grant)
 	}
 	p, err := kernel.RequireAuthenticated(ctx)
 	if err != nil {
@@ -128,7 +128,7 @@ func (t tokenAPI) mint(ctx context.Context, m mintRequest) (token.Issued, error)
 			raw = legacyScope(raw)
 		}
 		if req.Scope, err = types.ParseScope(raw); err != nil {
-			return token.Issued{}, BadRequestf("%v", err)
+			return token.Issued{}, httpkit.BadRequestf("%v", err)
 		}
 		if !p.Admin && !onlyUserScope(req.Scope) {
 			return token.Issued{}, apierror.New(
@@ -140,7 +140,7 @@ func (t tokenAPI) mint(ctx context.Context, m mintRequest) (token.Issued, error)
 	switch {
 	case m.expiresIn != nil:
 		if *m.expiresIn < 0 {
-			return token.Issued{}, BadRequestf("expires_in must not be negative")
+			return token.Issued{}, httpkit.BadRequestf("expires_in must not be negative")
 		}
 		d := time.Duration(*m.expiresIn) * time.Second
 		req.ExpiresIn = &d
@@ -162,7 +162,7 @@ func (t tokenAPI) mint(ctx context.Context, m mintRequest) (token.Issued, error)
 	case errors.Is(err, token.ErrNeverExpiresAdminOnly):
 		return token.Issued{}, errNeverExpires
 	case errors.Is(err, token.ErrInvalidRequest):
-		return token.Issued{}, BadRequestf("%v", err)
+		return token.Issued{}, httpkit.BadRequestf("%v", err)
 	}
 	if err != nil {
 		return token.Issued{}, t.internalError(ctx, "issue token", err)
@@ -190,7 +190,7 @@ func (t tokenAPI) refresh(
 	m mintRequest,
 ) (token.Issued, error) {
 	if m.refreshToken == "" {
-		return token.Issued{}, BadRequestf(
+		return token.Issued{}, httpkit.BadRequestf(
 			"refresh_token is required with grant_type refresh_token",
 		)
 	}
@@ -204,7 +204,7 @@ func (t tokenAPI) refresh(
 		// token being refreshed, possibly expired, as access_token
 		// (artifactory/services/security.go, buildRefreshTokenUrlValues).
 		if m.accessToken == "" {
-			return token.Issued{}, BadRequestf(
+			return token.Issued{}, httpkit.BadRequestf(
 				"access_token is required with grant_type refresh_token",
 			)
 		}
@@ -228,7 +228,7 @@ func (t tokenAPI) refresh(
 	case errors.Is(err, token.ErrRefreshOtherUser):
 		return token.Issued{}, errRefreshOtherUser
 	case errors.Is(err, authn.ErrInvalidToken):
-		return token.Issued{}, BadRequestf("The refresh token is not valid")
+		return token.Issued{}, httpkit.BadRequestf("The refresh token is not valid")
 	case err != nil:
 		return token.Issued{}, t.internalError(ctx, "refresh token", err)
 	}
@@ -453,7 +453,7 @@ func (s accessService) CreateToken(
 		body = req.FormdataBody
 	}
 	if body == nil {
-		return nil, BadRequestf("a token request body is required")
+		return nil, httpkit.BadRequestf("a token request body is required")
 	}
 	m := mintRequest{
 		username: httpkit.Deref(
@@ -551,7 +551,7 @@ func (s accessService) RevokeTokenById(
 	}
 	switch err := svc.Revoke(ctx, rec.ID); {
 	case errors.Is(err, accessapi.ErrNotRevocable):
-		return nil, BadRequestf("Token is not revocable")
+		return nil, httpkit.BadRequestf("Token is not revocable")
 	case errors.Is(err, store.ErrNotFound):
 		return nil, tokenNotFound()
 	case err != nil:
@@ -573,11 +573,11 @@ func (s accessService) RevokeTokenByValue(
 	if err != nil {
 		return nil, err
 	}
-	if err := AdminOnly(ctx); err != nil {
+	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}
 	if req.Body == nil || httpkit.Deref(req.Body.Token) == "" {
-		return nil, BadRequestf("token is required")
+		return nil, httpkit.BadRequestf("token is required")
 	}
 	// Verify resolves either form and refuses expired and revoked tokens,
 	// which the route answers 404.
@@ -607,7 +607,7 @@ func (s accessService) GetTokenDefaultExpiry(
 	if err != nil {
 		return nil, err
 	}
-	if err := AdminOnly(ctx); err != nil {
+	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}
 	secs := int64(types.DefaultTokenExpiry / time.Second)
@@ -630,11 +630,11 @@ func (s accessService) SetTokenDefaultExpiry(
 	if err != nil {
 		return nil, err
 	}
-	if err := AdminOnly(ctx); err != nil {
+	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}
 	if req.Body == nil || req.Body.DefaultTokenExpiration < 0 {
-		return nil, BadRequestf("default_token_expiration must be zero or more seconds")
+		return nil, httpkit.BadRequestf("default_token_expiration must be zero or more seconds")
 	}
 	if err := st.Settings().Put(ctx, types.SettingDefaultTokenExpiry,
 		int64(req.Body.DefaultTokenExpiration)); err != nil {
@@ -699,7 +699,7 @@ func (s securityAPI) GetLegacyTokens(
 // refreshed as access_token, which must pair with refresh_token (refresh).
 func (s securityAPI) createLegacyToken(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		httpkit.WriteErr(w, r, BadRequestf("malformed form: %v", err))
+		httpkit.WriteErr(w, r, httpkit.BadRequestf("malformed form: %v", err))
 		return
 	}
 	f := r.PostForm
@@ -711,14 +711,14 @@ func (s securityAPI) createLegacyToken(w http.ResponseWriter, r *http.Request) {
 	var err error
 	if v := f.Get("refreshable"); v != "" {
 		if m.isRefreshable, err = strconv.ParseBool(v); err != nil {
-			httpkit.WriteErr(w, r, BadRequestf("refreshable must be true or false"))
+			httpkit.WriteErr(w, r, httpkit.BadRequestf("refreshable must be true or false"))
 			return
 		}
 	}
 	if v := f.Get("expires_in"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil {
-			httpkit.WriteErr(w, r, BadRequestf("expires_in must be a number of seconds"))
+			httpkit.WriteErr(w, r, httpkit.BadRequestf("expires_in must be a number of seconds"))
 			return
 		}
 		m.expiresIn = &n
@@ -755,7 +755,7 @@ func (s securityAPI) revokeLegacyToken(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		err = r.ParseForm()
 		if err != nil {
-			err = BadRequestf("malformed form: %v", err)
+			err = httpkit.BadRequestf("malformed form: %v", err)
 		}
 	}
 	if err != nil {
@@ -764,7 +764,7 @@ func (s securityAPI) revokeLegacyToken(w http.ResponseWriter, r *http.Request) {
 	}
 	value, id := r.PostForm.Get("token"), r.PostForm.Get("token_id")
 	if (value == "") == (id == "") {
-		httpkit.WriteErr(w, r, BadRequestf("exactly one of token and token_id is required"))
+		httpkit.WriteErr(w, r, httpkit.BadRequestf("exactly one of token and token_id is required"))
 		return
 	}
 	if value != "" {
@@ -791,7 +791,7 @@ func (s securityAPI) revokeLegacyToken(w http.ResponseWriter, r *http.Request) {
 	}
 	switch err := svc.Revoke(ctx, rec.ID); {
 	case errors.Is(err, accessapi.ErrNotRevocable):
-		httpkit.WriteErr(w, r, BadRequestf("Token is not revocable"))
+		httpkit.WriteErr(w, r, httpkit.BadRequestf("Token is not revocable"))
 	case errors.Is(err, store.ErrNotFound):
 		writeText(w, "Token not found or already revoked")
 	case err != nil:
@@ -822,7 +822,7 @@ func (s securityAPI) GetUserEncryptedPassword(
 		return nil, fmt.Errorf("tokens: %w", err)
 	}
 	if p.TokenID != "" {
-		return nil, BadRequestf(
+		return nil, httpkit.BadRequestf(
 			"The encrypted password needs a password login, not an access token",
 		)
 	}

@@ -139,7 +139,7 @@ func (s artifactoryService) traceDownload(
 		return s.itemError(ctx, "resolve repository", err)
 	}
 	if !acc.folder(c, req.path, types.ActionRead) {
-		return Denied(p)
+		return httpkit.Denied(p)
 	}
 	kind := string(c.Class)
 	if cached {
@@ -201,7 +201,7 @@ func (s artifactoryService) traceDownload(
 		return s.itemError(ctx, "lookup item", err)
 	}
 	if !acc.item(f.repo, f.item.FullPath(), f.item.Folder, types.ActionRead) {
-		return Denied(p)
+		return httpkit.Denied(p)
 	}
 	t.stepf(
 		"Returning found resource from %s",
@@ -245,7 +245,7 @@ func (s artifactoryService) traceContained(
 			return itemNotFound()
 		}
 		if !acc.file(a.repo, a.item.FullPath(), types.ActionRead) {
-			return Denied(caller)
+			return httpkit.Denied(caller)
 		}
 		if a.item.Folder {
 			return itemNotFound()

@@ -25,7 +25,7 @@ const oidcTokenRoute = "POST /access/api/v1/oidc/token"
 
 // oidcService checks the caller is an administrator and returns the service.
 func (s accessService) oidcService(ctx context.Context) (oidc.Service, error) {
-	if err := AdminOnly(ctx); err != nil {
+	if err := httpkit.AdminOnly(ctx); err != nil {
 		return oidc.Service{}, err
 	}
 	return s.oidc()
@@ -78,14 +78,14 @@ func recode[T any](v any) (T, error) {
 // provider decodes a request body; a missing one is a bad request.
 func providerBody(b *accessgen.OidcConfiguration) (oidc.Provider, error) {
 	if b == nil {
-		return oidc.Provider{}, BadRequestf("a body with the OIDC provider is required")
+		return oidc.Provider{}, httpkit.BadRequestf("a body with the OIDC provider is required")
 	}
 	return recode[oidc.Provider](b)
 }
 
 func mappingBody(b *accessgen.OidcIdentityMapping) (oidc.Mapping, error) {
 	if b == nil {
-		return oidc.Mapping{}, BadRequestf("a body with the identity mapping is required")
+		return oidc.Mapping{}, httpkit.BadRequestf("a body with the identity mapping is required")
 	}
 	return recode[oidc.Mapping](b)
 }
@@ -306,7 +306,7 @@ func (s accessService) OidcTokenExchange(
 	}
 	b := req.Body
 	if b == nil {
-		return nil, BadRequestf("a body with the token exchange is required")
+		return nil, httpkit.BadRequestf("a body with the token exchange is required")
 	}
 	got, err := svc.Exchange(ctx, oidc.ExchangeRequest{
 		GrantType:        httpkit.Deref(b.GrantType),

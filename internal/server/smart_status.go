@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -20,7 +21,7 @@ import (
 func (s artifactoryService) smartStatus(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
-	if err := AdminOnly(ctx); err != nil {
+	if err := httpkit.AdminOnly(ctx); err != nil {
 		apierror.Write(w, apierror.ProfileArtifactory, err)
 		return
 	}
@@ -35,7 +36,7 @@ func (s artifactoryService) smartStatus(w http.ResponseWriter, r *http.Request) 
 		apierror.Write(
 			w,
 			apierror.ProfileArtifactory,
-			BadRequestf("one canonical repository path is required"),
+			httpkit.BadRequestf("one canonical repository path is required"),
 		)
 		return
 	}
@@ -53,7 +54,7 @@ func (s artifactoryService) smartStatus(w http.ResponseWriter, r *http.Request) 
 		case errors.Is(err, store.ErrNotFound):
 			err = apierror.New(http.StatusNotFound, "remote repository does not exist")
 		case errors.Is(err, store.ErrInvalid), errors.Is(err, source.ErrInvalidRequest):
-			err = BadRequestf("one canonical remote repository path is required")
+			err = httpkit.BadRequestf("one canonical remote repository path is required")
 		default:
 			err = s.internalError(ctx, "remote status", err)
 		}

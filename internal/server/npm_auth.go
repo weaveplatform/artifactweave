@@ -10,6 +10,7 @@ import (
 	npmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 )
@@ -154,11 +155,11 @@ func (s artifactoryService) GetNpmScopeAuth(
 	case err != nil:
 		return nil, s.itemError(ctx, "resolve repository", err)
 	case cached || rc.PackageType != repo.NPM:
-		return nil, BadRequestf("Repository '%s' is not an npm repository", req.RepoKey)
+		return nil, httpkit.BadRequestf("Repository '%s' is not an npm repository", req.RepoKey)
 	}
 	scope := strings.TrimPrefix(req.Scope, "@")
 	if !npmhttp.ValidScope(scope) {
-		return nil, BadRequestf("'%s' is not an npm scope", req.Scope)
+		return nil, httpkit.BadRequestf("'%s' is not an npm scope", req.Scope)
 	}
 	registry := baseurl.From(ctx) + npmAPI + url.PathEscape(rc.Key) + "/"
 	return artgen.GetNpmScopeAuth200TextResponse(npmhttp.ScopeAuthLines(scope, registry, c)), nil

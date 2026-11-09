@@ -47,7 +47,7 @@ func (s artifactoryService) SearchDependency(
 	}
 	sha1 := strings.ToLower(req.Params.Sha1)
 	if !checksumHex["sha1"].MatchString(sha1) {
-		return nil, BadRequestf("%s is not a hex sha1 checksum", req.Params.Sha1)
+		return nil, httpkit.BadRequestf("%s is not a hex sha1 checksum", req.Params.Sha1)
 	}
 	refs, err := r.st.Builds().FindDependencies(ctx, types.Checksums{SHA1: sha1})
 	if err != nil {
@@ -103,11 +103,11 @@ func (s artifactoryService) SearchBuildArtifacts(
 	number, status := blank(httpkit.Deref(body.BuildNumber)), blank(httpkit.Deref(body.BuildStatus))
 	switch {
 	case blank(body.BuildName) == "":
-		return nil, BadRequestf("Cannot search without build name.")
+		return nil, httpkit.BadRequestf("Cannot search without build name.")
 	case number == "" && status == "":
-		return nil, BadRequestf("Cannot search without build number or build status.")
+		return nil, httpkit.BadRequestf("Cannot search without build number or build status.")
 	case number != "" && status != "":
-		return nil, BadRequestf(
+		return nil, httpkit.BadRequestf(
 			"Cannot search with both build number and build status parameters, " +
 				"please omit build number if your are looking for latest build by status " +
 				"or omit build status to search for specific build version.",
@@ -124,7 +124,11 @@ func (s artifactoryService) SearchBuildArtifacts(
 		}
 		re, err := regexp.Compile(`^(?:` + *m.Input + `)$`)
 		if err != nil {
-			return nil, BadRequestf("mapping %q is not a regular expression: %v", *m.Input, err)
+			return nil, httpkit.BadRequestf(
+				"mapping %q is not a regular expression: %v",
+				*m.Input,
+				err,
+			)
 		}
 		mappings = append(mappings, re)
 	}

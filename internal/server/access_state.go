@@ -76,7 +76,7 @@ func (s accessState) identityErr(ctx context.Context, op, notFound string, err e
 		if _, after, ok := strings.Cut(msg, identity.ErrInvalid.Error()+": "); ok {
 			msg = after
 		}
-		return BadRequestf("%s", msg)
+		return httpkit.BadRequestf("%s", msg)
 	case errors.Is(err, store.ErrNotFound) && notFound != "":
 		return apierror.New(http.StatusNotFound, notFound)
 	default:
@@ -93,9 +93,9 @@ func (s accessState) permissionError(ctx context.Context, op string, err error) 
 	case errors.As(err, &ae):
 		return err
 	case errors.Is(err, permission.ErrInvalid):
-		return BadRequestf("%s", after(err, permission.ErrInvalid))
+		return httpkit.BadRequestf("%s", after(err, permission.ErrInvalid))
 	case errors.Is(err, types.ErrLossyProjection):
-		return BadRequestf("%s; read it through /access/api/v2/permissions", err)
+		return httpkit.BadRequestf("%s; read it through /access/api/v2/permissions", err)
 	case errors.Is(err, permission.ErrNotFound):
 		return apierror.New(http.StatusNotFound, after(err, permission.ErrNotFound))
 	case errors.Is(err, permission.ErrConflict):

@@ -11,6 +11,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/keymaterial"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -41,7 +42,7 @@ func keypairSummary(k types.Keypair) artgen.KeyPairSummary {
 // halves that belong together.
 func keypairFrom(in *artgen.KeyPairInput) (types.Keypair, error) {
 	if in == nil {
-		return types.Keypair{}, BadRequestf("A key pair body is required")
+		return types.Keypair{}, httpkit.BadRequestf("A key pair body is required")
 	}
 	priv, pass := "", ""
 	if in.PrivateKey != nil {
@@ -51,18 +52,20 @@ func keypairFrom(in *artgen.KeyPairInput) (types.Keypair, error) {
 		pass = *in.Passphrase
 	}
 	if in.VaultKey != nil && *in.VaultKey != "" && priv == "" {
-		return types.Keypair{}, BadRequestf("Vault keys are not supported; supply privateKey")
+		return types.Keypair{}, httpkit.BadRequestf(
+			"Vault keys are not supported; supply privateKey",
+		)
 	}
 	for field, value := range map[string]string{
 		"pairName": in.PairName, "pairType": string(in.PairType), "alias": in.Alias,
 		"privateKey": priv, "publicKey": in.PublicKey,
 	} {
 		if strings.TrimSpace(value) == "" {
-			return types.Keypair{}, BadRequestf("'%s' is required", field)
+			return types.Keypair{}, httpkit.BadRequestf("'%s' is required", field)
 		}
 	}
 	if err := keymaterial.CheckPair(string(in.PairType), priv, in.PublicKey, pass); err != nil {
-		return types.Keypair{}, BadRequestf("%s", err.Error())
+		return types.Keypair{}, httpkit.BadRequestf("%s", err.Error())
 	}
 	return types.Keypair{
 		Name: in.PairName, Type: types.KeypairType(in.PairType), Alias: in.Alias,
@@ -72,7 +75,7 @@ func keypairFrom(in *artgen.KeyPairInput) (types.Keypair, error) {
 
 // adminStore is the store of an admin-only operation.
 func (s securityAPI) adminStore(ctx context.Context) (store.Store, error) {
-	if err := AdminOnly(ctx); err != nil {
+	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}
 	return s.content()
@@ -165,7 +168,7 @@ func (s securityAPI) VerifyKeyPair(
 	ctx context.Context,
 	req artgen.VerifyKeyPairRequestObject,
 ) (artgen.VerifyKeyPairResponseObject, error) {
-	if err := AdminOnly(ctx); err != nil {
+	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}
 	if _, err := keypairFrom(req.Body); err != nil {
@@ -352,24 +355,24 @@ func (s securityAPI) AddCertificate(
 	}
 	alias := strings.TrimSpace(req.CertificateAlias)
 	if alias == "" {
-		return nil, BadRequestf("A certificate alias is required")
+		return nil, httpkit.BadRequestf("A certificate alias is required")
 	}
 	if req.Body == nil {
-		return nil, BadRequestf("A PEM certificate bundle is required")
+		return nil, httpkit.BadRequestf("A PEM certificate bundle is required")
 	}
 	data, err := io.ReadAll(io.LimitReader(req.Body, maxCertificateBundle+1))
 	switch {
 	case err != nil:
-		return nil, BadRequestf("Cannot read the certificate bundle")
+		return nil, httpkit.BadRequestf("Cannot read the certificate bundle")
 	case len(data) > maxCertificateBundle:
-		return nil, BadRequestf(
+		return nil, httpkit.BadRequestf(
 			"The certificate bundle is larger than %d bytes",
 			maxCertificateBundle,
 		)
 	}
 	b, err := keymaterial.ParseBundle(data)
 	if err != nil {
-		return nil, BadRequestf("%s", err.Error())
+		return nil, httpkit.BadRequestf("%s", err.Error())
 	}
 	if err := st.Keys().PutCertificate(ctx, types.Certificate{
 		Alias: alias, PEM: b.Certificates, PrivateKey: b.PrivateKey,
@@ -404,7 +407,7 @@ func (s securityAPI) DeleteCertificate(
 		}
 	}
 	if len(using) > 0 {
-		return nil, BadRequestf(
+		return nil, httpkit.BadRequestf(
 			"Certificate '%s' is used by repositories: %s",
 			alias,
 			strings.Join(using, ", "),

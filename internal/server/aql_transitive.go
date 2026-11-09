@@ -307,7 +307,7 @@ func transitiveError(err error) error {
 		errors.Is(err, aql.ErrUnsupported),
 		errors.Is(err, source.ErrInvalidRequest),
 		errors.Is(err, source.ErrUnsupported):
-		return BadRequestf("unsupported transitive AQL query or source")
+		return httpkit.BadRequestf("unsupported transitive AQL query or source")
 	case errors.Is(err, source.ErrDenied):
 		return apierror.New(http.StatusForbidden, "transitive AQL access denied")
 	case errors.Is(err, context.DeadlineExceeded):

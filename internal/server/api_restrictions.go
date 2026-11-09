@@ -84,7 +84,7 @@ func (s securityAPI) restrictionCaller(
 		)
 	}
 	if user == "anonymous" || user == "" {
-		return p, BadRequestf("A managed user name is required")
+		return p, httpkit.BadRequestf("A managed user name is required")
 	}
 	if _, err := s.cfg.Store.Users().Get(ctx, user); err != nil {
 		return p, restrictionStoreError(err)
@@ -154,7 +154,7 @@ func (s securityAPI) SetAPIRestriction(
 		req.Body.Until.After(now.Add(7*24*time.Hour)) ||
 		strings.TrimSpace(req.Body.Reason) == "" ||
 		len(strings.TrimSpace(req.Body.Reason)) > 1024 {
-		return nil, BadRequestf(
+		return nil, httpkit.BadRequestf(
 			"Supply a reason of 1 to 1024 bytes and an expiry within the next seven days",
 		)
 	}
@@ -206,20 +206,22 @@ func (s securityAPI) GetAPIRestrictionAudit(
 		limit = *req.Params.Limit
 	}
 	if limit < 1 || limit > 1000 {
-		return nil, BadRequestf("limit must be between 1 and 1000")
+		return nil, httpkit.BadRequestf("limit must be between 1 and 1000")
 	}
 	page := store.Page{Limit: limit}
 	if raw := httpkit.Deref(req.Params.Cursor); raw != "" {
 		parts, err := (store.Page{After: raw}).Key(4)
 		if err != nil || len(parts) != 4 || parts[0] != "v1" || parts[1] != user ||
 			parts[2] != p.Name {
-			return nil, BadRequestf("Invalid audit cursor for this filter and administrator")
+			return nil, httpkit.BadRequestf(
+				"Invalid audit cursor for this filter and administrator",
+			)
 		}
 		page.After = parts[3]
 	}
 	rows, next, err := s.cfg.Store.APIRestrictions().History(ctx, user, page)
 	if errors.Is(err, store.ErrInvalidCursor) {
-		return nil, BadRequestf("Invalid audit cursor")
+		return nil, httpkit.BadRequestf("Invalid audit cursor")
 	}
 	if err != nil {
 		return nil, restrictionStoreError(err)

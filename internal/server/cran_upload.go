@@ -32,7 +32,7 @@ func (s artifactoryService) uploadCranBinary(w http.ResponseWriter, r *http.Requ
 	version := q.Get("rVersion")
 	if len(q["distribution"]) != 1 || len(q["rVersion"]) != 1 ||
 		strings.Contains(version, "/") {
-		httpkit.WriteErr(w, r, BadRequestf("distribution and rVersion are required"))
+		httpkit.WriteErr(w, r, httpkit.BadRequestf("distribution and rVersion are required"))
 		return
 	}
 	var feed, suffix string
@@ -45,7 +45,7 @@ func (s artifactoryService) uploadCranBinary(w http.ResponseWriter, r *http.Requ
 		feed, suffix = "bin/linux/contrib/"+version, ".tar.gz"
 	}
 	if _, ok := cran.Feed(feed); !ok {
-		httpkit.WriteErr(w, r, BadRequestf("invalid CRAN distribution or R version"))
+		httpkit.WriteErr(w, r, httpkit.BadRequestf("invalid CRAN distribution or R version"))
 		return
 	}
 	s.uploadCran(w, r, feed, suffix)
@@ -76,11 +76,11 @@ func (s artifactoryService) uploadCran(
 		return
 	}
 	if c.PackageType != repo.Cran {
-		httpkit.WriteErr(w, r, BadRequestf("repository is not a CRAN repository"))
+		httpkit.WriteErr(w, r, httpkit.BadRequestf("repository is not a CRAN repository"))
 		return
 	}
 	if !acc.folder(c, feed, types.ActionWrite) {
-		httpkit.WriteErr(w, r, Denied(p))
+		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	tmp, err := os.CreateTemp("", "artifactweave-cran-upload-*")
@@ -91,11 +91,11 @@ func (s artifactoryService) uploadCran(
 	defer func() { _ = os.Remove(tmp.Name()); _ = tmp.Close() }()
 	size, err := io.Copy(tmp, io.LimitReader(r.Body, cranUploadLimit+1))
 	if err != nil {
-		httpkit.WriteErr(w, r, BadRequestf("cannot read CRAN package upload"))
+		httpkit.WriteErr(w, r, httpkit.BadRequestf("cannot read CRAN package upload"))
 		return
 	}
 	if size > cranUploadLimit {
-		httpkit.WriteErr(w, r, BadRequestf("CRAN package exceeds upload limit"))
+		httpkit.WriteErr(w, r, httpkit.BadRequestf("CRAN package exceeds upload limit"))
 		return
 	}
 	if _, err := tmp.Seek(0, io.SeekStart); err != nil {
@@ -104,11 +104,11 @@ func (s artifactoryService) uploadCran(
 	}
 	pkg, err := cran.ReadUploaded(ctx, tmp, size, feed, suffix)
 	if err != nil {
-		httpkit.WriteErr(w, r, BadRequestf("invalid CRAN package archive"))
+		httpkit.WriteErr(w, r, httpkit.BadRequestf("invalid CRAN package archive"))
 		return
 	}
 	if !acc.file(c, pkg.Path, types.ActionWrite) {
-		httpkit.WriteErr(w, r, Denied(p))
+		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	if _, err := tmp.Seek(0, io.SeekStart); err != nil {
@@ -123,7 +123,7 @@ func (s artifactoryService) uploadCran(
 		OverwriteIdentical: s.mayBeIdentical(false),
 	})
 	if errors.Is(err, cran.ErrPackage) {
-		httpkit.WriteErr(w, r, BadRequestf("invalid CRAN package archive"))
+		httpkit.WriteErr(w, r, httpkit.BadRequestf("invalid CRAN package archive"))
 		return
 	}
 	if err != nil {

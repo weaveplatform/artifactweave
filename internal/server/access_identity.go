@@ -47,7 +47,7 @@ func (s accessService) identity() (*identity.Service, error) {
 // adminIdentity checks the caller is an administrator, then returns the
 // service.
 func (s accessService) adminIdentity(ctx context.Context) (*identity.Service, error) {
-	if err := AdminOnly(ctx); err != nil {
+	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}
 	return s.identity()
@@ -137,7 +137,7 @@ func (s accessService) GetUserList(
 		},
 		types.UserStatus(*p.Status),
 	) {
-		return nil, BadRequestf(
+		return nil, httpkit.BadRequestf(
 			"status %q is not one of invited, enabled, disabled or locked",
 			*p.Status,
 		)
@@ -157,7 +157,7 @@ func (s accessService) GetUserList(
 		Status: types.UserStatus(httpkit.Deref(p.Status)), OnlyAdmins: httpkit.Deref(p.OnlyAdmins),
 	}, store.Page{After: httpkit.Deref(p.Cursor), Limit: limit})
 	if errors.Is(err, store.ErrInvalidCursor) {
-		return nil, BadRequestf("cursor is not valid")
+		return nil, httpkit.BadRequestf("cursor is not valid")
 	}
 	if err != nil {
 		return nil, s.identityErr(ctx, "list users", "", err)
@@ -194,12 +194,12 @@ func (s accessService) CreateUser(
 	}
 	b := req.Body
 	if b == nil {
-		return nil, BadRequestf("a body with the user is required")
+		return nil, httpkit.BadRequestf("a body with the user is required")
 	}
 	// The spec stores usernames lower-case, as Artifactory does.
 	name := strings.ToLower(b.Username)
 	if name == "" || len(name) > maxUsernameLength {
-		return nil, BadRequestf("username must be 1 to %d characters", maxUsernameLength)
+		return nil, httpkit.BadRequestf("username must be 1 to %d characters", maxUsernameLength)
 	}
 	u := types.User{
 		Name:             name,
@@ -285,7 +285,9 @@ func (s accessService) UpdateUser(
 			return nil, s.identityErr(ctx, "update user", userNotFound(name), err)
 		}
 		if len(u.PasswordHash) == 0 {
-			return nil, BadRequestf("a password is required to enable the internal password")
+			return nil, httpkit.BadRequestf(
+				"a password is required to enable the internal password",
+			)
 		}
 	}
 	if err := svc.PatchUser(ctx, name, patch); err != nil {
@@ -349,7 +351,7 @@ func (s accessService) ChangeUserPassword(
 		return nil, kernel.ErrForbidden
 	}
 	if req.Body == nil || req.Body.Password == nil || *req.Body.Password == "" {
-		return nil, BadRequestf("a body with the new password is required")
+		return nil, httpkit.BadRequestf("a body with the new password is required")
 	}
 	svc, err := s.identity()
 	if err != nil {
@@ -502,7 +504,7 @@ func (s accessService) GetGroupList(
 		Resource:   resource,
 	}, store.Page{After: httpkit.Deref(p.Cursor), Limit: limit})
 	if errors.Is(err, store.ErrInvalidCursor) {
-		return nil, BadRequestf("cursor is not valid")
+		return nil, httpkit.BadRequestf("cursor is not valid")
 	}
 	if err != nil {
 		return nil, s.identityErr(ctx, "list groups", "", err)
@@ -530,15 +532,15 @@ func (s accessService) CreateGroup(
 	}
 	b := req.Body
 	if b == nil || b.Name == "" {
-		return nil, BadRequestf("a body with the group name is required")
+		return nil, httpkit.BadRequestf("a body with the group name is required")
 	}
 	if b.ImportFromLdapGroupSetting != nil {
 		if b.Members != nil {
-			return nil, BadRequestf(
+			return nil, httpkit.BadRequestf(
 				"members and import_from_ldap_group_setting are mutually exclusive",
 			)
 		}
-		return nil, BadRequestf("LDAP group import is not available in artifactweave")
+		return nil, httpkit.BadRequestf("LDAP group import is not available in artifactweave")
 	}
 	g := types.Group{
 		Name:            b.Name,
@@ -649,15 +651,15 @@ func fixedGroupFields(raw []byte, g types.Group) error {
 		RealmAttributes *string `json:"realm_attributes"`
 	}
 	if err := json.Unmarshal(raw, &sent); err != nil {
-		return BadRequestf("the body is not a group update: %v", err)
+		return httpkit.BadRequestf("the body is not a group update: %v", err)
 	}
 	switch {
 	case sent.Name != nil && *sent.Name != g.Name:
-		return BadRequestf("name cannot be changed")
+		return httpkit.BadRequestf("name cannot be changed")
 	case sent.Realm != nil && *sent.Realm != realmOf(g.Realm):
-		return BadRequestf("realm cannot be changed")
+		return httpkit.BadRequestf("realm cannot be changed")
 	case sent.RealmAttributes != nil && *sent.RealmAttributes != g.RealmAttributes:
-		return BadRequestf("realm_attributes cannot be changed")
+		return httpkit.BadRequestf("realm_attributes cannot be changed")
 	}
 	return nil
 }
@@ -768,7 +770,7 @@ func (s accessService) SetBasicAuthenticationStatus(
 		return nil, err
 	}
 	if req.Body == nil {
-		return nil, BadRequestf("a body with enabled is required")
+		return nil, httpkit.BadRequestf("a body with enabled is required")
 	}
 	if err := svc.Store.Settings().
 		Put(ctx, types.SettingBasicAuthEnabled, req.Body.Enabled); err != nil {
@@ -861,7 +863,7 @@ func (s accessService) ConfigureAccessUserLockPolicy(
 		return nil, err
 	}
 	if req.Body == nil {
-		return nil, BadRequestf("a user lock policy is required")
+		return nil, httpkit.BadRequestf("a user lock policy is required")
 	}
 	b := req.Body
 	stored, err := svc.SetAccessLockPolicy(ctx, identity.AccessLockPolicy{
@@ -920,7 +922,10 @@ func identityResource(resourceType, resourceName *string) (*store.IdentityResour
 		types.ResourceDestination, types.ResourcePipelineSource:
 		return &store.IdentityResource{Type: rt, Name: *resourceName}, nil
 	default:
-		return nil, BadRequestf("resourceType %q is not a permission resource type", *resourceType)
+		return nil, httpkit.BadRequestf(
+			"resourceType %q is not a permission resource type",
+			*resourceType,
+		)
 	}
 }
 
@@ -935,7 +940,7 @@ func identityCursor(next string) *string {
 // within projects, which artifactweave does not serve yet.
 func projectsUnsupported(role, projectKey *string) error {
 	if role != nil || projectKey != nil {
-		return BadRequestf(
+		return httpkit.BadRequestf(
 			"filtering by role or projectKey needs projects, which artifactweave does not serve yet",
 		)
 	}
@@ -947,7 +952,7 @@ func listLimit(limit *int) (int, error) {
 		return defaultListLimit, nil
 	}
 	if *limit < 1 || *limit > store.MaxLimit {
-		return 0, BadRequestf("limit must be between 1 and %d", store.MaxLimit)
+		return 0, httpkit.BadRequestf("limit must be between 1 and %d", store.MaxLimit)
 	}
 	return *limit, nil
 }

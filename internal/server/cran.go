@@ -78,7 +78,7 @@ func (s artifactoryService) serveCranIndex(
 	}
 	if !acc.folder(c, feed, types.ActionRead) || !acc.file(c, req.path, types.ActionRead) ||
 		generic.CheckDownload(c, req.path, false) != nil {
-		httpkit.WriteErr(w, r, Denied(p))
+		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	var candidates []cranCandidate
@@ -334,7 +334,7 @@ func (s artifactoryService) serveCranPackage(
 	}
 	if !acc.file(c, req.path, types.ActionRead) ||
 		generic.CheckDownload(c, req.path, false) != nil {
-		httpkit.WriteErr(w, r, Denied(p))
+		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	feed, _, _, _ := cran.PackagePath(req.path)

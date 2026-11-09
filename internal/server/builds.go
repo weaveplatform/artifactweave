@@ -67,9 +67,12 @@ func (s artifactoryService) buildError(
 ) error {
 	switch {
 	case errors.Is(err, build.ErrForbidden):
-		return Denied(p)
+		return httpkit.Denied(p)
 	case errors.Is(err, build.ErrInvalid):
-		return BadRequestf("%s", strings.TrimPrefix(err.Error(), build.ErrInvalid.Error()+": "))
+		return httpkit.BadRequestf(
+			"%s",
+			strings.TrimPrefix(err.Error(), build.ErrInvalid.Error()+": "),
+		)
 	case errors.Is(err, build.ErrNoRepository):
 		return notFoundRepo(types.BuildInfoRepo(build.ProjectKey(project)))
 	case errors.Is(err, build.ErrConflict):
@@ -94,7 +97,10 @@ func started(s *string) (time.Time, error) {
 	}
 	t, err := build.ParseStarted(*s)
 	if err != nil {
-		return t, BadRequestf("%s", strings.TrimPrefix(err.Error(), build.ErrInvalid.Error()+": "))
+		return t, httpkit.BadRequestf(
+			"%s",
+			strings.TrimPrefix(err.Error(), build.ErrInvalid.Error()+": "),
+		)
 	}
 	return t, nil
 }
@@ -171,7 +177,7 @@ func (s artifactoryService) UploadBuild(
 func checkBuildRepo(project string, buildRepo *string) error {
 	want := types.BuildInfoRepo(build.ProjectKey(project))
 	if httpkit.Deref(buildRepo) != "" && *buildRepo != want {
-		return BadRequestf(
+		return httpkit.BadRequestf(
 			"The build-info repository '%s' does not hold this project's builds; '%s' does",
 			*buildRepo, want)
 	}
@@ -232,7 +238,7 @@ func (s artifactoryService) GetBuildInfo(
 	}
 	if diff := req.Params.Diff; diff != nil {
 		if *diff == "null" {
-			return nil, BadRequestf("Parameter 'diff' must contain a value, if specified.")
+			return nil, httpkit.BadRequestf("Parameter 'diff' must contain a value, if specified.")
 		}
 		older, err := svc.Run(ctx, project, req.BuildName, *diff, time.Time{}, a)
 		if err != nil {
@@ -244,7 +250,7 @@ func (s artifactoryService) GetBuildInfo(
 			), err)
 		}
 		if b.Started.Before(older.Started) {
-			return nil, BadRequestf(
+			return nil, httpkit.BadRequestf(
 				"Build number should be greater than the build number to compare against.")
 		}
 		return nil, apierror.New(http.StatusNotImplemented,

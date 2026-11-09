@@ -89,7 +89,7 @@ func (systemAPI) GetSystemLicense(
 	ctx context.Context,
 	_ artgen.GetSystemLicenseRequestObject,
 ) (artgen.GetSystemLicenseResponseObject, error) {
-	if err := AdminOnly(ctx); err != nil {
+	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}
 	return artgen.GetSystemLicense200JSONResponse{
@@ -107,7 +107,7 @@ func (s systemAPI) GetServiceId(
 	ctx context.Context,
 	_ artgen.GetServiceIdRequestObject,
 ) (artgen.GetServiceIdResponseObject, error) {
-	if err := AdminOnly(ctx); err != nil {
+	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}
 	id, err := s.cfg.Store.Instance().Get(ctx)

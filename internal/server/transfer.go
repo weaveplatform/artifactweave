@@ -54,16 +54,16 @@ func splitRepoPath(escaped string) (key, p string, folder bool, err error) {
 	segs := strings.Split(strings.Trim(escaped, "/"), "/")
 	for i, seg := range segs {
 		if segs[i], err = url.PathUnescape(seg); err != nil {
-			return "", "", false, BadRequestf("malformed path: %v", err)
+			return "", "", false, httpkit.BadRequestf("malformed path: %v", err)
 		}
 	}
 	key, p = segs[0], strings.Join(segs[1:], "/")
 	if key == "" {
-		return "", "", false, BadRequestf("a repository key is required")
+		return "", "", false, httpkit.BadRequestf("a repository key is required")
 	}
 	if p != "" {
 		if _, _, _, err := types.SplitItemPath(p); err != nil {
-			return "", "", false, BadRequestf("malformed path %q", p)
+			return "", "", false, httpkit.BadRequestf("malformed path %q", p)
 		}
 	}
 	return key, p, folder, nil
@@ -77,7 +77,7 @@ func flag01(q url.Values, name string, def bool) (bool, error) {
 	}
 	b, err := strconv.ParseBool(v)
 	if err != nil {
-		return false, BadRequestf("%s must be 0 or 1", name)
+		return false, httpkit.BadRequestf("%s must be 0 or 1", name)
 	}
 	return b, nil
 }
@@ -150,7 +150,7 @@ func (s artifactoryService) transfer(w http.ResponseWriter, r *http.Request, mov
 	}
 	if !acc.file(from, srcPath, types.ActionRead) ||
 		(move && !acc.file(from, srcPath, types.ActionDelete)) {
-		httpkit.WriteErr(w, r, Denied(p))
+		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	cached = cached || from.Class == repo.Remote
@@ -185,7 +185,7 @@ func (s artifactoryService) transfer(w http.ResponseWriter, r *http.Request, mov
 		dest = path.Join(toPath, path.Base(srcPath))
 	}
 	if !acc.file(target, dest, types.ActionWrite) {
-		httpkit.WriteErr(w, r, Denied(p))
+		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	svc, src := s.items(st), item.Target{Repo: from, Cached: cached, Path: srcPath}
@@ -252,7 +252,7 @@ func (s artifactoryService) overwriteRight(
 	overwrite := acc.file(l.target, l.dest, types.ActionDelete)
 	for _, m := range moves {
 		if !acc.file(l.src.Repo, m.From, want) || !acc.file(l.target, m.To, types.ActionWrite) {
-			return false, Denied(p)
+			return false, httpkit.Denied(p)
 		}
 		if acc.file(l.target, m.To, types.ActionDelete) {
 			continue
@@ -322,7 +322,7 @@ func (s artifactoryService) downloadFolderArchive(w http.ResponseWriter, r *http
 	}
 	kind, ok := item.ParseArchiveKind(r.URL.Query().Get("archiveType"))
 	if !ok {
-		httpkit.WriteErr(w, r, BadRequestf("archiveType must be zip, tar, tar.gz or tgz"))
+		httpkit.WriteErr(w, r, httpkit.BadRequestf("archiveType must be zip, tar, tar.gz or tgz"))
 		return
 	}
 	sums, err := flag01(r.URL.Query(), "includeChecksumFiles", false)
@@ -341,11 +341,11 @@ func (s artifactoryService) downloadFolderArchive(w http.ResponseWriter, r *http
 		return
 	}
 	if !acc.folder(c, p, types.ActionRead) {
-		httpkit.WriteErr(w, r, Denied(caller))
+		httpkit.WriteErr(w, r, httpkit.Denied(caller))
 		return
 	}
 	if c.Class == repo.Virtual {
-		httpkit.WriteErr(w, r, BadRequestf(
+		httpkit.WriteErr(w, r, httpkit.BadRequestf(
 			"Only local repositories and remote caches can be downloaded as an archive"))
 		return
 	}
@@ -365,7 +365,7 @@ func (s artifactoryService) downloadFolderArchive(w http.ResponseWriter, r *http
 		return
 	}
 	if len(tree) > 0 && p != "" && !tree[0].Folder {
-		httpkit.WriteErr(w, r, BadRequestf("%s is a file, not a folder", p))
+		httpkit.WriteErr(w, r, httpkit.BadRequestf("%s is a file, not a folder", p))
 		return
 	}
 	var files []types.Item
@@ -380,13 +380,13 @@ func (s artifactoryService) downloadFolderArchive(w http.ResponseWriter, r *http
 		}
 	}
 	if len(files) > fd.MaxFiles || total > int64(fd.MaxDownloadSizeMB)<<20 {
-		httpkit.WriteErr(w, r, BadRequestf(
+		httpkit.WriteErr(w, r, httpkit.BadRequestf(
 			"The folder exceeds the download limits: %d files and %d MB at most",
 			fd.MaxFiles, fd.MaxDownloadSizeMB))
 		return
 	}
 	if !s.takeFolderSlot() {
-		httpkit.WriteErr(w, r, BadRequestf(
+		httpkit.WriteErr(w, r, httpkit.BadRequestf(
 			"There are too many folder download requests currently running. Try again later."))
 		return
 	}

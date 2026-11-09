@@ -9,6 +9,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	puppethttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/puppet/http"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
@@ -37,7 +38,7 @@ func (s artifactoryService) registerPuppetMetadataRoutes(r chi.Router) {
 				apierror.Write(
 					w,
 					apierror.ProfileArtifactory,
-					BadRequestf("Puppet reindex does not accept query parameters"),
+					httpkit.BadRequestf("Puppet reindex does not accept query parameters"),
 				)
 				return
 			}

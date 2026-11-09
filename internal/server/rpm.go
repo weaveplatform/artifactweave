@@ -67,7 +67,7 @@ func (s artifactoryService) serveVirtualRPMMetadata(
 	}
 	if !acc.folder(c, req.path, types.ActionRead) || !acc.file(c, req.path, types.ActionRead) ||
 		generic.CheckDownload(c, req.path, false) != nil {
-		httpkit.WriteErr(w, r, Denied(p))
+		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	candidates, err := s.rpmCandidates(r.Context(), st, c, root, p, acc, map[string]bool{})
@@ -133,7 +133,7 @@ func (s artifactoryService) serveVirtualRPMPackage(
 	}
 	if !acc.folder(c, req.path, types.ActionRead) || !acc.file(c, req.path, types.ActionRead) ||
 		generic.CheckDownload(c, req.path, false) != nil {
-		httpkit.WriteErr(w, r, Denied(p))
+		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	root := ""

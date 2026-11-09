@@ -95,7 +95,7 @@ func parseEscapedItemPath(escaped string) (itemRequest, error) {
 	}
 	if req.path != "" {
 		if _, _, _, err := types.SplitItemPath(req.path); err != nil {
-			return req, BadRequestf("malformed path %q", req.path)
+			return req, httpkit.BadRequestf("malformed path %q", req.path)
 		}
 	}
 	return req, nil
@@ -106,7 +106,7 @@ func (s artifactoryService) itemCaller(
 	ctx context.Context,
 	st store.Store,
 ) (kernel.Principal, access, error) {
-	p, err := Principal(ctx)
+	p, err := httpkit.Principal(ctx)
 	if err != nil {
 		return p, access{}, err
 	}
@@ -305,11 +305,11 @@ func (s artifactoryService) deployEscapedItem(
 		return
 	}
 	if !acc.item(c, req.path, req.isFolder, types.ActionWrite) {
-		httpkit.WriteErr(w, r, Denied(p))
+		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	if req.path == "" {
-		httpkit.WriteErr(w, r, BadRequestf("a deploy needs a path inside the repository"))
+		httpkit.WriteErr(w, r, httpkit.BadRequestf("a deploy needs a path inside the repository"))
 		return
 	}
 	svc := s.items(st)
@@ -522,7 +522,7 @@ func (s artifactoryService) recordChecksum(
 	// A checksum is at most 64 hex characters; anything longer is not one.
 	b, err := io.ReadAll(io.LimitReader(r.Body, 256))
 	if err != nil {
-		httpkit.WriteErr(w, r, BadRequestf("reading the checksum: %v", err))
+		httpkit.WriteErr(w, r, httpkit.BadRequestf("reading the checksum: %v", err))
 		return
 	}
 	// Sidecars may carry "<hex>  <file name>" as sha1sum writes them.
@@ -745,7 +745,7 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 	// answers a caller who may not read the path without telling it how
 	// the repository is configured (DV-057).
 	if !acc.folder(c, req.path, types.ActionRead) {
-		httpkit.WriteErr(w, r, Denied(p))
+		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	if s.getRemoteFolder(w, r, c, cached, req, p, acc) {
@@ -786,7 +786,7 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if !acc.file(a.repo, a.item.FullPath(), types.ActionRead) {
-				httpkit.WriteErr(w, r, Denied(p))
+				httpkit.WriteErr(w, r, httpkit.Denied(p))
 				return
 			}
 			s.getArchiveEntry(w, r, st, a, entry)
@@ -800,7 +800,7 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !acc.item(f.repo, f.item.FullPath(), f.item.Folder, types.ActionRead) {
-		httpkit.WriteErr(w, r, Denied(p))
+		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	if ok, err := matchesMatrix(ctx, st, f.item, req); err != nil {
@@ -1099,7 +1099,7 @@ func (s artifactoryService) deleteItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !acc.file(c, req.path, types.ActionDelete) {
-		httpkit.WriteErr(w, r, Denied(p))
+		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	if c.PackageType == repo.Debian && strings.HasPrefix(req.path, "snapshots/") {
@@ -1122,7 +1122,7 @@ func (s artifactoryService) deleteItem(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, sc := range sidecars {
 		if !acc.file(c, sc.From, types.ActionDelete) {
-			httpkit.WriteErr(w, r, Denied(p))
+			httpkit.WriteErr(w, r, httpkit.Denied(p))
 			return
 		}
 	}

@@ -177,7 +177,7 @@ func invalidDoc(err error) error {
 // wins over a body name that agrees; a disagreeing body name is a 400.
 func bodyName(path string, body *string) (string, error) {
 	if body != nil && *body != "" && *body != path {
-		return "", BadRequestf(
+		return "", httpkit.BadRequestf(
 			"the name in the body (%s) does not match the path (%s)",
 			*body,
 			path,
@@ -271,7 +271,7 @@ func (s securityAPI) CreateOrReplacePermissionTarget(
 		)
 	}
 	if body == nil {
-		return nil, BadRequestf("a permission target body is required")
+		return nil, httpkit.BadRequestf("a permission target body is required")
 	}
 	name, err := bodyName(req.PermissionTargetName, body.Name)
 	if err != nil {
@@ -463,7 +463,7 @@ func v2Body(
 		json = vendor
 	}
 	if json == nil {
-		return nil, BadRequestf("a permission target body is required")
+		return nil, httpkit.BadRequestf("a permission target body is required")
 	}
 	return json, nil
 }
@@ -676,9 +676,9 @@ func (s accessService) GetPermissions(
 	expand := q.Expand != nil && *q.Expand
 	switch {
 	case limit < 1 || limit > permPageMax:
-		return nil, BadRequestf("limit must be between 1 and %d", permPageMax)
+		return nil, httpkit.BadRequestf("limit must be between 1 and %d", permPageMax)
 	case expand && !filtered:
-		return nil, BadRequestf("expand requires a user or group filter")
+		return nil, httpkit.BadRequestf("expand requires a user or group filter")
 	}
 	var (
 		ps []types.Permission
@@ -756,7 +756,7 @@ func readAccess(ctx context.Context, body any) (wire.AccessPermission, error) {
 	var w wire.AccessPermission
 	if raw := httpkit.RawBody(ctx); raw != nil {
 		if err := json.Unmarshal(raw, &w); err != nil {
-			return w, BadRequestf("the permission is not valid JSON: %v", err)
+			return w, httpkit.BadRequestf("the permission is not valid JSON: %v", err)
 		}
 		return w, nil
 	}

@@ -47,7 +47,7 @@ func (s artifactoryService) serveVirtualDebianMetadata(
 		!acc.folder(c, req.path, types.ActionRead) ||
 		!acc.file(c, req.path, types.ActionRead) ||
 		generic.CheckDownload(c, req.path, false) != nil {
-		httpkit.WriteErr(w, r, Denied(p))
+		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	parts := strings.Split(req.path, "/")
@@ -238,7 +238,7 @@ func (s artifactoryService) serveVirtualDebianPackage(
 	if len(req.props) != 0 || r.URL.RawQuery != "" ||
 		!acc.file(c, req.path, types.ActionRead) ||
 		generic.CheckDownload(c, req.path, false) != nil {
-		httpkit.WriteErr(w, r, Denied(p))
+		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	for _, key := range c.Repositories {
