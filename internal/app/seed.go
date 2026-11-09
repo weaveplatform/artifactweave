@@ -12,6 +12,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/config"
+	"github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
@@ -60,7 +62,11 @@ func seedPrincipals(
 	if err != nil {
 		return fmt.Errorf("seed: %w", err)
 	}
-	seededNow, err := auth.SeedHashed(ctx, st, hash, time.Now())
+	// The build-info repository is the artifacts module's, so the seed
+	// creates it through the module's binding over the same store, which
+	// joins the seed's transaction.
+	repositories := repos.NewRepositories(st, access.KeysOf(st), access.ProjectsOf(st))
+	seededNow, err := auth.SeedHashed(ctx, st, repositories, hash, time.Now())
 	if err != nil {
 		return err //nolint:wrapcheck // auth wraps its own errors
 	}

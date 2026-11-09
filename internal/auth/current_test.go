@@ -4,15 +4,18 @@ import (
 	"testing"
 	"time"
 
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitCurrentPrincipalRechecksIdentity(t *testing.T) {
 	ctx := t.Context()
 	db := inmem.New()
 	a, clock := newAuth(t, db, Options{Hash: HashParams{Time: 1, MemoryKiB: 8, Threads: 1}})
-	addUser(t, db, types.User{Name: "user", Admin: true}, "pw")
+	addUser(t, db, model.User{Name: "user", Admin: true}, "pw")
 	p, err := a.Basic(ctx, "user", "pw")
 	if err != nil {
 		t.Fatal(err)
@@ -21,7 +24,7 @@ func TestUnitCurrentPrincipalRechecksIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = db.Groups().Create(ctx, types.Group{Name: "new"}); err != nil {
+	if err = db.Groups().Create(ctx, model.Group{Name: "new"}); err != nil {
 		t.Fatal(err)
 	}
 	u.Admin = false
@@ -38,13 +41,14 @@ func TestUnitCurrentPrincipalRechecksIdentity(t *testing.T) {
 			changed := u
 			switch change {
 			case "disabled":
-				changed.Status = types.UserDisabled
+				changed.Status = model.UserDisabled
 			case "hash":
 				changed.PasswordHash = []byte("changed")
 			case "password off":
 				changed.InternalPasswordDisabled = true
 			case "basic off":
-				if err := db.Settings().Put(ctx, types.SettingBasicAuthEnabled, false); err != nil {
+				if err := db.Settings().
+					Put(ctx, settings.SettingBasicAuthEnabled, false); err != nil {
 					t.Fatal(err)
 				}
 			case "deleted":
@@ -70,27 +74,27 @@ func TestUnitCurrentPrincipalRechecksIdentity(t *testing.T) {
 				}
 			}
 			if change == "basic off" {
-				if err := db.Settings().Delete(ctx, types.SettingBasicAuthEnabled); err != nil {
+				if err := db.Settings().Delete(ctx, settings.SettingBasicAuthEnabled); err != nil {
 					t.Fatal(err)
 				}
 			}
 		})
 	}
-	for _, p := range []Principal{{Name: "user"}, {Registry: &types.RegistryAccess{}}} {
+	for _, p := range []kernel.Principal{{Name: "user"}, {Registry: &kernel.RegistryAccess{}}} {
 		if _, err := a.Current(ctx, p, db.Tokens()); err == nil {
 			t.Fatal("unverified accepted")
 		}
 	}
-	if _, err := a.Current(ctx, Anonymous, db.Tokens()); err == nil {
+	if _, err := a.Current(ctx, kernel.Anonymous, db.Tokens()); err == nil {
 		t.Fatal("anonymous while off")
 	}
-	if err := db.Settings().Put(ctx, types.SettingAnonymousAccess, true); err != nil {
+	if err := db.Settings().Put(ctx, settings.SettingAnonymousAccess, true); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := a.Current(ctx, Anonymous, db.Tokens()); err != nil {
+	if _, err := a.Current(ctx, kernel.Anonymous, db.Tokens()); err != nil {
 		t.Fatal(err)
 	}
-	tok := types.Token{
+	tok := model.Token{
 		ID:        "current",
 		Subject:   "jfac@test/users/user",
 		Scope:     scope(t, "applied-permissions/user"),
@@ -105,7 +109,7 @@ func TestUnitCurrentPrincipalRechecksIdentity(t *testing.T) {
 		ctx,
 		p,
 		db.Tokens(),
-	); err != nil || SubjectOf(fresh).Scope == nil ||
+	); err != nil || accessapi.SubjectOf(fresh).Scope == nil ||
 		fresh.TokenID != tok.ID {
 		t.Fatalf("token %+v %v", fresh, err)
 	}

@@ -14,10 +14,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/p2"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/blobtest"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -120,7 +120,7 @@ func TestUnitP2ReadFailsClosedAtSourceAndDeliveryFences(t *testing.T) {
 		URL: "https://root.example/site/", P2ChildOrigins: []string{"https://child.example"},
 	})
 	w := newItemWorld(t, false)
-	p := auth.Principal{Name: "admin", Admin: true}
+	p := kernel.Principal{Name: "admin", Admin: true}
 	acc, err := accessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -261,7 +261,7 @@ func TestUnitP2ReadCachedMetadataUsesItsStoredBytes(t *testing.T) {
 		URL: "https://root.example/site/",
 	})
 	w := newItemWorld(t, false)
-	p := auth.Principal{Name: "admin", Admin: true}
+	p := kernel.Principal{Name: "admin", Admin: true}
 	acc, err := accessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -305,7 +305,7 @@ func TestUnitP2ReadBoundsStreamAndExtractsOnlyValidArchives(t *testing.T) {
 		URL: "https://root.example/site/", P2ChildOrigins: []string{"https://child.example"},
 	})
 	w := newItemWorld(t, false)
-	p := auth.Principal{Name: "admin", Admin: true}
+	p := kernel.Principal{Name: "admin", Admin: true}
 	acc, err := accessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -353,7 +353,7 @@ func TestUnitP2ArchiveEntryValidationFailsBeforePublication(t *testing.T) {
 		URL: "https://root.example/site/", P2ChildOrigins: []string{"https://child.example"},
 	})
 	w := newItemWorld(t, false)
-	p := auth.Principal{Name: "admin", Admin: true}
+	p := kernel.Principal{Name: "admin", Admin: true}
 	acc, err := accessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)

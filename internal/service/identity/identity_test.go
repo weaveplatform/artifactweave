@@ -10,6 +10,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/service/identity"
+	"github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -26,7 +29,8 @@ func newService(t *testing.T) (*identity.Service, *inmem.Store) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := auth.SeedHashed(context.Background(), db, hash, clock); err != nil {
+	repositories := repos.NewRepositories(db, access.KeysOf(db), access.ProjectsOf(db))
+	if _, err := auth.SeedHashed(context.Background(), db, repositories, hash, clock); err != nil {
 		t.Fatal(err)
 	}
 	return &identity.Service{Store: db, Hash: cheap, Now: func() time.Time { return clock }}, db
@@ -144,7 +148,7 @@ func TestUnitLastAdminAndDeletion(t *testing.T) {
 		s.PatchUser(ctx, auth.AdminUser, identity.UserPatch{Admin: &no}),
 	)
 	wantInvalid(t, "delete admin", s.DeleteUser(ctx, auth.AdminUser))
-	wantInvalid(t, "delete anonymous", s.DeleteUser(ctx, auth.AnonymousUser))
+	wantInvalid(t, "delete anonymous", s.DeleteUser(ctx, kernel.AnonymousUser))
 
 	boss := newUser("boss")
 	boss.Admin = true

@@ -17,9 +17,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	skillsfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/skills"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -38,7 +38,7 @@ type skill struct {
 func (s skill) latest() skillVersion { return s.versions[0] }
 
 func (h handler) authenticated(w http.ResponseWriter, r *http.Request) bool {
-	if _, err := auth.RequireAuthenticated(r.Context()); err != nil {
+	if _, err := kernel.RequireAuthenticated(r.Context()); err != nil {
 		h.k.Error(w, r, err)
 		return false
 	}

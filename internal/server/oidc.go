@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/idtoken"
 	"github.com/weaveplatform/artifactweave/internal/service/oidc"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
@@ -43,8 +43,8 @@ func (s accessService) oidc() (oidc.Service, error) {
 // a token that does not verify, and is logged so an operator sees why.
 func (s accessService) oidcError(ctx context.Context, op string, err error) error {
 	switch {
-	case errors.Is(err, auth.ErrAPIRestricted):
-		return auth.ErrAPIRestricted
+	case errors.Is(err, kernel.ErrAPIRestricted):
+		return kernel.ErrAPIRestricted
 	case errors.Is(err, oidc.ErrNotFound):
 		return apierror.New(http.StatusNotFound, err.Error())
 	case errors.Is(err, oidc.ErrInvalid), errors.Is(err, oidc.ErrNoMatch):

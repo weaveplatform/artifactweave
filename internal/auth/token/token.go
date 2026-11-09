@@ -18,8 +18,13 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/instance"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
+	"github.com/weaveplatform/artifactweave/migration/platform/tx"
 )
 
 var (
@@ -60,9 +65,24 @@ type Options struct {
 	KeyBits int
 }
 
+// Store is what the service needs from persistence: the instance identity
+// its issuer names, the settings that hold token.default_expiry and the
+// signing key state, the token records and signing keys, the API
+// restrictions that issuance and refresh check, and the unit of work a
+// refresh runs in. The metadata store satisfies it, so the composition root
+// passes its store as it is.
+type Store interface {
+	tx.Runner
+	Instance() instance.InstanceStore
+	Settings() settings.SettingsStore
+	Tokens() port.TokenStore
+	Keys() port.KeyStore
+	APIRestrictions() port.APIRestrictionStore
+}
+
 // Service issues and verifies tokens over a store.
 type Service struct {
-	st     store.Store
+	st     Store
 	now    func() time.Time
 	bits   int
 	issuer string
@@ -74,7 +94,7 @@ type Service struct {
 // New returns a Service. The instance identity must exist: the issuer is
 // jfac@<the instance's id>. The first signing key is created when there is
 // none.
-func New(ctx context.Context, st store.Store, o Options) (*Service, error) {
+func New(ctx context.Context, st Store, o Options) (*Service, error) {
 	id, err := st.Instance().Get(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("token: instance identity: %w", err)
@@ -118,8 +138,8 @@ func (s *Service) reload(ctx context.Context) error {
 type Request struct {
 	Username string
 	// Scope defaults to applied-permissions/user.
-	Scope types.Scope
-	// ExpiresIn defaults to token.default_expiry (types.DefaultTokenExpiry
+	Scope kernel.Scope
+	// ExpiresIn defaults to token.default_expiry (model.DefaultTokenExpiry
 	// when unset); zero means never and needs ByAdmin.
 	ExpiresIn      *time.Duration
 	Refreshable    bool
@@ -132,13 +152,13 @@ type Request struct {
 	// ByAdmin is whether the caller is an administrator.
 	ByAdmin bool
 	// Purpose marks a token its user holds at most one of
-	// (types.TokenPurposeEncryptedPassword). Such a token always has a
+	// (model.TokenPurposeEncryptedPassword). Such a token always has a
 	// reference token, and keeps it sealed so it can be shown again.
 	Purpose string
 	// Identity is how the token's subject resolves to a user. An OIDC token
 	// exchange, and an administrator minting for a name that is no stored
 	// user, issue a token for a user who need not be stored.
-	Identity types.TokenIdentity
+	Identity kernel.TokenIdentity
 	// NotAfter, when set, is the latest the token may expire; a longer or
 	// unending lifetime is cut to it. A transient user's token for itself
 	// sets it to the expiry of the token that minted it: the user exists
@@ -150,7 +170,7 @@ type Request struct {
 // Issued is a new token and its secrets, which are never stored and so
 // cannot be shown again.
 type Issued struct {
-	Record         types.Token
+	Record         model.Token
 	AccessToken    string
 	RefreshToken   string
 	ReferenceToken string
@@ -182,7 +202,7 @@ func (s *Service) Issue(ctx context.Context, r Request) (Issued, error) {
 	}
 	scope := r.Scope
 	if len(scope.Entries) == 0 {
-		scope = types.UserScope()
+		scope = kernel.UserScope()
 	}
 	// Seconds: the claims carry whole seconds, and the record matches them.
 	now := s.now().Truncate(time.Second)
@@ -195,7 +215,7 @@ func (s *Service) Issue(ctx context.Context, r Request) (Issued, error) {
 			expiresIn = left
 		}
 	}
-	rec := types.Token{
+	rec := model.Token{
 		ID:          newUUID(),
 		Subject:     s.issuer + "/users/" + r.Username,
 		Scope:       scope,
@@ -204,8 +224,8 @@ func (s *Service) Issue(ctx context.Context, r Request) (Issued, error) {
 		ProjectKey:  r.ProjectKey,
 		IssuedAt:    now,
 		Refreshable: r.Refreshable,
-		Revocable: types.Revocable(
-			expiresIn, types.DefaultRevocableThreshold, r.ForceRevocable, r.Refreshable,
+		Revocable: model.Revocable(
+			expiresIn, model.DefaultRevocableThreshold, r.ForceRevocable, r.Refreshable,
 		),
 		Purpose:  r.Purpose,
 		Identity: r.Identity,
@@ -250,17 +270,17 @@ func (s *Service) Issue(ctx context.Context, r Request) (Issued, error) {
 type RegistryRequest struct {
 	Username string
 	// ExpiresIn is the lifetime; it must be positive, and at most
-	// types.RegistryTokenExpiry.
+	// model.RegistryTokenExpiry.
 	ExpiresIn time.Duration
-	Access    types.RegistryAccess
+	Access    kernel.RegistryAccess
 	// Scope is the scope of the credential that obtained the token, which
 	// the token keeps so it never acts more broadly; it defaults to
 	// applied-permissions/user, a password's.
-	Scope types.Scope
+	Scope kernel.Scope
 	// Identity is that credential's identity when it came from an OIDC
 	// exchange, so the token resolves to the same transient or synthetic
 	// user it does.
-	Identity types.TokenIdentity
+	Identity kernel.TokenIdentity
 	// Parent is the id of the stored token that obtained it, empty for a
 	// password or anonymous caller. The token is refused once the parent is
 	// revoked.
@@ -276,9 +296,9 @@ func (s *Service) IssueRegistry(_ context.Context, r RegistryRequest) (Issued, e
 	if r.Username == "" || strings.Contains(r.Username, "/") {
 		return Issued{}, fmt.Errorf("%w: a user name is required", ErrInvalidRequest)
 	}
-	if r.ExpiresIn <= 0 || r.ExpiresIn > types.RegistryTokenExpiry {
+	if r.ExpiresIn <= 0 || r.ExpiresIn > model.RegistryTokenExpiry {
 		return Issued{}, fmt.Errorf("%w: a registry token lives at most %s",
-			ErrInvalidRequest, types.RegistryTokenExpiry)
+			ErrInvalidRequest, model.RegistryTokenExpiry)
 	}
 	if !knownIdentity(r.Identity) {
 		return Issued{}, fmt.Errorf("%w: unknown identity %q", ErrInvalidRequest, r.Identity)
@@ -288,13 +308,13 @@ func (s *Service) IssueRegistry(_ context.Context, r RegistryRequest) (Issued, e
 	if access.Grants == nil {
 		// An empty list, not null, in the claim, as the Docker token
 		// specification writes it.
-		access.Grants = []types.RegistryGrant{}
+		access.Grants = []kernel.RegistryGrant{}
 	}
 	scope := r.Scope
 	if len(scope.Entries) == 0 {
-		scope = types.UserScope()
+		scope = kernel.UserScope()
 	}
-	rec := types.Token{
+	rec := model.Token{
 		ID:        newUUID(),
 		Subject:   s.issuer + "/users/" + r.Username,
 		Scope:     scope,
@@ -330,14 +350,14 @@ func (s *Service) expiresIn(ctx context.Context, req *time.Duration) (time.Durat
 	// token.default_expiry is whole seconds, as the Access configuration
 	// API carries it.
 	var secs int64
-	err := s.st.Settings().Get(ctx, types.SettingDefaultTokenExpiry, &secs)
+	err := s.st.Settings().Get(ctx, settings.SettingDefaultTokenExpiry, &secs)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
-		return types.DefaultTokenExpiry, nil
+	case errors.Is(err, kernel.ErrNotFound):
+		return model.DefaultTokenExpiry, nil
 	case err != nil:
 		return 0, fmt.Errorf("token: default expiry: %w", err)
 	case secs < 0:
-		return types.DefaultTokenExpiry, nil
+		return model.DefaultTokenExpiry, nil
 	}
 	return time.Duration(secs) * time.Second, nil
 }
@@ -346,20 +366,20 @@ func (s *Service) expiresIn(ctx context.Context, req *time.Duration) (time.Durat
 // record. A token that is malformed, badly signed, signed by an unknown or
 // retired key, expired, or revoked (no record) fails with an error wrapping
 // auth.ErrInvalidToken.
-func (s *Service) Verify(ctx context.Context, raw string) (types.Token, error) {
-	var rec types.Token
+func (s *Service) Verify(ctx context.Context, raw string) (model.Token, error) {
+	var rec model.Token
 	var err error
-	if types.IsReferenceToken(raw) {
-		rec, err = s.byDigest(ctx, store.DigestReference, raw)
+	if accessapi.IsReferenceToken(raw) {
+		rec, err = s.byDigest(ctx, port.DigestReference, raw)
 	} else {
 		rec, err = s.verifyJWT(ctx, raw, false)
 	}
 	if err != nil {
-		return types.Token{}, err
+		return model.Token{}, err
 	}
 	now := s.now()
 	if rec.Expired(now) {
-		return types.Token{}, fmt.Errorf("%w: expired", auth.ErrInvalidToken)
+		return model.Token{}, fmt.Errorf("%w: expired", auth.ErrInvalidToken)
 	}
 	if rec.Registry == nil && now.Sub(rec.LastUsed) >= touchEvery {
 		// Best effort: a failed write must not fail the request.
@@ -373,11 +393,11 @@ func (s *Service) Verify(ctx context.Context, raw string) (types.Token, error) {
 // subject are all still checked; a reference token always fails. It serves
 // only the refresh grant, which the JFrog CLI sends with the access token it
 // is replacing, by then often expired. The record outlives its expiry for
-// types.DefaultRefreshGrace (the gc keeps it), which bounds how long after
+// model.DefaultRefreshGrace (the gc keeps it), which bounds how long after
 // expiry this succeeds.
-func (s *Service) VerifyExpired(ctx context.Context, raw string) (types.Token, error) {
-	if types.IsReferenceToken(raw) {
-		return types.Token{}, fmt.Errorf("%w: not an access token", auth.ErrInvalidToken)
+func (s *Service) VerifyExpired(ctx context.Context, raw string) (model.Token, error) {
+	if accessapi.IsReferenceToken(raw) {
+		return model.Token{}, fmt.Errorf("%w: not an access token", auth.ErrInvalidToken)
 	}
 	return s.verifyJWT(ctx, raw, true)
 }
@@ -386,40 +406,40 @@ func (s *Service) verifyJWT(
 	ctx context.Context,
 	raw string,
 	allowExpired bool,
-) (types.Token, error) {
+) (model.Token, error) {
 	p, err := parse(raw)
 	if err != nil {
-		return types.Token{}, err
+		return model.Token{}, err
 	}
 	if p.header.Alg != algRS256 {
-		return types.Token{}, fmt.Errorf("%w: algorithm %q", auth.ErrInvalidToken, p.header.Alg)
+		return model.Token{}, fmt.Errorf("%w: algorithm %q", auth.ErrInvalidToken, p.header.Alg)
 	}
 	key, err := s.publicKey(ctx, p.header.Kid)
 	if err != nil {
-		return types.Token{}, err
+		return model.Token{}, err
 	}
 	if !p.verify(key) {
-		return types.Token{}, fmt.Errorf("%w: signature", auth.ErrInvalidToken)
+		return model.Token{}, fmt.Errorf("%w: signature", auth.ErrInvalidToken)
 	}
 	var c claims
 	if err := json.Unmarshal(p.payload, &c); err != nil {
-		return types.Token{}, errMalformed
+		return model.Token{}, errMalformed
 	}
 	if !allowExpired && c.Exp != 0 && !s.now().Before(time.Unix(c.Exp, 0)) {
-		return types.Token{}, fmt.Errorf("%w: expired", auth.ErrInvalidToken)
+		return model.Token{}, fmt.Errorf("%w: expired", auth.ErrInvalidToken)
 	}
 	if c.Registry != nil {
 		return s.registryRecord(ctx, c, allowExpired)
 	}
 	rec, err := s.st.Tokens().Get(ctx, c.Jti)
-	if errors.Is(err, store.ErrNotFound) {
-		return types.Token{}, fmt.Errorf("%w: revoked", auth.ErrInvalidToken)
+	if errors.Is(err, kernel.ErrNotFound) {
+		return model.Token{}, fmt.Errorf("%w: revoked", auth.ErrInvalidToken)
 	}
 	if err != nil {
-		return types.Token{}, fmt.Errorf("token: %w", err)
+		return model.Token{}, fmt.Errorf("token: %w", err)
 	}
 	if rec.Subject != c.Sub {
-		return types.Token{}, fmt.Errorf("%w: subject", auth.ErrInvalidToken)
+		return model.Token{}, fmt.Errorf("%w: subject", auth.ErrInvalidToken)
 	}
 	return rec, nil
 }
@@ -431,17 +451,17 @@ func (s *Service) registryRecord(
 	ctx context.Context,
 	c claims,
 	allowExpired bool,
-) (types.Token, error) {
+) (model.Token, error) {
 	rec, err := registryClaims(c, allowExpired)
 	if err != nil || rec.Parent == "" {
 		return rec, err
 	}
 	_, err = s.st.Tokens().Get(ctx, rec.Parent)
-	if errors.Is(err, store.ErrNotFound) {
-		return types.Token{}, fmt.Errorf("%w: its parent token was revoked", auth.ErrInvalidToken)
+	if errors.Is(err, kernel.ErrNotFound) {
+		return model.Token{}, fmt.Errorf("%w: its parent token was revoked", auth.ErrInvalidToken)
 	}
 	if err != nil {
-		return types.Token{}, fmt.Errorf("token: parent of a registry token: %w", err)
+		return model.Token{}, fmt.Errorf("token: parent of a registry token: %w", err)
 	}
 	return rec, nil
 }
@@ -449,15 +469,15 @@ func (s *Service) registryRecord(
 // registryClaims is the record a registry token's claims describe. A
 // registry token never refreshes, and one without an expiry was not issued
 // here.
-func registryClaims(c claims, allowExpired bool) (types.Token, error) {
+func registryClaims(c claims, allowExpired bool) (model.Token, error) {
 	if allowExpired || c.Exp == 0 {
-		return types.Token{}, fmt.Errorf("%w: registry token", auth.ErrInvalidToken)
+		return model.Token{}, fmt.Errorf("%w: registry token", auth.ErrInvalidToken)
 	}
-	scope, err := types.ParseScope(c.Scp)
+	scope, err := kernel.ParseScope(c.Scp)
 	if err != nil || !knownIdentity(c.Idn) {
-		return types.Token{}, errMalformed
+		return model.Token{}, errMalformed
 	}
-	return types.Token{
+	return model.Token{
 		ID: c.Jti, Subject: c.Sub, Scope: scope, Audience: c.Aud,
 		IssuedAt: time.Unix(c.Iat, 0), ExpiresAt: time.Unix(c.Exp, 0), Registry: c.Registry,
 		Identity: c.Idn, Parent: c.Ptk,
@@ -466,9 +486,9 @@ func registryClaims(c claims, allowExpired bool) (types.Token, error) {
 
 // knownIdentity reports whether id is a stored user's or one an OIDC
 // exchange issues.
-func knownIdentity(id types.TokenIdentity) bool {
-	return id == types.IdentityStored || id == types.IdentityTransient ||
-		id == types.IdentitySynthetic
+func knownIdentity(id kernel.TokenIdentity) bool {
+	return id == kernel.IdentityStored || id == kernel.IdentityTransient ||
+		id == kernel.IdentitySynthetic
 }
 
 // publicKey returns the key with kid, reloading once when it is unknown,
@@ -490,22 +510,22 @@ func (s *Service) publicKey(ctx context.Context, kid string) (*rsa.PublicKey, er
 
 func (s *Service) byDigest(
 	ctx context.Context,
-	kind store.DigestKind,
+	kind port.DigestKind,
 	raw string,
-) (types.Token, error) {
+) (model.Token, error) {
 	rec, err := s.st.Tokens().ByDigest(ctx, kind, digest(raw))
-	if errors.Is(err, store.ErrNotFound) {
-		return types.Token{}, fmt.Errorf("%w: unknown token", auth.ErrInvalidToken)
+	if errors.Is(err, kernel.ErrNotFound) {
+		return model.Token{}, fmt.Errorf("%w: unknown token", auth.ErrInvalidToken)
 	}
 	if err != nil {
-		return types.Token{}, fmt.Errorf("token: %w", err)
+		return model.Token{}, fmt.Errorf("token: %w", err)
 	}
 	return rec, nil
 }
 
 // Refresh exchanges a refresh token for a new token with the same subject,
 // scope, lifetime and options, and revokes the old one. A refresh token
-// stays usable for types.DefaultRefreshGrace after its token expires.
+// stays usable for model.DefaultRefreshGrace after its token expires.
 func (s *Service) Refresh(ctx context.Context, refreshToken string) (Issued, error) {
 	return s.RefreshAs(ctx, refreshToken, RefreshCheck{})
 }
@@ -531,15 +551,15 @@ func (s *Service) RefreshAs(
 ) (Issued, error) {
 	var out Issued
 	err := s.st.Tx(ctx, func(ctx context.Context) error {
-		old, err := s.byDigest(ctx, store.DigestRefresh, refreshToken)
+		old, err := s.byDigest(ctx, port.DigestRefresh, refreshToken)
 		if err != nil {
 			return err
 		}
 		if !old.ExpiresAt.IsZero() &&
-			!s.now().Before(old.ExpiresAt.Add(types.DefaultRefreshGrace)) {
+			!s.now().Before(old.ExpiresAt.Add(model.DefaultRefreshGrace)) {
 			return fmt.Errorf("%w: refresh token expired", auth.ErrInvalidToken)
 		}
-		sub, err := types.ParseSubject(old.Subject)
+		sub, err := model.ParseSubject(old.Subject)
 		if err != nil {
 			return fmt.Errorf("%w: %w", auth.ErrInvalidToken, err)
 		}
@@ -583,7 +603,7 @@ func (s *Service) RefreshAs(
 }
 
 // EncryptedPassword returns the user's encrypted password: the reference
-// token of their types.TokenPurposeEncryptedPassword token, which never
+// token of their model.TokenPurposeEncryptedPassword token, which never
 // expires. A user holds at most one, created on first use and shown again
 // after, so every client given it keeps working until the password changes
 // and the identity service revokes it.
@@ -594,12 +614,12 @@ func (s *Service) EncryptedPassword(ctx context.Context, username string) (strin
 	never := time.Duration(0)
 	issued, err := s.Issue(ctx, Request{
 		Username: username, ExpiresIn: &never, ForceRevocable: true,
-		Description: "encrypted password", Purpose: types.TokenPurposeEncryptedPassword,
+		Description: "encrypted password", Purpose: model.TokenPurposeEncryptedPassword,
 		// Never expiring is otherwise admin only; this token stands in for
 		// the user's own password, which does not expire either.
 		ByAdmin: true,
 	})
-	if errors.Is(err, store.ErrConflict) {
+	if errors.Is(err, kernel.ErrConflict) {
 		// A concurrent first use created it: answer with that one, so both
 		// callers hold the same value.
 		secret, rerr := s.encryptedPassword(ctx, username)
@@ -615,9 +635,9 @@ func (s *Service) EncryptedPassword(ctx context.Context, username string) (strin
 
 // encryptedPassword returns the user's stored encrypted password, or "".
 func (s *Service) encryptedPassword(ctx context.Context, username string) (string, error) {
-	ts, _, err := s.st.Tokens().List(ctx, store.TokenFilter{
-		Subject: s.issuer + "/users/" + username, Purpose: types.TokenPurposeEncryptedPassword,
-	}, store.Page{})
+	ts, _, err := s.st.Tokens().List(ctx, port.TokenFilter{
+		Subject: s.issuer + "/users/" + username, Purpose: model.TokenPurposeEncryptedPassword,
+	}, kernel.Page{})
 	if err != nil {
 		return "", fmt.Errorf("token: encrypted password: %w", err)
 	}
@@ -638,9 +658,9 @@ func (s *Service) Revoke(ctx context.Context, id string) error {
 
 // RevokeValue revokes the token whose access or reference token is raw.
 func (s *Service) RevokeValue(ctx context.Context, raw string) error {
-	kind := store.DigestAccess
-	if types.IsReferenceToken(raw) {
-		kind = store.DigestReference
+	kind := port.DigestAccess
+	if accessapi.IsReferenceToken(raw) {
+		kind = port.DigestReference
 	}
 	rec, err := s.st.Tokens().ByDigest(ctx, kind, digest(raw))
 	if err != nil {
@@ -649,9 +669,9 @@ func (s *Service) RevokeValue(ctx context.Context, raw string) error {
 	return s.revoke(ctx, rec)
 }
 
-func (s *Service) revoke(ctx context.Context, rec types.Token) error {
+func (s *Service) revoke(ctx context.Context, rec model.Token) error {
 	if !rec.Revocable {
-		return ErrNotRevocable
+		return accessapi.ErrNotRevocable
 	}
 	if err := s.st.Tokens().Delete(ctx, rec.ID); err != nil {
 		return fmt.Errorf("token: revoke: %w", err)

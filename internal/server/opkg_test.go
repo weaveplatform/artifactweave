@@ -16,11 +16,11 @@ import (
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/opkg"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/terraformtest"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -157,7 +157,7 @@ func TestAccOpkgVirtualGraphAndRouteBoundaries(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	p := auth.Principal{Name: "admin", Admin: true}
+	p := kernel.Principal{Name: "admin", Admin: true}
 	acc, err := accessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -332,7 +332,7 @@ func TestAccOpkgVirtualFeedSignsOnlyWithConfiguredGPGKey(t *testing.T) {
 
 func TestAccOpkgDirectRoutingRejectsUnsafeAndWrongClassRequests(t *testing.T) {
 	w := newItemWorld(t, false)
-	p := auth.Principal{Name: "admin", Admin: true}
+	p := kernel.Principal{Name: "admin", Admin: true}
 	acc, err := accessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -423,7 +423,7 @@ func TestAccOpkgVirtualLocalPackageRejectsMissingAndDriftedBytes(t *testing.T) {
 		}
 	}
 	seed("feed/Packages", index)
-	p := auth.Principal{Name: "admin", Admin: true}
+	p := kernel.Principal{Name: "admin", Admin: true}
 	acc, err := accessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -504,7 +504,7 @@ func TestAccOpkgRemoteIndexRejectsFaultsAndRevokedAuthority(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	p := auth.Principal{Name: "admin", Admin: true}
+	p := kernel.Principal{Name: "admin", Admin: true}
 	acc, err := accessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -802,7 +802,7 @@ func TestAccOpkgRemotePackagePinsIndependentIndexAndCachedBytes(t *testing.T) {
 	if res := w.do(http.MethodGet, url, "admin", ""); res.Code == http.StatusOK || used != 1 {
 		t.Errorf("wrong cached size published success: status=%d used=%d", res.Code, used)
 	}
-	p := auth.Principal{Name: "admin", Admin: true}
+	p := kernel.Principal{Name: "admin", Admin: true}
 	acc, err := accessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)

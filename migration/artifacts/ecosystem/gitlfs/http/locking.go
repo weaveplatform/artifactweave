@@ -17,9 +17,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -70,11 +70,11 @@ func lockHeaders(r *http.Request) bool {
 		validMediaType(r.Header.Get("Content-Type"))
 }
 
-func lockPrincipal(w http.ResponseWriter, r *http.Request) (auth.Principal, bool) {
-	p, err := auth.RequireAuthenticated(r.Context())
+func lockPrincipal(w http.ResponseWriter, r *http.Request) (kernel.Principal, bool) {
+	p, err := kernel.RequireAuthenticated(r.Context())
 	if err != nil {
 		lockError(w, http.StatusUnauthorized, "authentication required")
-		return auth.Principal{}, false
+		return kernel.Principal{}, false
 	}
 	return p, true
 }
@@ -141,7 +141,7 @@ func (h handler) lockTarget(r *http.Request, path string) (*http.Request, error)
 	// Virtual repositories cannot be permission targets. Their deployment
 	// member supplies write authority; read members supply list authority.
 	if c.Class != repo.Virtual && !h.k.Can(r, path, types.ActionWrite) {
-		return nil, auth.ErrForbidden
+		return nil, kernel.ErrForbidden
 	}
 	if c.Class != repo.Virtual {
 		return r, nil
@@ -151,7 +151,7 @@ func (h handler) lockTarget(r *http.Request, path string) (*http.Request, error)
 		return nil, err
 	}
 	if !h.k.Can(target, path, types.ActionWrite) {
-		return nil, auth.ErrForbidden
+		return nil, kernel.ErrForbidden
 	}
 	return target, nil
 }
@@ -161,7 +161,7 @@ func lockTargetStatus(err error) int {
 	if errors.As(err, &api) {
 		return api.Status
 	}
-	if errors.Is(err, auth.ErrForbidden) {
+	if errors.Is(err, kernel.ErrForbidden) {
 		return http.StatusForbidden
 	}
 	if errors.Is(err, store.ErrNotFound) {
@@ -467,7 +467,7 @@ func (h handler) lockTargetForID(r *http.Request) (*http.Request, error) {
 
 func lockReadError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, auth.ErrForbidden):
+	case errors.Is(err, kernel.ErrForbidden):
 		lockError(w, http.StatusForbidden, "Git LFS locks denied")
 	case errors.Is(err, store.ErrInvalidCursor), errors.Is(err, store.ErrInvalid):
 		lockError(w, http.StatusBadRequest, "invalid Git LFS lock cursor")
@@ -482,7 +482,7 @@ func (h handler) lockMembers(r *http.Request, mode string) ([]*http.Request, err
 	c := pkgroute.RequestFrom(r).Repo
 	if c.Class == repo.Remote {
 		if mode == "verify" {
-			return nil, auth.ErrForbidden
+			return nil, kernel.ErrForbidden
 		}
 		return []*http.Request{r}, nil
 	}
@@ -495,7 +495,7 @@ func (h handler) lockMembers(r *http.Request, mode string) ([]*http.Request, err
 			return nil, err
 		}
 		if !h.k.CanFolder(target, "", types.ActionWrite) {
-			return nil, auth.ErrForbidden
+			return nil, kernel.ErrForbidden
 		}
 	}
 	return h.members(r)
@@ -548,10 +548,10 @@ func (h handler) collectLocks(
 	virtual := pkgroute.RequestFrom(r).Repo.Class == repo.Virtual
 	if f.Path != "" {
 		if !virtual && !h.k.Can(r, f.Path, want) {
-			return nil, "", auth.ErrForbidden
+			return nil, "", kernel.ErrForbidden
 		}
 	} else if !virtual && !h.k.CanFolder(r, "", want) {
-		return nil, "", auth.ErrForbidden
+		return nil, "", kernel.ErrForbidden
 	}
 	members, err := h.lockMembers(r, mode)
 	if err != nil {
@@ -583,7 +583,7 @@ func (h handler) collectLocks(
 			memberWant = types.ActionRead
 		}
 		if virtualVerify && !h.k.CanFolder(member, "", memberWant) {
-			return nil, "", auth.ErrForbidden
+			return nil, "", kernel.ErrForbidden
 		}
 		// An unreadable virtual member must not trigger an upstream call or
 		// prevent a later readable member from contributing to the view.
@@ -638,7 +638,7 @@ func (h handler) visibleLockRow(
 	}
 	if !h.k.Can(members[memberIndex], row.Path, memberWant) {
 		if virtualVerify {
-			return false, auth.ErrForbidden
+			return false, kernel.ErrForbidden
 		}
 		return false, nil
 	}

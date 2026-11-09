@@ -7,27 +7,29 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitPasswordExpired(t *testing.T) {
 	now := time.Date(2026, 10, 13, 0, 0, 0, 0, time.UTC)
-	on := types.PasswordExpirationPolicy{Enabled: true, MaxAgeDays: 30}
+	on := model.PasswordExpirationPolicy{Enabled: true, MaxAgeDays: 30}
 	for name, c := range map[string]struct {
-		u        types.User
-		p        types.PasswordExpirationPolicy
+		u        model.User
+		p        model.PasswordExpirationPolicy
 		expected bool
 	}{
-		"forced, policy off": {types.User{PasswordExpired: true}, types.PasswordExpirationPolicy{}, true},
-		"young":              {types.User{PasswordChanged: now.AddDate(0, 0, -29)}, on, false},
-		"old":                {types.User{PasswordChanged: now.AddDate(0, 0, -31)}, on, true},
-		"old, policy off":    {types.User{PasswordChanged: now.AddDate(0, 0, -31)}, types.PasswordExpirationPolicy{}, false},
-		"age unknown":        {types.User{}, on, false},
+		"forced, policy off": {model.User{PasswordExpired: true}, model.PasswordExpirationPolicy{}, true},
+		"young":              {model.User{PasswordChanged: now.AddDate(0, 0, -29)}, on, false},
+		"old":                {model.User{PasswordChanged: now.AddDate(0, 0, -31)}, on, true},
+		"old, policy off":    {model.User{PasswordChanged: now.AddDate(0, 0, -31)}, model.PasswordExpirationPolicy{}, false},
+		"age unknown":        {model.User{}, on, false},
 		"no max age": {
-			types.User{PasswordChanged: now.AddDate(-1, 0, 0)},
-			types.PasswordExpirationPolicy{Enabled: true},
+			model.User{PasswordChanged: now.AddDate(-1, 0, 0)},
+			model.PasswordExpirationPolicy{Enabled: true},
 			false,
 		},
 	} {
@@ -40,31 +42,31 @@ func TestUnitPasswordExpired(t *testing.T) {
 func TestUnitLockoutThroughBasic(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
-	addUser(t, db, types.User{Name: "dev", Status: types.UserEnabled}, "pw")
+	addUser(t, db, model.User{Name: "dev", Status: model.UserEnabled}, "pw")
 	noSuspension(t, db)
 	a, c := newAuth(t, db, Options{})
 
 	// With the policy off, failures are not counted.
-	if _, err := a.Basic(ctx, "dev", "wrong"); !errors.Is(err, ErrBadCredentials) {
+	if _, err := a.Basic(ctx, "dev", "wrong"); !errors.Is(err, kernel.ErrBadCredentials) {
 		t.Fatal(err)
 	}
 	if u, _ := db.Users().Get(ctx, "dev"); u.FailedLogins != 0 {
 		t.Fatalf("counted with the policy off: %d", u.FailedLogins)
 	}
 
-	if err := db.Settings().Put(ctx, types.SettingUserLockPolicy,
-		types.UserLockPolicy{Enabled: true, LoginAttempts: 2}); err != nil {
+	if err := db.Settings().Put(ctx, settings.SettingUserLockPolicy,
+		model.UserLockPolicy{Enabled: true, LoginAttempts: 2}); err != nil {
 		t.Fatal(err)
 	}
 	// The cached (off) policy still applies until it expires or is forgotten.
-	if _, err := a.Basic(ctx, "dev", "wrong"); !errors.Is(err, ErrBadCredentials) {
+	if _, err := a.Basic(ctx, "dev", "wrong"); !errors.Is(err, kernel.ErrBadCredentials) {
 		t.Fatal(err)
 	}
 	if u, _ := db.Users().Get(ctx, "dev"); u.FailedLogins != 0 {
 		t.Fatalf("the cached policy was not used: %d", u.FailedLogins)
 	}
 	c.t = c.t.Add(policyTTL)
-	if _, err := a.Basic(ctx, "dev", "wrong"); !errors.Is(err, ErrBadCredentials) {
+	if _, err := a.Basic(ctx, "dev", "wrong"); !errors.Is(err, kernel.ErrBadCredentials) {
 		t.Fatal(err)
 	}
 	// A correct password between failures resets the count, even from the
@@ -84,7 +86,7 @@ func TestUnitLockoutThroughBasic(t *testing.T) {
 	// The lock answers 403 whatever the password, before it is checked, and
 	// counts nothing.
 	for _, pw := range []string{"pw", "wrong"} {
-		if _, err := a.Basic(ctx, "dev", pw); !errors.Is(err, ErrAccountLocked) {
+		if _, err := a.Basic(ctx, "dev", pw); !errors.Is(err, kernel.ErrAccountLocked) {
 			t.Fatalf("a locked user with %q: %v", pw, err)
 		}
 	}
@@ -106,7 +108,7 @@ func TestUnitLockoutThroughBasic(t *testing.T) {
 func TestUnitLockBeforeSuspensionAndPassword(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
-	addUser(t, db, types.User{Name: "dev", Status: types.UserEnabled}, "pw")
+	addUser(t, db, model.User{Name: "dev", Status: model.UserEnabled}, "pw")
 	a, _ := newAuth(t, db, Options{Concurrency: 1})
 	for range 2 {
 		_, _ = a.Basic(ctx, "dev", "wrong")
@@ -118,7 +120,7 @@ func TestUnitLockBeforeSuspensionAndPassword(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	u.Status = types.UserLocked
+	u.Status = model.UserLocked
 	if err := db.Users().Update(ctx, u); err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +133,7 @@ func TestUnitLockBeforeSuspensionAndPassword(t *testing.T) {
 	for _, pw := range []string{"pw", "wrong"} {
 		_, err := a.Basic(bounded, "dev", pw)
 		var e *apierror.Error
-		if !errors.Is(err, ErrAccountLocked) || !errors.As(err, &e) ||
+		if !errors.Is(err, kernel.ErrAccountLocked) || !errors.As(err, &e) ||
 			e.Status != http.StatusForbidden {
 			t.Fatalf("%s while locked and suspended: %v", pw, err)
 		}
@@ -142,10 +144,10 @@ func TestUnitLockBeforeSuspensionAndPassword(t *testing.T) {
 // user lock, the other defence, sees its own answers alone.
 func noSuspension(t *testing.T, db *inmem.Store) {
 	t.Helper()
-	s := types.DefaultAccessLockSettings()
+	s := model.DefaultAccessLockSettings()
 	s.ClientLoginSuspensionEnabled = false
 	if err := db.Settings().
-		Put(context.Background(), types.SettingAccessLockSettings, s); err != nil {
+		Put(context.Background(), settings.SettingAccessLockSettings, s); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -154,20 +156,20 @@ func TestUnitExpiryThroughBasic(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	a, c := newAuth(t, db, Options{})
-	addUser(t, db, types.User{Name: "dev", PasswordChanged: c.t.AddDate(0, 0, -10)}, "pw")
+	addUser(t, db, model.User{Name: "dev", PasswordChanged: c.t.AddDate(0, 0, -10)}, "pw")
 	if _, err := a.Basic(ctx, "dev", "pw"); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Settings().Put(ctx, types.SettingPasswordExpirationPolicy,
-		types.PasswordExpirationPolicy{Enabled: true, MaxAgeDays: 5}); err != nil {
+	if err := db.Settings().Put(ctx, settings.SettingPasswordExpirationPolicy,
+		model.PasswordExpirationPolicy{Enabled: true, MaxAgeDays: 5}); err != nil {
 		t.Fatal(err)
 	}
 	a.ForgetPolicies()
 	// The cached credentials do not bypass the policy.
-	if _, err := a.Basic(ctx, "dev", "pw"); !errors.Is(err, ErrPasswordExpired) {
+	if _, err := a.Basic(ctx, "dev", "pw"); !errors.Is(err, kernel.ErrPasswordExpired) {
 		t.Fatalf("an old password: %v", err)
 	}
-	if _, err := a.Basic(ctx, "dev", "wrong"); !errors.Is(err, ErrBadCredentials) {
+	if _, err := a.Basic(ctx, "dev", "wrong"); !errors.Is(err, kernel.ErrBadCredentials) {
 		t.Fatalf("a wrong password must not learn of the expiry: %v", err)
 	}
 }
@@ -175,16 +177,16 @@ func TestUnitExpiryThroughBasic(t *testing.T) {
 func TestUnitPolicyReadErrors(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
-	addUser(t, db, types.User{Name: "dev"}, "pw")
+	addUser(t, db, model.User{Name: "dev"}, "pw")
 	a, err := NewAuthenticator(db.Users(), failingSettings{db.Settings()}, Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := a.Basic(ctx, "dev", "pw"); err == nil || errors.Is(err, ErrBadCredentials) {
+	if _, err := a.Basic(ctx, "dev", "pw"); err == nil || errors.Is(err, kernel.ErrBadCredentials) {
 		t.Fatalf("a policy that cannot be read: %v", err)
 	}
 	// A wrong password still answers as one: counting is best effort.
-	if _, err := a.Basic(ctx, "dev", "wrong"); !errors.Is(err, ErrBadCredentials) {
+	if _, err := a.Basic(ctx, "dev", "wrong"); !errors.Is(err, kernel.ErrBadCredentials) {
 		t.Fatalf("a wrong password with unreadable policies: %v", err)
 	}
 	if _, err := LockPolicy(ctx, failingSettings{db.Settings()}); err == nil {

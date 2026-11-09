@@ -12,7 +12,7 @@ import (
 	"strings"
 	"unicode/utf16"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // header is a token's JOSE header. Only RS256 is issued or accepted, so a
@@ -37,12 +37,12 @@ type claims struct {
 	Iat int64  `json:"iat"`
 	Jti string `json:"jti"`
 	// Registry marks a registry token, which no record backs (IssueRegistry).
-	Registry *types.RegistryAccess `json:"registry,omitempty"`
+	Registry *kernel.RegistryAccess `json:"registry,omitempty"`
 	// Idn carries, on a registry token alone, the identity of the token from
 	// an OIDC exchange that obtained it. The exchanged token's own identity
 	// lives in its stored record, but nothing stores a registry token, so
 	// without the claim its subject would have to be a stored user.
-	Idn types.TokenIdentity `json:"idn,omitempty"`
+	Idn kernel.TokenIdentity `json:"idn,omitempty"`
 	// Ptk is, on a registry token alone, the id of the stored token that
 	// obtained it, checked on every use: nothing stores a registry token,
 	// so this is how revoking its parent reaches it.

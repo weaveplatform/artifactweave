@@ -7,6 +7,7 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authz"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
@@ -19,7 +20,7 @@ func TestUnitDeciderFrom(t *testing.T) {
 	p, decider, err := Authorize(
 		ctx,
 		authz.Sources{Permissions: db.Permissions(), Groups: db.Groups()},
-		Principal{Name: "ann"},
+		kernel.Principal{Name: "ann"},
 	)
 	if err != nil || decider == nil {
 		t.Fatalf("authorize: %+v, %v", p, err)
@@ -35,7 +36,7 @@ func TestUnitDeciderFrom(t *testing.T) {
 	}
 	// The same name, but never authorised: matching principals by value
 	// would let ann's decider answer for it.
-	child := WithPrincipal(derived, Principal{Name: p.Name})
+	child := kernel.WithPrincipal(derived, kernel.Principal{Name: p.Name})
 	if d := DeciderFrom(child); d != nil {
 		t.Fatalf("a later WithPrincipal sees the earlier decider %p", d)
 	}
@@ -44,7 +45,7 @@ func TestUnitDeciderFrom(t *testing.T) {
 	}
 	// An entry stored without a decider of its own, even one holding the
 	// same principal, is not the entry the decider was bound to.
-	rebound := WithPrincipal(parent, p)
+	rebound := kernel.WithPrincipal(parent, p)
 	if d := DeciderFrom(rebound); d != nil {
 		t.Fatalf("a decider answers for an entry it is not bound to: %p", d)
 	}
@@ -62,19 +63,19 @@ func TestUnitWithAuthorized(t *testing.T) {
 	ctx := t.Context()
 	db := inmem.New()
 	src := authz.Sources{Permissions: db.Permissions(), Groups: db.Groups()}
-	p, decider, err := Authorize(ctx, src, Principal{Name: "ann"})
+	p, decider, err := Authorize(ctx, src, kernel.Principal{Name: "ann"})
 	if err != nil || decider == nil {
 		t.Fatalf("authorize: %+v, %v", p, err)
 	}
 	authorized := WithAuthorized(ctx, p, decider)
-	if got, ok := FromContext(authorized); !ok || got.Name != p.Name {
+	if got, ok := kernel.FromContext(authorized); !ok || got.Name != p.Name {
 		t.Fatalf("stored principal %+v, %v", got, ok)
 	}
 	if d := DeciderFrom(authorized); d != decider {
 		t.Fatalf("attached decider %p, want %p", d, decider)
 	}
-	hidden := WithPrincipal(authorized, p)
-	if got, ok := FromContext(hidden); !ok || got.Name != p.Name {
+	hidden := kernel.WithPrincipal(authorized, p)
+	if got, ok := kernel.FromContext(hidden); !ok || got.Name != p.Name {
 		t.Fatalf("principal stored again %+v, %v", got, ok)
 	}
 	if d := DeciderFrom(hidden); d != nil {
@@ -101,7 +102,7 @@ func TestUnitDeciderSharedWithAccessAPI(t *testing.T) {
 	p, decider, err := Authorize(
 		ctx,
 		authz.Sources{Permissions: db.Permissions(), Groups: db.Groups()},
-		Principal{Name: "ann", Groups: []string{"readers"}},
+		kernel.Principal{Name: "ann", Groups: []string{"readers"}},
 	)
 	if err != nil || decider == nil {
 		t.Fatalf("authorize: %+v, %v", p, err)
@@ -115,7 +116,7 @@ func TestUnitDeciderSharedWithAccessAPI(t *testing.T) {
 	if d := DeciderFrom(caller); d != decider {
 		t.Errorf("DeciderFrom after accessapi.WithCaller = %p, want %p", d, decider)
 	}
-	if got, ok := FromContext(caller); !ok || got.Name != p.Name {
+	if got, ok := kernel.FromContext(caller); !ok || got.Name != p.Name {
 		t.Errorf("principal after accessapi.WithCaller %+v, %v", got, ok)
 	}
 

@@ -234,7 +234,7 @@ func TestUnitAuthorizerBinding(t *testing.T) {
 	}, types.Grants{Groups: map[string]types.Actions{"readers": types.ActionRead}})))
 	must(t, w.st.Permissions().Create(ctx, permission("anonymous-public", map[string]types.Target{
 		public.Key: {},
-	}, types.Grants{Users: map[string]types.Actions{auth.AnonymousUser: types.ActionRead}})))
+	}, types.Grants{Users: map[string]types.Actions{kernel.AnonymousUser: types.ActionRead}})))
 	az := w.api.Authorizer
 	src := authz.Sources{Permissions: w.st.Permissions(), Groups: w.st.Groups()}
 	ann := kernel.Principal{Name: "ann", Groups: []string{"readers"}, Password: true}
@@ -262,7 +262,7 @@ func TestUnitAuthorizerBinding(t *testing.T) {
 		t.Error("Authorize kept a member of an admin-privilege group from administering")
 	}
 	// The anonymous user's grants apply only while anonymous access is on.
-	anonymous := kernel.Principal{Name: auth.AnonymousUser, Anonymous: true}
+	anonymous := kernel.Principal{Name: kernel.AnonymousUser, Anonymous: true}
 	for _, on := range []bool{false, true} {
 		if _, d, err := az.Authorize(ctx, anonymous, on); err != nil || reads(d, public) != on {
 			t.Errorf("Authorize(anonymous, %v) reads public = %v, %v", on, reads(d, public), err)

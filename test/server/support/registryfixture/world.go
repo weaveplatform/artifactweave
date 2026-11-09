@@ -10,6 +10,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -80,7 +81,7 @@ func New(t *testing.T, anonymous bool, tune ...harness.Tune) *World {
 			Name: "anonymous-remotes",
 			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
 				Actions: types.Grants{Users: map[string]types.Actions{
-					auth.AnonymousUser: types.ActionRead,
+					kernel.AnonymousUser: types.ActionRead,
 				}},
 				Targets: map[string]types.Target{types.TargetAnyRemote: {Include: []string{"**"}}},
 			}},

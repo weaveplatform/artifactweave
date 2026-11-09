@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
@@ -21,6 +20,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -80,7 +80,7 @@ func searchUpstreamWorld(t *testing.T) *upstreamSearchWorld {
 				if err != nil || current != permit.Identity {
 					return source.ErrSuperseded
 				}
-				p, _ := auth.FromContext(ctx)
+				p, _ := kernel.FromContext(ctx)
 				p, err = c.Auth.Current(ctx, p, c.Store.Tokens())
 				if err != nil {
 					return source.ErrDenied

@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Temporary login suspension, the second of Artifactory 7.x's two defences
@@ -57,7 +57,7 @@ func suspendedFor(d time.Duration) error {
 
 // suspensionOn reports whether s suspends anything at all. A zero delay
 // turns suspension off, as Artifactory's maxLoginBlockDelay of 0 does.
-func suspensionOn(s types.AccessLockSettings) bool {
+func suspensionOn(s model.AccessLockSettings) bool {
 	return s.ClientLoginSuspensionEnabled && s.BaseLoginDelayMillis > 0 && s.MaxLoginDelayMillis > 0
 }
 
@@ -66,7 +66,7 @@ func suspensionOn(s types.AccessLockSettings) bool {
 // base delay, doubled for each failure past that and capped at the maximum
 // (Artifactory 6.x's loginBlockDelay << (attempts - allowed)). A threshold
 // below 1 suspends from the first failure.
-func suspensionDelay(n int, s types.AccessLockSettings) time.Duration {
+func suspensionDelay(n int, s model.AccessLockSettings) time.Duration {
 	if !suspensionOn(s) {
 		return 0
 	}
@@ -123,7 +123,7 @@ func (s *suspensions) remaining(name string, now time.Time) time.Duration {
 // already past the check when the suspension began, is not counted: a burst
 // of concurrent wrong passwords starts one suspension rather than
 // stretching it.
-func (s *suspensions) fail(name string, now time.Time, set types.AccessLockSettings) {
+func (s *suspensions) fail(name string, now time.Time, set model.AccessLockSettings) {
 	if !suspensionOn(set) {
 		return
 	}

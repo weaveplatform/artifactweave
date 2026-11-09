@@ -6,6 +6,7 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authz"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // Authorize evaluates p's permissions once for the request (decision 0006).
@@ -19,11 +20,11 @@ import (
 func Authorize(
 	ctx context.Context,
 	src authz.Sources,
-	p Principal,
-) (Principal, *authz.Decider, error) {
-	d, err := authz.New(ctx, src, SubjectOf(p))
+	p kernel.Principal,
+) (kernel.Principal, *authz.Decider, error) {
+	d, err := authz.New(ctx, src, accessapi.SubjectOf(p))
 	if err != nil {
-		return Principal{}, nil, fmt.Errorf("auth: permissions: %w", err)
+		return kernel.Principal{}, nil, fmt.Errorf("auth: permissions: %w", err)
 	}
 	p.Admin, p.Groups = d.IsAdmin(), d.Groups()
 	return p, d, nil
@@ -35,7 +36,7 @@ func Authorize(
 // It stores them with accessapi.WithCaller, so one context key serves both
 // packages and accessapi.DeciderFrom sees d too; AsAPI keeps a nil d from
 // becoming a typed nil there.
-func WithAuthorized(ctx context.Context, p Principal, d *authz.Decider) context.Context {
+func WithAuthorized(ctx context.Context, p kernel.Principal, d *authz.Decider) context.Context {
 	return accessapi.WithCaller(ctx, p, authz.AsAPI(d))
 }
 

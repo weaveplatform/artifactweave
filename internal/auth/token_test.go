@@ -7,29 +7,32 @@ import (
 	"testing"
 	"time"
 
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authz"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // fakeVerifier resolves tokens from a map; anything else is invalid.
-type fakeVerifier map[string]types.Token
+type fakeVerifier map[string]model.Token
 
-func (f fakeVerifier) Verify(_ context.Context, raw string) (types.Token, error) {
+func (f fakeVerifier) Verify(_ context.Context, raw string) (model.Token, error) {
 	if raw == "broken" {
-		return types.Token{}, errors.New("database down")
+		return model.Token{}, errors.New("database down")
 	}
 	t, ok := f[raw]
 	if !ok {
-		return types.Token{}, ErrInvalidToken
+		return model.Token{}, ErrInvalidToken
 	}
 	return t, nil
 }
 
-func scope(t *testing.T, s string) types.Scope {
+func scope(t *testing.T, s string) kernel.Scope {
 	t.Helper()
-	sc, err := types.ParseScope(s)
+	sc, err := kernel.ParseScope(s)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,17 +42,17 @@ func scope(t *testing.T, s string) types.Scope {
 func TestUnitTokenPrincipal(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
-	for _, g := range []types.Group{
+	for _, g := range []model.Group{
 		{Name: "ops"}, {Name: "devs"}, {Name: "readers"}, {Name: "admins", AdminPrivileges: true},
 	} {
 		if err := db.Groups().Create(ctx, g); err != nil {
 			t.Fatal(err)
 		}
 	}
-	for _, u := range []types.User{
-		{Name: "root", Admin: true, Groups: []string{"ops"}, Status: types.UserEnabled},
+	for _, u := range []model.User{
+		{Name: "root", Admin: true, Groups: []string{"ops"}, Status: model.UserEnabled},
 		{Name: "dev", Groups: []string{"devs", "readers"}},
-		{Name: "gone", Status: types.UserDisabled},
+		{Name: "gone", Status: model.UserDisabled},
 	} {
 		if err := db.Users().Create(ctx, u); err != nil {
 			t.Fatal(err)
@@ -71,10 +74,10 @@ func TestUnitTokenPrincipal(t *testing.T) {
 			Subject: iss + "dev",
 			Scope:   scope(t, "applied-permissions/groups:admins"),
 		},
-		"gone":      {Subject: iss + "gone", Scope: types.UserScope()},
-		"missing":   {Subject: iss + "nobody", Scope: types.UserScope()},
-		"node":      {Subject: "jfac@x/nodes/n1", Scope: types.UserScope()},
-		"malformed": {Subject: "nonsense", Scope: types.UserScope()},
+		"gone":      {Subject: iss + "gone", Scope: kernel.UserScope()},
+		"missing":   {Subject: iss + "nobody", Scope: kernel.UserScope()},
+		"node":      {Subject: "jfac@x/nodes/n1", Scope: kernel.UserScope()},
+		"malformed": {Subject: "nonsense", Scope: kernel.UserScope()},
 	}
 	a, err := NewAuthenticator(db.Users(), db.Settings(), Options{Tokens: v})
 	if err != nil {
@@ -86,7 +89,7 @@ func TestUnitTokenPrincipal(t *testing.T) {
 	// an admin-privilege group makes its members administrators, and a
 	// resource-only scope keeps the user's groups for the evaluator to narrow.
 	src := authz.Sources{Permissions: db.Permissions(), Groups: db.Groups()}
-	for raw, want := range map[string]Principal{
+	for raw, want := range map[string]kernel.Principal{
 		"root-user":   {Name: "root", Admin: true, Groups: []string{"ops"}},
 		"root-admin":  {Name: "root", Admin: true, Groups: []string{"ops"}},
 		"root-groups": {Name: "root", Groups: []string{"readers"}},
@@ -108,7 +111,7 @@ func TestUnitTokenPrincipal(t *testing.T) {
 		}
 	}
 	for _, raw := range []string{"gone", "missing", "node", "malformed", "unknown"} {
-		if _, err := a.Token(ctx, raw, ""); !errors.Is(err, ErrBadCredentials) {
+		if _, err := a.Token(ctx, raw, ""); !errors.Is(err, kernel.ErrBadCredentials) {
 			t.Errorf("%s: %v", raw, err)
 		}
 	}
@@ -117,18 +120,23 @@ func TestUnitTokenPrincipal(t *testing.T) {
 	if p, err := a.Token(ctx, "dev-user", "dev"); err != nil || p.Password {
 		t.Fatalf("dev's token as a Basic password: %+v, %v", p, err)
 	}
-	if _, err := a.Token(ctx, "dev-user", "root"); !errors.Is(err, ErrBadCredentials) {
+	if _, err := a.Token(ctx, "dev-user", "root"); !errors.Is(err, kernel.ErrBadCredentials) {
 		t.Fatalf("another user's token: %v", err)
 	}
 	// A verifier failure is not a credential failure.
-	if _, err := a.Token(ctx, "broken", ""); err == nil || errors.Is(err, ErrBadCredentials) {
+	if _, err := a.Token(
+		ctx,
+		"broken",
+		"",
+	); err == nil ||
+		errors.Is(err, kernel.ErrBadCredentials) {
 		t.Fatalf("verifier failure: %v", err)
 	}
 	none, err := NewAuthenticator(db.Users(), db.Settings(), Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := none.Token(ctx, "dev-user", ""); !errors.Is(err, ErrBadCredentials) {
+	if _, err := none.Token(ctx, "dev-user", ""); !errors.Is(err, kernel.ErrBadCredentials) {
 		t.Fatalf("no verifier: %v", err)
 	}
 }
@@ -137,13 +145,13 @@ func TestUnitTokenPrincipal(t *testing.T) {
 // a map of its own.
 type expiringVerifier struct {
 	fakeVerifier
-	expired map[string]types.Token
+	expired map[string]model.Token
 }
 
-func (e expiringVerifier) VerifyExpired(_ context.Context, raw string) (types.Token, error) {
+func (e expiringVerifier) VerifyExpired(_ context.Context, raw string) (model.Token, error) {
 	t, ok := e.expired[raw]
 	if !ok {
-		return types.Token{}, ErrInvalidToken
+		return model.Token{}, ErrInvalidToken
 	}
 	return t, nil
 }
@@ -151,9 +159,9 @@ func (e expiringVerifier) VerifyExpired(_ context.Context, raw string) (types.To
 func TestUnitExpiredToken(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
-	addUser(t, db, types.User{Name: "dev", Status: types.UserEnabled}, "")
-	addUser(t, db, types.User{Name: "gone", Status: types.UserDisabled}, "")
-	v := expiringVerifier{expired: map[string]types.Token{
+	addUser(t, db, model.User{Name: "dev", Status: model.UserEnabled}, "")
+	addUser(t, db, model.User{Name: "gone", Status: model.UserDisabled}, "")
+	v := expiringVerifier{expired: map[string]model.Token{
 		"old":      {ID: "t1", Subject: "jfac@x/users/dev"},
 		"disabled": {ID: "t2", Subject: "jfac@x/users/gone"},
 	}}
@@ -187,15 +195,15 @@ func TestUnitEncryptedPasswordToken(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	a, clk := newAuth(t, db, Options{})
-	addUser(t, db, types.User{Name: "dev", PasswordChanged: clk.t.AddDate(0, 0, -10)}, "pw")
-	addUser(t, db, types.User{Name: "sso", InternalPasswordDisabled: true}, "pw")
-	addUser(t, db, types.User{Name: "nopass"}, "")
-	addUser(t, db, types.User{Name: "forced", PasswordExpired: true}, "pw")
+	addUser(t, db, model.User{Name: "dev", PasswordChanged: clk.t.AddDate(0, 0, -10)}, "pw")
+	addUser(t, db, model.User{Name: "sso", InternalPasswordDisabled: true}, "pw")
+	addUser(t, db, model.User{Name: "nopass"}, "")
+	addUser(t, db, model.User{Name: "forced", PasswordExpired: true}, "pw")
 	v := fakeVerifier{}
 	for _, n := range []string{"dev", "sso", "nopass", "forced"} {
-		v[n] = types.Token{
-			ID: n, Subject: "jfac@x/users/" + n, Scope: types.UserScope(),
-			Purpose: types.TokenPurposeEncryptedPassword,
+		v[n] = model.Token{
+			ID: n, Subject: "jfac@x/users/" + n, Scope: kernel.UserScope(),
+			Purpose: model.TokenPurposeEncryptedPassword,
 		}
 	}
 	a.tokens = v
@@ -203,7 +211,7 @@ func TestUnitEncryptedPasswordToken(t *testing.T) {
 		t.Fatalf("dev = %+v, %v", p, err)
 	}
 	for raw, want := range map[string]error{
-		"sso": ErrBadCredentials, "nopass": ErrBadCredentials, "forced": ErrPasswordExpired,
+		"sso": kernel.ErrBadCredentials, "nopass": kernel.ErrBadCredentials, "forced": kernel.ErrPasswordExpired,
 	} {
 		if _, err := a.Token(ctx, raw, ""); !errors.Is(err, want) {
 			t.Errorf("%s: %v, want %v", raw, err, want)
@@ -211,12 +219,12 @@ func TestUnitEncryptedPasswordToken(t *testing.T) {
 	}
 	// The age policy expires the password with no write that could revoke
 	// its encrypted password.
-	if err := db.Settings().Put(ctx, types.SettingPasswordExpirationPolicy,
-		types.PasswordExpirationPolicy{Enabled: true, MaxAgeDays: 5}); err != nil {
+	if err := db.Settings().Put(ctx, settings.SettingPasswordExpirationPolicy,
+		model.PasswordExpirationPolicy{Enabled: true, MaxAgeDays: 5}); err != nil {
 		t.Fatal(err)
 	}
 	a.ForgetPolicies()
-	if _, err := a.Token(ctx, "dev", ""); !errors.Is(err, ErrPasswordExpired) {
+	if _, err := a.Token(ctx, "dev", ""); !errors.Is(err, kernel.ErrPasswordExpired) {
 		t.Fatalf("a password past the policy's age: %v", err)
 	}
 
@@ -224,13 +232,18 @@ func TestUnitEncryptedPasswordToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := broken.Token(ctx, "dev", ""); err == nil || errors.Is(err, ErrBadCredentials) {
+	if _, err := broken.Token(
+		ctx,
+		"dev",
+		"",
+	); err == nil ||
+		errors.Is(err, kernel.ErrBadCredentials) {
 		t.Fatalf("a policy that cannot be read: %v", err)
 	}
 }
 
 // failingAutoJoin is a group store whose auto-join list cannot be read.
-type failingAutoJoin struct{ store.GroupStore }
+type failingAutoJoin struct{ port.GroupStore }
 
 func (failingAutoJoin) AutoJoin(context.Context) ([]string, error) {
 	return nil, errors.New("database down")
@@ -241,14 +254,14 @@ func (failingAutoJoin) AutoJoin(context.Context) ([]string, error) {
 func TestUnitOIDCTokenIdentities(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
-	for _, g := range []types.Group{{Name: "everyone", AutoJoin: true}, {Name: "ci"}} {
+	for _, g := range []model.Group{{Name: "everyone", AutoJoin: true}, {Name: "ci"}} {
 		if err := db.Groups().Create(ctx, g); err != nil {
 			t.Fatal(err)
 		}
 	}
-	for _, u := range []types.User{
+	for _, u := range []model.User{
 		{Name: "dev", Groups: []string{"ci"}},
-		{Name: "gone", Status: types.UserDisabled},
+		{Name: "gone", Status: model.UserDisabled},
 	} {
 		if err := db.Users().Create(ctx, u); err != nil {
 			t.Fatal(err)
@@ -257,33 +270,33 @@ func TestUnitOIDCTokenIdentities(t *testing.T) {
 	const iss = "jfac@x/users/"
 	v := fakeVerifier{
 		"transient-new": {
-			Subject: iss + "robot", Scope: types.UserScope(), Identity: types.IdentityTransient,
+			Subject: iss + "robot", Scope: kernel.UserScope(), Identity: kernel.IdentityTransient,
 		},
 		"transient-stored": {
-			Subject: iss + "dev", Scope: types.UserScope(), Identity: types.IdentityTransient,
+			Subject: iss + "dev", Scope: kernel.UserScope(), Identity: kernel.IdentityTransient,
 		},
 		"transient-disabled": {
-			Subject: iss + "gone", Scope: types.UserScope(), Identity: types.IdentityTransient,
+			Subject: iss + "gone", Scope: kernel.UserScope(), Identity: kernel.IdentityTransient,
 		},
 		"synthetic": {
 			Subject:  iss + "dev",
 			Scope:    scope(t, "applied-permissions/groups:ci"),
-			Identity: types.IdentitySynthetic,
+			Identity: kernel.IdentitySynthetic,
 		},
 		// Registry tokens obtained with those (decision 0005): no record
 		// backs them, so the identity travels in the token itself.
 		"registry-transient": {
-			Subject: iss + "robot", Scope: types.UserScope(), Identity: types.IdentityTransient,
-			Registry: &types.RegistryAccess{},
+			Subject: iss + "robot", Scope: kernel.UserScope(), Identity: kernel.IdentityTransient,
+			Registry: &kernel.RegistryAccess{},
 		},
 		"registry-synthetic": {
 			Subject:  iss + "oidc-github-ci",
 			Scope:    scope(t, "applied-permissions/groups:ci"),
-			Identity: types.IdentitySynthetic,
-			Registry: &types.RegistryAccess{},
+			Identity: kernel.IdentitySynthetic,
+			Registry: &kernel.RegistryAccess{},
 		},
 		"registry-stored-missing": {
-			Subject: iss + "robot", Scope: types.UserScope(), Registry: &types.RegistryAccess{},
+			Subject: iss + "robot", Scope: kernel.UserScope(), Registry: &kernel.RegistryAccess{},
 		},
 	}
 	a, err := NewAuthenticator(db.Users(), db.Settings(), Options{Tokens: v, Groups: db.Groups()})
@@ -304,17 +317,17 @@ func TestUnitOIDCTokenIdentities(t *testing.T) {
 			t.Errorf("%s: %+v, %v; want groups %v", raw, p, err, want)
 		}
 	}
-	if _, err := a.Token(ctx, "transient-disabled", ""); !errors.Is(err, ErrBadCredentials) {
+	if _, err := a.Token(ctx, "transient-disabled", ""); !errors.Is(err, kernel.ErrBadCredentials) {
 		t.Errorf("a disabled stored user still wins over the transient one: %v", err)
 	}
 	// A registry token stands for the same user as the exchanged token that
 	// obtained it, and still reaches the registry alone.
 	for raw, want := range map[string]struct {
 		groups   []string
-		identity types.TokenIdentity
+		identity kernel.TokenIdentity
 	}{
-		"registry-transient": {[]string{"everyone"}, types.IdentityTransient},
-		"registry-synthetic": {nil, types.IdentitySynthetic},
+		"registry-transient": {[]string{"everyone"}, kernel.IdentityTransient},
+		"registry-synthetic": {nil, kernel.IdentitySynthetic},
 	} {
 		p, err := a.Token(ctx, raw, "")
 		if err != nil || !slices.Equal(p.Groups, want.groups) || p.Identity != want.identity ||
@@ -323,14 +336,21 @@ func TestUnitOIDCTokenIdentities(t *testing.T) {
 		}
 	}
 	if p, err := a.Token(ctx, "registry-synthetic", ""); err == nil &&
-		!slices.Contains(SubjectOf(p).Groups, "ci") {
+		!slices.Contains(accessapi.SubjectOf(p).Groups, "ci") {
 		t.Errorf(
 			"a synthetic registry token acts through its scope's groups: %v",
-			SubjectOf(p).Groups,
+			accessapi.SubjectOf(p).Groups,
 		)
 	}
 	// Without the identity a registry token's subject must be stored.
-	if _, err := a.Token(ctx, "registry-stored-missing", ""); !errors.Is(err, ErrBadCredentials) {
+	if _, err := a.Token(
+		ctx,
+		"registry-stored-missing",
+		"",
+	); !errors.Is(
+		err,
+		kernel.ErrBadCredentials,
+	) {
 		t.Errorf("an unstored subject without an OIDC identity: %v", err)
 	}
 	// Without a group store a transient user joins nothing.
@@ -348,7 +368,7 @@ func TestUnitOIDCTokenIdentities(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := broken.Token(ctx, "transient-new", ""); err == nil ||
-		errors.Is(err, ErrBadCredentials) {
+		errors.Is(err, kernel.ErrBadCredentials) {
 		t.Errorf("an unreadable auto-join list is not a credential failure: %v", err)
 	}
 }
@@ -362,7 +382,7 @@ func TestUnitOIDCTokenIdentities(t *testing.T) {
 func TestUnitTransientTokenScopes(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
-	for _, g := range []types.Group{{Name: "everyone", AutoJoin: true}, {Name: "ci"}} {
+	for _, g := range []model.Group{{Name: "everyone", AutoJoin: true}, {Name: "ci"}} {
 		if err := db.Groups().Create(ctx, g); err != nil {
 			t.Fatal(err)
 		}
@@ -374,8 +394,8 @@ func TestUnitTransientTokenScopes(t *testing.T) {
 		"groups": "applied-permissions/groups:ci",
 		"admin":  "applied-permissions/admin",
 	} {
-		v[raw] = types.Token{
-			Subject: iss + "ghost", Scope: scope(t, sc), Identity: types.IdentityTransient,
+		v[raw] = model.Token{
+			Subject: iss + "ghost", Scope: scope(t, sc), Identity: kernel.IdentityTransient,
 		}
 	}
 	a, err := NewAuthenticator(db.Users(), db.Settings(), Options{Tokens: v, Groups: db.Groups()})
@@ -383,7 +403,7 @@ func TestUnitTransientTokenScopes(t *testing.T) {
 		t.Fatal(err)
 	}
 	src := authz.Sources{Permissions: db.Permissions(), Groups: db.Groups()}
-	for raw, want := range map[string]Principal{
+	for raw, want := range map[string]kernel.Principal{
 		"user":   {Name: "ghost", Groups: []string{"everyone"}},
 		"groups": {Name: "ghost", Groups: []string{"ci"}},
 		"admin":  {Name: "ghost", Admin: true, Groups: []string{"everyone"}},
@@ -393,7 +413,7 @@ func TestUnitTransientTokenScopes(t *testing.T) {
 			p, _, err = Authorize(ctx, src, p)
 		}
 		if err != nil || p.Name != want.Name || p.Admin != want.Admin ||
-			!slices.Equal(p.Groups, want.Groups) || p.Identity != types.IdentityTransient {
+			!slices.Equal(p.Groups, want.Groups) || p.Identity != kernel.IdentityTransient {
 			t.Errorf("%s: %+v, %v; want %+v", raw, p, err, want)
 		}
 	}
@@ -404,26 +424,30 @@ func TestUnitTransientTokenScopes(t *testing.T) {
 func TestUnitRegistryTokenPrincipal(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
-	for _, u := range []types.User{{Name: "dev"}, {Name: AnonymousUser}} {
+	for _, u := range []model.User{{Name: "dev"}, {Name: kernel.AnonymousUser}} {
 		if err := db.Users().Create(ctx, u); err != nil {
 			t.Fatal(err)
 		}
 	}
 	exp := time.Now().Add(time.Hour).Truncate(time.Second)
-	access := &types.RegistryAccess{Grants: []types.RegistryGrant{
+	access := &kernel.RegistryAccess{Grants: []kernel.RegistryGrant{
 		{Type: "repository", Name: "r/app", Actions: []string{"pull"}},
 	}}
 	v := fakeVerifier{
 		"dev": {
-			ID: "j1", Subject: "jfac@x/users/dev", Scope: types.UserScope(),
+			ID: "j1", Subject: "jfac@x/users/dev", Scope: kernel.UserScope(),
 			ExpiresAt: exp, Registry: access,
 		},
 		"anon": {
-			ID: "j2", Subject: "jfac@x/users/" + AnonymousUser, Scope: types.UserScope(),
+			ID: "j2", Subject: "jfac@x/users/" + kernel.AnonymousUser, Scope: kernel.UserScope(),
 			ExpiresAt: exp, Registry: access,
 		},
 		// An ordinary token keeps its user, even one named anonymous.
-		"plain": {ID: "j3", Subject: "jfac@x/users/" + AnonymousUser, Scope: types.UserScope()},
+		"plain": {
+			ID:      "j3",
+			Subject: "jfac@x/users/" + kernel.AnonymousUser,
+			Scope:   kernel.UserScope(),
+		},
 	}
 	a, err := NewAuthenticator(db.Users(), db.Settings(), Options{Tokens: v})
 	if err != nil {
@@ -434,13 +458,18 @@ func TestUnitRegistryTokenPrincipal(t *testing.T) {
 		p.TokenID != "j1" {
 		t.Fatalf("dev: %+v, %v", p, err)
 	}
-	if _, err := a.Token(ctx, "anon", ""); !errors.Is(err, ErrBadCredentials) {
+	if _, err := a.Token(ctx, "anon", ""); !errors.Is(err, kernel.ErrBadCredentials) {
 		t.Fatalf("anonymous while off: %v", err)
 	}
-	if err := db.Settings().Put(ctx, types.SettingAnonymousAccess, true); err != nil {
+	if err := db.Settings().Put(ctx, settings.SettingAnonymousAccess, true); err != nil {
 		t.Fatal(err)
 	}
-	if p, err := a.Token(ctx, "anon", ""); err != nil || !p.Anonymous || p.Name != AnonymousUser {
+	if p, err := a.Token(
+		ctx,
+		"anon",
+		"",
+	); err != nil || !p.Anonymous ||
+		p.Name != kernel.AnonymousUser {
 		t.Fatalf("anonymous while on: %+v, %v", p, err)
 	}
 	if p, err := a.Token(ctx, "plain", ""); err != nil || p.Anonymous || p.Registry != nil {
@@ -450,7 +479,12 @@ func TestUnitRegistryTokenPrincipal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := broken.Token(ctx, "anon", ""); err == nil || errors.Is(err, ErrBadCredentials) {
+	if _, err := broken.Token(
+		ctx,
+		"anon",
+		"",
+	); err == nil ||
+		errors.Is(err, kernel.ErrBadCredentials) {
 		t.Fatalf("settings failure: %v", err)
 	}
 }

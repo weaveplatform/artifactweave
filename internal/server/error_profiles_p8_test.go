@@ -9,6 +9,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/test/server/support"
@@ -93,7 +94,7 @@ func TestAccReindexEnvelopes(t *testing.T) {
 // served before authentication, as Terraform's discovery document is.
 func hostFormat() pkgroute.Protocol {
 	serve := func(w http.ResponseWriter, r *http.Request, _ *pkgroute.Kit) {
-		if p, ok := auth.FromContext(r.Context()); ok {
+		if p, ok := kernel.FromContext(r.Context()); ok {
 			_, _ = io.WriteString(w, "as "+p.Name)
 			return
 		}

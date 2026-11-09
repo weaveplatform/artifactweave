@@ -16,12 +16,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	bowerfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bower"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/kernel/antpath"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -145,14 +145,14 @@ func (h handler) currentDependencyRead(
 	if !ok {
 		return source.ErrSuperseded
 	}
-	p, _ := auth.FromContext(ctx)
+	p, _ := kernel.FromContext(ctx)
 	d, _ := accessapi.DeciderFrom(ctx)
 	resource := source.Resource{Path: path, PermissionPath: path, PermissionFolder: folder}
 	err := h.sources.Revalidate(
 		ctx,
 		source.Request{
 			Repo:     pkgroute.RequestFrom(r).Repo,
-			Subject:  auth.SubjectOf(p),
+			Subject:  accessapi.SubjectOf(p),
 			Access:   d,
 			Resource: resource,
 		},
@@ -194,11 +194,11 @@ func (h handler) dependencyVersionRead(
 		if h.sources == nil || h.sources.Revalidate == nil {
 			return nil
 		}
-		p, _ := auth.FromContext(ctx)
+		p, _ := kernel.FromContext(ctx)
 		d, _ := accessapi.DeciderFrom(ctx)
 		err := h.sources.Revalidate(ctx, source.Request{
 			Repo:    pkgroute.RequestFrom(member).Repo,
-			Subject: auth.SubjectOf(p),
+			Subject: accessapi.SubjectOf(p),
 			Access:  d,
 			Resource: source.Resource{
 				Kind:   source.ResourceKindArtifact,
@@ -580,12 +580,12 @@ func (h handler) rewrittenMember(
 			return
 		}
 		read.revalidate = func(ctx context.Context) error {
-			p, _ := auth.FromContext(ctx)
+			p, _ := kernel.FromContext(ctx)
 			d, _ := accessapi.DeciderFrom(ctx)
 			for path := range files {
 				q := source.Request{
 					Repo:     pkgroute.RequestFrom(member).Repo,
-					Subject:  auth.SubjectOf(p),
+					Subject:  accessapi.SubjectOf(p),
 					Access:   d,
 					Resource: source.Resource{Path: name + "/" + version + "/" + path},
 				}

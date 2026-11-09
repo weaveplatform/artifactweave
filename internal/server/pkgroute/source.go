@@ -11,11 +11,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -43,12 +43,12 @@ func (s Remote) Read(
 	if s.Service == nil {
 		return source.Result{}, apierror.ErrNotImplemented
 	}
-	p, _ := auth.FromContext(r.Context())
+	p, _ := kernel.FromContext(r.Context())
 	d, _ := accessapi.DeciderFrom(r.Context())
 	result, err := s.Service.Read(r.Context(), source.Request{
 		Repo:      c,
 		CacheOnly: RequestFrom(r).CacheOnly,
-		Subject:   auth.SubjectOf(p),
+		Subject:   accessapi.SubjectOf(p),
 		Access:    d,
 		Resource:  resource,
 		Project:   c.ProjectKey,
@@ -133,9 +133,9 @@ func SourceError(err error, anonymous bool) error {
 		return e
 	case errors.Is(err, source.ErrDenied):
 		if anonymous {
-			return auth.ErrUnauthenticated
+			return kernel.ErrUnauthenticated
 		}
-		return auth.ErrForbidden
+		return kernel.ErrForbidden
 	case errors.Is(err, source.ErrInvalidRequest):
 		status = http.StatusBadRequest
 	case errors.Is(err, source.ErrUnsupported):
@@ -270,7 +270,7 @@ func (k *Kit) ServeResult(w http.ResponseWriter, r *http.Request, result source.
 			if result.Stream != nil {
 				_ = result.Stream.Body.Close()
 			}
-			p, _ := auth.FromContext(r.Context())
+			p, _ := kernel.FromContext(r.Context())
 			k.Error(w, r, SourceError(err, p.Anonymous))
 			return
 		}

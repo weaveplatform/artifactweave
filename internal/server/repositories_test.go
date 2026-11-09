@@ -15,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -1118,7 +1119,7 @@ func TestAccRepositoriesWithoutStore(t *testing.T) {
 			t.Errorf("%s: %d", path, rec.Code)
 		}
 	}
-	ctx := auth.WithPrincipal(context.Background(), auth.Principal{Name: "admin", Admin: true})
+	ctx := kernel.WithPrincipal(context.Background(), kernel.Principal{Name: "admin", Admin: true})
 	svc := artifactoryService{}
 	if _, err := svc.content(); err == nil {
 		t.Fatal("content without a store")
@@ -1176,10 +1177,10 @@ func TestAccHandlersCalledDirectly(t *testing.T) {
 	if _, err := svc.GetRepositoriesByTypeAndProject(
 		ctx,
 		artgen.GetRepositoriesByTypeAndProjectRequestObject{},
-	); !errors.Is(err, auth.ErrUnauthenticated) {
+	); !errors.Is(err, kernel.ErrUnauthenticated) {
 		t.Fatalf("no principal: %v", err)
 	}
-	admin := auth.WithPrincipal(ctx, auth.Principal{Name: "admin", Admin: true})
+	admin := kernel.WithPrincipal(ctx, kernel.Principal{Name: "admin", Admin: true})
 	// Without the saved body the decoded one is used, which cannot express
 	// a null reset but still merges.
 	if _, err := svc.UpdateRepositoryConfiguration(

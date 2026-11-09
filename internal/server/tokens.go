@@ -14,6 +14,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -86,7 +88,7 @@ func (t tokenAPI) mint(ctx context.Context, m mintRequest) (token.Issued, error)
 	default:
 		return token.Issued{}, badRequestf("unsupported grant_type %q", m.grant)
 	}
-	p, err := auth.RequireAuthenticated(ctx)
+	p, err := kernel.RequireAuthenticated(ctx)
 	if err != nil {
 		return token.Issued{}, fmt.Errorf("tokens: %w", err)
 	}
@@ -156,8 +158,8 @@ func (t tokenAPI) mint(ctx context.Context, m mintRequest) (token.Issued, error)
 	}
 	issued, err := svc.Issue(ctx, req)
 	switch {
-	case errors.Is(err, auth.ErrAPIRestricted):
-		return token.Issued{}, auth.ErrAPIRestricted
+	case errors.Is(err, kernel.ErrAPIRestricted):
+		return token.Issued{}, kernel.ErrAPIRestricted
 	case errors.Is(err, token.ErrNeverExpiresAdminOnly):
 		return token.Issued{}, errNeverExpires
 	case errors.Is(err, token.ErrInvalidRequest):
@@ -194,7 +196,7 @@ func (t tokenAPI) refresh(
 		)
 	}
 	var check token.RefreshCheck
-	if p, ok := auth.FromContext(ctx); ok && !p.Anonymous {
+	if p, ok := kernel.FromContext(ctx); ok && !p.Anonymous {
 		check.Username = p.Name
 	}
 	of, presented := auth.ExpiredTokenFrom(ctx)
@@ -211,7 +213,7 @@ func (t tokenAPI) refresh(
 			of, presented = t.cfg.Auth.ExpiredToken(ctx, m.accessToken)
 		}
 		if !presented {
-			return token.Issued{}, auth.ErrBadCredentials
+			return token.Issued{}, kernel.ErrBadCredentials
 		}
 	}
 	if presented {
@@ -222,8 +224,8 @@ func (t tokenAPI) refresh(
 	}
 	issued, err := svc.RefreshAs(ctx, m.refreshToken, check)
 	switch {
-	case errors.Is(err, auth.ErrAPIRestricted):
-		return token.Issued{}, auth.ErrAPIRestricted
+	case errors.Is(err, kernel.ErrAPIRestricted):
+		return token.Issued{}, kernel.ErrAPIRestricted
 	case errors.Is(err, token.ErrRefreshOtherUser):
 		return token.Issued{}, errRefreshOtherUser
 	case errors.Is(err, auth.ErrInvalidToken):
@@ -279,7 +281,7 @@ func (t tokenAPI) identityOf(ctx context.Context, username string) (types.TokenI
 // caller's token.
 func (t tokenAPI) asTransientCaller(
 	ctx context.Context,
-	p auth.Principal,
+	p kernel.Principal,
 	req *token.Request,
 ) error {
 	req.Identity, req.Scope, req.NotAfter = p.Identity, p.Scope, p.TokenExpires
@@ -317,7 +319,7 @@ var errBasicTokenCreation = apierror.New(http.StatusUnauthorized,
 // than its user's identity. Such a token must not mint a broader credential,
 // a token or a password: a resource- or group-scoped token doing so would
 // escalate past its own scope.
-func narrowedToken(p auth.Principal) bool { return p.TokenID != "" && !identityScope(p.Scope) }
+func narrowedToken(p kernel.Principal) bool { return p.TokenID != "" && !identityScope(p.Scope) }
 
 // identityScope reports whether a scope acts as its user or as an
 // administrator, rather than narrowing to groups or resources.
@@ -371,7 +373,7 @@ func (t tokenAPI) visible(ctx context.Context) ([]types.Token, *token.Service, e
 	if err != nil {
 		return nil, nil, err
 	}
-	p, err := auth.RequireAuthenticated(ctx)
+	p, err := kernel.RequireAuthenticated(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("tokens: %w", err)
 	}
@@ -407,7 +409,7 @@ func (t tokenAPI) own(ctx context.Context, id string) (types.Token, *token.Servi
 	if err != nil {
 		return types.Token{}, nil, err
 	}
-	p, err := auth.RequireAuthenticated(ctx)
+	p, err := kernel.RequireAuthenticated(ctx)
 	if err != nil {
 		return types.Token{}, nil, fmt.Errorf("tokens: %w", err)
 	}
@@ -538,7 +540,7 @@ func (s accessService) RevokeTokenById(
 		return nil, err
 	}
 	switch err := svc.Revoke(ctx, rec.ID); {
-	case errors.Is(err, token.ErrNotRevocable):
+	case errors.Is(err, accessapi.ErrNotRevocable):
 		return nil, badRequestf("Token is not revocable")
 	case errors.Is(err, store.ErrNotFound):
 		return nil, tokenNotFound()
@@ -577,7 +579,7 @@ func (s accessService) RevokeTokenByValue(
 		return nil, t.internalError(ctx, "verify token", err)
 	}
 	switch err := svc.Revoke(ctx, rec.ID); {
-	case errors.Is(err, token.ErrNotRevocable), errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, accessapi.ErrNotRevocable), errors.Is(err, store.ErrNotFound):
 		return nil, errNotRevocable
 	case err != nil:
 		return nil, t.internalError(ctx, "revoke token", err)
@@ -665,7 +667,7 @@ func (s artifactoryService) GetLegacyTokens(
 	ctx context.Context,
 	_ artgen.GetLegacyTokensRequestObject,
 ) (artgen.GetLegacyTokensResponseObject, error) {
-	if _, err := auth.RequireAdmin(ctx); err != nil {
+	if _, err := kernel.RequireAdmin(ctx); err != nil {
 		return nil, fmt.Errorf("tokens: %w", err)
 	}
 	recs, svc, err := tokenAPI{cfg: s.cfg}.visible(ctx)
@@ -739,7 +741,7 @@ func (s artifactoryService) revokeLegacyToken(w http.ResponseWriter, r *http.Req
 	t := tokenAPI{cfg: s.cfg}
 	svc, err := t.service()
 	if err == nil {
-		_, err = auth.RequireAdmin(ctx)
+		_, err = kernel.RequireAdmin(ctx)
 	}
 	if err == nil {
 		err = r.ParseForm()
@@ -779,7 +781,7 @@ func (s artifactoryService) revokeLegacyToken(w http.ResponseWriter, r *http.Req
 		return
 	}
 	switch err := svc.Revoke(ctx, rec.ID); {
-	case errors.Is(err, token.ErrNotRevocable):
+	case errors.Is(err, accessapi.ErrNotRevocable):
 		writeErr(w, r, badRequestf("Token is not revocable"))
 	case errors.Is(err, store.ErrNotFound):
 		writeText(w, "Token not found or already revoked")
@@ -806,7 +808,7 @@ func (s artifactoryService) GetUserEncryptedPassword(
 	if err != nil {
 		return nil, err
 	}
-	p, err := auth.RequireAuthenticated(ctx)
+	p, err := kernel.RequireAuthenticated(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("tokens: %w", err)
 	}

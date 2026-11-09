@@ -3,8 +3,8 @@ package pkgroute
 import (
 	"net/http"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -58,7 +58,7 @@ func (k *Kit) fileDeploy(
 	declared types.Checksums,
 ) item.Deploy {
 	c := RequestFrom(r).Repo
-	by, _ := auth.FromContext(r.Context())
+	by, _ := kernel.FromContext(r.Context())
 	return item.Deploy{
 		Target: item.Target{
 			Repo: c,

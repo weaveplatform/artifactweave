@@ -20,6 +20,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth/idtoken"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
+	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -313,7 +314,7 @@ func (s Service) now() time.Time {
 	return s.Now()
 }
 
-func (s Service) configs() store.ConfigStore { return s.Store.Configs() }
+func (s Service) configs() configdoc.ConfigStore { return s.Store.Configs() }
 
 // Providers returns every provider, by name.
 func (s Service) Providers(ctx context.Context) ([]Provider, error) {

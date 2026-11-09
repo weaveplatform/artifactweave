@@ -91,7 +91,7 @@ func transitiveFixture(t *testing.T) *transitiveWorld {
 						return err
 					}
 				}
-				p, ok := auth.FromContext(ctx)
+				p, ok := kernel.FromContext(ctx)
 				if !ok {
 					return source.ErrDenied
 				}

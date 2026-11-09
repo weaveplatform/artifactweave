@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
@@ -39,7 +41,14 @@ var CheapHash = func() []byte {
 // seeded is left as it is.
 func Seed(t *testing.T, db store.Store) {
 	t.Helper()
-	if _, err := auth.SeedHashed(context.Background(), db, CheapHash, time.Now()); err != nil {
+	repositories := repos.NewRepositories(db, access.KeysOf(db), access.ProjectsOf(db))
+	if _, err := auth.SeedHashed(
+		context.Background(),
+		db,
+		repositories,
+		CheapHash,
+		time.Now(),
+	); err != nil {
 		t.Fatal(err)
 	}
 }

@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -155,10 +155,10 @@ func TestAccOverwriteRefusalAnonymous(t *testing.T) {
 	w := newItemWorld(t, true, func(c *Config) {
 		c.Protocols = append(c.Protocols, pkgtestProtocol())
 	})
-	grant(t, w, "anonymous-deploys", auth.AnonymousUser, "libs-local",
+	grant(t, w, "anonymous-deploys", kernel.AnonymousUser, "libs-local",
 		types.ActionRead|types.ActionWrite)
 	w.put("/artifactory/libs-local/taken.txt", "taken")
-	want := refusedOverwrite("libs-local", "taken.txt", auth.AnonymousUser)
+	want := refusedOverwrite("libs-local", "taken.txt", kernel.AnonymousUser)
 	for _, path := range []string{
 		"/artifactory/libs-local/taken.txt",
 		"/artifactory/api/pkgtest/libs-local/files/taken.txt",

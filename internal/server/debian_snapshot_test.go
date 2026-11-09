@@ -22,7 +22,7 @@ func TestAccClaimDebianSnapshotBindsSourceAndDistribution(t *testing.T) {
 	job := debianSnapshotRequest{
 		Source: "source", Target: "target", Tag: "tag", Distribution: "stable",
 	}
-	p := auth.Principal{Name: "admin", Admin: true}
+	p := kernel.Principal{Name: "admin", Admin: true}
 	if err := claimDebianSnapshot(ctx, st, job, p); err != nil {
 		t.Fatal(err)
 	}
@@ -85,9 +85,9 @@ func TestUnitDebianSnapshotRequiresValidRepositoriesAndPermissions(t *testing.T)
 					}
 				}
 			}
-			p := auth.Principal{Name: "admin", Admin: true}
+			p := kernel.Principal{Name: "admin", Admin: true}
 			if tc.user != "" {
-				p = auth.Principal{Name: tc.user}
+				p = kernel.Principal{Name: tc.user}
 			}
 			acc, err := accessFor(ctx, authorizerOver(st), p, nil)
 			if err != nil {
@@ -143,7 +143,7 @@ func TestUnitDebianSnapshotPreservesCompletedAndClaimedTags(t *testing.T) {
 				SetProperties(ctx, marker.ID, props, time.Now().UTC()); err != nil {
 				t.Fatal(err)
 			}
-			p := auth.Principal{Name: "admin", Admin: true}
+			p := kernel.Principal{Name: "admin", Admin: true}
 			acc, err := accessFor(ctx, authorizerOver(st), p, nil)
 			if err != nil {
 				t.Fatal(err)
@@ -246,7 +246,7 @@ func TestUnitDebianSnapshotWorkUsesCurrentPermissions(t *testing.T) {
 	if err := run("dev"); err != nil {
 		t.Fatalf("a caller with the grant: %v", err)
 	}
-	if err := run("other"); !errors.Is(err, auth.ErrForbidden) {
+	if err := run("other"); !errors.Is(err, kernel.ErrForbidden) {
 		t.Fatalf("a caller without the grant: %v", err)
 	}
 }

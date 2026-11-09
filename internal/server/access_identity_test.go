@@ -12,6 +12,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -838,7 +839,7 @@ func TestAccGroupListPagesAndFilters(t *testing.T) {
 }
 
 func TestAccAccessIdentityWithoutStore(t *testing.T) {
-	ctx := auth.WithPrincipal(context.Background(), auth.Principal{Name: "admin", Admin: true})
+	ctx := kernel.WithPrincipal(context.Background(), kernel.Principal{Name: "admin", Admin: true})
 	svc := accessService{}
 	if _, err := svc.GetUserList(
 		ctx,

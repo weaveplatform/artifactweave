@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -237,7 +237,7 @@ func TestUnitDebianSnapshotRejectsUnboundMetadata(t *testing.T) {
 			if tc.index != "" {
 				put(index, tc.index)
 			}
-			p := auth.Principal{Name: "admin", Admin: true}
+			p := kernel.Principal{Name: "admin", Admin: true}
 			acc, err := accessFor(t.Context(), authorizerOver(w.db), p, nil)
 			if err != nil {
 				t.Fatal(err)
@@ -260,7 +260,7 @@ func TestAccDebianSnapshotClaimCannotBeReusedByAnotherSource(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	p := auth.Principal{Name: "admin", Admin: true}
+	p := kernel.Principal{Name: "admin", Admin: true}
 	job := debianSnapshotRequest{
 		Source: "deb-source-one", Target: "deb-target", Tag: "first", Distribution: "stable",
 	}

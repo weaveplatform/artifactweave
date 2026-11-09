@@ -9,10 +9,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // TestMain makes hashing cheap: the production parameters cost 64 MiB and
@@ -69,14 +71,15 @@ func TestUnitHashParamsReachTheHashAndTheDummy(t *testing.T) {
 	if err != nil || !strings.HasPrefix(string(a.dummy), "$argon2id$v=19$m=32,t=1,p=1$") {
 		t.Fatalf("dummy %q, %v", a.dummy, err)
 	}
-	if _, err := SeedHashed(context.Background(), db, h, time.Now()); err != nil {
+	repos := newSeedRepos()
+	if _, err := SeedHashed(context.Background(), db, repos, h, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	admin, err := db.Users().Get(context.Background(), AdminUser)
 	if err != nil || string(admin.PasswordHash) != string(h) {
 		t.Fatalf("admin hash %q, %v", admin.PasswordHash, err)
 	}
-	if now, err := SeedHashed(context.Background(), db, h, time.Now()); now || err != nil {
+	if now, err := SeedHashed(context.Background(), db, repos, h, time.Now()); now || err != nil {
 		t.Fatalf("second seed: %v %v", now, err)
 	}
 }
@@ -107,10 +110,10 @@ func TestUnitCheckPasswordRejectsMalformedHashes(t *testing.T) {
 
 func TestUnitRequire(t *testing.T) {
 	ctx := context.Background()
-	user := WithPrincipal(ctx, Principal{Name: "dev", Groups: []string{"readers"}})
-	admin := WithPrincipal(ctx, Principal{Name: "admin", Admin: true})
-	anon := WithPrincipal(ctx, Anonymous)
-	if _, ok := FromContext(ctx); ok {
+	user := kernel.WithPrincipal(ctx, kernel.Principal{Name: "dev", Groups: []string{"readers"}})
+	admin := kernel.WithPrincipal(ctx, kernel.Principal{Name: "admin", Admin: true})
+	anon := kernel.WithPrincipal(ctx, kernel.Anonymous)
+	if _, ok := kernel.FromContext(ctx); ok {
 		t.Fatal("a bare context has a principal")
 	}
 	for name, tc := range map[string]struct {
@@ -118,24 +121,24 @@ func TestUnitRequire(t *testing.T) {
 		authn     error
 		adminOnly error
 	}{
-		"none":      {ctx, ErrUnauthenticated, ErrUnauthenticated},
-		"anonymous": {anon, ErrUnauthenticated, ErrUnauthenticated},
-		"user":      {user, nil, ErrForbidden},
+		"none":      {ctx, kernel.ErrUnauthenticated, kernel.ErrUnauthenticated},
+		"anonymous": {anon, kernel.ErrUnauthenticated, kernel.ErrUnauthenticated},
+		"user":      {user, nil, kernel.ErrForbidden},
 		"admin":     {admin, nil, nil},
 	} {
-		if _, err := RequireAuthenticated(tc.ctx); !errors.Is(err, tc.authn) {
+		if _, err := kernel.RequireAuthenticated(tc.ctx); !errors.Is(err, tc.authn) {
 			t.Errorf("%s: RequireAuthenticated = %v", name, err)
 		}
-		if _, err := RequireAdmin(tc.ctx); !errors.Is(err, tc.adminOnly) {
+		if _, err := kernel.RequireAdmin(tc.ctx); !errors.Is(err, tc.adminOnly) {
 			t.Errorf("%s: RequireAdmin = %v", name, err)
 		}
 	}
-	if p, _ := RequireAdmin(admin); p.Name != "admin" {
+	if p, _ := kernel.RequireAdmin(admin); p.Name != "admin" {
 		t.Fatalf("RequireAdmin returned %+v", p)
 	}
 	var e *apierror.Error
-	if !errors.As(ErrForbidden, &e) || e.Status != http.StatusForbidden ||
-		ErrBadCredentials.Status != http.StatusUnauthorized {
+	if !errors.As(kernel.ErrForbidden, &e) || e.Status != http.StatusForbidden ||
+		kernel.ErrBadCredentials.Status != http.StatusUnauthorized {
 		t.Fatal("errors carry the wrong status")
 	}
 }
@@ -158,7 +161,7 @@ func newAuth(t *testing.T, db *inmem.Store, o Options) (*Authenticator, *clock) 
 	return a, c
 }
 
-func addUser(t *testing.T, db *inmem.Store, u types.User, password string) {
+func addUser(t *testing.T, db *inmem.Store, u model.User, password string) {
 	t.Helper()
 	if password != "" {
 		h, err := HashPassword(password)
@@ -184,20 +187,20 @@ func lastLogin(t *testing.T, db *inmem.Store, name string) time.Time {
 func TestUnitBasic(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
-	if err := db.Groups().Create(ctx, types.Group{Name: "readers"}); err != nil {
+	if err := db.Groups().Create(ctx, model.Group{Name: "readers"}); err != nil {
 		t.Fatal(err)
 	}
 	addUser(
 		t,
 		db,
-		types.User{Name: "dev", Status: types.UserEnabled, Groups: []string{"readers"}},
+		model.User{Name: "dev", Status: model.UserEnabled, Groups: []string{"readers"}},
 		"pw",
 	)
-	addUser(t, db, types.User{Name: "boss", Admin: true}, "pw")
-	addUser(t, db, types.User{Name: "gone", Status: types.UserDisabled}, "pw")
-	addUser(t, db, types.User{Name: "sso", InternalPasswordDisabled: true}, "pw")
-	addUser(t, db, types.User{Name: "nopass"}, "")
-	addUser(t, db, types.User{Name: "corrupt", PasswordHash: []byte("$argon2id$garbage")}, "")
+	addUser(t, db, model.User{Name: "boss", Admin: true}, "pw")
+	addUser(t, db, model.User{Name: "gone", Status: model.UserDisabled}, "pw")
+	addUser(t, db, model.User{Name: "sso", InternalPasswordDisabled: true}, "pw")
+	addUser(t, db, model.User{Name: "nopass"}, "")
+	addUser(t, db, model.User{Name: "corrupt", PasswordHash: []byte("$argon2id$garbage")}, "")
 	a, clk := newAuth(t, db, Options{})
 
 	p, err := a.Basic(ctx, "dev", "pw")
@@ -216,7 +219,7 @@ func TestUnitBasic(t *testing.T) {
 		{"nopass", ""},
 		{"corrupt", "pw"},
 	} {
-		if _, err := a.Basic(ctx, c[0], c[1]); !errors.Is(err, ErrBadCredentials) {
+		if _, err := a.Basic(ctx, c[0], c[1]); !errors.Is(err, kernel.ErrBadCredentials) {
 			t.Errorf("%s/%s: %v", c[0], c[1], err)
 		}
 	}
@@ -248,7 +251,7 @@ func TestUnitBasic(t *testing.T) {
 	if err := db.Users().Update(ctx, u); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := a.Basic(ctx, "dev", "pw"); !errors.Is(err, ErrBadCredentials) {
+	if _, err := a.Basic(ctx, "dev", "pw"); !errors.Is(err, kernel.ErrBadCredentials) {
 		t.Fatalf("old password after a change: %v", err)
 	}
 	if _, err := a.Basic(ctx, "dev", "new"); err != nil {
@@ -257,14 +260,14 @@ func TestUnitBasic(t *testing.T) {
 }
 
 // failingUsers fails Get, as a database that went away would.
-type failingUsers struct{ store.UserStore }
+type failingUsers struct{ port.UserStore }
 
-func (failingUsers) Get(context.Context, string) (types.User, error) {
-	return types.User{}, errors.New("database down")
+func (failingUsers) Get(context.Context, string) (model.User, error) {
+	return model.User{}, errors.New("database down")
 }
 
 // failingSettings fails Get.
-type failingSettings struct{ store.SettingsStore }
+type failingSettings struct{ settings.SettingsStore }
 
 func (failingSettings) Get(
 	context.Context,
@@ -281,13 +284,13 @@ func TestUnitBasicErrors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := a.Basic(ctx, "dev", "pw"); err == nil || errors.Is(err, ErrBadCredentials) {
+	if _, err := a.Basic(ctx, "dev", "pw"); err == nil || errors.Is(err, kernel.ErrBadCredentials) {
 		t.Fatalf("store failure = %v, want a server error", err)
 	}
 
 	// With every hashing slot taken, a request gives up when its context
 	// ends rather than queueing for ever.
-	addUser(t, db, types.User{Name: "dev"}, "pw")
+	addUser(t, db, model.User{Name: "dev"}, "pw")
 	b, _ := newAuth(t, db, Options{Concurrency: 1})
 	b.slots <- struct{}{}
 	cancelled, cancel := context.WithCancel(ctx)
@@ -305,7 +308,7 @@ func TestUnitAnonymousAllowed(t *testing.T) {
 	if on, err := a.AnonymousAllowed(ctx); on || err != nil {
 		t.Fatalf("unset = %v, %v", on, err)
 	}
-	if err := db.Settings().Put(ctx, types.SettingAnonymousAccess, true); err != nil {
+	if err := db.Settings().Put(ctx, settings.SettingAnonymousAccess, true); err != nil {
 		t.Fatal(err)
 	}
 	if on, err := a.AnonymousAllowed(ctx); !on || err != nil {

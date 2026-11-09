@@ -13,9 +13,11 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var errBoom = errors.New("boom")
@@ -26,14 +28,14 @@ type faultStore struct {
 	fail map[string]bool
 }
 
-func (s *faultStore) Settings() store.SettingsStore {
+func (s *faultStore) Settings() settings.SettingsStore {
 	return faultSettings{s.Store.Settings(), s.fail}
 }
-func (s *faultStore) Keys() store.KeyStore     { return faultKeys{s.Store.Keys(), s.fail} }
-func (s *faultStore) Tokens() store.TokenStore { return faultTokens{s.Store.Tokens(), s.fail} }
+func (s *faultStore) Keys() port.KeyStore     { return faultKeys{s.Store.Keys(), s.fail} }
+func (s *faultStore) Tokens() port.TokenStore { return faultTokens{s.Store.Tokens(), s.fail} }
 
 type faultSettings struct {
-	store.SettingsStore
+	settings.SettingsStore
 	fail map[string]bool
 }
 
@@ -52,18 +54,18 @@ func (x faultSettings) Put(ctx context.Context, k string, v any) error {
 }
 
 type faultKeys struct {
-	store.KeyStore
+	port.KeyStore
 	fail map[string]bool
 }
 
-func (x faultKeys) SigningKeys(ctx context.Context) ([]types.SigningKey, error) {
+func (x faultKeys) SigningKeys(ctx context.Context) ([]model.SigningKey, error) {
 	if x.fail["keys.list"] {
 		return nil, errBoom
 	}
 	return x.KeyStore.SigningKeys(ctx) //nolint:wrapcheck // test fake
 }
 
-func (x faultKeys) PutSigningKey(ctx context.Context, k types.SigningKey) error {
+func (x faultKeys) PutSigningKey(ctx context.Context, k model.SigningKey) error {
 	if x.fail["keys.put"] {
 		return errBoom
 	}
@@ -71,40 +73,40 @@ func (x faultKeys) PutSigningKey(ctx context.Context, k types.SigningKey) error 
 }
 
 type faultTokens struct {
-	store.TokenStore
+	port.TokenStore
 	fail map[string]bool
 }
 
-func (x faultTokens) Create(ctx context.Context, t types.Token) error {
+func (x faultTokens) Create(ctx context.Context, t model.Token) error {
 	if x.fail["tokens.create"] {
 		return errBoom
 	}
 	return x.TokenStore.Create(ctx, t) //nolint:wrapcheck // test fake
 }
 
-func (x faultTokens) Get(ctx context.Context, id string) (types.Token, error) {
+func (x faultTokens) Get(ctx context.Context, id string) (model.Token, error) {
 	if x.fail["tokens.get"] {
-		return types.Token{}, errBoom
+		return model.Token{}, errBoom
 	}
 	return x.TokenStore.Get(ctx, id) //nolint:wrapcheck // test fake
 }
 
 func (x faultTokens) ByDigest(
 	ctx context.Context,
-	k store.DigestKind,
+	k port.DigestKind,
 	d []byte,
-) (types.Token, error) {
+) (model.Token, error) {
 	if x.fail["tokens.bydigest"] {
-		return types.Token{}, errBoom
+		return model.Token{}, errBoom
 	}
 	return x.TokenStore.ByDigest(ctx, k, d) //nolint:wrapcheck // test fake
 }
 
 func (x faultTokens) List(
 	ctx context.Context,
-	f store.TokenFilter,
-	p store.Page,
-) ([]types.Token, string, error) {
+	f port.TokenFilter,
+	p kernel.Page,
+) ([]model.Token, string, error) {
 	if x.fail["tokens.list"] {
 		return nil, "", errBoom
 	}
@@ -212,7 +214,7 @@ func TestUnitBadStoredKeys(t *testing.T) {
 	rsaPubDER, err := x509.MarshalPKIXPublicKey(&rk.PublicKey)
 	rsaPub := pemOf(t, "PUBLIC KEY", rsaPubDER, err)
 	garbage := pemOf(t, "PUBLIC KEY", []byte("garbage"), nil)
-	for name, k := range map[string]types.SigningKey{
+	for name, k := range map[string]model.SigningKey{
 		"no pem public":   {PublicKey: "not pem", PrivateKey: ecPriv},
 		"garbage public":  {PublicKey: garbage, PrivateKey: ecPriv},
 		"ec public":       {PublicKey: ecPub, PrivateKey: ecPriv},
@@ -249,7 +251,7 @@ func TestUnitRecordMismatches(t *testing.T) {
 		t.Fatal(err)
 	}
 	invalid(t, s, out.AccessToken, "record of another subject")
-	if err := db.Tokens().Create(ctx, types.Token{
+	if err := db.Tokens().Create(ctx, model.Token{
 		ID: "bad", Subject: "nobody", Refreshable: true, RefreshDigest: digest("r"),
 		IssuedAt: time.Now(),
 	}); err != nil {
@@ -258,7 +260,7 @@ func TestUnitRecordMismatches(t *testing.T) {
 	if _, err := s.Refresh(ctx, "r"); !errors.Is(err, auth.ErrInvalidToken) {
 		t.Fatalf("refresh of a bad subject: %v", err)
 	}
-	if err := db.Settings().Put(ctx, types.SettingDefaultTokenExpiry, "soon"); err != nil {
+	if err := db.Settings().Put(ctx, settings.SettingDefaultTokenExpiry, "soon"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.Issue(ctx, Request{Username: "a"}); err == nil {

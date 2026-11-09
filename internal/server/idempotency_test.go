@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -31,14 +32,14 @@ func TestUnitIdempotencyKey(t *testing.T) {
 			t.Fatalf("invalid key %q accepted", raw)
 		}
 	}
-	for _, p := range []auth.Principal{{}, auth.Anonymous, {Name: "registry", Registry: &types.RegistryAccess{}}} {
+	for _, p := range []kernel.Principal{{}, kernel.Anonymous, {Name: "registry", Registry: &types.RegistryAccess{}}} {
 		if _, err := appendReplayRequest(`"key"`, p, build.Append{}); err == nil {
 			t.Fatalf("unsupported principal accepted: %+v", p)
 		}
 	}
 	if _, err := appendReplayRequest(
 		`"key"`,
-		auth.Principal{Name: "user", Password: true},
+		kernel.Principal{Name: "user", Password: true},
 		build.Append{Started: time.Date(10000, 1, 1, 0, 0, 0, 0, time.UTC)},
 	); err == nil {
 		t.Fatal("unencodable scope accepted")

@@ -6,8 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitCurrentRegistryKeepsGrantAndRechecksCredential(t *testing.T) {
@@ -23,29 +25,30 @@ func TestUnitCurrentRegistryKeepsGrantAndRechecksCredential(t *testing.T) {
 			)
 			name := "user"
 			if change == "anonymous disabled" {
-				name = AnonymousUser
-				if err := db.Settings().Put(ctx, types.SettingAnonymousAccess, true); err != nil {
+				name = kernel.AnonymousUser
+				if err := db.Settings().
+					Put(ctx, settings.SettingAnonymousAccess, true); err != nil {
 					t.Fatal(err)
 				}
 			}
-			addUser(t, db, types.User{Name: name, Admin: true}, "pw")
+			addUser(t, db, model.User{Name: name, Admin: true}, "pw")
 			u, err := db.Users().Get(ctx, name)
 			if err != nil {
 				t.Fatal(err)
 			}
-			rec := types.Token{
+			rec := model.Token{
 				ID:        "registry",
 				Subject:   "jfac@test/users/" + name,
-				Scope:     types.UserScope(),
+				Scope:     kernel.UserScope(),
 				ExpiresAt: clock.now().Add(time.Hour),
-				Registry: &types.RegistryAccess{
+				Registry: &kernel.RegistryAccess{
 					Realm: "remote",
-					Grants: []types.RegistryGrant{
+					Grants: []kernel.RegistryGrant{
 						{Type: "repository", Name: "image", Actions: []string{"pull"}},
 					},
 				},
 			}
-			parent := types.Token{
+			parent := model.Token{
 				ID:        "parent",
 				Subject:   rec.Subject,
 				Scope:     rec.Scope,
@@ -68,7 +71,7 @@ func TestUnitCurrentRegistryKeepsGrantAndRechecksCredential(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			var reference CredentialReference
+			var reference kernel.CredentialReference
 			if err = json.Unmarshal(encoded, &reference); err != nil {
 				t.Fatal(err)
 			}
@@ -79,12 +82,12 @@ func TestUnitCurrentRegistryKeepsGrantAndRechecksCredential(t *testing.T) {
 			switch change {
 			case "user groups":
 				u.Admin = false
-				if err := db.Groups().Create(ctx, types.Group{Name: "new"}); err != nil {
+				if err := db.Groups().Create(ctx, model.Group{Name: "new"}); err != nil {
 					t.Fatal(err)
 				}
 				u.Groups = []string{"new"}
 			case "user disabled":
-				u.Status = types.UserDisabled
+				u.Status = model.UserDisabled
 			case "password changed":
 				u.PasswordHash = []byte("different")
 			case "expired":
@@ -94,9 +97,10 @@ func TestUnitCurrentRegistryKeepsGrantAndRechecksCredential(t *testing.T) {
 			case "parent scope":
 				parent.Scope = scope(t, "artifact:other:r")
 			case "parent identity":
-				parent.Identity = types.IdentitySynthetic
+				parent.Identity = kernel.IdentitySynthetic
 			case "anonymous disabled":
-				if err := db.Settings().Put(ctx, types.SettingAnonymousAccess, false); err != nil {
+				if err := db.Settings().
+					Put(ctx, settings.SettingAnonymousAccess, false); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -137,7 +141,7 @@ func TestUnitCurrentRegistryKeepsGrantAndRechecksCredential(t *testing.T) {
 			if _, err := a.Current(ctx, fresh, db.Tokens()); err == nil {
 				t.Fatal("registry token became generic credential")
 			}
-			for _, unverified := range []Principal{{Registry: p.Registry}, {Name: p.Name, TokenID: p.TokenID, TokenExpires: p.TokenExpires, Registry: p.Registry}} {
+			for _, unverified := range []kernel.Principal{{Registry: p.Registry}, {Name: p.Name, TokenID: p.TokenID, TokenExpires: p.TokenExpires, Registry: p.Registry}} {
 				if _, err := a.CurrentRegistry(ctx, unverified, db.Tokens()); err == nil {
 					t.Fatal("unverified principal accepted")
 				}

@@ -12,8 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 const (
@@ -57,7 +58,7 @@ func newKID(now time.Time) string {
 func (s *Service) state(ctx context.Context) (keyState, error) {
 	var st keyState
 	err := s.st.Settings().Get(ctx, stateSetting, &st)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return keyState{}, nil
 	}
 	if err != nil {
@@ -80,7 +81,7 @@ func (s *Service) load(ctx context.Context) (keyset, error) {
 	}
 	now := s.now()
 	ks := keyset{public: map[string]*rsa.PublicKey{}}
-	var activeKey types.SigningKey
+	var activeKey model.SigningKey
 	for _, k := range all {
 		kid, ok := strings.CutPrefix(k.Alias, keyPrefix)
 		if !ok {
@@ -121,7 +122,7 @@ func (s *Service) createKey(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("token: encode key: %w", err)
 	}
-	err = s.st.Keys().PutSigningKey(ctx, types.SigningKey{
+	err = s.st.Keys().PutSigningKey(ctx, model.SigningKey{
 		Alias:      keyPrefix + newKID(s.now()),
 		PublicKey:  string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDER})),
 		PrivateKey: string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der})),
@@ -168,9 +169,9 @@ func (s *Service) Rotate(ctx context.Context) error {
 // one never expires.
 func (s *Service) latestExpiry(ctx context.Context) (time.Time, error) {
 	var latest time.Time
-	p := store.Page{Limit: 500}
+	p := kernel.Page{Limit: 500}
 	for {
-		page, next, err := s.st.Tokens().List(ctx, store.TokenFilter{}, p)
+		page, next, err := s.st.Tokens().List(ctx, port.TokenFilter{}, p)
 		if err != nil {
 			return time.Time{}, fmt.Errorf("token: list: %w", err)
 		}

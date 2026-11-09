@@ -10,6 +10,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -328,7 +329,7 @@ func TestAccPermissionCallerWithoutMiddleware(t *testing.T) {
 	cheapSeed(t, db)
 	f := &permFault{op: "forprincipal"}
 	cfg := withAccess(Config{Store: permFaultStore{Store: db, f: f}})
-	ctx := auth.WithPrincipal(context.Background(), auth.Principal{Name: "admin", Admin: true})
+	ctx := kernel.WithPrincipal(context.Background(), kernel.Principal{Name: "admin", Admin: true})
 	_, err := permissionCaller(ctx, cfg)
 	var ae *apierror.Error
 	if !errors.As(err, &ae) || ae.Status != http.StatusInternalServerError {

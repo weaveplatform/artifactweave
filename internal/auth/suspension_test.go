@@ -8,18 +8,20 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitSuspensionDelay(t *testing.T) {
-	on := types.DefaultAccessLockSettings()
+	on := model.DefaultAccessLockSettings()
 	huge := on
 	huge.MaxLoginDelayMillis = 1<<63 - 1
 	for name, c := range map[string]struct {
 		n        int
-		set      types.AccessLockSettings
+		set      model.AccessLockSettings
 		expected time.Duration
 	}{
 		// 7.x's defaults: suspended from the second failure, from 1 s up
@@ -30,11 +32,11 @@ func TestUnitSuspensionDelay(t *testing.T) {
 		"doubled again":   {7, on, 32 * time.Second},
 		"capped":          {8, on, time.Minute},
 		"capped far out":  {1000, on, time.Minute},
-		"no threshold":    {1, with(on, func(s *types.AccessLockSettings) { s.MaxLoginDelayIncorrectAttempts = 0 }), time.Second},
-		"switched off":    {5, with(on, func(s *types.AccessLockSettings) { s.ClientLoginSuspensionEnabled = false }), 0},
-		"no base delay":   {5, with(on, func(s *types.AccessLockSettings) { s.BaseLoginDelayMillis = 0 }), 0},
-		"no max delay":    {5, with(on, func(s *types.AccessLockSettings) { s.MaxLoginDelayMillis = 0 }), 0},
-		"base above max":  {2, with(on, func(s *types.AccessLockSettings) { s.BaseLoginDelayMillis = 90_000 }), time.Minute},
+		"no threshold":    {1, with(on, func(s *model.AccessLockSettings) { s.MaxLoginDelayIncorrectAttempts = 0 }), time.Second},
+		"switched off":    {5, with(on, func(s *model.AccessLockSettings) { s.ClientLoginSuspensionEnabled = false }), 0},
+		"no base delay":   {5, with(on, func(s *model.AccessLockSettings) { s.BaseLoginDelayMillis = 0 }), 0},
+		"no max delay":    {5, with(on, func(s *model.AccessLockSettings) { s.MaxLoginDelayMillis = 0 }), 0},
+		"base above max":  {2, with(on, func(s *model.AccessLockSettings) { s.BaseLoginDelayMillis = 90_000 }), time.Minute},
 		"near the limit":  {35, huge, time.Duration(1000<<33) * time.Millisecond},
 		"overflow halted": {36, huge, time.Duration(maxDelayMillis) * time.Millisecond},
 		"far past it":     {200, huge, time.Duration(maxDelayMillis) * time.Millisecond},
@@ -64,7 +66,7 @@ func TestUnitSuspendedForMessage(t *testing.T) {
 	}
 }
 
-func with(s types.AccessLockSettings, f func(*types.AccessLockSettings)) types.AccessLockSettings {
+func with(s model.AccessLockSettings, f func(*model.AccessLockSettings)) model.AccessLockSettings {
 	f(&s)
 	return s
 }
@@ -92,16 +94,16 @@ func suspendedWait(t *testing.T, err error) int {
 func TestUnitSuspensionThroughBasic(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
-	addUser(t, db, types.User{Name: "dev", Status: types.UserEnabled}, "pw")
+	addUser(t, db, model.User{Name: "dev", Status: model.UserEnabled}, "pw")
 	// The lock policy is on but far off, to count the failures it sees.
-	if err := db.Settings().Put(ctx, types.SettingUserLockPolicy,
-		types.UserLockPolicy{Enabled: true, LoginAttempts: 100}); err != nil {
+	if err := db.Settings().Put(ctx, settings.SettingUserLockPolicy,
+		model.UserLockPolicy{Enabled: true, LoginAttempts: 100}); err != nil {
 		t.Fatal(err)
 	}
 	a, c := newAuth(t, db, Options{})
 	wrong := func(name string) {
 		t.Helper()
-		if _, err := a.Basic(ctx, name, "wrong"); !errors.Is(err, ErrBadCredentials) {
+		if _, err := a.Basic(ctx, name, "wrong"); !errors.Is(err, kernel.ErrBadCredentials) {
 			t.Fatalf("%s, wrong password: %v", name, err)
 		}
 	}
@@ -154,7 +156,7 @@ func TestUnitSuspensionThroughBasic(t *testing.T) {
 	// Failures are forgotten a day after the last one.
 	c.t = c.t.Add(suspensionMemory)
 	wrong("ghost")
-	if _, err := a.Basic(ctx, "ghost", "pw"); !errors.Is(err, ErrBadCredentials) {
+	if _, err := a.Basic(ctx, "ghost", "pw"); !errors.Is(err, kernel.ErrBadCredentials) {
 		t.Fatalf("a day later, one failure suspended ghost: %v", err)
 	}
 }
@@ -171,7 +173,7 @@ func ezBasic(a *Authenticator, name, password string) error {
 func TestUnitSuspensionBeforeHashing(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
-	addUser(t, db, types.User{Name: "dev", Status: types.UserEnabled}, "pw")
+	addUser(t, db, model.User{Name: "dev", Status: model.UserEnabled}, "pw")
 	a, _ := newAuth(t, db, Options{Concurrency: 1})
 	for range 2 {
 		_, _ = a.Basic(ctx, "dev", "wrong")
@@ -192,18 +194,18 @@ func TestUnitSuspensionBeforeHashing(t *testing.T) {
 func TestUnitSuspensionSettings(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
-	addUser(t, db, types.User{Name: "dev", Status: types.UserEnabled}, "pw")
+	addUser(t, db, model.User{Name: "dev", Status: model.UserEnabled}, "pw")
 	a, c := newAuth(t, db, Options{})
-	put := func(s types.AccessLockSettings) {
+	put := func(s model.AccessLockSettings) {
 		t.Helper()
-		if err := db.Settings().Put(ctx, types.SettingAccessLockSettings, s); err != nil {
+		if err := db.Settings().Put(ctx, settings.SettingAccessLockSettings, s); err != nil {
 			t.Fatal(err)
 		}
 		a.ForgetPolicies()
 	}
 
 	// Stored settings apply: here from the first failure, 5 s at once.
-	put(with(types.DefaultAccessLockSettings(), func(s *types.AccessLockSettings) {
+	put(with(model.DefaultAccessLockSettings(), func(s *model.AccessLockSettings) {
 		s.MaxLoginDelayIncorrectAttempts, s.BaseLoginDelayMillis = 1, 5000
 	}))
 	_, _ = a.Basic(ctx, "dev", "wrong")
@@ -211,7 +213,7 @@ func TestUnitSuspensionSettings(t *testing.T) {
 		t.Fatalf("waits %d s, want 5", got)
 	}
 	// Switching suspension off lifts one in progress and starts no other.
-	put(with(types.DefaultAccessLockSettings(), func(s *types.AccessLockSettings) {
+	put(with(model.DefaultAccessLockSettings(), func(s *model.AccessLockSettings) {
 		s.ClientLoginSuspensionEnabled = false
 	}))
 	if _, err := a.Basic(ctx, "dev", "pw"); err != nil {
@@ -231,14 +233,14 @@ func TestUnitSuspensionSettings(t *testing.T) {
 		t.Fatal(err)
 	}
 	for range 3 {
-		if _, err := broken.Basic(ctx, "dev", "wrong"); !errors.Is(err, ErrBadCredentials) {
+		if _, err := broken.Basic(ctx, "dev", "wrong"); !errors.Is(err, kernel.ErrBadCredentials) {
 			t.Fatalf("unreadable settings: %v", err)
 		}
 	}
 }
 
 func TestUnitSuspensionsBounded(t *testing.T) {
-	set := with(types.DefaultAccessLockSettings(), func(s *types.AccessLockSettings) {
+	set := with(model.DefaultAccessLockSettings(), func(s *model.AccessLockSettings) {
 		s.MaxLoginDelayIncorrectAttempts = 1
 	})
 	t0 := time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC)
@@ -282,7 +284,7 @@ func TestUnitSuspensionsBounded(t *testing.T) {
 // TestUnitSuspensionsForgetStale checks a name's failures stop counting a day
 // after the last one: the next failure starts over.
 func TestUnitSuspensionsForgetStale(t *testing.T) {
-	set := types.DefaultAccessLockSettings()
+	set := model.DefaultAccessLockSettings()
 	t0 := time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC)
 	var s suspensions
 	s.fail("dev", t0, set)

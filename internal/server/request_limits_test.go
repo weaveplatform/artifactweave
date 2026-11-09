@@ -10,7 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -128,7 +128,7 @@ func TestAccAPIConcurrencyCancellation(t *testing.T) {
 	entered := make(chan string, 4)
 	releaseBob := make(chan struct{})
 	router.Post("/artifactory/api/search/aql", func(w http.ResponseWriter, r *http.Request) {
-		p, _ := auth.FromContext(r.Context())
+		p, _ := kernel.FromContext(r.Context())
 		entered <- p.Name
 		select {
 		case <-r.Context().Done():
@@ -138,7 +138,7 @@ func TestAccAPIConcurrencyCancellation(t *testing.T) {
 	})
 	call := func(ctx context.Context, name string) *httptest.ResponseRecorder {
 		req := httptest.NewRequestWithContext(
-			auth.WithPrincipal(ctx, auth.Principal{Name: name}),
+			kernel.WithPrincipal(ctx, kernel.Principal{Name: name}),
 			http.MethodPost,
 			"/artifactory/api/search/aql",
 			nil,

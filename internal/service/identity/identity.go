@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -298,7 +299,7 @@ func (s *Service) admins(ctx context.Context) ([]string, error) {
 // DeleteUser removes a user, its group memberships and its tokens. The
 // seeded admin and anonymous users and the last administrator stay.
 func (s *Service) DeleteUser(ctx context.Context, name string) error {
-	if name == auth.AdminUser || name == auth.AnonymousUser {
+	if name == auth.AdminUser || name == kernel.AnonymousUser {
 		return fmt.Errorf(
 			"%w: %w: the built-in user %q cannot be deleted",
 			ErrInvalid,

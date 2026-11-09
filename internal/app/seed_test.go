@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -82,6 +84,12 @@ func TestAccSeedUsesConfiguredPassword(t *testing.T) {
 	if !adminPasswordIs(t, db, "configured") {
 		t.Fatal("admin does not have the configured password")
 	}
+	// The seed creates the build-info repository through the artifacts
+	// module's binding, so it lands in the store app passes.
+	bi, err := db.Repos().Get(context.Background(), types.BuildInfoRepository)
+	if err != nil || bi.Key != types.BuildInfoRepository {
+		t.Fatalf("build-info repository = %+v, %v", bi, err)
+	}
 	if _, err := os.Stat(filepath.Join(cfg.DataDir, InitialPasswordFile)); !os.IsNotExist(err) {
 		t.Fatalf("a configured password was also written to a file: %v", err)
 	}
@@ -115,7 +123,8 @@ func TestAccSeedLostRaceRemovesPasswordFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := auth.SeedHashed(ctx, db, hash, time.Now()); err != nil {
+	repositories := repos.NewRepositories(db, access.KeysOf(db), access.ProjectsOf(db))
+	if _, err := auth.SeedHashed(ctx, db, repositories, hash, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	h := &hidden{Store: db}

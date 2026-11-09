@@ -12,27 +12,62 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/postgres"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var seedTime = time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)
 
+// seedRepos stands in for the artifacts module's Repositories, of which the
+// seed calls only Create: it keeps each configuration it is given and
+// refuses a key it already holds with kernel.ErrConflict, as the
+// repository store does, and Get reads one back. It takes no part in the
+// seed's transaction, which the artifacts binding that app passes does;
+// app's seed tests check that binding.
+type seedRepos struct {
+	artifactsapi.Repositories
+	configs map[string]repo.Config
+}
+
+func newSeedRepos() *seedRepos { return &seedRepos{configs: map[string]repo.Config{}} }
+
+func (r *seedRepos) Create(_ context.Context, c repo.Config) error {
+	if _, ok := r.configs[c.Key]; ok {
+		return kernel.ErrConflict
+	}
+	r.configs[c.Key] = c
+	return nil
+}
+
+func (r *seedRepos) Get(_ context.Context, key string) (repo.Config, error) {
+	c, ok := r.configs[key]
+	if !ok {
+		return repo.Config{}, kernel.ErrNotFound
+	}
+	return c, nil
+}
+
 // checkSeeded asserts every built-in exists as seeded, and that admin can
 // log in with password.
-func checkSeeded(t *testing.T, st store.Store, password string) {
+func checkSeeded(t *testing.T, st store.Store, repos *seedRepos, password string) {
 	t.Helper()
 	ctx := context.Background()
 	admin, err := st.Users().Get(ctx, AdminUser)
-	if err != nil || !admin.Admin || admin.Status != types.UserEnabled {
+	if err != nil || !admin.Admin || admin.Status != model.UserEnabled {
 		t.Fatalf("admin = %+v, %v", admin, err)
 	}
 	if ok, err := CheckPassword(admin.PasswordHash, password); !ok || err != nil {
 		t.Fatalf("admin password: %v %v", ok, err)
 	}
-	if anon, err := st.Users().Get(ctx, AnonymousUser); err != nil || len(anon.PasswordHash) != 0 {
+	if anon, err := st.Users().
+		Get(ctx, kernel.AnonymousUser); err != nil ||
+		len(anon.PasswordHash) != 0 {
 		t.Fatalf("anonymous = %+v, %v", anon, err)
 	}
 	if g, err := st.Groups().Get(ctx, ReadersGroup); err != nil || !g.AutoJoin {
@@ -41,19 +76,20 @@ func checkSeeded(t *testing.T, st store.Store, password string) {
 	// Since 7.84.3 neither seeded permission grants anonymous (#383):
 	// Anything grants readers alone, and Any Remote no one.
 	anything, err := st.Permissions().Get(ctx, AnythingPermission)
-	if a := anything.Resources[types.ResourceArtifact]; err != nil ||
+	if a := anything.Resources[accessapi.ResourceArtifact]; err != nil ||
 		len(a.Actions.Users) != 0 || len(a.Actions.Groups) != 1 ||
-		a.Actions.Groups[ReadersGroup] != types.ActionRead ||
-		len(a.Targets[types.TargetAny].Include) != 1 {
+		a.Actions.Groups[ReadersGroup] != accessapi.ActionRead ||
+		len(a.Targets[accessapi.TargetAny].Include) != 1 {
 		t.Fatalf("Anything = %+v, %v", anything, err)
 	}
 	remote, err := st.Permissions().Get(ctx, AnyRemotePermission)
-	if r := remote.Resources[types.ResourceArtifact]; err != nil || len(remote.Resources) != 1 ||
-		len(r.Actions.Users) != 0 || len(r.Actions.Groups) != 0 ||
-		!slices.Equal(r.Targets[types.TargetAnyRemote].Include, []string{"**"}) {
+	if r := remote.Resources[accessapi.ResourceArtifact]; err != nil || len(remote.Resources) != 1 ||
+		len(r.Actions.Users) != 0 ||
+		len(r.Actions.Groups) != 0 ||
+		!slices.Equal(r.Targets[accessapi.TargetAnyRemote].Include, []string{"**"}) {
 		t.Fatalf("Any Remote = %+v, %v", remote, err)
 	}
-	bi, err := st.Repos().Get(ctx, types.BuildInfoRepository)
+	bi, err := repos.Get(ctx, accessapi.BuildInfoRepository)
 	if err != nil || bi.Class != repo.Local || bi.PackageType != repo.BuildInfo ||
 		bi.RepoLayoutRef != repo.LayoutSimple {
 		t.Fatalf("build-info repository = %+v, %v", bi, err)
@@ -68,14 +104,15 @@ func checkSeeded(t *testing.T, st store.Store, password string) {
 func seedTwice(t *testing.T, st store.Store) {
 	t.Helper()
 	ctx := context.Background()
-	if now, err := Seed(ctx, st, "first", seedTime); !now || err != nil {
+	repos := newSeedRepos()
+	if now, err := Seed(ctx, st, repos, "first", seedTime); !now || err != nil {
 		t.Fatalf("first Seed = %v, %v", now, err)
 	}
-	checkSeeded(t, st, "first")
-	if now, err := Seed(ctx, st, "second", seedTime.Add(time.Hour)); now || err != nil {
+	checkSeeded(t, st, repos, "first")
+	if now, err := Seed(ctx, st, repos, "second", seedTime.Add(time.Hour)); now || err != nil {
 		t.Fatalf("second Seed = %v, %v", now, err)
 	}
-	checkSeeded(t, st, "first")
+	checkSeeded(t, st, repos, "first")
 }
 
 func TestUnitSeedInMemory(t *testing.T) { seedTwice(t, inmem.New()) }
@@ -110,16 +147,16 @@ type racing struct {
 	hide atomic.Int32
 }
 
-func (r *racing) Settings() store.SettingsStore { return racingSettings{r.Store.Settings(), r} }
+func (r *racing) Settings() settings.SettingsStore { return racingSettings{r.Store.Settings(), r} }
 
 type racingSettings struct {
-	store.SettingsStore
+	settings.SettingsStore
 	r *racing
 }
 
 func (s racingSettings) Get(ctx context.Context, key string, into any) error {
-	if key == types.SettingSeeded && s.r.hide.Add(-1) >= 0 {
-		return store.ErrNotFound
+	if key == settings.SettingSeeded && s.r.hide.Add(-1) >= 0 {
+		return kernel.ErrNotFound
 	}
 	return s.SettingsStore.Get(ctx, key, into) //nolint:wrapcheck // test double
 }
@@ -127,7 +164,8 @@ func (s racingSettings) Get(ctx context.Context, key string, into any) error {
 func TestUnitSeedLosesARace(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
-	if _, err := Seed(ctx, db, "winner", seedTime); err != nil {
+	repos := newSeedRepos()
+	if _, err := Seed(ctx, db, repos, "winner", seedTime); err != nil {
 		t.Fatal(err)
 	}
 	// The marker shows up inside the transaction (one hidden read), or only
@@ -136,19 +174,19 @@ func TestUnitSeedLosesARace(t *testing.T) {
 	for hide := int32(1); hide <= 2; hide++ {
 		r := &racing{Store: db}
 		r.hide.Store(hide)
-		if now, err := Seed(ctx, r, "loser", seedTime); now || err != nil {
+		if now, err := Seed(ctx, r, repos, "loser", seedTime); now || err != nil {
 			t.Fatalf("hide %d: Seed = %v, %v", hide, now, err)
 		}
 	}
-	checkSeeded(t, db, "winner")
+	checkSeeded(t, db, repos, "winner")
 }
 
 // failingPut fails every settings write.
 type failingPut struct{ store.Store }
 
-func (f failingPut) Settings() store.SettingsStore { return putFails{f.Store.Settings()} }
+func (f failingPut) Settings() settings.SettingsStore { return putFails{f.Store.Settings()} }
 
-type putFails struct{ store.SettingsStore }
+type putFails struct{ settings.SettingsStore }
 
 func (putFails) Put(context.Context, string, any) error { return errors.New("disk full") }
 
@@ -156,46 +194,63 @@ func TestUnitSeedErrors(t *testing.T) {
 	ctx := context.Background()
 	// Each built-in already present (without the marker) conflicts, and
 	// the whole seed rolls back.
-	for name, pre := range map[string]func(store.Store) error{
-		"group": func(st store.Store) error {
-			return st.Groups().Create(ctx, types.Group{Name: ReadersGroup})
+	for name, pre := range map[string]func(store.Store, *seedRepos) error{
+		"group": func(st store.Store, _ *seedRepos) error {
+			return st.Groups().Create(ctx, model.Group{Name: ReadersGroup})
 		},
-		"user": func(st store.Store) error {
-			return st.Users().Create(ctx, types.User{Name: AdminUser})
+		"user": func(st store.Store, _ *seedRepos) error {
+			return st.Users().Create(ctx, model.User{Name: AdminUser})
 		},
-		"permission": func(st store.Store) error {
-			return st.Permissions().Create(ctx, types.Permission{Name: AnythingPermission})
+		"permission": func(st store.Store, _ *seedRepos) error {
+			return st.Permissions().Create(ctx, model.Permission{Name: AnythingPermission})
 		},
-		"repository": func(st store.Store) error {
-			return st.Repos().Create(ctx, repo.Config{
-				Key: types.BuildInfoRepository, Class: repo.Local, PackageType: repo.Generic,
+		"repository": func(_ store.Store, repos *seedRepos) error {
+			return repos.Create(ctx, repo.Config{
+				Key: accessapi.BuildInfoRepository, Class: repo.Local, PackageType: repo.Generic,
 			})
 		},
 	} {
-		db := inmem.New()
-		if err := pre(db); err != nil {
+		db, repos := inmem.New(), newSeedRepos()
+		if err := pre(db, repos); err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
-		if now, err := Seed(ctx, db, "pw", seedTime); now || !errors.Is(err, store.ErrConflict) {
+		if now, err := Seed(
+			ctx,
+			db,
+			repos,
+			"pw",
+			seedTime,
+		); now ||
+			!errors.Is(err, kernel.ErrConflict) {
 			t.Errorf("%s: Seed = %v, %v", name, now, err)
 		}
-		if _, err := db.Users().Get(ctx, AnonymousUser); !errors.Is(err, store.ErrNotFound) &&
+		if _, err := db.Users().
+			Get(ctx, kernel.AnonymousUser); !errors.Is(
+			err,
+			kernel.ErrNotFound,
+		) &&
 			name != "user" {
 			t.Errorf("%s: the failed seed was not rolled back", name)
 		}
 	}
-	if _, err := Seed(ctx, failingPut{inmem.New()}, "pw", seedTime); err == nil {
+	if _, err := Seed(ctx, failingPut{inmem.New()}, newSeedRepos(), "pw", seedTime); err == nil {
 		t.Fatal("a failed marker write was not reported")
 	}
 	if _, err := Seeded(ctx, failingSettingsStore{inmem.New()}); err == nil {
 		t.Fatal("Seeded hid a settings failure")
 	}
-	if _, err := Seed(ctx, failingSettingsStore{inmem.New()}, "pw", seedTime); err == nil {
+	if _, err := Seed(
+		ctx,
+		failingSettingsStore{inmem.New()},
+		newSeedRepos(),
+		"pw",
+		seedTime,
+	); err == nil {
 		t.Fatal("Seed hid a settings failure")
 	}
 	// The marker read inside the transaction can fail on its own too.
 	r := &racingErr{Store: inmem.New()}
-	if _, err := Seed(ctx, r, "pw", seedTime); err == nil {
+	if _, err := Seed(ctx, r, newSeedRepos(), "pw", seedTime); err == nil {
 		t.Fatal("Seed hid a settings failure inside its transaction")
 	}
 }
@@ -203,7 +258,7 @@ func TestUnitSeedErrors(t *testing.T) {
 // failingSettingsStore fails every settings read.
 type failingSettingsStore struct{ store.Store }
 
-func (f failingSettingsStore) Settings() store.SettingsStore {
+func (f failingSettingsStore) Settings() settings.SettingsStore {
 	return failingSettings{f.Store.Settings()}
 }
 
@@ -213,10 +268,12 @@ type racingErr struct {
 	n atomic.Int32
 }
 
-func (r *racingErr) Settings() store.SettingsStore { return racingErrSettings{r.Store.Settings(), r} }
+func (r *racingErr) Settings() settings.SettingsStore {
+	return racingErrSettings{r.Store.Settings(), r}
+}
 
 type racingErrSettings struct {
-	store.SettingsStore
+	settings.SettingsStore
 	r *racingErr
 }
 

@@ -16,11 +16,11 @@ import (
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/rpm"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/terraformtest"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -160,7 +160,7 @@ func TestAccRPMVirtualMemberGraphRejectsCyclesWrongTypesAndUnavailableSources(t 
 			t.Fatal(err)
 		}
 	}
-	p := auth.Principal{Name: "admin", Admin: true}
+	p := kernel.Principal{Name: "admin", Admin: true}
 	acc, err := accessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -287,7 +287,7 @@ func TestAccRPMVirtualSigningRejectsMissingAndInvalidKeys(t *testing.T) {
 
 func TestAccRPMVirtualRemoteMemberRejectsUntrustedMetadata(t *testing.T) {
 	w := newItemWorld(t, false)
-	p := auth.Principal{Name: "admin", Admin: true}
+	p := kernel.Principal{Name: "admin", Admin: true}
 	acc, err := accessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -420,7 +420,7 @@ func TestAccRPMRemoteMetadataClosesBodyWhenAuthorityIsRevoked(t *testing.T) {
 			map[int]string{2: "before_delivery", 3: "before_path_read"}[revokeAt],
 			func(t *testing.T) {
 				w := newItemWorld(t, false)
-				p := auth.Principal{Name: "admin", Admin: true}
+				p := kernel.Principal{Name: "admin", Admin: true}
 				acc, err := accessFor(t.Context(), authorizerOver(w.db), p, nil)
 				if err != nil {
 					t.Fatal(err)
@@ -482,7 +482,7 @@ func TestAccRPMVirtualRemotePackagePinsIndexedSHA(t *testing.T) {
 	path := "pool/artifactweave-alpha-1.0-1.fc42.noarch.rpm"
 	correctSHA := fmt.Sprintf("%x", sha256.Sum256(body))
 	w := newItemWorld(t, false)
-	p := auth.Principal{Name: "admin", Admin: true}
+	p := kernel.Principal{Name: "admin", Admin: true}
 	acc, err := accessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -580,7 +580,7 @@ func TestAccRPMVirtualLocalMemberRejectsIncompleteAndDriftedContent(t *testing.T
 	}
 	manifest, primary, primaryPath := rpmUpstreamFixture(t)
 	seed("repodata/repomd.xml", manifest)
-	p := auth.Principal{Name: "admin", Admin: true}
+	p := kernel.Principal{Name: "admin", Admin: true}
 	acc, err := accessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)

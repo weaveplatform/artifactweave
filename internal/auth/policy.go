@@ -8,9 +8,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	platformsettings "github.com/weaveplatform/artifactweave/migration/platform/settings"
 )
 
 // The policies' defaults when nothing is stored, as Artifactory ships them.
@@ -32,34 +33,37 @@ var ErrBasicAuthDisabled = apierror.New(http.StatusUnauthorized,
 
 // BasicAuthEnabled reports whether user names and passwords are accepted
 // over HTTP Basic. Unset means on, as Artifactory ships.
-func BasicAuthEnabled(ctx context.Context, settings store.SettingsStore) (bool, error) {
+func BasicAuthEnabled(ctx context.Context, settings platformsettings.SettingsStore) (bool, error) {
 	on := true
-	if err := settings.Get(ctx, types.SettingBasicAuthEnabled, &on); err != nil &&
-		!errors.Is(err, store.ErrNotFound) {
+	if err := settings.Get(ctx, platformsettings.SettingBasicAuthEnabled, &on); err != nil &&
+		!errors.Is(err, kernel.ErrNotFound) {
 		return on, fmt.Errorf("auth: basic authentication switch: %w", err)
 	}
 	return on, nil
 }
 
 // LockPolicy returns the stored user lock policy, or the default.
-func LockPolicy(ctx context.Context, settings store.SettingsStore) (types.UserLockPolicy, error) {
-	p := types.UserLockPolicy{LoginAttempts: DefaultLoginAttempts}
-	if err := settings.Get(ctx, types.SettingUserLockPolicy, &p); err != nil &&
-		!errors.Is(err, store.ErrNotFound) {
+func LockPolicy(
+	ctx context.Context,
+	settings platformsettings.SettingsStore,
+) (model.UserLockPolicy, error) {
+	p := model.UserLockPolicy{LoginAttempts: DefaultLoginAttempts}
+	if err := settings.Get(ctx, platformsettings.SettingUserLockPolicy, &p); err != nil &&
+		!errors.Is(err, kernel.ErrNotFound) {
 		return p, fmt.Errorf("auth: user lock policy: %w", err)
 	}
 	return p, nil
 }
 
 // AccessLockSettings returns the stored Access user lock settings, or
-// types.DefaultAccessLockSettings.
+// model.DefaultAccessLockSettings.
 func AccessLockSettings(
 	ctx context.Context,
-	settings store.SettingsStore,
-) (types.AccessLockSettings, error) {
-	p := types.DefaultAccessLockSettings()
-	if err := settings.Get(ctx, types.SettingAccessLockSettings, &p); err != nil &&
-		!errors.Is(err, store.ErrNotFound) {
+	settings platformsettings.SettingsStore,
+) (model.AccessLockSettings, error) {
+	p := model.DefaultAccessLockSettings()
+	if err := settings.Get(ctx, platformsettings.SettingAccessLockSettings, &p); err != nil &&
+		!errors.Is(err, kernel.ErrNotFound) {
 		return p, fmt.Errorf("auth: access lock settings: %w", err)
 	}
 	return p, nil
@@ -69,11 +73,11 @@ func AccessLockSettings(
 // default.
 func ExpirationPolicy(
 	ctx context.Context,
-	settings store.SettingsStore,
-) (types.PasswordExpirationPolicy, error) {
-	p := types.PasswordExpirationPolicy{MaxAgeDays: DefaultPasswordMaxAgeDays, NotifyByEmail: true}
-	if err := settings.Get(ctx, types.SettingPasswordExpirationPolicy, &p); err != nil &&
-		!errors.Is(err, store.ErrNotFound) {
+	settings platformsettings.SettingsStore,
+) (model.PasswordExpirationPolicy, error) {
+	p := model.PasswordExpirationPolicy{MaxAgeDays: DefaultPasswordMaxAgeDays, NotifyByEmail: true}
+	if err := settings.Get(ctx, platformsettings.SettingPasswordExpirationPolicy, &p); err != nil &&
+		!errors.Is(err, kernel.ErrNotFound) {
 		return p, fmt.Errorf("auth: password expiration policy: %w", err)
 	}
 	return p, nil
@@ -83,7 +87,7 @@ func ExpirationPolicy(
 // administrator's expiry applies whatever the policy; age counts only from
 // a recorded change, so users whose password predates the record (the
 // seeded admin of an older install) are not locked out by enabling it.
-func PasswordExpired(u types.User, p types.PasswordExpirationPolicy, now time.Time) bool {
+func PasswordExpired(u model.User, p model.PasswordExpirationPolicy, now time.Time) bool {
 	if u.PasswordExpired {
 		return true
 	}
@@ -97,17 +101,17 @@ func PasswordExpired(u types.User, p types.PasswordExpirationPolicy, now time.Ti
 type policyCache struct {
 	mu             sync.Mutex
 	fetched        time.Time
-	lock           types.UserLockPolicy
-	expiry         types.PasswordExpirationPolicy
+	lock           model.UserLockPolicy
+	expiry         model.PasswordExpirationPolicy
 	allowBasicAuth bool
-	access         types.AccessLockSettings
+	access         model.AccessLockSettings
 }
 
 // policies returns the lock and expiration policies, from the cache when
 // it is fresh.
 func (a *Authenticator) policies(
 	ctx context.Context,
-) (types.UserLockPolicy, types.PasswordExpirationPolicy, error) {
+) (model.UserLockPolicy, model.PasswordExpirationPolicy, error) {
 	c := &a.policy
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -117,7 +121,7 @@ func (a *Authenticator) policies(
 	}
 	lock, err := LockPolicy(ctx, a.settings)
 	if err != nil {
-		return lock, types.PasswordExpirationPolicy{}, err
+		return lock, model.PasswordExpirationPolicy{}, err
 	}
 	expiry, err := ExpirationPolicy(ctx, a.settings)
 	if err != nil {
@@ -147,9 +151,9 @@ func (a *Authenticator) basicEnabled(ctx context.Context) (bool, error) {
 
 // suspension is the cached temporary login suspension settings; ok is false
 // when they cannot be read, and then nothing is suspended.
-func (a *Authenticator) suspension(ctx context.Context) (types.AccessLockSettings, bool) {
+func (a *Authenticator) suspension(ctx context.Context) (model.AccessLockSettings, bool) {
 	if _, _, err := a.policies(ctx); err != nil {
-		return types.AccessLockSettings{}, false
+		return model.AccessLockSettings{}, false
 	}
 	a.policy.mu.Lock()
 	defer a.policy.mu.Unlock()
@@ -179,23 +183,23 @@ func (a *Authenticator) recordFailure(ctx context.Context, name string) {
 // per fill, not per request) or when failures need resetting.
 func (a *Authenticator) accept(
 	ctx context.Context,
-	u types.User,
+	u model.User,
 	now time.Time,
 	filled bool,
-) (Principal, error) {
+) (kernel.Principal, error) {
 	if err := a.apiAllowed(ctx, u.Name); err != nil {
-		return Principal{}, err
+		return kernel.Principal{}, err
 	}
 	_, expiry, err := a.policies(ctx)
 	if err != nil {
-		return Principal{}, err
+		return kernel.Principal{}, err
 	}
 	if PasswordExpired(u, expiry, now) {
 		// The principal comes back with the error: the one request it may
 		// make is changing its own password.
 		p := principalOf(u)
 		p.PasswordExpired = true
-		return p, ErrPasswordExpired
+		return p, kernel.ErrPasswordExpired
 	}
 	if filled || u.FailedLogins > 0 {
 		// Best effort: a failed write must not fail the login.

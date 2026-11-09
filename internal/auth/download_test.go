@@ -5,15 +5,18 @@ import (
 	"testing"
 	"time"
 
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitDownloadCredentialRestoration(t *testing.T) {
 	ctx := t.Context()
 	db := inmem.New()
 	a, clock := newAuth(t, db, Options{})
-	addUser(t, db, types.User{Name: "user", Admin: true}, "password")
+	addUser(t, db, model.User{Name: "user", Admin: true}, "password")
 	p, err := a.Basic(ctx, "user", "password")
 	if err != nil {
 		t.Fatal(err)
@@ -26,7 +29,7 @@ func TestUnitDownloadCredentialRestoration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var restored DownloadCredential
+	var restored kernel.DownloadCredential
 	if err = json.Unmarshal(b, &restored); err != nil {
 		t.Fatal(err)
 	}
@@ -42,12 +45,12 @@ func TestUnitDownloadCredentialRestoration(t *testing.T) {
 	if _, err = a.RestoreDownload(ctx, "user", restored, db.Tokens()); err == nil {
 		t.Fatal("password change ignored")
 	}
-	tok := types.Token{
+	tok := model.Token{
 		ID:        "download-parent",
 		Subject:   "jfac@test/users/user",
 		Scope:     scope(t, "applied-permissions/user"),
 		ExpiresAt: clock.now().Add(time.Minute),
-		Identity:  types.IdentityStored,
+		Identity:  kernel.IdentityStored,
 	}
 	if err = db.Tokens().Create(ctx, tok); err != nil {
 		t.Fatal(err)
@@ -59,7 +62,7 @@ func TestUnitDownloadCredentialRestoration(t *testing.T) {
 		t.Fatal(err)
 	}
 	fresh, err = a.RestoreDownload(ctx, "user", reference, db.Tokens())
-	if err != nil || SubjectOf(fresh).Scope == nil || fresh.TokenID != tok.ID ||
+	if err != nil || accessapi.SubjectOf(fresh).Scope == nil || fresh.TokenID != tok.ID ||
 		!fresh.TokenExpires.Equal(tok.ExpiresAt) ||
 		fresh.Identity != tok.Identity {
 		t.Fatal(fresh, err)
@@ -77,23 +80,23 @@ func TestUnitDownloadCredentialRestoration(t *testing.T) {
 	if _, err = a.RestoreDownload(ctx, "user", reference, db.Tokens()); err == nil {
 		t.Fatal("revoked parent accepted")
 	}
-	reference, err = Anonymous.DownloadReference()
+	reference, err = kernel.Anonymous.DownloadReference()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = a.RestoreDownload(ctx, AnonymousUser, reference, db.Tokens()); err == nil {
+	if _, err = a.RestoreDownload(ctx, kernel.AnonymousUser, reference, db.Tokens()); err == nil {
 		t.Fatal("anonymous off")
 	}
-	if err = db.Settings().Put(ctx, types.SettingAnonymousAccess, true); err != nil {
+	if err = db.Settings().Put(ctx, settings.SettingAnonymousAccess, true); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = a.RestoreDownload(ctx, AnonymousUser, reference, db.Tokens()); err != nil {
+	if _, err = a.RestoreDownload(ctx, kernel.AnonymousUser, reference, db.Tokens()); err != nil {
 		t.Fatal(err)
 	}
-	if err = db.Settings().Put(ctx, types.SettingAnonymousAccess, false); err != nil {
+	if err = db.Settings().Put(ctx, settings.SettingAnonymousAccess, false); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = a.RestoreDownload(ctx, AnonymousUser, reference, db.Tokens()); err == nil {
+	if _, err = a.RestoreDownload(ctx, kernel.AnonymousUser, reference, db.Tokens()); err == nil {
 		t.Fatal("anonymous toggle ignored")
 	}
 }
@@ -101,12 +104,12 @@ func TestUnitDownloadCredentialRestoration(t *testing.T) {
 func TestUnitDownloadCredentialRejectsUnverifiedAndMixedReferences(t *testing.T) {
 	db := inmem.New()
 	a, _ := newAuth(t, db, Options{})
-	for _, p := range []Principal{{}, {Name: "user"}, {Name: "user", Registry: &types.RegistryAccess{}, TokenID: "registry"}, {Name: "user", Password: true, PasswordExpired: true}} {
+	for _, p := range []kernel.Principal{{}, {Name: "user"}, {Name: "user", Registry: &kernel.RegistryAccess{}, TokenID: "registry"}, {Name: "user", Password: true, PasswordExpired: true}} {
 		if _, err := p.DownloadReference(); err == nil {
 			t.Fatal("unverified principal", p)
 		}
 	}
-	for _, reference := range []DownloadCredential{{}, {Kind: "unknown"}, {Kind: "password"}, {Kind: "token"}, {Kind: "anonymous", TokenID: "other"}, {Kind: "token", TokenID: "t", PasswordRevision: [32]byte{1}}, {Kind: "password", TokenID: "t", PasswordRevision: [32]byte{1}}} {
+	for _, reference := range []kernel.DownloadCredential{{}, {Kind: "unknown"}, {Kind: "password"}, {Kind: "token"}, {Kind: "anonymous", TokenID: "other"}, {Kind: "token", TokenID: "t", PasswordRevision: [32]byte{1}}, {Kind: "password", TokenID: "t", PasswordRevision: [32]byte{1}}} {
 		if _, err := a.RestoreDownload(t.Context(), "user", reference, db.Tokens()); err == nil {
 			t.Fatal(reference)
 		}
@@ -114,7 +117,7 @@ func TestUnitDownloadCredentialRejectsUnverifiedAndMixedReferences(t *testing.T)
 	if _, err := a.RestoreDownload(
 		t.Context(),
 		"user",
-		DownloadCredential{Kind: "anonymous"},
+		kernel.DownloadCredential{Kind: "anonymous"},
 		db.Tokens(),
 	); err == nil {
 		t.Fatal("anonymous subject changed")

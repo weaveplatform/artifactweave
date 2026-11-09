@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 type apiRecoveryKey struct{}
@@ -22,7 +23,7 @@ func WithAPIRecovery(ctx context.Context) context.Context {
 // cache. Missing policy means unrestricted; backend failures fail closed.
 func CheckAPIRestriction(
 	ctx context.Context,
-	restrictions store.APIRestrictionStore,
+	restrictions port.APIRestrictionStore,
 	user string,
 	now time.Time,
 ) error {
@@ -30,14 +31,14 @@ func CheckAPIRestriction(
 		return nil
 	}
 	r, err := restrictions.Get(ctx, user)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return nil
 	}
 	if err != nil {
 		return fmt.Errorf("auth: API restriction: %w", err)
 	}
 	if r.Until.After(now) {
-		return ErrAPIRestricted
+		return kernel.ErrAPIRestricted
 	}
 	return nil
 }

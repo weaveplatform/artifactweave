@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
@@ -96,7 +95,7 @@ func mappedRuntimeRequest(
 		decider,
 	), source.Request{
 		Repo:    w.c,
-		Subject: auth.SubjectOf(p),
+		Subject: accessapi.SubjectOf(p),
 		Access:  decider,
 	}, d
 }

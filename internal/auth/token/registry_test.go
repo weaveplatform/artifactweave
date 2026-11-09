@@ -10,8 +10,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // A registry token verifies with what it grants and nothing stores it, so
@@ -19,7 +19,7 @@ import (
 func TestUnitIssueRegistry(t *testing.T) {
 	s, db, c := world(t)
 	ctx := context.Background()
-	access := types.RegistryAccess{Realm: "docker-local", Grants: []types.RegistryGrant{
+	access := kernel.RegistryAccess{Realm: "docker-local", Grants: []kernel.RegistryGrant{
 		{Type: "repository", Name: "app", Actions: []string{"pull", "push"}},
 	}}
 	out, err := s.IssueRegistry(ctx, RegistryRequest{
@@ -31,7 +31,7 @@ func TestUnitIssueRegistry(t *testing.T) {
 	if out.ExpiresIn != 600 || out.RefreshToken != "" || out.ReferenceToken != "" {
 		t.Fatalf("issued %+v", out)
 	}
-	if n, _, err := db.Tokens().List(ctx, store.TokenFilter{}, store.Page{}); err != nil ||
+	if n, _, err := db.Tokens().List(ctx, port.TokenFilter{}, kernel.Page{}); err != nil ||
 		len(n) != 0 {
 		t.Fatalf("stored %v, %v", n, err)
 	}
@@ -90,7 +90,7 @@ func TestUnitIssueRegistryRefuses(t *testing.T) {
 // A registry claim on a token without an expiry, or with a scope that does
 // not parse, was not issued here.
 func TestUnitRegistryRecordRefuses(t *testing.T) {
-	ok := claims{Scp: "applied-permissions/user", Exp: 1, Registry: &types.RegistryAccess{}}
+	ok := claims{Scp: "applied-permissions/user", Exp: 1, Registry: &kernel.RegistryAccess{}}
 	if _, err := registryClaims(ok, false); err != nil {
 		t.Fatal(err)
 	}
@@ -111,18 +111,18 @@ func TestUnitRegistryRecordRefuses(t *testing.T) {
 func TestUnitIssueRegistryKeepsScopeAndIdentity(t *testing.T) {
 	s, _, _ := world(t)
 	ctx := context.Background()
-	groups, err := types.ParseScope("applied-permissions/groups:readers")
+	groups, err := kernel.ParseScope("applied-permissions/groups:readers")
 	if err != nil {
 		t.Fatal(err)
 	}
 	for name, c := range map[string]struct {
-		scope       types.Scope
-		identity    types.TokenIdentity
+		scope       kernel.Scope
+		identity    kernel.TokenIdentity
 		expectedScp string
 	}{
-		"password":  {types.Scope{}, types.IdentityStored, "applied-permissions/user"},
-		"transient": {types.UserScope(), types.IdentityTransient, "applied-permissions/user"},
-		"synthetic": {groups, types.IdentitySynthetic, "applied-permissions/groups:readers"},
+		"password":  {kernel.Scope{}, kernel.IdentityStored, "applied-permissions/user"},
+		"transient": {kernel.UserScope(), kernel.IdentityTransient, "applied-permissions/user"},
+		"synthetic": {groups, kernel.IdentitySynthetic, "applied-permissions/groups:readers"},
 	} {
 		out, err := s.IssueRegistry(ctx, RegistryRequest{
 			Username: "oidc-ci", ExpiresIn: time.Hour, Scope: c.scope, Identity: c.identity,

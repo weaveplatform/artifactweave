@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // ErrInvalidToken reports a token that does not verify: malformed, badly
@@ -19,13 +19,13 @@ var ErrInvalidToken = errors.New("auth: invalid token")
 // TokenVerifier resolves an access token (a JWT) or a reference token to its
 // stored record. internal/auth/token implements it.
 type TokenVerifier interface {
-	Verify(ctx context.Context, raw string) (types.Token, error)
+	Verify(ctx context.Context, raw string) (model.Token, error)
 }
 
 // ExpiredVerifier is a TokenVerifier that also verifies an access token
 // whose only fault is its expiry. internal/auth/token implements it.
 type ExpiredVerifier interface {
-	VerifyExpired(ctx context.Context, raw string) (types.Token, error)
+	VerifyExpired(ctx context.Context, raw string) (model.Token, error)
 }
 
 // Token verifies a token presented as Bearer, as X-JFrog-Art-Api, or as the
@@ -33,24 +33,24 @@ type ExpiredVerifier interface {
 // two). A Basic user name must name the token's subject (decision 0005). The
 // subject must still be an enabled user: disabling a user disables their
 // tokens.
-func (a *Authenticator) Token(ctx context.Context, raw, user string) (Principal, error) {
+func (a *Authenticator) Token(ctx context.Context, raw, user string) (kernel.Principal, error) {
 	if a.tokens == nil {
-		return Principal{}, ErrBadCredentials
+		return kernel.Principal{}, kernel.ErrBadCredentials
 	}
 	t, err := a.tokens.Verify(ctx, raw)
 	if errors.Is(err, ErrInvalidToken) {
-		return Principal{}, ErrBadCredentials
+		return kernel.Principal{}, kernel.ErrBadCredentials
 	}
 	if err != nil {
-		return Principal{}, fmt.Errorf("auth: token: %w", err)
+		return kernel.Principal{}, fmt.Errorf("auth: token: %w", err)
 	}
 	u, err := a.tokenUser(ctx, t, user)
 	if err != nil {
-		return Principal{}, err
+		return kernel.Principal{}, err
 	}
-	if t.Purpose == types.TokenPurposeEncryptedPassword {
+	if t.Purpose == model.TokenPurposeEncryptedPassword {
 		if err := a.passwordUsable(ctx, u); err != nil {
-			return Principal{}, err
+			return kernel.Principal{}, err
 		}
 	}
 	p := tokenPrincipal(u, t.Scope)
@@ -59,15 +59,15 @@ func (a *Authenticator) Token(ctx context.Context, raw, user string) (Principal,
 	if t.Registry != nil {
 		p.Registry, p.TokenParent = t.Registry, t.Parent
 		p.PasswordRevision = sha256.Sum256(u.PasswordHash)
-		if u.Name == AnonymousUser {
+		if u.Name == kernel.AnonymousUser {
 			// An anonymous registry token works only while anonymous
 			// access does: turning it off ends the pulls at once.
 			on, err := a.AnonymousAllowed(ctx)
 			if err != nil {
-				return Principal{}, err
+				return kernel.Principal{}, err
 			}
 			if !on {
-				return Principal{}, ErrBadCredentials
+				return kernel.Principal{}, kernel.ErrBadCredentials
 			}
 			p.Anonymous = true
 		}
@@ -107,47 +107,47 @@ func (a *Authenticator) ExpiredToken(ctx context.Context, raw string) (Refresher
 // tokenUser returns the enabled user t's subject names, which must be user
 // when user is set. A token from an OIDC exchange, or one an administrator
 // minted for a name that is no stored user, may name a user who is not
-// stored (types.TokenIdentity): a synthetic subject is never a stored user,
+// stored (kernel.TokenIdentity): a synthetic subject is never a stored user,
 // and a transient one stands in for a missing user.
 func (a *Authenticator) tokenUser(
 	ctx context.Context,
-	t types.Token,
+	t model.Token,
 	user string,
-) (types.User, error) {
+) (model.User, error) {
 	u, err := a.lookupTokenUser(ctx, t, user)
 	if err != nil {
 		return u, err
 	}
 	if err := a.apiAllowed(ctx, u.Name); err != nil {
-		return types.User{}, err
+		return model.User{}, err
 	}
 	return u, nil
 }
 
 func (a *Authenticator) lookupTokenUser(
 	ctx context.Context,
-	t types.Token,
+	t model.Token,
 	user string,
-) (types.User, error) {
-	sub, err := types.ParseSubject(t.Subject)
+) (model.User, error) {
+	sub, err := model.ParseSubject(t.Subject)
 	if err != nil || sub.Kind != "users" || (user != "" && user != sub.Name) {
-		return types.User{}, ErrBadCredentials
+		return model.User{}, kernel.ErrBadCredentials
 	}
-	if t.Identity == types.IdentitySynthetic {
-		return types.User{Name: sub.Name}, nil
+	if t.Identity == kernel.IdentitySynthetic {
+		return model.User{Name: sub.Name}, nil
 	}
 	u, err := a.users.Get(ctx, sub.Name)
-	if errors.Is(err, store.ErrNotFound) && t.Identity == types.IdentityTransient {
+	if errors.Is(err, kernel.ErrNotFound) && t.Identity == kernel.IdentityTransient {
 		return a.transientUser(ctx, sub.Name)
 	}
-	if errors.Is(err, store.ErrNotFound) {
-		return types.User{}, ErrBadCredentials
+	if errors.Is(err, kernel.ErrNotFound) {
+		return model.User{}, kernel.ErrBadCredentials
 	}
 	if err != nil {
-		return types.User{}, fmt.Errorf("auth: user %s: %w", sub.Name, err)
+		return model.User{}, fmt.Errorf("auth: user %s: %w", sub.Name, err)
 	}
-	if u.Status != "" && u.Status != types.UserEnabled {
-		return types.User{}, ErrBadCredentials
+	if u.Status != "" && u.Status != model.UserEnabled {
+		return model.User{}, kernel.ErrBadCredentials
 	}
 	return u, nil
 }
@@ -158,14 +158,14 @@ func (a *Authenticator) lookupTokenUser(
 // Join Groups" in JFrog's access-tokens page; research 21). The token's
 // scope then decides what applies: applied-permissions/user keeps those
 // groups and grants to the name, a groups scope only the groups it names.
-func (a *Authenticator) transientUser(ctx context.Context, name string) (types.User, error) {
-	u := types.User{Name: name}
+func (a *Authenticator) transientUser(ctx context.Context, name string) (model.User, error) {
+	u := model.User{Name: name}
 	if a.groups == nil {
 		return u, nil
 	}
 	groups, err := a.groups.AutoJoin(ctx)
 	if err != nil {
-		return types.User{}, fmt.Errorf("auth: auto-join groups: %w", err)
+		return model.User{}, fmt.Errorf("auth: auto-join groups: %w", err)
 	}
 	u.Groups = groups
 	return u, nil
@@ -175,16 +175,16 @@ func (a *Authenticator) transientUser(ctx context.Context, name string) (types.U
 // password it stands for. Setting or expiring the password revokes it
 // (internal/service/identity), but the age policy expires a password with
 // no write to revoke on, so expiry is checked here as well.
-func (a *Authenticator) passwordUsable(ctx context.Context, u types.User) error {
+func (a *Authenticator) passwordUsable(ctx context.Context, u model.User) error {
 	if len(u.PasswordHash) == 0 || u.InternalPasswordDisabled {
-		return ErrBadCredentials
+		return kernel.ErrBadCredentials
 	}
 	_, expiry, err := a.policies(ctx)
 	if err != nil {
 		return err
 	}
 	if PasswordExpired(u, expiry, a.now()) {
-		return ErrPasswordExpired
+		return kernel.ErrPasswordExpired
 	}
 	return nil
 }
@@ -209,8 +209,8 @@ func ExpiredTokenFrom(ctx context.Context) (Refresher, bool) {
 // acts through the named groups the user belongs to, and resource and
 // system entries only narrow. The user's own flag and groups are kept here
 // because a resource-only scope narrows them rather than replacing them.
-func tokenPrincipal(u types.User, scope types.Scope) Principal {
-	return Principal{
+func tokenPrincipal(u model.User, scope kernel.Scope) kernel.Principal {
+	return kernel.Principal{
 		Name:                 u.Name,
 		Admin:                u.Admin,
 		Groups:               slices.Clone(u.Groups),

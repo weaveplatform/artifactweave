@@ -6,9 +6,13 @@ import (
 	"fmt"
 	"time"
 
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Names of the built-in principals Artifactory ships (research 05).
@@ -32,8 +36,8 @@ type seedMarker struct {
 // Seeded reports whether the built-in principals have been created.
 func Seeded(ctx context.Context, st store.Store) (bool, error) {
 	var m seedMarker
-	err := st.Settings().Get(ctx, types.SettingSeeded, &m)
-	if errors.Is(err, store.ErrNotFound) {
+	err := st.Settings().Get(ctx, settings.SettingSeeded, &m)
+	if errors.Is(err, kernel.ErrNotFound) {
 		return false, nil
 	}
 	if err != nil {
@@ -47,8 +51,17 @@ func Seeded(ctx context.Context, st store.Store) (bool, error) {
 // permissions and the artifactory-build-info repository, then marks the
 // store seeded. It reports whether this call seeded: false when the store
 // already was, including when another instance sharing the database won a
-// race to seed it first.
-func Seed(ctx context.Context, st store.Store, adminPassword string, now time.Time) (bool, error) {
+// race to seed it first. The repository belongs to the artifacts module,
+// so the seed creates it through repos, which must work over st: Create
+// gets the transaction's context and joins the transaction as the other
+// creates do.
+func Seed(
+	ctx context.Context,
+	st store.Store,
+	repos artifactsapi.Repositories,
+	adminPassword string,
+	now time.Time,
+) (bool, error) {
 	if seeded, err := Seeded(ctx, st); err != nil || seeded {
 		return false, err
 	}
@@ -56,7 +69,7 @@ func Seed(ctx context.Context, st store.Store, adminPassword string, now time.Ti
 	if err != nil {
 		return false, err
 	}
-	return SeedHashed(ctx, st, hash, now)
+	return SeedHashed(ctx, st, repos, hash, now)
 }
 
 // SeedHashed is Seed with the admin password already hashed (HashPassword or
@@ -64,6 +77,7 @@ func Seed(ctx context.Context, st store.Store, adminPassword string, now time.Ti
 func SeedHashed(
 	ctx context.Context,
 	st store.Store,
+	repos artifactsapi.Repositories,
 	adminHash []byte,
 	now time.Time,
 ) (bool, error) {
@@ -80,14 +94,14 @@ func SeedHashed(
 		if seeded {
 			return errAlreadySeeded
 		}
-		return seed(ctx, st, adminHash, now)
+		return seed(ctx, st, repos, adminHash, now)
 	})
 	switch {
 	case err == nil:
 		return true, nil
 	case errors.Is(err, errAlreadySeeded):
 		return false, nil
-	case errors.Is(err, store.ErrConflict):
+	case errors.Is(err, kernel.ErrConflict):
 		// Two instances seeding one database at once: the loser's creates
 		// conflict. It is fine if the winner's marker is now there.
 		if seeded, serr := Seeded(ctx, st); serr == nil && seeded {
@@ -99,45 +113,51 @@ func SeedHashed(
 
 var errAlreadySeeded = errors.New("auth: already seeded")
 
-func seed(ctx context.Context, st store.Store, adminHash []byte, now time.Time) error {
-	if err := st.Groups().Create(ctx, types.Group{
+func seed(
+	ctx context.Context,
+	st store.Store,
+	repos artifactsapi.Repositories,
+	adminHash []byte,
+	now time.Time,
+) error {
+	if err := st.Groups().Create(ctx, model.Group{
 		Name: ReadersGroup, Description: "A group for read-only users",
 		AutoJoin: true, Realm: "internal",
 	}); err != nil {
 		return fmt.Errorf("group %s: %w", ReadersGroup, err)
 	}
-	for _, u := range []types.User{
+	for _, u := range []model.User{
 		{
 			Name: AdminUser, PasswordHash: adminHash, Admin: true, ProfileUpdatable: true,
-			Realm: "internal", Status: types.UserEnabled, Created: now, PasswordChanged: now,
+			Realm: "internal", Status: model.UserEnabled, Created: now, PasswordChanged: now,
 		},
 		// No password: anonymous never logs in, it is what a request without
 		// credentials acts as when anonymous access is on.
-		{Name: AnonymousUser, Realm: "internal", Status: types.UserEnabled, Created: now},
+		{Name: kernel.AnonymousUser, Realm: "internal", Status: model.UserEnabled, Created: now},
 	} {
 		if err := st.Users().Create(ctx, u); err != nil {
 			return fmt.Errorf("user %s: %w", u.Name, err)
 		}
 	}
 	everything := []string{"**"}
-	for _, p := range []types.Permission{
+	for _, p := range []model.Permission{
 		{
 			Name: AnythingPermission,
-			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-				Actions: types.Grants{Groups: map[string]types.Actions{ReadersGroup: types.ActionRead}},
-				Targets: map[string]types.Target{types.TargetAny: {Include: everything, Exclude: []string{}}},
+			Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {
+				Actions: model.Grants{Groups: map[string]accessapi.Actions{ReadersGroup: accessapi.ActionRead}},
+				Targets: map[string]model.Target{accessapi.TargetAny: {Include: everything, Exclude: []string{}}},
 			}},
 			Created: now, Updated: now,
 		},
 		{
 			Name: AnyRemotePermission,
-			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
+			Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {
 				// No grants, as Artifactory ships it since 7.84.3: anonymous
 				// here would let anyone fetch through every remote, and fill
 				// its cache, once anonymous access is on.
-				Actions: types.Grants{},
-				Targets: map[string]types.Target{
-					types.TargetAnyRemote: {Include: everything, Exclude: []string{}},
+				Actions: model.Grants{},
+				Targets: map[string]model.Target{
+					accessapi.TargetAnyRemote: {Include: everything, Exclude: []string{}},
 				},
 			}},
 			Created: now, Updated: now,
@@ -148,14 +168,14 @@ func seed(ctx context.Context, st store.Store, adminHash []byte, now time.Time) 
 		}
 	}
 	buildInfo := repo.Config{
-		Key: types.BuildInfoRepository, Class: repo.Local, PackageType: repo.BuildInfo,
+		Key: accessapi.BuildInfoRepository, Class: repo.Local, PackageType: repo.BuildInfo,
 		Description: "Build Info repository", RepoLayoutRef: repo.LayoutSimple,
 	}
-	if err := st.Repos().Create(ctx, *repo.Defaults(&buildInfo)); err != nil {
-		return fmt.Errorf("repository %s: %w", types.BuildInfoRepository, err)
+	if err := repos.Create(ctx, *repo.Defaults(&buildInfo)); err != nil {
+		return fmt.Errorf("repository %s: %w", accessapi.BuildInfoRepository, err)
 	}
 	if err := st.Settings().
-		Put(ctx, types.SettingSeeded, seedMarker{Version: 1, At: now}); err != nil {
+		Put(ctx, settings.SettingSeeded, seedMarker{Version: 1, At: now}); err != nil {
 		return fmt.Errorf("seeded marker: %w", err)
 	}
 	return nil

@@ -11,8 +11,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 )
 
 // Defaults for the zero Options fields.
@@ -42,18 +44,18 @@ type Options struct {
 	// Tokens verifies access and reference tokens; nil refuses every token.
 	Tokens TokenVerifier
 	// Groups names the groups new users join automatically, which the
-	// transient user of a transient token joins (types.IdentityTransient);
+	// transient user of a transient token joins (kernel.IdentityTransient);
 	// nil means none.
-	Groups store.GroupStore
+	Groups port.GroupStore
 	// APIRestrictions gates newly authenticated calls and Current rechecks.
 	// Nil disables this policy for embedders; the application supplies it.
-	APIRestrictions store.APIRestrictionStore
+	APIRestrictions port.APIRestrictionStore
 }
 
 // Authenticator verifies credentials against the user store.
 type Authenticator struct {
-	users    store.UserStore
-	settings store.SettingsStore
+	users    port.UserStore
+	settings settings.SettingsStore
 	now      func() time.Time
 	cache    *verified
 	slots    chan struct{}
@@ -61,8 +63,8 @@ type Authenticator struct {
 	// does not tell which user names exist.
 	dummy        []byte
 	tokens       TokenVerifier
-	groups       store.GroupStore
-	restrictions store.APIRestrictionStore
+	groups       port.GroupStore
+	restrictions port.APIRestrictionStore
 	policy       policyCache
 	// suspended holds the temporary login suspensions (suspension.go).
 	suspended suspensions
@@ -70,8 +72,8 @@ type Authenticator struct {
 
 // NewAuthenticator returns an Authenticator over users and settings.
 func NewAuthenticator(
-	users store.UserStore,
-	settings store.SettingsStore,
+	users port.UserStore,
+	settings settings.SettingsStore,
 	o Options,
 ) (*Authenticator, error) {
 	var pw [16]byte
@@ -108,31 +110,34 @@ func NewAuthenticator(
 // answers ErrPasswordExpired with the principal, marked PasswordExpired.
 // While the name is temporarily suspended after failed logins, every
 // password answers ErrLoginSuspended (suspension.go).
-func (a *Authenticator) Basic(ctx context.Context, name, password string) (Principal, error) {
+func (a *Authenticator) Basic(
+	ctx context.Context,
+	name, password string,
+) (kernel.Principal, error) {
 	// A switch that cannot be read does not stop the check here: a correct
 	// password then fails in accept, which needs the same settings, and a
 	// wrong one still answers as a wrong password.
 	if enabled, err := a.basicEnabled(ctx); err == nil && !enabled {
-		return Principal{}, ErrBasicAuthDisabled
+		return kernel.Principal{}, ErrBasicAuthDisabled
 	}
 	now := a.now()
 	u, err := a.users.Get(ctx, name)
 	switch {
-	case err == nil && u.Status == types.UserLocked:
+	case err == nil && u.Status == model.UserLocked:
 		// Before the suspension and the password, the order Artifactory
 		// checks them in (decision 0005): the answer is the same whatever
 		// password came, so it tells nothing about the password, and it
 		// costs no hash. It is no failed login, so nothing is counted.
-		return Principal{}, ErrAccountLocked
-	case err != nil && !errors.Is(err, store.ErrNotFound):
-		return Principal{}, fmt.Errorf("auth: user %s: %w", name, err)
+		return kernel.Principal{}, kernel.ErrAccountLocked
+	case err != nil && !errors.Is(err, kernel.ErrNotFound):
+		return kernel.Principal{}, fmt.Errorf("auth: user %s: %w", name, err)
 	}
 	// Before any password is hashed, and whether or not the name exists: a
 	// suspended name answers at once and alike, so neither the answer nor
 	// the time it takes tells the right password from a wrong one.
 	if set, ok := a.suspension(ctx); ok && suspensionOn(set) {
 		if wait := a.suspended.remaining(name, now); wait > 0 {
-			return Principal{}, suspendedFor(wait)
+			return kernel.Principal{}, suspendedFor(wait)
 		}
 	}
 	if err != nil {
@@ -140,7 +145,7 @@ func (a *Authenticator) Basic(ctx context.Context, name, password string) (Princ
 		return a.refuse(ctx, name, now)
 	}
 	if len(u.PasswordHash) == 0 || u.InternalPasswordDisabled ||
-		(u.Status != "" && u.Status != types.UserEnabled) {
+		(u.Status != "" && u.Status != model.UserEnabled) {
 		return a.refuse(ctx, name, now)
 	}
 	key := cacheKey(u.PasswordHash, password)
@@ -154,7 +159,7 @@ func (a *Authenticator) Basic(ctx context.Context, name, password string) (Princ
 		a.recordFailure(ctx, u.Name)
 		return a.refuse(ctx, name, now)
 	case err != nil:
-		return Principal{}, err
+		return kernel.Principal{}, err
 	}
 	a.cache.add(key, now)
 	a.suspended.forget(name)
@@ -164,11 +169,15 @@ func (a *Authenticator) Basic(ctx context.Context, name, password string) (Princ
 // refuse answers credentials that did not verify, counting them toward the
 // name's temporary suspension whether or not the user exists, so that a
 // suspension tells nothing about which names do.
-func (a *Authenticator) refuse(ctx context.Context, name string, now time.Time) (Principal, error) {
+func (a *Authenticator) refuse(
+	ctx context.Context,
+	name string,
+	now time.Time,
+) (kernel.Principal, error) {
 	if set, ok := a.suspension(ctx); ok {
 		a.suspended.fail(name, now, set)
 	}
-	return Principal{}, ErrBadCredentials
+	return kernel.Principal{}, kernel.ErrBadCredentials
 }
 
 // AnonymousAllowed reports whether requests without credentials act as the
@@ -176,8 +185,8 @@ func (a *Authenticator) refuse(ctx context.Context, name string, now time.Time) 
 // Artifactory.
 func (a *Authenticator) AnonymousAllowed(ctx context.Context) (bool, error) {
 	var on bool
-	err := a.settings.Get(ctx, types.SettingAnonymousAccess, &on)
-	if errors.Is(err, store.ErrNotFound) {
+	err := a.settings.Get(ctx, settings.SettingAnonymousAccess, &on)
+	if errors.Is(err, kernel.ErrNotFound) {
 		return false, nil
 	}
 	if err != nil {
@@ -197,8 +206,8 @@ func (a *Authenticator) check(ctx context.Context, stored []byte, password strin
 }
 
 // principalOf is the principal of u's verified password.
-func principalOf(u types.User) Principal {
-	return Principal{
+func principalOf(u model.User) kernel.Principal {
+	return kernel.Principal{
 		Name: u.Name, Admin: u.Admin, Groups: slices.Clone(u.Groups), Password: true,
 		PasswordRevision: sha256.Sum256(u.PasswordHash),
 	}

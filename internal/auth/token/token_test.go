@@ -13,9 +13,14 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/instance"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const testBits = 1024
@@ -32,7 +37,7 @@ func (c *clock) add(d time.Duration) { c.mu.Lock(); c.t = c.t.Add(d); c.mu.Unloc
 func newStore(t *testing.T) *inmem.Store {
 	t.Helper()
 	db := inmem.New()
-	if err := db.Instance().Init(context.Background(), types.InstanceIdentity{
+	if err := db.Instance().Init(context.Background(), instance.InstanceIdentity{
 		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
 	}); err != nil {
 		t.Fatal(err)
@@ -137,7 +142,7 @@ func TestUnitIssueAndVerify(t *testing.T) {
 	if out.ExpiresIn != 31536000 || out.Record.Audience != DefaultAudience ||
 		out.Record.Subject != "jfac@01234567-89ab-4cde-8f01-23456789abcd/users/alice" ||
 		!out.Record.Revocable || out.RefreshToken != "" ||
-		!types.IsReferenceToken(out.ReferenceToken) {
+		!accessapi.IsReferenceToken(out.ReferenceToken) {
 		t.Fatalf("issued %+v", out)
 	}
 	if s.Issuer() != "jfac@01234567-89ab-4cde-8f01-23456789abcd" {
@@ -151,20 +156,20 @@ func TestUnitIssueAndVerify(t *testing.T) {
 		}
 	}
 	// The default lifetime is the setting when one is stored.
-	if err := db.Settings().Put(ctx, types.SettingDefaultTokenExpiry, 120); err != nil {
+	if err := db.Settings().Put(ctx, settings.SettingDefaultTokenExpiry, 120); err != nil {
 		t.Fatal(err)
 	}
 	if out := issue(t, s, Request{}); out.ExpiresIn != 120 {
 		t.Fatalf("default expiry %d", out.ExpiresIn)
 	}
-	if err := db.Settings().Put(ctx, types.SettingDefaultTokenExpiry, -1); err != nil {
+	if err := db.Settings().Put(ctx, settings.SettingDefaultTokenExpiry, -1); err != nil {
 		t.Fatal(err)
 	}
 	if out := issue(t, s, Request{}); out.ExpiresIn != 31536000 {
 		t.Fatalf("a negative setting falls back: %d", out.ExpiresIn)
 	}
 	// A long-lived token is revocable; a scope is kept as given.
-	sc, err := types.ParseScope("applied-permissions/groups:readers")
+	sc, err := kernel.ParseScope("applied-permissions/groups:readers")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -276,10 +281,10 @@ func TestUnitRevoke(t *testing.T) {
 	}
 	invalid(t, s, byRef.AccessToken, "revoked by reference")
 	short := issue(t, s, Request{ExpiresIn: dur(time.Hour)})
-	if err := s.Revoke(ctx, short.Record.ID); !errors.Is(err, ErrNotRevocable) {
+	if err := s.Revoke(ctx, short.Record.ID); !errors.Is(err, accessapi.ErrNotRevocable) {
 		t.Fatalf("short-lived token revoked: %v", err)
 	}
-	if err := s.RevokeValue(ctx, short.AccessToken); !errors.Is(err, ErrNotRevocable) {
+	if err := s.RevokeValue(ctx, short.AccessToken); !errors.Is(err, accessapi.ErrNotRevocable) {
 		t.Fatalf("short-lived token revoked by value: %v", err)
 	}
 	// A refreshable token is revocable whatever its lifetime
@@ -299,10 +304,10 @@ func TestUnitRevoke(t *testing.T) {
 	if err := s.RevokeValue(ctx, refreshable.AccessToken); err != nil {
 		t.Fatalf("revoke a refreshable token by value: %v", err)
 	}
-	if err := s.Revoke(ctx, "missing"); !errors.Is(err, store.ErrNotFound) {
+	if err := s.Revoke(ctx, "missing"); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("revoke missing: %v", err)
 	}
-	if err := s.RevokeValue(ctx, "eyJ.x.y"); !errors.Is(err, store.ErrNotFound) {
+	if err := s.RevokeValue(ctx, "eyJ.x.y"); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("revoke unknown value: %v", err)
 	}
 }
@@ -330,7 +335,7 @@ func TestUnitRefresh(t *testing.T) {
 	if _, err := s.Refresh(ctx, first.RefreshToken); !errors.Is(err, auth.ErrInvalidToken) {
 		t.Fatalf("a used refresh token: %v", err)
 	}
-	c.add(2*time.Hour + types.DefaultRefreshGrace)
+	c.add(2*time.Hour + model.DefaultRefreshGrace)
 	if _, err := s.Refresh(ctx, next.RefreshToken); !errors.Is(err, auth.ErrInvalidToken) {
 		t.Fatalf("after the grace: %v", err)
 	}
@@ -339,11 +344,11 @@ func TestUnitRefresh(t *testing.T) {
 func TestUnitRestrictionPreservesRefreshCredential(t *testing.T) {
 	s, db, c := world(t)
 	ctx := t.Context()
-	if err := db.Users().Create(ctx, types.User{Name: "alice"}); err != nil {
+	if err := db.Users().Create(ctx, model.User{Name: "alice"}); err != nil {
 		t.Fatal(err)
 	}
 	first := issue(t, s, Request{Refreshable: true, ExpiresIn: dur(time.Hour)})
-	r := store.APIRestriction{
+	r := port.APIRestriction{
 		User:    "alice",
 		Actor:   "admin",
 		Reason:  "Pause API",
@@ -353,10 +358,16 @@ func TestUnitRestrictionPreservesRefreshCredential(t *testing.T) {
 	if _, err := db.APIRestrictions().Put(ctx, r); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Refresh(ctx, first.RefreshToken); !errors.Is(err, auth.ErrAPIRestricted) {
+	if _, err := s.Refresh(ctx, first.RefreshToken); !errors.Is(err, kernel.ErrAPIRestricted) {
 		t.Fatalf("restricted refresh: %v", err)
 	}
-	if _, err := s.Issue(ctx, Request{Username: "alice"}); !errors.Is(err, auth.ErrAPIRestricted) {
+	if _, err := s.Issue(
+		ctx,
+		Request{Username: "alice"},
+	); !errors.Is(
+		err,
+		kernel.ErrAPIRestricted,
+	) {
 		t.Fatalf("restricted OIDC/issuance path: %v", err)
 	}
 	old, err := db.Tokens().Get(ctx, first.Record.ID)
@@ -411,14 +422,14 @@ func TestUnitRefreshKeepsIdentity(t *testing.T) {
 	ctx := context.Background()
 	first := issue(t, s, Request{
 		Username: "ghost", Refreshable: true, ExpiresIn: dur(time.Hour), ByAdmin: true,
-		Identity: types.IdentityTransient,
+		Identity: kernel.IdentityTransient,
 	})
 	next, err := s.Refresh(ctx, first.RefreshToken)
 	if err != nil {
 		t.Fatal(err)
 	}
 	rec, err := s.Verify(ctx, next.AccessToken)
-	if err != nil || rec.Identity != types.IdentityTransient {
+	if err != nil || rec.Identity != kernel.IdentityTransient {
 		t.Fatalf("refreshed record %+v, %v", rec, err)
 	}
 }
@@ -509,7 +520,7 @@ func TestUnitEncryptedPassword(t *testing.T) {
 	s, db, c := world(t)
 	ctx := context.Background()
 	first, err := s.EncryptedPassword(ctx, "alice")
-	if err != nil || !types.IsReferenceToken(first) {
+	if err != nil || !accessapi.IsReferenceToken(first) {
 		t.Fatalf("EncryptedPassword = %q, %v", first, err)
 	}
 	c.add(400 * 24 * time.Hour)
@@ -518,7 +529,7 @@ func TestUnitEncryptedPassword(t *testing.T) {
 		t.Fatalf("second EncryptedPassword = %q, %v; want %q", again, err, first)
 	}
 	rec, err := s.Verify(ctx, first)
-	if err != nil || rec.Purpose != types.TokenPurposeEncryptedPassword ||
+	if err != nil || rec.Purpose != model.TokenPurposeEncryptedPassword ||
 		!rec.ExpiresAt.IsZero() ||
 		!rec.Revocable {
 		t.Fatalf("Verify = %+v, %v", rec, err)
@@ -539,13 +550,13 @@ func TestUnitEncryptedPassword(t *testing.T) {
 // service's own, as a concurrent first use would, and with vanish revokes it
 // again before the service can read it.
 type racingTokens struct {
-	store.TokenStore
-	rival  types.Token
+	port.TokenStore
+	rival  model.Token
 	raced  bool
 	vanish bool
 }
 
-func (r *racingTokens) Create(ctx context.Context, t types.Token) error {
+func (r *racingTokens) Create(ctx context.Context, t model.Token) error {
 	if t.Purpose == "" || r.raced {
 		return r.TokenStore.Create(ctx, t) //nolint:wrapcheck // test fake
 	}
@@ -565,7 +576,7 @@ type racingStore struct {
 	tokens *racingTokens
 }
 
-func (s racingStore) Tokens() store.TokenStore { return s.tokens }
+func (s racingStore) Tokens() port.TokenStore { return s.tokens }
 
 // TestUnitEncryptedPasswordRace: the first use that loses the race answers with
 // the winner's value.
@@ -575,9 +586,9 @@ func TestUnitEncryptedPasswordRace(t *testing.T) {
 	db := newStore(t)
 	rs := racingStore{Store: db, tokens: &racingTokens{TokenStore: db.Tokens()}}
 	s := newService(t, rs, c)
-	rs.tokens.rival = types.Token{
+	rs.tokens.rival = model.Token{
 		ID: "rival", Subject: s.Issuer() + "/users/alice",
-		Purpose: types.TokenPurposeEncryptedPassword, Secret: "rival-secret",
+		Purpose: model.TokenPurposeEncryptedPassword, Secret: "rival-secret",
 	}
 	got, err := s.EncryptedPassword(ctx, "alice")
 	if err != nil || got != "rival-secret" {
@@ -588,7 +599,7 @@ func TestUnitEncryptedPasswordRace(t *testing.T) {
 		t.Fatal(err)
 	}
 	rs.tokens.raced, rs.tokens.vanish = false, true
-	if _, err := s.EncryptedPassword(ctx, "alice"); !errors.Is(err, store.ErrConflict) {
+	if _, err := s.EncryptedPassword(ctx, "alice"); !errors.Is(err, kernel.ErrConflict) {
 		t.Fatalf("a vanished rival: %v", err)
 	}
 }
@@ -667,7 +678,7 @@ func TestUnitNewNeedsIdentity(t *testing.T) {
 		Options{},
 	); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatalf("no identity: %v", err)
 	}
@@ -677,7 +688,7 @@ func TestUnitReferenceForm(t *testing.T) {
 	seen := map[string]bool{}
 	for range 200 {
 		r := newReference()
-		if !types.IsReferenceToken(r) || seen[r] {
+		if !accessapi.IsReferenceToken(r) || seen[r] {
 			t.Fatalf("reference %q", r)
 		}
 		seen[r] = true

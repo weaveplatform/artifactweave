@@ -6,22 +6,23 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitAPIRestrictionCredentialsAndRecovery(t *testing.T) {
 	ctx := t.Context()
 	db := inmem.New()
-	addUser(t, db, types.User{Name: "dev"}, "pw")
-	v := fakeVerifier{"dev-token": {Subject: "jfac@x/users/dev", Scope: types.UserScope()}}
+	addUser(t, db, model.User{Name: "dev"}, "pw")
+	v := fakeVerifier{"dev-token": {Subject: "jfac@x/users/dev", Scope: kernel.UserScope()}}
 	a, clock := newAuth(t, db, Options{APIRestrictions: db.APIRestrictions(), Tokens: v})
 	p, err := a.Basic(ctx, "dev", "pw")
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := store.APIRestriction{
+	r := port.APIRestriction{
 		User:    "dev",
 		Actor:   "admin",
 		Reason:  "Poll overload",
@@ -36,11 +37,11 @@ func TestUnitAPIRestrictionCredentialsAndRecovery(t *testing.T) {
 		"token":           func() error { _, err := a.Token(ctx, "dev-token", ""); return err },
 		"current":         func() error { _, err := a.Current(ctx, p, db.Tokens()); return err },
 	} {
-		if err := check(); !errors.Is(err, ErrAPIRestricted) {
+		if err := check(); !errors.Is(err, kernel.ErrAPIRestricted) {
 			t.Fatalf("%s: %v", name, err)
 		}
 	}
-	if _, err := a.Basic(ctx, "dev", "wrong"); !errors.Is(err, ErrBadCredentials) {
+	if _, err := a.Basic(ctx, "dev", "wrong"); !errors.Is(err, kernel.ErrBadCredentials) {
 		t.Fatalf("restriction disclosed before verification: %v", err)
 	}
 	recovery := WithAPIRecovery(ctx)
@@ -48,7 +49,12 @@ func TestUnitAPIRestrictionCredentialsAndRecovery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := RequireAdmin(WithPrincipal(recovery, verified)); !errors.Is(err, ErrForbidden) {
+	if _, err := kernel.RequireAdmin(
+		kernel.WithPrincipal(recovery, verified),
+	); !errors.Is(
+		err,
+		kernel.ErrForbidden,
+	) {
 		t.Fatalf("recovery granted admin: %v", err)
 	}
 	if _, err := a.Token(recovery, "dev-token", ""); err != nil {
@@ -74,8 +80,8 @@ func TestUnitAPIRestrictionCredentialsAndRecovery(t *testing.T) {
 	}
 }
 
-type brokenRestrictions struct{ store.APIRestrictionStore }
+type brokenRestrictions struct{ port.APIRestrictionStore }
 
-func (brokenRestrictions) Get(context.Context, string) (store.APIRestriction, error) {
-	return store.APIRestriction{}, context.DeadlineExceeded
+func (brokenRestrictions) Get(context.Context, string) (port.APIRestriction, error) {
+	return port.APIRestriction{}, context.DeadlineExceeded
 }

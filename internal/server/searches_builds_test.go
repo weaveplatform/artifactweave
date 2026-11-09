@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -220,7 +220,7 @@ func TestAccSearchBuildArtifacts(t *testing.T) {
 		Name: "anonymous-builds", Resources: map[types.ResourceType]types.Resource{
 			types.ResourceBuild: {
 				Actions: types.Grants{
-					Users: map[string]types.Actions{auth.AnonymousUser: types.ActionRead},
+					Users: map[string]types.Actions{kernel.AnonymousUser: types.ActionRead},
 				},
 				Targets: map[string]types.Target{
 					types.BuildInfoRepository: {Include: []string{"app/**"}},

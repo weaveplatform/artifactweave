@@ -32,6 +32,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -442,7 +443,7 @@ func (k *Kit) resolve(next http.Handler) http.Handler {
 			// Ahead of the class gate, so a client of a remote or virtual
 			// repository learns to send credentials now, as it will need
 			// to once P9 and P10 serve it.
-			k.Error(w, r, auth.ErrUnauthenticated)
+			k.Error(w, r, kernel.ErrUnauthenticated)
 			return
 		}
 		src, ok := k.p.Sources[c.Class]
@@ -509,7 +510,7 @@ func (k *Kit) lookup(ctx context.Context, keys []Key) (repo.Config, Key, error) 
 // anonymous reports whether r carries no credentials: the anonymous
 // principal, or none at all.
 func anonymous(r *http.Request) bool {
-	p, ok := auth.FromContext(r.Context())
+	p, ok := kernel.FromContext(r.Context())
 	return !ok || p.Anonymous
 }
 
@@ -647,7 +648,7 @@ func (k *Kit) Delete(r *http.Request, path string) error {
 	case err != nil:
 		return fmt.Errorf("get item %s/%s: %w", c.Key, path, err)
 	}
-	p, _ := auth.FromContext(ctx)
+	p, _ := kernel.FromContext(ctx)
 	if _, err := k.o.Items().Delete(ctx, item.Target{Repo: c, Path: path}, p.Name); err != nil {
 		return k.o.ItemError(ctx, "delete", err)
 	}
@@ -680,7 +681,7 @@ func (k *Kit) DeleteTree(r *http.Request, path string) error {
 		}
 		page.After = next
 	}
-	p, _ := auth.FromContext(ctx)
+	p, _ := kernel.FromContext(ctx)
 	if _, err := k.o.Items().Delete(ctx, item.Target{Repo: c, Path: path}, p.Name); err != nil {
 		return k.o.ItemError(ctx, "delete", err)
 	}
@@ -688,10 +689,10 @@ func (k *Kit) DeleteTree(r *http.Request, path string) error {
 }
 
 func refusal(r *http.Request) error {
-	if p, ok := auth.FromContext(r.Context()); ok && !p.Anonymous {
-		return auth.ErrForbidden
+	if p, ok := kernel.FromContext(r.Context()); ok && !p.Anonymous {
+		return kernel.ErrForbidden
 	}
-	return auth.ErrUnauthenticated
+	return kernel.ErrUnauthenticated
 }
 
 // DB is the store the kit resolves repositories in, for a handler that
@@ -787,7 +788,7 @@ func (k *Kit) Store(
 	if !can(r, c, path, types.ActionWrite) {
 		return types.Item{}, refusal(r)
 	}
-	p, _ := auth.FromContext(ctx)
+	p, _ := kernel.FromContext(ctx)
 	existing, err := k.o.Store.Items().Get(ctx, c.Key, false, path)
 	switch {
 	case err == nil && !existing.Folder && !can(r, c, path, types.ActionDelete):
@@ -836,7 +837,7 @@ func (k *Kit) StoreOnce(
 	if !can(r, c, path, types.ActionWrite) {
 		return types.Item{}, refusal(r)
 	}
-	p, _ := auth.FromContext(ctx)
+	p, _ := kernel.FromContext(ctx)
 	d := item.Deploy{
 		Target: item.Target{Repo: c, Path: path}, Body: body, Declared: declared,
 		Properties: props, By: p.Name,
@@ -931,7 +932,7 @@ func (k *Kit) StoreNew(
 	if !can(r, c, path, types.ActionWrite) {
 		return types.Item{}, refusal(r)
 	}
-	p, _ := auth.FromContext(ctx)
+	p, _ := kernel.FromContext(ctx)
 	it, err := k.o.Items().DeployCommitted(ctx, item.Deploy{
 		Target: item.Target{Repo: c, Path: path}, Properties: props, By: p.Name,
 		Declared: declared, IfAbsent: true,

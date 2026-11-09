@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -187,7 +187,7 @@ func TestAccTrashListingFiltered(t *testing.T) {
 	list("admin", "", "/libs-local", "/other-local", "/server-local")
 
 	// Anonymous is told to sign in, even holding deploy.
-	grant("anon-deploy", auth.AnonymousUser, "libs-local", types.ActionWrite, []string{"**"}, nil)
+	grant("anon-deploy", kernel.AnonymousUser, "libs-local", types.ActionWrite, []string{"**"}, nil)
 	for _, p := range []string{"", "/libs-local", "/libs-local/b/three.txt"} {
 		wantStatus(t, w.do("GET", tc+p, "", ""), http.StatusUnauthorized)
 	}
