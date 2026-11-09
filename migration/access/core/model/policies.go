@@ -1,4 +1,4 @@
-package types
+package model
 
 // UserLockPolicy locks an account after repeated failed logins.
 type UserLockPolicy struct {

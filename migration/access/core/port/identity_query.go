@@ -1,4 +1,4 @@
-package store
+package port
 
 import "github.com/weaveplatform/artifactweave/pkg/types"
 

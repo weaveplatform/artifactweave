@@ -1,4 +1,4 @@
-package types
+package model
 
 // SigningKey signs bundle manifests. The private key and passphrase are
 // sealed and never serialised.
