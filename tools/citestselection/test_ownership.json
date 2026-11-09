@@ -216,6 +216,9 @@
       "vcs_routes_test.go",
       "vcs_tables_test.go",
       "virtual_members_test.go"
+    ],
+    "test/server/access": [
+      "auth_test.go"
     ]
   },
   "format_dependencies": {
