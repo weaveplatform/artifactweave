@@ -17,6 +17,11 @@ type APIRestriction struct {
 	Sequence            int64
 }
 
+// Validate reports an error wrapping kernel.ErrInvalid unless r can be
+// stored: User, Actor and Reason set, User and Actor at most 255 bytes and
+// Reason at most 1024, Changed set, and a non-zero Until after Changed at
+// the microsecond precision the stores keep. Both stores check it in Put
+// before they write anything.
 func (r APIRestriction) Validate() error {
 	if r.User == "" || r.Actor == "" || r.Reason == "" || len(r.User) > 255 || len(r.Actor) > 255 ||
 		len(

@@ -9,10 +9,10 @@ import (
 // ProjectStore persists projects with their roles, environments, members
 // and repository assignments. Global roles and environments are those with
 // an empty ProjectKey. Writes that name a project (a project role or
-// environment, a membership, an assignment's owner) return ErrNotFound when
-// that project does not exist.
+// environment, a membership, an assignment's owner) return
+// kernel.ErrNotFound when that project does not exist.
 type ProjectStore interface {
-	// Create stores p; ErrConflict when the key exists.
+	// Create stores p; kernel.ErrConflict when the key exists.
 	Create(ctx context.Context, p model.Project) error
 	// Get returns the project.
 	Get(ctx context.Context, key string) (model.Project, error)
@@ -34,14 +34,14 @@ type ProjectStore interface {
 	DeleteRole(ctx context.Context, projectKey, name string) error
 
 	// CreateEnvironment stores e. Environment names are unique across the
-	// instance, global and project alike, so ErrConflict when the name is
-	// taken anywhere.
+	// instance, global and project alike, so kernel.ErrConflict when the name
+	// is taken anywhere.
 	CreateEnvironment(ctx context.Context, e model.Environment) error
 	// Environments returns a project's environments, or the global ones for
 	// "", by name.
 	Environments(ctx context.Context, projectKey string) ([]model.Environment, error)
 	// RenameEnvironment renames an environment and every reference to it in
-	// roles and repository assignments; ErrConflict when to is taken.
+	// roles and repository assignments; kernel.ErrConflict when to is taken.
 	RenameEnvironment(ctx context.Context, projectKey, from, to string) error
 	// DeleteEnvironment removes an environment.
 	DeleteEnvironment(ctx context.Context, projectKey, name string) error

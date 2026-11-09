@@ -12,8 +12,8 @@ import (
 // UserStore persists users. A user's Groups are its memberships, kept in
 // the group_members table shared with GroupStore.
 type UserStore interface {
-	// Create stores u and its memberships; ErrConflict when the name exists,
-	// ErrNotFound when a named group does not.
+	// Create stores u and its memberships; kernel.ErrConflict when the name
+	// exists, kernel.ErrNotFound when a named group does not.
 	Create(ctx context.Context, u model.User) error
 	// Get returns the user with Groups sorted.
 	Get(ctx context.Context, name string) (model.User, error)
@@ -31,7 +31,7 @@ type UserStore interface {
 	// RecordFailedLogin adds one to FailedLogins in one atomic step and,
 	// when lockAt is positive and the count reaches it, sets an enabled
 	// user's Status to locked. It reports whether the user is locked
-	// afterwards. ErrNotFound when the user does not exist.
+	// afterwards. kernel.ErrNotFound when the user does not exist.
 	RecordFailedLogin(ctx context.Context, name string, lockAt int) (bool, error)
 	// Unlock sets locked users among names back to enabled and resets
 	// their FailedLogins; with no names it unlocks every locked user.
@@ -43,8 +43,8 @@ type UserStore interface {
 
 // GroupStore persists groups.
 type GroupStore interface {
-	// Create stores g and its members; ErrConflict when the name exists,
-	// ErrNotFound when a member does not.
+	// Create stores g and its members; kernel.ErrConflict when the name exists,
+	// kernel.ErrNotFound when a member does not.
 	Create(ctx context.Context, g model.Group) error
 	// Get returns the group with Members sorted.
 	Get(ctx context.Context, name string) (model.Group, error)
@@ -57,7 +57,7 @@ type GroupStore interface {
 	// ListNames filters and pages group names without loading member lists.
 	ListNames(ctx context.Context, f IdentityFilter, p kernel.Page) ([]string, string, error)
 	// AddMembers adds users to the group; adding a member twice is not an
-	// error. ErrNotFound when the group or a user does not exist.
+	// error. kernel.ErrNotFound when the group or a user does not exist.
 	AddMembers(ctx context.Context, group string, users ...string) error
 	// RemoveMembers removes users from the group; removing a non-member is
 	// not an error.
@@ -70,7 +70,7 @@ type GroupStore interface {
 // 0006). Grants and targets are mirrored into their own tables so the
 // authorizer looks permissions up by principal and by target.
 type PermissionStore interface {
-	// Create stores p; ErrConflict when the name exists.
+	// Create stores p; kernel.ErrConflict when the name exists.
 	Create(ctx context.Context, p model.Permission) error
 	// Get returns the permission.
 	Get(ctx context.Context, name string) (model.Permission, error)
@@ -108,8 +108,8 @@ type TokenFilter struct {
 // TokenStore persists access token records. The tokens themselves are never
 // stored, except a purposed token's Secret, which stores seal.
 type TokenStore interface {
-	// Create stores t; ErrConflict when the ID or a digest exists, or when
-	// the subject already has a token of t's purpose.
+	// Create stores t; kernel.ErrConflict when the ID or a digest exists, or
+	// when the subject already has a token of t's purpose.
 	Create(ctx context.Context, t model.Token) error
 	// Get returns the token with id.
 	Get(ctx context.Context, id string) (model.Token, error)
@@ -131,7 +131,7 @@ type TokenStore interface {
 // certificates, trusted release-bundle keys and Distribution signing keys.
 // Private keys and passphrases are sealed.
 type KeyStore interface {
-	// CreateKeypair stores k; ErrConflict when the name exists.
+	// CreateKeypair stores k; kernel.ErrConflict when the name exists.
 	CreateKeypair(ctx context.Context, k api.Keypair) error
 	// Keypair returns the key pair called name.
 	Keypair(ctx context.Context, name string) (api.Keypair, error)
@@ -152,7 +152,8 @@ type KeyStore interface {
 	// DeleteCertificate removes a certificate.
 	DeleteCertificate(ctx context.Context, alias string) error
 
-	// CreateTrustedKey stores k; ErrConflict when the kid or alias exists.
+	// CreateTrustedKey stores k; kernel.ErrConflict when the kid or alias
+	// exists.
 	CreateTrustedKey(ctx context.Context, k model.TrustedKey) error
 	// TrustedKey returns the trusted key with kid.
 	TrustedKey(ctx context.Context, kid string) (model.TrustedKey, error)
