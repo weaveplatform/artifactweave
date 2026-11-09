@@ -1,6 +1,6 @@
-// Package agentpackages serves the APM v1 registry protocol on Agent Packages
+// Package agentpackageshttp serves the APM v1 registry protocol on Agent Packages
 // local and federated repositories. Federated peer convergence belongs to P13.
-package agentpackages
+package agentpackageshttp
 
 import (
 	"encoding/json"
@@ -14,9 +14,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	apmfmt "github.com/weaveplatform/artifactweave/internal/format/agentpackages"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	apmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/agentpackages"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"

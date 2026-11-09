@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	agentpluginsfmt "github.com/weaveplatform/artifactweave/internal/format/agentplugins"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	agentpluginsfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/agentplugins"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support/agentcommon"
 )

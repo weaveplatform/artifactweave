@@ -18,7 +18,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/idtoken"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
-	"github.com/weaveplatform/artifactweave/internal/server/agentpackages"
 	"github.com/weaveplatform/artifactweave/internal/server/aieditorextensions"
 	"github.com/weaveplatform/artifactweave/internal/server/ansible"
 	"github.com/weaveplatform/artifactweave/internal/server/cargo"
@@ -43,6 +42,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	agentpackageshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/agentpackages/http"
 	bazelmoduleshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bazelmodules/http"
 	bowerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bower/http"
 	chefhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/chef/http"
@@ -244,7 +244,7 @@ var protocols = []func(Config) pkgroute.Protocol{
 	func(cfg Config) pkgroute.Protocol {
 		return gitlfs.Protocol(gitlfs.Options{RemoteSources: cfg.RemoteSources})
 	},
-	func(Config) pkgroute.Protocol { return agentpackages.Protocol() },
+	func(Config) pkgroute.Protocol { return agentpackageshttp.Protocol() },
 	func(cfg Config) pkgroute.Protocol {
 		return conanhttp.Protocol(conanhttp.Options{
 			RemoteSources: cfg.RemoteSources, Tokens: cfg.Access.Tokens,

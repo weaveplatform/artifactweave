@@ -46,7 +46,7 @@ var formats = map[string]formatImpact{
 	"nix":           {"./migration/artifacts/ecosystem/nix/...", "@nix", []string{"nix"}},
 	"puppet":        {"./migration/artifacts/ecosystem/puppet/...", "@puppet", []string{"puppet"}},
 	"pub":           {"./internal/format/pub/...", "@pub", []string{"dart"}},
-	"agentpackages": {"./internal/format/agentpackages/...", "@apm", []string{"apm"}},
+	"agentpackages": {"./migration/artifacts/ecosystem/agentpackages/...", "@apm", []string{"apm"}},
 	"bower":         {"./migration/artifacts/ecosystem/bower/...", "@bower", []string{"bower"}},
 	"debian":        {"./migration/artifacts/ecosystem/debian/...", "@debian", []string{"debian"}},
 	"gems":          {"./internal/format/gems/...", "@gems", []string{"ruby"}},
@@ -58,7 +58,7 @@ var formats = map[string]formatImpact{
 	},
 	"vagrant": {"./internal/format/vagrant/...", "@vagrant", []string{"vagrant"}},
 	"agentplugins": {
-		"./internal/format/agentplugins/...",
+		"./migration/artifacts/ecosystem/agentplugins/...",
 		"@agentplugins,@agentplugins_clients",
 		[]string{"jf"},
 	},

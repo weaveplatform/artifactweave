@@ -1,8 +1,6 @@
 package ecosystem
 
 import (
-	"github.com/weaveplatform/artifactweave/internal/format/agentpackages"
-	"github.com/weaveplatform/artifactweave/internal/format/agentplugins"
 	"github.com/weaveplatform/artifactweave/internal/format/aieditorextensions"
 	"github.com/weaveplatform/artifactweave/internal/format/ansible"
 	"github.com/weaveplatform/artifactweave/internal/format/cargo"
@@ -17,6 +15,8 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/vagrant"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/agentpackages"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/agentplugins"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/alpine"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bazelmodules"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bower"

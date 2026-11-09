@@ -3892,7 +3892,7 @@
   {
     "route": "GET /artifactory/api/agentpackages/{repoKey}/v1/packages/{owner}/{name}/versions",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/agentpackages.handler.versions-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/agentpackages/http.handler.versions-fm",
     "review_family": "native-agentpackages",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -3911,7 +3911,7 @@
   {
     "route": "GET /artifactory/api/agentpackages/{repoKey}/v1/packages/{owner}/{name}/versions/{version}/download",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/agentpackages.handler.download-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/agentpackages/http.handler.download-fm",
     "review_family": "native-agentpackages",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -3930,7 +3930,7 @@
   {
     "route": "GET /artifactory/api/agentpackages/{repoKey}/v1/search",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/agentpackages.handler.search-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/agentpackages/http.handler.search-fm",
     "review_family": "native-agentpackages",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -11683,7 +11683,7 @@
   {
     "route": "HEAD /artifactory/api/agentpackages/{repoKey}/v1/packages/{owner}/{name}/versions",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/agentpackages.handler.versions-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/agentpackages/http.handler.versions-fm",
     "review_family": "native-agentpackages",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -11702,7 +11702,7 @@
   {
     "route": "HEAD /artifactory/api/agentpackages/{repoKey}/v1/packages/{owner}/{name}/versions/{version}/download",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/agentpackages.handler.download-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/agentpackages/http.handler.download-fm",
     "review_family": "native-agentpackages",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -11721,7 +11721,7 @@
   {
     "route": "HEAD /artifactory/api/agentpackages/{repoKey}/v1/search",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/agentpackages.handler.search-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/agentpackages/http.handler.search-fm",
     "review_family": "native-agentpackages",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -20353,7 +20353,7 @@
   {
     "route": "PUT /artifactory/api/agentpackages/{repoKey}/v1/packages/{owner}/{name}/versions/{version}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/agentpackages.handler.publish-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/agentpackages/http.handler.publish-fm",
     "review_family": "native-agentpackages",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
