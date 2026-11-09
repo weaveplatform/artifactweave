@@ -9,11 +9,10 @@ import (
 	fedmigrations "github.com/weaveplatform/artifactweave/migration/federation/adapters/sql/migrations"
 	ntfmigrations "github.com/weaveplatform/artifactweave/migration/notifications/adapters/sql/migrations"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
-	platmigrations "github.com/weaveplatform/artifactweave/migration/platform/store/sql/migrations"
+	platsql "github.com/weaveplatform/artifactweave/migration/platform/store/sql"
 	relmigrations "github.com/weaveplatform/artifactweave/migration/releases/adapters/sql/migrations"
 	retmigrations "github.com/weaveplatform/artifactweave/migration/retention/adapters/sql/migrations"
 	wrkmigrations "github.com/weaveplatform/artifactweave/migration/workers/adapters/sql/migrations"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Modules returns every module's registration with the SQL layer, in the
@@ -29,19 +28,7 @@ import (
 // cycle.
 func Modules() []dialect.Module {
 	return []dialect.Module{
-		{Name: "platform", Migrations: platmigrations.FS, Sealed: []dialect.SealedColumn{
-			{
-				Table: "config_secrets", Column: "value", Purpose: purposeConfigSecret,
-				Keys: []string{"kind", "key", "name"},
-				RowID: func(k []string) string {
-					return configSecretID(types.ConfigKind(k[0]), k[1], k[2])
-				},
-			},
-			{
-				Table: "instance", Column: "private_key", Purpose: purposeInstanceKey,
-				Keys: []string{"instance_id"}, RowID: dialect.FirstKey,
-			},
-		}},
+		platsql.Module,
 		{
 			Name:       "artifacts",
 			Migrations: artmigrations.FS,

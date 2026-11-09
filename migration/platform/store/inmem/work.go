@@ -7,20 +7,20 @@ import (
 	"slices"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
-// WorkQueue implements store.Store.
-func (s *Store) WorkQueue() store.WorkQueue { return workQueue{s} }
+// WorkQueue returns the persistent work queue (decision 0033).
+func (s *Store) WorkQueue() work.WorkQueue { return workQueue{s} }
 
 type workQueue struct{ s *Store }
 
 type workKey struct{ kind, key string }
 
-func (w workQueue) items() *memtx.Table[workKey, types.WorkItem] {
-	return memtx.TableOf[workKey, types.WorkItem](w.s.Store, "work_items")
+func (w workQueue) items() *memtx.Table[workKey, work.WorkItem] {
+	return memtx.TableOf[workKey, work.WorkItem](w.s.Store, "work_items")
 }
 
 // micro compares times at the precision the SQL columns store.
@@ -32,26 +32,26 @@ func (w workQueue) Enqueue(
 	payload []byte,
 	now time.Time,
 ) error {
-	if err := store.ValidateWork(kind, key, payload); err != nil {
-		return err
+	if err := work.ValidateWork(kind, key, payload); err != nil {
+		return err //nolint:wrapcheck // the store's error names the item
 	}
 	return w.s.Do(ctx, func() error {
 		k := workKey{kind, key}
 		it, ok := w.items().Get(k)
 		if !ok {
-			it = types.WorkItem{
-				Kind: kind, Key: key, State: types.WorkPending, NotBefore: now, Enqueued: now,
+			it = work.WorkItem{
+				Kind: kind, Key: key, State: work.WorkPending, NotBefore: now, Enqueued: now,
 			}
 		}
 		it.Payload = payload
 		switch it.State {
-		case types.WorkLeased:
+		case work.WorkLeased:
 			if it.DirtySince.IsZero() {
 				it.DirtySince = now
 			}
-		case types.WorkParked:
-			it.State, it.Attempts, it.NotBefore, it.Enqueued = types.WorkPending, 0, now, now
-		case types.WorkPending:
+		case work.WorkParked:
+			it.State, it.Attempts, it.NotBefore, it.Enqueued = work.WorkPending, 0, now, now
+		case work.WorkPending:
 		}
 		it.Updated = now
 		w.items().Put(k, it)
@@ -60,20 +60,20 @@ func (w workQueue) Enqueue(
 }
 
 // due reports whether it can be leased at now, and from when it was due.
-func due(it types.WorkItem, now time.Time) (time.Time, bool) {
+func due(it work.WorkItem, now time.Time) (time.Time, bool) {
 	switch it.State {
-	case types.WorkPending:
+	case work.WorkPending:
 		return it.NotBefore, micro(it.NotBefore) <= micro(now)
-	case types.WorkLeased:
+	case work.WorkLeased:
 		return it.LeaseUntil, micro(it.LeaseUntil) <= micro(now)
-	case types.WorkParked:
+	case work.WorkParked:
 	}
 	return time.Time{}, false
 }
 
 // take leases it for req.
-func take(it types.WorkItem, req store.WorkLease) types.WorkItem {
-	it.State, it.LeasedBy, it.LeaseUntil = types.WorkLeased, req.Holder, req.Until
+func take(it work.WorkItem, req work.WorkLease) work.WorkItem {
+	it.State, it.LeasedBy, it.LeaseUntil = work.WorkLeased, req.Holder, req.Until
 	it.Generation++
 	it.Attempts++
 	it.DirtySince = time.Time{}
@@ -81,14 +81,14 @@ func take(it types.WorkItem, req store.WorkLease) types.WorkItem {
 	return it
 }
 
-func (w workQueue) Lease(ctx context.Context, req store.WorkLease) ([]types.WorkItem, error) {
-	if err := store.ValidateLease(req); err != nil {
-		return nil, err
+func (w workQueue) Lease(ctx context.Context, req work.WorkLease) ([]work.WorkItem, error) {
+	if err := work.ValidateLease(req); err != nil {
+		return nil, err //nolint:wrapcheck // the store's error names the request
 	}
-	var out []types.WorkItem
+	var out []work.WorkItem
 	err := w.s.Do(ctx, func() error {
 		type candidate struct {
-			it  types.WorkItem
+			it  work.WorkItem
 			due time.Time
 		}
 		var cands []candidate
@@ -111,7 +111,7 @@ func (w workQueue) Lease(ctx context.Context, req store.WorkLease) ([]types.Work
 		for _, c := range cands[:min(len(cands), max(req.Limit, 0))] {
 			it := take(c.it, req)
 			w.items().Put(workKey{it.Kind, it.Key}, it)
-			out = append(out, store.Normalise(it))
+			out = append(out, kernel.Normalise(it))
 		}
 		return nil
 	})
@@ -121,27 +121,27 @@ func (w workQueue) Lease(ctx context.Context, req store.WorkLease) ([]types.Work
 func (w workQueue) LeaseKey(
 	ctx context.Context,
 	kind, key string,
-	req store.WorkLease,
-) (types.WorkItem, bool, error) {
-	if err := store.ValidateLease(req); err != nil {
-		return types.WorkItem{}, false, err
+	req work.WorkLease,
+) (work.WorkItem, bool, error) {
+	if err := work.ValidateLease(req); err != nil {
+		return work.WorkItem{}, false, err //nolint:wrapcheck // the store's error names the request
 	}
 	var (
-		out  types.WorkItem
+		out  work.WorkItem
 		took bool
 	)
 	err := w.s.Do(ctx, func() error {
 		k := workKey{kind, key}
 		it, ok := w.items().Get(k)
 		if !ok {
-			return fmt.Errorf("work item %s/%s: %w", kind, key, store.ErrNotFound)
+			return fmt.Errorf("work item %s/%s: %w", kind, key, kernel.ErrNotFound)
 		}
 		_, expired := due(it, req.Now)
-		if it.State == types.WorkPending || it.State == types.WorkLeased && expired {
+		if it.State == work.WorkPending || it.State == work.WorkLeased && expired {
 			it, took = take(it, req), true
 			w.items().Put(k, it)
 		}
-		out = store.Normalise(it)
+		out = kernel.Normalise(it)
 		return nil
 	})
 	return out, took, err
@@ -153,13 +153,13 @@ func (w workQueue) run(
 	ctx context.Context,
 	kind, key string,
 	gen int64,
-	fn func(it *types.WorkItem) (keep bool),
+	fn func(it *work.WorkItem) (keep bool),
 ) error {
 	return w.s.Do(ctx, func() error {
 		k := workKey{kind, key}
 		it, ok := w.items().Get(k)
-		if !ok || it.State != types.WorkLeased || it.Generation != gen {
-			return fmt.Errorf("work item %s/%s run %d: %w", kind, key, gen, store.ErrConflict)
+		if !ok || it.State != work.WorkLeased || it.Generation != gen {
+			return fmt.Errorf("work item %s/%s run %d: %w", kind, key, gen, kernel.ErrConflict)
 		}
 		if !fn(&it) {
 			w.items().Del(k)
@@ -172,8 +172,8 @@ func (w workQueue) run(
 
 // unlease makes it pending from at, folding any work asked for during the
 // run into the pending one.
-func unlease(it *types.WorkItem, at, now time.Time) {
-	it.State, it.NotBefore, it.LeasedBy, it.LeaseUntil = types.WorkPending, at, "", time.Time{}
+func unlease(it *work.WorkItem, at, now time.Time) {
+	it.State, it.NotBefore, it.LeasedBy, it.LeaseUntil = work.WorkPending, at, "", time.Time{}
 	it.DirtySince = time.Time{}
 	it.Updated = now
 }
@@ -184,7 +184,7 @@ func (w workQueue) Extend(
 	gen int64,
 	until, now time.Time,
 ) error {
-	return w.run(ctx, kind, key, gen, func(it *types.WorkItem) bool {
+	return w.run(ctx, kind, key, gen, func(it *work.WorkItem) bool {
 		it.LeaseUntil, it.Updated = until, now
 		return true
 	})
@@ -196,7 +196,7 @@ func (w workQueue) Complete(
 	gen int64,
 	now time.Time,
 ) error {
-	return w.run(ctx, kind, key, gen, func(it *types.WorkItem) bool {
+	return w.run(ctx, kind, key, gen, func(it *work.WorkItem) bool {
 		if it.DirtySince.IsZero() {
 			return false
 		}
@@ -210,12 +210,12 @@ func (w workQueue) Fail(
 	ctx context.Context,
 	kind, key string,
 	gen int64,
-	f store.WorkFailure,
+	f work.WorkFailure,
 ) error {
-	return w.run(ctx, kind, key, gen, func(it *types.WorkItem) bool {
+	return w.run(ctx, kind, key, gen, func(it *work.WorkItem) bool {
 		it.LastError = f.Error
 		if f.Park && it.DirtySince.IsZero() {
-			it.State, it.NotBefore, it.LeasedBy, it.LeaseUntil = types.WorkParked, f.Now, "", time.Time{}
+			it.State, it.NotBefore, it.LeasedBy, it.LeaseUntil = work.WorkParked, f.Now, "", time.Time{}
 			it.Updated = f.Now
 			return true
 		}
@@ -230,19 +230,19 @@ func (w workQueue) Release(
 	gen int64,
 	now time.Time,
 ) error {
-	return w.run(ctx, kind, key, gen, func(it *types.WorkItem) bool {
+	return w.run(ctx, kind, key, gen, func(it *work.WorkItem) bool {
 		it.Attempts = max(it.Attempts-1, 0)
 		unlease(it, now, now)
 		return true
 	})
 }
 
-func (w workQueue) Get(ctx context.Context, kind, key string) (types.WorkItem, error) {
-	var out types.WorkItem
+func (w workQueue) Get(ctx context.Context, kind, key string) (work.WorkItem, error) {
+	var out work.WorkItem
 	err := w.s.Do(ctx, func() error {
 		it, ok := w.items().Get(workKey{kind, key})
 		if !ok {
-			return fmt.Errorf("work item %s/%s: %w", kind, key, store.ErrNotFound)
+			return fmt.Errorf("work item %s/%s: %w", kind, key, kernel.ErrNotFound)
 		}
 		out = it
 		return nil
@@ -250,32 +250,32 @@ func (w workQueue) Get(ctx context.Context, kind, key string) (types.WorkItem, e
 	return out, err
 }
 
-func (w workQueue) Stats(ctx context.Context) ([]types.WorkStats, error) {
-	var out []types.WorkStats
+func (w workQueue) Stats(ctx context.Context) ([]work.WorkStats, error) {
+	var out []work.WorkStats
 	err := w.s.Do(ctx, func() error {
-		by := map[string]*types.WorkStats{}
+		by := map[string]*work.WorkStats{}
 		for _, it := range w.items().Rows {
 			st := by[it.Kind]
 			if st == nil {
-				st = &types.WorkStats{Kind: it.Kind}
+				st = &work.WorkStats{Kind: it.Kind}
 				by[it.Kind] = st
 			}
 			switch it.State {
-			case types.WorkPending:
+			case work.WorkPending:
 				st.Pending++
 				if st.OldestPending.IsZero() || it.Enqueued.Before(st.OldestPending) {
 					st.OldestPending = it.Enqueued
 				}
-			case types.WorkLeased:
+			case work.WorkLeased:
 				st.Leased++
-			case types.WorkParked:
+			case work.WorkParked:
 				st.Parked++
 			}
 		}
 		for _, st := range by {
-			out = append(out, store.Normalise(*st))
+			out = append(out, kernel.Normalise(*st))
 		}
-		slices.SortFunc(out, func(a, b types.WorkStats) int { return cmp.Compare(a.Kind, b.Kind) })
+		slices.SortFunc(out, func(a, b work.WorkStats) int { return cmp.Compare(a.Kind, b.Kind) })
 		return nil
 	})
 	return out, err

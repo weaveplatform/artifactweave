@@ -9,16 +9,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
-// Settings implements store.Store.
-func (s *Store) Settings() store.SettingsStore { return settingStore{s} }
+// Settings returns the settings store, which keeps each value as the JSON
+// it encodes to, so a read decodes what the SQL store's would.
+func (s *Store) Settings() settings.SettingsStore { return settingStore{s} }
 
-// settingStore keeps values as JSON, so a read decodes exactly what the SQL
-// stores would.
 type settingStore struct{ s *Store }
 
 func (st settingStore) values() *memtx.Table[string, string] {
@@ -70,21 +71,21 @@ func (st settingStore) Keys(ctx context.Context) ([]string, error) {
 	return out, err
 }
 
-// Leases implements store.Store.
-func (s *Store) Leases() store.LeaseStore { return leaseStore{s} }
+// Leases returns the lease store.
+func (s *Store) Leases() work.LeaseStore { return leaseStore{s} }
 
 type leaseStore struct{ s *Store }
 
-func (l leaseStore) leases() *memtx.Table[string, types.Lease] {
-	return memtx.TableOf[string, types.Lease](l.s.Store, "leases")
+func (l leaseStore) leases() *memtx.Table[string, work.Lease] {
+	return memtx.TableOf[string, work.Lease](l.s.Store, "leases")
 }
 
-func (l leaseStore) Acquire(ctx context.Context, lease types.Lease, now time.Time) (bool, error) {
+func (l leaseStore) Acquire(ctx context.Context, lease work.Lease, now time.Time) (bool, error) {
 	if lease.Name == "" || lease.Holder == "" || lease.Expires.IsZero() {
 		return false, fmt.Errorf(
 			"lease %q: name, holder and expiry are required: %w",
 			lease.Name,
-			store.ErrInvalid,
+			kernel.ErrInvalid,
 		)
 	}
 	var took bool
@@ -110,37 +111,38 @@ func (l leaseStore) Release(ctx context.Context, name, holder string) error {
 	})
 }
 
-func (l leaseStore) List(ctx context.Context) ([]types.Lease, error) {
-	var out []types.Lease
+func (l leaseStore) List(ctx context.Context) ([]work.Lease, error) {
+	var out []work.Lease
 	err := l.s.Do(ctx, func() error {
 		out = l.leases().
-			All(nil, func(a, b types.Lease) int { return strings.Compare(a.Name, b.Name) })
+			All(nil, func(a, b work.Lease) int { return strings.Compare(a.Name, b.Name) })
 		return nil
 	})
 	return out, err
 }
 
-// Configs implements store.Store.
-func (s *Store) Configs() store.ConfigStore { return configStore{s} }
+// Configs returns the config document store. Its writes call the watches
+// given to New, as configdoc.Watch describes.
+func (s *Store) Configs() configdoc.ConfigStore { return configStore{s} }
 
 type configStore struct{ s *Store }
 
 type configKey struct {
-	kind types.ConfigKind
+	kind configdoc.ConfigKind
 	key  string
 }
 
-func (c configStore) docs() *memtx.Table[configKey, types.ConfigDocument] {
-	return memtx.TableOf[configKey, types.ConfigDocument](c.s.Store, "config_documents")
+func (c configStore) docs() *memtx.Table[configKey, configdoc.ConfigDocument] {
+	return memtx.TableOf[configKey, configdoc.ConfigDocument](c.s.Store, "config_documents")
 }
 
-func (c configStore) Put(ctx context.Context, d types.ConfigDocument) error {
+func (c configStore) Put(ctx context.Context, d configdoc.ConfigDocument) error {
 	if d.Kind == "" || d.Key == "" {
 		return fmt.Errorf(
 			"config document %q/%q: kind and key are required: %w",
 			d.Kind,
 			d.Key,
-			store.ErrInvalid,
+			kernel.ErrInvalid,
 		)
 	}
 	return c.s.Tx(ctx, func(ctx context.Context) error {
@@ -154,8 +156,8 @@ func (c configStore) Put(ctx context.Context, d types.ConfigDocument) error {
 		}
 		d.Secrets = secrets
 		c.docs().Put(configKey{d.Kind, d.Key}, d)
-		if d.Kind == types.ConfigLayout && (!exists || !bytes.Equal(old.Document, d.Document)) {
-			return store.FenceLayoutSources(ctx, c.s, remoteRecords{c.s}, d.Key)
+		if !exists || !bytes.Equal(old.Document, d.Document) {
+			return c.s.notify(ctx, d.Kind, d.Key)
 		}
 		return nil
 	})
@@ -163,10 +165,10 @@ func (c configStore) Put(ctx context.Context, d types.ConfigDocument) error {
 
 func (c configStore) Get(
 	ctx context.Context,
-	kind types.ConfigKind,
+	kind configdoc.ConfigKind,
 	key string,
-) (types.ConfigDocument, error) {
-	var out types.ConfigDocument
+) (configdoc.ConfigDocument, error) {
+	var out configdoc.ConfigDocument
 	err := c.s.Do(ctx, func() error {
 		var ok bool
 		if out, ok = c.docs().Get(configKey{kind, key}); !ok {
@@ -179,25 +181,23 @@ func (c configStore) Get(
 
 func (c configStore) List(
 	ctx context.Context,
-	kind types.ConfigKind,
-) ([]types.ConfigDocument, error) {
-	var out []types.ConfigDocument
+	kind configdoc.ConfigKind,
+) ([]configdoc.ConfigDocument, error) {
+	var out []configdoc.ConfigDocument
 	err := c.s.Do(ctx, func() error {
-		out = c.docs().All(func(k configKey, _ types.ConfigDocument) bool { return k.kind == kind },
-			func(a, b types.ConfigDocument) int { return strings.Compare(a.Key, b.Key) })
+		out = c.docs().
+			All(func(k configKey, _ configdoc.ConfigDocument) bool { return k.kind == kind },
+				func(a, b configdoc.ConfigDocument) int { return strings.Compare(a.Key, b.Key) })
 		return nil
 	})
 	return out, err
 }
 
-func (c configStore) Delete(ctx context.Context, kind types.ConfigKind, key string) error {
+func (c configStore) Delete(ctx context.Context, kind configdoc.ConfigKind, key string) error {
 	return c.s.Tx(ctx, func(ctx context.Context) error {
 		if !c.docs().Del(configKey{kind, key}) {
 			return memtx.NotFound("config "+string(kind), key)
 		}
-		if kind == types.ConfigLayout {
-			return store.FenceLayoutSources(ctx, c.s, remoteRecords{c.s}, key)
-		}
-		return nil
+		return c.s.notify(ctx, kind, key)
 	})
 }

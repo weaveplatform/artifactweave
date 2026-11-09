@@ -7,13 +7,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
-// WorkQueue implements store.Store.
-func (s *Store) WorkQueue() store.WorkQueue { return workQueue{s} }
+// WorkQueue returns the persistent work queue (decision 0033).
+func (s *Store) WorkQueue() work.WorkQueue { return workQueue{s} }
 
 // workQueue keeps the work_items table (decision 0033).
 type workQueue struct{ s *Store }
@@ -21,9 +21,9 @@ type workQueue struct{ s *Store }
 const workCols = "kind, key, payload, state, attempts, generation, not_before, leased_by, " +
 	"lease_until, dirty_since, last_error, enqueued_at, updated_at"
 
-func scanWork(r interface{ Scan(...any) error }) (types.WorkItem, error) {
+func scanWork(r interface{ Scan(...any) error }) (work.WorkItem, error) {
 	var (
-		it                           types.WorkItem
+		it                           work.WorkItem
 		payload                      sql.NullString
 		state                        string
 		notBefore, enqueued, updated int64
@@ -34,7 +34,7 @@ func scanWork(r interface{ Scan(...any) error }) (types.WorkItem, error) {
 	if payload.Valid {
 		it.Payload = []byte(payload.String)
 	}
-	it.State = types.WorkState(state)
+	it.State = work.WorkState(state)
 	it.NotBefore, it.Enqueued, it.Updated = dialect.FromMicros(
 		sql.NullInt64{Int64: notBefore, Valid: true},
 	),
@@ -62,7 +62,7 @@ func (w workQueue) Enqueue(
 	payload []byte,
 	now time.Time,
 ) error {
-	if err := store.ValidateWork(kind, key, payload); err != nil {
+	if err := work.ValidateWork(kind, key, payload); err != nil {
 		return err //nolint:wrapcheck // the store's error names the item
 	}
 	n := now.UnixMicro()
@@ -100,8 +100,8 @@ const dueClause = "((state = 'pending' AND not_before <= ?) OR (state = 'leased'
 func (w workQueue) take(
 	ctx context.Context,
 	kind, key string,
-	req store.WorkLease,
-) (types.WorkItem, error) {
+	req work.WorkLease,
+) (work.WorkItem, error) {
 	row := w.s.Q(ctx).QueryRowContext(ctx, w.s.Dialect().Rebind(
 		"UPDATE work_items SET state = 'leased', leased_by = ?, lease_until = ?, "+
 			"generation = generation + 1, attempts = attempts + 1, dirty_since = NULL, updated_at = ? "+
@@ -114,21 +114,21 @@ func (w workQueue) take(
 	return it, nil
 }
 
-func (w workQueue) Lease(ctx context.Context, req store.WorkLease) ([]types.WorkItem, error) {
-	if err := store.ValidateLease(req); err != nil {
+func (w workQueue) Lease(ctx context.Context, req work.WorkLease) ([]work.WorkItem, error) {
+	if err := work.ValidateLease(req); err != nil {
 		return nil, err //nolint:wrapcheck // the store's error names the request
 	}
 	if req.Limit <= 0 {
 		return nil, nil
 	}
-	var out []types.WorkItem
+	var out []work.WorkItem
 	err := w.s.Tx(ctx, func(ctx context.Context) error {
 		out = nil
 		now := req.Now.UnixMicro()
 		q := "SELECT kind, key FROM work_items WHERE " + dueClause
 		args := []any{now, now}
 		if len(req.Kinds) > 0 {
-			q += " AND kind IN (" + Placeholders(len(req.Kinds)) + ")"
+			q += " AND kind IN (" + dialect.Placeholders(len(req.Kinds)) + ")"
 			for _, k := range req.Kinds {
 				args = append(args, k)
 			}
@@ -167,13 +167,13 @@ func (w workQueue) Lease(ctx context.Context, req store.WorkLease) ([]types.Work
 func (w workQueue) LeaseKey(
 	ctx context.Context,
 	kind, key string,
-	req store.WorkLease,
-) (types.WorkItem, bool, error) {
-	if err := store.ValidateLease(req); err != nil {
-		return types.WorkItem{}, false, err //nolint:wrapcheck // the store's error names the request
+	req work.WorkLease,
+) (work.WorkItem, bool, error) {
+	if err := work.ValidateLease(req); err != nil {
+		return work.WorkItem{}, false, err //nolint:wrapcheck // the store's error names the request
 	}
 	var (
-		out  types.WorkItem
+		out  work.WorkItem
 		took bool
 	)
 	err := w.s.Tx(ctx, func(ctx context.Context) error {
@@ -186,8 +186,8 @@ func (w workQueue) LeaseKey(
 			return w.s.Wrap("get work "+kind+"/"+key, err)
 		}
 		out = it
-		expired := it.State == types.WorkLeased && it.LeaseUntil.UnixMicro() <= req.Now.UnixMicro()
-		if it.State != types.WorkPending && !expired {
+		expired := it.State == work.WorkLeased && it.LeaseUntil.UnixMicro() <= req.Now.UnixMicro()
+		if it.State != work.WorkPending && !expired {
 			return nil
 		}
 		if out, err = w.take(ctx, kind, key, req); err != nil {
@@ -217,7 +217,7 @@ func (w workQueue) held(
 		return err
 	}
 	if n == 0 {
-		return fmt.Errorf("work item %s/%s run %d: %w", kind, key, gen, store.ErrConflict)
+		return fmt.Errorf("work item %s/%s run %d: %w", kind, key, gen, kernel.ErrConflict)
 	}
 	return nil
 }
@@ -257,7 +257,7 @@ func (w workQueue) Complete(
 			now.UnixMicro(),
 			now.UnixMicro(),
 		)
-		if !errors.Is(err, store.ErrConflict) {
+		if !errors.Is(err, kernel.ErrConflict) {
 			return err
 		}
 		return w.held(ctx, "complete work "+kind, kind, key, gen, "", "DELETE FROM work_items")
@@ -268,7 +268,7 @@ func (w workQueue) Fail(
 	ctx context.Context,
 	kind, key string,
 	gen int64,
-	f store.WorkFailure,
+	f work.WorkFailure,
 ) error {
 	return w.s.Tx(ctx, func(ctx context.Context) error {
 		if f.Park {
@@ -278,7 +278,7 @@ func (w workQueue) Fail(
 				"UPDATE work_items SET state = 'parked', not_before = ?, leased_by = '', "+
 					"lease_until = NULL, last_error = ?, updated_at = ?",
 				f.Now.UnixMicro(), f.Error, f.Now.UnixMicro())
-			if !errors.Is(err, store.ErrConflict) {
+			if !errors.Is(err, kernel.ErrConflict) {
 				return err
 			}
 		}
@@ -307,7 +307,7 @@ func (w workQueue) Release(
 	)
 }
 
-func (w workQueue) Get(ctx context.Context, kind, key string) (types.WorkItem, error) {
+func (w workQueue) Get(ctx context.Context, kind, key string) (work.WorkItem, error) {
 	row := w.s.Q(ctx).QueryRowContext(ctx,
 		w.s.Dialect().Rebind("SELECT "+workCols+" FROM work_items WHERE kind = ? AND key = ?"),
 		kind, key)
@@ -318,8 +318,8 @@ func (w workQueue) Get(ctx context.Context, kind, key string) (types.WorkItem, e
 	return it, nil
 }
 
-func (w workQueue) Stats(ctx context.Context) ([]types.WorkStats, error) {
-	var out []types.WorkStats
+func (w workQueue) Stats(ctx context.Context) ([]work.WorkStats, error) {
+	var out []work.WorkStats
 	err := w.s.Rows(ctx, "work stats",
 		"SELECT kind, "+
 			"SUM(CASE WHEN state = 'pending' THEN 1 ELSE 0 END), "+
@@ -330,7 +330,7 @@ func (w workQueue) Stats(ctx context.Context) ([]types.WorkStats, error) {
 		nil,
 		func(r *sql.Rows) error {
 			var (
-				st     types.WorkStats
+				st     work.WorkStats
 				oldest sql.NullInt64
 			)
 			err := r.Scan(&st.Kind, &st.Pending, &st.Leased, &st.Parked, &oldest)

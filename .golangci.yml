@@ -116,6 +116,13 @@ linters:
       # in the SQL stores alone, and one for each new call in a module's SQL
       # adapter.
       #
+      # The in-memory unit of work's Do and Tx return the error of the
+      # function they run, which the in-memory store built to name the entity
+      # or which is a kernel sentinel, or the context's error under
+      # "inmem: ". The in-memory adapters pass them up as they are, as they
+      # did while memtx was their own package's code, so their errors read as
+      # the SQL adapters' do; a wrap would make the two differ.
+      #
       # The SQLite and PostgreSQL drivers' OpenDB names the engine in its
       # errors as the dialect layer names the operation ("sqlite: open: ...",
       # "postgres: parse dsn: ..."), or returns the sentinels ErrPathRequired
@@ -133,6 +140,7 @@ linters:
         - apierror.New(
         - format.Rejectf(
         - dialect.Store).
+        - memtx.Store).
         - dialect.ToJSON(
         - dialect.FromJSON(
         - dialect.Keyset(
