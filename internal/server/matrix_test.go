@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/service/oidc"
-	"github.com/weaveplatform/artifactweave/internal/service/roles"
 	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/roles"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"

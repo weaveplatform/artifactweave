@@ -174,7 +174,7 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 		StagingRoot: root,
 		Packages: []ledger.Package{
 			{
-				From:   "internal/service/identity",
+				From:   "migration/access/core/identity",
 				Action: ledger.ActionMove,
 				To:     "access/core/identity",
 			},
@@ -204,9 +204,9 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 		"test/server/support/assemble.go": file(tokens),
 		// Access's own tests: staged, and in legacy packages whose entries
 		// move them into access, the bridges' among them.
-		root + "/access/core/authn/authn_test.go":    file(evaluator, authenticator),
-		"internal/auth/bridge_kernel_test.go":        file(evaluator, authenticator, legacy),
-		"internal/service/identity/identity_test.go": file(evaluator, tokens),
+		root + "/access/core/authn/authn_test.go":         file(evaluator, authenticator),
+		"internal/auth/bridge_kernel_test.go":             file(evaluator, authenticator, legacy),
+		"migration/access/core/identity/identity_test.go": file(evaluator, tokens),
 		// The published contracts and access test support, staged and legacy.
 		"internal/server/xyz/npm_test.go": file(
 			root+"/access",

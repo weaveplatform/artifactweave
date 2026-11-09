@@ -399,7 +399,7 @@ func apiReviewPersistence(path string) (string, string, []string) {
 		return "identity", "legacy full lists/collection aggregates remain; source contract declares paged variants; underlying store pages do not bound a collecting service", []string{
 			"internal/server/access_identity.go",
 			"internal/server/tokens.go",
-			"internal/service/identity/identity.go",
+			"migration/access/core/identity/identity.go",
 			"migration/access/core/token/token.go",
 			"migration/access/adapters/sql/identity.go",
 			"migration/access/adapters/sql/projects.go",

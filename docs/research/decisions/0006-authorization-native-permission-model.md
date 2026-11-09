@@ -182,7 +182,7 @@ These are choices made where no source documents Artifactory's behaviour:
 
 ## Implementation notes (permission APIs, #82)
 
-`internal/service/permission` validates and stores; the v1, v2 and Access v2 handlers in
+`migration/access/core/permission` validates and stores; the v1, v2 and Access v2 handlers in
 `internal/server/permissions.go` are views over it, so a permission written in one format
 reads back in the others. Sources are the JFrog OpenAPI pages the parity oracle caches,
 `.specoracle/<family>/<page>.json`. Each rule is marked documented, inferred or
