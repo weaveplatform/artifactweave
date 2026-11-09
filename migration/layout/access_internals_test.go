@@ -20,12 +20,16 @@ import (
 // access may import: the evaluator and the authenticator, which ACC-11 and
 // ACC-12 split into access core, and the token service, which ACC-12 moves
 // there. Staged access core is judged by its path instead (accessInternal).
-var accessInternals = []string{"internal/authz", "internal/auth", "internal/auth/token"}
+var accessInternals = []string{
+	"migration/access/core/authz",
+	"internal/auth",
+	"internal/auth/token",
+}
 
 // accessSplits are the legacy access packages whose ledger entries split
 // them, so ledger.Translate names no target that places their tests in
 // access.
-var accessSplits = []string{"internal/auth", "internal/authz"}
+var accessSplits = []string{"internal/auth", "migration/access/core/authz"}
 
 // allowlistedInternals are the access internals that an allowlisted file may
 // import: the authenticator and the token service, which the server root,
@@ -192,7 +196,7 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 				To:     "artifacts/ecosystem/npm/http",
 			},
 			{From: "internal/auth", Action: ledger.ActionSplit},
-			{From: "internal/authz", Action: ledger.ActionSplit},
+			{From: "migration/access/core/authz", Action: ledger.ActionSplit},
 		},
 	}
 	allow := []accessAllowance{
@@ -214,7 +218,7 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 		// legacy package whose entry moves it into access.
 		root + "/access/core/authn/authn_test.go":    file(evaluator, root+"/access/core/authz"),
 		"internal/auth/auth_test.go":                 file(evaluator),
-		"internal/authz/authz_test.go":               file(authenticator),
+		"migration/access/core/authz/authz_test.go":  file(authenticator),
 		"internal/service/identity/identity_test.go": file(evaluator, tokens),
 		// The published contracts and access test support, staged and legacy.
 		"internal/server/xyz/npm_test.go": file(

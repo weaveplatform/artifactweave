@@ -55,7 +55,7 @@ The source inspection for this design is against the P8 baseline:
 - **[S]** [ProjectStore](../../migration/access/core/port/projects.go) and
   [RepositoryAssignment](../../migration/access/core/model/project.go) already hold ownership, environments,
   shares and a read-only flag. They do not model project-aware sharing mode, connection
-  identity or a monotonic authorization revision. [authz](../../internal/authz/authz.go)
+  identity or a monotonic authorization revision. [authz](../../migration/access/core/authz/authz.go)
   evaluates current identity/permission/token rules; that is not proof of P11 sharing
   administration or project-aware read enforcement.
 - **[S]** [pkgroute.Source](../../internal/server/pkgroute/pkgroute.go) returns persisted

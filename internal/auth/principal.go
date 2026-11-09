@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authz"
 )
 
 // Authorize evaluates p's permissions once for the request (decision 0006).

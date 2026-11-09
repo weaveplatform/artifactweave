@@ -17,7 +17,7 @@ hostweave used Cedar for its own policy model.
 
 ## Decision
 
-A native evaluator in `internal/authz`, not Cedar. One internal representation shaped
+A native evaluator in `migration/access/core/authz`, not Cedar. One internal representation shaped
 like the Access v2 permission (resources, actions per user and group, targets with
 include and exclude patterns) with converters to and from the v1 and v2 legacy formats.
 
@@ -115,7 +115,7 @@ where here a token's artifact entries only narrow what its user and groups alrea
 - Build and release-bundle resources are accepted in targets; only the build resource has
   behaviour in v1.
 
-## Implementation notes (`internal/authz`, #75)
+## Implementation notes (`migration/access/core/authz`, #75)
 
 These are choices made where no source documents Artifactory's behaviour:
 - **Patterns:**
