@@ -71,7 +71,7 @@ func TestUnitHashParamsReachTheHashAndTheDummy(t *testing.T) {
 	if err != nil || !strings.HasPrefix(string(a.dummy), "$argon2id$v=19$m=32,t=1,p=1$") {
 		t.Fatalf("dummy %q, %v", a.dummy, err)
 	}
-	repos := newSeedRepos()
+	repos := newSeedRepositories()
 	if _, err := SeedHashed(context.Background(), db, repos, h, time.Now()); err != nil {
 		t.Fatal(err)
 	}

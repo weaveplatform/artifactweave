@@ -9,7 +9,6 @@ import (
 	"go/token"
 	"io/fs"
 	"os"
-	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -32,7 +31,7 @@ var principalInternals = []string{"IsTokenAuthenticated", "PasswordRevision", "T
 const sharedInternal = "PasswordRevision"
 
 // principalPackages are the packages whose Principal a qualified literal type
-// names: the kernel and the bridge to it that migration/access/core/authn keeps until the
+// names: the kernel and the bridge to it that internal/auth keeps until the
 // bridges go.
 var principalPackages = []string{modulePath + "/internal/auth", modulePath + "/" + root + "/kernel"}
 
@@ -50,7 +49,7 @@ func TestUnitPrincipalInternals(t *testing.T) {
 		return `package v
 
 import (
-	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
@@ -64,16 +63,15 @@ func v(p auth.Principal, ref kernel.CredentialReference, r [32]byte) {
 	uses := file(`	_, _, _ = p.IsTokenAuthenticated, p.TokenSubject, ref.PasswordRevision
 	_ = auth.Principal{IsTokenAuthenticated: true, TokenSubject: "s", PasswordRevision: r}`)
 	conforming := map[string]string{
-		"go.mod": "module github.com/weaveplatform/artifactweave\n",
-		"migration/access/core/authn/principal.go":  uses,
-		"migration/kernel/principal.go":             uses,
-		"migration/kernel/sub/sub_test.go":          uses,
-		"migration/access/core/authn/a.go":          uses,
-		"migration/access/core/authn/testdata/x.go": uses,
-		"internal/nested/go.mod":                    "module example.com/nested\n",
-		"internal/nested/n.go":                      uses,
-		".worktrees/copy/internal/x/x.go":           uses,
-		"internal/server/unrelated/u.go":            "package u\n",
+		"go.mod":                           "module github.com/weaveplatform/artifactweave\n",
+		"migration/kernel/principal.go":    uses,
+		"migration/kernel/sub/sub_test.go": uses,
+		"migration/access/core/authn/a.go": uses,
+		"internal/auth/testdata/x.go":      uses,
+		"internal/nested/go.mod":           "module example.com/nested\n",
+		"internal/nested/n.go":             uses,
+		".worktrees/copy/internal/x/x.go":  uses,
+		"internal/server/unrelated/u.go":   "package u\n",
 		"migration/artifacts/ecosystem/huggingface/http/xet.go": file(
 			`	_ = []auth.DownloadCredential{{Kind: "password", PasswordRevision: r}}`,
 		),
@@ -153,10 +151,16 @@ func v(p auth.Principal, ref kernel.CredentialReference, r [32]byte) {
 			want: v + ":12: sets PasswordRevision in a Principal literal",
 		},
 		{
-			name: "subpackage of migration/access/core/authn",
-			file: "migration/access/core/token/token.go",
+			name: "file in internal/auth, which holds only bridges",
+			file: "internal/auth/principal.go",
 			src:  file(`	_ = p.TokenSubject`),
-			want: "migration/access/core/token/token.go:11: selects TokenSubject",
+			want: "internal/auth/principal.go:11: selects TokenSubject",
+		},
+		{
+			name: "subpackage of internal/auth",
+			file: "internal/auth/token/token.go",
+			src:  file(`	_ = p.TokenSubject`),
+			want: "internal/auth/token/token.go:11: selects TokenSubject",
 		},
 		{
 			name: "unparsable file",
@@ -221,13 +225,11 @@ func checkPrincipalInternals(dir string) []string {
 }
 
 // ownsPrincipalInternals reports whether the Go file at rel, a path relative
-// to the repository root, belongs to access or the kernel: a file directly in
-// migration/access/core/authn, whose subdirectories are other packages, or any file under
-// the staged kernel and access trees.
+// to the repository root, belongs to access or the kernel: any file under
+// the staged kernel and access trees. The legacy internal/auth holds only
+// bridges, which name none of the fields.
 func ownsPrincipalInternals(rel string) bool {
-	return path.Dir(rel) == "migration/access/core/authn" ||
-		strings.HasPrefix(rel, root+"/kernel/") ||
-		strings.HasPrefix(rel, root+"/access/")
+	return strings.HasPrefix(rel, root+"/kernel/") || strings.HasPrefix(rel, root+"/access/")
 }
 
 // principalInternalUses returns each use of a principal internal in the Go

@@ -49,9 +49,9 @@ type matcher struct {
 	// ledger entry or holds a package, so that it stays when its parent
 	// moves.
 	region func(dir string) bool
-	// isFile reports whether a path names a file of the tree, so that
-	// "migration/access/core/authn/token.go" is not read as the package migration/access/core/token
-	// followed by ".go".
+	// isFile reports whether a path names a file of the tree, so that a file
+	// such as "dir/token.go" is not read as a package dir/token followed by
+	// ".go" when dir/token is a package too.
 	isFile func(path string) bool
 	// fileEntry reports whether a path is, or lies in, the old path of a
 	// file entry, which its own entry judges: such a file stays when its

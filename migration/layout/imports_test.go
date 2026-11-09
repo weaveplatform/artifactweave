@@ -545,11 +545,7 @@ func TestUnitImportRulesDetectViolations(t *testing.T) {
 		Module:      modulePath,
 		StagingRoot: root,
 		Packages: []ledger.Package{
-			{
-				From:   "migration/access/core/token",
-				Action: ledger.ActionMove,
-				To:     "access/core/token",
-			},
+			{From: "internal/auth/token", Action: ledger.ActionMove, To: "access/core/token"},
 			{
 				From: "internal/fixture", Action: ledger.ActionMove, To: "test/fixture",
 				Scope: ledger.ScopeRepo,
@@ -567,17 +563,11 @@ func TestUnitImportRulesDetectViolations(t *testing.T) {
 		const item = "migration/artifacts/core/item/item.go"
 		dir := tree(t, map[string]string{
 			// Its own module once judged as the target, so allowed.
-			"migration/access/core/user/user.go": src(m + "migration/access/core/token"),
+			"migration/access/core/user/user.go": src(m + "internal/auth/token"),
 			item: src(
-				"fmt",
-				"example.com/elsewhere",
-				m+"migration/artifacts/core/port",
-				m+"migration/artifacts/adapters/sql",
-				m+"migration/access/core/token",
-				m+"internal/fixture",
-				m+"pkg/types",
-				m+"internal/layout",
-				m+"internal/unmapped",
+				"fmt", "example.com/elsewhere", m+"migration/artifacts/core/port",
+				m+"migration/artifacts/adapters/sql", m+"internal/auth/token", m+"internal/fixture",
+				m+"pkg/types", m+"internal/layout", m+"internal/unmapped",
 			),
 			"migration/artifacts/core/item/item_test.go": src(
 				m+"migration/artifacts/core/item", m+"internal/fixture", m+"pkg/types",
@@ -595,11 +585,7 @@ func TestUnitImportRulesDetectViolations(t *testing.T) {
 			return fmt.Sprintf("%s imports %s (row %d: %s)", file, shown, row, rows[row].text)
 		}
 		wantViolations := []string{
-			violation(
-				item,
-				"migration/access/core/token, judged as migration/access/core/token",
-				11,
-			),
+			violation(item, "internal/auth/token, judged as migration/access/core/token", 11),
 			violation(item, "internal/fixture, judged as test/fixture", 2),
 			item + " imports internal/layout (legacy package marked delete)",
 			item + " imports internal/unmapped (legacy package with no ledger entry)",

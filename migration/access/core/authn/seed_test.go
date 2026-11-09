@@ -24,20 +24,22 @@ import (
 
 var seedTime = time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)
 
-// seedRepos stands in for the artifacts module's Repositories, of which the
-// seed calls only Create: it keeps each configuration it is given and
-// refuses a key it already holds with kernel.ErrConflict, as the
+// seedRepositories stands in for the artifacts module's Repositories, of
+// which the seed calls only Create: it keeps each configuration it is given
+// and refuses a key it already holds with kernel.ErrConflict, as the
 // repository store does, and Get reads one back. It takes no part in the
 // seed's transaction, which the artifacts binding that app passes does;
 // app's seed tests check that binding.
-type seedRepos struct {
+type seedRepositories struct {
 	artifactsapi.Repositories
 	configs map[string]repo.Config
 }
 
-func newSeedRepos() *seedRepos { return &seedRepos{configs: map[string]repo.Config{}} }
+func newSeedRepositories() *seedRepositories {
+	return &seedRepositories{configs: map[string]repo.Config{}}
+}
 
-func (r *seedRepos) Create(_ context.Context, c repo.Config) error {
+func (r *seedRepositories) Create(_ context.Context, c repo.Config) error {
 	if _, ok := r.configs[c.Key]; ok {
 		return kernel.ErrConflict
 	}
@@ -45,7 +47,7 @@ func (r *seedRepos) Create(_ context.Context, c repo.Config) error {
 	return nil
 }
 
-func (r *seedRepos) Get(_ context.Context, key string) (repo.Config, error) {
+func (r *seedRepositories) Get(_ context.Context, key string) (repo.Config, error) {
 	c, ok := r.configs[key]
 	if !ok {
 		return repo.Config{}, kernel.ErrNotFound
@@ -55,7 +57,7 @@ func (r *seedRepos) Get(_ context.Context, key string) (repo.Config, error) {
 
 // checkSeeded asserts every built-in exists as seeded, and that admin can
 // log in with password.
-func checkSeeded(t *testing.T, st store.Store, repos *seedRepos, password string) {
+func checkSeeded(t *testing.T, st store.Store, repos *seedRepositories, password string) {
 	t.Helper()
 	ctx := context.Background()
 	admin, err := st.Users().Get(ctx, AdminUser)
@@ -105,7 +107,7 @@ func checkSeeded(t *testing.T, st store.Store, repos *seedRepos, password string
 func seedTwice(t *testing.T, st store.Store) {
 	t.Helper()
 	ctx := context.Background()
-	repos := newSeedRepos()
+	repos := newSeedRepositories()
 	if now, err := Seed(ctx, st, repos, "first", seedTime); !now || err != nil {
 		t.Fatalf("first Seed = %v, %v", now, err)
 	}
@@ -165,7 +167,7 @@ func (s racingSettings) Get(ctx context.Context, key string, into any) error {
 func TestUnitSeedLosesARace(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
-	repos := newSeedRepos()
+	repos := newSeedRepositories()
 	if _, err := Seed(ctx, db, repos, "winner", seedTime); err != nil {
 		t.Fatal(err)
 	}
@@ -195,23 +197,23 @@ func TestUnitSeedErrors(t *testing.T) {
 	ctx := context.Background()
 	// Each built-in already present (without the marker) conflicts, and
 	// the whole seed rolls back.
-	for name, pre := range map[string]func(store.Store, *seedRepos) error{
-		"group": func(st store.Store, _ *seedRepos) error {
+	for name, pre := range map[string]func(store.Store, *seedRepositories) error{
+		"group": func(st store.Store, _ *seedRepositories) error {
 			return st.Groups().Create(ctx, model.Group{Name: ReadersGroup})
 		},
-		"user": func(st store.Store, _ *seedRepos) error {
+		"user": func(st store.Store, _ *seedRepositories) error {
 			return st.Users().Create(ctx, model.User{Name: AdminUser})
 		},
-		"permission": func(st store.Store, _ *seedRepos) error {
+		"permission": func(st store.Store, _ *seedRepositories) error {
 			return st.Permissions().Create(ctx, model.Permission{Name: AnythingPermission})
 		},
-		"repository": func(_ store.Store, repos *seedRepos) error {
+		"repository": func(_ store.Store, repos *seedRepositories) error {
 			return repos.Create(ctx, repo.Config{
 				Key: accessapi.BuildInfoRepository, Class: repo.Local, PackageType: repo.Generic,
 			})
 		},
 	} {
-		db, repos := inmem.New(), newSeedRepos()
+		db, repos := inmem.New(), newSeedRepositories()
 		if err := pre(db, repos); err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
@@ -234,7 +236,13 @@ func TestUnitSeedErrors(t *testing.T) {
 			t.Errorf("%s: the failed seed was not rolled back", name)
 		}
 	}
-	if _, err := Seed(ctx, failingPut{inmem.New()}, newSeedRepos(), "pw", seedTime); err == nil {
+	if _, err := Seed(
+		ctx,
+		failingPut{inmem.New()},
+		newSeedRepositories(),
+		"pw",
+		seedTime,
+	); err == nil {
 		t.Fatal("a failed marker write was not reported")
 	}
 	if _, err := Seeded(ctx, failingSettingsStore{inmem.New()}); err == nil {
@@ -243,7 +251,7 @@ func TestUnitSeedErrors(t *testing.T) {
 	if _, err := Seed(
 		ctx,
 		failingSettingsStore{inmem.New()},
-		newSeedRepos(),
+		newSeedRepositories(),
 		"pw",
 		seedTime,
 	); err == nil {
@@ -251,7 +259,7 @@ func TestUnitSeedErrors(t *testing.T) {
 	}
 	// The marker read inside the transaction can fail on its own too.
 	r := &racingErr{Store: inmem.New()}
-	if _, err := Seed(ctx, r, newSeedRepos(), "pw", seedTime); err == nil {
+	if _, err := Seed(ctx, r, newSeedRepositories(), "pw", seedTime); err == nil {
 		t.Fatal("Seed hid a settings failure inside its transaction")
 	}
 }
