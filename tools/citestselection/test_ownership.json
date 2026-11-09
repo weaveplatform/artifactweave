@@ -50,7 +50,8 @@
     "test/server/artifacts/nuget": "nuget",
     "test/server/artifacts/pypi": "pypi",
     "test/server/artifacts/terraform": "terraform",
-    "test/server/artifacts/terraformbackend": "terraformbackend"
+    "test/server/artifacts/terraformbackend": "terraformbackend",
+    "test/server/configuration": "shared"
   },
   "shared_files": {
     "internal/app": [
@@ -84,12 +85,9 @@
       "access_api_test.go",
       "access_identity_internal_test.go",
       "access_identity_status_test.go",
-      "access_identity_test.go",
       "access_internal_test.go",
-      "access_test.go",
       "api_ledger_test.go",
       "api_restrictions_parts_test.go",
-      "api_restrictions_test.go",
       "aql_actions_test.go",
       "aql_builds_test.go",
       "aql_related_test.go",
@@ -121,7 +119,6 @@
       "folder_limit_test.go",
       "format_tables_test.go",
       "format_test.go",
-      "forwarded_test.go",
       "hash_test.go",
       "helm_fixture_test.go",
       "hex_remote_test.go",
@@ -133,7 +130,6 @@
       "idempotency_test.go",
       "items_test.go",
       "keypairs_internal_test.go",
-      "keypairs_test.go",
       "matrix_pkgtest_test.go",
       "matrix_reindex_test.go",
       "matrix_test.go",
@@ -144,7 +140,6 @@
       "npm_auth_paths_test.go",
       "npm_fixture_test.go",
       "oidc_status_test.go",
-      "oidc_test.go",
       "opkg_test.go",
       "overwrite_test.go",
       "p2_external_cache_integrity_test.go",
@@ -154,7 +149,6 @@
       "p2_test.go",
       "permissions_fault_test.go",
       "permissions_status_test.go",
-      "permissions_test.go",
       "properties_long_test.go",
       "redirect_test.go",
       "registry_shared_test.go",
@@ -166,8 +160,6 @@
       "request_limits_test.go",
       "reverseproxy_test.go",
       "roles_internal_test.go",
-      "roles_status_test.go",
-      "roles_test.go",
       "rpm_test.go",
       "searches_builds_test.go",
       "searches_layout_test.go",
@@ -178,7 +170,6 @@
       "searches_upstream_routes_test.go",
       "searches_upstream_test.go",
       "searches_versions_test.go",
-      "security_test.go",
       "server_test.go",
       "service_id_test.go",
       "sidecar_rights_test.go",
@@ -201,11 +192,9 @@
       "storageinfo_test.go",
       "stub_test.go",
       "system_health_test.go",
-      "token_auth_test.go",
       "tokens_fixture_test.go",
       "tokens_internal_test.go",
       "tokens_status_test.go",
-      "tokens_test.go",
       "trace_test.go",
       "transfer_test.go",
       "trash_handlers_test.go",
@@ -218,7 +207,21 @@
       "virtual_members_test.go"
     ],
     "test/server/access": [
-      "auth_test.go"
+      "access_identity_test.go",
+      "access_test.go",
+      "api_restrictions_test.go",
+      "auth_test.go",
+      "keypairs_test.go",
+      "oidc_test.go",
+      "permissions_test.go",
+      "roles_status_test.go",
+      "roles_test.go",
+      "security_test.go",
+      "token_auth_test.go",
+      "tokens_test.go"
+    ],
+    "test/server/configuration": [
+      "forwarded_test.go"
     ]
   },
   "format_dependencies": {
@@ -324,9 +327,9 @@
       "internal/server/rpm_test.go"
     ],
     "terraform": [
-      "internal/server/keypairs_test.go",
-      "internal/server/permissions_test.go",
-      "internal/server/storage_list_test.go"
+      "internal/server/storage_list_test.go",
+      "test/server/access/keypairs_test.go",
+      "test/server/access/permissions_test.go"
     ],
     "terraformbackend": [
       "internal/server/encrypt_states_v1_test.go"

@@ -1,4 +1,4 @@
-package server
+package access_test
 
 import (
 	"encoding/json"
