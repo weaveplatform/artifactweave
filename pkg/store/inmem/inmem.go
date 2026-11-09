@@ -6,7 +6,7 @@
 // transactions with their snapshots, the row copies and the paging are
 // memtx's, and so are Tx, AfterCommit and Close. Each entity store here
 // keeps its rows in memtx tables and makes every call through Do; the
-// platform's stores are migration/platform/store/inmem's, and the
+// platform's stores are migration/platform/store/inmem's, and the access,
 // notifications, retention, federation, releases and workers stores are
 // those modules' adapters/inmem's, all over the same memtx.Store. It serves
 // unit tests and embedders that need no durability.
@@ -15,6 +15,7 @@ package inmem
 import (
 	"context"
 
+	accinmem "github.com/weaveplatform/artifactweave/migration/access/adapters/inmem"
 	fedinmem "github.com/weaveplatform/artifactweave/migration/federation/adapters/inmem"
 	ntfinmem "github.com/weaveplatform/artifactweave/migration/notifications/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
@@ -33,6 +34,7 @@ import (
 type Store struct {
 	*memtx.Store
 	platform      *platinmem.Store
+	access        *accinmem.Store
 	notifications *ntfinmem.Store
 	retention     *retinmem.Store
 	federation    *fedinmem.Store
@@ -54,6 +56,7 @@ func New() *Store {
 			return store.FenceLayoutSources(ctx, s, remoteRecords{s}, key)
 		},
 	})
+	s.access = accinmem.New(s.Store)
 	s.notifications = ntfinmem.New(s.Store)
 	s.retention = retinmem.New(s.Store)
 	s.federation = fedinmem.New(s.Store)
@@ -90,6 +93,29 @@ func (s *Store) Replays() store.ReplayStore { return s.platform.Replays() }
 // RequestBudgets implements store.Store with the platform's request budget
 // store.
 func (s *Store) RequestBudgets() store.RequestBudgetStore { return s.platform.RequestBudgets() }
+
+// Users implements store.Store with the access module's user store.
+func (s *Store) Users() store.UserStore { return s.access.Users() }
+
+// Groups implements store.Store with the access module's group store.
+func (s *Store) Groups() store.GroupStore { return s.access.Groups() }
+
+// Permissions implements store.Store with the access module's permission
+// store.
+func (s *Store) Permissions() store.PermissionStore { return s.access.Permissions() }
+
+// Tokens implements store.Store with the access module's token store.
+func (s *Store) Tokens() store.TokenStore { return s.access.Tokens() }
+
+// Keys implements store.Store with the access module's key store.
+func (s *Store) Keys() store.KeyStore { return s.access.Keys() }
+
+// Projects implements store.Store with the access module's project store.
+func (s *Store) Projects() store.ProjectStore { return s.access.Projects() }
+
+// APIRestrictions implements store.Store with the access module's API
+// restriction store.
+func (s *Store) APIRestrictions() store.APIRestrictionStore { return s.access.APIRestrictions() }
 
 // Webhooks implements store.Store with the notifications module's webhook
 // store.

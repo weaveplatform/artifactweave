@@ -4,12 +4,13 @@
 //
 // # Role
 //
-// access module, core layer, store ports. The metadata store's SQL and
-// in-memory stores implement them, and both satisfy Store; STO-16 moves
-// those implementations, with the sealing of their secret columns, into
-// the module's adapters. The ports take and return the module's core/model
-// values, its api's key pairs, certificates and resource types, and
-// kernel.Page. The metadata store aliases every name here (its
+// access module, core layer, store ports. The module's adapters implement
+// them: adapters/sql, which seals the secret columns, and adapters/inmem.
+// The metadata store's SQL and in-memory stores delegate their user, group,
+// permission, token, key, project and API restriction accessors to those
+// adapters, so both satisfy Store. The ports take and return the module's
+// core/model values, its api's key pairs, certificates and resource types,
+// and kernel.Page. The metadata store aliases every name here (its
 // bridge_access_port.go) until PRO-02 deletes the bridge.
 //
 // # Inputs
@@ -80,12 +81,13 @@
 //
 // # Testing
 //
-//   - store_test.go: compile-time assertions that the metadata store's
-//     in-memory store and its SQL store satisfy Store.
-//
-// The metadata store's Users, UserLockout, Groups, Memberships,
-// Permissions, IdentityPages, Tokens, Keypairs, Certificates, TrustedKeys,
-// SigningKeys, Projects, Roles, Environments, ProjectMembers, Assignments,
-// APIRestrictions and APIRestrictionConcurrentAudit contract subtests run
-// the ports on its in-memory, SQLite and PostgreSQL stores.
+// The package declares only ports, so it has no tests of its own. The
+// module's contract (adapters/storetest), with its Users, UserLockout,
+// Groups, Memberships, Permissions, IdentityPages, Tokens, Keypairs,
+// Certificates, TrustedKeys, SigningKeys, Projects, Roles, Environments,
+// ProjectMembers, Assignments, APIRestrictions and
+// APIRestrictionConcurrentAudit subtests, runs the ports on the module's
+// in-memory and SQL adapters and on the metadata store's in-memory, SQLite
+// and PostgreSQL stores. Each factory returns a Store, so the tests compile
+// only while every one of those stores satisfies it.
 package port

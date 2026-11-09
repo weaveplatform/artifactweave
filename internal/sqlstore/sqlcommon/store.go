@@ -21,6 +21,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	accsql "github.com/weaveplatform/artifactweave/migration/access/adapters/sql"
 	fedsql "github.com/weaveplatform/artifactweave/migration/federation/adapters/sql"
 	ntfsql "github.com/weaveplatform/artifactweave/migration/notifications/adapters/sql"
 	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
@@ -42,6 +43,7 @@ import (
 type Store struct {
 	*dialect.Store
 	platform      *platsql.Store
+	access        *accsql.Store
 	notifications *ntfsql.Store
 	retention     *retsql.Store
 	federation    *fedsql.Store
@@ -103,6 +105,7 @@ func New(db *sql.DB, d Dialect, keys *crypt.Keyring) *Store {
 			return store.FenceLayoutSources(ctx, s, remoteRecords{s}, key)
 		},
 	})
+	s.access = accsql.New(s.Store)
 	s.notifications = ntfsql.New(s.Store)
 	s.retention = retsql.New(s.Store)
 	s.federation = fedsql.New(s.Store)
@@ -139,6 +142,29 @@ func (s *Store) Replays() store.ReplayStore { return s.platform.Replays() }
 // RequestBudgets implements store.Store with the platform's request budget
 // store.
 func (s *Store) RequestBudgets() store.RequestBudgetStore { return s.platform.RequestBudgets() }
+
+// Users implements store.Store with the access module's user store.
+func (s *Store) Users() store.UserStore { return s.access.Users() }
+
+// Groups implements store.Store with the access module's group store.
+func (s *Store) Groups() store.GroupStore { return s.access.Groups() }
+
+// Permissions implements store.Store with the access module's permission
+// store.
+func (s *Store) Permissions() store.PermissionStore { return s.access.Permissions() }
+
+// Tokens implements store.Store with the access module's token store.
+func (s *Store) Tokens() store.TokenStore { return s.access.Tokens() }
+
+// Keys implements store.Store with the access module's key store.
+func (s *Store) Keys() store.KeyStore { return s.access.Keys() }
+
+// Projects implements store.Store with the access module's project store.
+func (s *Store) Projects() store.ProjectStore { return s.access.Projects() }
+
+// APIRestrictions implements store.Store with the access module's API
+// restriction store.
+func (s *Store) APIRestrictions() store.APIRestrictionStore { return s.access.APIRestrictions() }
 
 // Webhooks implements store.Store with the notifications module's webhook
 // store.

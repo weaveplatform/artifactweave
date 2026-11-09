@@ -7,6 +7,8 @@ package storetest
 import (
 	"testing"
 
+	accstoretest "github.com/weaveplatform/artifactweave/migration/access/adapters/storetest"
+	accport "github.com/weaveplatform/artifactweave/migration/access/core/port"
 	fedstoretest "github.com/weaveplatform/artifactweave/migration/federation/adapters/storetest"
 	fedport "github.com/weaveplatform/artifactweave/migration/federation/core/port"
 	ntfstoretest "github.com/weaveplatform/artifactweave/migration/notifications/adapters/storetest"
@@ -35,8 +37,7 @@ func Run(t *testing.T, newStore Factory) {
 	runGitLFSLocks(t, newStore)
 	runBowerRegistrations(t, newStore)
 	runRemoteCache(t, newStore)
-	runIdentity(t, newStore)
-	runProjects(t, newStore)
+	accstoretest.Run(t, func(t *testing.T) accport.Store { return newStore(t) })
 	ntfstoretest.Run(t, func(t *testing.T) ntfport.Store { return newStore(t) })
 	retstoretest.Run(t, func(t *testing.T) retport.Store { return newStore(t) })
 	fedstoretest.Run(t, func(t *testing.T) fedport.Store { return newStore(t) })
@@ -49,5 +50,4 @@ func Run(t *testing.T, newStore Factory) {
 	wrkstoretest.Run(t, func(t *testing.T) wrkport.Store { return newStore(t) })
 	runBuilds(t, newStore)
 	runBuildRowLock(t, newStore)
-	runAPIRestrictions(t, newStore)
 }
