@@ -7,30 +7,47 @@ package server
 // through test/server/support/harness.
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/md5"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha1"
+	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
+	"io"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"slices"
+	"sort"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
@@ -875,4 +892,686 @@ func securityStatusRows() []statusCase {
 func changeBody(user, old, next string) string {
 	return fmt.Sprintf(`{"userName":%q,"oldPassword":%q,"newPassword1":%q,"newPassword2":%q}`,
 		user, old, next, next)
+}
+
+func sha1Hex(s string) string {
+	b := sha1.Sum([]byte(s)) //nolint:gosec // wire checksum
+	return hex.EncodeToString(b[:])
+}
+
+func sha256Hex(s string) string {
+	b := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(b[:])
+}
+
+func md5Hex(s string) string {
+	b := md5.Sum([]byte(s)) //nolint:gosec // wire checksum
+	return hex.EncodeToString(b[:])
+}
+
+const aqlURL = "/artifactory/api/search/aql"
+
+func decodeObject(t *testing.T, body string) map[string]any {
+	t.Helper()
+	var m map[string]any
+	if err := json.Unmarshal([]byte(body), &m); err != nil {
+		t.Fatalf("decode %q: %v", body, err)
+	}
+	return m
+}
+
+func zipBytes(t *testing.T, files map[string]string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	names := make([]string, 0, len(files))
+	for n := range files {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for _, n := range names {
+		w, err := zw.Create(n)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, _ = io.WriteString(w, files[n])
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+var errBoom = errors.New("boom")
+
+// faultyStore fails the repository operations named in fail with errBoom.
+type faultyStore struct {
+	*inmem.Store
+	fail map[string]bool
+}
+
+func (f faultyStore) Repos() store.RepoStore {
+	return faultyRepos{RepoStore: f.Store.Repos(), fail: f.fail}
+}
+
+func (f faultyStore) Permissions() store.PermissionStore {
+	if f.fail["permissions"] {
+		return failingPermissionStore{f.Store.Permissions()}
+	}
+	return f.Store.Permissions()
+}
+
+type failingPermissionStore struct{ store.PermissionStore }
+
+func (failingPermissionStore) ForPrincipal(
+	context.Context,
+	string,
+	[]string,
+) ([]types.Permission, error) {
+	return nil, errBoom
+}
+
+type faultyRepos struct {
+	store.RepoStore
+	fail map[string]bool
+}
+
+func (f faultyRepos) Including(ctx context.Context, key string) ([]string, error) {
+	if f.fail["including"] {
+		return nil, errBoom
+	}
+	return f.RepoStore.Including(ctx, key) //nolint:wrapcheck // test double
+}
+
+func (f faultyRepos) List(ctx context.Context, rf store.RepoFilter) ([]repo.Config, error) {
+	if f.fail["list"] {
+		return nil, errBoom
+	}
+	return f.RepoStore.List(ctx, rf) //nolint:wrapcheck // test double
+}
+
+// Get fails for every key under "get", or for one key under "get:<key>".
+func (f faultyRepos) Get(ctx context.Context, key string) (repo.Config, error) {
+	if f.fail["get"] || f.fail["get:"+key] {
+		return repo.Config{}, errBoom
+	}
+	return f.RepoStore.Get(ctx, key) //nolint:wrapcheck // test double
+}
+
+func (f faultyRepos) Create(ctx context.Context, c repo.Config) error {
+	if f.fail["create"] {
+		return errBoom
+	}
+	return f.RepoStore.Create(ctx, c) //nolint:wrapcheck // test double
+}
+
+func (f faultyRepos) Update(ctx context.Context, c repo.Config) error {
+	if f.fail["update"] {
+		return errBoom
+	}
+	return f.RepoStore.Update(ctx, c) //nolint:wrapcheck // test double
+}
+
+func (f faultyRepos) Delete(ctx context.Context, key string) error {
+	if f.fail["delete"] {
+		return errBoom
+	}
+	return f.RepoStore.Delete(ctx, key) //nolint:wrapcheck // test double
+}
+
+type failingReader struct{}
+
+func (failingReader) Read([]byte) (int, error) { return 0, errBoom }
+
+type sourceBackend func(context.Context, source.Request, source.Permit) (source.Result, error)
+
+func (f sourceBackend) Read(
+	ctx context.Context,
+	q source.Request,
+	p source.Permit,
+) (source.Result, error) {
+	return f(ctx, q, p)
+}
+
+func sourceIdentity(context.Context, repo.Config) (types.SourceIdentity, error) {
+	return types.SourceIdentity{
+		Kind:       types.ExternalHTTP,
+		Repository: "repo-1",
+		ID:         "http-1",
+		Generation: "revision-1",
+	}, nil
+}
+
+type sourceBody struct {
+	io.Reader
+	closes atomic.Int32
+}
+
+func (b *sourceBody) Close() error { b.closes.Add(1); return nil }
+
+// bearerFor issues dev a token with scope.
+func bearerFor(t *testing.T, tokens *token.Service, scope string) map[string]string {
+	t.Helper()
+	sc, err := types.ParseScope(scope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	issued, err := tokens.Issue(context.Background(), token.Request{Username: "dev", Scope: sc})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return map[string]string{"Authorization": "Bearer " + issued.AccessToken}
+}
+
+// buildsAQLWorld is a router over a store with runs app/1, app/2 and
+// tool/1, each producing libs-local/app.jar, and a promotion of app/1. dev
+// may read libs-local and the builds under app/**; tokens can be issued.
+func buildsAQLWorld(t *testing.T, tune ...func(*Config)) (http.Handler, *token.Service) {
+	t.Helper()
+	ctx := context.Background()
+	db := inmem.New()
+	cheapSeed(t, db)
+	if err := db.Users().Create(ctx, types.User{Name: "dev", PasswordHash: cheapHash}); err != nil {
+		t.Fatal(err)
+	}
+	dev := types.Grants{Users: map[string]types.Actions{"dev": types.ActionRead}}
+	if err := db.Permissions().Create(ctx, types.Permission{
+		Name: "dev-app", Resources: map[types.ResourceType]types.Resource{
+			types.ResourceArtifact: {
+				Actions: dev,
+				Targets: map[string]types.Target{"libs-local": {Include: []string{"**"}}},
+			},
+			types.ResourceBuild: {
+				Actions: dev,
+				Targets: map[string]types.Target{
+					"artifactory-build-info": {Include: []string{"app/**"}},
+				},
+			},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	blobs, err := fs.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := repo.Config{Key: "libs-local", Class: repo.Local}
+	if err := db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (&item.Service{
+		Store: db, Blobs: blobs, Formats: ecosystem.For,
+	}).Deploy(ctx, item.Deploy{
+		Target: item.Target{Repo: c, Path: "app.jar"}, Body: strings.NewReader("jar"),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	jar := types.BuildFile{Name: "app.jar", Checksums: types.Checksums{SHA1: sha1Hex("jar")}}
+	for n, run := range [][2]string{{"app", "1"}, {"app", "2"}, {"tool", "1"}} {
+		b, err := db.Builds().Put(ctx, types.Build{
+			Name: run[0], Number: run[1], Started: base.Add(time.Duration(n) * time.Minute),
+			Created: base.Add(time.Hour), CreatedBy: "ci", URL: "https://ci/" + run[0],
+			Modules: []types.BuildModule{{ID: run[0], Artifacts: []types.BuildFile{jar}}},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if n == 0 {
+			if _, err := db.Builds().AddPromotion(ctx, types.BuildPromotion{
+				BuildID: b.ID, Created: base.Add(2 * time.Hour), CreatedBy: "admin",
+				Status: "released", Repo: "libs-release", CIUser: "jenkins",
+			}); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if err := db.Instance().Init(ctx, types.InstanceIdentity{
+		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	tokens, err := token.New(ctx, db, token.Options{KeyBits: 1024})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err := authn.NewAuthenticator(db.Users(), db.Settings(), authn.Options{
+		Hash: testHash, Tokens: tokens,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := Config{
+		CompatVersion: "7.155.0", Store: db, Blobs: blobs, Auth: a, PasswordHash: testHash,
+		Tokens: tokens,
+	}
+	for _, f := range tune {
+		f(&cfg)
+	}
+	return New(cfg), tokens
+}
+
+// searchWorld is an item world holding:
+//   - libs-local/org/a/lib-1.0.jar (team=core, tier=gold), deployed with
+//     its true MD5 and SHA-1 declared;
+//   - libs-local/org/a/lib-1.0.pom (team=core);
+//   - other-local/org/b/lib-2.0.jar (team=edge), the same bytes as the jar;
+//   - server-local/bad.jar, whose declared MD5 is wrong;
+//   - up's cache cached.txt, created an hour ago and never downloaded.
+//
+// deployer reads libs-local only; anonymous, when on, reads up's cache.
+func searchWorld(t *testing.T, anonymous bool, tune ...func(*Config)) *itemWorld {
+	t.Helper()
+	w := newItemWorld(t, anonymous, tune...)
+	w.put("/artifactory/other-local/org/b/lib-2.0.jar;team=edge", "jar")
+	wantStatus(t, w.do("PUT", "/artifactory/libs-local/org/a/lib-1.0.jar;team=core;tier=gold",
+		"admin", "jar", "X-Checksum-Md5", md5Hex("jar"), "X-Checksum-Sha1", sha1Hex("jar")),
+		http.StatusCreated)
+	w.put("/artifactory/libs-local/org/a/lib-1.0.pom;team=core", "pom")
+	wantStatus(t, w.do("PUT", "/artifactory/server-local/bad.jar", "admin", "bad",
+		"X-Checksum-Md5", md5Hex("other")), http.StatusCreated)
+	hour := time.Now().Add(-time.Hour).UTC()
+	if _, err := w.db.Items().Put(context.Background(), types.Item{
+		RepoKey: "up", Cached: true, Path: types.RootPath, Name: "cached.txt", Size: 1,
+		Actual:  types.Checksums{SHA1: sha1Hex("c"), MD5: md5Hex("c")},
+		Created: hour, Modified: hour, Updated: hour,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return w
+}
+
+// hitsOf returns a search's results, failing unless it answered 200.
+func hitsOf(t *testing.T, rec *httptest.ResponseRecorder) []map[string]any {
+	t.Helper()
+	wantStatus(t, rec, http.StatusOK)
+	var body struct {
+		Results []map[string]any `json:"results"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("%v: %s", err, rec.Body)
+	}
+	if body.Results == nil {
+		t.Fatalf("results missing or null: %s", rec.Body)
+	}
+	return body.Results
+}
+
+// restrictionsOver is the access module's API restriction check over st, the
+// store a test's multipart service shares with its server, as the runtime
+// binds it.
+func restrictionsOver(t *testing.T, st store.Store) accessapi.Restrictions {
+	t.Helper()
+	m, err := accessmodule.New(accessmodule.Deps{Store: st})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return m.API().Restrictions
+}
+
+// setTrashcan turns the trash can on or off, with Artifactory's retention.
+func setTrashcan(t *testing.T, db store.Store, on bool) {
+	t.Helper()
+	if err := db.Settings().Put(context.Background(), types.SettingTrashcan,
+		types.TrashcanSettings{Enabled: on, RetentionDays: 14}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// overwriter is the status fixture's user who may deploy but not delete:
+// in libs-local under overwrite/, where seedOverwriteStatus puts the files
+// its rows would replace, and in the formats' repositories their parts
+// grant it.
+const overwriter = "overwriter:pw"
+
+// seedOverwriteStatus adds overwriter, its grant in libs-local, and the
+// files there its rows act on: taken.txt, which they would replace, and
+// other.txt, whose content a checksum deploy would put there.
+func seedOverwriteStatus(t *testing.T, db store.Store, items *item.Service) {
+	t.Helper()
+	ctx := context.Background()
+	name, _, _ := strings.Cut(overwriter, ":")
+	if err := db.Users().Create(ctx, types.User{Name: name, PasswordHash: cheapHash}); err != nil {
+		t.Fatal(err)
+	}
+	grantOverwriter(t, db, "libs-local", "overwrite/")
+	libs, err := db.Repos().Get(ctx, "libs-local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for p, body := range map[string]string{
+		"overwrite/taken.txt": "taken", "overwrite/other.txt": "other content",
+	} {
+		if _, err := items.Deploy(ctx, item.Deploy{
+			Target: item.Target{Repo: libs, Path: p}, Body: strings.NewReader(body),
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// searchStatusRows: quick, property, checksum and bad checksum searches
+// answer anonymous callers while anonymous access is on; the others need a
+// named user. A caller in no group gets 200 and only what it may read.
+func searchStatusRows() []statusCase {
+	const (
+		artifact = "GET /artifactory/api/search/artifact"
+		prop     = "GET /artifactory/api/search/prop"
+		checksum = "GET /artifactory/api/search/checksum"
+		bad      = "GET /artifactory/api/search/badChecksum"
+		creation = "GET /artifactory/api/search/creation"
+		dates    = "GET /artifactory/api/search/dates"
+		usage    = "GET /artifactory/api/search/usage"
+		pattern  = "GET /artifactory/api/search/pattern"
+		s        = "/artifactory/api/search/"
+	)
+	sum := s + "checksum?sha1=" + sha1Hex("fixture")
+	var rows []statusCase
+	for _, op := range []struct{ route, path, invalid string }{
+		{artifact, s + "artifact?name=get", s + "artifact"},
+		{prop, s + "prop?k=v", s + "prop"},
+		{checksum, sum, s + "checksum?sha1=x"},
+		{bad, s + "badChecksum?type=sha1", s + "badChecksum?type=crc"},
+	} {
+		rows = append(rows,
+			statusCase{op.route, op.path, "admin", "", 200},
+			statusCase{op.route, op.path, "user", "", 200},
+			statusCase{op.route, op.path, "anonymous", "", 200},
+			statusCase{op.route, op.path, "", "", 401},
+			statusCase{op.route, op.invalid, "admin", "", 400},
+		)
+	}
+	for _, op := range []struct{ route, path, invalid string }{
+		{creation, s + "creation?from=0", s + "creation?from=9&to=1"},
+		{dates, s + "dates?from=0&dateFields=created", s + "dates?from=0&dateFields=x"},
+		{usage, s + "usage?notUsedSince=0", s + "usage?notUsedSince=x"},
+		{pattern, s + "pattern?pattern=libs-local:fixture/*", s + "pattern?pattern=libs-local:**"},
+	} {
+		rows = append(rows,
+			statusCase{op.route, op.path, "admin", "", 200},
+			statusCase{op.route, op.path, "user", "", 200},
+			statusCase{op.route, op.path, "anonymous", "", 401},
+			statusCase{op.route, op.path, "", "", 401},
+			statusCase{op.route, op.invalid, "admin", "", 400},
+		)
+	}
+	rows = append(rows, statusCase{creation, s + "creation?from=0&repos=missing", "admin", "", 404})
+	return append(rows, moreSearchStatusRows()...)
+}
+
+// searchMatrix: the four searches anonymous may make answer anyone, with
+// what each caller may read; the others answer any named user.
+func searchMatrix() []matrixRow {
+	const s = "/artifactory/api/search/"
+	return append([]matrixRow{
+		row("GET "+s+"artifact", s+"artifact?name=get", "", anyone, 200),
+		row("GET "+s+"prop", s+"prop?k", "", anyone, 200),
+		row("GET "+s+"checksum", s+"checksum?sha1="+sha1Hex("matrix"), "", anyone, 200),
+		row("GET "+s+"badChecksum", s+"badChecksum?type=md5", "", anyone, 200),
+		row("GET "+s+"creation", s+"creation?from=0", "", signedIn, 200),
+		row("GET "+s+"dates", s+"dates?from=0&dateFields=created", "", signedIn, 200),
+		row("GET "+s+"usage", s+"usage?notUsedSince=0", "", signedIn, 200),
+		row("GET "+s+"pattern", s+"pattern?pattern=libs-local:work/*", "", signedIn, 200),
+	}, moreSearchMatrix()...)
+}
+
+// trashStatusRows run after itemStatusRows, which trashed
+// libs-local/fixture/del.txt in the same fixture.
+func trashStatusRows() []statusCase {
+	const (
+		list    = "GET /artifactory/api/storage/auto-trashcan"
+		restore = "POST /artifactory/api/trash/restore/{fromPath}"
+		clean   = "DELETE /artifactory/api/trash/clean/{repoPath}"
+		remove  = "DELETE /artifactory/{repoKey}/{filePath}"
+		empty   = "POST /artifactory/api/trash/empty"
+		gcOp    = "POST /artifactory/api/system/storage/gc"
+		info    = "GET /artifactory/api/storageinfo"
+		calc    = "POST /artifactory/api/storageinfo/calculate"
+		zap     = "POST /artifactory/api/zap/{repoPath}"
+		tc      = "/artifactory/api/storage/auto-trashcan"
+		del     = "libs-local/fixture/del.txt"
+		rs      = "/artifactory/api/trash/restore/"
+		cl      = "/artifactory/api/trash/clean/"
+		create  = "PUT /artifactory/api/repositories/{repoKey}"
+		drop    = "DELETE /artifactory/api/repositories/{repoKey}"
+		deploy  = "PUT /artifactory/{repoKey}/{filePath}"
+		gone    = "/artifactory/api/repositories/trashed-repo"
+	)
+	return []statusCase{
+		{list, tc, "admin", "", 200},
+		{list, tc + "/" + del, "admin", "", 200},
+		{list, tc + "/libs-local/absent", "admin", "", 404},
+		{list, tc + "/gone-repo", "admin", "", 404},
+		// "user" manages perm-local and holds nothing in libs-local (#439).
+		{list, tc, "user", "", 200},
+		{list, tc + "/perm-local", "user", "", 404},
+		{list, tc + "/" + del, "user", "", 403},
+		{list, tc + "/libs-local/absent", "user", "", 403},
+		{list, tc + "/gone-repo", "user", "", 403},
+		{list, tc, "anonymous", "", 401},
+		{list, tc, "", "", 401},
+		// The storage API's views, with the same filter (#455).
+		{
+			list,
+			tc + "?list&deep=1&listFolders=1&mdTimestamps=1&includeRootPath=1",
+			"admin",
+			"",
+			200,
+		},
+		{list, tc + "/libs-local?list&depth=1", "admin", "", 200},
+		{list, tc + "/" + del + "?list", "admin", "", 400},
+		{list, tc + "/libs-local/absent?list", "admin", "", 404},
+		{list, tc + "/" + del + "?properties", "admin", "", 200},
+		{list, tc + "/" + del + "?properties=absent", "admin", "", 404},
+		{list, tc + "/libs-local/fixture?properties", "admin", "", 404},
+		{list, tc + "/" + del + "?stats", "admin", "", 200},
+		{list, tc + "/libs-local/fixture?stats", "admin", "", 400},
+		{list, tc + "/" + del + "?lastModified", "admin", "", 200},
+		{list, tc + "/libs-local?lastModified", "admin", "", 200},
+		{list, tc + "/" + del + "?permissions", "admin", "", 400},
+		{list, tc + "?list&stats", "admin", "", 400},
+		{list, tc + "?depth=1", "admin", "", 400},
+		{list, tc + "?list&deep=1", "user", "", 200},
+		{list, tc + "/libs-local?list", "user", "", 403},
+		{list, tc + "/" + del + "?properties", "user", "", 403},
+		{list, tc + "/" + del + "?stats", "user", "", 403},
+		{list, tc + "/libs-local?lastModified", "user", "", 403},
+		{list, tc + "/" + del + "?permissions", "user", "", 403},
+		{list, tc + "?list", "", "", 401},
+
+		{restore, rs + del + "?to=virt", "admin", "", 400},
+		{restore, rs + del, "admin", "", 400},
+		{restore, rs + del + "?to=missing-repo", "admin", "", 400},
+		{restore, rs + del + "?to=libs-local&transaction-size=0", "admin", "", 400},
+		{restore, rs + del + "?to=libs-local", "user", "", 400},
+		{restore, rs + del + "?to=libs-local", "", "", 401},
+		{restore, rs + del + "?to=libs-local&transaction-size=10", "admin", "", 202},
+		{restore, rs + del + "?to=libs-local", "admin", "", 404},
+		{restore, rs + "libs-local?to=libs-local", "admin", "", 404},
+		// An admin may restore from a repository that is gone (#380).
+		{restore, rs + "gone-repo/x?to=libs-local", "admin", "", 404},
+		// A repository delete keeps the content in the trash can under the
+		// repository's key, which only an admin sees or restores, into a
+		// repository that exists (#504).
+		{create, gone, "admin", `{"rclass":"local"}`, 200},
+		{deploy, "/artifactory/trashed-repo/kept/file.txt", "admin", "kept", 201},
+		{drop, gone, "admin", "", 200},
+		{list, tc + "/trashed-repo/kept/file.txt", "admin", "", 200},
+		{list, tc + "/trashed-repo", "user", "", 403},
+		{restore, rs + "trashed-repo?to=libs-local/from-trashed-repo", "user", "", 400},
+		{restore, rs + "trashed-repo?to=trashed-repo", "admin", "", 400},
+		{restore, rs + "trashed-repo?to=libs-local/from-trashed-repo", "admin", "", 202},
+		{list, tc + "/trashed-repo", "admin", "", 404},
+
+		{remove, "/artifactory/" + del, "admin", "", 204},
+		{clean, cl + del, "user", "", 400},
+		{clean, cl + del, "", "", 401},
+		{clean, cl + "gone-repo/x", "user", "", 400},
+		{clean, cl + del, "admin", "", 204},
+		{clean, cl + "libs-local", "admin", "", 204},
+
+		{empty, "/artifactory/api/trash/empty", "user", "", 400},
+		{empty, "/artifactory/api/trash/empty", "anonymous", "", 401},
+		{empty, "/artifactory/api/trash/empty", "", "", 401},
+		{empty, "/artifactory/api/trash/empty", "admin", "", 202},
+
+		{gcOp, "/artifactory/api/system/storage/gc", "admin", "", 200},
+		{gcOp, "/artifactory/api/system/storage/gc", "user", "", 403},
+		{gcOp, "/artifactory/api/system/storage/gc", "", "", 401},
+
+		{info, "/artifactory/api/storageinfo", "admin", "", 200},
+		{info, "/artifactory/api/storageinfo", "admin-token", "", 200},
+		{info, "/artifactory/api/storageinfo", "user", "", 403},
+		{info, "/artifactory/api/storageinfo", "user-token", "", 403},
+		{info, "/artifactory/api/storageinfo", "anonymous", "", 401},
+		{info, "/artifactory/api/storageinfo", "", "", 401},
+		{calc, "/artifactory/api/storageinfo/calculate", "admin", "", 202},
+		{calc, "/artifactory/api/storageinfo/calculate", "user", "", 403},
+
+		{zap, "/artifactory/api/zap/remote-private-cache", "admin", "", 200},
+		{zap, "/artifactory/api/zap/remote-private-cache/absent", "admin", "", 404},
+		{zap, "/artifactory/api/zap/libs-local/x", "admin", "", 400},
+		{zap, "/artifactory/api/zap/missing-cache", "admin", "", 404},
+		{zap, "/artifactory/api/zap/remote-private-cache", "user", "", 403},
+		{zap, "/artifactory/api/zap/remote-private-cache", "", "", 401},
+	}
+}
+
+// repositoryTrashed seeds a local repository named key, {p} the principal's
+// name, with a file at kept/{p}.txt, and then deletes the repository, which
+// moves the file to the trash can under key (#504).
+func repositoryTrashed(key string) seeder {
+	return func(t *testing.T, f *matrixFixture, p string) {
+		t.Helper()
+		ctx := context.Background()
+		key := strings.ReplaceAll(key, "{p}", p)
+		c := repo.Config{Key: key, Class: repo.Local}
+		if err := f.db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+		f.deploy(t, key, "kept/"+p+".txt", []byte(p))
+		if _, _, err := repos.Remove(ctx, f.db, key, "admin"); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// trashedThenOff seeds what trashed does and then turns the trash can off,
+// so the row runs against what was trashed before it was turned off (#490).
+// The seed runs once per principal on one fixture, so the trash can is
+// turned on again for each principal's delete to reach it.
+func trashedThenOff(repoKey, path string) seeder {
+	seed := trashed(repoKey, path)
+	return func(t *testing.T, f *matrixFixture, p string) {
+		t.Helper()
+		setTrashcan(t, f.db, true)
+		seed(t, f, p)
+		setTrashcan(t, f.db, false)
+	}
+}
+
+func (w *itemWorld) put(p, body string) {
+	w.t.Helper()
+	wantStatus(w.t, w.do("PUT", p, "admin", body), http.StatusCreated)
+}
+
+// grantOverwriter lets overwriter read and deploy, but not delete, under
+// the prefix in repository key.
+func grantOverwriter(t *testing.T, db store.Store, key, under string) {
+	t.Helper()
+	name, _, _ := strings.Cut(overwriter, ":")
+	if err := db.Permissions().Create(context.Background(), types.Permission{
+		Name: "st-overwrite-" + key,
+		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
+			Actions: types.Grants{Users: map[string]types.Actions{
+				name: types.ActionRead | types.ActionWrite,
+			}},
+			Targets: map[string]types.Target{key: {Include: []string{under + "**"}}},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+const vendorJSON = "application/vnd.org.jfrog.artifactory+json"
+
+// startedAt is testStarted moved on by n seconds.
+func startedAt(n int) string {
+	t, err := build.ParseStarted(testStarted)
+	if err != nil {
+		panic(err)
+	}
+	return build.FormatStarted(t.Add(time.Duration(n) * time.Second))
+}
+
+// artifactDoc is a build-info document whose one module produced content,
+// with fields the spec does not list, which must survive.
+func artifactDoc(name, number, started, content string) string {
+	return fmt.Sprintf(`{"name":%q,"number":%q,"started":%q,`+
+		`"agent":{"name":"jfrog-cli-go","version":"2.80.0"},"vcs":[{"revision":"abc"}],`+
+		`"properties":{"buildInfo.env.CI":"true","count":3},`+
+		`"modules":[{"id":"m1","type":"generic","artifacts":[{"name":"a.bin","path":"app/a.bin",`+
+		`"sha1":%q,"sha256":%q,"md5":%q,"localPath":"/tmp/a.bin"}]}]}`,
+		name, number, started, sha1Hex(content), sha256Hex(content), md5Hex(content))
+}
+
+func (w *itemWorld) publish(doc string) {
+	w.t.Helper()
+	wantStatus(w.t, w.do(http.MethodPut, buildsPath, "admin", doc, "Content-Type", vendorJSON), 204)
+}
+
+// buildSearchFaults fails the build or item store operation named fail.
+type buildSearchFaults struct {
+	store.Store
+	fail string
+}
+
+func (f buildSearchFaults) Builds() store.BuildStore {
+	return faultyBuildSearch{f.Store.Builds(), f.fail}
+}
+
+func (f buildSearchFaults) Items() store.ItemStore {
+	return faultyChecksumSearch{f.Store.Items(), f.fail}
+}
+
+type faultyBuildSearch struct {
+	store.BuildStore
+	fail string
+}
+
+func (f faultyBuildSearch) FindDependencies(
+	ctx context.Context,
+	c types.Checksums,
+) ([]types.BuildFileRef, error) {
+	if f.fail == "dependencies" {
+		return nil, errBoom
+	}
+	return f.BuildStore.FindDependencies(ctx, c)
+}
+
+func (f faultyBuildSearch) Runs(
+	ctx context.Context,
+	project, name string,
+	p store.Page,
+) ([]types.BuildRun, string, error) {
+	if f.fail == "runs" {
+		return nil, "", errBoom
+	}
+	return f.BuildStore.Runs(ctx, project, name, p)
+}
+
+type faultyChecksumSearch struct {
+	store.ItemStore
+	fail string
+}
+
+func (f faultyChecksumSearch) FindByChecksum(
+	ctx context.Context,
+	c types.Checksums,
+	p store.Page,
+) ([]types.Item, string, error) {
+	if f.fail == "find" {
+		return nil, "", errBoom
+	}
+	return f.ItemStore.FindByChecksum(ctx, c, p)
 }

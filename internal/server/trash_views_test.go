@@ -351,15 +351,6 @@ func (f faultySettings) Get(ctx context.Context, key string, into any) error {
 	return f.SettingsStore.Get(ctx, key, into) //nolint:wrapcheck // test double
 }
 
-// setTrashcan turns the trash can on or off, with Artifactory's retention.
-func setTrashcan(t *testing.T, db store.Store, on bool) {
-	t.Helper()
-	if err := db.Settings().Put(context.Background(), types.SettingTrashcan,
-		types.TrashcanSettings{Enabled: on, RetentionDays: 14}); err != nil {
-		t.Fatal(err)
-	}
-}
-
 // TestAccTrashStorageWhileOff: while the trash can is off, its views answer as
 // for a path that is not there, to an administrator too, and what it held
 // stays, so restore still finds it and turning it on shows it again (#490).

@@ -2,9 +2,7 @@ package server
 
 import (
 	"bytes"
-	"context"
-	"crypto/sha1" //nolint:gosec // SHA-1 is a wire checksum here
-	"crypto/sha256"
+	"context" //nolint:gosec // SHA-1 is a wire checksum here
 	"crypto/sha512"
 	"encoding/hex"
 	"encoding/json"
@@ -25,16 +23,6 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
-
-func sha1Hex(s string) string {
-	b := sha1.Sum([]byte(s)) //nolint:gosec // wire checksum
-	return hex.EncodeToString(b[:])
-}
-
-func sha256Hex(s string) string {
-	b := sha256.Sum256([]byte(s))
-	return hex.EncodeToString(b[:])
-}
 
 func sha512Hex(s string) string {
 	b := sha512.Sum512([]byte(s))
@@ -906,8 +894,6 @@ func TestAccSearchAQL(t *testing.T) {
 		t.Fatalf("compact %s", compact.Body)
 	}
 }
-
-const aqlURL = "/artifactory/api/search/aql"
 
 // aqlRows runs query as user and returns each row as "<repo>/<path>/<name>"
 // and the range block.

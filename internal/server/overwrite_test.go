@@ -13,7 +13,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -248,54 +247,4 @@ func TestAccOverwriteRefusalTransfer(t *testing.T) {
 		w.do(http.MethodGet, "/artifactory/other-local/m.txt", "admin", ""),
 		http.StatusOK,
 	)
-}
-
-// overwriter is the status fixture's user who may deploy but not delete:
-// in libs-local under overwrite/, where seedOverwriteStatus puts the files
-// its rows would replace, and in the formats' repositories their parts
-// grant it.
-const overwriter = "overwriter:pw"
-
-// seedOverwriteStatus adds overwriter, its grant in libs-local, and the
-// files there its rows act on: taken.txt, which they would replace, and
-// other.txt, whose content a checksum deploy would put there.
-func seedOverwriteStatus(t *testing.T, db store.Store, items *item.Service) {
-	t.Helper()
-	ctx := context.Background()
-	name, _, _ := strings.Cut(overwriter, ":")
-	if err := db.Users().Create(ctx, types.User{Name: name, PasswordHash: cheapHash}); err != nil {
-		t.Fatal(err)
-	}
-	grantOverwriter(t, db, "libs-local", "overwrite/")
-	libs, err := db.Repos().Get(ctx, "libs-local")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for p, body := range map[string]string{
-		"overwrite/taken.txt": "taken", "overwrite/other.txt": "other content",
-	} {
-		if _, err := items.Deploy(ctx, item.Deploy{
-			Target: item.Target{Repo: libs, Path: p}, Body: strings.NewReader(body),
-		}); err != nil {
-			t.Fatal(err)
-		}
-	}
-}
-
-// grantOverwriter lets overwriter read and deploy, but not delete, under
-// the prefix in repository key.
-func grantOverwriter(t *testing.T, db store.Store, key, under string) {
-	t.Helper()
-	name, _, _ := strings.Cut(overwriter, ":")
-	if err := db.Permissions().Create(context.Background(), types.Permission{
-		Name: "st-overwrite-" + key,
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{
-				name: types.ActionRead | types.ActionWrite,
-			}},
-			Targets: map[string]types.Target{key: {Include: []string{under + "**"}}},
-		}},
-	}); err != nil {
-		t.Fatal(err)
-	}
 }

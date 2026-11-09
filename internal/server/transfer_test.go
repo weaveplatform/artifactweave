@@ -7,9 +7,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
-	"io"
 	"net/http"
-	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -18,28 +16,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
-
-func zipBytes(t *testing.T, files map[string]string) []byte {
-	t.Helper()
-	var buf bytes.Buffer
-	zw := zip.NewWriter(&buf)
-	names := make([]string, 0, len(files))
-	for n := range files {
-		names = append(names, n)
-	}
-	sort.Strings(names)
-	for _, n := range names {
-		w, err := zw.Create(n)
-		if err != nil {
-			t.Fatal(err)
-		}
-		_, _ = io.WriteString(w, files[n])
-	}
-	if err := zw.Close(); err != nil {
-		t.Fatal(err)
-	}
-	return buf.Bytes()
-}
 
 // report decodes a copy or move report.
 func report(t *testing.T, body []byte) []map[string]string {
@@ -51,11 +27,6 @@ func report(t *testing.T, body []byte) []map[string]string {
 		t.Fatalf("%v: %s", err, body)
 	}
 	return out.Messages
-}
-
-func (w *itemWorld) put(p, body string) {
-	w.t.Helper()
-	wantStatus(w.t, w.do("PUT", p, "admin", body), http.StatusCreated)
 }
 
 func TestAccCopyAndMoveOverHTTP(t *testing.T) {
