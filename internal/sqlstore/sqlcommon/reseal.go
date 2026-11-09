@@ -4,7 +4,7 @@ import (
 	"context"
 	"strconv"
 
-	accmigrations "github.com/weaveplatform/artifactweave/migration/access/adapters/sql/migrations"
+	accsql "github.com/weaveplatform/artifactweave/migration/access/adapters/sql"
 	artmigrations "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/sql/migrations"
 	fedsql "github.com/weaveplatform/artifactweave/migration/federation/adapters/sql"
 	ntfsql "github.com/weaveplatform/artifactweave/migration/notifications/adapters/sql"
@@ -59,41 +59,7 @@ func Modules() []dialect.Module {
 				},
 			},
 		},
-		{
-			Name:       "access",
-			Migrations: accmigrations.FS,
-			// Go fills the lowercase search names that a row lacks, because
-			// the engines fold case by their own rules (decision 0043).
-			AfterMigrate: func(ctx context.Context, s *dialect.Store) error {
-				return (&Store{Store: s}).backfillIdentitySearch(ctx)
-			},
-			Sealed: []dialect.SealedColumn{
-				{
-					Table: "keypairs", Column: "private_key", Purpose: purposeKeypairPrivate,
-					Keys: []string{"name"}, RowID: dialect.FirstKey,
-				},
-				{
-					Table: "keypairs", Column: "passphrase", Purpose: purposeKeypairPassphrase,
-					Keys: []string{"name"}, RowID: dialect.FirstKey,
-				},
-				{
-					Table: "signing_keys", Column: "private_key", Purpose: purposeSigningPrivate,
-					Keys: []string{"alias"}, RowID: dialect.FirstKey,
-				},
-				{
-					Table: "signing_keys", Column: "passphrase", Purpose: purposeSigningPassphrase,
-					Keys: []string{"alias"}, RowID: dialect.FirstKey,
-				},
-				{
-					Table: "certificates", Column: "private_key", Purpose: purposeCertificateKey,
-					Keys: []string{"alias"}, RowID: dialect.FirstKey,
-				},
-				{
-					Table: "tokens", Column: "secret", Purpose: purposeTokenSecret,
-					Keys: []string{"id"}, RowID: dialect.FirstKey,
-				},
-			},
-		},
+		accsql.Module,
 		ntfsql.Module,
 		retsql.Module,
 		fedsql.Module,

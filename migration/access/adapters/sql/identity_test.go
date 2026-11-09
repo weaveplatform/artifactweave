@@ -9,6 +9,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -268,7 +269,7 @@ func TestAccSealedIdentityColumns(t *testing.T) {
 		}
 	}
 	bare := sqlcommon.New(s.DB(), sqlite.Dialect, nil)
-	if _, err := bare.Keys().Keypair(ctx, "kp"); !errors.Is(err, sqlcommon.ErrNoKeyring) {
+	if _, err := bare.Keys().Keypair(ctx, "kp"); !errors.Is(err, dialect.ErrNoKeyring) {
 		t.Fatalf("read without a keyring: %v", err)
 	}
 }

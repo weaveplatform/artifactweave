@@ -5,23 +5,24 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
-func (us users) ListSummaries(ctx context.Context, f store.UserFilter, p store.Page) (
-	[]store.UserSummary, string, error,
+func (us users) ListSummaries(ctx context.Context, f port.UserFilter, p kernel.Page) (
+	[]port.UserSummary, string, error,
 ) {
 	p, err := p.Normalize()
 	if err != nil {
-		return nil, "", err
+		return nil, "", err //nolint:wrapcheck // already a store sentinel
 	}
 	after, err := p.Key(1)
 	if err != nil {
-		return nil, "", err
+		return nil, "", err //nolint:wrapcheck // already a store sentinel
 	}
-	var out []store.UserSummary
-	compare := func(a, b store.UserSummary) int {
+	var out []port.UserSummary
+	compare := func(a, b port.UserSummary) int {
 		return identityOrder(a.Name, b.Name, f.Descending)
 	}
 	err = us.s.Do(ctx, func() error {
@@ -31,7 +32,7 @@ func (us users) ListSummaries(ctx context.Context, f store.UserFilter, p store.P
 			}
 			status := u.Status
 			if status == "" {
-				status = types.UserEnabled
+				status = model.UserEnabled
 			}
 			if f.Status != "" && f.Status != status {
 				continue
@@ -49,7 +50,7 @@ func (us users) ListSummaries(ctx context.Context, f store.UserFilter, p store.P
 				!us.s.identityGranted(u.Name, memberships, f.Resource, false) {
 				continue
 			}
-			v := store.UserSummary{Name: u.Name, Realm: u.Realm, Status: status}
+			v := port.UserSummary{Name: u.Name, Realm: u.Realm, Status: status}
 			i, _ := slices.BinarySearchFunc(out, v, compare)
 			out = slices.Insert(out, i, v)
 			if len(out) > p.Limit+1 {
@@ -58,26 +59,26 @@ func (us users) ListSummaries(ctx context.Context, f store.UserFilter, p store.P
 		}
 		return nil
 	})
-	out, next := store.Trim(
+	out, next := kernel.Trim(
 		out,
 		p.Limit,
-		func(u store.UserSummary) []string { return []string{u.Name} },
+		func(u port.UserSummary) []string { return []string{u.Name} },
 	)
 	return out, next, err
 }
 
 func (gs groups) ListNames(
 	ctx context.Context,
-	f store.IdentityFilter,
-	p store.Page,
+	f port.IdentityFilter,
+	p kernel.Page,
 ) ([]string, string, error) {
 	p, err := p.Normalize()
 	if err != nil {
-		return nil, "", err
+		return nil, "", err //nolint:wrapcheck // already a store sentinel
 	}
 	after, err := p.Key(1)
 	if err != nil {
-		return nil, "", err
+		return nil, "", err //nolint:wrapcheck // already a store sentinel
 	}
 	var out []string
 	compare := func(a, b string) int { return identityOrder(a, b, f.Descending) }
@@ -93,7 +94,7 @@ func (gs groups) ListNames(
 		}
 		return nil
 	})
-	out, next := store.Trim(out, p.Limit, func(name string) []string { return []string{name} })
+	out, next := kernel.Trim(out, p.Limit, func(name string) []string { return []string{name} })
 	return out, next, err
 }
 
@@ -104,7 +105,7 @@ func identityOrder(a, b string, descending bool) int {
 	return strings.Compare(a, b)
 }
 
-func identityName(name string, f store.IdentityFilter, after []string) bool {
+func identityName(name string, f port.IdentityFilter, after []string) bool {
 	if !strings.Contains(strings.ToLower(name), strings.ToLower(f.NameContains)) {
 		return false
 	}
@@ -114,7 +115,7 @@ func identityName(name string, f store.IdentityFilter, after []string) bool {
 func (s *Store) identityGranted(
 	name string,
 	memberships []string,
-	target *store.IdentityResource,
+	target *port.IdentityResource,
 	group bool,
 ) bool {
 	if target == nil {

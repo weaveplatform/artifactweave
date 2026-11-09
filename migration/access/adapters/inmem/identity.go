@@ -6,29 +6,33 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// Users implements store.Store.
-func (s *Store) Users() store.UserStore { return users{s} }
+// Users returns the user store: users, their credentials and their
+// group memberships (decision 0005).
+func (s *Store) Users() port.UserStore { return users{s} }
 
-// Groups implements store.Store.
-func (s *Store) Groups() store.GroupStore { return groups{s} }
+// Groups returns the group store: groups and their members.
+func (s *Store) Groups() port.GroupStore { return groups{s} }
 
-// Permissions implements store.Store.
-func (s *Store) Permissions() store.PermissionStore { return permissions{s} }
+// Permissions returns the permission store: Access v2 permissions, with
+// their grants and targets mirrored for lookup by principal and by
+// target (decision 0006).
+func (s *Store) Permissions() port.PermissionStore { return permissions{s} }
 
 // membership is a group_members row.
 type membership struct{ Group, User string }
 
-func (s *Store) usersT() *memtx.Table[string, types.User] {
-	return memtx.TableOf[string, types.User](s.Store, "users")
+func (s *Store) usersT() *memtx.Table[string, model.User] {
+	return memtx.TableOf[string, model.User](s.Store, "users")
 }
 
-func (s *Store) groupsT() *memtx.Table[string, types.Group] {
-	return memtx.TableOf[string, types.Group](s.Store, "user_groups")
+func (s *Store) groupsT() *memtx.Table[string, model.Group] {
+	return memtx.TableOf[string, model.Group](s.Store, "user_groups")
 }
 
 func (s *Store) membersT() *memtx.Table[membership, struct{}] {
@@ -46,7 +50,7 @@ func sortedUnique(names []string) []string {
 func requireKeys[V any](t *memtx.Table[string, V], what string, names []string) error {
 	for _, n := range names {
 		if !t.Has(n) {
-			return memtx.NotFound(what, n)
+			return memtx.NotFound(what, n) //nolint:wrapcheck // wraps kernel.ErrNotFound
 		}
 	}
 	return nil
@@ -84,9 +88,9 @@ func compareByKey[V any](name func(V) string) func(a, b V) int {
 
 type users struct{ s *Store }
 
-func userName(u types.User) string { return u.Name }
+func userName(u model.User) string { return u.Name }
 
-func (us users) Create(ctx context.Context, u types.User) error {
+func (us users) Create(ctx context.Context, u model.User) error {
 	return us.s.Do(ctx, func() error {
 		if us.s.usersT().Has(u.Name) {
 			return memtx.Conflict("user", u.Name)
@@ -96,7 +100,7 @@ func (us users) Create(ctx context.Context, u types.User) error {
 }
 
 // write stores u and replaces its memberships, after checking its groups.
-func (us users) write(u types.User) error {
+func (us users) write(u model.User) error {
 	groups := sortedUnique(u.Groups)
 	if err := requireKeys(us.s.groupsT(), "group", groups); err != nil {
 		return err
@@ -110,8 +114,8 @@ func (us users) write(u types.User) error {
 	return nil
 }
 
-func (us users) Get(ctx context.Context, name string) (types.User, error) {
-	var out types.User
+func (us users) Get(ctx context.Context, name string) (model.User, error) {
+	var out model.User
 	err := us.s.Do(ctx, func() error {
 		u, ok := us.s.usersT().Get(name)
 		if !ok {
@@ -124,7 +128,7 @@ func (us users) Get(ctx context.Context, name string) (types.User, error) {
 	return out, err
 }
 
-func (us users) Update(ctx context.Context, u types.User) error {
+func (us users) Update(ctx context.Context, u model.User) error {
 	return us.s.Do(ctx, func() error {
 		if !us.s.usersT().Has(u.Name) {
 			return memtx.NotFound("user", u.Name)
@@ -139,14 +143,14 @@ func (us users) Delete(ctx context.Context, name string) error {
 			return memtx.NotFound("user", name)
 		}
 		us.s.membersT().DeleteWhere(func(m membership, _ struct{}) bool { return m.User == name })
-		apiRestrictions{us.s}.current().Del(name)
+		apiRestrictions(us).current().Del(name)
 		return nil
 	})
 }
 
-func (us users) List(ctx context.Context, p store.Page) ([]types.User, string, error) {
+func (us users) List(ctx context.Context, p kernel.Page) ([]model.User, string, error) {
 	var (
-		out  []types.User
+		out  []model.User
 		next string
 	)
 	err := us.s.Do(ctx, func() error {
@@ -156,12 +160,12 @@ func (us users) List(ctx context.Context, p store.Page) ([]types.User, string, e
 			rows,
 			p,
 			false,
-			func(u types.User) []any { return []any{u.Name} },
+			func(u model.User) []any { return []any{u.Name} },
 		)
 		for i := range out {
 			out[i].Groups = us.s.groupsOf(out[i].Name)
 		}
-		return err
+		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
 	})
 	return out, next, err
 }
@@ -187,11 +191,11 @@ func (us users) RecordFailedLogin(ctx context.Context, name string, lockAt int) 
 			return memtx.NotFound("user", name)
 		}
 		u.FailedLogins++
-		enabled := u.Status == "" || u.Status == types.UserEnabled
+		enabled := u.Status == "" || u.Status == model.UserEnabled
 		if lockAt > 0 && u.FailedLogins >= lockAt && enabled {
-			u.Status = types.UserLocked
+			u.Status = model.UserLocked
 		}
-		locked = u.Status == types.UserLocked
+		locked = u.Status == model.UserLocked
 		us.s.usersT().Put(name, u)
 		return nil
 	})
@@ -208,11 +212,11 @@ func (us users) Unlock(ctx context.Context, names ...string) error {
 			switch {
 			case len(names) > 0 && !want[u.Name]:
 				continue
-			case len(names) == 0 && u.Status != types.UserLocked && u.FailedLogins == 0:
+			case len(names) == 0 && u.Status != model.UserLocked && u.FailedLogins == 0:
 				continue
 			}
-			if u.Status == types.UserLocked {
-				u.Status = types.UserEnabled
+			if u.Status == model.UserLocked {
+				u.Status = model.UserEnabled
 			}
 			u.FailedLogins = 0
 			us.s.usersT().Put(u.Name, u)
@@ -225,7 +229,7 @@ func (us users) Locked(ctx context.Context) ([]string, error) {
 	out := []string{}
 	err := us.s.Do(ctx, func() error {
 		for _, u := range us.s.usersT().All(nil, compareByKey(userName)) {
-			if u.Status == types.UserLocked {
+			if u.Status == model.UserLocked {
 				out = append(out, u.Name)
 			}
 		}
@@ -238,9 +242,9 @@ func (us users) Locked(ctx context.Context) ([]string, error) {
 
 type groups struct{ s *Store }
 
-func groupName(g types.Group) string { return g.Name }
+func groupName(g model.Group) string { return g.Name }
 
-func (gs groups) Create(ctx context.Context, g types.Group) error {
+func (gs groups) Create(ctx context.Context, g model.Group) error {
 	return gs.s.Do(ctx, func() error {
 		if gs.s.groupsT().Has(g.Name) {
 			return memtx.Conflict("group", g.Name)
@@ -250,7 +254,7 @@ func (gs groups) Create(ctx context.Context, g types.Group) error {
 }
 
 // write stores g and replaces its members, after checking they exist.
-func (gs groups) write(g types.Group) error {
+func (gs groups) write(g model.Group) error {
 	members := sortedUnique(g.Members)
 	if err := requireKeys(gs.s.usersT(), "user", members); err != nil {
 		return err
@@ -264,8 +268,8 @@ func (gs groups) write(g types.Group) error {
 	return nil
 }
 
-func (gs groups) Get(ctx context.Context, name string) (types.Group, error) {
-	var out types.Group
+func (gs groups) Get(ctx context.Context, name string) (model.Group, error) {
+	var out model.Group
 	err := gs.s.Do(ctx, func() error {
 		g, ok := gs.s.groupsT().Get(name)
 		if !ok {
@@ -278,7 +282,7 @@ func (gs groups) Get(ctx context.Context, name string) (types.Group, error) {
 	return out, err
 }
 
-func (gs groups) Update(ctx context.Context, g types.Group) error {
+func (gs groups) Update(ctx context.Context, g model.Group) error {
 	return gs.s.Do(ctx, func() error {
 		if !gs.s.groupsT().Has(g.Name) {
 			return memtx.NotFound("group", g.Name)
@@ -297,9 +301,9 @@ func (gs groups) Delete(ctx context.Context, name string) error {
 	})
 }
 
-func (gs groups) List(ctx context.Context, p store.Page) ([]types.Group, string, error) {
+func (gs groups) List(ctx context.Context, p kernel.Page) ([]model.Group, string, error) {
 	var (
-		out  []types.Group
+		out  []model.Group
 		next string
 	)
 	err := gs.s.Do(ctx, func() error {
@@ -309,12 +313,12 @@ func (gs groups) List(ctx context.Context, p store.Page) ([]types.Group, string,
 			rows,
 			p,
 			false,
-			func(g types.Group) []any { return []any{g.Name} },
+			func(g model.Group) []any { return []any{g.Name} },
 		)
 		for i := range out {
 			out[i].Members = gs.s.membersOf(out[i].Name)
 		}
-		return err
+		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
 	})
 	return out, next, err
 }
@@ -350,7 +354,7 @@ func (gs groups) RemoveMembers(ctx context.Context, group string, users ...strin
 func (gs groups) AutoJoin(ctx context.Context) ([]string, error) {
 	var out []string
 	err := gs.s.Do(ctx, func() error {
-		for _, g := range gs.s.groupsT().All(func(_ string, g types.Group) bool { return g.AutoJoin }, compareByKey(groupName)) {
+		for _, g := range gs.s.groupsT().All(func(_ string, g model.Group) bool { return g.AutoJoin }, compareByKey(groupName)) {
 			out = append(out, g.Name)
 		}
 		return nil
@@ -362,13 +366,13 @@ func (gs groups) AutoJoin(ctx context.Context) ([]string, error) {
 
 type permissions struct{ s *Store }
 
-func (s *Store) permissionsT() *memtx.Table[string, types.Permission] {
-	return memtx.TableOf[string, types.Permission](s.Store, "permissions")
+func (s *Store) permissionsT() *memtx.Table[string, model.Permission] {
+	return memtx.TableOf[string, model.Permission](s.Store, "permissions")
 }
 
-func permissionName(p types.Permission) string { return p.Name }
+func permissionName(p model.Permission) string { return p.Name }
 
-func (ps permissions) Create(ctx context.Context, p types.Permission) error {
+func (ps permissions) Create(ctx context.Context, p model.Permission) error {
 	return ps.s.Do(ctx, func() error {
 		if ps.s.permissionsT().Has(p.Name) {
 			return memtx.Conflict("permission", p.Name)
@@ -378,8 +382,8 @@ func (ps permissions) Create(ctx context.Context, p types.Permission) error {
 	})
 }
 
-func (ps permissions) Get(ctx context.Context, name string) (types.Permission, error) {
-	var out types.Permission
+func (ps permissions) Get(ctx context.Context, name string) (model.Permission, error) {
+	var out model.Permission
 	err := ps.s.Do(ctx, func() error {
 		var ok bool
 		if out, ok = ps.s.permissionsT().Get(name); !ok {
@@ -390,7 +394,7 @@ func (ps permissions) Get(ctx context.Context, name string) (types.Permission, e
 	return out, err
 }
 
-func (ps permissions) Update(ctx context.Context, p types.Permission) error {
+func (ps permissions) Update(ctx context.Context, p model.Permission) error {
 	return ps.s.Do(ctx, func() error {
 		if !ps.s.permissionsT().Has(p.Name) {
 			return memtx.NotFound("permission", p.Name)
@@ -409,9 +413,9 @@ func (ps permissions) Delete(ctx context.Context, name string) error {
 	})
 }
 
-func (ps permissions) List(ctx context.Context, p store.Page) ([]types.Permission, string, error) {
+func (ps permissions) List(ctx context.Context, p kernel.Page) ([]model.Permission, string, error) {
 	var (
-		out  []types.Permission
+		out  []model.Permission
 		next string
 	)
 	err := ps.s.Do(ctx, func() error {
@@ -421,9 +425,9 @@ func (ps permissions) List(ctx context.Context, p store.Page) ([]types.Permissio
 			rows,
 			p,
 			false,
-			func(v types.Permission) []any { return []any{v.Name} },
+			func(v model.Permission) []any { return []any{v.Name} },
 		)
-		return err
+		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
 	})
 	return out, next, err
 }
@@ -431,12 +435,12 @@ func (ps permissions) List(ctx context.Context, p store.Page) ([]types.Permissio
 // where lists the permissions matching keep, by name.
 func (ps permissions) where(
 	ctx context.Context,
-	keep func(types.Permission) bool,
-) ([]types.Permission, error) {
-	var out []types.Permission
+	keep func(model.Permission) bool,
+) ([]model.Permission, error) {
+	var out []model.Permission
 	err := ps.s.Do(ctx, func() error {
 		out = ps.s.permissionsT().
-			All(func(_ string, p types.Permission) bool { return keep(p) }, compareByKey(permissionName))
+			All(func(_ string, p model.Permission) bool { return keep(p) }, compareByKey(permissionName))
 		return nil
 	})
 	return out, err
@@ -446,8 +450,8 @@ func (ps permissions) ForPrincipal(
 	ctx context.Context,
 	user string,
 	groups []string,
-) ([]types.Permission, error) {
-	return ps.where(ctx, func(p types.Permission) bool {
+) ([]model.Permission, error) {
+	return ps.where(ctx, func(p model.Permission) bool {
 		for _, r := range p.Resources {
 			if r.Actions.Users[user] != 0 {
 				return true
@@ -462,8 +466,8 @@ func (ps permissions) ForPrincipal(
 	})
 }
 
-func (ps permissions) WithTarget(ctx context.Context, target string) ([]types.Permission, error) {
-	return ps.where(ctx, func(p types.Permission) bool {
+func (ps permissions) WithTarget(ctx context.Context, target string) ([]model.Permission, error) {
+	return ps.where(ctx, func(p model.Permission) bool {
 		for _, r := range p.Resources {
 			if _, ok := r.Targets[target]; ok {
 				return true

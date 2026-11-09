@@ -7,13 +7,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Seal purposes of the key material columns (decision 0017). The row id is
-// the key pair name or signing key alias.
+// the row's key: the key pair name, the signing key or certificate alias,
+// or the token id.
 //
 //nolint:gosec // G101: column names, not credentials
 const (
@@ -25,11 +28,14 @@ const (
 	purposeTokenSecret       = "tokens.secret"
 )
 
-// Tokens implements store.Store.
-func (s *Store) Tokens() store.TokenStore { return tokens{s} }
+// Tokens returns the token store: token records, with a purposed
+// token's secret sealed (decisions 0005 and 0017).
+func (s *Store) Tokens() port.TokenStore { return tokens{s} }
 
-// Keys implements store.Store.
-func (s *Store) Keys() store.KeyStore { return keys{s} }
+// Keys returns the key store: key pairs, certificates, trusted keys and
+// signing keys, with private keys and passphrases sealed (decision
+// 0017).
+func (s *Store) Keys() port.KeyStore { return keys{s} }
 
 // --- Tokens ----------------------------------------------------------------
 
@@ -62,9 +68,9 @@ func digestArg(b []byte) any {
 
 // scan reads a token row; the secret of a purposed token is sealed with the
 // token id.
-func (ts tokens) scan(row interface{ Scan(...any) error }) (types.Token, error) {
+func (ts tokens) scan(row interface{ Scan(...any) error }) (model.Token, error) {
 	var (
-		t                types.Token
+		t                model.Token
 		scope            string
 		issued           int64
 		expires, used    sql.NullInt64
@@ -110,7 +116,7 @@ func (ts tokens) scan(row interface{ Scan(...any) error }) (types.Token, error) 
 	}
 	t.ExpiresAt, t.LastUsed = dialect.FromMicros(expires), dialect.FromMicros(used)
 	if scope != "" {
-		sc, err := types.ParseScope(scope)
+		sc, err := kernel.ParseScope(scope)
 		if err != nil {
 			return t, fmt.Errorf("token %q: %w", t.ID, err)
 		}
@@ -119,7 +125,7 @@ func (ts tokens) scan(row interface{ Scan(...any) error }) (types.Token, error) 
 	return t, nil
 }
 
-func (ts tokens) Create(ctx context.Context, t types.Token) error {
+func (ts tokens) Create(ctx context.Context, t model.Token) error {
 	secret, err := ts.s.Seal(purposeTokenSecret, t.ID, t.Secret)
 	if err != nil {
 		return err
@@ -127,7 +133,7 @@ func (ts tokens) Create(ctx context.Context, t types.Token) error {
 	_, err = ts.s.Exec(
 		ctx,
 		"create token "+t.ID,
-		Insert("tokens", strings.Split(tokenCols, ", ")),
+		dialect.Insert("tokens", strings.Split(tokenCols, ", ")),
 		t.ID,
 		t.Subject,
 		digestArg(t.AccessDigest),
@@ -149,7 +155,7 @@ func (ts tokens) Create(ctx context.Context, t types.Token) error {
 	return err
 }
 
-func (ts tokens) Get(ctx context.Context, id string) (types.Token, error) {
+func (ts tokens) Get(ctx context.Context, id string) (model.Token, error) {
 	t, err := ts.scan(ts.s.Q(ctx).QueryRowContext(ctx,
 		ts.s.Dialect().Rebind("SELECT "+tokenCols+" FROM tokens WHERE id = ?"), id))
 	return t, ts.s.Wrap(fmt.Sprintf("get token %q", id), err)
@@ -157,22 +163,22 @@ func (ts tokens) Get(ctx context.Context, id string) (types.Token, error) {
 
 func (ts tokens) ByDigest(
 	ctx context.Context,
-	kind store.DigestKind,
+	kind port.DigestKind,
 	d []byte,
-) (types.Token, error) {
+) (model.Token, error) {
 	var col string
 	switch kind {
-	case store.DigestAccess:
+	case port.DigestAccess:
 		col = "access_digest"
-	case store.DigestRefresh:
+	case port.DigestRefresh:
 		col = "refresh_digest"
-	case store.DigestReference:
+	case port.DigestReference:
 		col = "reference_digest"
 	default:
-		return types.Token{}, fmt.Errorf("token digest kind %d: %w", kind, store.ErrInvalid)
+		return model.Token{}, fmt.Errorf("token digest kind %d: %w", kind, kernel.ErrInvalid)
 	}
 	if len(d) == 0 {
-		return types.Token{}, fmt.Errorf("token by empty %s: %w", col, store.ErrNotFound)
+		return model.Token{}, fmt.Errorf("token by empty %s: %w", col, kernel.ErrNotFound)
 	}
 	t, err := ts.scan(ts.s.Q(ctx).QueryRowContext(ctx,
 		ts.s.Dialect().Rebind("SELECT "+tokenCols+" FROM tokens WHERE "+col+" = ?"), d))
@@ -181,9 +187,9 @@ func (ts tokens) ByDigest(
 
 func (ts tokens) List(
 	ctx context.Context,
-	f store.TokenFilter,
-	p store.Page,
-) ([]types.Token, string, error) {
+	f port.TokenFilter,
+	p kernel.Page,
+) ([]model.Token, string, error) {
 	p, err := p.Normalize()
 	if err != nil {
 		return nil, "", err //nolint:wrapcheck // already a store sentinel
@@ -200,7 +206,7 @@ func (ts tokens) List(
 		cond += " AND purpose = ?"
 		args = append(args, f.Purpose)
 	}
-	var out []types.Token
+	var out []model.Token
 	err = ts.s.Rows(ctx, "list tokens",
 		"SELECT "+tokenCols+" FROM tokens WHERE "+cond+dialect.OrderBy(tokenKey, false)+" LIMIT ?",
 		append(args, p.Limit+1),
@@ -212,7 +218,7 @@ func (ts tokens) List(
 	if err != nil {
 		return nil, "", err
 	}
-	page, next := store.Trim(out, p.Limit, func(t types.Token) []string {
+	page, next := kernel.Trim(out, p.Limit, func(t model.Token) []string {
 		return []string{dialect.Itoa(issuedMicros(t.IssuedAt)), t.ID}
 	})
 	return page, next, nil
@@ -243,7 +249,7 @@ type keys struct{ s *Store }
 
 const keypairCols = "name, type, alias, public_key, private_key, passphrase"
 
-func (ks keys) keypairArgs(k types.Keypair) ([]any, error) {
+func (ks keys) keypairArgs(k api.Keypair) ([]any, error) {
 	priv, err := ks.s.Seal(purposeKeypairPrivate, k.Name, k.PrivateKey)
 	if err != nil {
 		return nil, err
@@ -255,16 +261,16 @@ func (ks keys) keypairArgs(k types.Keypair) ([]any, error) {
 	return []any{k.Name, string(k.Type), k.Alias, k.PublicKey, priv, pass}, nil
 }
 
-func (ks keys) scanKeypair(row interface{ Scan(...any) error }) (types.Keypair, error) {
+func (ks keys) scanKeypair(row interface{ Scan(...any) error }) (api.Keypair, error) {
 	var (
-		k          types.Keypair
+		k          api.Keypair
 		typ        string
 		priv, pass []byte
 	)
 	if err := row.Scan(&k.Name, &typ, &k.Alias, &k.PublicKey, &priv, &pass); err != nil {
 		return k, err //nolint:wrapcheck // wrapped by the caller
 	}
-	k.Type = types.KeypairType(typ)
+	k.Type = api.KeypairType(typ)
 	var err error
 	if k.PrivateKey, err = ks.s.Unseal(purposeKeypairPrivate, k.Name, priv); err != nil {
 		return k, err
@@ -273,7 +279,7 @@ func (ks keys) scanKeypair(row interface{ Scan(...any) error }) (types.Keypair, 
 	return k, err
 }
 
-func (ks keys) CreateKeypair(ctx context.Context, k types.Keypair) error {
+func (ks keys) CreateKeypair(ctx context.Context, k api.Keypair) error {
 	args, err := ks.keypairArgs(k)
 	if err != nil {
 		return err
@@ -281,19 +287,19 @@ func (ks keys) CreateKeypair(ctx context.Context, k types.Keypair) error {
 	_, err = ks.s.Exec(
 		ctx,
 		"create keypair "+k.Name,
-		Insert("keypairs", strings.Split(keypairCols, ", ")),
+		dialect.Insert("keypairs", strings.Split(keypairCols, ", ")),
 		args...)
 	return err
 }
 
-func (ks keys) Keypair(ctx context.Context, name string) (types.Keypair, error) {
+func (ks keys) Keypair(ctx context.Context, name string) (api.Keypair, error) {
 	k, err := ks.scanKeypair(ks.s.Q(ctx).QueryRowContext(ctx,
 		ks.s.Dialect().Rebind("SELECT "+keypairCols+" FROM keypairs WHERE name = ?"), name))
 	return k, ks.s.Wrap(fmt.Sprintf("get keypair %q", name), err)
 }
 
-func (ks keys) Keypairs(ctx context.Context) ([]types.Keypair, error) {
-	var out []types.Keypair
+func (ks keys) Keypairs(ctx context.Context) ([]api.Keypair, error) {
+	var out []api.Keypair
 	err := ks.s.Rows(
 		ctx,
 		"list keypairs",
@@ -308,7 +314,7 @@ func (ks keys) Keypairs(ctx context.Context) ([]types.Keypair, error) {
 	return out, err
 }
 
-func (ks keys) UpdateKeypair(ctx context.Context, k types.Keypair) error {
+func (ks keys) UpdateKeypair(ctx context.Context, k api.Keypair) error {
 	args, err := ks.keypairArgs(k)
 	if err != nil {
 		return err
@@ -331,9 +337,9 @@ func (ks keys) DeleteKeypair(ctx context.Context, name string) error {
 
 const certificateCols = "alias, pem, private_key, issued_to, issued_by, issued_on, valid_until, fingerprint"
 
-func (ks keys) scanCertificate(row interface{ Scan(...any) error }) (types.Certificate, error) {
+func (ks keys) scanCertificate(row interface{ Scan(...any) error }) (api.Certificate, error) {
 	var (
-		c         types.Certificate
+		c         api.Certificate
 		key       []byte
 		on, until sql.NullInt64
 	)
@@ -355,7 +361,7 @@ func (ks keys) scanCertificate(row interface{ Scan(...any) error }) (types.Certi
 	return c, err
 }
 
-func (ks keys) PutCertificate(ctx context.Context, c types.Certificate) error {
+func (ks keys) PutCertificate(ctx context.Context, c api.Certificate) error {
 	key, err := ks.s.Seal(purposeCertificateKey, c.Alias, c.PrivateKey)
 	if err != nil {
 		return err
@@ -363,7 +369,7 @@ func (ks keys) PutCertificate(ctx context.Context, c types.Certificate) error {
 	_, err = ks.s.Exec(
 		ctx,
 		"put certificate "+c.Alias,
-		Upsert("certificates", strings.Split(certificateCols, ", "), []string{"alias"}),
+		dialect.Upsert("certificates", strings.Split(certificateCols, ", "), []string{"alias"}),
 		c.Alias,
 		c.PEM,
 		key,
@@ -376,15 +382,15 @@ func (ks keys) PutCertificate(ctx context.Context, c types.Certificate) error {
 	return err
 }
 
-func (ks keys) Certificate(ctx context.Context, alias string) (types.Certificate, error) {
+func (ks keys) Certificate(ctx context.Context, alias string) (api.Certificate, error) {
 	c, err := ks.scanCertificate(ks.s.Q(ctx).QueryRowContext(ctx,
 		ks.s.Dialect().Rebind("SELECT "+certificateCols+" FROM certificates WHERE alias = ?"),
 		alias))
 	return c, ks.s.Wrap(fmt.Sprintf("get certificate %q", alias), err)
 }
 
-func (ks keys) Certificates(ctx context.Context) ([]types.Certificate, error) {
-	var out []types.Certificate
+func (ks keys) Certificates(ctx context.Context) ([]api.Certificate, error) {
+	var out []api.Certificate
 	err := ks.s.Rows(ctx, "list certificates",
 		"SELECT "+certificateCols+" FROM certificates ORDER BY alias", nil,
 		func(r *sql.Rows) error {
@@ -402,9 +408,9 @@ func (ks keys) DeleteCertificate(ctx context.Context, alias string) error {
 
 const trustedKeyCols = "kid, alias, public_key, fingerprint, issued_on, issued_by, valid_until"
 
-func scanTrustedKey(row interface{ Scan(...any) error }) (types.TrustedKey, error) {
+func scanTrustedKey(row interface{ Scan(...any) error }) (model.TrustedKey, error) {
 	var (
-		k         types.TrustedKey
+		k         model.TrustedKey
 		alias     sql.NullString
 		on, until sql.NullInt64
 	)
@@ -424,11 +430,11 @@ func scanTrustedKey(row interface{ Scan(...any) error }) (types.TrustedKey, erro
 	return k, nil
 }
 
-func (ks keys) CreateTrustedKey(ctx context.Context, k types.TrustedKey) error {
+func (ks keys) CreateTrustedKey(ctx context.Context, k model.TrustedKey) error {
 	_, err := ks.s.Exec(
 		ctx,
 		"create trusted key "+k.Kid,
-		Insert("trusted_keys", strings.Split(trustedKeyCols, ", ")),
+		dialect.Insert("trusted_keys", strings.Split(trustedKeyCols, ", ")),
 		k.Kid,
 		dialect.NullString(k.Alias),
 		k.PublicKey,
@@ -440,14 +446,14 @@ func (ks keys) CreateTrustedKey(ctx context.Context, k types.TrustedKey) error {
 	return err
 }
 
-func (ks keys) TrustedKey(ctx context.Context, kid string) (types.TrustedKey, error) {
+func (ks keys) TrustedKey(ctx context.Context, kid string) (model.TrustedKey, error) {
 	k, err := scanTrustedKey(ks.s.Q(ctx).QueryRowContext(ctx,
 		ks.s.Dialect().Rebind("SELECT "+trustedKeyCols+" FROM trusted_keys WHERE kid = ?"), kid))
 	return k, ks.s.Wrap(fmt.Sprintf("get trusted key %q", kid), err)
 }
 
-func (ks keys) TrustedKeys(ctx context.Context) ([]types.TrustedKey, error) {
-	var out []types.TrustedKey
+func (ks keys) TrustedKeys(ctx context.Context) ([]model.TrustedKey, error) {
+	var out []model.TrustedKey
 	err := ks.s.Rows(ctx, "list trusted keys",
 		"SELECT "+trustedKeyCols+" FROM trusted_keys ORDER BY kid", nil,
 		func(r *sql.Rows) error {
@@ -465,9 +471,9 @@ func (ks keys) DeleteTrustedKey(ctx context.Context, kid string) error {
 
 const signingKeyCols = "alias, public_key, private_key, passphrase, is_default"
 
-func (ks keys) scanSigningKey(row interface{ Scan(...any) error }) (types.SigningKey, error) {
+func (ks keys) scanSigningKey(row interface{ Scan(...any) error }) (model.SigningKey, error) {
 	var (
-		k          types.SigningKey
+		k          model.SigningKey
 		priv, pass []byte
 	)
 	if err := row.Scan(&k.Alias, &k.PublicKey, &priv, &pass, &k.IsDefault); err != nil {
@@ -481,7 +487,7 @@ func (ks keys) scanSigningKey(row interface{ Scan(...any) error }) (types.Signin
 	return k, err
 }
 
-func (ks keys) PutSigningKey(ctx context.Context, k types.SigningKey) error {
+func (ks keys) PutSigningKey(ctx context.Context, k model.SigningKey) error {
 	priv, err := ks.s.Seal(purposeSigningPrivate, k.Alias, k.PrivateKey)
 	if err != nil {
 		return err
@@ -499,7 +505,7 @@ func (ks keys) PutSigningKey(ctx context.Context, k types.SigningKey) error {
 			}
 		}
 		_, err := ks.s.Exec(ctx, "put signing key "+k.Alias,
-			Upsert("signing_keys", strings.Split(signingKeyCols, ", "), []string{"alias"}),
+			dialect.Upsert("signing_keys", strings.Split(signingKeyCols, ", "), []string{"alias"}),
 			k.Alias, k.PublicKey, priv, pass, k.IsDefault)
 		return err
 	})
@@ -509,7 +515,7 @@ func (ks keys) signingKey(
 	ctx context.Context,
 	op, where string,
 	arg any,
-) (types.SigningKey, error) {
+) (model.SigningKey, error) {
 	k, err := ks.scanSigningKey(ks.s.Q(ctx).QueryRowContext(ctx,
 		ks.s.Dialect().
 			Rebind("SELECT "+signingKeyCols+" FROM signing_keys WHERE "+where+" ORDER BY alias LIMIT 1"),
@@ -518,16 +524,16 @@ func (ks keys) signingKey(
 	return k, ks.s.Wrap(op, err)
 }
 
-func (ks keys) SigningKey(ctx context.Context, alias string) (types.SigningKey, error) {
+func (ks keys) SigningKey(ctx context.Context, alias string) (model.SigningKey, error) {
 	return ks.signingKey(ctx, fmt.Sprintf("get signing key %q", alias), "alias = ?", alias)
 }
 
-func (ks keys) DefaultSigningKey(ctx context.Context) (types.SigningKey, error) {
+func (ks keys) DefaultSigningKey(ctx context.Context) (model.SigningKey, error) {
 	return ks.signingKey(ctx, "get default signing key", "is_default = ?", true)
 }
 
-func (ks keys) SigningKeys(ctx context.Context) ([]types.SigningKey, error) {
-	var out []types.SigningKey
+func (ks keys) SigningKeys(ctx context.Context) ([]model.SigningKey, error) {
+	var out []model.SigningKey
 	err := ks.s.Rows(ctx, "list signing keys",
 		"SELECT "+signingKeyCols+" FROM signing_keys ORDER BY alias", nil,
 		func(r *sql.Rows) error {

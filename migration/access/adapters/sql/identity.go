@@ -8,19 +8,24 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// Users implements store.Store.
-func (s *Store) Users() store.UserStore { return users{s} }
+// Users returns the user store: users, their credentials and their
+// group memberships (decision 0005).
+func (s *Store) Users() port.UserStore { return users{s} }
 
-// Groups implements store.Store.
-func (s *Store) Groups() store.GroupStore { return groups{s} }
+// Groups returns the group store: groups and their members.
+func (s *Store) Groups() port.GroupStore { return groups{s} }
 
-// Permissions implements store.Store.
-func (s *Store) Permissions() store.PermissionStore { return permissions{s} }
+// Permissions returns the permission store: Access v2 permissions, with
+// their grants and targets mirrored for lookup by principal and by
+// target (decision 0006).
+func (s *Store) Permissions() port.PermissionStore { return permissions{s} }
 
 // nameKeyset is the keyset of lists ordered by a name column.
 var nameKeyset = []string{"name"}
@@ -34,7 +39,7 @@ func (s *Store) requireRows(ctx context.Context, table, col, what string, names 
 			return err
 		}
 		if !ok {
-			return fmt.Errorf("%s %q: %w", what, n, store.ErrNotFound)
+			return fmt.Errorf("%s %q: %w", what, n, kernel.ErrNotFound)
 		}
 	}
 	return nil
@@ -56,9 +61,14 @@ func (s *Store) memberships(
 	for i, k := range keys {
 		args[i] = k
 	}
-	err := s.Rows(ctx, "list memberships",
-		"SELECT "+col+", "+other+" FROM group_members WHERE "+col+" IN ("+Placeholders(len(keys))+
-			") ORDER BY "+col+", "+other, args,
+	err := s.Rows(
+		ctx,
+		"list memberships",
+		"SELECT "+col+", "+other+" FROM group_members WHERE "+col+" IN ("+dialect.Placeholders(
+			len(keys),
+		)+
+			") ORDER BY "+col+", "+other,
+		args,
 		func(r *sql.Rows) error {
 			var k, v string
 			if err := r.Scan(&k, &v); err != nil {
@@ -66,7 +76,8 @@ func (s *Store) memberships(
 			}
 			out[k] = append(out[k], v)
 			return nil
-		})
+		},
+	)
 	return out, err
 }
 
@@ -83,7 +94,7 @@ func (s *Store) addMembers(ctx context.Context, group string, users []string) er
 		if _, err := s.Exec(
 			ctx,
 			"add member",
-			InsertIgnore(
+			dialect.InsertIgnore(
 				"group_members",
 				[]string{"group_name", "user_name"},
 				[]string{"group_name", "user_name"},
@@ -105,7 +116,7 @@ const userCols = "name, email, password_hash, admin, profile_updatable, internal
 	"disable_ui_access, realm, status, mfa, last_logged_in_at, created_at, roles, " +
 	"failed_logins, password_changed_at, password_expired"
 
-func userArgs(u types.User) []any {
+func userArgs(u model.User) []any {
 	var hash any
 	if len(u.PasswordHash) > 0 {
 		hash = u.PasswordHash
@@ -118,9 +129,9 @@ func userArgs(u types.User) []any {
 	}
 }
 
-func scanUser(row interface{ Scan(...any) error }) (types.User, error) {
+func scanUser(row interface{ Scan(...any) error }) (model.User, error) {
 	var (
-		u                 types.User
+		u                 model.User
 		status, mfa       string
 		lastLogin, create sql.NullInt64
 		changed           sql.NullInt64
@@ -131,7 +142,7 @@ func scanUser(row interface{ Scan(...any) error }) (types.User, error) {
 		&lastLogin, &create, &roles, &u.FailedLogins, &changed, &u.PasswordExpired); err != nil {
 		return u, err //nolint:wrapcheck // wrapped by the caller
 	}
-	u.Status, u.MFA = types.UserStatus(status), types.MFAStatus(mfa)
+	u.Status, u.MFA = model.UserStatus(status), model.MFAStatus(mfa)
 	u.LastLoggedIn, u.Created = dialect.FromMicros(lastLogin), dialect.FromMicros(create)
 	u.PasswordChanged = dialect.FromMicros(changed)
 	if len(u.PasswordHash) == 0 {
@@ -140,7 +151,7 @@ func scanUser(row interface{ Scan(...any) error }) (types.User, error) {
 	return u, dialect.FromJSON(roles, &u.Roles)
 }
 
-func (us users) Create(ctx context.Context, u types.User) error {
+func (us users) Create(ctx context.Context, u model.User) error {
 	args := userArgs(u)
 	return us.s.Tx(ctx, func(ctx context.Context) error {
 		groups := sortedUnique(u.Groups)
@@ -148,7 +159,7 @@ func (us users) Create(ctx context.Context, u types.User) error {
 			return err
 		}
 		if _, err := us.s.Exec(ctx, "create user "+u.Name,
-			Insert("users", strings.Split(userCols, ", ")), args...); err != nil {
+			dialect.Insert("users", strings.Split(userCols, ", ")), args...); err != nil {
 			return err
 		}
 		if err := us.s.writeIdentitySearch(ctx, "users", u.Name); err != nil {
@@ -163,7 +174,7 @@ func (us users) Create(ctx context.Context, u types.User) error {
 	})
 }
 
-func (us users) Get(ctx context.Context, name string) (types.User, error) {
+func (us users) Get(ctx context.Context, name string) (model.User, error) {
 	u, err := scanUser(us.s.Q(ctx).QueryRowContext(ctx,
 		us.s.Dialect().Rebind("SELECT "+userCols+" FROM users WHERE name = ?"), name))
 	if err != nil {
@@ -174,7 +185,7 @@ func (us users) Get(ctx context.Context, name string) (types.User, error) {
 	return u, err
 }
 
-func (us users) Update(ctx context.Context, u types.User) error {
+func (us users) Update(ctx context.Context, u model.User) error {
 	args := userArgs(u)
 	return us.s.Tx(ctx, func(ctx context.Context) error {
 		groups := sortedUnique(u.Groups)
@@ -226,7 +237,7 @@ func (us users) Delete(ctx context.Context, name string) error {
 	})
 }
 
-func (us users) List(ctx context.Context, p store.Page) ([]types.User, string, error) {
+func (us users) List(ctx context.Context, p kernel.Page) ([]model.User, string, error) {
 	p, err := p.Normalize()
 	if err != nil {
 		return nil, "", err //nolint:wrapcheck // already a store sentinel
@@ -235,7 +246,7 @@ func (us users) List(ctx context.Context, p store.Page) ([]types.User, string, e
 	if err != nil {
 		return nil, "", err
 	}
-	var out []types.User
+	var out []model.User
 	err = us.s.Rows(ctx, "list users",
 		"SELECT "+userCols+" FROM users WHERE "+cond+dialect.OrderBy(nameKeyset, false)+" LIMIT ?",
 		append(args, p.Limit+1),
@@ -247,7 +258,7 @@ func (us users) List(ctx context.Context, p store.Page) ([]types.User, string, e
 	if err != nil {
 		return nil, "", err
 	}
-	page, next := store.Trim(out, p.Limit, func(u types.User) []string { return []string{u.Name} })
+	page, next := kernel.Trim(out, p.Limit, func(u model.User) []string { return []string{u.Name} })
 	names := make([]string, len(page))
 	for i, u := range page {
 		names[i] = u.Name
@@ -281,7 +292,7 @@ func (us users) RecordFailedLogin(ctx context.Context, name string, lockAt int) 
 			"UPDATE users SET failed_logins = failed_logins + 1, status = CASE "+
 				"WHEN ? > 0 AND failed_logins + 1 >= ? AND status IN ('', ?) THEN ? "+
 				"ELSE status END WHERE name = ?",
-			lockAt, lockAt, string(types.UserEnabled), string(types.UserLocked), name); err != nil {
+			lockAt, lockAt, string(model.UserEnabled), string(model.UserLocked), name); err != nil {
 			return err
 		}
 		var status string
@@ -291,7 +302,7 @@ func (us users) RecordFailedLogin(ctx context.Context, name string, lockAt int) 
 			Scan(&status); err != nil {
 			return us.s.Wrap(fmt.Sprintf("read user %q", name), err)
 		}
-		locked = status == string(types.UserLocked)
+		locked = status == string(model.UserLocked)
 		return nil
 	})
 	return locked, err
@@ -299,27 +310,27 @@ func (us users) RecordFailedLogin(ctx context.Context, name string, lockAt int) 
 
 func (us users) Unlock(ctx context.Context, names ...string) error {
 	unlock := "UPDATE users SET failed_logins = 0, status = CASE WHEN status = ? THEN ? ELSE status END"
-	args := []any{string(types.UserLocked), string(types.UserEnabled)}
+	args := []any{string(model.UserLocked), string(model.UserEnabled)}
 	if len(names) == 0 {
 		_, err := us.s.Exec(
 			ctx,
 			"unlock users",
 			unlock+" WHERE status = ? OR failed_logins > 0",
-			append(args, string(types.UserLocked))...)
+			append(args, string(model.UserLocked))...)
 		return err
 	}
 	for _, n := range names {
 		args = append(args, n)
 	}
 	_, err := us.s.Exec(ctx, "unlock users",
-		unlock+" WHERE name IN ("+Placeholders(len(names))+")", args...)
+		unlock+" WHERE name IN ("+dialect.Placeholders(len(names))+")", args...)
 	return err
 }
 
 func (us users) Locked(ctx context.Context) ([]string, error) {
 	out := []string{}
 	err := us.s.Rows(ctx, "list locked users",
-		"SELECT name FROM users WHERE status = ? ORDER BY name", []any{string(types.UserLocked)},
+		"SELECT name FROM users WHERE status = ? ORDER BY name", []any{string(model.UserLocked)},
 		func(r *sql.Rows) error {
 			var n string
 			if err := r.Scan(&n); err != nil {
@@ -337,16 +348,16 @@ type groups struct{ s *Store }
 
 const groupCols = "name, description, auto_join, admin_privileges, realm, realm_attributes, external_id, roles"
 
-func groupArgs(g types.Group) []any {
+func groupArgs(g model.Group) []any {
 	return []any{
 		g.Name, g.Description, g.AutoJoin, g.AdminPrivileges, g.Realm, g.RealmAttributes,
 		g.ExternalID, dialect.MustJSON(g.Roles),
 	}
 }
 
-func scanGroup(row interface{ Scan(...any) error }) (types.Group, error) {
+func scanGroup(row interface{ Scan(...any) error }) (model.Group, error) {
 	var (
-		g     types.Group
+		g     model.Group
 		roles sql.NullString
 	)
 	if err := row.Scan(&g.Name, &g.Description, &g.AutoJoin, &g.AdminPrivileges, &g.Realm,
@@ -356,7 +367,7 @@ func scanGroup(row interface{ Scan(...any) error }) (types.Group, error) {
 	return g, dialect.FromJSON(roles, &g.Roles)
 }
 
-func (gs groups) Create(ctx context.Context, g types.Group) error {
+func (gs groups) Create(ctx context.Context, g model.Group) error {
 	args := groupArgs(g)
 	return gs.s.Tx(ctx, func(ctx context.Context) error {
 		members := sortedUnique(g.Members)
@@ -364,7 +375,7 @@ func (gs groups) Create(ctx context.Context, g types.Group) error {
 			return err
 		}
 		if _, err := gs.s.Exec(ctx, "create group "+g.Name,
-			Insert("user_groups", strings.Split(groupCols, ", ")), args...); err != nil {
+			dialect.Insert("user_groups", strings.Split(groupCols, ", ")), args...); err != nil {
 			return err
 		}
 		if err := gs.s.writeIdentitySearch(ctx, "user_groups", g.Name); err != nil {
@@ -374,7 +385,7 @@ func (gs groups) Create(ctx context.Context, g types.Group) error {
 	})
 }
 
-func (gs groups) Get(ctx context.Context, name string) (types.Group, error) {
+func (gs groups) Get(ctx context.Context, name string) (model.Group, error) {
 	g, err := scanGroup(gs.s.Q(ctx).QueryRowContext(ctx,
 		gs.s.Dialect().Rebind("SELECT "+groupCols+" FROM user_groups WHERE name = ?"), name))
 	if err != nil {
@@ -385,7 +396,7 @@ func (gs groups) Get(ctx context.Context, name string) (types.Group, error) {
 	return g, err
 }
 
-func (gs groups) Update(ctx context.Context, g types.Group) error {
+func (gs groups) Update(ctx context.Context, g model.Group) error {
 	args := groupArgs(g)
 	return gs.s.Tx(ctx, func(ctx context.Context) error {
 		members := sortedUnique(g.Members)
@@ -432,7 +443,7 @@ func (gs groups) Delete(ctx context.Context, name string) error {
 	})
 }
 
-func (gs groups) List(ctx context.Context, p store.Page) ([]types.Group, string, error) {
+func (gs groups) List(ctx context.Context, p kernel.Page) ([]model.Group, string, error) {
 	p, err := p.Normalize()
 	if err != nil {
 		return nil, "", err //nolint:wrapcheck // already a store sentinel
@@ -441,7 +452,7 @@ func (gs groups) List(ctx context.Context, p store.Page) ([]types.Group, string,
 	if err != nil {
 		return nil, "", err
 	}
-	var out []types.Group
+	var out []model.Group
 	err = gs.s.Rows(ctx, "list groups",
 		"SELECT "+groupCols+" FROM user_groups WHERE "+cond+dialect.OrderBy(nameKeyset, false)+
 			" LIMIT ?",
@@ -454,7 +465,11 @@ func (gs groups) List(ctx context.Context, p store.Page) ([]types.Group, string,
 	if err != nil {
 		return nil, "", err
 	}
-	page, next := store.Trim(out, p.Limit, func(g types.Group) []string { return []string{g.Name} })
+	page, next := kernel.Trim(
+		out,
+		p.Limit,
+		func(g model.Group) []string { return []string{g.Name} },
+	)
 	names := make([]string, len(page))
 	for i, g := range page {
 		names[i] = g.Name
@@ -533,9 +548,9 @@ type permissions struct{ s *Store }
 
 const permissionCols = "name, description, created_at, updated_at, resources"
 
-func scanPermission(row interface{ Scan(...any) error }) (types.Permission, error) {
+func scanPermission(row interface{ Scan(...any) error }) (model.Permission, error) {
 	var (
-		p                types.Permission
+		p                model.Permission
 		created, updated sql.NullInt64
 		resources        sql.NullString
 	)
@@ -548,7 +563,7 @@ func scanPermission(row interface{ Scan(...any) error }) (types.Permission, erro
 
 // mirror replaces the grant and target rows of p, which ForPrincipal and
 // WithTarget query.
-func (ps permissions) mirror(ctx context.Context, p types.Permission) error {
+func (ps permissions) mirror(ctx context.Context, p model.Permission) error {
 	for _, table := range []string{"permission_grants", "permission_targets"} {
 		if _, err := ps.s.Exec(ctx, "clear "+table,
 			"DELETE FROM "+table+" WHERE permission_name = ?", p.Name); err != nil {
@@ -558,11 +573,11 @@ func (ps permissions) mirror(ctx context.Context, p types.Permission) error {
 	for _, rt := range p.ResourceTypes() {
 		res := p.Resources[rt]
 		for _, principal := range []struct {
-			typ    types.PrincipalType
-			grants map[string]types.Actions
-		}{{types.PrincipalUser, res.Actions.Users}, {types.PrincipalGroup, res.Actions.Groups}} {
+			typ    model.PrincipalType
+			grants map[string]api.Actions
+		}{{model.PrincipalUser, res.Actions.Users}, {model.PrincipalGroup, res.Actions.Groups}} {
 			for name, a := range principal.grants {
-				if _, err := ps.s.Exec(ctx, "mirror grant", Insert(
+				if _, err := ps.s.Exec(ctx, "mirror grant", dialect.Insert(
 					"permission_grants",
 					[]string{
 						"permission_name",
@@ -581,7 +596,7 @@ func (ps permissions) mirror(ctx context.Context, p types.Permission) error {
 			if _, err := ps.s.Exec(
 				ctx,
 				"mirror target",
-				Insert(
+				dialect.Insert(
 					"permission_targets",
 					[]string{
 						"permission_name",
@@ -604,12 +619,12 @@ func (ps permissions) mirror(ctx context.Context, p types.Permission) error {
 	return nil
 }
 
-func (ps permissions) Create(ctx context.Context, p types.Permission) error {
+func (ps permissions) Create(ctx context.Context, p model.Permission) error {
 	return ps.s.Tx(ctx, func(ctx context.Context) error {
 		if _, err := ps.s.Exec(
 			ctx,
 			"create permission "+p.Name,
-			Insert("permissions", strings.Split(permissionCols, ", ")),
+			dialect.Insert("permissions", strings.Split(permissionCols, ", ")),
 			p.Name,
 			p.Description,
 			dialect.Micros(p.Created),
@@ -622,13 +637,13 @@ func (ps permissions) Create(ctx context.Context, p types.Permission) error {
 	})
 }
 
-func (ps permissions) Get(ctx context.Context, name string) (types.Permission, error) {
+func (ps permissions) Get(ctx context.Context, name string) (model.Permission, error) {
 	p, err := scanPermission(ps.s.Q(ctx).QueryRowContext(ctx,
 		ps.s.Dialect().Rebind("SELECT "+permissionCols+" FROM permissions WHERE name = ?"), name))
 	return p, ps.s.Wrap(fmt.Sprintf("get permission %q", name), err)
 }
 
-func (ps permissions) Update(ctx context.Context, p types.Permission) error {
+func (ps permissions) Update(ctx context.Context, p model.Permission) error {
 	return ps.s.Tx(ctx, func(ctx context.Context) error {
 		if err := ps.s.ExecOne(
 			ctx,
@@ -665,8 +680,8 @@ func (ps permissions) query(
 	ctx context.Context,
 	op, where, tail string,
 	args []any,
-) ([]types.Permission, error) {
-	var out []types.Permission
+) ([]model.Permission, error) {
+	var out []model.Permission
 	err := ps.s.Rows(
 		ctx,
 		op,
@@ -684,7 +699,7 @@ func (ps permissions) query(
 	return out, err
 }
 
-func (ps permissions) List(ctx context.Context, p store.Page) ([]types.Permission, string, error) {
+func (ps permissions) List(ctx context.Context, p kernel.Page) ([]model.Permission, string, error) {
 	p, err := p.Normalize()
 	if err != nil {
 		return nil, "", err //nolint:wrapcheck // already a store sentinel
@@ -697,10 +712,10 @@ func (ps permissions) List(ctx context.Context, p store.Page) ([]types.Permissio
 	if err != nil {
 		return nil, "", err
 	}
-	page, next := store.Trim(
+	page, next := kernel.Trim(
 		out,
 		p.Limit,
-		func(v types.Permission) []string { return []string{v.Name} },
+		func(v model.Permission) []string { return []string{v.Name} },
 	)
 	return page, next, nil
 }
@@ -709,15 +724,15 @@ func (ps permissions) ForPrincipal(
 	ctx context.Context,
 	user string,
 	groups []string,
-) ([]types.Permission, error) {
+) ([]model.Permission, error) {
 	where := []string{"(principal_type = ? AND principal_name = ?)"}
-	args := []any{string(types.PrincipalUser), user}
+	args := []any{string(model.PrincipalUser), user}
 	if len(groups) > 0 {
 		where = append(
 			where,
-			"(principal_type = ? AND principal_name IN ("+Placeholders(len(groups))+"))",
+			"(principal_type = ? AND principal_name IN ("+dialect.Placeholders(len(groups))+"))",
 		)
-		args = append(args, string(types.PrincipalGroup))
+		args = append(args, string(model.PrincipalGroup))
 		for _, g := range groups {
 			args = append(args, g)
 		}
@@ -727,7 +742,7 @@ func (ps permissions) ForPrincipal(
 			strings.Join(where, " OR ")+"))", "", args)
 }
 
-func (ps permissions) WithTarget(ctx context.Context, target string) ([]types.Permission, error) {
+func (ps permissions) WithTarget(ctx context.Context, target string) ([]model.Permission, error) {
 	return ps.query(
 		ctx,
 		"permissions with target",

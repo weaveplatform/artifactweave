@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // Fold with Go on write: database LOWER follows engine/locale-specific rules,
@@ -32,7 +33,7 @@ func (s *Store) backfillIdentitySearch(ctx context.Context) error {
 			err := s.Tx(ctx, func(ctx context.Context) error {
 				err := s.Rows(ctx, "read identity search backfill",
 					"SELECT name FROM "+table+" WHERE search_name IS NULL ORDER BY name LIMIT ?",
-					[]any{store.MaxLimit}, func(r *sql.Rows) error {
+					[]any{kernel.MaxLimit}, func(r *sql.Rows) error {
 						var name string
 						if err := r.Scan(&name); err != nil {
 							return err //nolint:wrapcheck // Rows supplies context
@@ -53,7 +54,7 @@ func (s *Store) backfillIdentitySearch(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
-			if len(names) < store.MaxLimit {
+			if len(names) < kernel.MaxLimit {
 				break
 			}
 		}
@@ -62,8 +63,8 @@ func (s *Store) backfillIdentitySearch(ctx context.Context) error {
 }
 
 func (s *Store) identityWhere(
-	f store.IdentityFilter,
-	p store.Page,
+	f port.IdentityFilter,
+	p kernel.Page,
 	group bool,
 ) (string, []any, error) {
 	where, args, err := dialect.Keyset(p, []string{"i.name"}, nil, f.Descending)
@@ -93,8 +94,8 @@ func (s *Store) identityWhere(
 	return where, args, nil
 }
 
-func (us users) ListSummaries(ctx context.Context, f store.UserFilter, p store.Page) (
-	[]store.UserSummary, string, error,
+func (us users) ListSummaries(ctx context.Context, f port.UserFilter, p kernel.Page) (
+	[]port.UserSummary, string, error,
 ) {
 	p, err := p.Normalize()
 	if err != nil {
@@ -117,27 +118,27 @@ func (us users) ListSummaries(ctx context.Context, f store.UserFilter, p store.P
 	query := "SELECT i.name, i.realm, " + status + " FROM users i WHERE " + where +
 		dialect.OrderBy([]string{"i.name"}, f.Descending) + " LIMIT ?"
 	args = append(args, p.Limit+1)
-	out := make([]store.UserSummary, 0, p.Limit+1)
+	out := make([]port.UserSummary, 0, p.Limit+1)
 	err = us.s.Rows(ctx, "page user summaries", query, args, func(r *sql.Rows) error {
-		var u store.UserSummary
+		var u port.UserSummary
 		if err := r.Scan(&u.Name, &u.Realm, &u.Status); err != nil {
 			return err //nolint:wrapcheck // Rows supplies context
 		}
 		out = append(out, u)
 		return nil
 	})
-	out, next := store.Trim(
+	out, next := kernel.Trim(
 		out,
 		p.Limit,
-		func(u store.UserSummary) []string { return []string{u.Name} },
+		func(u port.UserSummary) []string { return []string{u.Name} },
 	)
 	return out, next, err
 }
 
 func (gs groups) ListNames(
 	ctx context.Context,
-	f store.IdentityFilter,
-	p store.Page,
+	f port.IdentityFilter,
+	p kernel.Page,
 ) ([]string, string, error) {
 	p, err := p.Normalize()
 	if err != nil {
@@ -164,6 +165,6 @@ func (gs groups) ListNames(
 			return nil
 		},
 	)
-	out, next := store.Trim(out, p.Limit, func(name string) []string { return []string{name} })
+	out, next := kernel.Trim(out, p.Limit, func(name string) []string { return []string{name} })
 	return out, next, err
 }

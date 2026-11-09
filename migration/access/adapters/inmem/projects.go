@@ -6,13 +6,15 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// Projects implements store.Store.
-func (s *Store) Projects() store.ProjectStore { return projectStore{s} }
+// Projects returns the project store: projects with their roles,
+// environments, members and repository assignments (decision 0013).
+func (s *Store) Projects() port.ProjectStore { return projectStore{s} }
 
 type projectStore struct{ s *Store }
 
@@ -20,41 +22,41 @@ type (
 	roleKey   struct{ project, name string }
 	memberKey struct {
 		project string
-		typ     types.PrincipalType
+		typ     model.PrincipalType
 		name    string
 	}
 )
 
-func (p projectStore) projects() *memtx.Table[string, types.Project] {
-	return memtx.TableOf[string, types.Project](p.s.Store, "projects")
+func (p projectStore) projects() *memtx.Table[string, model.Project] {
+	return memtx.TableOf[string, model.Project](p.s.Store, "projects")
 }
 
-func (p projectStore) roles() *memtx.Table[roleKey, types.Role] {
-	return memtx.TableOf[roleKey, types.Role](p.s.Store, "roles")
+func (p projectStore) roles() *memtx.Table[roleKey, model.Role] {
+	return memtx.TableOf[roleKey, model.Role](p.s.Store, "roles")
 }
 
-func (p projectStore) environments() *memtx.Table[string, types.Environment] {
-	return memtx.TableOf[string, types.Environment](p.s.Store, "environments")
+func (p projectStore) environments() *memtx.Table[string, model.Environment] {
+	return memtx.TableOf[string, model.Environment](p.s.Store, "environments")
 }
 
-func (p projectStore) members() *memtx.Table[memberKey, types.ProjectMember] {
-	return memtx.TableOf[memberKey, types.ProjectMember](p.s.Store, "project_members")
+func (p projectStore) members() *memtx.Table[memberKey, model.ProjectMember] {
+	return memtx.TableOf[memberKey, model.ProjectMember](p.s.Store, "project_members")
 }
 
-func (p projectStore) assignments() *memtx.Table[string, types.RepositoryAssignment] {
-	return memtx.TableOf[string, types.RepositoryAssignment](p.s.Store, "project_repositories")
+func (p projectStore) assignments() *memtx.Table[string, model.RepositoryAssignment] {
+	return memtx.TableOf[string, model.RepositoryAssignment](p.s.Store, "project_repositories")
 }
 
 // requireProject returns ErrNotFound unless the project exists; global
 // records (an empty key) need none. Call it under the lock.
 func (p projectStore) requireProject(key string) error {
 	if key != "" && !p.projects().Has(key) {
-		return memtx.NotFound("project", key)
+		return memtx.NotFound("project", key) //nolint:wrapcheck // wraps kernel.ErrNotFound
 	}
 	return nil
 }
 
-func (p projectStore) Create(ctx context.Context, v types.Project) error {
+func (p projectStore) Create(ctx context.Context, v model.Project) error {
 	return p.s.Do(ctx, func() error {
 		if p.projects().Has(v.Key) {
 			return memtx.Conflict("project", v.Key)
@@ -64,8 +66,8 @@ func (p projectStore) Create(ctx context.Context, v types.Project) error {
 	})
 }
 
-func (p projectStore) Get(ctx context.Context, key string) (types.Project, error) {
-	var out types.Project
+func (p projectStore) Get(ctx context.Context, key string) (model.Project, error) {
+	var out model.Project
 	err := p.s.Do(ctx, func() error {
 		var ok bool
 		if out, ok = p.projects().Get(key); !ok {
@@ -76,7 +78,7 @@ func (p projectStore) Get(ctx context.Context, key string) (types.Project, error
 	return out, err
 }
 
-func (p projectStore) Update(ctx context.Context, v types.Project) error {
+func (p projectStore) Update(ctx context.Context, v model.Project) error {
 	return p.s.Do(ctx, func() error {
 		if !p.projects().Has(v.Key) {
 			return memtx.NotFound("project", v.Key)
@@ -91,16 +93,16 @@ func (p projectStore) Delete(ctx context.Context, key string) error {
 		if !p.projects().Del(key) {
 			return memtx.NotFound("project", key)
 		}
-		p.roles().DeleteWhere(func(k roleKey, _ types.Role) bool { return k.project == key })
+		p.roles().DeleteWhere(func(k roleKey, _ model.Role) bool { return k.project == key })
 		p.environments().
-			DeleteWhere(func(_ string, e types.Environment) bool { return e.ProjectKey == key })
+			DeleteWhere(func(_ string, e model.Environment) bool { return e.ProjectKey == key })
 		p.members().
-			DeleteWhere(func(k memberKey, _ types.ProjectMember) bool { return k.project == key })
+			DeleteWhere(func(k memberKey, _ model.ProjectMember) bool { return k.project == key })
 		p.assignments().
-			DeleteWhere(func(_ string, a types.RepositoryAssignment) bool { return a.ProjectKey == key })
+			DeleteWhere(func(_ string, a model.RepositoryAssignment) bool { return a.ProjectKey == key })
 		for repo, a := range p.assignments().Rows {
 			if slices.Contains(a.SharedWith, key) {
-				a = store.Clone(a)
+				a = kernel.Clone(a)
 				a.SharedWith = slices.DeleteFunc(
 					a.SharedWith,
 					func(k string) bool { return k == key },
@@ -112,17 +114,17 @@ func (p projectStore) Delete(ctx context.Context, key string) error {
 	})
 }
 
-func (p projectStore) List(ctx context.Context) ([]types.Project, error) {
-	var out []types.Project
+func (p projectStore) List(ctx context.Context) ([]model.Project, error) {
+	var out []model.Project
 	err := p.s.Do(ctx, func() error {
 		out = p.projects().
-			All(nil, func(a, b types.Project) int { return strings.Compare(a.Key, b.Key) })
+			All(nil, func(a, b model.Project) int { return strings.Compare(a.Key, b.Key) })
 		return nil
 	})
 	return out, err
 }
 
-func (p projectStore) PutRole(ctx context.Context, r types.Role) error {
+func (p projectStore) PutRole(ctx context.Context, r model.Role) error {
 	return p.s.Do(ctx, func() error {
 		if err := p.requireProject(r.ProjectKey); err != nil {
 			return err
@@ -132,8 +134,8 @@ func (p projectStore) PutRole(ctx context.Context, r types.Role) error {
 	})
 }
 
-func (p projectStore) Role(ctx context.Context, projectKey, name string) (types.Role, error) {
-	var out types.Role
+func (p projectStore) Role(ctx context.Context, projectKey, name string) (model.Role, error) {
+	var out model.Role
 	err := p.s.Do(ctx, func() error {
 		var ok bool
 		if out, ok = p.roles().Get(roleKey{projectKey, name}); !ok {
@@ -144,11 +146,11 @@ func (p projectStore) Role(ctx context.Context, projectKey, name string) (types.
 	return out, err
 }
 
-func (p projectStore) Roles(ctx context.Context, projectKey string) ([]types.Role, error) {
-	var out []types.Role
+func (p projectStore) Roles(ctx context.Context, projectKey string) ([]model.Role, error) {
+	var out []model.Role
 	err := p.s.Do(ctx, func() error {
-		out = p.roles().All(func(k roleKey, _ types.Role) bool { return k.project == projectKey },
-			func(a, b types.Role) int { return strings.Compare(a.Name, b.Name) })
+		out = p.roles().All(func(k roleKey, _ model.Role) bool { return k.project == projectKey },
+			func(a, b model.Role) int { return strings.Compare(a.Name, b.Name) })
 		return nil
 	})
 	return out, err
@@ -163,7 +165,7 @@ func (p projectStore) DeleteRole(ctx context.Context, projectKey, name string) e
 	})
 }
 
-func (p projectStore) CreateEnvironment(ctx context.Context, e types.Environment) error {
+func (p projectStore) CreateEnvironment(ctx context.Context, e model.Environment) error {
 	return p.s.Do(ctx, func() error {
 		if err := p.requireProject(e.ProjectKey); err != nil {
 			return err
@@ -179,12 +181,12 @@ func (p projectStore) CreateEnvironment(ctx context.Context, e types.Environment
 func (p projectStore) Environments(
 	ctx context.Context,
 	projectKey string,
-) ([]types.Environment, error) {
-	var out []types.Environment
+) ([]model.Environment, error) {
+	var out []model.Environment
 	err := p.s.Do(ctx, func() error {
 		out = p.environments().
-			All(func(_ string, e types.Environment) bool { return e.ProjectKey == projectKey },
-				func(a, b types.Environment) int { return strings.Compare(a.Name, b.Name) })
+			All(func(_ string, e model.Environment) bool { return e.ProjectKey == projectKey },
+				func(a, b model.Environment) int { return strings.Compare(a.Name, b.Name) })
 		return nil
 	})
 	return out, err
@@ -207,14 +209,14 @@ func (p projectStore) RenameEnvironment(ctx context.Context, projectKey, from, t
 		p.environments().Put(to, e)
 		for k, r := range p.roles().Rows {
 			if slices.Contains(r.Environments, from) {
-				r = store.Clone(r)
+				r = kernel.Clone(r)
 				renameEnv(r.Environments, from, to)
 				p.roles().Put(k, r)
 			}
 		}
 		for k, a := range p.assignments().Rows {
 			if slices.Contains(a.Environments, from) {
-				a = store.Clone(a)
+				a = kernel.Clone(a)
 				renameEnv(a.Environments, from, to)
 				p.assignments().Put(k, a)
 			}
@@ -243,7 +245,7 @@ func (p projectStore) DeleteEnvironment(ctx context.Context, projectKey, name st
 	})
 }
 
-func (p projectStore) PutMember(ctx context.Context, m types.ProjectMember) error {
+func (p projectStore) PutMember(ctx context.Context, m model.ProjectMember) error {
 	return p.s.Do(ctx, func() error {
 		if err := p.requireProject(m.ProjectKey); err != nil {
 			return err
@@ -254,9 +256,9 @@ func (p projectStore) PutMember(ctx context.Context, m types.ProjectMember) erro
 }
 
 func (p projectStore) Member(
-	ctx context.Context, projectKey string, typ types.PrincipalType, name string,
-) (types.ProjectMember, error) {
-	var out types.ProjectMember
+	ctx context.Context, projectKey string, typ model.PrincipalType, name string,
+) (model.ProjectMember, error) {
+	var out model.ProjectMember
 	err := p.s.Do(ctx, func() error {
 		var ok bool
 		if out, ok = p.members().Get(memberKey{projectKey, typ, name}); !ok {
@@ -268,13 +270,13 @@ func (p projectStore) Member(
 }
 
 func (p projectStore) Members(
-	ctx context.Context, projectKey string, typ types.PrincipalType,
-) ([]types.ProjectMember, error) {
-	var out []types.ProjectMember
+	ctx context.Context, projectKey string, typ model.PrincipalType,
+) ([]model.ProjectMember, error) {
+	var out []model.ProjectMember
 	err := p.s.Do(ctx, func() error {
 		out = p.members().All(
-			func(k memberKey, _ types.ProjectMember) bool { return k.project == projectKey && k.typ == typ },
-			func(a, b types.ProjectMember) int { return strings.Compare(a.Name, b.Name) })
+			func(k memberKey, _ model.ProjectMember) bool { return k.project == projectKey && k.typ == typ },
+			func(a, b model.ProjectMember) int { return strings.Compare(a.Name, b.Name) })
 		return nil
 	})
 	return out, err
@@ -283,7 +285,7 @@ func (p projectStore) Members(
 func (p projectStore) DeleteMember(
 	ctx context.Context,
 	projectKey string,
-	typ types.PrincipalType,
+	typ model.PrincipalType,
 	name string,
 ) error {
 	return p.s.Do(ctx, func() error {
@@ -294,7 +296,7 @@ func (p projectStore) DeleteMember(
 	})
 }
 
-func (p projectStore) PutAssignment(ctx context.Context, a types.RepositoryAssignment) error {
+func (p projectStore) PutAssignment(ctx context.Context, a model.RepositoryAssignment) error {
 	return p.s.Do(ctx, func() error {
 		if err := p.requireProject(a.ProjectKey); err != nil {
 			return err
@@ -308,8 +310,8 @@ func (p projectStore) PutAssignment(ctx context.Context, a types.RepositoryAssig
 func (p projectStore) Assignment(
 	ctx context.Context,
 	repoKey string,
-) (types.RepositoryAssignment, error) {
-	var out types.RepositoryAssignment
+) (model.RepositoryAssignment, error) {
+	var out model.RepositoryAssignment
 	err := p.s.Do(ctx, func() error {
 		var ok bool
 		if out, ok = p.assignments().Get(repoKey); !ok {
@@ -323,13 +325,13 @@ func (p projectStore) Assignment(
 func (p projectStore) Assignments(
 	ctx context.Context,
 	projectKey string,
-) ([]types.RepositoryAssignment, error) {
-	var out []types.RepositoryAssignment
+) ([]model.RepositoryAssignment, error) {
+	var out []model.RepositoryAssignment
 	err := p.s.Do(ctx, func() error {
-		out = p.assignments().All(func(_ string, a types.RepositoryAssignment) bool {
+		out = p.assignments().All(func(_ string, a model.RepositoryAssignment) bool {
 			return a.ProjectKey == projectKey || a.SharedWithAll ||
 				slices.Contains(a.SharedWith, projectKey)
-		}, func(a, b types.RepositoryAssignment) int { return strings.Compare(a.RepoKey, b.RepoKey) })
+		}, func(a, b model.RepositoryAssignment) int { return strings.Compare(a.RepoKey, b.RepoKey) })
 		return nil
 	})
 	return out, err

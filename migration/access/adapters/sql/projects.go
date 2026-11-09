@@ -6,13 +6,15 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// Projects implements store.Store.
-func (s *Store) Projects() store.ProjectStore { return projectStore{s} }
+// Projects returns the project store: projects with their roles,
+// environments, members and repository assignments (decision 0013).
+func (s *Store) Projects() port.ProjectStore { return projectStore{s} }
 
 // projectStore keeps projects, roles, environments, project_members,
 // project_repositories and project_repository_shares. Roles of every scope
@@ -22,7 +24,7 @@ type projectStore struct{ s *Store }
 
 const projectCols = "key, display_name, description, storage_quota_bytes, soft_limit, quota_email, admin_privileges"
 
-func projectArgs(v types.Project) ([]any, error) {
+func projectArgs(v model.Project) ([]any, error) {
 	priv, err := dialect.ToJSON(v.AdminPrivileges)
 	if err != nil {
 		return nil, err
@@ -32,9 +34,9 @@ func projectArgs(v types.Project) ([]any, error) {
 	}, nil
 }
 
-func scanProject(row interface{ Scan(...any) error }) (types.Project, error) {
+func scanProject(row interface{ Scan(...any) error }) (model.Project, error) {
 	var (
-		v    types.Project
+		v    model.Project
 		priv sql.NullString
 	)
 	if err := row.Scan(&v.Key, &v.DisplayName, &v.Description, &v.StorageQuotaBytes,
@@ -44,7 +46,7 @@ func scanProject(row interface{ Scan(...any) error }) (types.Project, error) {
 	return v, dialect.FromJSON(priv, &v.AdminPrivileges)
 }
 
-func (p projectStore) Create(ctx context.Context, v types.Project) error {
+func (p projectStore) Create(ctx context.Context, v model.Project) error {
 	args, err := projectArgs(v)
 	if err != nil {
 		return err
@@ -52,18 +54,18 @@ func (p projectStore) Create(ctx context.Context, v types.Project) error {
 	_, err = p.s.Exec(
 		ctx,
 		"create project "+v.Key,
-		Insert("projects", dialect.OpsCols(projectCols)),
+		dialect.Insert("projects", dialect.OpsCols(projectCols)),
 		args...)
 	return err
 }
 
-func (p projectStore) Get(ctx context.Context, key string) (types.Project, error) {
+func (p projectStore) Get(ctx context.Context, key string) (model.Project, error) {
 	v, err := scanProject(p.s.Q(ctx).QueryRowContext(ctx,
 		p.s.Dialect().Rebind("SELECT "+projectCols+" FROM projects WHERE key = ?"), key))
 	return v, p.s.Wrap("get project "+key, err)
 }
 
-func (p projectStore) Update(ctx context.Context, v types.Project) error {
+func (p projectStore) Update(ctx context.Context, v model.Project) error {
 	args, err := projectArgs(v)
 	if err != nil {
 		return err
@@ -103,8 +105,8 @@ func (p projectStore) Delete(ctx context.Context, key string) error {
 	})
 }
 
-func (p projectStore) List(ctx context.Context) ([]types.Project, error) {
-	var out []types.Project
+func (p projectStore) List(ctx context.Context) ([]model.Project, error) {
+	var out []model.Project
 	err := p.s.Rows(ctx, "list projects", "SELECT "+projectCols+" FROM projects ORDER BY key", nil,
 		func(r *sql.Rows) error {
 			v, err := scanProject(r)
@@ -125,16 +127,16 @@ func (p projectStore) requireProject(ctx context.Context, key string) error {
 		return err
 	}
 	if !ok {
-		return fmt.Errorf("project %s: %w", key, store.ErrNotFound)
+		return fmt.Errorf("project %s: %w", key, kernel.ErrNotFound)
 	}
 	return nil
 }
 
 const roleCols = "project_key, name, type, description, environments, actions"
 
-func scanRole(row interface{ Scan(...any) error }) (types.Role, error) {
+func scanRole(row interface{ Scan(...any) error }) (model.Role, error) {
 	var (
-		v          types.Role
+		v          model.Role
 		envs, acts sql.NullString
 	)
 	if err := row.Scan(&v.ProjectKey, &v.Name, &v.Type, &v.Description, &envs, &acts); err != nil {
@@ -146,7 +148,7 @@ func scanRole(row interface{ Scan(...any) error }) (types.Role, error) {
 	return v, dialect.FromJSON(acts, &v.Actions)
 }
 
-func (p projectStore) PutRole(ctx context.Context, r types.Role) error {
+func (p projectStore) PutRole(ctx context.Context, r model.Role) error {
 	return p.s.Tx(ctx, func(ctx context.Context) error {
 		if err := p.requireProject(ctx, r.ProjectKey); err != nil {
 			return err
@@ -162,7 +164,7 @@ func (p projectStore) PutRole(ctx context.Context, r types.Role) error {
 		_, err = p.s.Exec(
 			ctx,
 			"put role "+r.Name,
-			Upsert("roles", dialect.OpsCols(roleCols), []string{"project_key", "name"}),
+			dialect.Upsert("roles", dialect.OpsCols(roleCols), []string{"project_key", "name"}),
 			r.ProjectKey,
 			r.Name,
 			r.Type,
@@ -174,7 +176,7 @@ func (p projectStore) PutRole(ctx context.Context, r types.Role) error {
 	})
 }
 
-func (p projectStore) Role(ctx context.Context, projectKey, name string) (types.Role, error) {
+func (p projectStore) Role(ctx context.Context, projectKey, name string) (model.Role, error) {
 	v, err := scanRole(p.s.Q(ctx).QueryRowContext(ctx,
 		p.s.Dialect().Rebind("SELECT "+roleCols+" FROM roles WHERE project_key = ? AND name = ?"),
 		projectKey, name),
@@ -182,7 +184,7 @@ func (p projectStore) Role(ctx context.Context, projectKey, name string) (types.
 	return v, p.s.Wrap(fmt.Sprintf("get role %s/%s", projectKey, name), err)
 }
 
-func (p projectStore) Roles(ctx context.Context, projectKey string) ([]types.Role, error) {
+func (p projectStore) Roles(ctx context.Context, projectKey string) ([]model.Role, error) {
 	return p.roles(
 		ctx,
 		"SELECT "+roleCols+" FROM roles WHERE project_key = ? ORDER BY name",
@@ -190,8 +192,8 @@ func (p projectStore) Roles(ctx context.Context, projectKey string) ([]types.Rol
 	)
 }
 
-func (p projectStore) roles(ctx context.Context, q string, args ...any) ([]types.Role, error) {
-	var out []types.Role
+func (p projectStore) roles(ctx context.Context, q string, args ...any) ([]model.Role, error) {
+	var out []model.Role
 	err := p.s.Rows(ctx, "list roles", q, args, func(r *sql.Rows) error {
 		v, err := scanRole(r)
 		out = append(out, v)
@@ -205,13 +207,13 @@ func (p projectStore) DeleteRole(ctx context.Context, projectKey, name string) e
 		"DELETE FROM roles WHERE project_key = ? AND name = ?", projectKey, name)
 }
 
-func (p projectStore) CreateEnvironment(ctx context.Context, e types.Environment) error {
+func (p projectStore) CreateEnvironment(ctx context.Context, e model.Environment) error {
 	return p.s.Tx(ctx, func(ctx context.Context) error {
 		if err := p.requireProject(ctx, e.ProjectKey); err != nil {
 			return err
 		}
 		_, err := p.s.Exec(ctx, "create environment "+e.Name,
-			Insert("environments", []string{"name", "project_key"}), e.Name, e.ProjectKey)
+			dialect.Insert("environments", []string{"name", "project_key"}), e.Name, e.ProjectKey)
 		return err
 	})
 }
@@ -219,15 +221,15 @@ func (p projectStore) CreateEnvironment(ctx context.Context, e types.Environment
 func (p projectStore) Environments(
 	ctx context.Context,
 	projectKey string,
-) ([]types.Environment, error) {
-	var out []types.Environment
+) ([]model.Environment, error) {
+	var out []model.Environment
 	err := p.s.Rows(
 		ctx,
 		"list environments",
 		"SELECT name, project_key FROM environments WHERE project_key = ? ORDER BY name",
 		[]any{projectKey},
 		func(r *sql.Rows) error {
-			var v types.Environment
+			var v model.Environment
 			err := r.Scan(&v.Name, &v.ProjectKey)
 			out = append(out, v)
 			return err //nolint:wrapcheck // wrapped by Rows
@@ -309,9 +311,9 @@ func (p projectStore) DeleteEnvironment(ctx context.Context, projectKey, name st
 
 const memberCols = "project_key, principal_type, principal_name, roles"
 
-func scanMember(row interface{ Scan(...any) error }) (types.ProjectMember, error) {
+func scanMember(row interface{ Scan(...any) error }) (model.ProjectMember, error) {
 	var (
-		v     types.ProjectMember
+		v     model.ProjectMember
 		roles sql.NullString
 	)
 	if err := row.Scan(&v.ProjectKey, &v.Type, &v.Name, &roles); err != nil {
@@ -320,7 +322,7 @@ func scanMember(row interface{ Scan(...any) error }) (types.ProjectMember, error
 	return v, dialect.FromJSON(roles, &v.Roles)
 }
 
-func (p projectStore) PutMember(ctx context.Context, m types.ProjectMember) error {
+func (p projectStore) PutMember(ctx context.Context, m model.ProjectMember) error {
 	return p.s.Tx(ctx, func(ctx context.Context) error {
 		if err := p.requireProject(ctx, m.ProjectKey); err != nil {
 			return err
@@ -332,7 +334,7 @@ func (p projectStore) PutMember(ctx context.Context, m types.ProjectMember) erro
 		_, err = p.s.Exec(
 			ctx,
 			"put member "+m.Name,
-			Upsert(
+			dialect.Upsert(
 				"project_members",
 				dialect.OpsCols(memberCols),
 				[]string{"project_key", "principal_type", "principal_name"},
@@ -347,8 +349,8 @@ func (p projectStore) PutMember(ctx context.Context, m types.ProjectMember) erro
 }
 
 func (p projectStore) Member(
-	ctx context.Context, projectKey string, typ types.PrincipalType, name string,
-) (types.ProjectMember, error) {
+	ctx context.Context, projectKey string, typ model.PrincipalType, name string,
+) (model.ProjectMember, error) {
 	v, err := scanMember(p.s.Q(ctx).QueryRowContext(ctx, p.s.Dialect().Rebind("SELECT "+memberCols+
 		" FROM project_members WHERE project_key = ? AND principal_type = ? AND principal_name = ?"),
 		projectKey, typ, name))
@@ -356,9 +358,9 @@ func (p projectStore) Member(
 }
 
 func (p projectStore) Members(
-	ctx context.Context, projectKey string, typ types.PrincipalType,
-) ([]types.ProjectMember, error) {
-	var out []types.ProjectMember
+	ctx context.Context, projectKey string, typ model.PrincipalType,
+) ([]model.ProjectMember, error) {
+	var out []model.ProjectMember
 	err := p.s.Rows(ctx, "list members", "SELECT "+memberCols+
 		" FROM project_members WHERE project_key = ? AND principal_type = ? ORDER BY principal_name",
 		[]any{projectKey, typ}, func(r *sql.Rows) error {
@@ -372,7 +374,7 @@ func (p projectStore) Members(
 func (p projectStore) DeleteMember(
 	ctx context.Context,
 	projectKey string,
-	typ types.PrincipalType,
+	typ model.PrincipalType,
 	name string,
 ) error {
 	return p.s.ExecOne(
@@ -387,7 +389,7 @@ func (p projectStore) DeleteMember(
 
 const assignmentCols = "repo_key, project_key, environments, shared_with_all, shared_read_only, updated_at"
 
-func (p projectStore) PutAssignment(ctx context.Context, a types.RepositoryAssignment) error {
+func (p projectStore) PutAssignment(ctx context.Context, a model.RepositoryAssignment) error {
 	return p.s.Tx(ctx, func(ctx context.Context) error {
 		if err := p.requireProject(ctx, a.ProjectKey); err != nil {
 			return err
@@ -399,7 +401,11 @@ func (p projectStore) PutAssignment(ctx context.Context, a types.RepositoryAssig
 		if _, err := p.s.Exec(
 			ctx,
 			"put assignment "+a.RepoKey,
-			Upsert("project_repositories", dialect.OpsCols(assignmentCols), []string{"repo_key"}),
+			dialect.Upsert(
+				"project_repositories",
+				dialect.OpsCols(assignmentCols),
+				[]string{"repo_key"},
+			),
 			a.RepoKey,
 			a.ProjectKey,
 			envs,
@@ -417,7 +423,7 @@ func (p projectStore) PutAssignment(ctx context.Context, a types.RepositoryAssig
 			if _, err := p.s.Exec(
 				ctx,
 				"share "+a.RepoKey,
-				Insert(
+				dialect.Insert(
 					"project_repository_shares",
 					[]string{"repo_key", "project_key"},
 				),
@@ -445,13 +451,13 @@ func (p projectStore) assignments(
 	ctx context.Context,
 	where string,
 	args ...any,
-) ([]types.RepositoryAssignment, error) {
-	var out []types.RepositoryAssignment
+) ([]model.RepositoryAssignment, error) {
+	var out []model.RepositoryAssignment
 	err := p.s.Rows(ctx, "list assignments",
 		"SELECT "+assignmentCols+" FROM project_repositories "+where+" ORDER BY repo_key", args,
 		func(r *sql.Rows) error {
 			var (
-				v       types.RepositoryAssignment
+				v       model.RepositoryAssignment
 				envs    sql.NullString
 				updated sql.NullInt64
 			)
@@ -498,16 +504,16 @@ func (p projectStore) assignments(
 func (p projectStore) Assignment(
 	ctx context.Context,
 	repoKey string,
-) (types.RepositoryAssignment, error) {
+) (model.RepositoryAssignment, error) {
 	got, err := p.assignments(ctx, "WHERE repo_key = ?", repoKey)
 	if err != nil {
-		return types.RepositoryAssignment{}, err
+		return model.RepositoryAssignment{}, err
 	}
 	if len(got) == 0 {
-		return types.RepositoryAssignment{}, fmt.Errorf(
+		return model.RepositoryAssignment{}, fmt.Errorf(
 			"get assignment %s: %w",
 			repoKey,
-			store.ErrNotFound,
+			kernel.ErrNotFound,
 		)
 	}
 	return got[0], nil
@@ -516,7 +522,7 @@ func (p projectStore) Assignment(
 func (p projectStore) Assignments(
 	ctx context.Context,
 	projectKey string,
-) ([]types.RepositoryAssignment, error) {
+) ([]model.RepositoryAssignment, error) {
 	return p.assignments(ctx, "WHERE project_key = ? OR shared_with_all = ? OR repo_key IN "+
 		"(SELECT repo_key FROM project_repository_shares WHERE project_key = ?)", projectKey, true, projectKey)
 }
