@@ -409,7 +409,7 @@ func apiReviewPersistence(path string) (string, string, []string) {
 		return "build", "build names/numbers/runs retain complete legacy collections; store keysets may be collected; append/replay and run detail are singular", []string{
 			"internal/server/builds.go",
 			"migration/artifacts/core/build/build.go",
-			"internal/sqlstore/sqlcommon/builds.go",
+			"migration/artifacts/adapters/sql/builds.go",
 			"internal/server/builds_status_test.go",
 		}
 	}
@@ -418,7 +418,7 @@ func apiReviewPersistence(path string) (string, string, []string) {
 		return "repository", "legacy arrays remain complete; store keysets are collected and filtered; not bounded by client page size", []string{
 			"internal/server/repositories.go",
 			"migration/artifacts/core/repos/repos.go",
-			"internal/sqlstore/sqlcommon/content.go",
+			"migration/artifacts/adapters/sql/content.go",
 		}
 	}
 	if strings.HasPrefix(path, "/artifactory/api/search/") ||
