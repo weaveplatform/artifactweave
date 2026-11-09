@@ -1,6 +1,3 @@
-// Package aieditorextensionshttp serves the VS Code gallery API for read-only
-// remote extension repositories. The IDE has no header-authentication channel
-// for this gallery; repository policy still controls anonymous read access.
 package aieditorextensionshttp
 
 import (
@@ -27,6 +24,11 @@ import (
 
 const galleryPath = "extensionquery"
 
+// Protocol returns the VS Code gallery protocol for the router kit, under
+// /artifactory/api/aieditorextensions/{repoKey}: POST of an extension query
+// to _apis/public/gallery/extensionquery, and GET and HEAD of an asset at
+// assets/{publisher}/{name}/{version}/{assetType}. Only remote repositories
+// have a source, through svc; with svc nil, every class answers 501.
 func Protocol(svc *source.Service) pkgroute.Protocol {
 	sources := map[repo.Class]pkgroute.Source{}
 	if svc != nil {

@@ -1,5 +1,3 @@
-// Package luarockshttp serves local and federated LuaRocks repositories through
-// the native flat rocks-server URL and the native upload API.
 package luarockshttp
 
 import (
@@ -22,10 +20,25 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// Options configures the LuaRocks protocol. RemoteSources serves remote
+// repositories and fetches through them; nil leaves the remote class
+// without a source, so a remote repository answers 501.
 type Options struct {
 	RemoteSources *source.Service
 }
 
+// Protocol returns the LuaRocks protocol for the router kit, under
+// /artifactory/api/luarocks/{repoKey}: GET and HEAD of a path (a manifest
+// file, a rockspec or rock at the root or, in a local or federated
+// repository, any stored item), and the upload client's routes: GET of
+// api/tool_version and api/1/{key}/check_rockspec, and POST of
+// api/1/{key}/upload (a rockspec) and api/1/{key}/upload_rock/{versionID}
+// (its rock). Local and federated repositories are served from their
+// items, virtual ones from their members in order, with uploads sent to
+// the default deployment repository, and remote ones through
+// o.RemoteSources when it is set; a class without a source answers 501.
+// The virtual class's source supports no single-item lookup, because the
+// protocol resolves a virtual repository's members itself.
 func Protocol(o Options) pkgroute.Protocol {
 	sources := map[repo.Class]pkgroute.Source{
 		repo.Local:     pkgroute.Local{},

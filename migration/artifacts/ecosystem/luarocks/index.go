@@ -73,6 +73,10 @@ func setProperties(ctx context.Context, st store.Store, it types.Item, id Identi
 	return st.Items().PatchProperties(ctx, it.ID, set, nil, it.Updated) //nolint:wrapcheck
 }
 
+// VersionID returns the package index's id for id's version: the number
+// the native upload client receives after a rockspec upload and sends back
+// with the rock, which VersionFile maps back. A missing package or version
+// fails with an error that wraps the store's.
 func VersionID(ctx context.Context, st store.Store, c repo.Config, id Identity) (int64, error) {
 	p, err := st.Packages().Find(ctx, c.Key, id.Name)
 	if err != nil {
