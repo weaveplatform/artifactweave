@@ -6,16 +6,19 @@
 // transactions with their snapshots, the row copies and the paging are
 // memtx's, and so are Tx, AfterCommit and Close. Each entity store here
 // keeps its rows in memtx tables and makes every call through Do; the
-// platform's stores are migration/platform/store/inmem's, and the access,
-// notifications, retention, federation, releases and workers stores are
-// those modules' adapters/inmem's, all over the same memtx.Store. It serves
-// unit tests and embedders that need no durability.
+// platform's stores are migration/platform/store/inmem's, the artifacts
+// module's item, trash, package, build and archived-item stores and blob
+// and replica indexes are migration/artifacts/adapters/inmem's, and the
+// access, notifications, retention, federation, releases and workers stores
+// are those modules' adapters/inmem's, all over the same memtx.Store. It
+// serves unit tests and embedders that need no durability.
 package inmem
 
 import (
 	"context"
 
 	accinmem "github.com/weaveplatform/artifactweave/migration/access/adapters/inmem"
+	artinmem "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/inmem"
 	fedinmem "github.com/weaveplatform/artifactweave/migration/federation/adapters/inmem"
 	ntfinmem "github.com/weaveplatform/artifactweave/migration/notifications/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
@@ -34,6 +37,7 @@ import (
 type Store struct {
 	*memtx.Store
 	platform      *platinmem.Store
+	artifacts     *artinmem.Store
 	access        *accinmem.Store
 	notifications *ntfinmem.Store
 	retention     *retinmem.Store
@@ -56,6 +60,7 @@ func New() *Store {
 			return store.FenceLayoutSources(ctx, s, remoteRecords{s}, key)
 		},
 	})
+	s.artifacts = artinmem.New(s.Store)
 	s.access = accinmem.New(s.Store)
 	s.notifications = ntfinmem.New(s.Store)
 	s.retention = retinmem.New(s.Store)
@@ -93,6 +98,38 @@ func (s *Store) Replays() store.ReplayStore { return s.platform.Replays() }
 // RequestBudgets implements store.Store with the platform's request budget
 // store.
 func (s *Store) RequestBudgets() store.RequestBudgetStore { return s.platform.RequestBudgets() }
+
+// Items implements store.Store with the artifacts module's item store.
+func (s *Store) Items() store.ItemStore { return s.artifacts.Items() }
+
+// Trash implements store.Store with the artifacts module's trash store.
+func (s *Store) Trash() store.TrashStore { return s.artifacts.Trash() }
+
+// Packages implements store.Store with the artifacts module's package
+// store.
+func (s *Store) Packages() store.PackageStore { return s.artifacts.Packages() }
+
+// Blobs implements store.Store with the artifacts module's blob index.
+func (s *Store) Blobs() store.BlobIndex { return s.artifacts.Blobs() }
+
+// Replicas implements store.Store with the artifacts module's replica
+// index.
+func (s *Store) Replicas() store.ReplicaIndex { return s.artifacts.Replicas() }
+
+// Builds implements store.Store with the artifacts module's build store.
+func (s *Store) Builds() store.BuildStore { return s.artifacts.Builds() }
+
+// ArchivedItems implements store.Store with the artifacts module's
+// archived-item store.
+func (s *Store) ArchivedItems() store.ArchivedItemStore { return s.artifacts.ArchivedItems() }
+
+// ColdBlobs implements store.Store with the artifacts module's blob index
+// over the archive tier.
+func (s *Store) ColdBlobs() store.BlobIndex { return s.artifacts.ColdBlobs() }
+
+// ColdReplicas implements store.Store with the artifacts module's replica
+// index over the archive tier.
+func (s *Store) ColdReplicas() store.ReplicaIndex { return s.artifacts.ColdReplicas() }
 
 // Users implements store.Store with the access module's user store.
 func (s *Store) Users() store.UserStore { return s.access.Users() }

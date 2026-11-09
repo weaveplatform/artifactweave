@@ -17,15 +17,6 @@ import (
 // Repos implements store.Store.
 func (s *Store) Repos() store.RepoStore { return repos{s} }
 
-// Items implements store.Store.
-func (s *Store) Items() store.ItemStore { return items{s} }
-
-// Trash implements store.Store.
-func (s *Store) Trash() store.TrashStore { return trash{s} }
-
-// Packages implements store.Store.
-func (s *Store) Packages() store.PackageStore { return packages{s} }
-
 type repos struct{ s *Store }
 
 func (r repos) t() *memtx.Table[string, repo.Config] {

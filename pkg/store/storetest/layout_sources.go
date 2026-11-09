@@ -105,3 +105,28 @@ func testRemoteLayoutFences(t *testing.T, s store.Store) {
 		storekit.Get[types.SourceIdentity](t)(s.RemoteCache().Source(ctx, other.Key)),
 	)
 }
+
+// remoteFixture creates the remote repository a test starts from and
+// returns a cache key in it. The artifacts contract has the same fixture
+// for its remote cache tests; this copy serves the layout fence test, which
+// stays with the aggregate.
+func remoteFixture(
+	t *testing.T,
+	s store.Store,
+) (context.Context, repo.Config, types.RemoteCacheKey) {
+	t.Helper()
+	ctx := context.Background()
+	c := repo.Config{
+		Key:         "upstream",
+		Class:       repo.Remote,
+		PackageType: repo.Generic,
+		URL:         "https://source.example",
+	}
+	storekit.Must(t, s.Repos().Create(ctx, c))
+	return ctx, c, types.RemoteCacheKey{
+		RepoKey:          c.Key,
+		Path:             "pkg/index.json",
+		Variant:          "json",
+		SettingsRevision: "secret-revision-1",
+	}
+}

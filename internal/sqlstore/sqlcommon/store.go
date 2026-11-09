@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	accsql "github.com/weaveplatform/artifactweave/migration/access/adapters/sql"
+	artsql "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/sql"
 	fedsql "github.com/weaveplatform/artifactweave/migration/federation/adapters/sql"
 	ntfsql "github.com/weaveplatform/artifactweave/migration/notifications/adapters/sql"
 	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
@@ -43,6 +44,7 @@ import (
 type Store struct {
 	*dialect.Store
 	platform      *platsql.Store
+	artifacts     *artsql.Store
 	access        *accsql.Store
 	notifications *ntfsql.Store
 	retention     *retsql.Store
@@ -105,6 +107,7 @@ func New(db *sql.DB, d Dialect, keys *crypt.Keyring) *Store {
 			return store.FenceLayoutSources(ctx, s, remoteRecords{s}, key)
 		},
 	})
+	s.artifacts = artsql.New(s.Store)
 	s.access = accsql.New(s.Store)
 	s.notifications = ntfsql.New(s.Store)
 	s.retention = retsql.New(s.Store)
@@ -142,6 +145,35 @@ func (s *Store) Replays() store.ReplayStore { return s.platform.Replays() }
 // RequestBudgets implements store.Store with the platform's request budget
 // store.
 func (s *Store) RequestBudgets() store.RequestBudgetStore { return s.platform.RequestBudgets() }
+
+// Items implements store.Store with the artifacts module's item store.
+func (s *Store) Items() store.ItemStore { return s.artifacts.Items() }
+
+// Trash implements store.Store with the artifacts module's trash store.
+func (s *Store) Trash() store.TrashStore { return s.artifacts.Trash() }
+
+// Packages implements store.Store with the artifacts module's package
+// store.
+func (s *Store) Packages() store.PackageStore { return s.artifacts.Packages() }
+
+// Blobs implements store.Store with the artifacts module's blob index.
+func (s *Store) Blobs() store.BlobIndex { return s.artifacts.Blobs() }
+
+// Replicas implements store.Store with the artifacts module's replica
+// index.
+func (s *Store) Replicas() store.ReplicaIndex { return s.artifacts.Replicas() }
+
+// ArchivedItems implements store.Store with the artifacts module's
+// archived-item store.
+func (s *Store) ArchivedItems() store.ArchivedItemStore { return s.artifacts.ArchivedItems() }
+
+// ColdBlobs implements store.Store with the artifacts module's blob index
+// over the archive tier.
+func (s *Store) ColdBlobs() store.BlobIndex { return s.artifacts.ColdBlobs() }
+
+// ColdReplicas implements store.Store with the artifacts module's replica
+// index over the archive tier.
+func (s *Store) ColdReplicas() store.ReplicaIndex { return s.artifacts.ColdReplicas() }
 
 // Users implements store.Store with the access module's user store.
 func (s *Store) Users() store.UserStore { return s.access.Users() }

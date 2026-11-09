@@ -6,14 +6,17 @@
 //
 // # Role
 //
-// artifacts module, core layer, driven store ports. The metadata store's
-// SQL and in-memory stores implement them, and both satisfy Store; STO-17
-// and STO-18 move those implementations into the module's adapters. The
-// ports take and return the module's core/model values, repository
-// configurations (artifacts/api/repo), AQL queries and hits (core/aql),
-// kernel.Page, the platform's blob row and the mirror's replica rows. The
-// metadata store aliases every name here but Store (its
-// bridge_artifacts_port.go) until PRO-02 deletes the bridge.
+// artifacts module, core layer, driven store ports. The module's adapters
+// (adapters/sql and adapters/inmem) implement the item, trash, package and
+// archived-item stores and the blob and replica indexes of both tiers, and
+// the in-memory build store; the metadata store's SQL and in-memory stores
+// delegate those to them, still implement the rest, and both satisfy Store.
+// STO-18 moves the rest into the adapters. The ports take and return the
+// module's core/model values, repository configurations
+// (artifacts/api/repo), AQL queries and hits (core/aql), kernel.Page, the
+// platform's blob row and the mirror's replica rows. The metadata store
+// aliases every name here but Store (its bridge_artifacts_port.go) until
+// PRO-02 deletes the bridge.
 //
 // # Inputs
 //
@@ -106,6 +109,7 @@
 // The package has no tests of its own. The metadata store's in-memory and
 // SQL stores are checked against Store at compile time beside the other
 // modules' ports (pkg/store/inmem/inmem_test.go and
-// internal/sqlstore/sqlcommon/store_test.go), and its contract subtests run
-// every port on its in-memory, SQLite and PostgreSQL stores.
+// internal/sqlstore/sqlcommon/store_test.go). The module's contract suite,
+// adapters/storetest, runs every port on those stores' in-memory, SQLite
+// and PostgreSQL backends from inside the metadata store's contract suite.
 package port

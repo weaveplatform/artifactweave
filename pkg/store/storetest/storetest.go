@@ -9,6 +9,8 @@ import (
 
 	accstoretest "github.com/weaveplatform/artifactweave/migration/access/adapters/storetest"
 	accport "github.com/weaveplatform/artifactweave/migration/access/core/port"
+	artstoretest "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/storetest"
+	artport "github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	fedstoretest "github.com/weaveplatform/artifactweave/migration/federation/adapters/storetest"
 	fedport "github.com/weaveplatform/artifactweave/migration/federation/core/port"
 	ntfstoretest "github.com/weaveplatform/artifactweave/migration/notifications/adapters/storetest"
@@ -31,12 +33,11 @@ type Factory func(t *testing.T) store.Store
 func Run(t *testing.T, newStore Factory) {
 	t.Helper()
 	runCore(t, newStore)
-	runBlobs(t, newStore)
-	runReplicas(t, newStore)
-	runContent(t, newStore)
-	runGitLFSLocks(t, newStore)
-	runBowerRegistrations(t, newStore)
-	runRemoteCache(t, newStore)
+	artstoretest.Run(t, func(t *testing.T) artport.Store { return newStore(t) })
+	// A layout document lives in the platform's config store and fences the
+	// artifacts module's remote sources, so this test needs the whole
+	// aggregate and is not part of the artifacts contract.
+	t.Run("RemoteLayoutFences", func(t *testing.T) { testRemoteLayoutFences(t, newStore(t)) })
 	accstoretest.Run(t, func(t *testing.T) accport.Store { return newStore(t) })
 	ntfstoretest.Run(t, func(t *testing.T) ntfport.Store { return newStore(t) })
 	retstoretest.Run(t, func(t *testing.T) retport.Store { return newStore(t) })
@@ -46,8 +47,6 @@ func Run(t *testing.T, newStore Factory) {
 		func(t *testing.T) platstoretest.Store { return newStore(t) },
 	)
 	relstoretest.Run(t, func(t *testing.T) relport.Store { return newStore(t) })
-	runArchivedItems(t, newStore)
 	wrkstoretest.Run(t, func(t *testing.T) wrkport.Store { return newStore(t) })
-	runBuilds(t, newStore)
 	runBuildRowLock(t, newStore)
 }
