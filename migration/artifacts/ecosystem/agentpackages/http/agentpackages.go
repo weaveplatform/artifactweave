@@ -1,5 +1,3 @@
-// Package agentpackageshttp serves the APM v1 registry protocol on Agent Packages
-// local and federated repositories. Federated peer convergence belongs to P13.
 package agentpackageshttp
 
 import (
@@ -22,6 +20,15 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// Protocol returns the APM v1 registry protocol for the router kit, under
+// /artifactory/api/agentpackages/{repoKey}: GET and HEAD of a package's
+// versions (v1/packages/{owner}/{name}/versions) and of a version's archive
+// (.../versions/{version}/download), PUT of a version's archive as
+// application/zip (.../versions/{version}), and GET and HEAD of the search
+// (v1/search with q, type, tag, limit and offset). It serves local and
+// federated repositories only, the classes JFrog documents for Agent
+// Packages; any other class answers 501. Errors are RFC 7807 problem JSON,
+// as APM expects.
 func Protocol() pkgroute.Protocol {
 	return pkgroute.Protocol{
 		Name: "agentpackages", Types: []repo.PackageType{repo.AgentPackages},

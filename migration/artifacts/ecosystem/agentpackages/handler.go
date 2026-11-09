@@ -16,9 +16,16 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// Serves reports whether t is the Agent Packages package type.
 func Serves(t repo.PackageType) bool { return t == repo.AgentPackages }
 
 type (
+	// Handler is the Agent Packages format's hooks: it admits an archive
+	// only at its canonical path and when its descriptor agrees with that
+	// path, keeps published versions immutable, and keeps the package index
+	// and the agentpackages.* properties in step with the stored archives.
+	// It embeds the generic hooks, so every path is classed as generic
+	// content is.
 	Handler    struct{ generic.Handler }
 	inspection struct {
 		sha  string
@@ -27,6 +34,11 @@ type (
 	}
 )
 
+// Inspect reads the stored archive of every write but a checksum deploy
+// before the write's transaction, and keeps what it read, or why the archive
+// is invalid, for Admit and Deployed, so an archive is read once per write.
+// A write without a SHA-256 inspects nothing; an archive that cannot be
+// opened fails the write.
 func (Handler) Inspect(
 	ctx context.Context, env format.Env, _ repo.Config, w format.Write,
 ) (any, error) {
@@ -42,6 +54,12 @@ func (Handler) Inspect(
 	return &inspection{sha: w.Checksums.SHA256, meta: meta, err: err}, nil
 }
 
+// Admit refuses a write, other than a checksum deploy or a remote's cached
+// content, that is not at a canonical archive path, whose archive Inspect
+// did not read or found invalid, or whose apm.yml names another version or
+// a name other than the package's own or owner/name (409). It then applies
+// the generic blackout and include and exclude checks, keeping their
+// refusals as they are.
 func (Handler) Admit(
 	_ context.Context,
 	env format.Env,
@@ -93,6 +111,13 @@ func (Handler) GuardWrite(
 	}
 }
 
+// Deployed indexes a stored archive at a canonical path of the repository's
+// own tree; folders, cached items and other files change nothing. An
+// archive whose descriptor no longer agrees with its path fails with
+// ErrArchive. Otherwise it sets the agentpackages.* properties, dropping
+// agentpackages.description when the descriptor has none, creates the
+// package owner/name when it is new, and links the version to the archive,
+// with its Metadata as the version's metadata.
 func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
 	if it.Folder || it.Cached {
 		return nil
@@ -130,7 +155,12 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 	return err //nolint:wrapcheck // pkgindex names the version
 }
 
-func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error  { return nil }
+// Deleting does nothing: the item service drops a removed archive's
+// version link with it.
+func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error { return nil }
+
+// Deleted does nothing: a version is one archive, so the item service's
+// pruning of versions left without files is all a delete needs.
 func (Handler) Deleted(context.Context, format.Env, repo.Config, []types.Item) error { return nil }
 
 func metadataOf(ctx context.Context, env format.Env, it types.Item) (Metadata, error) {
@@ -178,6 +208,10 @@ func setProperties(ctx context.Context, st store.Store, it types.Item, meta Meta
 	return nil
 }
 
+// Reindex rebuilds repository c's package index from the archives at
+// canonical paths of its own tree, setting each archive's properties as
+// Deployed does, and fails with ErrArchive on the first archive that cannot
+// be read or whose descriptor disagrees with its path.
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	var all []pkgindex.Indexed
 	byName := map[string]int{}

@@ -16,9 +16,16 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// Serves reports whether t is the Agent Plugins package type.
 func Serves(t repo.PackageType) bool { return t == repo.AgentPlugins }
 
 type (
+	// Handler is the Agent Plugins format's hooks: it admits a plugin bundle
+	// at its canonical path only when it carries a harness manifest, keeps
+	// the package index and the agentplugins.* properties in step with the
+	// stored bundles, and keeps uploads off the marketplace file names. It
+	// embeds the generic hooks, so every path is classed as generic content
+	// is.
 	Handler    struct{ generic.Handler }
 	inspection struct {
 		sha  string
@@ -27,6 +34,11 @@ type (
 	}
 )
 
+// Inspect reads the stored bundle of a write to a .zip path before the
+// write's transaction, and keeps what it read, or why the bundle is
+// invalid, for Admit and Deployed, so a bundle is read once per write. A
+// write without a SHA-256 and any other file inspect nothing; a bundle that
+// cannot be opened fails the write.
 func (Handler) Inspect(
 	ctx context.Context,
 	env format.Env,
@@ -45,6 +57,12 @@ func (Handler) Inspect(
 	return &inspection{sha: w.Checksums.SHA256, meta: meta, err: err}, nil
 }
 
+// Admit refuses a write, other than a checksum deploy or a remote's cached
+// content, to a marketplace file name (409), since those files are rendered
+// for each reader and never stored, and a .zip that is not at a canonical
+// bundle path or whose bundle Inspect found invalid or without a harness
+// manifest (409). It then applies the generic blackout and include and
+// exclude checks, keeping their refusals as they are.
 func (Handler) Admit(
 	_ context.Context,
 	env format.Env,
@@ -72,6 +90,14 @@ func (Handler) Admit(
 	return w, nil
 }
 
+// Deployed indexes a stored bundle at a canonical path of the repository's
+// own tree; folders, cached items and other files change nothing. It sets
+// the agentplugins.* properties, dropping agentplugins.sha1 when the item
+// has no SHA-1, creates the plugin's package when it is new, and links the
+// version to the bundle, with its Metadata, named and versioned by the path,
+// as the version's metadata. A bundle without a harness manifest fails with
+// ErrArchive: the 7.161.32 target indexes harness manifests only, so a
+// root-only Agent Plugins Standard bundle is not indexed.
 func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
 	if it.Folder || it.Cached || !strings.HasSuffix(it.FullPath(), ".zip") {
 		return nil
@@ -97,7 +123,13 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 	}
 	return index(ctx, env.Store, c, it, meta)
 }
-func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error  { return nil }
+
+// Deleting does nothing: the item service drops a removed bundle's version
+// link with it.
+func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error { return nil }
+
+// Deleted does nothing: a version is one bundle, so the item service's
+// pruning of versions left without files is all a delete needs.
 func (Handler) Deleted(context.Context, format.Env, repo.Config, []types.Item) error { return nil }
 
 func metadataOf(ctx context.Context, env format.Env, it types.Item) (Metadata, error) {
@@ -161,6 +193,10 @@ func index(ctx context.Context, st store.Store, c repo.Config, it types.Item, me
 	return err //nolint:wrapcheck // pkgindex names the version
 }
 
+// Reindex rebuilds repository c's package index from the bundles at
+// canonical paths of its own tree, setting each bundle's properties as
+// Deployed does, and fails with ErrArchive on the first bundle that cannot
+// be read or has no harness manifest.
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	var all []pkgindex.Indexed
 	byName := map[string]int{}

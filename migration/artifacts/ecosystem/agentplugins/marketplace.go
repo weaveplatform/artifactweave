@@ -18,10 +18,21 @@ var indexes = map[string]string{
 	"codex-marketplace.json":  "codex",
 }
 
+// ErrMarketplace is what Marketplace returns, wrapped with the name, for a
+// name that is not a marketplace file.
 var ErrMarketplace = errors.New("agentplugins: unknown agent plugin marketplace")
 
+// IsMarketplace reports whether name is one of the marketplace files a local
+// Agent Plugins repository renders at its root: marketplace.json, which
+// lists every plugin, and claude-marketplace.json, cursor-marketplace.json
+// and codex-marketplace.json, which list the plugins carrying that
+// harness's manifest.
 func IsMarketplace(name string) bool { _, ok := indexes[name]; return ok }
 
+// IsReservedMarketplace reports whether name is a marketplace file or
+// vscode-marketplace.json. The 7.161.32 target does not render the VS Code
+// file, which arrived in a later JFrog release, so the item routes answer
+// 404 for it, but no upload may take the name either.
 func IsReservedMarketplace(name string) bool {
 	return IsMarketplace(name) || name == "vscode-marketplace.json"
 }

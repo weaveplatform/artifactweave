@@ -1,4 +1,3 @@
-// Package agentplugins validates and indexes local Agent Plugin ZIP bundles.
 package agentplugins
 
 import (
@@ -16,12 +15,20 @@ import (
 )
 
 const (
-	MaxArchiveBytes  = 64 << 20
+	// MaxArchiveBytes bounds a plugin bundle, and the total its files
+	// inflate to, at 64 MiB.
+	MaxArchiveBytes = 64 << 20
+	// MaxManifestBytes bounds each harness manifest and a root plugin.json
+	// at 1 MiB.
 	MaxManifestBytes = 1 << 20
-	MaxFiles         = 512
+	// MaxFiles bounds a bundle at 512 ZIP entries, folders included.
+	MaxFiles = 512
 )
 
 var (
+	// ErrArchive is what ReadArchive returns for every bundle it refuses;
+	// Deployed and Reindex wrap it for a stored bundle without a harness
+	// manifest.
 	ErrArchive   = errors.New("agentplugins: invalid agent plugin bundle")
 	namePattern  = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
 	harnessPaths = map[string]string{
@@ -44,7 +51,14 @@ type Metadata struct {
 	Root      bool                       `json:"root"`
 }
 
+// ValidName reports whether v is a plugin name the registry accepts: a
+// letter or digit followed by up to 127 letters, digits, dots, underscores
+// and hyphens.
 func ValidName(v string) bool { return namePattern.MatchString(v) }
+
+// ValidVersion reports whether v is a full semantic version of at most 128
+// bytes, major.minor.patch with an optional pre-release and build, written
+// without a leading v.
 func ValidVersion(v string) bool {
 	core, _, _ := strings.Cut(v, "-")
 	core, _, _ = strings.Cut(core, "+")
@@ -52,10 +66,16 @@ func ValidVersion(v string) bool {
 		strings.Count(core, ".") == 2 && semver.IsValid("v"+v)
 }
 
+// Path is the canonical item path of the bundle of plugin name at version,
+// <name>/<version>/<name>-<version>.zip, where jf agent plugins publish
+// uploads it.
 func Path(name, version string) string {
 	return name + "/" + version + "/" + name + "-" + version + ".zip"
 }
 
+// ParsePath splits a canonical bundle path into the plugin name and
+// version, and reports ok only when p is exactly Path(name, version) with a
+// valid name and version.
 func ParsePath(p string) (name, version string, ok bool) {
 	parts := strings.Split(p, "/")
 	if len(parts) != 3 || !ValidName(parts[0]) || !ValidVersion(parts[1]) ||

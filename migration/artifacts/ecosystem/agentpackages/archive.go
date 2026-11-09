@@ -1,4 +1,3 @@
-// Package agentpackages validates and indexes APM Agent Packages ZIP archives.
 package agentpackages
 
 import (
@@ -16,12 +15,20 @@ import (
 )
 
 const (
-	MaxArchiveBytes  = 64 << 20
+	// MaxArchiveBytes bounds an Agent Package archive, and the total its
+	// files inflate to, at 64 MiB.
+	MaxArchiveBytes = 64 << 20
+	// MaxManifestBytes bounds an archive's apm.yml and apm.lock.yaml at
+	// 1 MiB.
 	MaxManifestBytes = 1 << 20
-	MaxFiles         = 512
+	// MaxFiles bounds an archive at 512 ZIP entries, folders included.
+	MaxFiles = 512
 )
 
 var (
+	// ErrArchive is what ReadArchive returns for every archive it refuses;
+	// Deployed and Reindex wrap it for a stored archive whose descriptor
+	// disagrees with its path.
 	ErrArchive = errors.New("agentpackages: invalid agent package archive")
 	component  = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
 )
@@ -39,8 +46,14 @@ type Metadata struct {
 	Size        int64    `json:"size"`
 }
 
+// ValidComponent reports whether v is an owner or package name the registry
+// accepts: a letter or digit followed by up to 127 letters, digits, dots,
+// underscores and hyphens.
 func ValidComponent(v string) bool { return component.MatchString(v) }
 
+// ValidVersion reports whether v is a full semantic version of at most 128
+// bytes, major.minor.patch with an optional pre-release and build, written
+// without a leading v.
 func ValidVersion(v string) bool {
 	core, _, _ := strings.Cut(v, "-")
 	core, _, _ = strings.Cut(core, "+")
@@ -48,10 +61,16 @@ func ValidVersion(v string) bool {
 		strings.Count(core, ".") == 2 && semver.IsValid("v"+v)
 }
 
+// Path is the canonical item path of the archive of package owner/name at
+// version, <owner>/<name>/<name>-<version>.zip, the only path a version is
+// stored at.
 func Path(owner, name, version string) string {
 	return owner + "/" + name + "/" + name + "-" + version + ".zip"
 }
 
+// ParsePath splits a canonical archive path into the owner, package name
+// and version, and reports ok only when p is exactly Path(owner, name,
+// version) with valid components and version.
 func ParsePath(p string) (owner, name, version string, ok bool) {
 	parts := strings.Split(p, "/")
 	if len(parts) != 3 || !ValidComponent(parts[0]) || !ValidComponent(parts[1]) {
