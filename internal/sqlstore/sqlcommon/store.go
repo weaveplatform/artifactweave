@@ -111,3 +111,16 @@ func (s *Store) Configs() store.ConfigStore { return s.platform.Configs() }
 
 // Instance implements store.Store with the platform's instance store.
 func (s *Store) Instance() store.InstanceStore { return s.platform.Instance() }
+
+// Outbox implements store.Store with the platform's federation outbox store.
+func (s *Store) Outbox() store.OutboxStore { return s.platform.Outbox() }
+
+// Uploads implements store.Store with the platform's upload session store.
+func (s *Store) Uploads() store.UploadStore { return s.platform.Uploads() }
+
+// Replays implements store.Store with the platform's API replay store.
+func (s *Store) Replays() store.ReplayStore { return s.platform.Replays() }
+
+// RequestBudgets implements store.Store with the platform's request budget
+// store.
+func (s *Store) RequestBudgets() store.RequestBudgetStore { return s.platform.RequestBudgets() }
