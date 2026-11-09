@@ -16,8 +16,8 @@ import (
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
 
-	"github.com/weaveplatform/artifactweave/internal/auth/idtoken"
-	"github.com/weaveplatform/artifactweave/internal/auth/idtoken/idtokentest"
+	"github.com/weaveplatform/artifactweave/migration/access/core/idtoken"
+	"github.com/weaveplatform/artifactweave/migration/access/core/idtoken/idtokentest"
 )
 
 const aud = "artifactweave"

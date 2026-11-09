@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/service/oidc"
+	"github.com/weaveplatform/artifactweave/migration/access/core/oidc"
 )
 
 // patternCase is one mapping exchanged against patternClaims: the user and

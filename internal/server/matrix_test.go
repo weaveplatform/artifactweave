@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/service/oidc"
 	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/oidc"
 	"github.com/weaveplatform/artifactweave/migration/access/core/roles"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"

@@ -7,9 +7,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth/idtoken"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/idtoken"
 	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"

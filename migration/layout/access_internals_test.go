@@ -221,7 +221,7 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 			root+"/access/accesstest",
 			root+"/access/api/accessapitest",
 			root+"/access/core/idtoken/idtokentest",
-			"internal/auth/idtoken/idtokentest",
+			"migration/access/core/idtoken/idtokentest",
 		),
 		// Production code is the import tiers' to judge, as are the files
 		// of skipped directories.

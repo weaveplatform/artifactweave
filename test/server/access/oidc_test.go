@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth/idtoken/idtokentest"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/idtoken/idtokentest"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"

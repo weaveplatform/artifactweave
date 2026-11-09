@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/weaveplatform/artifactweave/internal/auth/idtoken"
-	"github.com/weaveplatform/artifactweave/internal/service/oidc"
+	"github.com/weaveplatform/artifactweave/migration/access/core/idtoken"
+	"github.com/weaveplatform/artifactweave/migration/access/core/oidc"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"

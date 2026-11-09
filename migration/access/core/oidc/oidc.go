@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth/idtoken"
+	"github.com/weaveplatform/artifactweave/migration/access/core/idtoken"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/pkg/store"

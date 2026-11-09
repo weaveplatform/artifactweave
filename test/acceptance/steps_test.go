@@ -28,7 +28,7 @@ import (
 
 	"github.com/cucumber/godog"
 
-	"github.com/weaveplatform/artifactweave/internal/auth/idtoken/idtokentest"
+	"github.com/weaveplatform/artifactweave/migration/access/core/idtoken/idtokentest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/platform/cdn/cdntest"
 )
