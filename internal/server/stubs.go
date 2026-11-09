@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
@@ -14,7 +15,7 @@ import (
 // Order matters: the JFrog operations beside the npm and Terraform
 // registries must match before the registries' own prefixes, and the first
 // matching rule wins.
-var errorProfileRules = []ProfileRule{
+var errorProfileRules = []httpkit.ProfileRule{
 	{Match: pathPrefix("/xray/"), Profile: apierror.ProfileXray},
 	{
 		Match: func(path string) bool {
@@ -69,7 +70,7 @@ var errorProfileRules = []ProfileRule{
 // routes keep the same profile as handled requests so clients can read
 // their 404 responses.
 func errorProfileFor(path string) apierror.Profile {
-	return ProfileFor(errorProfileRules, path)
+	return httpkit.ProfileFor(errorProfileRules, path)
 }
 
 // pathPrefix matches a path that starts with any of prefixes.

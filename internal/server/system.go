@@ -20,7 +20,9 @@ import (
 	gridgen "github.com/weaveplatform/artifactweave/migration/platform/gen/grid"
 	pfedgen "github.com/weaveplatform/artifactweave/migration/platform/gen/pfed"
 	workergen "github.com/weaveplatform/artifactweave/migration/platform/gen/worker"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/middleware"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
@@ -226,7 +228,7 @@ func sinkHandler(w http.ResponseWriter, r *http.Request) {
 	_, err := io.Copy(io.Discard, r.Body)
 	var tooLarge *http.MaxBytesError
 	if errors.As(err, &tooLarge) {
-		apierror.Write(w, errorProfileFor(r.URL.Path), BodyTooLarge(tooLarge.Limit))
+		apierror.Write(w, errorProfileFor(r.URL.Path), middleware.BodyTooLarge(tooLarge.Limit))
 		return
 	}
 	w.WriteHeader(http.StatusOK)
@@ -325,7 +327,7 @@ func (e *probeError) Unwrap() error { return e.cause }
 // probeFailed leaves err's cause for the access log and returns the 500 a
 // caller gets, which carries the reason alone.
 func (artifactoryService) probeFailed(ctx context.Context, err *probeError) *apierror.Error {
-	NoteCause(ctx, err)
+	httpkit.NoteCause(ctx, err)
 	return apierror.New(http.StatusInternalServerError, err.reason)
 }
 

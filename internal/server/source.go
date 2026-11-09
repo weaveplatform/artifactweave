@@ -28,6 +28,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/p2"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/rpm"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -47,7 +48,7 @@ func (s artifactoryService) getRemoteItem(w http.ResponseWriter, r *http.Request
 		return false
 	}
 	if err != nil && !errors.Is(err, store.ErrNotFound) {
-		WriteErr(w, r, s.itemError(ctx, "cached item", err))
+		httpkit.WriteErr(w, r, s.itemError(ctx, "cached item", err))
 		return true
 	}
 	if errors.Is(err, store.ErrNotFound) && strings.Contains(req.path, "!/") {
@@ -59,7 +60,7 @@ func (s artifactoryService) getRemoteItem(w http.ResponseWriter, r *http.Request
 		// A checksum cannot disclose a file the caller cannot read. Cold SHA-256
 		// retrieval is an explicit transient operation; other cold sidecars stay404.
 		if !acc.file(c, artifact, types.ActionRead) {
-			WriteErr(w, r, itemNotFound())
+			httpkit.WriteErr(w, r, itemNotFound())
 			return true
 		}
 		cached, getErr := s.cfg.Store.Items().Get(ctx, c.Key, true, artifact)
@@ -76,7 +77,7 @@ func (s artifactoryService) getRemoteItem(w http.ResponseWriter, r *http.Request
 			c.RetrieveSha256FromServer != nil && *c.RetrieveSha256FromServer:
 			resource.ChecksumOnly = true
 		default:
-			WriteErr(w, r, itemNotFound())
+			httpkit.WriteErr(w, r, itemNotFound())
 			return true
 		}
 	}
@@ -91,13 +92,17 @@ func (s artifactoryService) getRemoteItem(w http.ResponseWriter, r *http.Request
 	}
 	query, err = s.formatRemoteSourceRequest(ctx, query, acc)
 	if err != nil {
-		WriteErr(w, r, pkgroute.SourceError(err, p.Anonymous))
+		httpkit.WriteErr(w, r, pkgroute.SourceError(err, p.Anonymous))
 		return true
 	}
 	resource = query.Resource
 	result, err := s.cfg.RemoteSources.Read(ctx, query)
 	if err != nil {
-		WriteErr(w, r, s.itemError(ctx, "read source", pkgroute.SourceError(err, p.Anonymous)))
+		httpkit.WriteErr(
+			w,
+			r,
+			s.itemError(ctx, "read source", pkgroute.SourceError(err, p.Anonymous)),
+		)
 		return true
 	}
 	if result.Stream != nil {
@@ -109,9 +114,9 @@ func (s artifactoryService) getRemoteItem(w http.ResponseWriter, r *http.Request
 	ok, matchErr := matchesMatrix(ctx, s.cfg.Store, *result.Item, check)
 	switch {
 	case matchErr != nil:
-		WriteErr(w, r, s.internalError(ctx, "item properties", matchErr))
+		httpkit.WriteErr(w, r, s.internalError(ctx, "item properties", matchErr))
 	case !ok:
-		WriteErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, itemNotFound())
 	default:
 		if !s.remoteDeliveryAllowed(w, r, result, p.Anonymous) {
 			return true
@@ -212,7 +217,7 @@ func (s artifactoryService) serveRemoteStream(
 
 	if !req.matrix().Matches(nil) {
 		_ = result.Stream.Body.Close()
-		WriteErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, itemNotFound())
 		return
 	}
 	if !s.remoteDeliveryAllowed(w, r, result, anonymous) {
@@ -251,7 +256,7 @@ func (s artifactoryService) serveRemoteStream(
 	}
 	sw := &statusWriter{ResponseWriter: w}
 	if err := pkgroute.ServeStream(sw, r, result.Stream); err != nil {
-		NoteCause(ctx, err)
+		httpkit.NoteCause(ctx, err)
 		panic(http.ErrAbortHandler)
 	}
 	if sw.complete(r) && result.Used != nil {
@@ -270,7 +275,7 @@ func (s artifactoryService) remoteDeliveryAllowed(
 			if result.Stream != nil {
 				_ = result.Stream.Body.Close()
 			}
-			WriteErr(w, r, pkgroute.SourceError(err, anonymous))
+			httpkit.WriteErr(w, r, pkgroute.SourceError(err, anonymous))
 			return false
 		}
 	}
@@ -706,7 +711,7 @@ func (s artifactoryService) serveRemoteChecksum(
 	modified time.Time,
 ) {
 	if value == "" {
-		WriteErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, itemNotFound())
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain")
@@ -755,7 +760,7 @@ func (s artifactoryService) serveColdChecksum(
 	value, _, _ := strings.Cut(strings.TrimSpace(string(data)), " ")
 	sums, parseErr := item.ParseChecksums(types.Checksums{SHA256: value})
 	if err != nil || len(data) > 4096 || parseErr != nil || sums.SHA256 == "" {
-		WriteErr(
+		httpkit.WriteErr(
 			w,
 			r,
 			pkgroute.SourceError(

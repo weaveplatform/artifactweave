@@ -17,6 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -49,7 +50,7 @@ func (r *searchRun) upstreamSearch(
 	if !enabled || r.s.cfg.RemoteSources == nil {
 		return nil
 	}
-	u := &upstreamSearch{r: r, ls: ls, g: Deref(g), a: Deref(a)}
+	u := &upstreamSearch{r: r, ls: ls, g: httpkit.Deref(g), a: httpkit.Deref(a)}
 	u.prepareRoutes(repos)
 	return u
 }
@@ -210,7 +211,7 @@ func (u *upstreamSearch) allowed(key, full string, folder bool) bool {
 // send remote=0/1. Keep that explicit override without synthesizing storage
 // records for bytes that have never been downloaded.
 func gavcRemote(ctx context.Context, specific bool, g, a *string) (bool, error) {
-	query, err := rawQuery(RawSearchQuery(ctx))
+	query, err := rawQuery(httpkit.RawSearchQuery(ctx))
 	if err != nil {
 		return false, err
 	}
@@ -222,7 +223,8 @@ func gavcRemote(ctx context.Context, specific bool, g, a *string) (bool, error) 
 		return false, badRequestf("remote GAVC search requires specific=true")
 	}
 	enabled := specific && remote != "0"
-	if enabled && (Deref(g) == "" || Deref(a) == "" || hasWildcard(Deref(g)+Deref(a))) {
+	if enabled &&
+		(httpkit.Deref(g) == "" || httpkit.Deref(a) == "" || hasWildcard(httpkit.Deref(g)+httpkit.Deref(a))) {
 		if remote == "1" {
 			return false, badRequestf("remote GAVC search requires exact g and a")
 		}

@@ -1,4 +1,4 @@
-package server
+package middleware
 
 import (
 	"crypto/rand"
@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
@@ -33,7 +34,7 @@ func RequestID(next http.Handler) http.Handler {
 			id = newRequestID()
 		}
 		w.Header().Set(RequestIDHeader, id)
-		next.ServeHTTP(w, r.WithContext(WithRequestID(r.Context(), id)))
+		next.ServeHTTP(w, r.WithContext(httpkit.WithRequestID(r.Context(), id)))
 	})
 }
 
@@ -62,14 +63,17 @@ func AccessLog(
 			ww := chimiddleware.NewWrapResponseWriter(w, r.ProtoMajor)
 			var cause error
 			var user string
-			next.ServeHTTP(ww, r.WithContext(WithUser(WithCause(r.Context(), &cause), &user)))
+			next.ServeHTTP(
+				ww,
+				r.WithContext(httpkit.WithUser(httpkit.WithCause(r.Context(), &cause), &user)),
+			)
 			attrs := []slog.Attr{
 				slog.String("method", r.Method),
 				slog.String("path", redact(r.URL.Path)),
 				slog.Int("status", ww.Status()),
 				slog.Int("bytes", ww.BytesWritten()),
 				slog.Duration("duration", time.Since(start)),
-				slog.String("request_id", RequestIDFrom(r.Context())),
+				slog.String("request_id", httpkit.RequestIDFrom(r.Context())),
 			}
 			if user != "" {
 				attrs = append(attrs, slog.String("user", user))
@@ -103,11 +107,11 @@ func RecoverPanic(
 					logger.LogAttrs(ctx, slog.LevelError, "panic",
 						slog.Any("panic", rec),
 						slog.String("path", redact(r.URL.Path)),
-						slog.String("request_id", RequestIDFrom(ctx)),
+						slog.String("request_id", httpkit.RequestIDFrom(ctx)),
 					)
 					apierror.Write(
 						w,
-						ErrorProfile(r),
+						httpkit.ErrorProfile(r),
 						apierror.New(http.StatusInternalServerError, "internal error"),
 					)
 				}
@@ -126,7 +130,7 @@ func BodyLimit(limit int64) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.ContentLength > limit {
-				apierror.Write(w, ErrorProfile(r), BodyTooLarge(limit))
+				apierror.Write(w, httpkit.ErrorProfile(r), BodyTooLarge(limit))
 				return
 			}
 			if r.Body != nil {
@@ -167,7 +171,7 @@ func NormalizeContentType(keep func(*http.Request) bool) func(http.Handler) http
 					// ParseMediaType lowercases the type; keep the client's spelling
 					// (Artifactory vendor types use CamelCase) for handlers that echo it.
 					original := strings.TrimSpace(strings.SplitN(ct, ";", 2)[0])
-					r = r.WithContext(WithOriginalContentType(r.Context(), original))
+					r = r.WithContext(httpkit.WithOriginalContentType(r.Context(), original))
 					r.Header.Set("Content-Type", mime.FormatMediaType("application/json", params))
 				}
 			}
@@ -185,7 +189,7 @@ func BindingError(status int) func(w http.ResponseWriter, r *http.Request, err e
 		if errors.As(err, &tooLarge) {
 			apierror.Write(
 				w,
-				ErrorProfile(r),
+				httpkit.ErrorProfile(r),
 				apierror.New(http.StatusRequestEntityTooLarge, err.Error()),
 			)
 			return
@@ -194,13 +198,13 @@ func BindingError(status int) func(w http.ResponseWriter, r *http.Request, err e
 		// 4xx from validation); only untyped errors take the binder's default.
 		var typed *apierror.Error
 		if errors.As(err, &typed) {
-			apierror.Write(w, ErrorProfile(r), typed)
+			apierror.Write(w, httpkit.ErrorProfile(r), typed)
 			return
 		}
 		if status >= http.StatusInternalServerError {
-			NoteCause(r.Context(), err)
+			httpkit.NoteCause(r.Context(), err)
 		}
-		apierror.Write(w, ErrorProfile(r), apierror.New(status, err.Error()))
+		apierror.Write(w, httpkit.ErrorProfile(r), apierror.New(status, err.Error()))
 	}
 }
 

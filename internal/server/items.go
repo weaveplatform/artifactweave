@@ -30,6 +30,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -42,7 +43,7 @@ import (
 // HEAD is not in the spec; it shares the GET handler. Item routes are outside
 // the management body limit: an upload is streamed, however large.
 func (s artifactoryService) registerItemRoutes(r chi.Router) {
-	for _, p := range ChiPatterns("/artifactory/{repoKey}/{filePath}") {
+	for _, p := range httpkit.ChiPatterns("/artifactory/{repoKey}/{filePath}") {
 		r.Put(p, s.deployItem)
 		r.Get(p, s.getItem)
 		r.Head(p, s.getItem)
@@ -282,17 +283,17 @@ func (s artifactoryService) deployEscapedItem(
 	ctx := r.Context()
 	st, err := s.content()
 	if err != nil {
-		WriteErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	req, err := parseEscapedItemPath(escaped)
 	if err != nil {
-		WriteErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	p, acc, err := s.itemCaller(ctx, st)
 	if err != nil {
-		WriteErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	c, cached, err := resolveRepo(ctx, st, req.key)
@@ -300,15 +301,15 @@ func (s artifactoryService) deployEscapedItem(
 		c, err = deployTarget(ctx, st, c, cached)
 	}
 	if err != nil {
-		WriteErr(w, r, s.itemError(ctx, "resolve deploy target", err))
+		httpkit.WriteErr(w, r, s.itemError(ctx, "resolve deploy target", err))
 		return
 	}
 	if !acc.item(c, req.path, req.isFolder, types.ActionWrite) {
-		WriteErr(w, r, denied(p))
+		httpkit.WriteErr(w, r, denied(p))
 		return
 	}
 	if req.path == "" {
-		WriteErr(w, r, badRequestf("a deploy needs a path inside the repository"))
+		httpkit.WriteErr(w, r, badRequestf("a deploy needs a path inside the repository"))
 		return
 	}
 	svc := s.items(st)
@@ -324,12 +325,12 @@ func (s artifactoryService) deployEscapedItem(
 	switch {
 	case err == nil && !existing.Folder && !req.isFolder && !explode &&
 		!s.mayBeIdentical(byChecksum) && !acc.file(c, req.path, types.ActionDelete):
-		WriteErr(w, r, overwriteRefusal(ctx, &item.OverwriteDeniedError{
+		httpkit.WriteErr(w, r, overwriteRefusal(ctx, &item.OverwriteDeniedError{
 			Repo: c.Key, Path: req.path, User: p.Name,
 		}))
 		return
 	case err != nil && !errors.Is(err, store.ErrNotFound):
-		WriteErr(w, r, s.internalError(ctx, "get item", err))
+		httpkit.WriteErr(w, r, s.internalError(ctx, "get item", err))
 		return
 	}
 	var it types.Item
@@ -363,7 +364,7 @@ func (s artifactoryService) deployEscapedItem(
 		return
 	}
 	if err != nil {
-		WriteErr(w, r, s.itemError(ctx, "deploy", err))
+		httpkit.WriteErr(w, r, s.itemError(ctx, "deploy", err))
 		return
 	}
 	// Every deploy names what it stored, where a format may have put it, as
@@ -379,7 +380,7 @@ func (s artifactoryService) deployEscapedItem(
 		w.WriteHeader(http.StatusCreated)
 		return
 	}
-	WriteJSON(w, http.StatusCreated, itemCreated(ctx, it))
+	httpkit.WriteJSON(w, http.StatusCreated, itemCreated(ctx, it))
 }
 
 // answered writes the status of a write the format took without making it
@@ -521,7 +522,7 @@ func (s artifactoryService) recordChecksum(
 	// A checksum is at most 64 hex characters; anything longer is not one.
 	b, err := io.ReadAll(io.LimitReader(r.Body, 256))
 	if err != nil {
-		WriteErr(w, r, badRequestf("reading the checksum: %v", err))
+		httpkit.WriteErr(w, r, badRequestf("reading the checksum: %v", err))
 		return
 	}
 	// Sidecars may carry "<hex>  <file name>" as sha1sum writes them.
@@ -531,7 +532,7 @@ func (s artifactoryService) recordChecksum(
 		return
 	}
 	if err != nil {
-		WriteErr(w, r, s.itemError(r.Context(), "record checksum", err))
+		httpkit.WriteErr(w, r, s.itemError(r.Context(), "record checksum", err))
 		return
 	}
 	// The file the checksum was recorded on, which a format may have named
@@ -547,11 +548,11 @@ func (s artifactoryService) recordChecksum(
 // "/" (6.20's SuccessfulDeploymentResponseHelper).
 func itemCreated(ctx context.Context, it types.Item) map[string]any {
 	uri := baseurl.From(ctx) + "/artifactory/" + it.ReportedRepoKey() + "/" +
-		EscapePath(it.FullPath())
+		httpkit.EscapePath(it.FullPath())
 	body := map[string]any{
 		"repo":      it.ReportedRepoKey(),
 		"path":      it.StoragePath(),
-		"created":   FormatTime(it.Created),
+		"created":   httpkit.FormatTime(it.Created),
 		"createdBy": it.CreatedBy,
 		"uri":       uri,
 	}
@@ -716,22 +717,22 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	st, err := s.content()
 	if err != nil {
-		WriteErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	req, err := parseItemPath(r)
 	if err != nil {
-		WriteErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	p, acc, err := s.itemCaller(ctx, st)
 	if err != nil {
-		WriteErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	c, cached, err := resolveRepo(ctx, st, req.key)
 	if err != nil {
-		WriteErr(w, r, s.itemError(ctx, "resolve repository", err))
+		httpkit.WriteErr(w, r, s.itemError(ctx, "resolve repository", err))
 		return
 	}
 	if s.tryFormatItem(w, r, st, c, cached, req, p, acc) {
@@ -744,7 +745,7 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 	// answers a caller who may not read the path without telling it how
 	// the repository is configured (DV-057).
 	if !acc.folder(c, req.path, types.ActionRead) {
-		WriteErr(w, r, denied(p))
+		httpkit.WriteErr(w, r, denied(p))
 		return
 	}
 	if s.getRemoteFolder(w, r, c, cached, req, p, acc) {
@@ -761,7 +762,7 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 	dl := newDownload(req.path, req.isFolder, req.matrix(), s.items(st).Resolve)
 	if req.path == "" {
 		if err := generic.CheckDownload(c, "", true); err != nil {
-			WriteErr(w, r, s.itemError(ctx, "download check", err))
+			httpkit.WriteErr(w, r, s.itemError(ctx, "download check", err))
 			return
 		}
 		s.listFolder(
@@ -781,11 +782,11 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 		if archive, entry, ok := strings.Cut(req.path, "!/"); ok {
 			a, err := lookup(ctx, st, c, cached, archive, acc, dl, map[string]bool{})
 			if err != nil {
-				WriteErr(w, r, itemNotFound())
+				httpkit.WriteErr(w, r, itemNotFound())
 				return
 			}
 			if !acc.file(a.repo, a.item.FullPath(), types.ActionRead) {
-				WriteErr(w, r, denied(p))
+				httpkit.WriteErr(w, r, denied(p))
 				return
 			}
 			s.getArchiveEntry(w, r, st, a, entry)
@@ -795,18 +796,18 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		WriteErr(w, r, s.itemError(ctx, "lookup item", err))
+		httpkit.WriteErr(w, r, s.itemError(ctx, "lookup item", err))
 		return
 	}
 	if !acc.item(f.repo, f.item.FullPath(), f.item.Folder, types.ActionRead) {
-		WriteErr(w, r, denied(p))
+		httpkit.WriteErr(w, r, denied(p))
 		return
 	}
 	if ok, err := matchesMatrix(ctx, st, f.item, req); err != nil {
-		WriteErr(w, r, s.internalError(ctx, "item properties", err))
+		httpkit.WriteErr(w, r, s.internalError(ctx, "item properties", err))
 		return
 	} else if !ok {
-		WriteErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, itemNotFound())
 		return
 	}
 	if f.item.Folder {
@@ -868,20 +869,20 @@ func (s artifactoryService) getSidecar(
 ) {
 	artifact, alg, ok := item.Sidecar(p)
 	if !ok {
-		WriteErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, itemNotFound())
 		return
 	}
 	f, err := lookup(r.Context(), st, c, cached, artifact, acc, dl, map[string]bool{})
 	// A file the caller may not read has no visible checksum either.
 	if err != nil || f.item.Folder ||
 		!acc.file(f.repo, f.item.FullPath(), types.ActionRead) {
-		WriteErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, itemNotFound())
 		return
 	}
 	value := item.ServedChecksum(f.repo, f.item, alg)
 	if value == "" {
 		// Artifactory 6.20's message (DownloadServiceImpl.respondForChecksumRequest).
-		WriteErr(w, r, apierror.New(http.StatusNotFound,
+		httpkit.WriteErr(w, r, apierror.New(http.StatusNotFound,
 			"Checksum not found for "+f.item.FullPath()))
 		return
 	}
@@ -922,7 +923,7 @@ func (s artifactoryService) serveFile(
 	if err != nil {
 		// The index names content the blob store does not hold: data loss,
 		// not a client error.
-		WriteErr(w, r, s.internalError(ctx, "open blob", err))
+		httpkit.WriteErr(w, r, s.internalError(ctx, "open blob", err))
 		return
 	}
 	defer func() { _ = content.Close() }()
@@ -1010,7 +1011,7 @@ func (s artifactoryService) listFolder(
 	for {
 		batch, next, err := st.Items().Children(ctx, f.repo.Key, f.item.Cached, folder, page)
 		if err != nil {
-			WriteErr(w, r, s.internalError(ctx, "list folder", err))
+			httpkit.WriteErr(w, r, s.internalError(ctx, "list folder", err))
 			return
 		}
 		children = append(children, batch...)
@@ -1074,37 +1075,37 @@ func (s artifactoryService) deleteItem(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	st, err := s.content()
 	if err != nil {
-		WriteErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	req, err := parseItemPath(r)
 	if err != nil {
-		WriteErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	p, acc, err := s.itemCaller(ctx, st)
 	if err != nil {
-		WriteErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	c, cached, err := resolveRepo(ctx, st, req.key)
 	if err != nil {
-		WriteErr(w, r, s.itemError(ctx, "resolve repository", err))
+		httpkit.WriteErr(w, r, s.itemError(ctx, "resolve repository", err))
 		return
 	}
 	if c.Class == repo.Virtual {
-		WriteErr(w, r, apierror.New(http.StatusMethodNotAllowed,
+		httpkit.WriteErr(w, r, apierror.New(http.StatusMethodNotAllowed,
 			fmt.Sprintf("Cannot delete from the virtual repository '%s'", c.Key)))
 		return
 	}
 	if !acc.file(c, req.path, types.ActionDelete) {
-		WriteErr(w, r, denied(p))
+		httpkit.WriteErr(w, r, denied(p))
 		return
 	}
 	if c.PackageType == repo.Debian && strings.HasPrefix(req.path, "snapshots/") {
 		parts := strings.Split(req.path, "/")
 		if len(parts) != 2 || parts[1] == "" {
-			WriteErr(w, r, apierror.New(http.StatusConflict,
+			httpkit.WriteErr(w, r, apierror.New(http.StatusConflict,
 				"Delete the complete Debian snapshot folder"))
 			return
 		}
@@ -1116,17 +1117,17 @@ func (s artifactoryService) deleteItem(w http.ResponseWriter, r *http.Request) {
 	// caller needs Delete on each as on the file (decision 0039).
 	sidecars, err := svc.SidecarsBeside(ctx, t, t.Path)
 	if err != nil {
-		WriteErr(w, r, s.itemError(ctx, "sidecars", err))
+		httpkit.WriteErr(w, r, s.itemError(ctx, "sidecars", err))
 		return
 	}
 	for _, sc := range sidecars {
 		if !acc.file(c, sc.From, types.ActionDelete) {
-			WriteErr(w, r, denied(p))
+			httpkit.WriteErr(w, r, denied(p))
 			return
 		}
 	}
 	if _, err := svc.Delete(ctx, t, p.Name); err != nil {
-		WriteErr(w, r, s.itemError(ctx, "delete item", err))
+		httpkit.WriteErr(w, r, s.itemError(ctx, "delete item", err))
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

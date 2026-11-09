@@ -1,4 +1,4 @@
-package server
+package httpkit
 
 // Deref returns *p, or the zero value when p is nil, for the optional
 // fields of generated request types.

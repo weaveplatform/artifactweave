@@ -11,6 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/service/oidc"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
@@ -52,7 +53,7 @@ func (s accessService) oidcError(ctx context.Context, op string, err error) erro
 	case errors.Is(err, oidc.ErrUnverified):
 		if errors.Is(err, idtoken.ErrKeys) {
 			artifactoryService{cfg: s.cfg}.log().WarnContext(ctx, op,
-				"request_id", RequestIDFrom(ctx), "error", err)
+				"request_id", httpkit.RequestIDFrom(ctx), "error", err)
 		}
 		return apierror.New(http.StatusUnauthorized, err.Error())
 	default:
@@ -198,7 +199,7 @@ func (s accessService) GetOidcIdentityMappings(
 	if err != nil {
 		return nil, err
 	}
-	all, err := svc.Mappings(ctx, req.ProviderName, Deref(req.Params.ProjectKey))
+	all, err := svc.Mappings(ctx, req.ProviderName, httpkit.Deref(req.Params.ProjectKey))
 	if err != nil {
 		return nil, s.oidcError(ctx, "list identity mappings", err)
 	}
@@ -308,12 +309,20 @@ func (s accessService) OidcTokenExchange(
 		return nil, badRequestf("a body with the token exchange is required")
 	}
 	got, err := svc.Exchange(ctx, oidc.ExchangeRequest{
-		GrantType: Deref(b.GrantType), SubjectTokenType: Deref(b.SubjectTokenType),
-		SubjectToken: Deref(b.SubjectToken), ProviderName: Deref(b.ProviderName),
-		ProjectKey: Deref(b.ProjectKey), MappingName: Deref(b.IdentityMappingName),
-		IncludeReference: Deref(b.IncludeReferenceToken),
-		JobID:            Deref(b.JobId), RunID: Deref(b.RunId), Repo: Deref(b.Repo),
-		Revision: Deref(b.Revision), Branch: Deref(b.Branch),
+		GrantType:        httpkit.Deref(b.GrantType),
+		SubjectTokenType: httpkit.Deref(b.SubjectTokenType),
+		SubjectToken:     httpkit.Deref(b.SubjectToken),
+		ProviderName:     httpkit.Deref(b.ProviderName),
+		ProjectKey:       httpkit.Deref(b.ProjectKey),
+		MappingName:      httpkit.Deref(b.IdentityMappingName),
+		IncludeReference: httpkit.Deref(b.IncludeReferenceToken),
+		JobID: httpkit.Deref(
+			b.JobId,
+		),
+		RunID:    httpkit.Deref(b.RunId),
+		Repo:     httpkit.Deref(b.Repo),
+		Revision: httpkit.Deref(b.Revision),
+		Branch:   httpkit.Deref(b.Branch),
 	})
 	if err != nil {
 		return nil, s.oidcError(ctx, "OIDC token exchange", err)
@@ -321,11 +330,11 @@ func (s accessService) OidcTokenExchange(
 	expires := int(got.ExpiresIn)
 	out := accessgen.OidcTokenExchange200JSONResponse{
 		AccessToken:     &got.AccessToken,
-		TokenType:       PtrTo("Bearer"),
+		TokenType:       httpkit.PtrTo("Bearer"),
 		ExpiresIn:       &expires,
-		IssuedTokenType: PtrTo(oidc.IssuedAccessToken),
+		IssuedTokenType: httpkit.PtrTo(oidc.IssuedAccessToken),
 		Username:        &got.Username,
-		Scope:           PtrTo(got.Record.Scope.String()),
+		Scope:           httpkit.PtrTo(got.Record.Scope.String()),
 	}
 	if got.ReferenceToken != "" {
 		out.ReferenceToken = &got.ReferenceToken

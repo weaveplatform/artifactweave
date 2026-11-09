@@ -9,6 +9,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/core/roles"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -171,8 +172,8 @@ func (s accessService) CreateGlobalRole(
 	b := req.Body
 	r := types.Role{
 		Name: b.Name, Type: types.RoleType(b.Type),
-		Description: Deref(b.Description), Actions: Deref(b.Actions),
-		Environments: Deref(b.Environments),
+		Description: httpkit.Deref(b.Description), Actions: httpkit.Deref(b.Actions),
+		Environments: httpkit.Deref(b.Environments),
 	}
 	if err := svc.CreateRole(ctx, r); err != nil {
 		return nil, s.roleError(ctx, "create role", err, http.StatusConflict)
@@ -196,8 +197,8 @@ func (s accessService) UpdateGlobalRole(
 	b := req.Body
 	r := types.Role{
 		Name: b.Name, Type: types.RoleType(b.Type),
-		Description: Deref(b.Description), Actions: Deref(b.Actions),
-		Environments: Deref(b.Environments),
+		Description: httpkit.Deref(b.Description), Actions: httpkit.Deref(b.Actions),
+		Environments: httpkit.Deref(b.Environments),
 	}
 	if err := svc.UpdateRole(ctx, string(req.Role), r); err != nil {
 		return nil, s.roleError(ctx, "update role", err, http.StatusConflict)

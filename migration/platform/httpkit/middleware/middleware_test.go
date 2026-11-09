@@ -1,4 +1,4 @@
-package server
+package middleware
 
 import (
 	"bytes"
@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
@@ -19,7 +20,7 @@ func TestAccRequestIDReusedOrMinted(t *testing.T) {
 	var seen string
 	h := RequestID(
 		http.HandlerFunc(
-			func(_ http.ResponseWriter, r *http.Request) { seen = RequestIDFrom(r.Context()) },
+			func(_ http.ResponseWriter, r *http.Request) { seen = httpkit.RequestIDFrom(r.Context()) },
 		),
 	)
 
@@ -36,7 +37,7 @@ func TestAccRequestIDReusedOrMinted(t *testing.T) {
 	if seen == "" || seen == "client-id" || rec.Header().Get(RequestIDHeader) != seen {
 		t.Fatalf("minted id wrong: ctx %q header %q", seen, rec.Header().Get(RequestIDHeader))
 	}
-	if RequestIDFrom(context.Background()) != "" {
+	if httpkit.RequestIDFrom(context.Background()) != "" {
 		t.Fatal("bare context should have no id")
 	}
 	if newRequestID() == newRequestID() {
@@ -72,7 +73,7 @@ func TestAccAccessLogLogsTheCauseOfAnUntypedError(t *testing.T) {
 	}{{
 		name: "untyped error",
 		handler: func(w http.ResponseWriter, r *http.Request) {
-			WriteErr(w, r, errors.New("sqlite: disk I/O error"))
+			httpkit.WriteErr(w, r, errors.New("sqlite: disk I/O error"))
 		},
 		level: "ERROR",
 		cause: true,
@@ -85,7 +86,7 @@ func TestAccAccessLogLogsTheCauseOfAnUntypedError(t *testing.T) {
 		cause: true,
 	}, {
 		name:    "typed error",
-		handler: func(w http.ResponseWriter, r *http.Request) { WriteErr(w, r, itemNotFound()) },
+		handler: func(w http.ResponseWriter, r *http.Request) { httpkit.WriteErr(w, r, itemNotFound()) },
 		level:   "INFO",
 	}, {
 		name: "untyped binding error",
@@ -115,7 +116,7 @@ func TestAccAccessLogLogsTheCauseOfAnUntypedError(t *testing.T) {
 	// Without AccessLog above it, a handler's error has nowhere to go and
 	// must not panic.
 	rec := httptest.NewRecorder()
-	WriteErr(
+	httpkit.WriteErr(
 		rec,
 		httptest.NewRequest(http.MethodGet, "/artifactory/api/x", nil),
 		errors.New("lost"),
@@ -128,7 +129,7 @@ func TestAccAccessLogLogsTheCauseOfAnUntypedError(t *testing.T) {
 func TestAccRecoverPanicUsesEnvelope(t *testing.T) {
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&buf, nil))
-	h := ErrorProfiles(accessProfile)(RecoverPanic(
+	h := httpkit.ErrorProfiles(accessProfile)(RecoverPanic(
 		logger,
 		plainPath,
 	)(
@@ -217,7 +218,7 @@ func TestAccNormalizeContentType(t *testing.T) {
 	)(
 		http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 			gotHeader = r.Header.Get("Content-Type")
-			gotOriginal = OriginalContentType(r.Context())
+			gotOriginal = httpkit.OriginalContentType(r.Context())
 		}),
 	)
 	cases := []struct{ in, header, original, path string }{
@@ -272,7 +273,7 @@ func TestAccBindingError(t *testing.T) {
 	)(
 		rec,
 		httptest.NewRequest(http.MethodGet, "/access/api/x", nil).WithContext(
-			WithProfileRules(context.Background(), accessProfile),
+			httpkit.WithProfileRules(context.Background(), accessProfile),
 		),
 		&http.MaxBytesError{Limit: 8},
 	)
@@ -288,7 +289,7 @@ func plainPath(path string) string { return path }
 
 // accessProfile gives /access/ paths the Access profile, as the server's
 // rules do, so the tests can tell the two envelopes apart.
-var accessProfile = []ProfileRule{{
+var accessProfile = []httpkit.ProfileRule{{
 	Match:   func(path string) bool { return strings.HasPrefix(path, "/access/") },
 	Profile: apierror.ProfileAccess,
 }}

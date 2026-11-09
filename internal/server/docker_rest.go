@@ -12,6 +12,7 @@ import (
 	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -151,11 +152,11 @@ func promotionArgs(b *artgen.PromoteDockerImageJSONRequestBody) (promotion, erro
 	}
 	a := promotion{
 		targetRepo: b.TargetRepo,
-		name:       b.DockerRepository, tag: Deref(b.Tag),
+		name:       b.DockerRepository, tag: httpkit.Deref(b.Tag),
 		shouldCopy: b.Copy != nil && *b.Copy,
 	}
-	a.toName = orDefault(Deref(b.TargetDockerRepository), a.name)
-	a.toTag = orDefault(Deref(b.TargetTag), a.tag)
+	a.toName = orDefault(httpkit.Deref(b.TargetDockerRepository), a.name)
+	a.toTag = orDefault(httpkit.Deref(b.TargetTag), a.tag)
 	switch {
 	case !dockerhttp.ValidName(a.name):
 		return a, badRequestf("invalid image name '%s'", a.name)

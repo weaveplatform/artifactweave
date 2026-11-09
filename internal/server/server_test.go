@@ -15,6 +15,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/middleware"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
@@ -194,7 +195,7 @@ func TestAccSystemEndpoints(t *testing.T) {
 					t.Fatalf("body mismatch (-want +got):\n%s", diff)
 				}
 			}
-			if rec.Header().Get(RequestIDHeader) == "" {
+			if rec.Header().Get(middleware.RequestIDHeader) == "" {
 				t.Fatal("missing request id header")
 			}
 		})

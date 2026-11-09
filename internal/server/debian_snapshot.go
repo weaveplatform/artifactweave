@@ -23,6 +23,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -380,59 +381,59 @@ func (s artifactoryService) registerDebianSnapshotRoutes(r chi.Router) {
 func (s artifactoryService) getDebianSnapshot(w http.ResponseWriter, r *http.Request) {
 	st, err := s.content()
 	if err != nil {
-		WriteErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	p, acc, err := s.itemCaller(r.Context(), st)
 	if err != nil {
-		WriteErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	key, tag := chi.URLParam(r, "repoKey"), chi.URLParam(r, "tag")
 	if !debianSnapshotSegment.MatchString(tag) {
-		WriteErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, itemNotFound())
 		return
 	}
 	c, err := st.Repos().Get(r.Context(), key)
 	if err != nil || c.PackageType != repo.Debian || c.Class != repo.Local {
-		WriteErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, itemNotFound())
 		return
 	}
 	root := "snapshots/" + tag
 	marker, err := st.Items().Get(r.Context(), key, false, root)
 	if err != nil || !marker.Folder {
-		WriteErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, itemNotFound())
 		return
 	}
 	props, err := st.Items().Properties(r.Context(), marker.ID)
 	if err != nil || len(props["deb.snapshot.source"]) != 1 {
-		WriteErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, itemNotFound())
 		return
 	}
 	sourceKey := props["deb.snapshot.source"][0]
 	sourceRepo, err := st.Repos().Get(r.Context(), sourceKey)
 	if err != nil || sourceRepo.PackageType != repo.Debian {
-		WriteErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, itemNotFound())
 		return
 	}
 	rel := strings.TrimPrefix(chi.URLParam(r, "*"), "/")
 	if rel == "" || path.Clean(rel) != rel || strings.HasPrefix(rel, "../") {
-		WriteErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, itemNotFound())
 		return
 	}
 	if !acc.file(c, root+"/"+rel, types.ActionRead) ||
 		!acc.file(sourceRepo, rel, types.ActionRead) {
-		WriteErr(w, r, denied(p))
+		httpkit.WriteErr(w, r, denied(p))
 		return
 	}
 	if strings.HasPrefix(rel, "dists/") {
 		it, err := st.Items().Get(r.Context(), key, false, root+"/"+rel)
 		if err != nil || it.Folder {
-			WriteErr(w, r, itemNotFound())
+			httpkit.WriteErr(w, r, itemNotFound())
 			return
 		}
 		if err := s.checkDebianSnapshotIndex(r.Context(), rel, it, sourceRepo, p, acc); err != nil {
-			WriteErr(w, r, s.itemError(r.Context(), "Debian snapshot index", err))
+			httpkit.WriteErr(w, r, s.itemError(r.Context(), "Debian snapshot index", err))
 			return
 		}
 		s.serveFile(w, r, st, found{repo: c, item: it}, p)
@@ -440,10 +441,10 @@ func (s artifactoryService) getDebianSnapshot(w http.ResponseWriter, r *http.Req
 	}
 	if !debian.ValidBinaryPath(rel) && !debian.ValidSourcePath(rel) &&
 		!strings.HasPrefix(rel, "pool/") {
-		WriteErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, itemNotFound())
 		return
 	}
-	w.Header().Set("Location", "/artifactory/"+sourceKey+"/"+EscapePath(rel))
+	w.Header().Set("Location", "/artifactory/"+sourceKey+"/"+httpkit.EscapePath(rel))
 	w.WriteHeader(http.StatusFound)
 }
 

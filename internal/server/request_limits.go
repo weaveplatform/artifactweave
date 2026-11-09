@@ -13,6 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -265,7 +266,7 @@ func writeLimitError(w http.ResponseWriter, r *http.Request, err error) {
 	if errors.Is(err, apilimit.ErrBusy) {
 		status, message = http.StatusTooManyRequests, "API concurrent work limit exceeded"
 	} else {
-		NoteCause(r.Context(), err)
+		httpkit.NoteCause(r.Context(), err)
 	}
 	e := apierror.New(status, message)
 	e.RetryAfterSeconds = 1

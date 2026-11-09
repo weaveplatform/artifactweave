@@ -15,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -36,10 +37,10 @@ const calculateMetadataActions = types.ActionManage | types.ActionDelete | types
 // the spec, under the patterns chiPatterns derives so they replace the 501
 // stubs (decision 0036).
 func (s artifactoryService) registerMavenRoutes(r chi.Router) {
-	for _, p := range ChiPatterns(mavenCalculatePrefix + "{repoKey}/{folderPath}") {
+	for _, p := range httpkit.ChiPatterns(mavenCalculatePrefix + "{repoKey}/{folderPath}") {
 		r.Post(p, s.calculateMavenMetadata)
 	}
-	for _, p := range ChiPatterns(mavenGeneratePrefix + "{repoKey}/{jarFilePath}") {
+	for _, p := range httpkit.ChiPatterns(mavenGeneratePrefix + "{repoKey}/{jarFilePath}") {
 		r.Post(p, s.generateMavenPom)
 	}
 }
@@ -115,14 +116,14 @@ func (s artifactoryService) calculateMavenMetadata(w http.ResponseWriter, r *htt
 	if v := r.URL.Query().Get("noneRecursive"); v != "" {
 		none, err := strconv.ParseBool(v)
 		if err != nil {
-			WriteErr(w, r, badRequestf("noneRecursive must be true or false"))
+			httpkit.WriteErr(w, r, badRequestf("noneRecursive must be true or false"))
 			return
 		}
 		recursive = !none
 	}
 	t, err := s.mavenTargetOf(r, mavenCalculatePrefix, calculateMetadataActions)
 	if err != nil {
-		WriteErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	ctx := r.Context()
@@ -133,7 +134,7 @@ func (s artifactoryService) calculateMavenMetadata(w http.ResponseWriter, r *htt
 		t.path,
 		recursive,
 	); err != nil {
-		WriteErr(w, r, s.itemError(ctx, "calculate Maven metadata", err))
+		httpkit.WriteErr(w, r, s.itemError(ctx, "calculate Maven metadata", err))
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain")
@@ -153,17 +154,17 @@ func (s artifactoryService) generateMavenPom(w http.ResponseWriter, r *http.Requ
 		err = badRequestf("'%s/%s' is not a file", t.c.Key, t.path)
 	}
 	if err != nil {
-		WriteErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	svc := s.items(t.st)
 	at, body, err := maven.GeneratePOM(ctx, svc.Env(), t.c, t.it)
 	if err != nil {
-		WriteErr(w, r, s.itemError(ctx, "generate POM", err))
+		httpkit.WriteErr(w, r, s.itemError(ctx, "generate POM", err))
 		return
 	}
 	if err := s.writePom(ctx, svc, t, at, body); err != nil {
-		WriteErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusOK)

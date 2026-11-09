@@ -9,6 +9,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/agentplugins"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -17,23 +18,23 @@ func (s artifactoryService) getAgentMarketplace(w http.ResponseWriter, r *http.R
 	ctx := r.Context()
 	st, err := s.content()
 	if err != nil {
-		WriteErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	p, acc, err := s.itemCaller(ctx, st)
 	if err != nil {
-		WriteErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	c, cached, err := resolveRepo(ctx, st, chi.URLParam(r, "repoKey"))
 	if err != nil {
-		WriteErr(w, r, s.itemError(ctx, "resolve repository", err))
+		httpkit.WriteErr(w, r, s.itemError(ctx, "resolve repository", err))
 		return
 	}
 	name := chi.URLParam(r, "marketplace")
 	if c.PackageType != repo.AgentPlugins || c.Class != repo.Local || cached ||
 		!agentplugins.IsMarketplace(name) {
-		WriteErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, itemNotFound())
 		return
 	}
 	s.serveAgentMarketplace(w, r, st, c, name, p, acc)
@@ -48,7 +49,7 @@ func (s artifactoryService) tryAgentMarketplaceItem(
 		return false
 	}
 	if !agentplugins.IsMarketplace(req.path) {
-		WriteErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, itemNotFound())
 		return true
 	}
 	s.serveAgentMarketplace(w, r, st, c, req.path, p, acc)
@@ -60,18 +61,18 @@ func (s artifactoryService) serveAgentMarketplace(
 	name string, p kernel.Principal, acc access,
 ) {
 	if err := generic.CheckDownload(c, name, false); err != nil {
-		WriteErr(w, r, s.itemError(r.Context(), "download check", err))
+		httpkit.WriteErr(w, r, s.itemError(r.Context(), "download check", err))
 		return
 	}
 	if !acc.folder(c, "", types.ActionRead) {
-		WriteErr(w, r, denied(p))
+		httpkit.WriteErr(w, r, denied(p))
 		return
 	}
 	data, err := agentplugins.Marketplace(r.Context(), st, c.Key, name, func(path string) bool {
 		return acc.file(c, path, types.ActionRead) && generic.CheckDownload(c, path, false) == nil
 	})
 	if err != nil {
-		WriteErr(w, r, s.internalError(r.Context(), "agent plugin marketplace", err))
+		httpkit.WriteErr(w, r, s.internalError(r.Context(), "agent plugin marketplace", err))
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")

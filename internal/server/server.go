@@ -76,7 +76,9 @@ import (
 	gridgen "github.com/weaveplatform/artifactweave/migration/platform/gen/grid"
 	pfedgen "github.com/weaveplatform/artifactweave/migration/platform/gen/pfed"
 	workergen "github.com/weaveplatform/artifactweave/migration/platform/gen/worker"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/middleware"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -351,7 +353,7 @@ func newRegistry(cfg Config, artSvc artifactoryService) *dockerhttp.Registry {
 		// one the registry serves no repository, so the setting decides
 		// nothing.
 		Authenticated: cfg.Access.Authenticator != nil,
-		Fault:         func(r *http.Request, err error) { NoteCause(r.Context(), err) },
+		Fault:         func(r *http.Request, err error) { httpkit.NoteCause(r.Context(), err) },
 		// The registry serves only docker, oci and helmoci repositories,
 		// whose format takes no settings.
 		Formats: ecosystem.For,
@@ -448,16 +450,16 @@ func New(cfg Config) http.Handler {
 	// The registry exists before the middleware, whose challenge it writes.
 	registry := newRegistry(cfg, artSvc)
 	r.Use(
-		ErrorProfiles(errorProfileRules),
-		RequestID,
-		RecoverPanic(logger, loggedPath),
-		AccessLog(logger, loggedPath),
+		httpkit.ErrorProfiles(errorProfileRules),
+		middleware.RequestID,
+		middleware.RecoverPanic(logger, loggedPath),
+		middleware.AccessLog(logger, loggedPath),
 		baseurl.Middleware(cfg.BaseURL),
 		smart.SmartTrace,
 		dockerhttp.APIVersion,
 		registry.Challenge,
 		normalizeContentType,
-		CollectionSlash(slashCollections),
+		middleware.CollectionSlash(slashCollections),
 		plusAsSpace,
 		idempotencyRoutes,
 		apiRecoveryContext,
@@ -499,8 +501,9 @@ func New(cfg Config) http.Handler {
 	// Hand-written routes go first so they win over anything a generated mux
 	// might later claim for the same prefix.
 	r.Get("/artifactory/api/system/ping", artSvc.ping(artifactoryService.probeArtifactory))
-	r.With(BodyLimit(sinkBodyLimit)).Post("/artifactory/api/system/usage", sinkHandler)
-	r.With(BodyLimit(sinkBodyLimit)).Post("/jfconnect/api/v1/backoffice/metrics/log", sinkHandler)
+	r.With(middleware.BodyLimit(sinkBodyLimit)).Post("/artifactory/api/system/usage", sinkHandler)
+	r.With(middleware.BodyLimit(sinkBodyLimit)).
+		Post("/jfconnect/api/v1/backoffice/metrics/log", sinkHandler)
 	r.Get("/access/api/v1/system/ping", artSvc.ping(artifactoryService.probeAccess))
 	// Access's and the router's own probes, which JFrog's Helm charts and
 	// secret rotator poll through the public URL. The router is ready when
@@ -511,7 +514,7 @@ func New(cfg Config) http.Handler {
 	r.Get("/router/api/v1/system/liveness", liveness)
 	r.Get("/router/api/v1/system/health", artSvc.routerHealth)
 	r.Get("/artifactory/api/artifactweave/remote-status/{repoKey}", artSvc.smartStatus)
-	r.With(BodyLimit(managementBodyLimit)).
+	r.With(middleware.BodyLimit(managementBodyLimit)).
 		Patch("/artifactory/api/system/configuration", artSvc.patchConfiguration)
 	artSvc.registerItemRoutes(r)
 	artSvc.registerStorageRoutes(r)
@@ -529,7 +532,7 @@ func New(cfg Config) http.Handler {
 		terraformbackendhttp.Options{
 			Items:        artSvc.items(cfg.Store),
 			Keys:         cfg.Keys,
-			Fault:        func(r *http.Request, err error) { NoteCause(r.Context(), err) },
+			Fault:        func(r *http.Request, err error) { httpkit.NoteCause(r.Context(), err) },
 			Authorizer:   cfg.Access.Authorizer,
 			Identity:     cfg.Access.Identity,
 			Restrictions: cfg.Access.Restrictions,
@@ -553,46 +556,46 @@ func New(cfg Config) http.Handler {
 	// Generated strict servers, one per spec, each under its service prefix
 	// with the management body limit.
 	r.Group(func(g chi.Router) {
-		g.Use(BodyLimit(managementBodyLimit), requestDetails)
+		g.Use(middleware.BodyLimit(managementBodyLimit), requestDetails)
 		strictOpts := artgen.StrictHTTPServerOptions{
-			RequestErrorHandlerFunc:  BindingError(http.StatusBadRequest),
-			ResponseErrorHandlerFunc: BindingError(http.StatusInternalServerError),
+			RequestErrorHandlerFunc:  middleware.BindingError(http.StatusBadRequest),
+			ResponseErrorHandlerFunc: middleware.BindingError(http.StatusInternalServerError),
 		}
 		artgen.HandlerWithOptions(
 			artgen.NewStrictHandlerWithOptions(artSvc, nil, strictOpts),
 			artgen.ChiServerOptions{
 				BaseURL:          "/artifactory",
 				BaseRouter:       g,
-				ErrorHandlerFunc: BindingError(http.StatusBadRequest),
+				ErrorHandlerFunc: middleware.BindingError(http.StatusBadRequest),
 			},
 		)
 		accessOpts := accessgen.StrictHTTPServerOptions{
-			RequestErrorHandlerFunc:  BindingError(http.StatusBadRequest),
-			ResponseErrorHandlerFunc: BindingError(http.StatusInternalServerError),
+			RequestErrorHandlerFunc:  middleware.BindingError(http.StatusBadRequest),
+			ResponseErrorHandlerFunc: middleware.BindingError(http.StatusInternalServerError),
 		}
 		accessgen.HandlerWithOptions(
 			accessgen.NewStrictHandlerWithOptions(accSvc, nil, accessOpts),
 			accessgen.ChiServerOptions{
 				BaseURL:          "/access",
 				BaseRouter:       g,
-				ErrorHandlerFunc: BindingError(http.StatusBadRequest),
+				ErrorHandlerFunc: middleware.BindingError(http.StatusBadRequest),
 			},
 		)
 		eventOpts := eventgen.StrictHTTPServerOptions{
-			RequestErrorHandlerFunc:  BindingError(http.StatusBadRequest),
-			ResponseErrorHandlerFunc: BindingError(http.StatusInternalServerError),
+			RequestErrorHandlerFunc:  middleware.BindingError(http.StatusBadRequest),
+			ResponseErrorHandlerFunc: middleware.BindingError(http.StatusInternalServerError),
 		}
 		eventgen.HandlerWithOptions(
 			eventgen.NewStrictHandlerWithOptions(eventService{}, nil, eventOpts),
 			eventgen.ChiServerOptions{
 				BaseURL:          "/event",
 				BaseRouter:       g,
-				ErrorHandlerFunc: BindingError(http.StatusBadRequest),
+				ErrorHandlerFunc: middleware.BindingError(http.StatusBadRequest),
 			},
 		)
 		distributionOpts := distributiongen.StrictHTTPServerOptions{
-			RequestErrorHandlerFunc:  BindingError(http.StatusBadRequest),
-			ResponseErrorHandlerFunc: BindingError(http.StatusInternalServerError),
+			RequestErrorHandlerFunc:  middleware.BindingError(http.StatusBadRequest),
+			ResponseErrorHandlerFunc: middleware.BindingError(http.StatusInternalServerError),
 		}
 		distributiongen.HandlerWithOptions(
 			distributiongen.NewStrictHandlerWithOptions(
@@ -603,43 +606,43 @@ func New(cfg Config) http.Handler {
 			distributiongen.ChiServerOptions{
 				BaseURL:          "/distribution",
 				BaseRouter:       g,
-				ErrorHandlerFunc: BindingError(http.StatusBadRequest),
+				ErrorHandlerFunc: middleware.BindingError(http.StatusBadRequest),
 			},
 		)
 		workerOpts := workergen.StrictHTTPServerOptions{
-			RequestErrorHandlerFunc:  BindingError(http.StatusBadRequest),
-			ResponseErrorHandlerFunc: BindingError(http.StatusInternalServerError),
+			RequestErrorHandlerFunc:  middleware.BindingError(http.StatusBadRequest),
+			ResponseErrorHandlerFunc: middleware.BindingError(http.StatusInternalServerError),
 		}
 		workergen.HandlerWithOptions(
 			workergen.NewStrictHandlerWithOptions(workerService{}, nil, workerOpts),
 			workergen.ChiServerOptions{
 				BaseURL:          "/worker",
 				BaseRouter:       g,
-				ErrorHandlerFunc: BindingError(http.StatusBadRequest),
+				ErrorHandlerFunc: middleware.BindingError(http.StatusBadRequest),
 			},
 		)
 		pfedOpts := pfedgen.StrictHTTPServerOptions{
-			RequestErrorHandlerFunc:  BindingError(http.StatusBadRequest),
-			ResponseErrorHandlerFunc: BindingError(http.StatusInternalServerError),
+			RequestErrorHandlerFunc:  middleware.BindingError(http.StatusBadRequest),
+			ResponseErrorHandlerFunc: middleware.BindingError(http.StatusInternalServerError),
 		}
 		pfedgen.HandlerWithOptions(
 			pfedgen.NewStrictHandlerWithOptions(pfedService{}, nil, pfedOpts),
 			pfedgen.ChiServerOptions{
 				BaseURL:          "/pfed",
 				BaseRouter:       g,
-				ErrorHandlerFunc: BindingError(http.StatusBadRequest),
+				ErrorHandlerFunc: middleware.BindingError(http.StatusBadRequest),
 			},
 		)
 		gridOpts := gridgen.StrictHTTPServerOptions{
-			RequestErrorHandlerFunc:  BindingError(http.StatusBadRequest),
-			ResponseErrorHandlerFunc: BindingError(http.StatusInternalServerError),
+			RequestErrorHandlerFunc:  middleware.BindingError(http.StatusBadRequest),
+			ResponseErrorHandlerFunc: middleware.BindingError(http.StatusInternalServerError),
 		}
 		gridgen.HandlerWithOptions(
 			gridgen.NewStrictHandlerWithOptions(gridService{}, nil, gridOpts),
 			gridgen.ChiServerOptions{
 				BaseURL:          "/grid",
 				BaseRouter:       g,
-				ErrorHandlerFunc: BindingError(http.StatusBadRequest),
+				ErrorHandlerFunc: middleware.BindingError(http.StatusBadRequest),
 			},
 		)
 	})
@@ -659,7 +662,7 @@ func New(cfg Config) http.Handler {
 // media type is part of the content they store and serve back, and Git LFS
 // protocol requests, whose media type is the protocol's.
 func normalizeContentType(next http.Handler) http.Handler {
-	return NormalizeContentType(keepContentType)(next)
+	return middleware.NormalizeContentType(keepContentType)(next)
 }
 
 func keepContentType(r *http.Request) bool {

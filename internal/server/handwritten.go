@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/api"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
@@ -24,7 +25,7 @@ import (
 func registerHandwrittenStubs(r chi.Router, logger *slog.Logger) {
 	existing := registeredRoutes(r)
 	for _, op := range handwrittenOps() {
-		for _, pattern := range ChiPatterns(op.path) {
+		for _, pattern := range httpkit.ChiPatterns(op.path) {
 			key := op.method + " " + pattern
 			if existing[key] {
 				continue

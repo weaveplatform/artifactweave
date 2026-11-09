@@ -19,6 +19,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -780,7 +781,7 @@ func pageAfter(ps []types.Permission, cursor *string, limit int) ([]types.Permis
 // pipeline_source sections.
 func readAccess(ctx context.Context, body any) (wire.AccessPermission, error) {
 	var w wire.AccessPermission
-	if raw := RawBody(ctx); raw != nil {
+	if raw := httpkit.RawBody(ctx); raw != nil {
 		if err := json.Unmarshal(raw, &w); err != nil {
 			return w, badRequestf("the permission is not valid JSON: %v", err)
 		}

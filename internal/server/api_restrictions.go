@@ -11,6 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
@@ -57,7 +58,7 @@ func (s artifactoryService) checkAPIRestriction(next http.Handler) http.Handler 
 			cancel()
 			if err != nil {
 				if errors.Is(err, kernel.ErrAPIRestricted) {
-					WriteErr(w, r, err)
+					httpkit.WriteErr(w, r, err)
 				} else {
 					writeLimitError(w, r, err)
 				}
@@ -199,7 +200,7 @@ func (s artifactoryService) GetAPIRestrictionAudit(
 			"API restriction storage is unavailable",
 		)
 	}
-	user := Deref(req.Params.User)
+	user := httpkit.Deref(req.Params.User)
 	limit := 100
 	if req.Params.Limit != nil {
 		limit = *req.Params.Limit
@@ -208,7 +209,7 @@ func (s artifactoryService) GetAPIRestrictionAudit(
 		return nil, badRequestf("limit must be between 1 and 1000")
 	}
 	page := store.Page{Limit: limit}
-	if raw := Deref(req.Params.Cursor); raw != "" {
+	if raw := httpkit.Deref(req.Params.Cursor); raw != "" {
 		parts, err := (store.Page{After: raw}).Key(4)
 		if err != nil || len(parts) != 4 || parts[0] != "v1" || parts[1] != user ||
 			parts[2] != p.Name {

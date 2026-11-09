@@ -19,6 +19,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/rpm"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -583,7 +584,7 @@ func (s artifactoryService) helmPartialReindex(next http.Handler) http.Handler {
 		}
 		msg, err := s.reindex(r.Context(), repo.Helm, key, p, false)
 		if err != nil {
-			WriteErr(w, r, err)
+			httpkit.WriteErr(w, r, err)
 			return
 		}
 		// The generated reindex operations answer the same way.

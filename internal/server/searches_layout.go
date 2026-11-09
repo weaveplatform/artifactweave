@@ -13,6 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -75,10 +76,10 @@ func (r *searchRun) layoutScope(
 		}
 	}
 	values := layout.Values{}
-	if Deref(g) != "" {
+	if httpkit.Deref(g) != "" {
 		values[layout.TokenOrg] = *g
 	}
-	if Deref(a) != "" {
+	if httpkit.Deref(a) != "" {
 		values[layout.TokenModule] = *a
 	}
 	items := &item.Service{Store: r.st}
@@ -193,7 +194,7 @@ func (ls layoutScope) find(
 // wildcard compiles a search parameter in which * is any text and ? one
 // character; nil, for a parameter not given or empty, matches anything.
 func wildcard(p *string) *regexp.Regexp {
-	if Deref(p) == "" {
+	if httpkit.Deref(p) == "" {
 		return nil
 	}
 	var sb strings.Builder
@@ -216,7 +217,7 @@ func matches(re *regexp.Regexp, s string) bool { return re == nil || re.MatchStr
 
 // downloadURI is the URL an item downloads from under the key key.
 func downloadURI(ctx context.Context, key, fullPath string) string {
-	return baseurl.From(ctx) + "/artifactory/" + key + "/" + EscapePath(fullPath)
+	return baseurl.From(ctx) + "/artifactory/" + key + "/" + httpkit.EscapePath(fullPath)
 }
 
 // SearchGavc answers the GAVC search: the files whose layout coordinates
@@ -232,10 +233,11 @@ func (s artifactoryService) SearchGavc(
 		return nil, err
 	}
 	p := req.Params
-	if Deref(p.G) == "" && Deref(p.A) == "" && Deref(p.V) == "" && Deref(p.C) == "" {
+	if httpkit.Deref(p.G) == "" && httpkit.Deref(p.A) == "" && httpkit.Deref(p.V) == "" &&
+		httpkit.Deref(p.C) == "" {
 		return nil, badRequestf("name at least one of g, a, v and c")
 	}
-	specific := Deref(p.Specific)
+	specific := httpkit.Deref(p.Specific)
 	remote, err := gavcRemote(ctx, specific, p.G, p.A)
 	if err != nil {
 		return nil, err
@@ -338,7 +340,7 @@ func (r *searchRun) namedKeys(scope aql.Node) map[aql.RepoRef]string {
 // moduleSearch checks a versions or latest version search's parameters: a
 // group or a module, and remote 0 or 1.
 func moduleSearch[R ~int](g, a *string, remote *R) error {
-	if Deref(g) == "" && Deref(a) == "" {
+	if httpkit.Deref(g) == "" && httpkit.Deref(a) == "" {
 		return badRequestf("name the group (g), the module (a) or both")
 	}
 	if remote != nil && *remote != 0 && *remote != 1 {
@@ -462,8 +464,8 @@ func (s artifactoryService) SearchVersions(
 	if err != nil {
 		return nil, err
 	}
-	v := Deref(p.V)
-	upstream := r.upstreamSearch(ls, p.Repos, p.G, p.A, Deref(p.Remote) == 1)
+	v := httpkit.Deref(p.V)
+	upstream := r.upstreamSearch(ls, p.Repos, p.G, p.A, httpkit.Deref(p.Remote) == 1)
 	versions, err := moduleVersions(ctx, r, ls, p.G, p.A, v, false, upstream)
 	if err != nil {
 		return nil, err
@@ -507,8 +509,8 @@ func (s artifactoryService) SearchLatestVersion(
 	if err != nil {
 		return nil, err
 	}
-	v := Deref(p.V)
-	upstream := r.upstreamSearch(ls, p.Repos, p.G, p.A, Deref(p.Remote) == 1)
+	v := httpkit.Deref(p.V)
+	upstream := r.upstreamSearch(ls, p.Repos, p.G, p.A, httpkit.Deref(p.Remote) == 1)
 	versions, err := moduleVersions(ctx, r, ls, p.G, p.A, v, true, upstream)
 	if err != nil {
 		return nil, err

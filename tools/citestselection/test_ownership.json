@@ -123,7 +123,6 @@
       "matrix_pkgtest_test.go",
       "matrix_reindex_test.go",
       "matrix_test.go",
-      "middleware_test.go",
       "npm_auth_paths_test.go",
       "npm_fixture_test.go",
       "oidc_status_test.go",

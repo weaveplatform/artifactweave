@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -69,18 +70,23 @@ func TestAccTrashStorageLastModified(t *testing.T) {
 		wantStatus(t, rec, http.StatusOK)
 		return decodeObject(t, rec.Body.String())
 	}
-	if got := last("admin", "/libs-local/a/old.txt"); got["lastModified"] != FormatTime(t0) {
+	if got := last(
+		"admin",
+		"/libs-local/a/old.txt",
+	); got["lastModified"] != httpkit.FormatTime(
+		t0,
+	) {
 		t.Fatalf("file %v", got)
 	}
 	if got := last("admin", "/libs-local"); got["uri"] !=
 		"https://reg.example"+trashURL+"/libs-local/a/b/new.txt" {
 		t.Fatalf("folder %v", got)
 	}
-	if got := last("admin", ""); got["lastModified"] != FormatTime(t0.Add(2*time.Hour)) {
+	if got := last("admin", ""); got["lastModified"] != httpkit.FormatTime(t0.Add(2*time.Hour)) {
 		t.Fatalf("root %v", got)
 	}
 	// What the caller does not see does not count, though it is newer.
-	if got := last("deployer", ""); got["lastModified"] != FormatTime(t0.Add(time.Hour)) {
+	if got := last("deployer", ""); got["lastModified"] != httpkit.FormatTime(t0.Add(time.Hour)) {
 		t.Fatalf("deployer's root %v", got)
 	}
 }
@@ -120,7 +126,7 @@ func TestAccTrashStorageViewsFiltered(t *testing.T) {
 	list("/libs-local/a?list&listFolders=1&includeRootPath=1", "/", "/one.txt")
 	rec := w.do("GET", trashURL+"/libs-local/a?lastModified", "user", "")
 	wantStatus(t, rec, http.StatusOK)
-	if got := decodeObject(t, rec.Body.String()); got["lastModified"] != FormatTime(t0) {
+	if got := decodeObject(t, rec.Body.String()); got["lastModified"] != httpkit.FormatTime(t0) {
 		t.Fatalf("lastModified %v", got)
 	}
 	wantStatus(t, w.do("GET", trashURL+"/libs-local/a/one.txt?properties", "user", ""),

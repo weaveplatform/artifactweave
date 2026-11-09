@@ -18,6 +18,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/kernel/antpath"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -72,7 +73,7 @@ type searchResponse struct {
 
 func answer(ctx context.Context, vendor string, body any) searchResponse {
 	media := "application/json"
-	if Accepts(ctx, vendor) {
+	if httpkit.Accepts(ctx, vendor) {
 		media = vendor
 	}
 	return searchResponse{media: media, body: body}
@@ -312,7 +313,7 @@ func within(f aql.Field, from, to time.Time) aql.Node {
 func (r *searchRun) uri(ctx context.Context, it types.Item) string {
 	u := baseurl.From(ctx) + storagePrefix + it.ReportedRepoKey()
 	if p := it.FullPath(); p != "" {
-		u += "/" + EscapePath(p)
+		u += "/" + httpkit.EscapePath(p)
 	}
 	return u
 }
@@ -428,7 +429,7 @@ func (s artifactoryService) SearchProperty(
 	if err != nil {
 		return nil, err
 	}
-	criteria, err := propertyCriteria(RawSearchQuery(ctx))
+	criteria, err := propertyCriteria(httpkit.RawSearchQuery(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -579,7 +580,11 @@ func (r *searchRun) window(from time.Time, to *time.Time) (time.Time, time.Time,
 		end = *to
 	}
 	if from.After(end) {
-		return from, end, badRequestf("from %s is after to %s", FormatTime(from), FormatTime(end))
+		return from, end, badRequestf(
+			"from %s is after to %s",
+			httpkit.FormatTime(from),
+			httpkit.FormatTime(end),
+		)
 	}
 	return from, end, nil
 }
@@ -620,7 +625,7 @@ func (s artifactoryService) SearchCreation(
 	entries := make([]map[string]any, 0, len(hits))
 	for _, h := range hits {
 		entries = append(entries, map[string]any{
-			"uri": r.uri(ctx, h.Item), "created": FormatTime(h.Item.Created),
+			"uri": r.uri(ctx, h.Item), "created": httpkit.FormatTime(h.Item.Created),
 		})
 	}
 	return answer(ctx, mediaCreationSearch, results(entries)), nil

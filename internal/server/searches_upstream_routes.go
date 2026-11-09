@@ -10,6 +10,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -29,7 +30,7 @@ type searchDisclosure struct {
 func (u *upstreamSearch) prepareRoutes(requested *string) {
 	u.routes = map[string][]searchRoute{}
 	u.virtuals = map[string]repo.Config{}
-	keys := strings.Split(Deref(requested), ",")
+	keys := strings.Split(httpkit.Deref(requested), ",")
 	if requested == nil || strings.TrimSpace(*requested) == "" {
 		keys = nil
 		for key, c := range u.r.configs {

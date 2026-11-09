@@ -12,6 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -99,7 +100,7 @@ func (s artifactoryService) SearchBuildArtifacts(
 	if body == nil {
 		body = &artgen.SearchBuildArtifactsJSONRequestBody{}
 	}
-	number, status := blank(Deref(body.BuildNumber)), blank(Deref(body.BuildStatus))
+	number, status := blank(httpkit.Deref(body.BuildNumber)), blank(httpkit.Deref(body.BuildStatus))
 	switch {
 	case blank(body.BuildName) == "":
 		return nil, badRequestf("Cannot search without build name.")
@@ -117,8 +118,8 @@ func (s artifactoryService) SearchBuildArtifacts(
 		return nil, err
 	}
 	var mappings []*regexp.Regexp
-	for _, m := range Deref(body.Mappings) {
-		if Deref(m.Input) == "" {
+	for _, m := range httpkit.Deref(body.Mappings) {
+		if httpkit.Deref(m.Input) == "" {
 			continue
 		}
 		re, err := regexp.Compile(`^(?:` + *m.Input + `)$`)
@@ -128,7 +129,7 @@ func (s artifactoryService) SearchBuildArtifacts(
 		mappings = append(mappings, re)
 	}
 	var in func(types.Item) bool
-	if refs := r.refsOf(Deref(body.Repos)); refs != nil {
+	if refs := r.refsOf(httpkit.Deref(body.Repos)); refs != nil {
 		in = func(it types.Item) bool { return refs[aql.RepoRef{Key: it.RepoKey, Cached: it.Cached}] }
 	}
 	missing := noBuildArtifacts(body.BuildName, number, status)

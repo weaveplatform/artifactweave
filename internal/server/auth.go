@@ -12,6 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/core/authz"
 	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -113,10 +114,10 @@ func authenticate(
 					return
 				}
 				if err != nil {
-					WriteErr(w, r, err)
+					httpkit.WriteErr(w, r, err)
 					return
 				}
-				NoteUser(ctx, p.Name)
+				httpkit.NoteUser(ctx, p.Name)
 				next.ServeHTTP(
 					w,
 					r.WithContext(authn.WithAuthorized(keepNPMCredential(ctx, r, p), p, d)),
@@ -133,17 +134,17 @@ func authenticate(
 			}
 			anonymous, err := a.AnonymousAllowed(ctx)
 			if err != nil {
-				WriteErr(w, r, err)
+				httpkit.WriteErr(w, r, err)
 				return
 			}
 			switch {
 			case anonymous:
 				p, d, err := authorize(ctx, st, kernel.Anonymous, true)
 				if err != nil {
-					WriteErr(w, r, err)
+					httpkit.WriteErr(w, r, err)
 					return
 				}
-				NoteUser(ctx, p.Name)
+				httpkit.NoteUser(ctx, p.Name)
 				next.ServeHTTP(w, r.WithContext(authn.WithAuthorized(ctx, p, d)))
 			case publicRoutes[r.Method+" "+r.URL.Path]:
 				next.ServeHTTP(w, r)

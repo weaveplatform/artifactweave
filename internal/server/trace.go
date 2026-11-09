@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -69,17 +70,17 @@ func (s artifactoryService) traceItem(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	st, err := s.content()
 	if err != nil {
-		WriteErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	req, err := parseItemPath(r)
 	if err != nil {
-		WriteErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	p, acc, err := s.itemCaller(ctx, st)
 	if err != nil {
-		WriteErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	start := time.Now()
@@ -90,7 +91,7 @@ func (s artifactoryService) traceItem(w http.ResponseWriter, r *http.Request) {
 		if !errors.As(err, &e) {
 			// A failure the download would answer with a bare 500: its
 			// cause goes to the access log, as writeErr sends it.
-			NoteCause(ctx, err)
+			httpkit.NoteCause(ctx, err)
 			e = apierror.New(http.StatusInternalServerError, "internal error")
 		}
 		if e.Status == http.StatusNotFound {
@@ -101,7 +102,7 @@ func (s artifactoryService) traceItem(w http.ResponseWriter, r *http.Request) {
 		t.stepf("Request succeeded")
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "Request ID: %s\n", RequestIDFrom(ctx))
+	fmt.Fprintf(&b, "Request ID: %s\n", httpkit.RequestIDFrom(ctx))
 	fmt.Fprintf(&b, "Repo Path ID: %s:%s\n", req.key, req.path)
 	fmt.Fprintf(&b, "Method Name: %s\n", r.Method)
 	fmt.Fprintf(&b, "User: %s\n", p.Name)

@@ -7,6 +7,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	cheffmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/chef"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 )
 
 // Cached metadata describes versions outside an individual caller's permission
@@ -20,7 +21,7 @@ func (artifactoryService) tryChefItem(
 	if !chefMetadataItem(c, req.path) {
 		return false
 	}
-	WriteErr(w, r, itemNotFound())
+	httpkit.WriteErr(w, r, itemNotFound())
 	return true
 }
 

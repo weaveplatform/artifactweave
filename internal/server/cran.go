@@ -17,6 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cran"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -47,7 +48,7 @@ func (s artifactoryService) tryCranItem(
 		return false
 	}
 	if strings.HasSuffix(req.path, "/PACKAGES.rds") {
-		WriteErr(w, r, itemNotFound()) // R falls back to PACKAGES.gz.
+		httpkit.WriteErr(w, r, itemNotFound()) // R falls back to PACKAGES.gz.
 		return true
 	}
 	if _, _, ok := cran.IndexPath(req.path); ok {
@@ -72,12 +73,12 @@ func (s artifactoryService) serveCranIndex(
 	feed, name, ok := cran.IndexPath(req.path)
 	if !ok || len(req.props) != 0 || r.URL.RawQuery != "" ||
 		cached && c.Class != repo.Remote {
-		WriteErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, itemNotFound())
 		return
 	}
 	if !acc.folder(c, feed, types.ActionRead) || !acc.file(c, req.path, types.ActionRead) ||
 		generic.CheckDownload(c, req.path, false) != nil {
-		WriteErr(w, r, denied(p))
+		httpkit.WriteErr(w, r, denied(p))
 		return
 	}
 	var candidates []cranCandidate
@@ -106,7 +107,11 @@ func (s artifactoryService) serveCranIndex(
 		used = view.used
 	}
 	if err != nil {
-		WriteErr(w, r, s.itemError(ctx, "CRAN index", pkgroute.SourceError(err, p.Anonymous)))
+		httpkit.WriteErr(
+			w,
+			r,
+			s.itemError(ctx, "CRAN index", pkgroute.SourceError(err, p.Anonymous)),
+		)
 		return
 	}
 	packages := make([]cran.Package, 0, len(candidates))
@@ -115,7 +120,7 @@ func (s artifactoryService) serveCranIndex(
 	}
 	generated, err := cran.EncodeIndex(packages, feed)
 	if err != nil {
-		WriteErr(w, r, s.internalError(ctx, "CRAN index", err))
+		httpkit.WriteErr(w, r, s.internalError(ctx, "CRAN index", err))
 		return
 	}
 	body := generated[name]
@@ -324,12 +329,12 @@ func (s artifactoryService) serveCranPackage(
 	cached bool, req itemRequest, p kernel.Principal, acc access,
 ) {
 	if len(req.props) != 0 || r.URL.RawQuery != "" || cached && c.Class != repo.Remote {
-		WriteErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, itemNotFound())
 		return
 	}
 	if !acc.file(c, req.path, types.ActionRead) ||
 		generic.CheckDownload(c, req.path, false) != nil {
-		WriteErr(w, r, denied(p))
+		httpkit.WriteErr(w, r, denied(p))
 		return
 	}
 	feed, _, _, _ := cran.PackagePath(req.path)
@@ -351,7 +356,7 @@ func (s artifactoryService) serveCranPackage(
 		}
 	}
 	if err != nil {
-		WriteErr(w, r, s.itemError(r.Context(), "CRAN package index",
+		httpkit.WriteErr(w, r, s.itemError(r.Context(), "CRAN package index",
 			pkgroute.SourceError(err, p.Anonymous)))
 		return
 	}
@@ -365,17 +370,17 @@ func (s artifactoryService) serveCranPackage(
 		}
 		it, getErr := st.Items().Get(r.Context(), candidate.repo.Key, false, req.path)
 		if getErr != nil {
-			WriteErr(w, r, s.itemError(r.Context(), "CRAN member package", getErr))
+			httpkit.WriteErr(w, r, s.itemError(r.Context(), "CRAN member package", getErr))
 			return
 		}
 		if it.Folder {
-			WriteErr(w, r, itemNotFound())
+			httpkit.WriteErr(w, r, itemNotFound())
 			return
 		}
 		s.serveFile(w, r, st, found{repo: candidate.repo, item: it}, p)
 		return
 	}
-	WriteErr(w, r, itemNotFound())
+	httpkit.WriteErr(w, r, itemNotFound())
 }
 
 func (s artifactoryService) serveRemoteCranPackage(
@@ -392,12 +397,12 @@ func (s artifactoryService) serveRemoteCranPackage(
 	}
 	query, err := cranSourceRequest(query)
 	if err != nil {
-		WriteErr(w, r, s.itemError(r.Context(), "CRAN source", err))
+		httpkit.WriteErr(w, r, s.itemError(r.Context(), "CRAN source", err))
 		return
 	}
 	result, err := s.cfg.RemoteSources.Read(r.Context(), query)
 	if err != nil {
-		WriteErr(
+		httpkit.WriteErr(
 			w,
 			r,
 			s.itemError(r.Context(), "CRAN source", pkgroute.SourceError(err, p.Anonymous)),
@@ -412,7 +417,7 @@ func (s artifactoryService) serveRemoteCranPackage(
 		return
 	}
 	if result.Item == nil || expected.MD5 != "" && result.Item.Actual.MD5 != expected.MD5 {
-		WriteErr(w, r, pkgroute.SourceError(source.ErrInvalidResult, p.Anonymous))
+		httpkit.WriteErr(w, r, pkgroute.SourceError(source.ErrInvalidResult, p.Anonymous))
 		return
 	}
 	s.serveFile(w, r, s.cfg.Store,

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	vcshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/vcs/http"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
@@ -177,7 +178,7 @@ func (s artifactoryService) vcsNested(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/zip")
 		w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
 		if _, err := io.Copy(w, body); err != nil {
-			NoteCause(r.Context(), err)
+			httpkit.NoteCause(r.Context(), err)
 		}
 		return
 	}
@@ -209,6 +210,6 @@ func (s artifactoryService) vcsNested(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
 	}
 	if _, err := io.Copy(w, body); err != nil {
-		NoteCause(r.Context(), err)
+		httpkit.NoteCause(r.Context(), err)
 	}
 }
