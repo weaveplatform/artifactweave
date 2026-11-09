@@ -1,18 +1,3 @@
-// Package pkgroute is the router kit for package formats with a protocol of
-// their own: npm and Go in P7, then PyPI, NuGet, Helm and Terraform
-// (decision 0032). Mount claims /artifactory/api/<name>/{repoKey}/... for
-// one protocol, or /artifactory/api/<name>/... when the protocol finds the
-// repository key elsewhere in the path (Protocol.Resolve), and any routes
-// it has at the host root (Protocol.Host). Before the protocol's handlers
-// run it resolves the repository, checks its package type and passes it
-// through the class gate, so every protocol answers those the same way and
-// in its own envelope. The kit's helpers then check permissions, download
-// through the item routes' download path, deploy through the item service
-// and read multipart uploads (ReadForm).
-//
-// Docker's registry predates the kit and keeps its own router (decision
-// 0031). This package never imports internal/server: the server hands it
-// what it needs through Options.
 package pkgroute
 
 import (
