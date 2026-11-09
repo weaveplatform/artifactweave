@@ -91,6 +91,7 @@
 //     #p9d-modular-monolith-migration, epic STO
 //     (https://github.com/weaveplatform/artifactweave/issues/939).
 //   - https://github.com/weaveplatform/artifactweave/issues/1055
+//   - https://github.com/weaveplatform/artifactweave/issues/1062
 //
 // # Status
 //
@@ -104,10 +105,14 @@
 //
 // # Testing
 //
-// The package has no tests of its own. The metadata store's in-memory and
-// SQL stores are checked against Store at compile time beside the other
-// modules' ports (pkg/store/inmem/inmem_test.go and
+// The package has no tests of its own. The module's adapters declare at
+// compile time that their stores satisfy Store (adapters/inmem/store.go and
+// adapters/sql/store.go), and the metadata store's in-memory and SQL stores
+// are checked against it beside the other modules' ports
+// (pkg/store/inmem/inmem_test.go and
 // internal/sqlstore/sqlcommon/store_test.go). The module's contract suite,
-// adapters/storetest, runs every port on those stores' in-memory, SQLite
-// and PostgreSQL backends from inside the metadata store's contract suite.
+// adapters/storetest, runs every port on the module's adapters
+// (adapters/inmem's TestUnitContract, and adapters/sql's TestAccContract on
+// SQLite in memory and in a file) and on the metadata store's in-memory,
+// SQLite and PostgreSQL backends from inside its contract suite.
 package port

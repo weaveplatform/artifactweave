@@ -1,16 +1,17 @@
 // Package storetest is the contract suite of the artifacts module's
-// stores: one set of expectations that every implementation of the item,
-// trash, package, build, remote cache, Git LFS lock, Bower registration and
-// archived-item stores and of the blob and replica indexes must meet.
+// stores: one set of expectations that every implementation of the
+// repository, item, trash, package, build, remote cache, Git LFS lock,
+// Bower registration and archived-item stores and of the blob and replica
+// indexes must meet.
 //
 // # Role
 //
-// artifacts module, adapter layer, test support. The metadata store's
-// contract runs Run with a Factory over its own stores, so its in-memory,
-// SQLite and PostgreSQL stores pass the same cases; STO-18 adds the
-// module's own runs once its adapters implement the whole port.Store. The
-// package imports the standard library, the kernel, the platform and the
-// module's core and api only.
+// artifacts module, adapter layer, test support. The module's in-memory
+// and SQL adapters run Run over their own stores, and the metadata store's
+// contract runs it with a Factory over its stores, so its in-memory, SQLite
+// and PostgreSQL stores pass the same cases. The package imports the
+// standard library, the kernel, the platform and the module's core and api
+// only.
 //
 // # Inputs
 //
@@ -58,13 +59,14 @@
 //     ("Persistence": contract suites; "Names the migration introduces",
 //     which lists Factory and Run).
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
-//     lines 611 and 612 (the artifacts storetest adapter), line 847 (store
+//     lines 612 and 613 (the artifacts storetest adapter), line 847 (store
 //     contract suites per module, run by its adapters) and line 1057 (the
 //     metadata store's contract split per owner).
 //   - Plan: docs/implementation/plan.md#p2-stores and
 //     #p9d-modular-monolith-migration, epic STO
 //     (https://github.com/weaveplatform/artifactweave/issues/939).
 //   - https://github.com/weaveplatform/artifactweave/issues/1061
+//   - https://github.com/weaveplatform/artifactweave/issues/1062
 //
 // # Status
 //
@@ -77,7 +79,9 @@
 //
 // # Testing
 //
-// The package is the suite. The metadata store's TestUnitContract,
-// TestAccContractFile, TestAccContractMemory and TestAccContract
-// (PostgreSQL) run Run.
+// The package is the suite. The module's adapters run Run in
+// adapters/inmem's TestUnitContract and in adapters/sql's TestAccContract
+// (SQLite in memory and in a file), and the metadata store's
+// TestUnitContract, TestAccContractFile, TestAccContractMemory and
+// TestAccContract (PostgreSQL) run it under the same subtest names.
 package storetest
