@@ -1,4 +1,4 @@
-package artifacts
+package artifacts_test
 
 import (
 	"strings"

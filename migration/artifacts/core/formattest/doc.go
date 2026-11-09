@@ -74,9 +74,9 @@
 //     the index empty.
 //   - The suite drives the item service, whose entry points every API
 //     calls: the properties API and AQL properties.update call
-//     Service.Annotate, which internal/server's
-//     TestAccPropertyWritesReachTheFormat holds them to. A format that
-//     passes therefore keeps its index whichever API carries the write.
+//     Service.Annotate, which TestAccPropertyWritesReachTheFormat in
+//     test/server/artifacts holds them to. A format that passes therefore
+//     keeps its index whichever API carries the write.
 //   - Run holds the fixture to its own rules before any scenario: a kind of
 //     work is keyed either by package or by repository, a sidecar's owner is
 //     another file of its version that is no sidecar itself, and no sidecar

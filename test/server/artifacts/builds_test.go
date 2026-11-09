@@ -1,18 +1,48 @@
-package artifacts
+package artifacts_test
 
 import (
-	"context" //nolint:gosec // wire checksum
+	"context"
+	"crypto/md5" //nolint:gosec // wire checksum
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
+
+const vendorJSON = "application/vnd.org.jfrog.artifactory+json"
+
+func md5Hex(s string) string {
+	b := md5.Sum([]byte(s)) //nolint:gosec // wire checksum
+	return hex.EncodeToString(b[:])
+}
+
+// startedAt is testStarted moved on by n seconds.
+func startedAt(n int) string {
+	t, err := build.ParseStarted(testStarted)
+	if err != nil {
+		panic(err)
+	}
+	return build.FormatStarted(t.Add(time.Duration(n) * time.Second))
+}
+
+// artifactDoc is a build-info document whose one module produced content,
+// with fields the spec does not list, which must survive.
+func artifactDoc(name, number, started, content string) string {
+	return fmt.Sprintf(`{"name":%q,"number":%q,"started":%q,`+
+		`"agent":{"name":"jfrog-cli-go","version":"2.80.0"},"vcs":[{"revision":"abc"}],`+
+		`"properties":{"buildInfo.env.CI":"true","count":3},`+
+		`"modules":[{"id":"m1","type":"generic","artifacts":[{"name":"a.bin","path":"app/a.bin",`+
+		`"sha1":%q,"sha256":%q,"md5":%q,"localPath":"/tmp/a.bin"}]}]}`,
+		name, number, started, sha1Hex(content), sha256Hex(content), md5Hex(content))
+}
 
 // documentPath is where a run's document item is in artifactory-build-info.
 func documentPath(name, number, started string) string {
@@ -22,6 +52,11 @@ func documentPath(name, number, started string) string {
 	}
 	_, p := types.Build{Name: name, Number: number, Started: t}.DocumentItem()
 	return p
+}
+
+func (w *itemWorld) publish(doc string) {
+	w.t.Helper()
+	wantStatus(w.t, w.do(http.MethodPut, buildsPath, "admin", doc, "Content-Type", vendorJSON), 204)
 }
 
 func (w *itemWorld) hasItem(key, p string) bool {

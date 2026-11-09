@@ -1,4 +1,4 @@
-package artifacts
+package artifacts_test
 
 import (
 	"context"
@@ -7,15 +7,58 @@ import (
 	"net/http/httptest"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/reindexauth"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
+
+// reindexRecorder is the format of the P8 package types in these tests:
+// the generic format made a PathReindexer that records each rebuild, as
+// "<key>" or "<key>/<path>", and fails it with err.
+type reindexRecorder struct {
+	generic.Handler
+	mu   sync.Mutex
+	runs []string
+	err  error
+}
+
+func (f *reindexRecorder) Reindex(_ context.Context, _ format.Env, c repo.Config) error {
+	return f.record(c.Key)
+}
+
+func (f *reindexRecorder) ReindexPath(
+	_ context.Context,
+	_ format.Env,
+	c repo.Config,
+	p string,
+) error {
+	return f.record(c.Key + "/" + p)
+}
+
+func (f *reindexRecorder) record(run string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.runs = append(f.runs, run)
+	return f.err
+}
+
+// take returns the rebuilds run since it was last called.
+func (f *reindexRecorder) take() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := f.runs
+	f.runs = nil
+	return out
+}
 
 // claimsReindex is a format that claims a reindex kind as its own work,
 // which the item service refuses to register.
@@ -26,6 +69,93 @@ func (claimsReindex) WorkKinds() []string { return []string{format.KindReindex} 
 func (claimsReindex) Work(context.Context, format.Env, types.WorkItem) error { return nil }
 
 func (claimsReindex) Owed(repo.Config, bool, string) []format.WorkRef { return nil }
+
+// p8Repos are the P8 repositories of reindexWorld.
+var p8Repos = []repo.Config{
+	{Key: "pypi-local", Class: repo.Local, PackageType: repo.PyPI},
+	{Key: "pypi-remote", Class: repo.Remote, PackageType: repo.PyPI, URL: "https://up.example"},
+	{Key: "nuget-local", Class: repo.Local, PackageType: repo.NuGet},
+	{Key: "nuget-fed", Class: repo.Federated, PackageType: repo.NuGet},
+	{Key: "nuget-remote", Class: repo.Remote, PackageType: repo.NuGet, URL: "https://up.example"},
+	{
+		Key: "nuget-virtual", Class: repo.Virtual, PackageType: repo.NuGet,
+		Repositories: []string{"nuget-local"},
+	},
+	{Key: "helm-local", Class: repo.Local, PackageType: repo.Helm},
+	{Key: "helm-fed", Class: repo.Federated, PackageType: repo.Helm},
+	{
+		Key: "helm-virtual", Class: repo.Virtual, PackageType: repo.Helm,
+		Repositories: []string{"helm-local"},
+	},
+	{Key: "helmoci-local", Class: repo.Local, PackageType: repo.HelmOCI},
+	{
+		Key: "terraform-local", Class: repo.Local, PackageType: repo.Terraform,
+		TerraformType: repo.TerraformModule,
+	},
+}
+
+// reindexWorld is an item world with the P8 repositories, deployer holding
+// Manage on each and nothing else, and formats from pick. With a queue, the
+// work it is given runs only when a test asks.
+func reindexWorld(
+	t *testing.T,
+	pick func(repo.PackageType) format.Handler,
+	queue bool,
+) (*itemWorld, *work.Queue) {
+	t.Helper()
+	var q *work.Queue
+	w := newItemWorld(t, false, func(cfg *Config) {
+		cfg.Formats = pick
+		if !queue {
+			return
+		}
+		var err error
+		if q, err = work.New(cfg.Store, work.Options{}); err != nil {
+			t.Fatal(err)
+		}
+		api := withAccess(*cfg).Access
+		derived := &item.Service{
+			Store:            cfg.Store,
+			Blobs:            cfg.Blobs,
+			Work:             q,
+			Formats:          pick,
+			ReindexAuthorize: reindexauth.New(api.Authenticator, api.Authorizer),
+		}
+		if err := derived.RegisterWork(q); err != nil {
+			t.Fatal(err)
+		}
+		cfg.Work = q
+	})
+	ctx := context.Background()
+	targets := map[string]types.Target{}
+	for _, c := range p8Repos {
+		if err := w.db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+		targets[c.Key] = types.Target{Include: []string{"**"}}
+	}
+	if err := w.db.Permissions().Create(ctx, types.Permission{
+		Name: "manage-p8",
+		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
+			Actions: types.Grants{Users: map[string]types.Actions{"deployer": types.ActionManage}},
+			Targets: targets,
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return w, q
+}
+
+// recording picks f for the P8 package types and the real formats for the
+// rest.
+func recording(f *reindexRecorder) func(repo.PackageType) format.Handler {
+	return func(t repo.PackageType) format.Handler {
+		if slices.Contains(p8Types, t) {
+			return f
+		}
+		return ecosystem.For(t)
+	}
+}
 
 // wantText checks a reindex's 200 and its plain-text answer.
 func wantText(t *testing.T, rec *httptest.ResponseRecorder, text string) {

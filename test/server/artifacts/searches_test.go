@@ -1,4 +1,4 @@
-package artifacts
+package artifacts_test
 
 import (
 	"context"
@@ -19,6 +19,52 @@ import (
 )
 
 const storageURI = "https://reg.example/artifactory/api/storage/"
+
+// searchWorld is an item world holding:
+//   - libs-local/org/a/lib-1.0.jar (team=core, tier=gold), deployed with
+//     its true MD5 and SHA-1 declared;
+//   - libs-local/org/a/lib-1.0.pom (team=core);
+//   - other-local/org/b/lib-2.0.jar (team=edge), the same bytes as the jar;
+//   - server-local/bad.jar, whose declared MD5 is wrong;
+//   - up's cache cached.txt, created an hour ago and never downloaded.
+//
+// deployer reads libs-local only; anonymous, when on, reads up's cache.
+func searchWorld(t *testing.T, anonymous bool, tune ...func(*Config)) *itemWorld {
+	t.Helper()
+	w := newItemWorld(t, anonymous, tune...)
+	w.put("/artifactory/other-local/org/b/lib-2.0.jar;team=edge", "jar")
+	wantStatus(t, w.do("PUT", "/artifactory/libs-local/org/a/lib-1.0.jar;team=core;tier=gold",
+		"admin", "jar", "X-Checksum-Md5", md5Hex("jar"), "X-Checksum-Sha1", sha1Hex("jar")),
+		http.StatusCreated)
+	w.put("/artifactory/libs-local/org/a/lib-1.0.pom;team=core", "pom")
+	wantStatus(t, w.do("PUT", "/artifactory/server-local/bad.jar", "admin", "bad",
+		"X-Checksum-Md5", md5Hex("other")), http.StatusCreated)
+	hour := time.Now().Add(-time.Hour).UTC()
+	if _, err := w.db.Items().Put(context.Background(), types.Item{
+		RepoKey: "up", Cached: true, Path: types.RootPath, Name: "cached.txt", Size: 1,
+		Actual:  types.Checksums{SHA1: sha1Hex("c"), MD5: md5Hex("c")},
+		Created: hour, Modified: hour, Updated: hour,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return w
+}
+
+// hitsOf returns a search's results, failing unless it answered 200.
+func hitsOf(t *testing.T, rec *httptest.ResponseRecorder) []map[string]any {
+	t.Helper()
+	wantStatus(t, rec, http.StatusOK)
+	var body struct {
+		Results []map[string]any `json:"results"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("%v: %s", err, rec.Body)
+	}
+	if body.Results == nil {
+		t.Fatalf("results missing or null: %s", rec.Body)
+	}
+	return body.Results
+}
 
 // uris returns the results' uris under the storage API prefix.
 func uris(t *testing.T, rec *httptest.ResponseRecorder) []string {

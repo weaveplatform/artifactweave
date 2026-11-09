@@ -1,13 +1,19 @@
-package artifacts
+package artifacts_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/url"
 	"slices"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/sqlstore/postgres"
+	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/storetest"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -23,6 +29,38 @@ func TestAccLongPropertyValuesOnPostgres(
 	t *testing.T,
 ) {
 	testLongPropertyValues(t, openPostgres(t))
+}
+
+func openPostgres(t *testing.T) store.Store {
+	t.Helper()
+	db, err := postgres.Open(context.Background(), sqltest.PostgresDSN(t), postgres.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	sqltest.Reset(t, db.DB(), postgres.Dialect)
+	return db
+}
+
+// propertyServer is the router over db, with libs-local and the seeded
+// admin, whose password is "pw".
+func propertyServer(t *testing.T, db store.Store) http.Handler {
+	t.Helper()
+	ctx := context.Background()
+	cheapSeed(t, db)
+	libs := repo.Defaults(&repo.Config{Key: "libs-local", Class: repo.Local})
+	if err := db.Repos().Create(ctx, *libs); err != nil {
+		t.Fatal(err)
+	}
+	blobs, err := fs.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err := authn.NewAuthenticator(db.Users(), db.Settings(), authn.Options{Hash: testHash})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return New(Config{BaseURL: "https://reg.example", Store: db, Blobs: blobs, Auth: a})
 }
 
 // testLongPropertyValues sets property values of types.PropertyValueMax

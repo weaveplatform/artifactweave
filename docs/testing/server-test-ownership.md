@@ -8,8 +8,9 @@ new schema:
 - `packages` maps every directory with server tests to its owner: a format, or
   `shared`.
 - `shared_files` lists, by file name, every test file in a shared directory whose
-  files are reviewed one by one. Today these are `internal/server` and
-  `internal/app`.
+  files are reviewed one by one. Today these are `internal/server`,
+  `internal/app` and the module suites `test/server/access`,
+  `test/server/artifacts` and `test/server/configuration`.
 - `format_dependencies` maps a format to the repository paths of the shared test
   files that exercise it.
 
@@ -75,7 +76,7 @@ When a test file leaves a shared directory such as `internal/server`:
 | Skills | `migration/artifacts/ecosystem/skills/http` |
 | Terraform registry | `migration/artifacts/ecosystem/terraform/http`, `test/server/artifacts/terraform` |
 | Terraform backend | `migration/artifacts/ecosystem/terraformbackend/http`, `test/server/artifacts/terraformbackend` |
-| Shared | `internal/server`, `internal/server/pkgroute`, `test/server/access`, `test/server/configuration` |
+| Shared | `internal/server`, `internal/server/pkgroute`, `test/server/access`, `test/server/artifacts`, `test/server/configuration` |
 
 `test/server/support` and the packages under it (`harness`, `agentcommon` and
 `registryfixture`) contain fixtures and helpers, not test suites. A change
@@ -86,34 +87,34 @@ CI profiles; this inventory supplies the package boundary.
 
 ## Residual root test audit
 
-The 90 direct root test files cover shared server APIs and registration:
-authentication, access tokens, roles, permissions, repositories, generic item
-delivery, cache and source handling, search, AQL, builds, storage, trash,
-transfer, OpenAPI, status and principal matrices. The file names are explicit
-in the inventory. A new direct root test cannot be treated as format-owned
-without review.
+The 89 direct root test files cover shared server APIs and registration:
+authentication, the in-package parts of the access and artifacts management
+suites (`<name>_internal_test.go`), AQL relations and transitive searches,
+request limits, the format route suites that have not moved yet, OpenAPI,
+status and principal matrices. The file names are explicit in the inventory.
+A new direct root test cannot be treated as format-owned without review.
 
 Some shared API tests use a format-specific fixture. The inventory's
 `format_dependencies` records the link from a format to such a test as the
 test's repository path (`internal/server/<file>`, or `test/server/access/<file>`
-for the access suite's) so #673 can include those tests when that format
-changes:
+and `test/server/artifacts/<file>` for the module suites') so #673 can include
+those tests when that format changes:
 
 | Shared tests | Shared behavior exercised |
 | --- | --- |
-| `test/server/access`: `keypairs_test.go`, `permissions_test.go`; root: `storage_list_test.go` | Keypair, permission and storage APIs using Terraform fixtures |
-| `searches_upstream_test.go`, `searches_upstream_mapped_test.go` | Generic upstream search and cache mapping using Maven coordinates |
-| `reindex_test.go` | Generic reindex orchestration using PyPI and Helm cases |
-| `repositories_test.go` | Repository settings using NuGet contexts |
-| `repositories_format_class_test.go` | Repository class validation across LuaRocks, NIM and Agent formats |
+| `test/server/access`: `keypairs_test.go`, `permissions_test.go`; `test/server/artifacts`: `storage_list_test.go` | Keypair, permission and storage APIs using Terraform fixtures |
+| `test/server/artifacts`: `searches_upstream_test.go`, `searches_upstream_mapped_test.go` | Generic upstream search and cache mapping using Maven coordinates |
+| `test/server/artifacts`: `reindex_test.go`; root: `reindex_internal_test.go` | Generic reindex orchestration using PyPI and Helm cases |
+| `test/server/artifacts`: `repositories_test.go` | Repository settings using NuGet contexts |
+| `test/server/artifacts`: `repositories_format_class_test.go` | Repository class validation across LuaRocks, NIM and Agent formats |
 | `npm_auth_paths_test.go` | Private middleware path recognition and log redaction for npm and LuaRocks |
-| `registry_shared_test.go`, `sidecar_rights_test.go` | Shared registry content type and sidecar permission rules using Docker and Helm |
+| root: `registry_shared_test.go`; `test/server/artifacts`: `sidecar_rights_test.go` | Shared registry content type and sidecar permission rules using Docker and Helm |
 | `encrypt_states_v1_test.go` | Generic v1 repository read using Terraform backend settings |
 
 These tests use shared APIs or private server helpers. A format-only change
-that could affect one of them must include the root package; #673 may widen
-that selection further based on Go reverse dependencies. Unknown ownership
-selects full qualification.
+that could affect one of them must include the package that holds it, the root
+package or a module suite; #673 may widen that selection further based on Go
+reverse dependencies. Unknown ownership selects full qualification.
 
 ## Application acceptance dependencies
 

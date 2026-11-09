@@ -116,8 +116,8 @@ Feature: Trash can and garbage collection
 
   # The fields jf transfer-files and jfrog-client-go read (#390). A run of
   # transfer-files itself needs a source Artifactory with JFrog's
-  # data-transfer plugin; test/server/artifacts/storageinfo_test.go decodes the
-  # summary with the clients' own structs and parsers instead.
+  # data-transfer plugin; internal/server/storageinfo_internal_test.go decodes
+  # the summary with the clients' own structs and parsers instead.
   Scenario: The storage summary counts the trash can, and a token scoped to it reads it
     When I PUT "/artifactory/trash-local/docs/a.txt" as admin with body:
       """

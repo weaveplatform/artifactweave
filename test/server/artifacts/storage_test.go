@@ -1,7 +1,8 @@
-package artifacts
+package artifacts_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"reflect"
@@ -34,6 +35,15 @@ func storageWorld(t *testing.T, anonymous bool) *itemWorld {
 		wantStatus(t, w.do(http.MethodPut, path, "admin", body), http.StatusCreated)
 	}
 	return w
+}
+
+func decodeObject(t *testing.T, body string) map[string]any {
+	t.Helper()
+	var m map[string]any
+	if err := json.Unmarshal([]byte(body), &m); err != nil {
+		t.Fatalf("decode %q: %v", body, err)
+	}
+	return m
 }
 
 func TestAccStorageInfo(t *testing.T) {

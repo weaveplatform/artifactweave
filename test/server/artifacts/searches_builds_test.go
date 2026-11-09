@@ -1,4 +1,4 @@
-package artifacts
+package artifacts_test
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -271,4 +272,60 @@ func TestAccBuildSearchStoreErrors(t *testing.T) {
 			t.Errorf("%s: %d %s", fail, rec.Code, rec.Body)
 		}
 	}
+}
+
+// buildSearchFaults fails the build or item store operation named fail.
+type buildSearchFaults struct {
+	store.Store
+	fail string
+}
+
+func (f buildSearchFaults) Builds() store.BuildStore {
+	return faultyBuildSearch{f.Store.Builds(), f.fail}
+}
+
+func (f buildSearchFaults) Items() store.ItemStore {
+	return faultyChecksumSearch{f.Store.Items(), f.fail}
+}
+
+type faultyBuildSearch struct {
+	store.BuildStore
+	fail string
+}
+
+func (f faultyBuildSearch) FindDependencies(
+	ctx context.Context,
+	c types.Checksums,
+) ([]types.BuildFileRef, error) {
+	if f.fail == "dependencies" {
+		return nil, errBoom
+	}
+	return f.BuildStore.FindDependencies(ctx, c)
+}
+
+func (f faultyBuildSearch) Runs(
+	ctx context.Context,
+	project, name string,
+	p store.Page,
+) ([]types.BuildRun, string, error) {
+	if f.fail == "runs" {
+		return nil, "", errBoom
+	}
+	return f.BuildStore.Runs(ctx, project, name, p)
+}
+
+type faultyChecksumSearch struct {
+	store.ItemStore
+	fail string
+}
+
+func (f faultyChecksumSearch) FindByChecksum(
+	ctx context.Context,
+	c types.Checksums,
+	p store.Page,
+) ([]types.Item, string, error) {
+	if f.fail == "find" {
+		return nil, "", errBoom
+	}
+	return f.ItemStore.FindByChecksum(ctx, c, p)
 }

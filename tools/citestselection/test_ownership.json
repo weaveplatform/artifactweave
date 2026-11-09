@@ -198,6 +198,7 @@
       "cache_maintenance_test.go",
       "checksum_files_test.go",
       "download_policy_test.go",
+      "fixture_test.go",
       "folder_limit_test.go",
       "format_test.go",
       "idempotency_sql_test.go",
@@ -283,6 +284,7 @@
       "internal/server/registry_shared_test.go"
     ],
     "helm": [
+      "internal/server/reindex_internal_test.go",
       "test/server/artifacts/reindex_test.go",
       "test/server/artifacts/sidecar_rights_test.go"
     ],
@@ -338,6 +340,7 @@
       "internal/server/status_puppet_test.go"
     ],
     "pypi": [
+      "internal/server/reindex_internal_test.go",
       "test/server/artifacts/reindex_test.go"
     ],
     "rpm": [

@@ -19,8 +19,10 @@ because their repository and permission models differ.
 
 `test/server/support/harness` is the one place the suites build the router
 from. `Config` and `Tune` alias the router's configuration and its option
-function, and `Router` builds the production handler, so a change of router
-edits the harness and no suite. The harness also exports the item world of the
+function, `Mirrors`, `MirrorStatus`, `SearchLimits` and `DefaultRedirectTTL`
+alias the configuration types and the default that suites name, and `Router`
+builds the production handler, so a change of router edits the harness and no
+suite. The harness also exports the item world of the
 root `internal/server` tests (`NewItemWorld`, with `Do`, `Item` and
 `WantStatus`) for the route suites that move out of that package, and
 `RepoFile`, which resolves a root-relative fixture path. Because the harness
@@ -39,9 +41,14 @@ Agent Packages and Agent Plugins. Like the harness, they build the router, so
 users and groups, permissions, roles and environments, key pairs and
 certificates, the OIDC exchange and API restrictions, through the full router.
 `test/server/configuration` is the configuration module's suite: the base URL
-behind a chain of proxies and the configured base URL. Each suite's
-`fixture_test.go` keeps the root helper names the tests call (`statusFixture`,
-`newItemWorld`, `tokenFixture`, `do`, `basic`) as adapters over the harness and
+behind a chain of proxies and the configured base URL. `test/server/artifacts`
+is the artifacts module's management API suite: items with their checksums,
+properties and sidecars, the storage views and summary, the trash can, copy and
+move, build-info and promotion, the GET searches and AQL, reindex, repository
+configuration, remote sources and upstream searches, download redirects,
+multipart uploads and idempotent build appends. Each suite's `fixture_test.go`
+keeps the root helper names the tests call (`statusFixture`, `newItemWorld`,
+`newRepoWorld`, `tokenFixture`, `do`, `basic`) as adapters over the harness and
 `test/server/support`.
 `test/server/artifacts/nuget` contains the NuGet v2/v3 status table, route ×
 principal matrix, API-key and force-authentication cases, symbols lifecycle,
@@ -77,6 +84,7 @@ with:
 ```sh
 go test ./test/server/access
 go test ./test/server/configuration
+go test ./test/server/artifacts
 go test ./test/server/artifacts/nuget
 go test ./test/server/artifacts/npm
 go test ./test/server/artifacts/golang
@@ -92,13 +100,15 @@ go test ./test/server/artifacts/agentplugins
 go test ./test/server/artifacts/gems
 ```
 
-`go test ./test/server/artifacts/...` runs every ecosystem suite at once.
+`go test ./test/server/artifacts/...` runs the management API suite and every
+ecosystem suite at once.
 
 The root `internal/server` package still contains shared cross-format and
 private server helper tests. NuGet-only, npm-only, Go-only, Maven-only, PyPI-only,
 classic Helm-only, Docker-only, Helm OCI-only, Terraform registry-only,
 Terraform backend-only, Agent Packages-only and Agent Plugins-only route
-assertions no longer run from it. The root registration and stub guards retain
+assertions no longer run from it, nor do the router-level access,
+configuration and artifacts management API assertions. The root registration and stub guards retain
 the implemented route patterns through
 `test/server/support.NuGetRoutes`, `NPMRoutes`, `GoRoutes`, `MavenRoutes`,
 `PyPIRoutes`, `HelmRoutes`, `DockerRoutes`, `TerraformRoutes` and

@@ -12,7 +12,9 @@ import (
 func TestUnitSelectKindsKeepsMixedPackagesAndBuildTaggedTests(t *testing.T) {
 	root := t.TempDir()
 	for path, source := range map[string]string{
-		"test/server/artifacts/repositories_test.go": `package server
+		// The format plan below reads the repository's own inventory, which
+		// lists this root file as a Cargo dependency.
+		"internal/server/spec_test.go": `package server
 func TestUnitRead() {}
 func TestAccPublish() {}
 func TestAccess() {}
@@ -76,7 +78,7 @@ func TestAccCloud() {}
 		t.Fatal("Windows-only TestUnit source was lost on this host")
 	}
 	format, err := scanKinds(root, plan{profile: "format", candidate: affectedPlan{
-		owner: "nuget",
+		owner: "cargo",
 		units: []string{"./internal/server", "./migration/artifacts/ecosystem/demo/..."},
 	}})
 	if err != nil {
@@ -208,17 +210,19 @@ func TestUnitAffectedFormatSelectsOwnedMixedPackageEntries(t *testing.T) {
 	for _, file := range inventory.FormatDependencies["maven"] {
 		allowed[file] = true
 	}
-	rootEntries := 0
+	// Maven's shared dependencies are upstream search suites of the
+	// artifacts management package; the root must add none of its own.
+	sharedEntries := 0
 	for _, entry := range selection.Selected {
-		if entry.Package != "./internal/server" {
+		if entry.Package != "./internal/server" && entry.Package != "./test/server/artifacts" {
 			continue
 		}
-		rootEntries++
+		sharedEntries++
 		if !allowed[entry.Source] {
-			t.Errorf("unrelated root suite selected: %+v", entry)
+			t.Errorf("unrelated shared suite selected: %+v", entry)
 		}
 	}
-	if rootEntries == 0 || !slices.Contains(selection.Acc, "./test/server/artifacts/maven") ||
+	if sharedEntries == 0 || !slices.Contains(selection.Acc, "./test/server/artifacts/maven") ||
 		!slices.Contains(selection.Acc, "./internal/app") {
 		t.Fatalf("Maven acceptance dependencies omitted: %+v", selection)
 	}

@@ -1,4 +1,4 @@
-package artifacts
+package artifacts_test
 
 import (
 	"context"
@@ -13,6 +13,48 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
+
+const trashURL = "/artifactory/api/storage/auto-trashcan"
+
+// seedTrash adds an entry trashed from repoKey at full, modified and deleted
+// at the times given, so the views' times are known.
+func seedTrash(
+	t *testing.T,
+	db store.Store,
+	repoKey, full string,
+	folder bool,
+	modified, deleted time.Time,
+) {
+	t.Helper()
+	parent, name, depth, err := types.SplitItemPath(full)
+	if err != nil {
+		t.Fatal(err)
+	}
+	it := types.Item{
+		RepoKey: repoKey, Path: parent, Name: name, Depth: depth, Folder: folder,
+		Created: modified, Modified: modified, Updated: modified,
+	}
+	if !folder {
+		it.Size = int64(len(full))
+		it.Actual = types.Checksums{SHA1: sha1Hex(full), SHA256: sha256Hex(full)}
+	}
+	if _, err := db.Trash().Add(context.Background(), types.TrashEntry{
+		Record:    types.TrashRecord{Item: it, PackageType: "generic"},
+		DeletedAt: deleted, DeletedBy: "admin",
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// fileURIs are the uris of a FileList body's entries, in order.
+func fileURIs(t *testing.T, body map[string]any) []string {
+	t.Helper()
+	var out []string
+	for _, f := range body["files"].([]any) { //nolint:forcetypeassert // fixture
+		out = append(out, f.(map[string]any)["uri"].(string)) //nolint:forcetypeassert // fixture
+	}
+	return out
+}
 
 // TestAccTrashStorageViews: the trash can serves the storage API's views as
 // any repository does (#455).
@@ -214,6 +256,15 @@ func (f faultySettings) Get(ctx context.Context, key string, into any) error {
 		return errBoom
 	}
 	return f.SettingsStore.Get(ctx, key, into) //nolint:wrapcheck // test double
+}
+
+// setTrashcan turns the trash can on or off, with Artifactory's retention.
+func setTrashcan(t *testing.T, db store.Store, on bool) {
+	t.Helper()
+	if err := db.Settings().Put(context.Background(), types.SettingTrashcan,
+		types.TrashcanSettings{Enabled: on, RetentionDays: 14}); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // TestAccTrashStorageWhileOff: while the trash can is off, its views answer as

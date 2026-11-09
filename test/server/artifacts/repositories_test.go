@@ -1,4 +1,4 @@
-package artifacts
+package artifacts_test
 
 import (
 	"context"
@@ -15,6 +15,83 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
+
+// faultyStore fails the repository operations named in fail with errBoom.
+type faultyStore struct {
+	*inmem.Store
+	fail map[string]bool
+}
+
+var errBoom = errors.New("boom")
+
+func (f faultyStore) Repos() store.RepoStore {
+	return faultyRepos{RepoStore: f.Store.Repos(), fail: f.fail}
+}
+
+func (f faultyStore) Permissions() store.PermissionStore {
+	if f.fail["permissions"] {
+		return failingPermissionStore{f.Store.Permissions()}
+	}
+	return f.Store.Permissions()
+}
+
+type failingPermissionStore struct{ store.PermissionStore }
+
+func (failingPermissionStore) ForPrincipal(
+	context.Context,
+	string,
+	[]string,
+) ([]types.Permission, error) {
+	return nil, errBoom
+}
+
+func (f faultyRepos) Including(ctx context.Context, key string) ([]string, error) {
+	if f.fail["including"] {
+		return nil, errBoom
+	}
+	return f.RepoStore.Including(ctx, key) //nolint:wrapcheck // test double
+}
+
+type faultyRepos struct {
+	store.RepoStore
+	fail map[string]bool
+}
+
+func (f faultyRepos) List(ctx context.Context, rf store.RepoFilter) ([]repo.Config, error) {
+	if f.fail["list"] {
+		return nil, errBoom
+	}
+	return f.RepoStore.List(ctx, rf) //nolint:wrapcheck // test double
+}
+
+// Get fails for every key under "get", or for one key under "get:<key>".
+func (f faultyRepos) Get(ctx context.Context, key string) (repo.Config, error) {
+	if f.fail["get"] || f.fail["get:"+key] {
+		return repo.Config{}, errBoom
+	}
+	return f.RepoStore.Get(ctx, key) //nolint:wrapcheck // test double
+}
+
+func (f faultyRepos) Create(ctx context.Context, c repo.Config) error {
+	if f.fail["create"] {
+		return errBoom
+	}
+	return f.RepoStore.Create(ctx, c) //nolint:wrapcheck // test double
+}
+
+func (f faultyRepos) Update(ctx context.Context, c repo.Config) error {
+	if f.fail["update"] {
+		return errBoom
+	}
+	return f.RepoStore.Update(ctx, c) //nolint:wrapcheck // test double
+}
+
+func (f faultyRepos) Delete(ctx context.Context, key string) error {
+	if f.fail["delete"] {
+		return errBoom
+	}
+	return f.RepoStore.Delete(ctx, key) //nolint:wrapcheck // test double
+}
 
 func jsonBody(t *testing.T, rec *httptest.ResponseRecorder, into any) {
 	t.Helper()
