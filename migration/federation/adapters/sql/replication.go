@@ -5,13 +5,15 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/weaveplatform/artifactweave/migration/federation/core/model"
+	"github.com/weaveplatform/artifactweave/migration/federation/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// Replications implements store.Store.
-func (s *Store) Replications() store.ReplicationStore { return replicationStore{s} }
+// Replications returns the replication store: replication definitions,
+// with their sealed passwords, and the last run of each.
+func (s *Store) Replications() port.ReplicationStore { return replicationStore{s} }
 
 // replicationStore keeps replications and replication_runs.
 type replicationStore struct{ s *Store }
@@ -23,9 +25,9 @@ const replicationCols = "replication_key, repo_key, url, username, password, ena
 	"event_replication, sync_deletes, sync_properties, sync_statistics, include_prefix, exclude_prefix, " +
 	"proxy, disable_proxy, check_binary_existence, socket_timeout_ms"
 
-func (rs replicationStore) scan(row interface{ Scan(...any) error }) (types.Replication, error) {
+func (rs replicationStore) scan(row interface{ Scan(...any) error }) (model.Replication, error) {
 	var (
-		r        types.Replication
+		r        model.Replication
 		password []byte
 		timeout  int64
 	)
@@ -56,9 +58,9 @@ func (rs replicationStore) scan(row interface{ Scan(...any) error }) (types.Repl
 	return r, err
 }
 
-func (rs replicationStore) Put(ctx context.Context, r types.Replication) error {
+func (rs replicationStore) Put(ctx context.Context, r model.Replication) error {
 	if r.Key == "" {
-		return fmt.Errorf("replication of %s: key is required: %w", r.RepoKey, store.ErrInvalid)
+		return fmt.Errorf("replication of %s: key is required: %w", r.RepoKey, kernel.ErrInvalid)
 	}
 	password, err := rs.s.Seal(purposeReplicationPassword, r.Key, r.Password)
 	if err != nil {
@@ -67,7 +69,11 @@ func (rs replicationStore) Put(ctx context.Context, r types.Replication) error {
 	_, err = rs.s.Exec(
 		ctx,
 		"put replication "+r.Key,
-		Upsert("replications", dialect.OpsCols(replicationCols), []string{"replication_key"}),
+		dialect.Upsert(
+			"replications",
+			dialect.OpsCols(replicationCols),
+			[]string{"replication_key"},
+		),
 		r.Key,
 		r.RepoKey,
 		r.URL,
@@ -89,7 +95,7 @@ func (rs replicationStore) Put(ctx context.Context, r types.Replication) error {
 	return err
 }
 
-func (rs replicationStore) Get(ctx context.Context, key string) (types.Replication, error) {
+func (rs replicationStore) Get(ctx context.Context, key string) (model.Replication, error) {
 	r, err := rs.scan(rs.s.Q(ctx).QueryRowContext(ctx,
 		rs.s.Dialect().
 			Rebind("SELECT "+replicationCols+" FROM replications WHERE replication_key = ?"),
@@ -102,8 +108,8 @@ func (rs replicationStore) list(
 	ctx context.Context,
 	q string,
 	args ...any,
-) ([]types.Replication, error) {
-	var out []types.Replication
+) ([]model.Replication, error) {
+	var out []model.Replication
 	err := rs.s.Rows(ctx, "list replications", q, args, func(r *sql.Rows) error {
 		v, err := rs.scan(r)
 		out = append(out, v)
@@ -115,7 +121,7 @@ func (rs replicationStore) list(
 func (rs replicationStore) ForRepo(
 	ctx context.Context,
 	repoKey string,
-) ([]types.Replication, error) {
+) ([]model.Replication, error) {
 	return rs.list(
 		ctx,
 		"SELECT "+replicationCols+" FROM replications WHERE repo_key = ? ORDER BY replication_key",
@@ -123,7 +129,7 @@ func (rs replicationStore) ForRepo(
 	)
 }
 
-func (rs replicationStore) List(ctx context.Context) ([]types.Replication, error) {
+func (rs replicationStore) List(ctx context.Context) ([]model.Replication, error) {
 	return rs.list(
 		ctx,
 		"SELECT "+replicationCols+" FROM replications ORDER BY repo_key, replication_key",
@@ -166,7 +172,7 @@ func (rs replicationStore) DeleteForRepo(ctx context.Context, repoKey string) er
 	})
 }
 
-func (rs replicationStore) PutRun(ctx context.Context, r types.ReplicationRun) error {
+func (rs replicationStore) PutRun(ctx context.Context, r model.ReplicationRun) error {
 	return rs.s.Tx(ctx, func(ctx context.Context) error {
 		ok, err := rs.s.Exists(ctx, "find replication "+r.ReplicationKey,
 			"SELECT 1 FROM replications WHERE replication_key = ?", r.ReplicationKey)
@@ -174,19 +180,26 @@ func (rs replicationStore) PutRun(ctx context.Context, r types.ReplicationRun) e
 			return err
 		}
 		if !ok {
-			return fmt.Errorf("replication %s: %w", r.ReplicationKey, store.ErrNotFound)
+			return fmt.Errorf("replication %s: %w", r.ReplicationKey, kernel.ErrNotFound)
 		}
-		_, err = rs.s.Exec(ctx, "put replication run "+r.ReplicationKey, Upsert("replication_runs",
-			[]string{"replication_key", "started_at", "completed_at", "status"},
-			[]string{"replication_key", "started_at"}),
-			r.ReplicationKey, r.Started.UnixMicro(), dialect.Micros(r.Completed), r.Status)
+		_, err = rs.s.Exec(
+			ctx,
+			"put replication run "+r.ReplicationKey,
+			dialect.Upsert("replication_runs",
+				[]string{"replication_key", "started_at", "completed_at", "status"},
+				[]string{"replication_key", "started_at"}),
+			r.ReplicationKey,
+			r.Started.UnixMicro(),
+			dialect.Micros(r.Completed),
+			r.Status,
+		)
 		return err
 	})
 }
 
-func (rs replicationStore) LastRun(ctx context.Context, key string) (types.ReplicationRun, error) {
+func (rs replicationStore) LastRun(ctx context.Context, key string) (model.ReplicationRun, error) {
 	var (
-		r                  types.ReplicationRun
+		r                  model.ReplicationRun
 		started, completed sql.NullInt64
 	)
 	err := rs.s.Q(ctx).

@@ -6,11 +6,11 @@ import (
 
 	accmigrations "github.com/weaveplatform/artifactweave/migration/access/adapters/sql/migrations"
 	artmigrations "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/sql/migrations"
-	fedmigrations "github.com/weaveplatform/artifactweave/migration/federation/adapters/sql/migrations"
+	fedsql "github.com/weaveplatform/artifactweave/migration/federation/adapters/sql"
 	ntfsql "github.com/weaveplatform/artifactweave/migration/notifications/adapters/sql"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	platsql "github.com/weaveplatform/artifactweave/migration/platform/store/sql"
-	relmigrations "github.com/weaveplatform/artifactweave/migration/releases/adapters/sql/migrations"
+	relsql "github.com/weaveplatform/artifactweave/migration/releases/adapters/sql"
 	retsql "github.com/weaveplatform/artifactweave/migration/retention/adapters/sql"
 	wrksql "github.com/weaveplatform/artifactweave/migration/workers/adapters/sql"
 )
@@ -96,13 +96,8 @@ func Modules() []dialect.Module {
 		},
 		ntfsql.Module,
 		retsql.Module,
-		{Name: "federation", Migrations: fedmigrations.FS, Sealed: []dialect.SealedColumn{
-			{
-				Table: "replications", Column: "password", Purpose: purposeReplicationPassword,
-				Keys: []string{"replication_key"}, RowID: dialect.FirstKey,
-			},
-		}},
-		{Name: "releases", Migrations: relmigrations.FS},
+		fedsql.Module,
+		relsql.Module,
 		wrksql.Module,
 	}
 }

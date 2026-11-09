@@ -12,8 +12,10 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
 )
 
-// Webhooks returns the webhook store: subscriptions, their handlers' sealed
-// secrets and the delivery records (decision 0011).
+// Webhooks returns the webhook store: subscriptions, their handlers'
+// secrets and the delivery records (decision 0011). Nothing here outlives
+// the process, so secrets are kept as given, not sealed as the SQL store
+// seals them.
 func (s *Store) Webhooks() port.WebhookStore { return webhookStore{s} }
 
 type webhookStore struct{ s *Store }

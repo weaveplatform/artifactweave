@@ -6,9 +6,10 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/releases/core/model"
+	"github.com/weaveplatform/artifactweave/migration/releases/core/port"
 )
 
 // bundleKey identifies one release bundle version.
@@ -20,7 +21,7 @@ func (k bundleKey) String() string { return k.Name + "/" + k.Version }
 // records created in the same microsecond.
 type bundleAudit struct {
 	ID    int64
-	Audit types.BundleRetentionAudit
+	Audit model.BundleRetentionAudit
 }
 
 // jobKey identifies one distribution job.
@@ -29,22 +30,24 @@ type jobKey struct {
 	Peer    string
 }
 
-// Bundles implements store.Store.
-func (s *Store) Bundles() store.BundleStore { return bundleStore{s} }
+// Bundles returns the release bundle store: bundles with their
+// artifacts, keeps, retention audits and exports (decision 0023).
+func (s *Store) Bundles() port.BundleStore { return bundleStore{s} }
 
-// Distribution implements store.Store.
-func (s *Store) Distribution() store.DistributionStore { return distributionStore{s} }
+// Distribution returns the distribution store: trackers and their
+// per-peer jobs (decision 0023).
+func (s *Store) Distribution() port.DistributionStore { return distributionStore{s} }
 
 // --- Release bundles -------------------------------------------------------
 
 type bundleStore struct{ s *Store }
 
-func (b bundleStore) bundles() *memtx.Table[bundleKey, types.ReleaseBundle] {
-	return memtx.TableOf[bundleKey, types.ReleaseBundle](b.s.Store, "release_bundles")
+func (b bundleStore) bundles() *memtx.Table[bundleKey, model.ReleaseBundle] {
+	return memtx.TableOf[bundleKey, model.ReleaseBundle](b.s.Store, "release_bundles")
 }
 
-func (b bundleStore) artifacts() *memtx.Table[bundleKey, []types.BundleArtifact] {
-	return memtx.TableOf[bundleKey, []types.BundleArtifact](b.s.Store, "bundle_artifacts")
+func (b bundleStore) artifacts() *memtx.Table[bundleKey, []model.BundleArtifact] {
+	return memtx.TableOf[bundleKey, []model.BundleArtifact](b.s.Store, "bundle_artifacts")
 }
 
 func (b bundleStore) keeps() *memtx.Table[bundleKey, bool] {
@@ -55,23 +58,24 @@ func (b bundleStore) audits() *memtx.Table[int64, bundleAudit] {
 	return memtx.TableOf[int64, bundleAudit](b.s.Store, "bundle_audits")
 }
 
-func (b bundleStore) exports() *memtx.Table[bundleKey, types.BundleExport] {
-	return memtx.TableOf[bundleKey, types.BundleExport](b.s.Store, "bundle_exports")
+func (b bundleStore) exports() *memtx.Table[bundleKey, model.BundleExport] {
+	return memtx.TableOf[bundleKey, model.BundleExport](b.s.Store, "bundle_exports")
 }
 
 // putArtifacts stores a bundle's artifact list, owned by key and sorted by
 // target path; ErrConflict when two share a target path.
-func (b bundleStore) putArtifacts(key bundleKey, list []types.BundleArtifact) error {
+func (b bundleStore) putArtifacts(key bundleKey, list []model.BundleArtifact) error {
 	list = slices.Clone(list)
 	for i := range list {
 		list[i].BundleName, list[i].BundleVersion = key.Name, key.Version
 	}
 	slices.SortFunc(
 		list,
-		func(x, y types.BundleArtifact) int { return strings.Compare(x.TargetPath, y.TargetPath) },
+		func(x, y model.BundleArtifact) int { return strings.Compare(x.TargetPath, y.TargetPath) },
 	)
 	for i := 1; i < len(list); i++ {
 		if list[i].TargetPath == list[i-1].TargetPath {
+			//nolint:wrapcheck // wraps kernel.ErrConflict
 			return memtx.Conflict("bundle artifact "+key.String(), list[i].TargetPath)
 		}
 	}
@@ -81,8 +85,8 @@ func (b bundleStore) putArtifacts(key bundleKey, list []types.BundleArtifact) er
 
 func (b bundleStore) Create(
 	ctx context.Context,
-	rb types.ReleaseBundle,
-	list []types.BundleArtifact,
+	rb model.ReleaseBundle,
+	list []model.BundleArtifact,
 ) error {
 	return b.s.Do(ctx, func() error {
 		key := bundleKey{rb.Name, rb.Version}
@@ -97,8 +101,8 @@ func (b bundleStore) Create(
 	})
 }
 
-func (b bundleStore) Get(ctx context.Context, name, version string) (types.ReleaseBundle, error) {
-	var out types.ReleaseBundle
+func (b bundleStore) Get(ctx context.Context, name, version string) (model.ReleaseBundle, error) {
+	var out model.ReleaseBundle
 	err := b.s.Do(ctx, func() error {
 		var ok bool
 		if out, ok = b.bundles().Get(bundleKey{name, version}); !ok {
@@ -109,7 +113,7 @@ func (b bundleStore) Get(ctx context.Context, name, version string) (types.Relea
 	return out, err
 }
 
-func (b bundleStore) Update(ctx context.Context, rb types.ReleaseBundle) error {
+func (b bundleStore) Update(ctx context.Context, rb model.ReleaseBundle) error {
 	return b.s.Do(ctx, func() error {
 		key := bundleKey{rb.Name, rb.Version}
 		if !b.bundles().Has(key) {
@@ -123,7 +127,7 @@ func (b bundleStore) Update(ctx context.Context, rb types.ReleaseBundle) error {
 func (b bundleStore) ReplaceArtifacts(
 	ctx context.Context,
 	name, version string,
-	list []types.BundleArtifact,
+	list []model.BundleArtifact,
 ) error {
 	return b.s.Do(ctx, func() error {
 		key := bundleKey{name, version}
@@ -152,25 +156,25 @@ func (b bundleStore) Delete(ctx context.Context, name, version string) error {
 }
 
 func (b bundleStore) List(
-	ctx context.Context, f store.BundleFilter, p store.Page,
-) ([]types.ReleaseBundle, string, error) {
+	ctx context.Context, f port.BundleFilter, p kernel.Page,
+) ([]model.ReleaseBundle, string, error) {
 	var (
-		out  []types.ReleaseBundle
+		out  []model.ReleaseBundle
 		next string
 	)
 	err := b.s.Do(ctx, func() error {
-		rows := b.bundles().All(func(_ bundleKey, v types.ReleaseBundle) bool {
+		rows := b.bundles().All(func(_ bundleKey, v model.ReleaseBundle) bool {
 			return (f.Name == "" || v.Name == f.Name) &&
 				(f.Origin == "" || v.Origin == f.Origin) &&
 				(f.ProjectKey == "" || v.ProjectKey == f.ProjectKey)
-		}, func(x, y types.ReleaseBundle) int {
+		}, func(x, y model.ReleaseBundle) int {
 			return cmp.Or(strings.Compare(x.Name, y.Name), strings.Compare(x.Version, y.Version))
 		})
 		var err error
-		out, next, err = memtx.Paginate(rows, p, false, func(v types.ReleaseBundle) []any {
+		out, next, err = memtx.Paginate(rows, p, false, func(v model.ReleaseBundle) []any {
 			return []any{v.Name, v.Version}
 		})
-		return err
+		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
 	})
 	return out, next, err
 }
@@ -178,8 +182,8 @@ func (b bundleStore) List(
 func (b bundleStore) Artifacts(
 	ctx context.Context,
 	name, version string,
-) ([]types.BundleArtifact, error) {
-	var out []types.BundleArtifact
+) ([]model.BundleArtifact, error) {
+	var out []model.BundleArtifact
 	err := b.s.Do(ctx, func() error {
 		key := bundleKey{name, version}
 		if !b.bundles().Has(key) {
@@ -219,7 +223,7 @@ func (b bundleStore) Kept(ctx context.Context, name, version string) (bool, erro
 	return kept, err
 }
 
-func (b bundleStore) AddAudit(ctx context.Context, a types.BundleRetentionAudit) error {
+func (b bundleStore) AddAudit(ctx context.Context, a model.BundleRetentionAudit) error {
 	return b.s.Do(ctx, func() error {
 		id := b.s.NextID("bundle_audits")
 		b.audits().Put(id, bundleAudit{ID: id, Audit: a})
@@ -230,8 +234,8 @@ func (b bundleStore) AddAudit(ctx context.Context, a types.BundleRetentionAudit)
 func (b bundleStore) Audits(
 	ctx context.Context,
 	name string,
-) ([]types.BundleRetentionAudit, error) {
-	var out []types.BundleRetentionAudit
+) ([]model.BundleRetentionAudit, error) {
+	var out []model.BundleRetentionAudit
 	err := b.s.Do(ctx, func() error {
 		rows := b.audits().All(func(_ int64, v bundleAudit) bool {
 			return name == "" || v.Audit.BundleName == name
@@ -246,7 +250,7 @@ func (b bundleStore) Audits(
 	return out, err
 }
 
-func (b bundleStore) PutExport(ctx context.Context, e types.BundleExport) error {
+func (b bundleStore) PutExport(ctx context.Context, e model.BundleExport) error {
 	return b.s.Do(ctx, func() error {
 		key := bundleKey{e.BundleName, e.BundleVersion}
 		if !b.bundles().Has(key) {
@@ -257,8 +261,8 @@ func (b bundleStore) PutExport(ctx context.Context, e types.BundleExport) error 
 	})
 }
 
-func (b bundleStore) Export(ctx context.Context, name, version string) (types.BundleExport, error) {
-	var out types.BundleExport
+func (b bundleStore) Export(ctx context.Context, name, version string) (model.BundleExport, error) {
+	var out model.BundleExport
 	err := b.s.Do(ctx, func() error {
 		var ok bool
 		if out, ok = b.exports().Get(bundleKey{name, version}); !ok {
@@ -282,18 +286,18 @@ func (b bundleStore) DeleteExport(ctx context.Context, name, version string) err
 
 type distributionStore struct{ s *Store }
 
-func (d distributionStore) trackers() *memtx.Table[int64, types.DistributionTracker] {
-	return memtx.TableOf[int64, types.DistributionTracker](d.s.Store, "distribution_trackers")
+func (d distributionStore) trackers() *memtx.Table[int64, model.DistributionTracker] {
+	return memtx.TableOf[int64, model.DistributionTracker](d.s.Store, "distribution_trackers")
 }
 
-func (d distributionStore) jobs() *memtx.Table[jobKey, types.DistributionJob] {
-	return memtx.TableOf[jobKey, types.DistributionJob](d.s.Store, "distribution_jobs")
+func (d distributionStore) jobs() *memtx.Table[jobKey, model.DistributionJob] {
+	return memtx.TableOf[jobKey, model.DistributionJob](d.s.Store, "distribution_jobs")
 }
 
 func (d distributionStore) CreateTracker(
-	ctx context.Context, t types.DistributionTracker, jobs []types.DistributionJob,
-) (types.DistributionTracker, error) {
-	var out types.DistributionTracker
+	ctx context.Context, t model.DistributionTracker, jobs []model.DistributionJob,
+) (model.DistributionTracker, error) {
+	var out model.DistributionTracker
 	err := d.s.Do(ctx, func() error {
 		seen := map[string]bool{}
 		for _, j := range jobs {
@@ -317,8 +321,8 @@ func (d distributionStore) CreateTracker(
 func (d distributionStore) Tracker(
 	ctx context.Context,
 	id int64,
-) (types.DistributionTracker, error) {
-	var out types.DistributionTracker
+) (model.DistributionTracker, error) {
+	var out model.DistributionTracker
 	err := d.s.Do(ctx, func() error {
 		var ok bool
 		if out, ok = d.trackers().Get(id); !ok {
@@ -329,7 +333,7 @@ func (d distributionStore) Tracker(
 	return out, err
 }
 
-func (d distributionStore) UpdateTracker(ctx context.Context, t types.DistributionTracker) error {
+func (d distributionStore) UpdateTracker(ctx context.Context, t model.DistributionTracker) error {
 	return d.s.Do(ctx, func() error {
 		if !d.trackers().Has(t.ID) {
 			return memtx.NotFound("distribution tracker", t.ID)
@@ -342,19 +346,19 @@ func (d distributionStore) UpdateTracker(ctx context.Context, t types.Distributi
 func (d distributionStore) Trackers(
 	ctx context.Context,
 	name, version string,
-) ([]types.DistributionTracker, error) {
-	var out []types.DistributionTracker
+) ([]model.DistributionTracker, error) {
+	var out []model.DistributionTracker
 	err := d.s.Do(ctx, func() error {
-		out = d.trackers().All(func(_ int64, v types.DistributionTracker) bool {
+		out = d.trackers().All(func(_ int64, v model.DistributionTracker) bool {
 			return (name == "" || v.BundleName == name) &&
 				(version == "" || v.BundleVersion == version)
-		}, func(x, y types.DistributionTracker) int { return cmp.Compare(y.ID, x.ID) })
+		}, func(x, y model.DistributionTracker) int { return cmp.Compare(y.ID, x.ID) })
 		return nil
 	})
 	return out, err
 }
 
-func (d distributionStore) PutJob(ctx context.Context, j types.DistributionJob) error {
+func (d distributionStore) PutJob(ctx context.Context, j model.DistributionJob) error {
 	return d.s.Do(ctx, func() error {
 		if !d.trackers().Has(j.TrackerID) {
 			return memtx.NotFound("distribution tracker", j.TrackerID)
@@ -364,7 +368,7 @@ func (d distributionStore) PutJob(ctx context.Context, j types.DistributionJob) 
 	})
 }
 
-func compareJobs(x, y types.DistributionJob) int {
+func compareJobs(x, y model.DistributionJob) int {
 	return cmp.Or(
 		cmp.Compare(x.TrackerID, y.TrackerID),
 		strings.Compare(x.PeerInstanceID, y.PeerInstanceID),
@@ -374,25 +378,25 @@ func compareJobs(x, y types.DistributionJob) int {
 func (d distributionStore) Jobs(
 	ctx context.Context,
 	trackerID int64,
-) ([]types.DistributionJob, error) {
-	var out []types.DistributionJob
+) ([]model.DistributionJob, error) {
+	var out []model.DistributionJob
 	err := d.s.Do(ctx, func() error {
 		if !d.trackers().Has(trackerID) {
 			return memtx.NotFound("distribution tracker", trackerID)
 		}
 		out = d.jobs().
-			All(func(k jobKey, _ types.DistributionJob) bool { return k.Tracker == trackerID }, compareJobs)
+			All(func(k jobKey, _ model.DistributionJob) bool { return k.Tracker == trackerID }, compareJobs)
 		return nil
 	})
 	return out, err
 }
 
 func (d distributionStore) JobsForPeer(
-	ctx context.Context, peer string, statuses []types.JobStatus,
-) ([]types.DistributionJob, error) {
-	var out []types.DistributionJob
+	ctx context.Context, peer string, statuses []model.JobStatus,
+) ([]model.DistributionJob, error) {
+	var out []model.DistributionJob
 	err := d.s.Do(ctx, func() error {
-		out = d.jobs().All(func(k jobKey, v types.DistributionJob) bool {
+		out = d.jobs().All(func(k jobKey, v model.DistributionJob) bool {
 			return k.Peer == peer && (len(statuses) == 0 || slices.Contains(statuses, v.Status))
 		}, compareJobs)
 		return nil

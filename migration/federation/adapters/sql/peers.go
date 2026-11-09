@@ -8,22 +8,25 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/federation/core/model"
+	"github.com/weaveplatform/artifactweave/migration/federation/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	retentionapi "github.com/weaveplatform/artifactweave/migration/retention/api"
 )
 
-// Peers implements store.Store.
-func (s *Store) Peers() store.PeerStore { return peerStore{s} }
+// Peers returns the peer store: paired instances and the pairing nonces
+// that admit new ones (decision 0021).
+func (s *Store) Peers() port.PeerStore { return peerStore{s} }
 
 type peerStore struct{ s *Store }
 
 const peerCols = "instance_id, base_url, public_key, protocol_version, status, last_seen_at, " +
 	"display_name, city_name, country_code, edge_role"
 
-func scanPeer(r dialect.PeersScanner) (types.Peer, error) {
+func scanPeer(r dialect.PeersScanner) (model.Peer, error) {
 	var (
-		p    types.Peer
+		p    model.Peer
 		pub  []byte
 		seen sql.NullInt64
 	)
@@ -36,12 +39,12 @@ func scanPeer(r dialect.PeersScanner) (types.Peer, error) {
 	return p, err //nolint:wrapcheck // wrapped by the caller
 }
 
-func (p peerStore) Put(ctx context.Context, peer types.Peer) error {
+func (p peerStore) Put(ctx context.Context, peer model.Peer) error {
 	return p.s.Tx(ctx, func(ctx context.Context) error {
 		if _, err := p.s.Exec(
 			ctx,
 			"put peer "+peer.InstanceID,
-			Upsert("peers", strings.Split(peerCols, ", "), []string{"instance_id"}),
+			dialect.Upsert("peers", strings.Split(peerCols, ", "), []string{"instance_id"}),
 			peer.InstanceID,
 			peer.BaseURL,
 			[]byte(peer.PublicKey),
@@ -76,21 +79,21 @@ func (p peerStore) Put(ctx context.Context, peer types.Peer) error {
 
 // peerUseCaseSet sorts and deduplicates use cases, the form they are stored
 // in.
-func peerUseCaseSet(in []types.UseCase) []types.UseCase {
+func peerUseCaseSet(in []model.UseCase) []model.UseCase {
 	out := slices.Clone(in)
 	slices.Sort(out)
 	return slices.Compact(out)
 }
 
-func (p peerStore) Get(ctx context.Context, instanceID string) (types.Peer, error) {
+func (p peerStore) Get(ctx context.Context, instanceID string) (model.Peer, error) {
 	peer, err := scanPeer(p.s.Q(ctx).QueryRowContext(ctx,
 		p.s.Dialect().Rebind("SELECT "+peerCols+" FROM peers WHERE instance_id = ?"), instanceID))
 	if err != nil {
-		return types.Peer{}, p.s.Wrap("get peer "+instanceID, err)
+		return model.Peer{}, p.s.Wrap("get peer "+instanceID, err)
 	}
 	uses, err := p.useCases(ctx, "WHERE peer = ?", instanceID)
 	if err != nil {
-		return types.Peer{}, err
+		return model.Peer{}, err
 	}
 	peer.UseCases = uses[instanceID]
 	return peer, nil
@@ -102,8 +105,8 @@ func (p peerStore) useCases(
 	ctx context.Context,
 	where string,
 	args ...any,
-) (map[string][]types.UseCase, error) {
-	out := map[string][]types.UseCase{}
+) (map[string][]model.UseCase, error) {
+	out := map[string][]model.UseCase{}
 	err := p.s.Rows(ctx, "list peer use cases",
 		"SELECT peer, use_case FROM peer_use_cases "+where+" ORDER BY peer, use_case", args,
 		func(r *sql.Rows) error {
@@ -111,19 +114,19 @@ func (p peerStore) useCases(
 			if err := r.Scan(&peer, &use); err != nil {
 				return err //nolint:wrapcheck // wrapped by Rows
 			}
-			out[peer] = append(out[peer], types.UseCase(use))
+			out[peer] = append(out[peer], model.UseCase(use))
 			return nil
 		})
 	return out, err
 }
 
-func (p peerStore) List(ctx context.Context, f store.PeerFilter) ([]types.Peer, error) {
+func (p peerStore) List(ctx context.Context, f port.PeerFilter) ([]model.Peer, error) {
 	where, args := "", []any(nil)
 	if f.UseCase != "" {
 		where = " WHERE instance_id IN (SELECT peer FROM peer_use_cases WHERE use_case = ?)"
 		args = []any{string(f.UseCase)}
 	}
-	var out []types.Peer
+	var out []model.Peer
 	err := p.s.Rows(
 		ctx,
 		"list peers",
@@ -165,7 +168,7 @@ func (p peerStore) Delete(ctx context.Context, instanceID string) error {
 	})
 }
 
-func (p peerStore) AddNonce(ctx context.Context, n types.PairingNonce) error {
+func (p peerStore) AddNonce(ctx context.Context, n model.PairingNonce) error {
 	_, err := p.s.Exec(
 		ctx,
 		"add pairing nonce",
@@ -182,8 +185,8 @@ func (p peerStore) RedeemNonce(
 	ctx context.Context,
 	hash []byte,
 	now time.Time,
-) (types.PairingNonce, error) {
-	var out types.PairingNonce
+) (model.PairingNonce, error) {
+	var out model.PairingNonce
 	err := p.s.Tx(ctx, func(ctx context.Context) error {
 		// The conditional update is the redemption: of two concurrent
 		// redeemers exactly one changes the row.
@@ -208,21 +211,21 @@ func (p peerStore) RedeemNonce(
 		if err != nil {
 			return p.s.Wrap(fmt.Sprintf("redeem pairing nonce %x", hash), err)
 		}
-		out = types.PairingNonce{
-			NonceHash: hash, UseCase: types.UseCase(use),
+		out = model.PairingNonce{
+			NonceHash: hash, UseCase: model.UseCase(use),
 			ExpiresAt: dialect.FromMicros(exp), RedeemedAt: dialect.FromMicros(red),
 		}
 		switch {
 		case n == 1:
 			return nil
 		case red.Valid:
-			return fmt.Errorf("pairing nonce %x already redeemed: %w", hash, store.ErrConflict)
+			return fmt.Errorf("pairing nonce %x already redeemed: %w", hash, kernel.ErrConflict)
 		default:
-			return fmt.Errorf("pairing nonce %x expired: %w", hash, store.ErrNotFound)
+			return fmt.Errorf("pairing nonce %x expired: %w", hash, kernel.ErrNotFound)
 		}
 	})
 	if err != nil {
-		return types.PairingNonce{}, err
+		return model.PairingNonce{}, err
 	}
 	return out, nil
 }
@@ -232,8 +235,9 @@ func (p peerStore) PruneNonces(ctx context.Context, before time.Time) (int64, er
 		"DELETE FROM pairing_nonces WHERE expires_at IS NULL OR expires_at < ?", before.UnixMicro())
 }
 
-// Federation implements store.Store.
-func (s *Store) Federation() store.FederationStore { return federationStore{s} }
+// Federation returns the federated repository store: members and full
+// syncs (decision 0022).
+func (s *Store) Federation() port.FederationStore { return federationStore{s} }
 
 type federationStore struct{ s *Store }
 
@@ -242,7 +246,7 @@ const fedMemberCols = "repo_key, peer, base_url, remote_repo_key, enabled"
 func (f federationStore) SetMembers(
 	ctx context.Context,
 	repoKey string,
-	members []types.FederationMember,
+	members []model.FederationMember,
 ) error {
 	for _, m := range members {
 		if m.PeerInstanceID == "" {
@@ -250,7 +254,7 @@ func (f federationStore) SetMembers(
 				"federation member %q of %s has no peer: %w",
 				m.BaseURL,
 				repoKey,
-				store.ErrInvalid,
+				kernel.ErrInvalid,
 			)
 		}
 	}
@@ -263,7 +267,7 @@ func (f federationStore) SetMembers(
 			if _, err := f.s.Exec(
 				ctx,
 				"set federation members",
-				Insert("federation_members", strings.Split(fedMemberCols, ", ")),
+				dialect.Insert("federation_members", strings.Split(fedMemberCols, ", ")),
 				repoKey,
 				m.PeerInstanceID,
 				m.BaseURL,
@@ -281,15 +285,15 @@ func (f federationStore) members(
 	ctx context.Context,
 	where, order string,
 	arg string,
-) ([]types.FederationMember, error) {
-	var out []types.FederationMember
+) ([]model.FederationMember, error) {
+	var out []model.FederationMember
 	err := f.s.Rows(
 		ctx,
 		"list federation members",
 		"SELECT "+fedMemberCols+" FROM federation_members WHERE "+where+" = ? ORDER BY "+order,
 		[]any{arg},
 		func(r *sql.Rows) error {
-			var m types.FederationMember
+			var m model.FederationMember
 			err := r.Scan(&m.RepoKey, &m.PeerInstanceID, &m.BaseURL, &m.RemoteRepoKey, &m.Enabled)
 			out = append(out, m)
 			return err //nolint:wrapcheck // wrapped by Rows
@@ -301,22 +305,22 @@ func (f federationStore) members(
 func (f federationStore) Members(
 	ctx context.Context,
 	repoKey string,
-) ([]types.FederationMember, error) {
+) ([]model.FederationMember, error) {
 	return f.members(ctx, "repo_key", "peer", repoKey)
 }
 
 func (f federationStore) MembersWithPeer(
 	ctx context.Context,
 	peer string,
-) ([]types.FederationMember, error) {
+) ([]model.FederationMember, error) {
 	return f.members(ctx, "peer", "repo_key", peer)
 }
 
 const fullSyncCols = "repo_key, peer, forced, snapshot_seq, started_at, finished_at, status, result_paths"
 
-func scanFullSync(r dialect.PeersScanner) (types.FullSyncRun, error) {
+func scanFullSync(r dialect.PeersScanner) (model.FullSyncRun, error) {
 	var (
-		run               types.FullSyncRun
+		run               model.FullSyncRun
 		started, finished sql.NullInt64
 		status            string
 		paths             sql.NullString
@@ -329,14 +333,14 @@ func scanFullSync(r dialect.PeersScanner) (types.FullSyncRun, error) {
 		started,
 	), dialect.FromMicros(
 		finished,
-	), types.RunStatus(
+	), retentionapi.RunStatus(
 		status,
 	)
 	return run, dialect.FromJSON(paths, &run.ResultPaths)
 }
 
 // fullSyncArgs returns the column values of r after the id.
-func fullSyncArgs(r types.FullSyncRun) []any {
+func fullSyncArgs(r model.FullSyncRun) []any {
 	return []any{
 		r.RepoKey, r.PeerInstanceID, r.Forced, r.SnapshotSeq,
 		dialect.Micros(r.Started), dialect.Micros(r.Finished), string(r.Status),
@@ -345,7 +349,7 @@ func fullSyncArgs(r types.FullSyncRun) []any {
 }
 
 // peersDoc encodes a document column of this group. Every document here is a
-// string slice, a map of string slices or a types.PatternFilter, none of
+// string slice, a map of string slices or a model.PatternFilter, none of
 // which can fail to marshal, so the error dialect.ToJSON reports for other types
 // cannot occur.
 func peersDoc(v any) any {
@@ -355,40 +359,40 @@ func peersDoc(v any) any {
 
 func (f federationStore) CreateFullSync(
 	ctx context.Context,
-	r types.FullSyncRun,
-) (types.FullSyncRun, error) {
+	r model.FullSyncRun,
+) (model.FullSyncRun, error) {
 	var err error
 	if r.ID, err = f.s.InsertID(
 		ctx,
 		"create full sync",
-		Insert(
+		dialect.Insert(
 			"full_sync_runs",
 			strings.Split(fullSyncCols, ", "),
 		),
 		fullSyncArgs(r)...); err != nil {
-		return types.FullSyncRun{}, err
+		return model.FullSyncRun{}, err
 	}
-	return store.Normalise(r), nil
+	return kernel.Normalise(r), nil
 }
 
-func (f federationStore) FullSync(ctx context.Context, id int64) (types.FullSyncRun, error) {
+func (f federationStore) FullSync(ctx context.Context, id int64) (model.FullSyncRun, error) {
 	r, err := scanFullSync(f.s.Q(ctx).QueryRowContext(ctx, f.s.Dialect().Rebind(
 		"SELECT id, "+fullSyncCols+" FROM full_sync_runs WHERE id = ?"), id))
 	if err != nil {
-		return types.FullSyncRun{}, f.s.Wrap(fmt.Sprintf("get full sync %d", id), err)
+		return model.FullSyncRun{}, f.s.Wrap(fmt.Sprintf("get full sync %d", id), err)
 	}
 	return r, nil
 }
 
-func (f federationStore) UpdateFullSync(ctx context.Context, r types.FullSyncRun) error {
+func (f federationStore) UpdateFullSync(ctx context.Context, r model.FullSyncRun) error {
 	return f.s.ExecOne(ctx, fmt.Sprintf("update full sync %d", r.ID), "UPDATE full_sync_runs SET "+
 		"repo_key = ?, peer = ?, forced = ?, snapshot_seq = ?, started_at = ?, finished_at = ?, "+
 		"status = ?, result_paths = ? WHERE id = ?", append(fullSyncArgs(r), r.ID)...)
 }
 
 func (f federationStore) FullSyncs(
-	ctx context.Context, repoKey string, p store.Page,
-) ([]types.FullSyncRun, string, error) {
+	ctx context.Context, repoKey string, p kernel.Page,
+) ([]model.FullSyncRun, string, error) {
 	p, err := p.Normalize()
 	if err != nil {
 		return nil, "", err //nolint:wrapcheck // already a store sentinel
@@ -401,7 +405,7 @@ func (f federationStore) FullSyncs(
 		cond += " AND repo_key = ?"
 		args = append(args, repoKey)
 	}
-	var out []types.FullSyncRun
+	var out []model.FullSyncRun
 	err = f.s.Rows(
 		ctx,
 		"list full syncs",
@@ -419,24 +423,25 @@ func (f federationStore) FullSyncs(
 	if err != nil {
 		return nil, "", err
 	}
-	page, next := store.Trim(
+	page, next := kernel.Trim(
 		out,
 		p.Limit,
-		func(r types.FullSyncRun) []string { return []string{dialect.Itoa(r.ID)} },
+		func(r model.FullSyncRun) []string { return []string{dialect.Itoa(r.ID)} },
 	)
 	return page, next, nil
 }
 
-// Platform implements store.Store.
-func (s *Store) Platform() store.PlatformStore { return platformStore{s} }
+// Platform returns the platform federation store: access federation
+// targets, platform federations and topologies (decision 0025).
+func (s *Store) Platform() port.PlatformStore { return platformStore{s} }
 
 type platformStore struct{ s *Store }
 
 const accessTargetCols = "name, peer, active, created_at, entities, permission_filters, group_filters"
 
-func scanAccessTarget(r dialect.PeersScanner) (types.AccessFederationTarget, error) {
+func scanAccessTarget(r dialect.PeersScanner) (model.AccessFederationTarget, error) {
 	var (
-		t                       types.AccessFederationTarget
+		t                       model.AccessFederationTarget
 		created                 sql.NullInt64
 		entities, perms, groups sql.NullString
 	)
@@ -463,11 +468,11 @@ func scanAccessTarget(r dialect.PeersScanner) (types.AccessFederationTarget, err
 	return t, nil
 }
 
-func (p platformStore) PutAccessTarget(ctx context.Context, t types.AccessFederationTarget) error {
+func (p platformStore) PutAccessTarget(ctx context.Context, t model.AccessFederationTarget) error {
 	_, err := p.s.Exec(
 		ctx,
 		"put access federation target "+t.Name,
-		Upsert(
+		dialect.Upsert(
 			"access_federation_targets",
 			strings.Split(accessTargetCols, ", "),
 			[]string{"name"},
@@ -486,17 +491,17 @@ func (p platformStore) PutAccessTarget(ctx context.Context, t types.AccessFedera
 func (p platformStore) AccessTarget(
 	ctx context.Context,
 	name string,
-) (types.AccessFederationTarget, error) {
+) (model.AccessFederationTarget, error) {
 	t, err := scanAccessTarget(p.s.Q(ctx).QueryRowContext(ctx, p.s.Dialect().Rebind(
 		"SELECT "+accessTargetCols+" FROM access_federation_targets WHERE name = ?"), name))
 	if err != nil {
-		return types.AccessFederationTarget{}, p.s.Wrap("get access federation target "+name, err)
+		return model.AccessFederationTarget{}, p.s.Wrap("get access federation target "+name, err)
 	}
 	return t, nil
 }
 
-func (p platformStore) AccessTargets(ctx context.Context) ([]types.AccessFederationTarget, error) {
-	var out []types.AccessFederationTarget
+func (p platformStore) AccessTargets(ctx context.Context) ([]model.AccessFederationTarget, error) {
+	var out []model.AccessFederationTarget
 	err := p.s.Rows(ctx, "list access federation targets",
 		"SELECT "+accessTargetCols+" FROM access_federation_targets ORDER BY name", nil,
 		func(r *sql.Rows) error {
@@ -514,9 +519,9 @@ func (p platformStore) DeleteAccessTarget(ctx context.Context, name string) erro
 
 const platformFedCols = "id, name, description, connection_groups, entities"
 
-func scanPlatformFed(r dialect.PeersScanner) (types.PlatformFederation, error) {
+func scanPlatformFed(r dialect.PeersScanner) (model.PlatformFederation, error) {
 	var (
-		f              types.PlatformFederation
+		f              model.PlatformFederation
 		groups, entity sql.NullString
 	)
 	if err := r.Scan(&f.ID, &f.Name, &f.Description, &groups, &entity); err != nil {
@@ -528,27 +533,38 @@ func scanPlatformFed(r dialect.PeersScanner) (types.PlatformFederation, error) {
 	return f, dialect.FromJSON(entity, &f.Entities)
 }
 
-func (p platformStore) PutFederation(ctx context.Context, f types.PlatformFederation) error {
-	_, err := p.s.Exec(ctx, "put platform federation "+f.ID,
-		Upsert("platform_federations", strings.Split(platformFedCols, ", "), []string{"id"}),
-		f.ID, f.Name, f.Description, peersDoc(f.ConnectionGroups), peersDoc(f.Entities))
+func (p platformStore) PutFederation(ctx context.Context, f model.PlatformFederation) error {
+	_, err := p.s.Exec(
+		ctx,
+		"put platform federation "+f.ID,
+		dialect.Upsert(
+			"platform_federations",
+			strings.Split(platformFedCols, ", "),
+			[]string{"id"},
+		),
+		f.ID,
+		f.Name,
+		f.Description,
+		peersDoc(f.ConnectionGroups),
+		peersDoc(f.Entities),
+	)
 	return err
 }
 
 func (p platformStore) Federation(
 	ctx context.Context,
 	id string,
-) (types.PlatformFederation, error) {
+) (model.PlatformFederation, error) {
 	f, err := scanPlatformFed(p.s.Q(ctx).QueryRowContext(ctx, p.s.Dialect().Rebind(
 		"SELECT "+platformFedCols+" FROM platform_federations WHERE id = ?"), id))
 	if err != nil {
-		return types.PlatformFederation{}, p.s.Wrap("get platform federation "+id, err)
+		return model.PlatformFederation{}, p.s.Wrap("get platform federation "+id, err)
 	}
 	return f, nil
 }
 
-func (p platformStore) Federations(ctx context.Context) ([]types.PlatformFederation, error) {
-	var out []types.PlatformFederation
+func (p platformStore) Federations(ctx context.Context) ([]model.PlatformFederation, error) {
+	var out []model.PlatformFederation
 	err := p.s.Rows(ctx, "list platform federations",
 		"SELECT "+platformFedCols+" FROM platform_federations ORDER BY id", nil,
 		func(r *sql.Rows) error {
@@ -570,10 +586,10 @@ func (p platformStore) DeleteFederation(ctx context.Context, id string) error {
 
 const topologyCols = "key, name, description, created_at, modified_at"
 
-func (p platformStore) PutTopology(ctx context.Context, t types.Topology) error {
+func (p platformStore) PutTopology(ctx context.Context, t model.Topology) error {
 	return p.s.Tx(ctx, func(ctx context.Context) error {
 		if _, err := p.s.Exec(ctx, "put topology "+t.Key,
-			Upsert("topologies", strings.Split(topologyCols, ", "), []string{"key"}),
+			dialect.Upsert("topologies", strings.Split(topologyCols, ", "), []string{"key"}),
 			t.Key, t.Name, t.Description, dialect.Micros(t.Created),
 			dialect.Micros(t.Modified)); err != nil {
 			return err
@@ -598,13 +614,13 @@ func (p platformStore) topologies(
 	ctx context.Context,
 	where string,
 	args ...any,
-) ([]types.Topology, error) {
-	var out []types.Topology
+) ([]model.Topology, error) {
+	var out []model.Topology
 	err := p.s.Rows(ctx, "list topologies",
 		"SELECT "+topologyCols+" FROM topologies"+where+" ORDER BY key", args,
 		func(r *sql.Rows) error {
 			var (
-				t                 types.Topology
+				t                 model.Topology
 				created, modified sql.NullInt64
 			)
 			err := r.Scan(&t.Key, &t.Name, &t.Description, &created, &modified)
@@ -615,7 +631,7 @@ func (p platformStore) topologies(
 	if err != nil || len(out) == 0 {
 		return out, err
 	}
-	sites := map[string][]types.TopologySite{}
+	sites := map[string][]model.TopologySite{}
 	siteWhere := strings.ReplaceAll(where, "key", "topology_key")
 	err = p.s.Rows(
 		ctx,
@@ -625,7 +641,7 @@ func (p platformStore) topologies(
 		func(r *sql.Rows) error {
 			var (
 				key  string
-				site types.TopologySite
+				site model.TopologySite
 			)
 			err := r.Scan(&key, &site.SiteName, &site.PeerInstanceID)
 			sites[key] = append(sites[key], site)
@@ -641,18 +657,18 @@ func (p platformStore) topologies(
 	return out, nil
 }
 
-func (p platformStore) Topology(ctx context.Context, key string) (types.Topology, error) {
+func (p platformStore) Topology(ctx context.Context, key string) (model.Topology, error) {
 	out, err := p.topologies(ctx, " WHERE key = ?", key)
 	if err != nil {
-		return types.Topology{}, err
+		return model.Topology{}, err
 	}
 	if len(out) == 0 {
-		return types.Topology{}, fmt.Errorf("get topology %s: %w", key, store.ErrNotFound)
+		return model.Topology{}, fmt.Errorf("get topology %s: %w", key, kernel.ErrNotFound)
 	}
 	return out[0], nil
 }
 
-func (p platformStore) Topologies(ctx context.Context) ([]types.Topology, error) {
+func (p platformStore) Topologies(ctx context.Context) ([]model.Topology, error) {
 	return p.topologies(ctx, "")
 }
 

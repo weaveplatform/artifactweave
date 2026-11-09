@@ -15,8 +15,9 @@ import (
 // workerEntry identifies one state entry or secret of a worker.
 type workerEntry struct{ Worker, Name string }
 
-// Workers returns the worker store: definitions, state, sealed secrets
-// and executions (decision 0026).
+// Workers returns the worker store: definitions, state, secrets and
+// executions (decision 0026). Nothing here outlives the process, so
+// secrets are kept as given, not sealed as the SQL store seals them.
 func (s *Store) Workers() port.WorkerStore { return workerStore{s} }
 
 type workerStore struct{ s *Store }

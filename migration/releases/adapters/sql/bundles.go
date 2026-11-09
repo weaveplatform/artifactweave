@@ -6,16 +6,19 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/releases/core/model"
+	"github.com/weaveplatform/artifactweave/migration/releases/core/port"
 )
 
-// Bundles implements store.Store.
-func (s *Store) Bundles() store.BundleStore { return bundleStore{s} }
+// Bundles returns the release bundle store: bundles with their
+// artifacts, keeps, retention audits and exports (decision 0023).
+func (s *Store) Bundles() port.BundleStore { return bundleStore{s} }
 
-// Distribution implements store.Store.
-func (s *Store) Distribution() store.DistributionStore { return distributionStore{s} }
+// Distribution returns the distribution store: trackers and their
+// per-peer jobs (decision 0023).
+func (s *Store) Distribution() port.DistributionStore { return distributionStore{s} }
 
 // --- Release bundles -------------------------------------------------------
 
@@ -26,7 +29,7 @@ var bundleCols = []string{
 	"created_at", "created_by", "signed_at", "signing_key_alias", "signature", "notes", "spec",
 }
 
-func bundleRow(b types.ReleaseBundle) []any {
+func bundleRow(b model.ReleaseBundle) []any {
 	return []any{
 		b.Name, b.Version, string(b.State), b.StoringRepository, b.ProjectKey, string(b.Origin),
 		b.Description, dialect.Micros(b.Created), b.CreatedBy, dialect.Micros(b.SignedAt),
@@ -35,9 +38,9 @@ func bundleRow(b types.ReleaseBundle) []any {
 	}
 }
 
-func scanBundle(r dialect.EntRow) (types.ReleaseBundle, error) {
+func scanBundle(r dialect.EntRow) (model.ReleaseBundle, error) {
 	var (
-		b               types.ReleaseBundle
+		b               model.ReleaseBundle
 		state, origin   string
 		created, signed sql.NullInt64
 		notes, spec     sql.NullString
@@ -47,7 +50,7 @@ func scanBundle(r dialect.EntRow) (types.ReleaseBundle, error) {
 		&notes, &spec); err != nil {
 		return b, err //nolint:wrapcheck // wrapped by the caller
 	}
-	b.State, b.Origin = types.BundleState(state), types.BundleOrigin(origin)
+	b.State, b.Origin = model.BundleState(state), model.BundleOrigin(origin)
 	b.Created, b.SignedAt = dialect.FromMicros(created), dialect.FromMicros(signed)
 	if err := dialect.FromJSON(notes, &b.Notes); err != nil {
 		return b, err
@@ -61,7 +64,7 @@ func (b bundleStore) get(
 	ctx context.Context,
 	name, version string,
 	lock bool,
-) (types.ReleaseBundle, error) {
+) (model.ReleaseBundle, error) {
 	q := "SELECT " + strings.Join(
 		bundleCols,
 		", ",
@@ -77,7 +80,7 @@ func (b bundleStore) get(
 func (b bundleStore) insertArtifacts(
 	ctx context.Context,
 	name, version string,
-	list []types.BundleArtifact,
+	list []model.BundleArtifact,
 ) error {
 	cols := []string{
 		"bundle_name", "bundle_version", "target_path", "source_path",
@@ -87,7 +90,7 @@ func (b bundleStore) insertArtifacts(
 		if _, err := b.s.Exec(
 			ctx,
 			"add bundle artifact "+a.TargetPath,
-			Insert("bundle_artifacts", cols),
+			dialect.Insert("bundle_artifacts", cols),
 			name,
 			version,
 			a.TargetPath,
@@ -107,25 +110,25 @@ func (b bundleStore) insertArtifacts(
 
 func (b bundleStore) Create(
 	ctx context.Context,
-	rb types.ReleaseBundle,
-	list []types.BundleArtifact,
+	rb model.ReleaseBundle,
+	list []model.BundleArtifact,
 ) error {
-	row := bundleRow(store.Normalise(rb))
+	row := bundleRow(kernel.Normalise(rb))
 	return b.s.Tx(ctx, func(ctx context.Context) error {
 		if _, err := b.s.Exec(ctx, "create release bundle "+rb.Name+"/"+rb.Version,
-			Insert("release_bundles", bundleCols), row...); err != nil {
+			dialect.Insert("release_bundles", bundleCols), row...); err != nil {
 			return err
 		}
 		return b.insertArtifacts(ctx, rb.Name, rb.Version, list)
 	})
 }
 
-func (b bundleStore) Get(ctx context.Context, name, version string) (types.ReleaseBundle, error) {
+func (b bundleStore) Get(ctx context.Context, name, version string) (model.ReleaseBundle, error) {
 	return b.get(ctx, name, version, false)
 }
 
-func (b bundleStore) Update(ctx context.Context, rb types.ReleaseBundle) error {
-	row := bundleRow(store.Normalise(rb))
+func (b bundleStore) Update(ctx context.Context, rb model.ReleaseBundle) error {
+	row := bundleRow(kernel.Normalise(rb))
 	sets := make([]string, 0, len(bundleCols)-2)
 	for _, c := range bundleCols[2:] {
 		sets = append(sets, c+" = ?")
@@ -138,7 +141,7 @@ func (b bundleStore) Update(ctx context.Context, rb types.ReleaseBundle) error {
 func (b bundleStore) ReplaceArtifacts(
 	ctx context.Context,
 	name, version string,
-	list []types.BundleArtifact,
+	list []model.BundleArtifact,
 ) error {
 	return b.s.Tx(ctx, func(ctx context.Context) error {
 		cur, err := b.get(ctx, name, version, true)
@@ -151,7 +154,7 @@ func (b bundleStore) ReplaceArtifacts(
 				name,
 				version,
 				cur.State,
-				store.ErrConflict,
+				kernel.ErrConflict,
 			)
 		}
 		if _, err := b.s.Exec(
@@ -175,8 +178,8 @@ func (b bundleStore) Delete(ctx context.Context, name, version string) error {
 }
 
 func (b bundleStore) List(
-	ctx context.Context, f store.BundleFilter, p store.Page,
-) ([]types.ReleaseBundle, string, error) {
+	ctx context.Context, f port.BundleFilter, p kernel.Page,
+) ([]model.ReleaseBundle, string, error) {
 	p, err := p.Normalize()
 	if err != nil {
 		return nil, "", err //nolint:wrapcheck // already a store sentinel
@@ -195,7 +198,7 @@ func (b bundleStore) List(
 			args = append(args, v)
 		}
 	}
-	var out []types.ReleaseBundle
+	var out []model.ReleaseBundle
 	err = b.s.Rows(ctx, "list release bundles",
 		"SELECT "+strings.Join(bundleCols, ", ")+" FROM release_bundles WHERE "+
 			strings.Join(where, " AND ")+dialect.OrderBy(order, false)+" LIMIT ?",
@@ -208,10 +211,10 @@ func (b bundleStore) List(
 	if err != nil {
 		return nil, "", err
 	}
-	page, next := store.Trim(
+	page, next := kernel.Trim(
 		out,
 		p.Limit,
-		func(v types.ReleaseBundle) []string { return []string{v.Name, v.Version} },
+		func(v model.ReleaseBundle) []string { return []string{v.Name, v.Version} },
 	)
 	return page, next, nil
 }
@@ -224,7 +227,7 @@ func (b bundleStore) requireBundle(ctx context.Context, name, version string) er
 		return err
 	}
 	if !ok {
-		return fmt.Errorf("release bundle %s/%s: %w", name, version, store.ErrNotFound)
+		return fmt.Errorf("release bundle %s/%s: %w", name, version, kernel.ErrNotFound)
 	}
 	return nil
 }
@@ -232,11 +235,11 @@ func (b bundleStore) requireBundle(ctx context.Context, name, version string) er
 func (b bundleStore) Artifacts(
 	ctx context.Context,
 	name, version string,
-) ([]types.BundleArtifact, error) {
+) ([]model.BundleArtifact, error) {
 	if err := b.requireBundle(ctx, name, version); err != nil {
 		return nil, err
 	}
-	var out []types.BundleArtifact
+	var out []model.BundleArtifact
 	err := b.s.Rows(
 		ctx,
 		"list bundle artifacts",
@@ -246,7 +249,7 @@ func (b bundleStore) Artifacts(
 		[]any{name, version},
 		func(r *sql.Rows) error {
 			var (
-				a     types.BundleArtifact
+				a     model.BundleArtifact
 				props sql.NullString
 			)
 			if err := r.Scan(
@@ -280,7 +283,7 @@ func (b bundleStore) SetKeep(ctx context.Context, name, version string, keep boo
 		}
 		q := "DELETE FROM bundle_keeps WHERE bundle_name = ? AND bundle_version = ?"
 		if keep {
-			q = InsertIgnore("bundle_keeps", []string{"bundle_name", "bundle_version"},
+			q = dialect.InsertIgnore("bundle_keeps", []string{"bundle_name", "bundle_version"},
 				[]string{"bundle_name", "bundle_version"})
 		}
 		_, err := b.s.Exec(ctx, "set bundle keep", q, name, version)
@@ -296,11 +299,11 @@ func (b bundleStore) Kept(ctx context.Context, name, version string) (bool, erro
 		"SELECT 1 FROM bundle_keeps WHERE bundle_name = ? AND bundle_version = ?", name, version)
 }
 
-func (b bundleStore) AddAudit(ctx context.Context, a types.BundleRetentionAudit) error {
+func (b bundleStore) AddAudit(ctx context.Context, a model.BundleRetentionAudit) error {
 	_, err := b.s.Exec(
 		ctx,
 		"add bundle audit",
-		Insert(
+		dialect.Insert(
 			"bundle_audits",
 			[]string{"bundle_name", "bundle_version", "operation", "created_at", "created_by"},
 		),
@@ -316,14 +319,14 @@ func (b bundleStore) AddAudit(ctx context.Context, a types.BundleRetentionAudit)
 func (b bundleStore) Audits(
 	ctx context.Context,
 	name string,
-) ([]types.BundleRetentionAudit, error) {
+) ([]model.BundleRetentionAudit, error) {
 	q := "SELECT bundle_name, bundle_version, operation, created_at, created_by FROM bundle_audits"
 	var args []any
 	if name != "" {
 		q += " WHERE bundle_name = ?"
 		args = append(args, name)
 	}
-	var out []types.BundleRetentionAudit
+	var out []model.BundleRetentionAudit
 	err := b.s.Rows(
 		ctx,
 		"list bundle audits",
@@ -331,7 +334,7 @@ func (b bundleStore) Audits(
 		args,
 		func(r *sql.Rows) error {
 			var (
-				a       types.BundleRetentionAudit
+				a       model.BundleRetentionAudit
 				op      string
 				created sql.NullInt64
 			)
@@ -344,7 +347,7 @@ func (b bundleStore) Audits(
 			); err != nil {
 				return err //nolint:wrapcheck // wrapped by Rows
 			}
-			a.Operation, a.Created = types.BundleOperation(op), dialect.FromMicros(created)
+			a.Operation, a.Created = model.BundleOperation(op), dialect.FromMicros(created)
 			out = append(out, a)
 			return nil
 		},
@@ -352,13 +355,13 @@ func (b bundleStore) Audits(
 	return out, err
 }
 
-func (b bundleStore) PutExport(ctx context.Context, e types.BundleExport) error {
+func (b bundleStore) PutExport(ctx context.Context, e model.BundleExport) error {
 	return b.s.Tx(ctx, func(ctx context.Context) error {
 		if err := b.requireBundle(ctx, e.BundleName, e.BundleVersion); err != nil {
 			return err
 		}
 		_, err := b.s.Exec(ctx, "put bundle export",
-			Upsert("bundle_exports",
+			dialect.Upsert("bundle_exports",
 				[]string{"bundle_name", "bundle_version", "status", "archive_sha256", "created_at"},
 				[]string{"bundle_name", "bundle_version"}),
 			e.BundleName, e.BundleVersion, string(e.Status), e.ArchiveSHA256,
@@ -367,9 +370,9 @@ func (b bundleStore) PutExport(ctx context.Context, e types.BundleExport) error 
 	})
 }
 
-func (b bundleStore) Export(ctx context.Context, name, version string) (types.BundleExport, error) {
+func (b bundleStore) Export(ctx context.Context, name, version string) (model.BundleExport, error) {
 	var (
-		e       types.BundleExport
+		e       model.BundleExport
 		status  string
 		created sql.NullInt64
 	)
@@ -382,7 +385,7 @@ func (b bundleStore) Export(ctx context.Context, name, version string) (types.Bu
 	if err != nil {
 		return e, b.s.Wrap(fmt.Sprintf("get bundle export %s/%s", name, version), err)
 	}
-	e.Status, e.Created = types.JobStatus(status), dialect.FromMicros(created)
+	e.Status, e.Created = model.JobStatus(status), dialect.FromMicros(created)
 	return e, nil
 }
 
@@ -400,16 +403,16 @@ var trackerCols = []string{
 	"status", "created_at", "created_by", "rules",
 }
 
-func trackerRow(t types.DistributionTracker) []any {
+func trackerRow(t model.DistributionTracker) []any {
 	return []any{
 		t.BundleName, t.BundleVersion, string(t.Kind), t.DryRun, t.AutoCreateMissingRepositories,
 		string(t.Status), dialect.Micros(t.Created), t.CreatedBy, dialect.MustJSON(t.Rules),
 	}
 }
 
-func scanTracker(r dialect.EntRow) (types.DistributionTracker, error) {
+func scanTracker(r dialect.EntRow) (model.DistributionTracker, error) {
 	var (
-		t            types.DistributionTracker
+		t            model.DistributionTracker
 		kind, status string
 		created      sql.NullInt64
 		rules        sql.NullString
@@ -418,9 +421,9 @@ func scanTracker(r dialect.EntRow) (types.DistributionTracker, error) {
 		&t.AutoCreateMissingRepositories, &status, &created, &t.CreatedBy, &rules); err != nil {
 		return t, err //nolint:wrapcheck // wrapped by the caller
 	}
-	t.Kind, t.Status, t.Created = types.TrackerKind(
+	t.Kind, t.Status, t.Created = model.TrackerKind(
 		kind,
-	), types.JobStatus(
+	), model.JobStatus(
 		status,
 	), dialect.FromMicros(
 		created,
@@ -438,10 +441,10 @@ var jobCols = []string{
 	"error",
 }
 
-func (d distributionStore) putJob(ctx context.Context, j types.DistributionJob, upsert bool) error {
-	q := Insert("distribution_jobs", jobCols)
+func (d distributionStore) putJob(ctx context.Context, j model.DistributionJob, upsert bool) error {
+	q := dialect.Insert("distribution_jobs", jobCols)
 	if upsert {
-		q = Upsert("distribution_jobs", jobCols, []string{"tracker_id", "peer"})
+		q = dialect.Upsert("distribution_jobs", jobCols, []string{"tracker_id", "peer"})
 	}
 	_, err := d.s.Exec(ctx, "put distribution job "+j.PeerInstanceID, q,
 		j.TrackerID, j.PeerInstanceID, string(j.Status), j.Priority,
@@ -450,12 +453,12 @@ func (d distributionStore) putJob(ctx context.Context, j types.DistributionJob, 
 }
 
 func (d distributionStore) CreateTracker(
-	ctx context.Context, t types.DistributionTracker, jobs []types.DistributionJob,
-) (types.DistributionTracker, error) {
-	t = store.Normalise(t)
+	ctx context.Context, t model.DistributionTracker, jobs []model.DistributionJob,
+) (model.DistributionTracker, error) {
+	t = kernel.Normalise(t)
 	err := d.s.Tx(ctx, func(ctx context.Context) error {
 		id, err := d.s.InsertID(ctx, "create distribution tracker",
-			Insert("distribution_trackers", trackerCols), trackerRow(t)...)
+			dialect.Insert("distribution_trackers", trackerCols), trackerRow(t)...)
 		if err != nil {
 			return err
 		}
@@ -469,7 +472,7 @@ func (d distributionStore) CreateTracker(
 		return nil
 	})
 	if err != nil {
-		return types.DistributionTracker{}, err
+		return model.DistributionTracker{}, err
 	}
 	return t, nil
 }
@@ -477,7 +480,7 @@ func (d distributionStore) CreateTracker(
 func (d distributionStore) Tracker(
 	ctx context.Context,
 	id int64,
-) (types.DistributionTracker, error) {
+) (model.DistributionTracker, error) {
 	out, err := scanTracker(d.s.Q(ctx).QueryRowContext(ctx, d.s.Dialect().Rebind(
 		"SELECT id, "+strings.Join(
 			trackerCols,
@@ -487,8 +490,8 @@ func (d distributionStore) Tracker(
 	return out, d.s.Wrap(fmt.Sprintf("get distribution tracker %d", id), err)
 }
 
-func (d distributionStore) UpdateTracker(ctx context.Context, t types.DistributionTracker) error {
-	row := trackerRow(store.Normalise(t))
+func (d distributionStore) UpdateTracker(ctx context.Context, t model.DistributionTracker) error {
+	row := trackerRow(kernel.Normalise(t))
 	sets := make([]string, 0, len(trackerCols))
 	for _, c := range trackerCols {
 		sets = append(sets, c+" = ?")
@@ -506,7 +509,7 @@ func (d distributionStore) UpdateTracker(ctx context.Context, t types.Distributi
 func (d distributionStore) Trackers(
 	ctx context.Context,
 	name, version string,
-) ([]types.DistributionTracker, error) {
+) ([]model.DistributionTracker, error) {
 	q := "SELECT id, " + strings.Join(trackerCols, ", ") + " FROM distribution_trackers WHERE 1 = 1"
 	var args []any
 	if name != "" {
@@ -517,7 +520,7 @@ func (d distributionStore) Trackers(
 		q += " AND bundle_version = ?"
 		args = append(args, version)
 	}
-	var out []types.DistributionTracker
+	var out []model.DistributionTracker
 	err := d.s.Rows(
 		ctx,
 		"list distribution trackers",
@@ -532,7 +535,7 @@ func (d distributionStore) Trackers(
 	return out, err
 }
 
-func (d distributionStore) PutJob(ctx context.Context, j types.DistributionJob) error {
+func (d distributionStore) PutJob(ctx context.Context, j model.DistributionJob) error {
 	return d.s.Tx(ctx, func(ctx context.Context) error {
 		if err := d.requireTracker(ctx, j.TrackerID); err != nil {
 			return err
@@ -553,7 +556,7 @@ func (d distributionStore) requireTracker(ctx context.Context, id int64) error {
 		return err
 	}
 	if !ok {
-		return fmt.Errorf("distribution tracker %d: %w", id, store.ErrNotFound)
+		return fmt.Errorf("distribution tracker %d: %w", id, kernel.ErrNotFound)
 	}
 	return nil
 }
@@ -563,8 +566,8 @@ func (d distributionStore) jobs(
 	ctx context.Context,
 	where string,
 	args ...any,
-) ([]types.DistributionJob, error) {
-	var out []types.DistributionJob
+) ([]model.DistributionJob, error) {
+	var out []model.DistributionJob
 	err := d.s.Rows(
 		ctx,
 		"list distribution jobs",
@@ -575,7 +578,7 @@ func (d distributionStore) jobs(
 		args,
 		func(r *sql.Rows) error {
 			var (
-				j                 types.DistributionJob
+				j                 model.DistributionJob
 				status            string
 				started, finished sql.NullInt64
 			)
@@ -583,7 +586,7 @@ func (d distributionStore) jobs(
 				&started, &finished, &j.Error); err != nil {
 				return err //nolint:wrapcheck // wrapped by Rows
 			}
-			j.Status, j.Started, j.Finished = types.JobStatus(
+			j.Status, j.Started, j.Finished = model.JobStatus(
 				status,
 			), dialect.FromMicros(
 				started,
@@ -600,7 +603,7 @@ func (d distributionStore) jobs(
 func (d distributionStore) Jobs(
 	ctx context.Context,
 	trackerID int64,
-) ([]types.DistributionJob, error) {
+) ([]model.DistributionJob, error) {
 	if err := d.requireTracker(ctx, trackerID); err != nil {
 		return nil, err
 	}
@@ -608,12 +611,12 @@ func (d distributionStore) Jobs(
 }
 
 func (d distributionStore) JobsForPeer(
-	ctx context.Context, peer string, statuses []types.JobStatus,
-) ([]types.DistributionJob, error) {
+	ctx context.Context, peer string, statuses []model.JobStatus,
+) ([]model.DistributionJob, error) {
 	where := "peer = ?"
 	args := []any{peer}
 	if len(statuses) > 0 {
-		where += " AND status IN (" + Placeholders(len(statuses)) + ")"
+		where += " AND status IN (" + dialect.Placeholders(len(statuses)) + ")"
 		for _, st := range statuses {
 			args = append(args, string(st))
 		}
