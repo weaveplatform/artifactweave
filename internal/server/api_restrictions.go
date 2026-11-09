@@ -21,7 +21,12 @@ const (
 	apiRestrictionAuditPath = "/artifactory/api/artifactweave/api-restriction-audit"
 )
 
-func apiRecoveryRequest(r *http.Request) bool {
+// APIRecoveryRequest reports the administrator's recovery requests: reading,
+// setting and lifting a user's API restriction and reading the audit. They
+// pass the restriction check (CheckAPIRestriction), and the request limiter
+// serves them from a reserve of their own, so that a restriction can always
+// be lifted.
+func APIRecoveryRequest(r *http.Request) bool {
 	// Match chi's escaped route path. Decoding static segments first could
 	// grant recovery privileges to the ordinary artifact catch-all route.
 	if r.URL.EscapedPath() == apiRestrictionAuditPath {
@@ -34,9 +39,13 @@ func apiRecoveryRequest(r *http.Request) bool {
 	return r.Method == http.MethodGet || r.Method == http.MethodPut || r.Method == http.MethodDelete
 }
 
-func apiRecoveryContext(next http.Handler) http.Handler {
+// APIRecoveryContext marks a recovery request (APIRecoveryRequest) so that
+// the authenticator verifies its credentials even while the caller's API
+// restriction is in force, and bounds the request to five seconds. The flag
+// grants no authority: the handlers still require an administrator.
+func APIRecoveryContext(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if apiRecoveryRequest(r) {
+		if APIRecoveryRequest(r) {
 			// Bound recovery too, including password verification and database waits.
 			ctx, cancel := context.WithTimeout(authn.WithAPIRecovery(r.Context()), 5*time.Second)
 			defer cancel()
@@ -46,30 +55,47 @@ func apiRecoveryContext(next http.Handler) http.Handler {
 	})
 }
 
+// CheckAPIRestriction returns the middleware that refuses an authenticated
+// user's request while that user's API restriction is in force. It runs
+// after authentication, which names the user, and needs a store. The router
+// supplies health, the probes that every caller may make, and limitErr, which
+// answers a restriction read that failed or timed out as the request limiter
+// answers; recovery requests (APIRecoveryRequest) always pass.
+//
 // This also covers embedders with a custom Authenticator. The application
 // supplies the policy to Authenticator as well, for native self-authentication
 // and subsequent Current credential checks.
-func (s securityAPI) checkAPIRestriction(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		p, ok := kernel.FromContext(r.Context())
-		if ok && !p.Anonymous && !healthRequest(r) && !apiRecoveryRequest(r) {
-			ctx, cancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
-			err := authn.CheckAPIRestriction(ctx, s.cfg.Store.APIRestrictions(), p.Name, time.Now())
-			cancel()
-			if err != nil {
-				if errors.Is(err, kernel.ErrAPIRestricted) {
-					httpkit.WriteErr(w, r, err)
-				} else {
-					writeLimitError(w, r, err)
+func (s *Server) CheckAPIRestriction(
+	health func(*http.Request) bool,
+	limitErr func(http.ResponseWriter, *http.Request, error),
+) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			p, ok := kernel.FromContext(r.Context())
+			if ok && !p.Anonymous && !health(r) && !APIRecoveryRequest(r) {
+				ctx, cancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
+				err := authn.CheckAPIRestriction(
+					ctx,
+					s.Security.deps.Store.APIRestrictions(),
+					p.Name,
+					time.Now(),
+				)
+				cancel()
+				if err != nil {
+					if errors.Is(err, kernel.ErrAPIRestricted) {
+						httpkit.WriteErr(w, r, err)
+					} else {
+						limitErr(w, r, err)
+					}
+					return
 				}
-				return
 			}
-		}
-		next.ServeHTTP(w, r)
-	})
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
-func (s securityAPI) restrictionCaller(
+func (s SecurityAPI) restrictionCaller(
 	ctx context.Context,
 	user string,
 ) (kernel.Principal, error) {
@@ -77,7 +103,7 @@ func (s securityAPI) restrictionCaller(
 	if err != nil {
 		return p, fmt.Errorf("API restriction administrator: %w", err)
 	}
-	if s.cfg.Store == nil {
+	if s.deps.Store == nil {
 		return p, apierror.New(
 			http.StatusServiceUnavailable,
 			"API restriction storage is unavailable",
@@ -86,7 +112,7 @@ func (s securityAPI) restrictionCaller(
 	if user == "anonymous" || user == "" {
 		return p, httpkit.BadRequestf("A managed user name is required")
 	}
-	if _, err := s.cfg.Store.Users().Get(ctx, user); err != nil {
+	if _, err := s.deps.Store.Users().Get(ctx, user); err != nil {
 		return p, restrictionStoreError(err)
 	}
 	return p, nil
@@ -124,14 +150,14 @@ func restrictionDocument(r store.APIRestriction) artgen.APIRestriction {
 	return out
 }
 
-func (s securityAPI) GetAPIRestriction(
+func (s SecurityAPI) GetAPIRestriction(
 	ctx context.Context,
 	req artgen.GetAPIRestrictionRequestObject,
 ) (artgen.GetAPIRestrictionResponseObject, error) {
 	if _, err := s.restrictionCaller(ctx, req.UserName); err != nil {
 		return nil, err
 	}
-	r, err := s.cfg.Store.APIRestrictions().Get(ctx, req.UserName)
+	r, err := s.deps.Store.APIRestrictions().Get(ctx, req.UserName)
 	if errors.Is(err, store.ErrNotFound) {
 		r, err = store.APIRestriction{User: req.UserName}, nil
 	}
@@ -141,7 +167,7 @@ func (s securityAPI) GetAPIRestriction(
 	return artgen.GetAPIRestriction200JSONResponse(restrictionDocument(r)), nil
 }
 
-func (s securityAPI) SetAPIRestriction(
+func (s SecurityAPI) SetAPIRestriction(
 	ctx context.Context,
 	req artgen.SetAPIRestrictionRequestObject,
 ) (artgen.SetAPIRestrictionResponseObject, error) {
@@ -158,7 +184,7 @@ func (s securityAPI) SetAPIRestriction(
 			"Supply a reason of 1 to 1024 bytes and an expiry within the next seven days",
 		)
 	}
-	r, err := s.cfg.Store.APIRestrictions().Put(ctx, store.APIRestriction{
+	r, err := s.deps.Store.APIRestrictions().Put(ctx, store.APIRestriction{
 		User: req.UserName, Actor: p.Name,
 		Reason: strings.TrimSpace(req.Body.Reason), Until: req.Body.Until, Changed: now,
 	})
@@ -168,7 +194,7 @@ func (s securityAPI) SetAPIRestriction(
 	return artgen.SetAPIRestriction200JSONResponse(restrictionDocument(r)), nil
 }
 
-func (s securityAPI) ClearAPIRestriction(
+func (s SecurityAPI) ClearAPIRestriction(
 	ctx context.Context,
 	req artgen.ClearAPIRestrictionRequestObject,
 ) (artgen.ClearAPIRestrictionResponseObject, error) {
@@ -176,7 +202,7 @@ func (s securityAPI) ClearAPIRestriction(
 	if err != nil {
 		return nil, err
 	}
-	_, err = s.cfg.Store.APIRestrictions().Put(ctx, store.APIRestriction{
+	_, err = s.deps.Store.APIRestrictions().Put(ctx, store.APIRestriction{
 		User: req.UserName, Actor: p.Name,
 		Reason: "Restriction cleared", Changed: time.Now().UTC(),
 	})
@@ -186,7 +212,7 @@ func (s securityAPI) ClearAPIRestriction(
 	return artgen.ClearAPIRestriction204Response{}, nil
 }
 
-func (s securityAPI) GetAPIRestrictionAudit(
+func (s SecurityAPI) GetAPIRestrictionAudit(
 	ctx context.Context,
 	req artgen.GetAPIRestrictionAuditRequestObject,
 ) (artgen.GetAPIRestrictionAuditResponseObject, error) {
@@ -194,7 +220,7 @@ func (s securityAPI) GetAPIRestrictionAudit(
 	if err != nil {
 		return nil, fmt.Errorf("API restriction audit administrator: %w", err)
 	}
-	if s.cfg.Store == nil {
+	if s.deps.Store == nil {
 		return nil, apierror.New(
 			http.StatusServiceUnavailable,
 			"API restriction storage is unavailable",
@@ -219,7 +245,7 @@ func (s securityAPI) GetAPIRestrictionAudit(
 		}
 		page.After = parts[3]
 	}
-	rows, next, err := s.cfg.Store.APIRestrictions().History(ctx, user, page)
+	rows, next, err := s.deps.Store.APIRestrictions().History(ctx, user, page)
 	if errors.Is(err, store.ErrInvalidCursor) {
 		return nil, httpkit.BadRequestf("Invalid audit cursor")
 	}

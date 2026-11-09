@@ -35,8 +35,8 @@ const (
 	infoNoAPIKeys     = "No API key was revoked: API keys are retired, use access tokens" //nolint:gosec // a message, not a credential
 )
 
-func (s securityAPI) identity(st store.Store) *identity.Service {
-	return &identity.Service{Store: st, Hash: s.cfg.PasswordHash}
+func (s SecurityAPI) identity(st store.Store) *identity.Service {
+	return &identity.Service{Store: st, Hash: s.deps.PasswordHash}
 }
 
 // plusPrefixes are the security API paths whose user, group and permission
@@ -45,12 +45,12 @@ func (s securityAPI) identity(st store.Store) *identity.Service {
 // permissions and the v2 permission targets, sub-paths included.
 var plusPrefixes = []string{securityUsers, securityGroups, permV1Path, permV2Path}
 
-// plusAsSpace rewrites an unescaped "+" in those paths to an escaped space
+// PlusAsSpace rewrites an unescaped "+" in those paths to an escaped space
 // before chi routes the request, so the generated binders decode it as one.
 // A plus sent as %2B is not a "+" in the escaped path and stays a plus,
 // which keeps names that contain one reachable. It must run before routing:
 // chi takes the path parameters from the escaped path as it matches.
-func plusAsSpace(next http.Handler) http.Handler {
+func PlusAsSpace(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		escaped := r.URL.EscapedPath()
 		for _, prefix := range plusPrefixes {
@@ -96,7 +96,7 @@ func strPtr(s string) *string { return &s }
 // --- Users -----------------------------------------------------------------
 
 // GetUsers lists users with their detail URLs.
-func (s securityAPI) GetUsers(
+func (s SecurityAPI) GetUsers(
 	ctx context.Context,
 	_ artgen.GetUsersRequestObject,
 ) (artgen.GetUsersResponseObject, error) {
@@ -123,7 +123,7 @@ func (s securityAPI) GetUsers(
 }
 
 // GetUserDetails returns the legacy user document, without the password.
-func (s securityAPI) GetUserDetails(
+func (s SecurityAPI) GetUserDetails(
 	ctx context.Context,
 	req artgen.GetUserDetailsRequestObject,
 ) (artgen.GetUserDetailsResponseObject, error) {
@@ -158,7 +158,7 @@ func userBody(name string, bodies ...*artgen.UserConfiguration) (*artgen.UserCon
 
 // CreateOrReplaceUser creates the user or replaces its fields. It answers
 // 201 either way, which the artifactory_user resource relies on.
-func (s securityAPI) CreateOrReplaceUser(
+func (s SecurityAPI) CreateOrReplaceUser(
 	ctx context.Context,
 	req artgen.CreateOrReplaceUserRequestObject,
 ) (artgen.CreateOrReplaceUserResponseObject, error) {
@@ -188,7 +188,7 @@ func (s securityAPI) CreateOrReplaceUser(
 }
 
 // UpdateUser changes the fields the body carries.
-func (s securityAPI) UpdateUser(
+func (s SecurityAPI) UpdateUser(
 	ctx context.Context,
 	req artgen.UpdateUserRequestObject,
 ) (artgen.UpdateUserResponseObject, error) {
@@ -214,7 +214,7 @@ func (s securityAPI) UpdateUser(
 }
 
 // DeleteUser removes the user, its memberships and its tokens.
-func (s securityAPI) DeleteUser(
+func (s SecurityAPI) DeleteUser(
 	ctx context.Context,
 	req artgen.DeleteUserRequestObject,
 ) (artgen.DeleteUserResponseObject, error) {
@@ -232,7 +232,7 @@ func (s securityAPI) DeleteUser(
 // --- Groups ----------------------------------------------------------------
 
 // GetGroups lists groups with their detail URLs.
-func (s securityAPI) GetGroups(
+func (s SecurityAPI) GetGroups(
 	ctx context.Context,
 	_ artgen.GetGroupsRequestObject,
 ) (artgen.GetGroupsResponseObject, error) {
@@ -256,7 +256,7 @@ func (s securityAPI) GetGroups(
 
 // GetGroupDetails returns the legacy group document; members only with
 // includeUsers=true.
-func (s securityAPI) GetGroupDetails(
+func (s SecurityAPI) GetGroupDetails(
 	ctx context.Context,
 	req artgen.GetGroupDetailsRequestObject,
 ) (artgen.GetGroupDetailsResponseObject, error) {
@@ -299,7 +299,7 @@ func groupBody(
 
 // CreateOrReplaceGroup creates the group or replaces its fields. It answers
 // 201 either way, which the artifactory_group resource requires.
-func (s securityAPI) CreateOrReplaceGroup(
+func (s SecurityAPI) CreateOrReplaceGroup(
 	ctx context.Context,
 	req artgen.CreateOrReplaceGroupRequestObject,
 ) (artgen.CreateOrReplaceGroupResponseObject, error) {
@@ -324,7 +324,7 @@ func (s securityAPI) CreateOrReplaceGroup(
 }
 
 // UpdateGroup changes the fields the body carries.
-func (s securityAPI) UpdateGroup(
+func (s SecurityAPI) UpdateGroup(
 	ctx context.Context,
 	req artgen.UpdateGroupRequestObject,
 ) (artgen.UpdateGroupResponseObject, error) {
@@ -349,7 +349,7 @@ func (s securityAPI) UpdateGroup(
 }
 
 // DeleteGroup removes the group and its memberships.
-func (s securityAPI) DeleteGroup(
+func (s SecurityAPI) DeleteGroup(
 	ctx context.Context,
 	req artgen.DeleteGroupRequestObject,
 ) (artgen.DeleteGroupResponseObject, error) {
@@ -367,7 +367,7 @@ func (s securityAPI) DeleteGroup(
 // --- Locks and passwords ---------------------------------------------------
 
 // GetLockedOutUsers lists the users the lock policy locked.
-func (s securityAPI) GetLockedOutUsers(
+func (s SecurityAPI) GetLockedOutUsers(
 	ctx context.Context,
 	_ artgen.GetLockedOutUsersRequestObject,
 ) (artgen.GetLockedOutUsersResponseObject, error) {
@@ -383,7 +383,7 @@ func (s securityAPI) GetLockedOutUsers(
 }
 
 // UnlockAllLockedOutUsers clears every lock.
-func (s securityAPI) UnlockAllLockedOutUsers(
+func (s SecurityAPI) UnlockAllLockedOutUsers(
 	ctx context.Context,
 	_ artgen.UnlockAllLockedOutUsersRequestObject,
 ) (artgen.UnlockAllLockedOutUsersResponseObject, error) {
@@ -398,7 +398,7 @@ func (s securityAPI) UnlockAllLockedOutUsers(
 }
 
 // UnlockLockedOutUsers clears the named users' locks.
-func (s securityAPI) UnlockLockedOutUsers(
+func (s SecurityAPI) UnlockLockedOutUsers(
 	ctx context.Context,
 	req artgen.UnlockLockedOutUsersRequestObject,
 ) (artgen.UnlockLockedOutUsersResponseObject, error) {
@@ -417,7 +417,7 @@ func (s securityAPI) UnlockLockedOutUsers(
 }
 
 // UnlockLockedOutUser is the path form the JFrog CLI sends for one user.
-func (s securityAPI) UnlockLockedOutUser(
+func (s SecurityAPI) UnlockLockedOutUser(
 	ctx context.Context,
 	req artgen.UnlockLockedOutUserRequestObject,
 ) (artgen.UnlockLockedOutUserResponseObject, error) {
@@ -437,7 +437,7 @@ func (s securityAPI) UnlockLockedOutUser(
 }
 
 // GetUserLockPolicy returns the lockout settings.
-func (s securityAPI) GetUserLockPolicy(
+func (s SecurityAPI) GetUserLockPolicy(
 	ctx context.Context,
 	_ artgen.GetUserLockPolicyRequestObject,
 ) (artgen.GetUserLockPolicyResponseObject, error) {
@@ -457,7 +457,7 @@ func (s securityAPI) GetUserLockPolicy(
 
 // ConfigureUserLockPolicy replaces the lockout settings; omitted fields take
 // their defaults. Disabling the policy also clears every lock.
-func (s securityAPI) ConfigureUserLockPolicy(
+func (s SecurityAPI) ConfigureUserLockPolicy(
 	ctx context.Context,
 	req artgen.ConfigureUserLockPolicyRequestObject,
 ) (artgen.ConfigureUserLockPolicyResponseObject, error) {
@@ -485,7 +485,7 @@ func (s securityAPI) ConfigureUserLockPolicy(
 }
 
 // GetPasswordExpirationPolicy returns the password expiry settings.
-func (s securityAPI) GetPasswordExpirationPolicy(
+func (s SecurityAPI) GetPasswordExpirationPolicy(
 	ctx context.Context,
 	_ artgen.GetPasswordExpirationPolicyRequestObject,
 ) (artgen.GetPasswordExpirationPolicyResponseObject, error) {
@@ -508,7 +508,7 @@ func expirationDoc(p types.PasswordExpirationPolicy) artgen.PasswordExpirationPo
 
 // SetPasswordExpirationPolicy replaces the policy: omitted fields take their
 // defaults, not their previous values, as in Artifactory.
-func (s securityAPI) SetPasswordExpirationPolicy(
+func (s SecurityAPI) SetPasswordExpirationPolicy(
 	ctx context.Context,
 	req artgen.SetPasswordExpirationPolicyRequestObject,
 ) (artgen.SetPasswordExpirationPolicyResponseObject, error) {
@@ -541,15 +541,15 @@ func (s securityAPI) SetPasswordExpirationPolicy(
 }
 
 // forgetPolicies makes a policy change apply to this instance's next login.
-func (s securityAPI) forgetPolicies() {
-	if s.cfg.Auth != nil {
-		s.cfg.Auth.ForgetPolicies()
+func (s SecurityAPI) forgetPolicies() {
+	if s.deps.Authenticator != nil {
+		s.deps.Authenticator.ForgetPolicies()
 	}
 }
 
 // ExpirePasswordForMultipleUsers forces the named users to change their
 // passwords; unknown names are reported, not refused.
-func (s securityAPI) ExpirePasswordForMultipleUsers(
+func (s SecurityAPI) ExpirePasswordForMultipleUsers(
 	ctx context.Context,
 	req artgen.ExpirePasswordForMultipleUsersRequestObject,
 ) (artgen.ExpirePasswordForMultipleUsersResponseObject, error) {
@@ -574,7 +574,7 @@ func (s securityAPI) ExpirePasswordForMultipleUsers(
 }
 
 // UnexpirePasswordForSingleUser clears a forced password change.
-func (s securityAPI) UnexpirePasswordForSingleUser(
+func (s SecurityAPI) UnexpirePasswordForSingleUser(
 	ctx context.Context,
 	req artgen.UnexpirePasswordForSingleUserRequestObject,
 ) (artgen.UnexpirePasswordForSingleUserResponseObject, error) {
@@ -591,7 +591,7 @@ func (s securityAPI) UnexpirePasswordForSingleUser(
 
 // ExpirePasswordForSingleUser is the deprecated path form of the expiry, for
 // one user; an unknown user is 404, as the unexpire form answers.
-func (s securityAPI) ExpirePasswordForSingleUser(
+func (s SecurityAPI) ExpirePasswordForSingleUser(
 	ctx context.Context,
 	req artgen.ExpirePasswordForSingleUserRequestObject,
 ) (artgen.ExpirePasswordForSingleUserResponseObject, error) {
@@ -612,7 +612,7 @@ func (s securityAPI) ExpirePasswordForSingleUser(
 
 // ExpirePasswordForAllUsers expires every internal password, the caller's
 // included.
-func (s securityAPI) ExpirePasswordForAllUsers(
+func (s SecurityAPI) ExpirePasswordForAllUsers(
 	ctx context.Context,
 	_ artgen.ExpirePasswordForAllUsersRequestObject,
 ) (artgen.ExpirePasswordForAllUsersResponseObject, error) {
@@ -634,7 +634,7 @@ func (s securityAPI) ExpirePasswordForAllUsers(
 // as the Access v2 change refuses one. An expired password reaches here
 // (ownPasswordChange) with its administrator rights intact, so it is held to
 // its own name.
-func (s securityAPI) ChangePassword(
+func (s SecurityAPI) ChangePassword(
 	ctx context.Context,
 	req artgen.ChangePasswordRequestObject,
 ) (artgen.ChangePasswordResponseObject, error) {
@@ -665,7 +665,7 @@ func (s securityAPI) ChangePassword(
 // --- Retired API keys --------------------------------------------------------
 
 // CreateApiKey refuses: API keys are retired (decision 0005).
-func (s securityAPI) CreateApiKey(
+func (s SecurityAPI) CreateApiKey(
 	ctx context.Context,
 	_ artgen.CreateApiKeyRequestObject,
 ) (artgen.CreateApiKeyResponseObject, error) {
@@ -676,7 +676,7 @@ func (s securityAPI) CreateApiKey(
 }
 
 // RegenerateApiKey refuses: no user holds a key to rotate.
-func (s securityAPI) RegenerateApiKey(
+func (s SecurityAPI) RegenerateApiKey(
 	ctx context.Context,
 	_ artgen.RegenerateApiKeyRequestObject,
 ) (artgen.RegenerateApiKeyResponseObject, error) {
@@ -688,7 +688,7 @@ func (s securityAPI) RegenerateApiKey(
 
 // GetApiKey answers 404, the documented answer when no key exists; the
 // JFrog CLI reads it as "no key".
-func (s securityAPI) GetApiKey(
+func (s SecurityAPI) GetApiKey(
 	ctx context.Context,
 	_ artgen.GetApiKeyRequestObject,
 ) (artgen.GetApiKeyResponseObject, error) {
@@ -700,7 +700,7 @@ func (s securityAPI) GetApiKey(
 
 // RevokeApiKey answers 200 with nothing revoked, for scripts that revoke
 // unconditionally. deleteAll=1 needs an administrator.
-func (s securityAPI) RevokeApiKey(
+func (s SecurityAPI) RevokeApiKey(
 	ctx context.Context,
 	req artgen.RevokeApiKeyRequestObject,
 ) (artgen.RevokeApiKeyResponseObject, error) {
@@ -719,7 +719,7 @@ func (s securityAPI) RevokeApiKey(
 
 // RevokeUserApiKey answers 200 for an existing user and 404 otherwise; there
 // is never a key to remove.
-func (s securityAPI) RevokeUserApiKey(
+func (s SecurityAPI) RevokeUserApiKey(
 	ctx context.Context,
 	req artgen.RevokeUserApiKeyRequestObject,
 ) (artgen.RevokeUserApiKeyResponseObject, error) {

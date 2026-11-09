@@ -15,7 +15,7 @@ import (
 
 func TestAccGlobalRolesWithoutStore(t *testing.T) {
 	ctx := kernel.WithPrincipal(context.Background(), kernel.Principal{Name: "admin", Admin: true})
-	if _, err := (accessService{}).GetAllGlobalRoles(
+	if _, err := (AccessService{}).GetAllGlobalRoles(
 		ctx,
 		accessgen.GetAllGlobalRolesRequestObject{},
 	); !errors.Is(
@@ -24,7 +24,7 @@ func TestAccGlobalRolesWithoutStore(t *testing.T) {
 	) {
 		t.Fatalf("a router without a store answers 501: %v", err)
 	}
-	if _, err := (accessService{}).GetAllGlobalRoles(
+	if _, err := (AccessService{}).GetAllGlobalRoles(
 		context.Background(),
 		accessgen.GetAllGlobalRolesRequestObject{},
 	); !errors.Is(
@@ -36,7 +36,7 @@ func TestAccGlobalRolesWithoutStore(t *testing.T) {
 }
 
 func TestAccRoleErrorStatuses(t *testing.T) {
-	s, ctx := accessService{}, context.Background()
+	s, ctx := AccessService{}, context.Background()
 	for err, want := range map[error]int{
 		fmt.Errorf("x: %w", roles.ErrNotFound): http.StatusNotFound,
 		fmt.Errorf("x: %w", roles.ErrConflict): http.StatusTeapot,

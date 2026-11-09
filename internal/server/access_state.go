@@ -7,46 +7,62 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/auth/idtoken"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/identity"
 	"github.com/weaveplatform/artifactweave/migration/access/core/permission"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// accessState is what the access partials share: the configuration, the
-// OIDC verifier and the helpers that reach the store and the logger and map
-// the identity and permission services' errors. accessService and
-// securityAPI embed one value, so neither builds an artifactoryService to
-// reach them. It defines no method named after an operation: promoted into
-// a composite beside the generated stubs, such a method would make the
+// accessState is what the access partials share: their dependencies and
+// the helpers that reach the store and the logger and map the identity and
+// permission services' errors. AccessService and SecurityAPI embed one
+// value. It defines no method named after an operation: promoted into a
+// composite beside the generated stubs, such a method would make the
 // operation ambiguous.
 type accessState struct {
-	cfg Config
-	// idTokens verifies the subject tokens of the OIDC token exchange and
-	// caches each provider's signing keys for the life of the handler.
-	idTokens *idtoken.Verifier
+	deps Deps
 }
 
-// accessService implements the access spec's operations; the composite
-// strict server (composites.go) adds the generated stubs.
-type accessService struct{ accessState }
+// AccessService implements the access spec's operations. It is the access
+// spec's partial strict server: the composition root embeds it beside the
+// generated stubs, which answer 501 for every operation it leaves out.
+type AccessService struct{ accessState }
 
-// securityAPI implements the artifactory spec's security operations: users,
+// SecurityAPI implements the artifactory spec's security operations: users,
 // groups, permission targets, key pairs and certificates, API restrictions,
-// passwords and policies, and the legacy tokens. It is a partial of the
-// artifactory composite (composites.go).
-type securityAPI struct{ accessState }
+// passwords and policies, and the legacy tokens. It is a partial strict
+// server of the artifactory spec, which the composition root embeds beside
+// the other partials and the generated stubs.
+type SecurityAPI struct{ accessState }
+
+// deciderFor returns the decider of p's permissions: d, the decider the
+// middleware stored with the request's principal (accessapi.DeciderFrom), or,
+// when d is nil, az's evaluation of p, for a principal the middleware did not
+// see. The error is For's, unwrapped: it already names the read that failed,
+// and callers wrap it with their own operation.
+func deciderFor(
+	ctx context.Context,
+	az accessapi.Authorizer,
+	p kernel.Principal,
+	d accessapi.Decider,
+) (accessapi.Decider, error) {
+	if d != nil {
+		return d, nil
+	}
+	return az.For(ctx, p) //nolint:wrapcheck // For names the read that failed
+}
 
 // content returns the store. A router built without one (tests of the
 // routing alone) answers like an unimplemented operation.
 func (s accessState) content() (store.Store, error) {
-	if s.cfg.Store == nil {
+	if s.deps.Store == nil {
 		return nil, apierror.ErrNotImplemented
 	}
-	return s.cfg.Store, nil
+	return s.deps.Store, nil
 }
 
 // internalError logs err and returns a 500 that names nothing internal.
@@ -58,10 +74,10 @@ func (s accessState) internalError(ctx context.Context, op string, err error) er
 // log is the configured logger, or slog's default for handlers built
 // without one in tests.
 func (s accessState) log() *slog.Logger {
-	if s.cfg.Logger == nil {
+	if s.deps.Log == nil {
 		return slog.Default()
 	}
-	return s.cfg.Logger
+	return s.deps.Log
 }
 
 // identityErr maps the identity service's errors: ErrInvalid is a 400 with

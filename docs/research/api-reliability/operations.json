@@ -345,7 +345,7 @@
     "operation_id": "deleteGlobalEnvironment",
     "state": "implemented",
     "contract": "Removes an environment. DEV and PROD cannot be deleted, nor can an environment that repositories or global roles still name; both answer 400. Admin only. Answers 204 with no body.",
-    "handler": "internal/server/roles.go: accessService.DeleteGlobalEnvironment",
+    "handler": "internal/server/roles.go: AccessService.DeleteGlobalEnvironment",
     "direct_calls": [
       "s.roleError",
       "s.roleService",
@@ -407,7 +407,7 @@
     "operation_id": "deleteOidcConfiguration",
     "state": "implemented",
     "contract": "Removes the provider and its identity mappings, so token exchanges that name it fail from then on. Tokens already issued through it stay valid until they expire or are revoked. Returns 204. Requires a platform admin.",
-    "handler": "internal/server/oidc.go: accessService.DeleteOidcConfiguration",
+    "handler": "internal/server/oidc.go: AccessService.DeleteOidcConfiguration",
     "direct_calls": [
       "s.oidcError",
       "s.oidcService",
@@ -435,7 +435,7 @@
     "operation_id": "deleteOidcIdentityMapping",
     "state": "implemented",
     "contract": "Removes one identity mapping. Tokens already issued through it stay valid. Returns 204. Requires a platform admin.",
-    "handler": "internal/server/oidc.go: accessService.DeleteOidcIdentityMapping",
+    "handler": "internal/server/oidc.go: AccessService.DeleteOidcIdentityMapping",
     "direct_calls": [
       "s.oidcError",
       "s.oidcService",
@@ -599,7 +599,7 @@
     "operation_id": "deleteGlobalRole",
     "state": "implemented",
     "contract": "Removes a CUSTOM_GLOBAL role and every assignment of it. Built-in roles answer 400. Admin only. Answers 204 with no body.",
-    "handler": "internal/server/roles.go: accessService.DeleteGlobalRole",
+    "handler": "internal/server/roles.go: AccessService.DeleteGlobalRole",
     "direct_calls": [
       "s.roleError",
       "s.roleService",
@@ -695,7 +695,7 @@
     "operation_id": "revokeTokenByValue",
     "state": "implemented",
     "contract": "Revokes the token whose JWT or reference token is given in the body and returns its id. A token is revocable when it never expires, its lifetime is at least the revocable threshold (21600 seconds), or it was created with force_revocable or refreshable; any other token answers 404, as an unknown one does. Admin only.",
-    "handler": "internal/server/tokens.go: accessService.RevokeTokenByValue",
+    "handler": "internal/server/tokens.go: AccessService.RevokeTokenByValue",
     "direct_calls": [
       "errors.Is",
       "httpkit.AdminOnly",
@@ -729,7 +729,7 @@
     "operation_id": "revokeTokenById",
     "state": "implemented",
     "contract": "Revokes the token with this id; me revokes the caller's own token. A token is revocable on the same terms as for revocation by value; any other token answers 400. A non-admin may only revoke their own tokens. Answers 200 with no body.",
-    "handler": "internal/server/tokens.go: accessService.RevokeTokenById",
+    "handler": "internal/server/tokens.go: AccessService.RevokeTokenById",
     "direct_calls": [
       "errors.Is",
       "httpkit.BadRequestf",
@@ -777,7 +777,7 @@
     "operation_id": "deleteGroup",
     "state": "implemented",
     "contract": "Removes the group, its memberships and its entries in permission targets. The built-in readers group can be deleted; a group that is the sole admin grant for the last admin cannot. Admin only. Answers 204 with no body.",
-    "handler": "internal/server/access_identity.go: accessService.DeleteGroup",
+    "handler": "internal/server/access_identity.go: AccessService.DeleteGroup",
     "direct_calls": [
       "s.adminIdentity",
       "s.identityErr",
@@ -805,7 +805,7 @@
     "operation_id": "deletePermission",
     "state": "implemented",
     "contract": "Removes the permission and every grant it carried. Requires a platform admin or a Manage Resources holder. Answers 204 with no body.",
-    "handler": "internal/server/permissions.go: accessService.DeletePermission",
+    "handler": "internal/server/permissions.go: AccessService.DeletePermission",
     "direct_calls": [
       "c.admin",
       "c.svc.Delete",
@@ -835,7 +835,7 @@
     "operation_id": "deletePermissionResource",
     "state": "implemented",
     "contract": "Removes the section for the resource type; the permission itself stays, even when it ends up with no sections. Requires a platform admin or a Manage Resources holder. Answers 204 with no body.",
-    "handler": "internal/server/permissions.go: accessService.DeletePermissionResource",
+    "handler": "internal/server/permissions.go: AccessService.DeletePermissionResource",
     "direct_calls": [
       "c.admin",
       "c.svc.DeleteResource",
@@ -864,7 +864,7 @@
     "operation_id": "deleteUser",
     "state": "implemented",
     "contract": "Removes the user, its group memberships, its tokens and its entries in permission targets. The built-in admin and anonymous users cannot be deleted. Admin only. Answers 204 with no body.",
-    "handler": "internal/server/access_identity.go: accessService.DeleteUser",
+    "handler": "internal/server/access_identity.go: AccessService.DeleteUser",
     "direct_calls": [
       "s.adminIdentity",
       "s.identityErr",
@@ -928,10 +928,10 @@
     "operation_id": "ClearAPIRestriction",
     "state": "implemented",
     "contract": "Requires an administrator. Records a durable clear event even if already inactive. This recovery route remains available to restricted administrators; each retry appends another audit entry.",
-    "handler": "internal/server/api_restrictions.go: securityAPI.ClearAPIRestriction",
+    "handler": "internal/server/api_restrictions.go: SecurityAPI.ClearAPIRestriction",
     "direct_calls": [
-      "s.cfg.Store.APIRestrictions",
-      "s.cfg.Store.APIRestrictions().Put",
+      "s.deps.Store.APIRestrictions",
+      "s.deps.Store.APIRestrictions().Put",
       "s.restrictionCaller",
       "time.Now",
       "time.Now().UTC"
@@ -1543,7 +1543,7 @@
     "operation_id": "revokeApiKey",
     "state": "implemented",
     "contract": "Revokes the caller's key, or every key when deleteAll=1 and the caller is an admin. There are no keys to revoke, so the operation always answers 200 with an informational message.",
-    "handler": "internal/server/security.go: securityAPI.RevokeApiKey",
+    "handler": "internal/server/security.go: SecurityAPI.RevokeApiKey",
     "direct_calls": [
       "httpkit.AdminOnly",
       "kernel.RequireAuthenticated"
@@ -1570,7 +1570,7 @@
     "operation_id": "revokeUserApiKey",
     "state": "implemented",
     "contract": "Admin-only revocation of a named user's key. Answers 200 with an informational message when the user exists and 404 when it does not; there is never a key to remove.",
-    "handler": "internal/server/security.go: securityAPI.RevokeUserApiKey",
+    "handler": "internal/server/security.go: SecurityAPI.RevokeUserApiKey",
     "direct_calls": [
       "s.adminStore",
       "s.identity",
@@ -1599,7 +1599,7 @@
     "operation_id": "deleteGroup",
     "state": "implemented",
     "contract": "Removes the group and its grants. Admin only. The seeded readers group cannot be deleted (400).",
-    "handler": "internal/server/security.go: securityAPI.DeleteGroup",
+    "handler": "internal/server/security.go: SecurityAPI.DeleteGroup",
     "direct_calls": [
       "artgen.DeleteGroup200TextResponse",
       "fmt.Sprintf",
@@ -1630,7 +1630,7 @@
     "operation_id": "deleteKeyPair",
     "state": "implemented",
     "contract": "Removes the pair. Admin only. A pair that repositories still use is removed all the same, and each of those repositories loses its primaryKeyPairRef or secondaryKeyPairRef to it in the same change.",
-    "handler": "internal/server/keypairs.go: securityAPI.DeleteKeyPair",
+    "handler": "internal/server/keypairs.go: SecurityAPI.DeleteKeyPair",
     "direct_calls": [
       "artgen.DeleteKeyPair200TextResponse",
       "errors.Is",
@@ -1639,7 +1639,6 @@
       "st.Keys",
       "st.Keys().DeleteKeypair",
       "st.Keys().Keypair",
-      "st.Repos",
       "st.Tx"
     ],
     "review_family": "identity",
@@ -1681,7 +1680,7 @@
     "operation_id": "deletePermissionTarget",
     "state": "implemented",
     "contract": "Removes the whole target, every section included. Admins and Manage Resources holders only. The seeded `Anything` and `Any Remote` targets can be deleted. Deprecated in favour of `DELETE /access/api/v2/permissions/{name}`.",
-    "handler": "internal/server/permissions.go: securityAPI.DeletePermissionTarget",
+    "handler": "internal/server/permissions.go: SecurityAPI.DeletePermissionTarget",
     "direct_calls": [
       "artgen.DeletePermissionTarget200TextResponse",
       "c.admin",
@@ -1711,7 +1710,7 @@
     "operation_id": "deleteUser",
     "state": "implemented",
     "contract": "Removes the user and its tokens and membership. Admin only. The seeded admin and anonymous users cannot be deleted (400).",
-    "handler": "internal/server/security.go: securityAPI.DeleteUser",
+    "handler": "internal/server/security.go: SecurityAPI.DeleteUser",
     "direct_calls": [
       "artgen.DeleteUser200TextResponse",
       "fmt.Sprintf",
@@ -1836,17 +1835,16 @@
     "operation_id": "deleteCertificate",
     "state": "implemented",
     "contract": "Removes the certificate. Admin only. A certificate still referenced by a remote repository is refused with 400.",
-    "handler": "internal/server/keypairs.go: securityAPI.DeleteCertificate",
+    "handler": "internal/server/keypairs.go: SecurityAPI.DeleteCertificate",
     "direct_calls": [
       "errors.Is",
       "fmt.Sprintf",
       "httpkit.BadRequestf",
       "s.adminStore",
+      "s.deps.Repositories.List",
       "s.internalError",
       "st.Keys",
       "st.Keys().DeleteCertificate",
-      "st.Repos",
-      "st.Repos().List",
       "strings.Join"
     ],
     "review_family": "content-and-configuration",
@@ -2119,7 +2117,7 @@
     "operation_id": "deletePermissionTargetV2",
     "state": "implemented",
     "contract": "Removes the target and every section. Answers 200 with no body. Admins and Manage Resources holders may call it.",
-    "handler": "internal/server/permissions.go: securityAPI.DeletePermissionTargetV2",
+    "handler": "internal/server/permissions.go: SecurityAPI.DeletePermissionTargetV2",
     "direct_calls": [
       "c.admin",
       "c.svc.Delete",
@@ -2577,7 +2575,7 @@
     "operation_id": "getBasicAuthenticationStatus",
     "state": "implemented",
     "contract": "Returns whether usernames and passwords are accepted over HTTP Basic. When the switch is off, only access tokens and reference tokens authenticate (decision 0005). Requires a platform admin.",
-    "handler": "internal/server/access_identity.go: accessService.GetBasicAuthenticationStatus",
+    "handler": "internal/server/access_identity.go: AccessService.GetBasicAuthenticationStatus",
     "direct_calls": [
       "authn.BasicAuthEnabled",
       "s.adminIdentity",
@@ -2606,7 +2604,7 @@
     "operation_id": "getAccessUserLockPolicy",
     "state": "implemented",
     "contract": "Returns the user lock policy. A setting never changed reports its default. Reads the same state as GET /artifactory/api/security/userLockPolicy and GET /artifactory/api/security/configuration/passwordExpirationPolicy. Requires a platform admin.",
-    "handler": "internal/server/access_identity.go: accessService.GetAccessUserLockPolicy",
+    "handler": "internal/server/access_identity.go: AccessService.GetAccessUserLockPolicy",
     "direct_calls": [
       "accessgen.GetAccessUserLockPolicy200JSONResponse",
       "s.adminIdentity",
@@ -2635,7 +2633,7 @@
     "operation_id": "getTokenDefaultExpiry",
     "state": "implemented",
     "contract": "Returns the lifetime, in seconds, that POST /api/v1/tokens gives to tokens created without expires_in. Requires a platform admin.",
-    "handler": "internal/server/tokens.go: accessService.GetTokenDefaultExpiry",
+    "handler": "internal/server/tokens.go: AccessService.GetTokenDefaultExpiry",
     "direct_calls": [
       "errors.Is",
       "httpkit.AdminOnly",
@@ -2684,7 +2682,7 @@
     "operation_id": "getGlobalEnvironments",
     "state": "implemented",
     "contract": "Returns every global environment, including the built-in DEV and PROD. Every repository belongs to exactly one environment (DEV by default). Admin only.",
-    "handler": "internal/server/roles.go: accessService.GetGlobalEnvironments",
+    "handler": "internal/server/roles.go: AccessService.GetGlobalEnvironments",
     "direct_calls": [
       "s.roleError",
       "s.roleService",
@@ -2823,7 +2821,7 @@
     "operation_id": "getAllOidcConfigurations",
     "state": "implemented",
     "contract": "Returns every OpenID Connect provider whose ID tokens the token exchange (POST /api/v1/oidc/token) trusts. Requires a platform admin.",
-    "handler": "internal/server/oidc.go: accessService.GetAllOidcConfigurations",
+    "handler": "internal/server/oidc.go: AccessService.GetAllOidcConfigurations",
     "direct_calls": [
       "s.oidcError",
       "s.oidcService",
@@ -2854,7 +2852,7 @@
     "operation_id": "getOidcConfiguration",
     "state": "implemented",
     "contract": "Returns one provider configuration. Requires a platform admin.",
-    "handler": "internal/server/oidc.go: accessService.GetOidcConfiguration",
+    "handler": "internal/server/oidc.go: AccessService.GetOidcConfiguration",
     "direct_calls": [
       "s.oidcError",
       "s.oidcService",
@@ -2882,7 +2880,7 @@
     "operation_id": "getOidcIdentityMappings",
     "state": "implemented",
     "contract": "Returns the identity mappings of one provider, optionally only those of one project. Requires a platform admin.",
-    "handler": "internal/server/oidc.go: accessService.GetOidcIdentityMappings",
+    "handler": "internal/server/oidc.go: AccessService.GetOidcIdentityMappings",
     "direct_calls": [
       "httpkit.Deref",
       "s.oidcError",
@@ -2914,7 +2912,7 @@
     "operation_id": "getOidcIdentityMappingByName",
     "state": "implemented",
     "contract": "Returns one identity mapping of a provider. Requires a platform admin.",
-    "handler": "internal/server/oidc.go: accessService.GetOidcIdentityMappingByName",
+    "handler": "internal/server/oidc.go: AccessService.GetOidcIdentityMappingByName",
     "direct_calls": [
       "s.oidcError",
       "s.oidcService",
@@ -3141,7 +3139,7 @@
     "operation_id": "getAllGlobalRoles",
     "state": "implemented",
     "contract": "Returns every global role: the built-in ADMIN and PREDEFINED roles and the CUSTOM_GLOBAL roles created through this API. Admin only.",
-    "handler": "internal/server/roles.go: accessService.GetAllGlobalRoles",
+    "handler": "internal/server/roles.go: AccessService.GetAllGlobalRoles",
     "direct_calls": [
       "s.roleError",
       "s.roleService",
@@ -3172,7 +3170,7 @@
     "operation_id": "getGlobalRole",
     "state": "implemented",
     "contract": "Returns one global role by name. Admin only.",
-    "handler": "internal/server/roles.go: accessService.GetGlobalRole",
+    "handler": "internal/server/roles.go: AccessService.GetGlobalRole",
     "direct_calls": [
       "accessgen.GetGlobalRole200JSONResponse",
       "s.roleError",
@@ -3523,7 +3521,7 @@
     "operation_id": "getAccessVersion",
     "state": "implemented",
     "contract": "Returns the compatibility version in name and version, the same value as /artifactory/api/system/version reports.",
-    "handler": "internal/server/access_version.go: accessService.GetAccessVersion",
+    "handler": "internal/server/access_version.go: AccessService.GetAccessVersion",
     "review_family": "identity",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -3546,7 +3544,7 @@
     "operation_id": "getTokens",
     "state": "implemented",
     "contract": "A platform admin sees every token; any other caller sees only tokens whose subject is their own user. Expired tokens and tokens that are not revocable are omitted. The token values themselves are never returned, only their metadata. A token issued with a reference token is listed like any other.",
-    "handler": "internal/server/tokens.go: accessService.GetTokens",
+    "handler": "internal/server/tokens.go: AccessService.GetTokens",
     "direct_calls": [
       "s.tokenAPI",
       "s.tokenAPI().visible"
@@ -3576,7 +3574,7 @@
     "operation_id": "getTokenById",
     "state": "implemented",
     "contract": "Returns the metadata of one token. The id me stands for the token used to authenticate the call. A non-admin may only read their own tokens.",
-    "handler": "internal/server/tokens.go: accessService.GetTokenById",
+    "handler": "internal/server/tokens.go: AccessService.GetTokenById",
     "direct_calls": [
       "accessgen.GetTokenById200JSONResponse",
       "s.tokenAPI",
@@ -3624,7 +3622,7 @@
     "operation_id": "getGroupList",
     "state": "implemented",
     "contract": "Returns one record per group as a cursor-paginated page. Requires a platform admin or the system:identities:r scope. Filters combine with AND.",
-    "handler": "internal/server/access_identity.go: accessService.GetGroupList",
+    "handler": "internal/server/access_identity.go: AccessService.GetGroupList",
     "direct_calls": [
       "baseurl.From",
       "errors.Is",
@@ -3662,7 +3660,7 @@
     "operation_id": "getGroupDetails",
     "state": "implemented",
     "contract": "Returns the group including its member usernames. Requires a platform admin or the system:identities:r scope.",
-    "handler": "internal/server/access_identity.go: accessService.GetGroupDetails",
+    "handler": "internal/server/access_identity.go: AccessService.GetGroupDetails",
     "direct_calls": [
       "accessgen.GetGroupDetails200JSONResponse",
       "s.groupDetails",
@@ -3693,7 +3691,7 @@
     "operation_id": "getPermissions",
     "state": "implemented",
     "contract": "Returns permissions as a cursor-paginated page. Without filters the page holds name and uri per permission. With user or group filters it holds only permissions that grant something to those principals, and expand=true then returns the full PermissionDetails instead of the name and uri pair. Requires a platform admin, a holder of the Manage Resources role or the system:permissions:r scope.",
-    "handler": "internal/server/permissions.go: accessService.GetPermissions",
+    "handler": "internal/server/permissions.go: AccessService.GetPermissions",
     "direct_calls": [
       "baseurl.From",
       "c.reader",
@@ -3733,7 +3731,7 @@
     "operation_id": "getPermissionDetails",
     "state": "implemented",
     "contract": "Returns the full permission document. Requires a platform admin, a Manage Resources holder, the system:permissions:r scope, or MANAGE on every resource of the permission.",
-    "handler": "internal/server/permissions.go: accessService.GetPermissionDetails",
+    "handler": "internal/server/permissions.go: AccessService.GetPermissionDetails",
     "direct_calls": [
       "c.lookup",
       "c.reader",
@@ -3764,7 +3762,7 @@
     "operation_id": "getPermissionResource",
     "state": "implemented",
     "contract": "Returns the actions and targets of a single resource type within the permission. A permission that has no section for the type answers 404. Requires a platform admin or a Manage Resources holder.",
-    "handler": "internal/server/permissions.go: accessService.GetPermissionResource",
+    "handler": "internal/server/permissions.go: AccessService.GetPermissionResource",
     "direct_calls": [
       "accessgen.GetPermissionResource200JSONResponse",
       "apierror.New",
@@ -3820,7 +3818,7 @@
     "operation_id": "getUserList",
     "state": "implemented",
     "contract": "Returns one record per user, newest first unless descendingOrder is false, as a cursor-paginated page. Requires a platform admin or a token carrying the system:identities:r scope. Every query parameter is a filter; filters combine with AND.",
-    "handler": "internal/server/access_identity.go: accessService.GetUserList",
+    "handler": "internal/server/access_identity.go: AccessService.GetUserList",
     "direct_calls": [
       "baseurl.From",
       "errors.Is",
@@ -3860,7 +3858,7 @@
     "operation_id": "getUserDetails",
     "state": "implemented",
     "contract": "Returns the stored user record. Requires a platform admin or the system:identities:r scope; a user may always read their own record.",
-    "handler": "internal/server/access_identity.go: accessService.GetUserDetails",
+    "handler": "internal/server/access_identity.go: AccessService.GetUserDetails",
     "direct_calls": [
       "accessgen.GetUserDetails200JSONResponse",
       "s.identityFor",
@@ -4185,7 +4183,7 @@
     "operation_id": "GetAPIRestrictionAudit",
     "state": "implemented",
     "contract": "Requires an administrator. Returns retained changes even after user deletion. New changes appear before the current page and do not shift its continuation. A changed filter or administrator invalidates the cursor.",
-    "handler": "internal/server/api_restrictions.go: securityAPI.GetAPIRestrictionAudit",
+    "handler": "internal/server/api_restrictions.go: SecurityAPI.GetAPIRestrictionAudit",
     "direct_calls": [
       "apierror.New",
       "artgen.GetAPIRestrictionAudit200JSONResponse",
@@ -4195,8 +4193,8 @@
       "httpkit.BadRequestf",
       "httpkit.Deref",
       "kernel.RequireAdmin",
-      "s.cfg.Store.APIRestrictions",
-      "s.cfg.Store.APIRestrictions().History",
+      "s.deps.Store.APIRestrictions",
+      "s.deps.Store.APIRestrictions().History",
       "store.Cursor"
     ],
     "review_family": "restriction",
@@ -4225,12 +4223,12 @@
     "operation_id": "GetAPIRestriction",
     "state": "implemented",
     "contract": "Requires an administrator. This recovery route remains available to restricted administrators and has a separate bounded admission allowance.",
-    "handler": "internal/server/api_restrictions.go: securityAPI.GetAPIRestriction",
+    "handler": "internal/server/api_restrictions.go: SecurityAPI.GetAPIRestriction",
     "direct_calls": [
       "artgen.GetAPIRestriction200JSONResponse",
       "errors.Is",
-      "s.cfg.Store.APIRestrictions",
-      "s.cfg.Store.APIRestrictions().Get",
+      "s.deps.Store.APIRestrictions",
+      "s.deps.Store.APIRestrictions().Get",
       "s.restrictionCaller"
     ],
     "review_family": "restriction",
@@ -7969,7 +7967,7 @@
     "operation_id": "getApiKey",
     "state": "implemented",
     "contract": "Returns the caller's API key. No keys are ever issued, so the operation always answers 404, the response for a user without a key.",
-    "handler": "internal/server/security.go: securityAPI.GetApiKey",
+    "handler": "internal/server/security.go: SecurityAPI.GetApiKey",
     "direct_calls": [
       "apierror.New",
       "kernel.RequireAuthenticated"
@@ -7996,7 +7994,7 @@
     "operation_id": "getPasswordExpirationPolicy",
     "state": "implemented",
     "contract": "Returns the platform-wide password expiry settings. Admin only. The same policy is visible in the security section of the YAML descriptor. Deprecated in favour of GET /api/security/userLockPolicy.",
-    "handler": "internal/server/security.go: securityAPI.GetPasswordExpirationPolicy",
+    "handler": "internal/server/security.go: SecurityAPI.GetPasswordExpirationPolicy",
     "direct_calls": [
       "artgen.GetPasswordExpirationPolicy200JSONResponse",
       "s.adminStore",
@@ -8026,7 +8024,7 @@
     "operation_id": "getUserEncryptedPassword",
     "state": "implemented",
     "contract": "Returns a reference token bound to the caller, usable in place of the clear-text password wherever an encrypted password is accepted. The caller must authenticate with Basic credentials; token authentication is a 400.",
-    "handler": "internal/server/tokens.go: securityAPI.GetUserEncryptedPassword",
+    "handler": "internal/server/tokens.go: SecurityAPI.GetUserEncryptedPassword",
     "direct_calls": [
       "artgen.GetUserEncryptedPassword200TextResponse",
       "fmt.Errorf",
@@ -8058,7 +8056,7 @@
     "operation_id": "getGroups",
     "state": "implemented",
     "contract": "Lists every group with its detail URL. Admin only. Deprecated in favour of GET /access/api/v2/groups.",
-    "handler": "internal/server/security.go: securityAPI.GetGroups",
+    "handler": "internal/server/security.go: SecurityAPI.GetGroups",
     "direct_calls": [
       "baseurl.From",
       "s.adminStore",
@@ -8092,7 +8090,7 @@
     "operation_id": "getGroupDetails",
     "state": "implemented",
     "contract": "Returns the legacy group document. Admin only. Members are included only when includeUsers=true.",
-    "handler": "internal/server/security.go: securityAPI.GetGroupDetails",
+    "handler": "internal/server/security.go: SecurityAPI.GetGroupDetails",
     "direct_calls": [
       "s.adminStore",
       "s.identity",
@@ -8127,7 +8125,7 @@
     "operation_id": "getAllKeyPairs",
     "state": "implemented",
     "contract": "Lists every key pair without private material. Admin only.",
-    "handler": "internal/server/keypairs.go: securityAPI.GetAllKeyPairs",
+    "handler": "internal/server/keypairs.go: SecurityAPI.GetAllKeyPairs",
     "direct_calls": [
       "s.adminStore",
       "s.internalError",
@@ -8159,18 +8157,17 @@
     "operation_id": "getKeyPairPublicKeyPerRepository",
     "state": "implemented",
     "contract": "Returns the public half of the repository's signing key pair, which package clients fetch to verify signed metadata. Alpine virtual repositories use their keyPair; other repositories use the primary key pair. Any authenticated caller may read it, with no permission on the repository. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled. 404 when the repository does not exist or has no pair assigned.",
-    "handler": "internal/server/keypairs.go: securityAPI.GetKeyPairPublicKeyPerRepository",
+    "handler": "internal/server/keypairs.go: SecurityAPI.GetKeyPairPublicKeyPerRepository",
     "direct_calls": [
       "apierror.New",
       "errors.Is",
       "fmt.Sprintf",
       "mime.FormatMediaType",
       "s.content",
+      "s.deps.Repositories.Get",
       "s.internalError",
       "st.Keys",
-      "st.Keys().Keypair",
-      "st.Repos",
-      "st.Repos().Get"
+      "st.Keys().Keypair"
     ],
     "review_family": "identity",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
@@ -8194,7 +8191,7 @@
     "operation_id": "getKeyPair",
     "state": "implemented",
     "contract": "Returns the readable projection of one pair, which never includes the private key or the passphrase. Any authenticated caller may read it. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled.",
-    "handler": "internal/server/keypairs.go: securityAPI.GetKeyPair",
+    "handler": "internal/server/keypairs.go: SecurityAPI.GetKeyPair",
     "direct_calls": [
       "artgen.GetKeyPair200JSONResponse",
       "errors.Is",
@@ -8245,7 +8242,7 @@
     "operation_id": "getLockedOutUsers",
     "state": "implemented",
     "contract": "Returns the names of users locked by the user lock policy. Admin only.",
-    "handler": "internal/server/security.go: securityAPI.GetLockedOutUsers",
+    "handler": "internal/server/security.go: SecurityAPI.GetLockedOutUsers",
     "direct_calls": [
       "artgen.GetLockedOutUsers200JSONResponse",
       "s.adminStore",
@@ -8278,7 +8275,7 @@
     "operation_id": "getPermissionTargets",
     "state": "implemented",
     "contract": "Lists every target by name and detail URL, including targets created through the v2 or Access APIs. Admins and Manage Resources holders only. Deprecated in favour of GET /access/api/v2/permissions.",
-    "handler": "internal/server/permissions.go: securityAPI.GetPermissionTargets",
+    "handler": "internal/server/permissions.go: SecurityAPI.GetPermissionTargets",
     "direct_calls": [
       "artgen.GetPermissionTargets200JSONResponse",
       "c.admin",
@@ -8311,7 +8308,7 @@
     "operation_id": "getPermissionTargetDetails",
     "state": "implemented",
     "contract": "Returns the target projected to the v1 shape: only its repository section, with action names mapped back to the single-letter codes. Admins and Manage Resources holders only. Deprecated in favour of GET /access/api/v2/permissions/{name}.",
-    "handler": "internal/server/permissions.go: securityAPI.GetPermissionTargetDetails",
+    "handler": "internal/server/permissions.go: SecurityAPI.GetPermissionTargetDetails",
     "direct_calls": [
       "c.admin",
       "c.svc.Get",
@@ -8345,7 +8342,7 @@
     "operation_id": "getLegacyTokens",
     "state": "implemented",
     "contract": "Lists every user's revocable, unexpired tokens in the legacy shape. Admin only.",
-    "handler": "internal/server/tokens.go: securityAPI.GetLegacyTokens",
+    "handler": "internal/server/tokens.go: SecurityAPI.GetLegacyTokens",
     "direct_calls": [
       "fmt.Errorf",
       "kernel.RequireAdmin",
@@ -8376,7 +8373,7 @@
     "operation_id": "getUserLockPolicy",
     "state": "implemented",
     "contract": "Returns the lockout settings. Admin only.",
-    "handler": "internal/server/security.go: securityAPI.GetUserLockPolicy",
+    "handler": "internal/server/security.go: SecurityAPI.GetUserLockPolicy",
     "direct_calls": [
       "s.adminStore",
       "s.identity",
@@ -8405,7 +8402,7 @@
     "operation_id": "getUsers",
     "state": "implemented",
     "contract": "Lists every user with its detail URL and realm. Admin only. Deprecated in favour of GET /access/api/v2/users.",
-    "handler": "internal/server/security.go: securityAPI.GetUsers",
+    "handler": "internal/server/security.go: SecurityAPI.GetUsers",
     "direct_calls": [
       "baseurl.From",
       "s.adminStore",
@@ -8439,7 +8436,7 @@
     "operation_id": "getUserDetails",
     "state": "implemented",
     "contract": "Returns the legacy user document without the password. Admin only. The seeded anonymous user is readable here. Deprecated in favour of GET /access/api/v2/users/{username}.",
-    "handler": "internal/server/security.go: securityAPI.GetUserDetails",
+    "handler": "internal/server/security.go: SecurityAPI.GetUserDetails",
     "direct_calls": [
       "s.adminStore",
       "s.identity",
@@ -9084,7 +9081,7 @@
     "operation_id": "getCertificates",
     "state": "implemented",
     "contract": "Lists the client certificates remote repositories can present to upstreams. Admin only.",
-    "handler": "internal/server/keypairs.go: securityAPI.GetCertificates",
+    "handler": "internal/server/keypairs.go: SecurityAPI.GetCertificates",
     "direct_calls": [
       "s.adminStore",
       "s.internalError",
@@ -9791,7 +9788,7 @@
     "operation_id": "getPermissionTargetsV2",
     "state": "implemented",
     "contract": "Lists every target by name and detail URL. Admins and holders of the Manage Resources role see all; other users see the targets they hold Manage on.",
-    "handler": "internal/server/permissions.go: securityAPI.GetPermissionTargetsV2",
+    "handler": "internal/server/permissions.go: SecurityAPI.GetPermissionTargetsV2",
     "direct_calls": [
       "artgen.GetPermissionTargetsV2200JSONResponse",
       "c.manages",
@@ -9824,7 +9821,7 @@
     "operation_id": "getPermissionTargetsByGroupV2",
     "state": "implemented",
     "contract": "Returns every target in which the group appears in any section's actions. Admins and Manage Resources holders see every match; other users see the matches they hold Manage on.",
-    "handler": "internal/server/permissions.go: securityAPI.GetPermissionTargetsByGroupV2",
+    "handler": "internal/server/permissions.go: SecurityAPI.GetPermissionTargetsByGroupV2",
     "direct_calls": [
       "artgen.GetPermissionTargetsByGroupV2200JSONResponse",
       "s.granting"
@@ -9853,7 +9850,7 @@
     "operation_id": "getPermissionTargetsByUserV2",
     "state": "implemented",
     "contract": "Returns every target in which the user appears directly in any section's actions; grants inherited through groups are not expanded. Admins and Manage Resources holders see every match; other users see the matches they hold Manage on.",
-    "handler": "internal/server/permissions.go: securityAPI.GetPermissionTargetsByUserV2",
+    "handler": "internal/server/permissions.go: SecurityAPI.GetPermissionTargetsByUserV2",
     "direct_calls": [
       "artgen.GetPermissionTargetsByUserV2200JSONResponse",
       "s.granting"
@@ -9882,7 +9879,7 @@
     "operation_id": "getPermissionTargetDetailsV2",
     "state": "implemented",
     "contract": "Returns the target with every section. Admins, Manage Resources holders and holders of Manage on the target may read it.",
-    "handler": "internal/server/permissions.go: securityAPI.GetPermissionTargetDetailsV2",
+    "handler": "internal/server/permissions.go: SecurityAPI.GetPermissionTargetDetailsV2",
     "direct_calls": [
       "c.lookup",
       "s.internalError",
@@ -12934,7 +12931,7 @@
     "operation_id": "permissionTargetExistenceCheckV2",
     "state": "implemented",
     "contract": "200 when the target exists, 404 when it does not, with no body.",
-    "handler": "internal/server/permissions.go: securityAPI.PermissionTargetExistenceCheckV2",
+    "handler": "internal/server/permissions.go: SecurityAPI.PermissionTargetExistenceCheckV2",
     "direct_calls": [
       "c.lookup",
       "s.permissionError"
@@ -13509,7 +13506,7 @@
     "operation_id": "updatePasswordPolicy",
     "state": "implemented",
     "contract": "Merges the supplied fields into the password policy; omitted fields keep their current values. The policy applies when a password is set or changed, not to existing passwords. Returns 204 with no body. Requires a platform admin.",
-    "handler": "internal/server/access_identity.go: accessService.UpdatePasswordPolicy",
+    "handler": "internal/server/access_identity.go: AccessService.UpdatePasswordPolicy",
     "direct_calls": [
       "s.adminIdentity",
       "s.identityErr",
@@ -13596,7 +13593,7 @@
     "operation_id": "updateGroup",
     "state": "implemented",
     "contract": "Partial update of the group's attributes. Omitted fields keep their values. The name, realm, realm_attributes and members cannot be changed here; members go through the members sub-resource. The body may be empty, which changes nothing and returns the current group. Admin only.",
-    "handler": "internal/server/access_identity.go: accessService.UpdateGroup",
+    "handler": "internal/server/access_identity.go: AccessService.UpdateGroup",
     "direct_calls": [
       "accessgen.UpdateGroup200JSONResponse",
       "httpkit.RawBody",
@@ -13631,7 +13628,7 @@
     "operation_id": "updateGroupMembers",
     "state": "partial: handler enforces the contract's limitations",
     "contract": "Applies the add list then the remove list to the group's members and returns the resulting full member list. Unknown usernames in add answer 404; names already present or already absent are ignored. Admin only.",
-    "handler": "internal/server/access_identity.go: accessService.UpdateGroupMembers",
+    "handler": "internal/server/access_identity.go: AccessService.UpdateGroupMembers",
     "direct_calls": [
       "apierror.New",
       "errors.Is",
@@ -13666,7 +13663,7 @@
     "operation_id": "updatePermissionResource",
     "state": "implemented",
     "contract": "Merges the body into the existing section: principals and targets present in the body replace their stored counterparts, others stay. To remove a principal or target use PUT with the full section. Requires a platform admin or a Manage Resources holder.",
-    "handler": "internal/server/permissions.go: accessService.UpdatePermissionResource",
+    "handler": "internal/server/permissions.go: AccessService.UpdatePermissionResource",
     "direct_calls": [
       "accessgen.UpdatePermissionResource200JSONResponse",
       "c.admin",
@@ -13696,7 +13693,7 @@
     "operation_id": "updateUser",
     "state": "implemented",
     "contract": "Partial update: only the fields present in the body change, omitted fields keep their stored values, and the username cannot be changed. Group membership is not updated here; use the groups sub-resource. Setting internal_password_disabled to false on a user that has no password requires a password in the same request. Admin only.",
-    "handler": "internal/server/access_identity.go: accessService.UpdateUser",
+    "handler": "internal/server/access_identity.go: AccessService.UpdateUser",
     "direct_calls": [
       "accessgen.UpdateUser200JSONResponse",
       "httpkit.BadRequestf",
@@ -13731,7 +13728,7 @@
     "operation_id": "updateUserGroups",
     "state": "partial: handler enforces the contract's limitations",
     "contract": "Applies the add list then the remove list to the user's memberships and returns the resulting full membership. Names that are already present (add) or already absent (remove) are ignored; a name in both lists ends up removed. Admin only.",
-    "handler": "internal/server/access_identity.go: accessService.UpdateUserGroups",
+    "handler": "internal/server/access_identity.go: AccessService.UpdateUserGroups",
     "direct_calls": [
       "httpkit.DerefSlice",
       "s.adminIdentity",
@@ -14169,7 +14166,7 @@
     "operation_id": "createGlobalEnvironment",
     "state": "implemented",
     "contract": "Creates an environment and returns it with status 201. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. At most 10 global environments may exist by default, DEV and PROD among them; once that many exist, another answers 400. Admin only.",
-    "handler": "internal/server/roles.go: accessService.CreateGlobalEnvironment",
+    "handler": "internal/server/roles.go: AccessService.CreateGlobalEnvironment",
     "direct_calls": [
       "httpkit.BadRequestf",
       "s.roleError",
@@ -14198,7 +14195,7 @@
     "operation_id": "renameGlobalEnvironment",
     "state": "implemented",
     "contract": "Renames the environment and updates every repository and role that references it. The built-in DEV and PROD cannot be renamed. Admin only. Answers 200 with the environment under its new name.",
-    "handler": "internal/server/roles.go: accessService.RenameGlobalEnvironment",
+    "handler": "internal/server/roles.go: AccessService.RenameGlobalEnvironment",
     "direct_calls": [
       "httpkit.BadRequestf",
       "s.roleError",
@@ -14349,7 +14346,7 @@
     "operation_id": "createOidcConfiguration",
     "state": "implemented",
     "contract": "Registers an external identity provider, typically a CI system, whose signed ID tokens may be exchanged for access tokens. Answers 200 with the stored configuration. A duplicate name or a GitHub provider type without organization is rejected with 400. Requires a platform admin.",
-    "handler": "internal/server/oidc.go: accessService.CreateOidcConfiguration",
+    "handler": "internal/server/oidc.go: AccessService.CreateOidcConfiguration",
     "direct_calls": [
       "s.oidcError",
       "s.oidcService",
@@ -14377,7 +14374,7 @@
     "operation_id": "oidcTokenExchange",
     "state": "implemented",
     "contract": "Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider's identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed, when no mapping matches, or when the matching mapping's patterns do not accept the token's claims, and 401 when the subject token does not verify.",
-    "handler": "internal/server/oidc.go: accessService.OidcTokenExchange",
+    "handler": "internal/server/oidc.go: AccessService.OidcTokenExchange",
     "direct_calls": [
       "got.Record.Scope.String",
       "httpkit.BadRequestf",
@@ -14409,7 +14406,7 @@
     "operation_id": "createOidcIdentityMapping",
     "state": "implemented",
     "contract": "Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200 with the stored mapping, including the project_key derived from its scope. A scope that names project roles in more than one project is refused with 400. Requires a platform admin.",
-    "handler": "internal/server/oidc.go: accessService.CreateOidcIdentityMapping",
+    "handler": "internal/server/oidc.go: AccessService.CreateOidcIdentityMapping",
     "direct_calls": [
       "s.oidcError",
       "s.oidcService",
@@ -14509,7 +14506,7 @@
     "operation_id": "createGlobalRole",
     "state": "implemented",
     "contract": "Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with {\"code\":\"OK\",\"message\":\"Role '\u003cname\u003e' created\"}. Admin only. An existing name answers 409.",
-    "handler": "internal/server/roles.go: accessService.CreateGlobalRole",
+    "handler": "internal/server/roles.go: AccessService.CreateGlobalRole",
     "direct_calls": [
       "fmt.Sprintf",
       "httpkit.BadRequestf",
@@ -14687,7 +14684,7 @@
     "operation_id": "createToken",
     "state": "implemented",
     "contract": "With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A transient user, the subject of a token minted for a name that is no stored user or of an OIDC exchange, mints for itself a token with its own token's scope that resolves to the same transient user. That token expires no later than the caller's own token, and may be refreshable only when the caller's own token is, or the request is refused with 403. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.",
-    "handler": "internal/server/tokens.go: accessService.CreateToken",
+    "handler": "internal/server/tokens.go: AccessService.CreateToken",
     "direct_calls": [
       "httpkit.BadRequestf",
       "httpkit.Deref",
@@ -14734,7 +14731,7 @@
     "operation_id": "createGroup",
     "state": "partial: handler enforces the contract's limitations",
     "contract": "Creates a group and returns its details with status 201. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or takes them from an LDAP group setting (LDAP import is not supported and answers 400). Admin only. An existing name answers 409.",
-    "handler": "internal/server/access_identity.go: accessService.CreateGroup",
+    "handler": "internal/server/access_identity.go: AccessService.CreateGroup",
     "direct_calls": [
       "accessgen.CreateGroup201JSONResponse",
       "apierror.New",
@@ -14769,7 +14766,7 @@
     "operation_id": "createPermission",
     "state": "implemented",
     "contract": "Creates a permission in the Access v2 model and returns it with status 201. The /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Requires a platform admin or a Manage Resources holder. An existing name answers 409.",
-    "handler": "internal/server/permissions.go: accessService.CreatePermission",
+    "handler": "internal/server/permissions.go: AccessService.CreatePermission",
     "direct_calls": [
       "c.admin",
       "c.svc.Create",
@@ -14801,7 +14798,7 @@
     "operation_id": "createUser",
     "state": "implemented",
     "contract": "Creates an internal user and returns its details with status 201. The same internal user record backs the /artifactory/api/security/users endpoint. Admin only. A username that already exists answers 409.",
-    "handler": "internal/server/access_identity.go: accessService.CreateUser",
+    "handler": "internal/server/access_identity.go: AccessService.CreateUser",
     "direct_calls": [
       "accessgen.CreateUser201JSONResponse",
       "httpkit.BadRequestf",
@@ -14835,7 +14832,7 @@
     "operation_id": "expirePasswordForAllUsers",
     "state": "implemented",
     "contract": "Marks every internal user's password as expired so each user must set a new one at next login. Users with internal_password_disabled are unaffected. Admin only. Responds with a plain text confirmation.",
-    "handler": "internal/server/access_identity.go: accessService.ExpirePasswordForAllUsers",
+    "handler": "internal/server/access_identity.go: AccessService.ExpirePasswordForAllUsers",
     "direct_calls": [
       "accessgen.ExpirePasswordForAllUsers200TextResponse",
       "s.adminIdentity",
@@ -14864,7 +14861,7 @@
     "operation_id": "unexpirePasswordForAllUsers",
     "state": "implemented",
     "contract": "Reverses expire_password_for_all_users: every internal password becomes valid again without the user changing it. Admin only. Responds with a plain text confirmation.",
-    "handler": "internal/server/access_identity.go: accessService.UnexpirePasswordForAllUsers",
+    "handler": "internal/server/access_identity.go: AccessService.UnexpirePasswordForAllUsers",
     "direct_calls": [
       "accessgen.UnexpirePasswordForAllUsers200TextResponse",
       "s.adminIdentity",
@@ -14893,7 +14890,7 @@
     "operation_id": "expireUserPassword",
     "state": "implemented",
     "contract": "Marks the user's password as expired so they must change it at next login. Admin only. Answers 204 with no body.",
-    "handler": "internal/server/access_identity.go: accessService.ExpireUserPassword",
+    "handler": "internal/server/access_identity.go: AccessService.ExpireUserPassword",
     "direct_calls": [
       "apierror.New",
       "s.adminIdentity",
@@ -14922,7 +14919,7 @@
     "operation_id": "unlockUser",
     "state": "implemented",
     "contract": "Clears the lock that the user lock policy applied after too many failed logins and resets the failure counter. Unlocking an unlocked user succeeds. Admin only. Answers 204 with no body.",
-    "handler": "internal/server/access_identity.go: accessService.UnlockUser",
+    "handler": "internal/server/access_identity.go: AccessService.UnlockUser",
     "direct_calls": [
       "s.adminIdentity",
       "s.identityErr",
@@ -17523,7 +17520,7 @@
     "operation_id": "createApiKey",
     "state": "implemented",
     "contract": "Legacy API-key creation, which is disabled. Always answers 400 with the message \"API key creation is disabled\". Use an access token or a reference token from /access/api/v1/tokens instead.",
-    "handler": "internal/server/security.go: securityAPI.CreateApiKey",
+    "handler": "internal/server/security.go: SecurityAPI.CreateApiKey",
     "direct_calls": [
       "httpkit.BadRequestf",
       "kernel.RequireAuthenticated"
@@ -17550,7 +17547,7 @@
     "operation_id": "updateGroup",
     "state": "implemented",
     "contract": "Changes only the fields present in the body; userNames, when present, replaces the membership. Admin only.",
-    "handler": "internal/server/security.go: securityAPI.UpdateGroup",
+    "handler": "internal/server/security.go: SecurityAPI.UpdateGroup",
     "direct_calls": [
       "s.adminStore",
       "s.identity",
@@ -17579,7 +17576,7 @@
     "operation_id": "createKeyPair",
     "state": "implemented",
     "contract": "Stores a key pair, replacing any pair of the same name. Admin only. The private and public keys must match (400). Repositories that reference a replaced pair by name use its new material from the next request. Answers 201 with an empty object.",
-    "handler": "internal/server/keypairs.go: securityAPI.CreateKeyPair",
+    "handler": "internal/server/keypairs.go: SecurityAPI.CreateKeyPair",
     "direct_calls": [
       "s.adminStore",
       "s.internalError",
@@ -17607,7 +17604,7 @@
     "operation_id": "verifyKeyPair",
     "state": "implemented",
     "contract": "Checks that the private and public keys in the body belong together and that the passphrase, if given, unlocks the private key. Nothing is stored. Admin only. A mismatch is a 400 whose message names the problem.",
-    "handler": "internal/server/keypairs.go: securityAPI.VerifyKeyPair",
+    "handler": "internal/server/keypairs.go: SecurityAPI.VerifyKeyPair",
     "direct_calls": [
       "artgen.VerifyKeyPair200TextResponse",
       "httpkit.AdminOnly"
@@ -17697,7 +17694,7 @@
     "operation_id": "unlockAllLockedOutUsers",
     "state": "implemented",
     "contract": "Clears every account lock. Admin only.",
-    "handler": "internal/server/security.go: securityAPI.UnlockAllLockedOutUsers",
+    "handler": "internal/server/security.go: SecurityAPI.UnlockAllLockedOutUsers",
     "direct_calls": [
       "artgen.UnlockAllLockedOutUsers200TextResponse",
       "s.adminStore",
@@ -17727,7 +17724,7 @@
     "operation_id": "unlockLockedOutUsers",
     "state": "partial: handler enforces the contract's limitations",
     "contract": "Clears the lock on each named user. Admin only. Unknown names are ignored so a stale list does not fail the whole call; an empty array is a 400.",
-    "handler": "internal/server/security.go: securityAPI.UnlockLockedOutUsers",
+    "handler": "internal/server/security.go: SecurityAPI.UnlockLockedOutUsers",
     "direct_calls": [
       "artgen.UnlockLockedOutUsers200TextResponse",
       "s.adminStore",
@@ -17757,7 +17754,7 @@
     "operation_id": "unlockLockedOutUser",
     "state": "implemented",
     "contract": "The older form, with the user in the path and no body. Behaves like the array form for one user.",
-    "handler": "internal/server/security.go: securityAPI.UnlockLockedOutUser",
+    "handler": "internal/server/security.go: SecurityAPI.UnlockLockedOutUser",
     "direct_calls": [
       "artgen.UnlockLockedOutUser200TextResponse",
       "fmt.Sprintf",
@@ -17789,7 +17786,7 @@
     "operation_id": "changePassword",
     "state": "implemented",
     "contract": "Replaces the internal password of the user the body names. An administrator may name any user; any other caller only itself, and not with an access token scoped more narrowly than its user (403). oldPassword must verify for every caller, and a wrong one counts as a failed login under the user lock policy. A caller whose password has expired may make this call for itself with that password. Deprecated in favour of PUT /access/api/v2/users/{username}/password.",
-    "handler": "internal/server/security.go: securityAPI.ChangePassword",
+    "handler": "internal/server/security.go: SecurityAPI.ChangePassword",
     "direct_calls": [
       "artgen.ChangePassword200TextResponse",
       "httpkit.BadRequestf",
@@ -17821,7 +17818,7 @@
     "operation_id": "expirePasswordForMultipleUsers",
     "state": "implemented",
     "contract": "Forces each named user to change their password at the next login. Admin only. Unknown users are reported in the message rather than failing the call.",
-    "handler": "internal/server/security.go: securityAPI.ExpirePasswordForMultipleUsers",
+    "handler": "internal/server/security.go: SecurityAPI.ExpirePasswordForMultipleUsers",
     "direct_calls": [
       "httpkit.BadRequestf",
       "s.adminStore",
@@ -17852,7 +17849,7 @@
     "operation_id": "expirePasswordForSingleUser",
     "state": "implemented",
     "contract": "Forces the user to set a new password, whether or not the password expiration policy is enabled. Until then, requests that authenticate with the expired password answer 403, except the caller's own password change. Admin only. Deprecated in favour of POST /access/api/v2/users/{username}/password/expire.",
-    "handler": "internal/server/security.go: securityAPI.ExpirePasswordForSingleUser",
+    "handler": "internal/server/security.go: SecurityAPI.ExpirePasswordForSingleUser",
     "direct_calls": [
       "apierror.New",
       "artgen.ExpirePasswordForSingleUser200TextResponse",
@@ -17884,7 +17881,7 @@
     "operation_id": "expirePasswordForAllUsers",
     "state": "implemented",
     "contract": "Forces every user with an internal password, the caller included, to set a new one; users whose internal password is disabled are unaffected. Until then, requests that authenticate with an expired password answer 403, except the caller's own password change. Admin only. Deprecated in favour of POST /access/api/v2/users/expire_password_for_all_users.",
-    "handler": "internal/server/security.go: securityAPI.ExpirePasswordForAllUsers",
+    "handler": "internal/server/security.go: SecurityAPI.ExpirePasswordForAllUsers",
     "direct_calls": [
       "artgen.ExpirePasswordForAllUsers200TextResponse",
       "s.adminStore",
@@ -17914,7 +17911,7 @@
     "operation_id": "unexpirePasswordForSingleUser",
     "state": "implemented",
     "contract": "Clears the forced password change for one user. Admin only.",
-    "handler": "internal/server/security.go: securityAPI.UnexpirePasswordForSingleUser",
+    "handler": "internal/server/security.go: SecurityAPI.UnexpirePasswordForSingleUser",
     "direct_calls": [
       "artgen.UnexpirePasswordForSingleUser200TextResponse",
       "fmt.Sprintf",
@@ -17945,7 +17942,7 @@
     "operation_id": "updateUser",
     "state": "implemented",
     "contract": "Changes only the fields present in the body. Admin only. groups, when present, replaces the membership. Deprecated in favour of PATCH /access/api/v2/users/{name}.",
-    "handler": "internal/server/security.go: securityAPI.UpdateUser",
+    "handler": "internal/server/security.go: SecurityAPI.UpdateUser",
     "direct_calls": [
       "s.adminStore",
       "s.identity",
@@ -18262,7 +18259,7 @@
     "operation_id": "addCertificate",
     "state": "implemented",
     "contract": "Stores a PEM bundle holding the certificate and its private key under the alias. Admin only. The private key is sealed at rest. A bundle without a private key or with a mismatched pair is a 400; an existing alias is replaced. The request media type is application/text; text/plain is accepted as well.",
-    "handler": "internal/server/keypairs.go: securityAPI.AddCertificate",
+    "handler": "internal/server/keypairs.go: SecurityAPI.AddCertificate",
     "direct_calls": [
       "err.Error",
       "fmt.Sprintf",
@@ -19063,7 +19060,7 @@
     "operation_id": "createPermissionTargetV2",
     "state": "implemented",
     "contract": "Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admins and Manage Resources holders may call it. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.",
-    "handler": "internal/server/permissions.go: securityAPI.CreatePermissionTargetV2",
+    "handler": "internal/server/permissions.go: SecurityAPI.CreatePermissionTargetV2",
     "direct_calls": [
       "c.admin",
       "c.svc.Create",
@@ -19866,7 +19863,7 @@
     "operation_id": "setBasicAuthenticationStatus",
     "state": "implemented",
     "contract": "Turns acceptance of usernames and passwords over HTTP Basic on or off for the whole instance, from the next request on. Returns 200 with no body. Requires a platform admin.",
-    "handler": "internal/server/access_identity.go: accessService.SetBasicAuthenticationStatus",
+    "handler": "internal/server/access_identity.go: AccessService.SetBasicAuthenticationStatus",
     "direct_calls": [
       "httpkit.BadRequestf",
       "s.adminIdentity",
@@ -19897,7 +19894,7 @@
     "operation_id": "createPasswordPolicy",
     "state": "implemented",
     "contract": "Replaces the whole password policy that internal users' passwords must satisfy. Every field not supplied returns to its default, so an empty object resets the policy. The policy applies when a password is set or changed, not to existing passwords. Returns 204 with no body. Requires a platform admin.",
-    "handler": "internal/server/access_identity.go: accessService.CreatePasswordPolicy",
+    "handler": "internal/server/access_identity.go: AccessService.CreatePasswordPolicy",
     "direct_calls": [
       "s.adminIdentity",
       "s.identityErr",
@@ -19926,7 +19923,7 @@
     "operation_id": "configureAccessUserLockPolicy",
     "state": "implemented",
     "contract": "Replaces the user lock policy and returns what was stored. Send every field; an omitted field is stored as 0 or false, not as its default. To change one setting, read the policy and send it back with that field changed. Setting attempts to 0 unlocks every locked user. Requires a platform admin.",
-    "handler": "internal/server/access_identity.go: accessService.ConfigureAccessUserLockPolicy",
+    "handler": "internal/server/access_identity.go: AccessService.ConfigureAccessUserLockPolicy",
     "direct_calls": [
       "accessgen.ConfigureAccessUserLockPolicy200JSONResponse",
       "httpkit.BadRequestf",
@@ -19957,7 +19954,7 @@
     "operation_id": "setTokenDefaultExpiry",
     "state": "implemented",
     "contract": "Changes the lifetime given to access tokens created without expires_in. Tokens already issued keep their expiry. Returns 200 with no body. Requires a platform admin.",
-    "handler": "internal/server/tokens.go: accessService.SetTokenDefaultExpiry",
+    "handler": "internal/server/tokens.go: AccessService.SetTokenDefaultExpiry",
     "direct_calls": [
       "httpkit.AdminOnly",
       "httpkit.BadRequestf",
@@ -20057,7 +20054,7 @@
     "operation_id": "updateOidcConfiguration",
     "state": "implemented",
     "contract": "Replaces the named provider's configuration with the body. The path names the provider; a name in the body must match it. Requires a platform admin.",
-    "handler": "internal/server/oidc.go: accessService.UpdateOidcConfiguration",
+    "handler": "internal/server/oidc.go: AccessService.UpdateOidcConfiguration",
     "direct_calls": [
       "s.oidcError",
       "s.oidcService",
@@ -20085,7 +20082,7 @@
     "operation_id": "updateOidcIdentityMapping",
     "state": "implemented",
     "contract": "Replaces the named mapping with the body. The mapping's project, which the project roles in token_spec.scope imply, cannot change, so a scope that implies another project, none for a project's mapping or one for a global mapping is refused with 400, as is a scope that names project roles in more than one project. Requires a platform admin.",
-    "handler": "internal/server/oidc.go: accessService.UpdateOidcIdentityMapping",
+    "handler": "internal/server/oidc.go: AccessService.UpdateOidcIdentityMapping",
     "direct_calls": [
       "s.oidcError",
       "s.oidcService",
@@ -20242,7 +20239,7 @@
     "operation_id": "updateGlobalRole",
     "state": "implemented",
     "contract": "Replaces the description, environments and actions of a CUSTOM_GLOBAL role, or the environments and actions of a PREDEFINED one. The name in the body must equal the path name and the type must stay the same; the ADMIN role cannot be changed. Each of these answers 400. Admin only. Answers 200 with no body.",
-    "handler": "internal/server/roles.go: accessService.UpdateGlobalRole",
+    "handler": "internal/server/roles.go: AccessService.UpdateGlobalRole",
     "direct_calls": [
       "httpkit.BadRequestf",
       "httpkit.Deref",
@@ -20381,7 +20378,7 @@
     "operation_id": "replacePermissionResource",
     "state": "implemented",
     "contract": "Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. Requires a platform admin or a Manage Resources holder.",
-    "handler": "internal/server/permissions.go: accessService.ReplacePermissionResource",
+    "handler": "internal/server/permissions.go: AccessService.ReplacePermissionResource",
     "direct_calls": [
       "accessgen.ReplacePermissionResource200JSONResponse",
       "c.admin",
@@ -20411,7 +20408,7 @@
     "operation_id": "changeUserPassword",
     "state": "implemented",
     "contract": "Replaces the user's internal password. A platform admin may set any user's password; any user may set their own. The new value must satisfy the password policy and, when the policy forbids reuse, differ from the current one. Answers 204 with no body.",
-    "handler": "internal/server/access_identity.go: accessService.ChangeUserPassword",
+    "handler": "internal/server/access_identity.go: AccessService.ChangeUserPassword",
     "direct_calls": [
       "httpkit.BadRequestf",
       "kernel.RequireAuthenticated",
@@ -20574,14 +20571,14 @@
     "operation_id": "SetAPIRestriction",
     "state": "implemented",
     "contract": "Requires an administrator. Each accepted change replaces current state and appends a durable audit entry. It affects subsequent authenticated calls and credential rechecks; already running work is not forcibly stopped. Retries append another audit entry.",
-    "handler": "internal/server/api_restrictions.go: securityAPI.SetAPIRestriction",
+    "handler": "internal/server/api_restrictions.go: SecurityAPI.SetAPIRestriction",
     "direct_calls": [
       "artgen.SetAPIRestriction200JSONResponse",
       "httpkit.BadRequestf",
       "now.Add",
       "req.Body.Until.After",
-      "s.cfg.Store.APIRestrictions",
-      "s.cfg.Store.APIRestrictions().Put",
+      "s.deps.Store.APIRestrictions",
+      "s.deps.Store.APIRestrictions().Put",
       "s.restrictionCaller",
       "strings.TrimSpace",
       "time.Now",
@@ -21505,7 +21502,7 @@
     "operation_id": "regenerateApiKey",
     "state": "implemented",
     "contract": "Legacy key rotation, which is disabled. Always answers 400 \"API key creation is disabled\"; no user holds a key.",
-    "handler": "internal/server/security.go: securityAPI.RegenerateApiKey",
+    "handler": "internal/server/security.go: SecurityAPI.RegenerateApiKey",
     "direct_calls": [
       "httpkit.BadRequestf",
       "kernel.RequireAuthenticated"
@@ -21532,7 +21529,7 @@
     "operation_id": "setPasswordExpirationPolicy",
     "state": "implemented",
     "contract": "Replaces the policy. Admin only. The body is the whole policy, so omitted fields take their defaults, not their previous values. Returns the stored policy with JSON boolean and integer types. Deprecated in favour of PUT /api/security/userLockPolicy.",
-    "handler": "internal/server/security.go: securityAPI.SetPasswordExpirationPolicy",
+    "handler": "internal/server/security.go: SecurityAPI.SetPasswordExpirationPolicy",
     "direct_calls": [
       "artgen.SetPasswordExpirationPolicy200JSONResponse",
       "httpkit.BadRequestf",
@@ -21564,7 +21561,7 @@
     "operation_id": "createOrReplaceGroup",
     "state": "implemented",
     "contract": "Creates the group or replaces every field of an existing one, including the membership when userNames is present. Admin only. Always answers 201, both on create and on replace.",
-    "handler": "internal/server/security.go: securityAPI.CreateOrReplaceGroup",
+    "handler": "internal/server/security.go: SecurityAPI.CreateOrReplaceGroup",
     "direct_calls": [
       "httpkit.BadRequestf",
       "s.adminStore",
@@ -21595,7 +21592,7 @@
     "operation_id": "updateKeyPair",
     "state": "implemented",
     "contract": "Replaces the pair named by pairName in the body. Admin only. The pair must exist (404) and the keys must match (400). Repositories referencing the pair pick up the new material immediately.",
-    "handler": "internal/server/keypairs.go: securityAPI.UpdateKeyPair",
+    "handler": "internal/server/keypairs.go: SecurityAPI.UpdateKeyPair",
     "direct_calls": [
       "artgen.UpdateKeyPair200JSONResponse",
       "errors.Is",
@@ -21626,7 +21623,7 @@
     "operation_id": "createOrReplacePermissionTarget",
     "state": "implemented",
     "contract": "Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admins and Manage Resources holders only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.",
-    "handler": "internal/server/permissions.go: securityAPI.CreateOrReplacePermissionTarget",
+    "handler": "internal/server/permissions.go: SecurityAPI.CreateOrReplacePermissionTarget",
     "direct_calls": [
       "c.admin",
       "c.svc.PutResource",
@@ -21658,7 +21655,7 @@
     "operation_id": "configureUserLockPolicy",
     "state": "implemented",
     "contract": "Replaces the lockout settings. Admin only. Disabling the policy also clears existing locks.",
-    "handler": "internal/server/security.go: securityAPI.ConfigureUserLockPolicy",
+    "handler": "internal/server/security.go: SecurityAPI.ConfigureUserLockPolicy",
     "direct_calls": [
       "artgen.ConfigureUserLockPolicy200TextResponse",
       "httpkit.BadRequestf",
@@ -21690,7 +21687,7 @@
     "operation_id": "createOrReplaceUser",
     "state": "implemented",
     "contract": "Creates the user, or replaces every field of an existing one. Admin only. name, email and password are required (password may be omitted only with internalPasswordDisabled true). Answers 201 whether the user was created or replaced. Deprecated in favour of POST /access/api/v2/users.",
-    "handler": "internal/server/security.go: securityAPI.CreateOrReplaceUser",
+    "handler": "internal/server/security.go: SecurityAPI.CreateOrReplaceUser",
     "direct_calls": [
       "httpkit.BadRequestf",
       "s.adminStore",
@@ -21965,7 +21962,7 @@
     "operation_id": "createOrReplacePermissionTargetV2",
     "state": "implemented",
     "contract": "Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and Manage Resources holders may create or change anything; holders of Manage on an existing target may call it too. A holder of Manage who is neither may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself. It may not change its own user entry or the entry of a group it belongs to. Any other change answers 403. Validation is the same as for create.",
-    "handler": "internal/server/permissions.go: securityAPI.CreateOrReplacePermissionTargetV2",
+    "handler": "internal/server/permissions.go: SecurityAPI.CreateOrReplacePermissionTargetV2",
     "direct_calls": [
       "c.admin",
       "c.manages",

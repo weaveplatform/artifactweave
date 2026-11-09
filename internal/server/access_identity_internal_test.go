@@ -12,7 +12,7 @@ import (
 
 func TestAccAccessIdentityWithoutStore(t *testing.T) {
 	ctx := kernel.WithPrincipal(context.Background(), kernel.Principal{Name: "admin", Admin: true})
-	svc := accessService{}
+	svc := AccessService{}
 	if _, err := svc.GetUserList(
 		ctx,
 		accessgen.GetUserListRequestObject{},

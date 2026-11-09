@@ -153,7 +153,7 @@ func TestAccHandwrittenRoutesNotGenerated(t *testing.T) {
 		{"artifactory.openapi.yaml", func(r chi.Router) {
 			artgen.HandlerWithOptions(
 				artgen.NewStrictHandler(artifactoryServer{
-					securityAPI:        &securityAPI{},
+					SecurityAPI:        &SecurityAPI{},
 					systemAPI:          &systemAPI{},
 					artifactoryService: &artifactoryService{},
 				}, nil),
@@ -162,7 +162,7 @@ func TestAccHandwrittenRoutesNotGenerated(t *testing.T) {
 		}},
 		{"access.openapi.yaml", func(r chi.Router) {
 			accessgen.HandlerWithOptions(
-				accessgen.NewStrictHandler(accessServer{accessService: &accessService{}}, nil),
+				accessgen.NewStrictHandler(accessServer{AccessService: &AccessService{}}, nil),
 				accessgen.ChiServerOptions{BaseRouter: r},
 			)
 		}},

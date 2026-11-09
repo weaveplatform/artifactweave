@@ -10,8 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-chi/chi/v5"
-
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
@@ -20,7 +18,6 @@ import (
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/middleware"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -42,10 +39,10 @@ const (
 type tokenAPI struct{ accessState }
 
 func (t tokenAPI) service() (*token.Service, error) {
-	if t.cfg.Tokens == nil {
+	if t.deps.Tokens == nil {
 		return nil, apierror.ErrNotImplemented
 	}
-	return t.cfg.Tokens, nil
+	return t.deps.Tokens, nil
 }
 
 // subject is the token subject of a user name on this instance.
@@ -97,7 +94,7 @@ func (t tokenAPI) mint(ctx context.Context, m mintRequest) (token.Issued, error)
 	// it for a token there (jfrog-cli-core utils/config/tokenrefresh.go), and
 	// jf rt atc with a password still works where jf atc cannot (jfrog-cli
 	// issue 2547). Refusing it too would break every such configuration.
-	if p.Password && !m.isLegacy && !t.cfg.AllowBasicAuthTokens {
+	if p.Password && !m.isLegacy && !t.deps.Settings.AllowBasicAuthTokens {
 		return token.Issued{}, errBasicTokenCreation
 	}
 	if narrowedToken(p) {
@@ -208,8 +205,8 @@ func (t tokenAPI) refresh(
 				"access_token is required with grant_type refresh_token",
 			)
 		}
-		if t.cfg.Auth != nil {
-			of, presented = t.cfg.Auth.ExpiredToken(ctx, m.accessToken)
+		if t.deps.Authenticator != nil {
+			of, presented = t.deps.Authenticator.ExpiredToken(ctx, m.accessToken)
 		}
 		if !presented {
 			return token.Issued{}, kernel.ErrBadCredentials
@@ -257,7 +254,7 @@ var errNeverExpires = apierror.New(
 // Only an administrator's token is marked: anyone else mints for
 // themselves alone.
 func (t tokenAPI) identityOf(ctx context.Context, username string) (types.TokenIdentity, error) {
-	_, err := t.cfg.Store.Users().Get(ctx, username)
+	_, err := t.deps.Store.Users().Get(ctx, username)
 	switch {
 	case errors.Is(err, store.ErrNotFound):
 		return types.IdentityTransient, nil
@@ -287,7 +284,7 @@ func (t tokenAPI) asTransientCaller(
 	if !req.Refreshable {
 		return nil
 	}
-	caller, err := t.cfg.Store.Tokens().Get(ctx, p.TokenID)
+	caller, err := t.deps.Store.Tokens().Get(ctx, p.TokenID)
 	if err != nil {
 		return t.internalError(ctx, "the caller's token", err)
 	}
@@ -384,7 +381,7 @@ func (t tokenAPI) visible(ctx context.Context) ([]types.Token, *token.Service, e
 	var out []types.Token
 	page := store.Page{Limit: 500}
 	for {
-		recs, next, err := t.cfg.Store.Tokens().List(ctx, filter, page)
+		recs, next, err := t.deps.Store.Tokens().List(ctx, filter, page)
 		if err != nil {
 			return nil, nil, t.internalError(ctx, "list tokens", err)
 		}
@@ -418,7 +415,7 @@ func (t tokenAPI) own(ctx context.Context, id string) (types.Token, *token.Servi
 	if id == "" {
 		return types.Token{}, nil, tokenNotFound()
 	}
-	rec, err := t.cfg.Store.Tokens().Get(ctx, id)
+	rec, err := t.deps.Store.Tokens().Get(ctx, id)
 	if errors.Is(err, store.ErrNotFound) || (err == nil && rec.Expired(time.Now())) {
 		return types.Token{}, nil, tokenNotFound()
 	}
@@ -440,11 +437,11 @@ func tokenNotFound() error {
 // words.
 var errNotRevocable = apierror.New(http.StatusNotFound, "Token not found or not revocable")
 
-func (s accessService) tokenAPI() tokenAPI { return tokenAPI(s) }
+func (s AccessService) tokenAPI() tokenAPI { return tokenAPI(s) }
 
 // CreateToken mints or refreshes a token. The body may be JSON (the
 // Terraform provider) or a form (the JFrog CLI); both carry the same fields.
-func (s accessService) CreateToken(
+func (s AccessService) CreateToken(
 	ctx context.Context,
 	req accessgen.CreateTokenRequestObject,
 ) (accessgen.CreateTokenResponseObject, error) {
@@ -495,7 +492,7 @@ func (s accessService) CreateToken(
 
 // GetTokens lists the caller's tokens, or every token for an administrator,
 // keeping only those with the scope the scope parameter names.
-func (s accessService) GetTokens(
+func (s AccessService) GetTokens(
 	ctx context.Context,
 	req accessgen.GetTokensRequestObject,
 ) (accessgen.GetTokensResponseObject, error) {
@@ -525,7 +522,7 @@ func hasScope(sc types.Scope, want string) bool {
 // GetTokenById returns one token's metadata. A non-revocable token is still
 // found by its id: the artifactory_scoped_token resource reads its token
 // back after creating it, and drops it from state on a 404.
-func (s accessService) GetTokenById(
+func (s AccessService) GetTokenById(
 	ctx context.Context,
 	req accessgen.GetTokenByIdRequestObject,
 ) (accessgen.GetTokenByIdResponseObject, error) {
@@ -540,7 +537,7 @@ func (s accessService) GetTokenById(
 // answers it (JFrog KB 000005622, which shows the UI's DELETE of such a
 // token failing with 400); revoketokenbyid lists 403 only for a caller
 // without the permission.
-func (s accessService) RevokeTokenById(
+func (s AccessService) RevokeTokenById(
 	ctx context.Context,
 	req accessgen.RevokeTokenByIdRequestObject,
 ) (accessgen.RevokeTokenByIdResponseObject, error) {
@@ -564,7 +561,7 @@ func (s accessService) RevokeTokenById(
 // given. Admin only. An unknown token and a non-revocable one both answer
 // 404, which revoketokenbyvalue documents as "Token not found or not
 // revocable", so the answer does not tell which.
-func (s accessService) RevokeTokenByValue(
+func (s AccessService) RevokeTokenByValue(
 	ctx context.Context,
 	req accessgen.RevokeTokenByValueRequestObject,
 ) (accessgen.RevokeTokenByValueResponseObject, error) {
@@ -598,7 +595,7 @@ func (s accessService) RevokeTokenByValue(
 }
 
 // GetTokenDefaultExpiry answers the default lifetime in seconds. Admin only.
-func (s accessService) GetTokenDefaultExpiry(
+func (s AccessService) GetTokenDefaultExpiry(
 	ctx context.Context,
 	_ accessgen.GetTokenDefaultExpiryRequestObject,
 ) (accessgen.GetTokenDefaultExpiryResponseObject, error) {
@@ -621,7 +618,7 @@ func (s accessService) GetTokenDefaultExpiry(
 
 // SetTokenDefaultExpiry sets the default lifetime, in seconds as the token
 // service reads it. Admin only; it applies to tokens created afterwards.
-func (s accessService) SetTokenDefaultExpiry(
+func (s AccessService) SetTokenDefaultExpiry(
 	ctx context.Context,
 	req accessgen.SetTokenDefaultExpiryRequestObject,
 ) (accessgen.SetTokenDefaultExpiryResponseObject, error) {
@@ -661,18 +658,12 @@ func tokenDetails(svc *token.Service, r types.Token) accessgen.TokenDetails {
 }
 
 // Legacy endpoints: /api/security/token. The create and revoke bodies are
-// form-encoded, so those two routes are hand-written.
-
-func (s securityAPI) registerTokenRoutes(r chi.Router) {
-	r.With(middleware.BodyLimit(managementBodyLimit)).Post(legacyTokenPath, s.createLegacyToken)
-	r.With(middleware.BodyLimit(managementBodyLimit)).
-		Post(legacyTokenRevokePath, s.revokeLegacyToken)
-}
+// form-encoded, so those two routes are hand-written (Server.RegisterRoutes).
 
 // GetLegacyTokens lists every token in the legacy shape. Unlike
 // GET /access/api/v1/tokens, which shows a user their own, it is admin only,
 // as the deprecated legacy API documents (#382).
-func (s securityAPI) GetLegacyTokens(
+func (s SecurityAPI) GetLegacyTokens(
 	ctx context.Context,
 	_ artgen.GetLegacyTokensRequestObject,
 ) (artgen.GetLegacyTokensResponseObject, error) {
@@ -697,7 +688,7 @@ func (s securityAPI) GetLegacyTokens(
 // createLegacyToken is POST /api/security/token: the form-encoded create or
 // refresh the JFrog CLI still implements. A refresh carries the token being
 // refreshed as access_token, which must pair with refresh_token (refresh).
-func (s securityAPI) createLegacyToken(w http.ResponseWriter, r *http.Request) {
+func (s SecurityAPI) createLegacyToken(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		httpkit.WriteErr(w, r, httpkit.BadRequestf("malformed form: %v", err))
 		return
@@ -745,7 +736,7 @@ func (s securityAPI) createLegacyToken(w http.ResponseWriter, r *http.Request) {
 // Artifactory does, and 400 for a non-revocable one. It is admin only, even
 // for the caller's own token (#382): DELETE /access/api/v1/tokens/{id} is
 // where a user revokes their own.
-func (s securityAPI) revokeLegacyToken(w http.ResponseWriter, r *http.Request) {
+func (s SecurityAPI) revokeLegacyToken(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	t := tokenAPI(s)
 	svc, err := t.service()
@@ -808,7 +799,7 @@ func (s securityAPI) revokeLegacyToken(w http.ResponseWriter, r *http.Request) {
 // or expired, which revokes it; it is also revocable through the token API.
 // A token-authenticated caller is refused: the encrypted password stands
 // for a password, which only a password login proves.
-func (s securityAPI) GetUserEncryptedPassword(
+func (s SecurityAPI) GetUserEncryptedPassword(
 	ctx context.Context,
 	_ artgen.GetUserEncryptedPasswordRequestObject,
 ) (artgen.GetUserEncryptedPasswordResponseObject, error) {

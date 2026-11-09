@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 
+	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
@@ -24,6 +25,12 @@ const maxCertificateBundle = 1 << 20
 
 func keypairNotFound(name string) error {
 	return apierror.New(http.StatusNotFound, fmt.Sprintf("Key pair '%s' does not exist", name))
+}
+
+// repoNotFound is the repositories API's answer for a missing repository,
+// which the public key download gives in the same words.
+func repoNotFound(key string) error {
+	return apierror.New(http.StatusNotFound, fmt.Sprintf("Repository '%s' does not exist", key))
 }
 
 func certificateNotFound(alias string) error {
@@ -74,7 +81,7 @@ func keypairFrom(in *artgen.KeyPairInput) (types.Keypair, error) {
 }
 
 // adminStore is the store of an admin-only operation.
-func (s securityAPI) adminStore(ctx context.Context) (store.Store, error) {
+func (s SecurityAPI) adminStore(ctx context.Context) (store.Store, error) {
 	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}
@@ -82,7 +89,7 @@ func (s securityAPI) adminStore(ctx context.Context) (store.Store, error) {
 }
 
 // GetAllKeyPairs lists every key pair without private material.
-func (s securityAPI) GetAllKeyPairs(
+func (s SecurityAPI) GetAllKeyPairs(
 	ctx context.Context,
 	_ artgen.GetAllKeyPairsRequestObject,
 ) (artgen.GetAllKeyPairsResponseObject, error) {
@@ -105,7 +112,7 @@ func (s securityAPI) GetAllKeyPairs(
 // (createkeypair). Repositories refer to a pair by name, so those using a
 // replaced pair sign with the new material from the next request. The
 // Terraform provider requires 201 with an empty object either way.
-func (s securityAPI) CreateKeyPair(
+func (s SecurityAPI) CreateKeyPair(
 	ctx context.Context,
 	req artgen.CreateKeyPairRequestObject,
 ) (artgen.CreateKeyPairResponseObject, error) {
@@ -142,7 +149,7 @@ func putKeypair(ctx context.Context, keys store.KeyStore, k types.Keypair) error
 
 // UpdateKeyPair replaces the pair named in the body; repositories that
 // reference it sign with the new material from the next request.
-func (s securityAPI) UpdateKeyPair(
+func (s SecurityAPI) UpdateKeyPair(
 	ctx context.Context,
 	req artgen.UpdateKeyPairRequestObject,
 ) (artgen.UpdateKeyPairResponseObject, error) {
@@ -164,7 +171,7 @@ func (s securityAPI) UpdateKeyPair(
 }
 
 // VerifyKeyPair checks a pair without storing it.
-func (s securityAPI) VerifyKeyPair(
+func (s SecurityAPI) VerifyKeyPair(
 	ctx context.Context,
 	req artgen.VerifyKeyPairRequestObject,
 ) (artgen.VerifyKeyPairResponseObject, error) {
@@ -183,7 +190,7 @@ func (s securityAPI) VerifyKeyPair(
 // anonymous access is on (getkeypair). That is safe only because the
 // projection carries the public half alone: keypairSummary must never gain
 // the private key or the passphrase.
-func (s securityAPI) GetKeyPair(
+func (s SecurityAPI) GetKeyPair(
 	ctx context.Context,
 	req artgen.GetKeyPairRequestObject,
 ) (artgen.GetKeyPairResponseObject, error) {
@@ -207,7 +214,7 @@ func (s securityAPI) GetKeyPair(
 // it. Those repositories lose their reference in the same transaction.
 // Left behind, it would name a pair that does not exist, which every later
 // update of the repository would then be refused for (repos.CheckKeypairs).
-func (s securityAPI) DeleteKeyPair(
+func (s SecurityAPI) DeleteKeyPair(
 	ctx context.Context,
 	req artgen.DeleteKeyPairRequestObject,
 ) (artgen.DeleteKeyPairResponseObject, error) {
@@ -220,7 +227,7 @@ func (s securityAPI) DeleteKeyPair(
 		if _, err := st.Keys().Keypair(ctx, name); err != nil {
 			return err //nolint:wrapcheck // ErrNotFound is the 404 below
 		}
-		if err := dropKeypairRefs(ctx, st.Repos(), name); err != nil {
+		if err := dropKeypairRefs(ctx, s.deps.Repositories, name); err != nil {
 			return err
 		}
 		return st.Keys().DeleteKeypair(ctx, name) //nolint:wrapcheck // wrapped below
@@ -235,8 +242,10 @@ func (s securityAPI) DeleteKeyPair(
 }
 
 // dropKeypairRefs clears the key pair name from every repository that signs
-// with it, as its primary or secondary pair.
-func dropKeypairRefs(ctx context.Context, repos store.RepoStore, name string) error {
+// with it, as its primary or secondary pair. Each call takes ctx, so inside
+// DeleteKeyPair's transaction the cleared references commit or roll back
+// with the delete.
+func dropKeypairRefs(ctx context.Context, repos artifactsapi.Repositories, name string) error {
 	using, err := repos.UsingKeypair(ctx, name)
 	if err != nil {
 		return fmt.Errorf("repositories using key pair %q: %w", name, err)
@@ -273,7 +282,7 @@ func publicKeyFile(k types.Keypair) string {
 // (getkeypairpublickeyperrepository), and no read
 // permission on the repository, so a caller that may not read a repository
 // still learns whether it exists and which key signs it.
-func (s securityAPI) GetKeyPairPublicKeyPerRepository(
+func (s SecurityAPI) GetKeyPairPublicKeyPerRepository(
 	ctx context.Context,
 	req artgen.GetKeyPairPublicKeyPerRepositoryRequestObject,
 ) (artgen.GetKeyPairPublicKeyPerRepositoryResponseObject, error) {
@@ -281,10 +290,10 @@ func (s securityAPI) GetKeyPairPublicKeyPerRepository(
 	if err != nil {
 		return nil, err
 	}
-	cfg, err := st.Repos().Get(ctx, req.RepoKey)
+	cfg, err := s.deps.Repositories.Get(ctx, req.RepoKey)
 	switch {
 	case errors.Is(err, store.ErrNotFound):
-		return nil, notFoundRepo(req.RepoKey)
+		return nil, repoNotFound(req.RepoKey)
 	case err != nil:
 		return nil, s.internalError(ctx, "get repository", err)
 	}
@@ -320,7 +329,7 @@ func (s securityAPI) GetKeyPairPublicKeyPerRepository(
 
 // GetCertificates lists the client certificates remote repositories may
 // present to upstreams.
-func (s securityAPI) GetCertificates(
+func (s SecurityAPI) GetCertificates(
 	ctx context.Context,
 	_ artgen.GetCertificatesRequestObject,
 ) (artgen.GetCertificatesResponseObject, error) {
@@ -345,7 +354,7 @@ func (s securityAPI) GetCertificates(
 
 // AddCertificate stores a PEM bundle of a certificate and its private key
 // under the alias, replacing any certificate already there.
-func (s securityAPI) AddCertificate(
+func (s SecurityAPI) AddCertificate(
 	ctx context.Context,
 	req artgen.AddCertificateRequestObject,
 ) (artgen.AddCertificateResponseObject, error) {
@@ -387,7 +396,7 @@ func (s securityAPI) AddCertificate(
 }
 
 // DeleteCertificate removes a certificate no remote repository presents.
-func (s securityAPI) DeleteCertificate(
+func (s SecurityAPI) DeleteCertificate(
 	ctx context.Context,
 	req artgen.DeleteCertificateRequestObject,
 ) (artgen.DeleteCertificateResponseObject, error) {
@@ -396,7 +405,7 @@ func (s securityAPI) DeleteCertificate(
 		return nil, err
 	}
 	alias := req.CertificateAlias
-	remotes, err := st.Repos().List(ctx, store.RepoFilter{Class: repo.Remote})
+	remotes, err := s.deps.Repositories.List(ctx, artifactsapi.RepoFilter{Class: repo.Remote})
 	if err != nil {
 		return nil, s.internalError(ctx, "list remote repositories", err)
 	}

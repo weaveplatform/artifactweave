@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -328,15 +329,16 @@ func TestAccPermissionCallerWithoutMiddleware(t *testing.T) {
 	db := inmem.New()
 	cheapSeed(t, db)
 	f := &permFault{op: "forprincipal"}
-	cfg := withAccess(Config{Store: permFaultStore{Store: db, f: f}})
+	st := permFaultStore{Store: db, f: f}
+	deps := Deps{Store: st, API: accesstest.Over(t, st).API()}
 	ctx := kernel.WithPrincipal(context.Background(), kernel.Principal{Name: "admin", Admin: true})
-	_, err := permissionCaller(ctx, accessState{cfg: cfg})
+	_, err := permissionCaller(ctx, accessState{deps: deps})
 	var ae *apierror.Error
 	if !errors.As(err, &ae) || ae.Status != http.StatusInternalServerError {
 		t.Fatalf("failing evaluation: %v", err)
 	}
 	*f = permFault{}
-	c, err := permissionCaller(ctx, accessState{cfg: cfg})
+	c, err := permissionCaller(ctx, accessState{deps: deps})
 	if err != nil || !c.dec.IsAdmin() {
 		t.Fatalf("caller = %+v, %v", c, err)
 	}

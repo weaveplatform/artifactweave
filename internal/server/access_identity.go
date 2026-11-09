@@ -36,17 +36,17 @@ const (
 	maxUsernameLength = 255
 )
 
-func (s accessService) identity() (*identity.Service, error) {
+func (s AccessService) identity() (*identity.Service, error) {
 	st, err := s.content()
 	if err != nil {
 		return nil, err
 	}
-	return &identity.Service{Store: st, Hash: s.cfg.PasswordHash}, nil
+	return &identity.Service{Store: st, Hash: s.deps.PasswordHash}, nil
 }
 
 // adminIdentity checks the caller is an administrator, then returns the
 // service.
-func (s accessService) adminIdentity(ctx context.Context) (*identity.Service, error) {
+func (s AccessService) adminIdentity(ctx context.Context) (*identity.Service, error) {
 	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}
@@ -55,14 +55,14 @@ func (s accessService) adminIdentity(ctx context.Context) (*identity.Service, er
 
 // readerIdentity checks the caller may read users and groups, then returns
 // the service.
-func (s accessService) readerIdentity(ctx context.Context) (*identity.Service, error) {
+func (s AccessService) readerIdentity(ctx context.Context) (*identity.Service, error) {
 	return s.identityFor(ctx, "")
 }
 
 // identityFor returns the service when the caller may read users and
 // groups, or self's record: administrators, and tokens whose system scope
 // covers identities:r, as the permission evaluator decides (decision 0006).
-func (s accessService) identityFor(ctx context.Context, self string) (*identity.Service, error) {
+func (s AccessService) identityFor(ctx context.Context, self string) (*identity.Service, error) {
 	p, err := kernel.RequireAuthenticated(ctx)
 	if err != nil {
 		return nil, err //nolint:wrapcheck // an apierror value
@@ -75,11 +75,11 @@ func (s accessService) identityFor(ctx context.Context, self string) (*identity.
 		return svc, nil
 	}
 	d, _ := accessapi.DeciderFrom(ctx)
-	a, err := accessFor(ctx, s.cfg.Access.Authorizer, p, d)
+	d, err = deciderFor(ctx, s.deps.API.Authorizer, p, d)
 	if err != nil {
 		return nil, s.identityErr(ctx, "evaluate permissions", "", err)
 	}
-	if !a.d.System("identities", types.ScopeRead) {
+	if !d.System("identities", types.ScopeRead) {
 		return nil, kernel.ErrForbidden
 	}
 	return svc, nil
@@ -88,7 +88,7 @@ func (s accessService) identityFor(ctx context.Context, self string) (*identity.
 // identityErr maps the identity service's errors the way Access v2 documents
 // them: a protected principal is 403, a taken name 409, and the rest as the
 // legacy API maps them (400, 404 or 500).
-func (s accessService) identityErr(ctx context.Context, op, notFound string, err error) error {
+func (s AccessService) identityErr(ctx context.Context, op, notFound string, err error) error {
 	switch {
 	case errors.Is(err, identity.ErrProtected):
 		return apierror.New(http.StatusForbidden, afterSentinels(err))
@@ -112,7 +112,7 @@ func groupExists(name string) string { return fmt.Sprintf("Group '%s' already ex
 
 // --- Users -------------------------------------------------------------------
 
-func (s accessService) GetUserList(
+func (s AccessService) GetUserList(
 	ctx context.Context,
 	req accessgen.GetUserListRequestObject,
 ) (accessgen.GetUserListResponseObject, error) {
@@ -184,7 +184,7 @@ func (s accessService) GetUserList(
 	return out, nil
 }
 
-func (s accessService) CreateUser(
+func (s AccessService) CreateUser(
 	ctx context.Context,
 	req accessgen.CreateUserRequestObject,
 ) (accessgen.CreateUserResponseObject, error) {
@@ -237,7 +237,7 @@ func (s accessService) CreateUser(
 	return accessgen.CreateUser201JSONResponse(d), nil
 }
 
-func (s accessService) GetUserDetails(
+func (s AccessService) GetUserDetails(
 	ctx context.Context,
 	req accessgen.GetUserDetailsRequestObject,
 ) (accessgen.GetUserDetailsResponseObject, error) {
@@ -254,7 +254,7 @@ func (s accessService) GetUserDetails(
 	return accessgen.GetUserDetails200JSONResponse(d), nil
 }
 
-func (s accessService) UpdateUser(
+func (s AccessService) UpdateUser(
 	ctx context.Context,
 	req accessgen.UpdateUserRequestObject,
 ) (accessgen.UpdateUserResponseObject, error) {
@@ -300,7 +300,7 @@ func (s accessService) UpdateUser(
 	return accessgen.UpdateUser200JSONResponse(d), nil
 }
 
-func (s accessService) DeleteUser(
+func (s AccessService) DeleteUser(
 	ctx context.Context,
 	req accessgen.DeleteUserRequestObject,
 ) (accessgen.DeleteUserResponseObject, error) {
@@ -315,7 +315,7 @@ func (s accessService) DeleteUser(
 	return accessgen.DeleteUser204Response{}, nil
 }
 
-func (s accessService) UpdateUserGroups(
+func (s AccessService) UpdateUserGroups(
 	ctx context.Context,
 	req accessgen.UpdateUserGroupsRequestObject,
 ) (accessgen.UpdateUserGroupsResponseObject, error) {
@@ -335,7 +335,7 @@ func (s accessService) UpdateUserGroups(
 	return accessgen.UpdateUserGroups200JSONResponse{Groups: nonNil(groups)}, nil
 }
 
-func (s accessService) ChangeUserPassword(
+func (s AccessService) ChangeUserPassword(
 	ctx context.Context,
 	req accessgen.ChangeUserPasswordRequestObject,
 ) (accessgen.ChangeUserPasswordResponseObject, error) {
@@ -363,7 +363,7 @@ func (s accessService) ChangeUserPassword(
 	return accessgen.ChangeUserPassword204Response{}, nil
 }
 
-func (s accessService) ExpireUserPassword(
+func (s AccessService) ExpireUserPassword(
 	ctx context.Context,
 	req accessgen.ExpireUserPasswordRequestObject,
 ) (accessgen.ExpireUserPasswordResponseObject, error) {
@@ -382,7 +382,7 @@ func (s accessService) ExpireUserPassword(
 	return accessgen.ExpireUserPassword204Response{}, nil
 }
 
-func (s accessService) ExpirePasswordForAllUsers(
+func (s AccessService) ExpirePasswordForAllUsers(
 	ctx context.Context,
 	_ accessgen.ExpirePasswordForAllUsersRequestObject,
 ) (accessgen.ExpirePasswordForAllUsersResponseObject, error) {
@@ -396,7 +396,7 @@ func (s accessService) ExpirePasswordForAllUsers(
 	return accessgen.ExpirePasswordForAllUsers200TextResponse("All passwords were expired"), nil
 }
 
-func (s accessService) UnexpirePasswordForAllUsers(
+func (s AccessService) UnexpirePasswordForAllUsers(
 	ctx context.Context,
 	_ accessgen.UnexpirePasswordForAllUsersRequestObject,
 ) (accessgen.UnexpirePasswordForAllUsersResponseObject, error) {
@@ -412,7 +412,7 @@ func (s accessService) UnexpirePasswordForAllUsers(
 	), nil
 }
 
-func (s accessService) UnlockUser(
+func (s AccessService) UnlockUser(
 	ctx context.Context,
 	req accessgen.UnlockUserRequestObject,
 ) (accessgen.UnlockUserResponseObject, error) {
@@ -432,7 +432,7 @@ func (s accessService) UnlockUser(
 }
 
 // userDetails reads a user in the Access v2 shape.
-func (s accessService) userDetails(
+func (s AccessService) userDetails(
 	ctx context.Context,
 	svc *identity.Service,
 	name string,
@@ -476,7 +476,7 @@ func (s accessService) userDetails(
 
 // --- Groups ------------------------------------------------------------------
 
-func (s accessService) GetGroupList(
+func (s AccessService) GetGroupList(
 	ctx context.Context,
 	req accessgen.GetGroupListRequestObject,
 ) (accessgen.GetGroupListResponseObject, error) {
@@ -522,7 +522,7 @@ func (s accessService) GetGroupList(
 	return out, nil
 }
 
-func (s accessService) CreateGroup(
+func (s AccessService) CreateGroup(
 	ctx context.Context,
 	req accessgen.CreateGroupRequestObject,
 ) (accessgen.CreateGroupResponseObject, error) {
@@ -579,7 +579,7 @@ func (s accessService) CreateGroup(
 	return accessgen.CreateGroup201JSONResponse(d), nil
 }
 
-func (s accessService) GetGroupDetails(
+func (s AccessService) GetGroupDetails(
 	ctx context.Context,
 	req accessgen.GetGroupDetailsRequestObject,
 ) (accessgen.GetGroupDetailsResponseObject, error) {
@@ -594,7 +594,7 @@ func (s accessService) GetGroupDetails(
 	return accessgen.GetGroupDetails200JSONResponse(d), nil
 }
 
-func (s accessService) UpdateGroup(
+func (s AccessService) UpdateGroup(
 	ctx context.Context,
 	req accessgen.UpdateGroupRequestObject,
 ) (accessgen.UpdateGroupResponseObject, error) {
@@ -664,7 +664,7 @@ func fixedGroupFields(raw []byte, g types.Group) error {
 	return nil
 }
 
-func (s accessService) DeleteGroup(
+func (s AccessService) DeleteGroup(
 	ctx context.Context,
 	req accessgen.DeleteGroupRequestObject,
 ) (accessgen.DeleteGroupResponseObject, error) {
@@ -679,7 +679,7 @@ func (s accessService) DeleteGroup(
 	return accessgen.DeleteGroup204Response{}, nil
 }
 
-func (s accessService) UpdateGroupMembers(
+func (s AccessService) UpdateGroupMembers(
 	ctx context.Context,
 	req accessgen.UpdateGroupMembersRequestObject,
 ) (accessgen.UpdateGroupMembersResponseObject, error) {
@@ -706,7 +706,7 @@ func (s accessService) UpdateGroupMembers(
 }
 
 // groupDetails reads a group in the Access v2 shape.
-func (s accessService) groupDetails(
+func (s AccessService) groupDetails(
 	ctx context.Context,
 	svc *identity.Service,
 	name string,
@@ -743,7 +743,7 @@ func (s accessService) groupDetails(
 
 // --- Configuration -------------------------------------------------------------
 
-func (s accessService) GetBasicAuthenticationStatus(
+func (s AccessService) GetBasicAuthenticationStatus(
 	ctx context.Context,
 	_ accessgen.GetBasicAuthenticationStatusRequestObject,
 ) (accessgen.GetBasicAuthenticationStatusResponseObject, error) {
@@ -761,7 +761,7 @@ func (s accessService) GetBasicAuthenticationStatus(
 // SetBasicAuthenticationStatus switches passwords over HTTP Basic on or
 // off. Tokens keep working either way, which is how an administrator turns
 // it back on.
-func (s accessService) SetBasicAuthenticationStatus(
+func (s AccessService) SetBasicAuthenticationStatus(
 	ctx context.Context,
 	req accessgen.SetBasicAuthenticationStatusRequestObject,
 ) (accessgen.SetBasicAuthenticationStatusResponseObject, error) {
@@ -782,7 +782,7 @@ func (s accessService) SetBasicAuthenticationStatus(
 
 // CreatePasswordPolicy replaces the whole policy: an omitted field returns
 // to its default, as JFrog documents for this PUT.
-func (s accessService) CreatePasswordPolicy(
+func (s AccessService) CreatePasswordPolicy(
 	ctx context.Context,
 	req accessgen.CreatePasswordPolicyRequestObject,
 ) (accessgen.CreatePasswordPolicyResponseObject, error) {
@@ -801,7 +801,7 @@ func (s accessService) CreatePasswordPolicy(
 }
 
 // UpdatePasswordPolicy merges the fields sent into the stored policy.
-func (s accessService) UpdatePasswordPolicy(
+func (s AccessService) UpdatePasswordPolicy(
 	ctx context.Context,
 	req accessgen.UpdatePasswordPolicyRequestObject,
 ) (accessgen.UpdatePasswordPolicyResponseObject, error) {
@@ -835,7 +835,7 @@ func mergePolicy(p types.PasswordPolicy, b accessgen.PasswordPolicy) types.Passw
 // GetAccessUserLockPolicy returns the Access view of the state that
 // /artifactory/api/security/userLockPolicy and the password expiration
 // policy also read.
-func (s accessService) GetAccessUserLockPolicy(
+func (s AccessService) GetAccessUserLockPolicy(
 	ctx context.Context,
 	_ accessgen.GetAccessUserLockPolicyRequestObject,
 ) (accessgen.GetAccessUserLockPolicyResponseObject, error) {
@@ -854,7 +854,7 @@ func (s accessService) GetAccessUserLockPolicy(
 // stored as 0 or false, not as its default: Access's request model has plain
 // numbers and booleans, and JFrog documents the consequences (omitting
 // attempts turns locking off).
-func (s accessService) ConfigureAccessUserLockPolicy(
+func (s AccessService) ConfigureAccessUserLockPolicy(
 	ctx context.Context,
 	req accessgen.ConfigureAccessUserLockPolicyRequestObject,
 ) (accessgen.ConfigureAccessUserLockPolicyResponseObject, error) {
@@ -903,9 +903,9 @@ func lockPolicyDoc(p identity.AccessLockPolicy) accessgen.UserLockPolicyConfig {
 // forgetPolicies makes this instance's next login read the switch and the
 // policies again; other instances follow within the authenticator's cache
 // lifetime.
-func (s accessService) forgetPolicies() {
-	if s.cfg.Auth != nil {
-		s.cfg.Auth.ForgetPolicies()
+func (s AccessService) forgetPolicies() {
+	if s.deps.Authenticator != nil {
+		s.deps.Authenticator.ForgetPolicies()
 	}
 }
 

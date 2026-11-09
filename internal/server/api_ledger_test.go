@@ -226,9 +226,9 @@ func apiReviewHandlers(t *testing.T) map[string]apiReviewHandler {
 	// (composites.go); each receiver keys its handlers by its spec.
 	specOf := map[string]string{
 		"artifactoryService": "artifactory",
-		"securityAPI":        "artifactory",
+		"SecurityAPI":        "artifactory",
 		"systemAPI":          "artifactory",
-		"accessService":      "access",
+		"AccessService":      "access",
 	}
 	out := map[string]apiReviewHandler{}
 	for _, file := range files {
@@ -320,7 +320,7 @@ func apiReviewPolicy(e *apiReviewOperation) {
 	if healthRequest(r) {
 		e.Admission = "health exemption"
 	}
-	if apiRecoveryRequest(r) {
+	if APIRecoveryRequest(r) {
 		e.Admission = "administrator recovery reserve: 2 concurrent and 60/min per process; 5s deadline"
 	}
 	e.Effects = "resource mutation/action; see served contract and handler calls"

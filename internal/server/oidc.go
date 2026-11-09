@@ -24,25 +24,25 @@ import (
 const oidcTokenRoute = "POST /access/api/v1/oidc/token"
 
 // oidcService checks the caller is an administrator and returns the service.
-func (s accessService) oidcService(ctx context.Context) (oidc.Service, error) {
+func (s AccessService) oidcService(ctx context.Context) (oidc.Service, error) {
 	if err := httpkit.AdminOnly(ctx); err != nil {
 		return oidc.Service{}, err
 	}
 	return s.oidc()
 }
 
-func (s accessService) oidc() (oidc.Service, error) {
+func (s AccessService) oidc() (oidc.Service, error) {
 	st, err := s.content()
 	if err != nil {
 		return oidc.Service{}, err
 	}
-	return oidc.Service{Store: st, Tokens: s.cfg.Tokens, Keys: s.idTokens}, nil
+	return oidc.Service{Store: st, Tokens: s.deps.Tokens, Keys: s.deps.IDTokens}, nil
 }
 
 // oidcError maps the service's errors to statuses. A provider whose keys
 // cannot be fetched still answers 401, the status the operation declares for
 // a token that does not verify, and is logged so an operator sees why.
-func (s accessService) oidcError(ctx context.Context, op string, err error) error {
+func (s AccessService) oidcError(ctx context.Context, op string, err error) error {
 	switch {
 	case errors.Is(err, kernel.ErrAPIRestricted):
 		return kernel.ErrAPIRestricted
@@ -90,7 +90,7 @@ func mappingBody(b *accessgen.OidcIdentityMapping) (oidc.Mapping, error) {
 	return recode[oidc.Mapping](b)
 }
 
-func (s accessService) GetAllOidcConfigurations(
+func (s AccessService) GetAllOidcConfigurations(
 	ctx context.Context,
 	_ accessgen.GetAllOidcConfigurationsRequestObject,
 ) (accessgen.GetAllOidcConfigurationsResponseObject, error) {
@@ -114,7 +114,7 @@ func (s accessService) GetAllOidcConfigurations(
 
 // CreateOidcConfiguration answers 200, not 201: the jfrog/platform provider
 // expects exactly 200.
-func (s accessService) CreateOidcConfiguration(
+func (s AccessService) CreateOidcConfiguration(
 	ctx context.Context,
 	req accessgen.CreateOidcConfigurationRequestObject,
 ) (accessgen.CreateOidcConfigurationResponseObject, error) {
@@ -136,7 +136,7 @@ func (s accessService) CreateOidcConfiguration(
 	return out, nil
 }
 
-func (s accessService) GetOidcConfiguration(
+func (s AccessService) GetOidcConfiguration(
 	ctx context.Context,
 	req accessgen.GetOidcConfigurationRequestObject,
 ) (accessgen.GetOidcConfigurationResponseObject, error) {
@@ -155,7 +155,7 @@ func (s accessService) GetOidcConfiguration(
 	return out, nil
 }
 
-func (s accessService) UpdateOidcConfiguration(
+func (s AccessService) UpdateOidcConfiguration(
 	ctx context.Context,
 	req accessgen.UpdateOidcConfigurationRequestObject,
 ) (accessgen.UpdateOidcConfigurationResponseObject, error) {
@@ -177,7 +177,7 @@ func (s accessService) UpdateOidcConfiguration(
 	return out, nil
 }
 
-func (s accessService) DeleteOidcConfiguration(
+func (s AccessService) DeleteOidcConfiguration(
 	ctx context.Context,
 	req accessgen.DeleteOidcConfigurationRequestObject,
 ) (accessgen.DeleteOidcConfigurationResponseObject, error) {
@@ -191,7 +191,7 @@ func (s accessService) DeleteOidcConfiguration(
 	return accessgen.DeleteOidcConfiguration204Response{}, nil
 }
 
-func (s accessService) GetOidcIdentityMappings(
+func (s AccessService) GetOidcIdentityMappings(
 	ctx context.Context,
 	req accessgen.GetOidcIdentityMappingsRequestObject,
 ) (accessgen.GetOidcIdentityMappingsResponseObject, error) {
@@ -213,7 +213,7 @@ func (s accessService) GetOidcIdentityMappings(
 	return out, nil
 }
 
-func (s accessService) CreateOidcIdentityMapping(
+func (s AccessService) CreateOidcIdentityMapping(
 	ctx context.Context,
 	req accessgen.CreateOidcIdentityMappingRequestObject,
 ) (accessgen.CreateOidcIdentityMappingResponseObject, error) {
@@ -235,7 +235,7 @@ func (s accessService) CreateOidcIdentityMapping(
 	return out, nil
 }
 
-func (s accessService) GetOidcIdentityMappingByName(
+func (s AccessService) GetOidcIdentityMappingByName(
 	ctx context.Context,
 	req accessgen.GetOidcIdentityMappingByNameRequestObject,
 ) (accessgen.GetOidcIdentityMappingByNameResponseObject, error) {
@@ -254,7 +254,7 @@ func (s accessService) GetOidcIdentityMappingByName(
 	return out, nil
 }
 
-func (s accessService) UpdateOidcIdentityMapping(
+func (s AccessService) UpdateOidcIdentityMapping(
 	ctx context.Context,
 	req accessgen.UpdateOidcIdentityMappingRequestObject,
 ) (accessgen.UpdateOidcIdentityMappingResponseObject, error) {
@@ -276,7 +276,7 @@ func (s accessService) UpdateOidcIdentityMapping(
 	return out, nil
 }
 
-func (s accessService) DeleteOidcIdentityMapping(
+func (s AccessService) DeleteOidcIdentityMapping(
 	ctx context.Context,
 	req accessgen.DeleteOidcIdentityMappingRequestObject,
 ) (accessgen.DeleteOidcIdentityMappingResponseObject, error) {
@@ -293,11 +293,11 @@ func (s accessService) DeleteOidcIdentityMapping(
 // OidcTokenExchange issues an access token for a provider's ID token
 // (RFC 8693). It answers without credentials; the token service must be
 // configured, as for the token API.
-func (s accessService) OidcTokenExchange(
+func (s AccessService) OidcTokenExchange(
 	ctx context.Context,
 	req accessgen.OidcTokenExchangeRequestObject,
 ) (accessgen.OidcTokenExchangeResponseObject, error) {
-	if s.cfg.Tokens == nil {
+	if s.deps.Tokens == nil {
 		return nil, apierror.ErrNotImplemented
 	}
 	svc, err := s.oidc()

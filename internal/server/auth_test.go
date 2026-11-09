@@ -25,7 +25,7 @@ func TestAccAuthenticatePrincipal(t *testing.T) {
 		t.Fatal(err)
 	}
 	var got *kernel.Principal
-	h := authenticate(
+	h := Authenticate(
 		newAuthnOptions(a, nil),
 	)(
 		http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
@@ -89,7 +89,7 @@ func TestAccAuthenticateAttachesDecider(t *testing.T) {
 		stored  bool
 		d       accessapi.Decider
 	)
-	h := authenticate(
+	h := Authenticate(
 		newAuthnOptions(a, db, skip),
 	)(
 		http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
@@ -150,7 +150,7 @@ func TestAccAuthenticateStoreFailures(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := authenticate(
+	h := Authenticate(
 		newAuthnOptions(a, nil),
 	)(
 		http.HandlerFunc(func(http.ResponseWriter, *http.Request) {

@@ -14,7 +14,6 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authz"
 	"github.com/weaveplatform/artifactweave/migration/access/core/permission"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
@@ -63,10 +62,10 @@ func permissionCaller(ctx context.Context, s accessState) (permCaller, error) {
 		return permCaller{}, err
 	}
 	// The middleware has already evaluated the request's permissions under
-	// its token scope; accessFor only evaluates them for a principal it did
+	// its token scope; deciderFor only evaluates them for a principal it did
 	// not see.
 	d, _ := accessapi.DeciderFrom(ctx)
-	a, err := accessFor(ctx, s.cfg.Access.Authorizer, p, d)
+	d, err = deciderFor(ctx, s.deps.API.Authorizer, p, d)
 	if err != nil {
 		return permCaller{}, s.internalError(
 			ctx,
@@ -78,7 +77,7 @@ func permissionCaller(ctx context.Context, s accessState) (permCaller, error) {
 	// documents are the evaluator's alone (access/api's Decider leaves them
 	// out), so the permission APIs take the evaluator behind the decider,
 	// which the middleware and Authorizer.For always build.
-	dec, _ := authz.FromAPI(a.d)
+	dec, _ := authz.FromAPI(d)
 	resources, err := dec.ManagesResources(ctx, st.Users(), st.Groups())
 	if err != nil {
 		return permCaller{}, s.internalError(
@@ -90,7 +89,7 @@ func permissionCaller(ctx context.Context, s accessState) (permCaller, error) {
 	return permCaller{
 		svc: permission.Service{
 			Store:        st,
-			Repositories: repos.NewRepositories(st, s.cfg.Access.Keys, s.cfg.Access.Projects),
+			Repositories: s.deps.Repositories,
 		},
 		dec:                dec,
 		canManageResources: resources,
@@ -189,7 +188,7 @@ func bodyName(path string, body *string) (string, error) {
 // --- v1 permission targets ------------------------------------------------
 
 // GetPermissionTargets lists every permission with its v1 detail URL.
-func (s securityAPI) GetPermissionTargets(
+func (s SecurityAPI) GetPermissionTargets(
 	ctx context.Context,
 	_ artgen.GetPermissionTargetsRequestObject,
 ) (artgen.GetPermissionTargetsResponseObject, error) {
@@ -224,7 +223,7 @@ func listItems(
 
 // GetPermissionTargetDetails returns the v1 view: the repository section
 // with action letters.
-func (s securityAPI) GetPermissionTargetDetails(
+func (s SecurityAPI) GetPermissionTargetDetails(
 	ctx context.Context,
 	req artgen.GetPermissionTargetDetailsRequestObject,
 ) (artgen.GetPermissionTargetDetailsResponseObject, error) {
@@ -253,7 +252,7 @@ func (s securityAPI) GetPermissionTargetDetails(
 // CreateOrReplacePermissionTarget creates the permission or replaces its
 // repository section; build and release bundle sections set through v2 or
 // Access stay.
-func (s securityAPI) CreateOrReplacePermissionTarget(
+func (s SecurityAPI) CreateOrReplacePermissionTarget(
 	ctx context.Context,
 	req artgen.CreateOrReplacePermissionTargetRequestObject,
 ) (artgen.CreateOrReplacePermissionTargetResponseObject, error) {
@@ -301,7 +300,7 @@ func (s securityAPI) CreateOrReplacePermissionTarget(
 }
 
 // DeletePermissionTarget removes the whole permission.
-func (s securityAPI) DeletePermissionTarget(
+func (s SecurityAPI) DeletePermissionTarget(
 	ctx context.Context,
 	req artgen.DeletePermissionTargetRequestObject,
 ) (artgen.DeletePermissionTargetResponseObject, error) {
@@ -324,7 +323,7 @@ func (s securityAPI) DeletePermissionTarget(
 // GetPermissionTargetsV2 lists what the caller may manage: every permission
 // for an administrator or a Manage Resources holder, otherwise those it
 // holds MANAGE on.
-func (s securityAPI) GetPermissionTargetsV2(
+func (s SecurityAPI) GetPermissionTargetsV2(
 	ctx context.Context,
 	_ artgen.GetPermissionTargetsV2RequestObject,
 ) (artgen.GetPermissionTargetsV2ResponseObject, error) {
@@ -364,7 +363,7 @@ func v2Views(ps []types.Permission) ([]artgen.PermissionTargetV2, error) {
 
 // granting lists, for the by-user and by-group views, the permissions
 // naming one principal directly; an unknown principal has none.
-func (s securityAPI) granting(
+func (s SecurityAPI) granting(
 	ctx context.Context,
 	users, groups []string,
 ) ([]artgen.PermissionTargetV2, error) {
@@ -391,7 +390,7 @@ func (s securityAPI) granting(
 }
 
 // GetPermissionTargetsByGroupV2 returns the permissions granting the group.
-func (s securityAPI) GetPermissionTargetsByGroupV2(
+func (s SecurityAPI) GetPermissionTargetsByGroupV2(
 	ctx context.Context,
 	req artgen.GetPermissionTargetsByGroupV2RequestObject,
 ) (artgen.GetPermissionTargetsByGroupV2ResponseObject, error) {
@@ -404,7 +403,7 @@ func (s securityAPI) GetPermissionTargetsByGroupV2(
 
 // GetPermissionTargetsByUserV2 returns the permissions granting the user
 // directly; grants through its groups are not expanded.
-func (s securityAPI) GetPermissionTargetsByUserV2(
+func (s SecurityAPI) GetPermissionTargetsByUserV2(
 	ctx context.Context,
 	req artgen.GetPermissionTargetsByUserV2RequestObject,
 ) (artgen.GetPermissionTargetsByUserV2ResponseObject, error) {
@@ -416,7 +415,7 @@ func (s securityAPI) GetPermissionTargetsByUserV2(
 }
 
 // GetPermissionTargetDetailsV2 returns every v2 section.
-func (s securityAPI) GetPermissionTargetDetailsV2(
+func (s SecurityAPI) GetPermissionTargetDetailsV2(
 	ctx context.Context,
 	req artgen.GetPermissionTargetDetailsV2RequestObject,
 ) (artgen.GetPermissionTargetDetailsV2ResponseObject, error) {
@@ -440,7 +439,7 @@ func (s securityAPI) GetPermissionTargetDetailsV2(
 }
 
 // PermissionTargetExistenceCheckV2 answers 200 or 404 with no body.
-func (s securityAPI) PermissionTargetExistenceCheckV2(
+func (s SecurityAPI) PermissionTargetExistenceCheckV2(
 	ctx context.Context,
 	req artgen.PermissionTargetExistenceCheckV2RequestObject,
 ) (artgen.PermissionTargetExistenceCheckV2ResponseObject, error) {
@@ -468,7 +467,7 @@ func v2Body(
 	return json, nil
 }
 
-func (s securityAPI) readV2(
+func (s SecurityAPI) readV2(
 	ctx context.Context,
 	path string,
 	body *artgen.PermissionTargetV2,
@@ -491,7 +490,7 @@ func (s securityAPI) readV2(
 
 // CreatePermissionTargetV2 creates the permission; 409 when the name is
 // taken, which jfrog-client-go reads as "already exists".
-func (s securityAPI) CreatePermissionTargetV2(
+func (s SecurityAPI) CreatePermissionTargetV2(
 	ctx context.Context,
 	req artgen.CreatePermissionTargetV2RequestObject,
 ) (artgen.CreatePermissionTargetV2ResponseObject, error) {
@@ -534,7 +533,7 @@ var v2Sections = []types.ResourceType{
 // actions they hold and never MANAGE, and leaving their own entries and
 // their groups' as they are (createorreplacepermissiontargetv2.json,
 // decision 0006).
-func (s securityAPI) CreateOrReplacePermissionTargetV2(
+func (s SecurityAPI) CreateOrReplacePermissionTargetV2(
 	ctx context.Context,
 	req artgen.CreateOrReplacePermissionTargetV2RequestObject,
 ) (artgen.CreateOrReplacePermissionTargetV2ResponseObject, error) {
@@ -587,7 +586,7 @@ func (s securityAPI) CreateOrReplacePermissionTargetV2(
 // DeletePermissionTargetV2 removes the permission. Unlike a read or a
 // replace, it needs an administrator (deletepermissiontargetv2.json) or a
 // Manage Resources holder.
-func (s securityAPI) DeletePermissionTargetV2(
+func (s SecurityAPI) DeletePermissionTargetV2(
 	ctx context.Context,
 	req artgen.DeletePermissionTargetV2RequestObject,
 ) (artgen.DeletePermissionTargetV2ResponseObject, error) {
@@ -637,11 +636,11 @@ func (r accessJSON) VisitGetPermissionDetailsResponse(w http.ResponseWriter) err
 func (r accessJSON) VisitGetPermissionsResponse(w http.ResponseWriter) error { return r.write(w) }
 
 // accessCaller is permissionCaller for the Access service.
-func (s accessService) caller(ctx context.Context) (permCaller, error) {
+func (s AccessService) caller(ctx context.Context) (permCaller, error) {
 	return permissionCaller(ctx, s.accessState)
 }
 
-func (s accessService) errOf(ctx context.Context, op string, err error) error {
+func (s AccessService) errOf(ctx context.Context, op string, err error) error {
 	return s.permissionError(ctx, op, err)
 }
 
@@ -649,7 +648,7 @@ func (s accessService) errOf(ctx context.Context, op string, err error) error {
 // granting given users or groups, as name and uri pairs or, with expand,
 // documents narrowed to those principals' grants. The cursor is the last
 // name of the previous page.
-func (s accessService) GetPermissions(
+func (s AccessService) GetPermissions(
 	ctx context.Context,
 	req accessgen.GetPermissionsRequestObject,
 ) (accessgen.GetPermissionsResponseObject, error) {
@@ -764,7 +763,7 @@ func readAccess(ctx context.Context, body any) (wire.AccessPermission, error) {
 }
 
 // CreatePermission creates a permission and returns it as stored, 201.
-func (s accessService) CreatePermission(
+func (s AccessService) CreatePermission(
 	ctx context.Context,
 	req accessgen.CreatePermissionRequestObject,
 ) (accessgen.CreatePermissionResponseObject, error) {
@@ -796,7 +795,7 @@ func (s accessService) CreatePermission(
 // GetPermissionDetails returns one permission to an administrator, a
 // Manage Resources holder or a system:permissions:r token
 // (getpermissiondetails.json).
-func (s accessService) GetPermissionDetails(
+func (s AccessService) GetPermissionDetails(
 	ctx context.Context,
 	req accessgen.GetPermissionDetailsRequestObject,
 ) (accessgen.GetPermissionDetailsResponseObject, error) {
@@ -815,7 +814,7 @@ func (s accessService) GetPermissionDetails(
 }
 
 // DeletePermission removes a permission, 204.
-func (s accessService) DeletePermission(
+func (s AccessService) DeletePermission(
 	ctx context.Context,
 	req accessgen.DeletePermissionRequestObject,
 ) (accessgen.DeletePermissionResponseObject, error) {
@@ -874,7 +873,7 @@ func sectionTo(rt types.ResourceType, r types.Resource) (accessgen.PermissionRes
 // getpermissionresource documents, but for Manage Resources holders, who
 // see every permission whole: a system:permissions:r token, which reads the
 // whole permission, is refused here (#382).
-func (s accessService) GetPermissionResource(
+func (s AccessService) GetPermissionResource(
 	ctx context.Context,
 	req accessgen.GetPermissionResourceRequestObject,
 ) (accessgen.GetPermissionResourceResponseObject, error) {
@@ -906,7 +905,7 @@ func (s accessService) GetPermissionResource(
 }
 
 // UpdatePermissionResource merges the body into an existing section.
-func (s accessService) UpdatePermissionResource(
+func (s AccessService) UpdatePermissionResource(
 	ctx context.Context,
 	req accessgen.UpdatePermissionResourceRequestObject,
 ) (accessgen.UpdatePermissionResourceResponseObject, error) {
@@ -938,7 +937,7 @@ func (s accessService) UpdatePermissionResource(
 
 // ReplacePermissionResource replaces one section whole, creating it when
 // the permission had none.
-func (s accessService) ReplacePermissionResource(
+func (s AccessService) ReplacePermissionResource(
 	ctx context.Context,
 	req accessgen.ReplacePermissionResourceRequestObject,
 ) (accessgen.ReplacePermissionResourceResponseObject, error) {
@@ -968,7 +967,7 @@ func (s accessService) ReplacePermissionResource(
 }
 
 // DeletePermissionResource removes one section, 204.
-func (s accessService) DeletePermissionResource(
+func (s AccessService) DeletePermissionResource(
 	ctx context.Context,
 	req accessgen.DeletePermissionResourceRequestObject,
 ) (accessgen.DeletePermissionResourceResponseObject, error) {

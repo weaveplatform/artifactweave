@@ -26,7 +26,7 @@ type artifactoryStubs struct{ artgen.UnimplementedStrict }
 
 // artifactoryServer is the artifactory spec's strict server.
 type artifactoryServer struct {
-	*securityAPI
+	*SecurityAPI
 	*systemAPI
 	*artifactoryService
 	artifactoryStubs
@@ -37,7 +37,7 @@ type accessStubs struct{ accessgen.UnimplementedStrict }
 
 // accessServer is the access spec's strict server.
 type accessServer struct {
-	*accessService
+	*AccessService
 	accessStubs
 }
 

@@ -37,10 +37,12 @@ var accessPublicRoutes = map[string]bool{
 // refreshRoute is the one route an expired access token reaches.
 const refreshRoute = "POST /access/api/v1/tokens"
 
-// authnOptions are the values authenticate takes from the modules, which
+// AuthnOptions are the values Authenticate takes from the modules, which
 // the router composes. Credential parsing (credentials) is not among them:
 // every credential form is accepted the same way on every route.
-type authnOptions struct {
+// RegistryPath and ChallengeAnonymous must be set, because Authenticate calls
+// them without a nil check; the maps and lists may be empty.
+type AuthnOptions struct {
 	// Auth verifies credentials and answers whether anonymous access is on.
 	Auth *authn.Authenticator
 	// Store holds the permissions each principal is authorised with.
@@ -66,7 +68,7 @@ type authnOptions struct {
 	PublicRoutes map[string]bool
 }
 
-// authenticate puts the request's principal in its context. It decides in
+// Authenticate puts the request's principal in its context. It decides in
 // this order, and the order matters:
 //
 //  1. A self-authenticated route passes untouched.
@@ -97,7 +99,7 @@ type authnOptions struct {
 //  7. Otherwise the request acts as anonymous, authorised the same way,
 //     when anonymous access is on.
 //  8. With anonymous access off, only public routes answer.
-func authenticate(o authnOptions) func(http.Handler) http.Handler {
+func Authenticate(o AuthnOptions) func(http.Handler) http.Handler {
 	skipped := func(r *http.Request) bool {
 		return slices.ContainsFunc(
 			o.Skip,
@@ -164,7 +166,7 @@ func authenticate(o authnOptions) func(http.Handler) http.Handler {
 			case o.PublicRoutes[r.Method+" "+r.URL.Path]:
 				next.ServeHTTP(w, r)
 			default:
-				apierror.Write(w, errorProfileFor(r.URL.Path), kernel.ErrUnauthenticated)
+				apierror.Write(w, httpkit.ErrorProfile(r), kernel.ErrUnauthenticated)
 			}
 		})
 	}

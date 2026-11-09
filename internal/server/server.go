@@ -17,7 +17,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth/idtoken"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
@@ -30,6 +29,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/smart"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	agentpackageshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/agentpackages/http"
@@ -448,10 +448,24 @@ func New(cfg Config) http.Handler {
 		),
 	}
 	sysAPI := systemAPI{cfg: cfg, instanceID: new(atomic.Pointer[string])}
-	// One verifier per handler, so providers' keys stay cached between
-	// exchanges. The access spec's server and the security partial share it.
-	access := accessState{cfg: cfg, idTokens: idtoken.New(idtoken.Options{})}
-	accSvc, secAPI := accessService{access}, securityAPI{access}
+	accessHTTP := NewServer(Deps{
+		API:           cfg.Access,
+		Store:         cfg.Store,
+		Authenticator: cfg.Auth,
+		Tokens:        cfg.Tokens,
+		Settings: accessapi.Settings{
+			AllowBasicAuthTokens:   cfg.AllowBasicAuthTokens,
+			GlobalEnvironmentLimit: cfg.GlobalEnvironmentLimit,
+		},
+		PasswordHash:  cfg.PasswordHash,
+		CompatVersion: cfg.CompatVersion,
+		Log:           cfg.Logger,
+		Repositories:  repos.NewRepositories(cfg.Store, cfg.Access.Keys, cfg.Access.Projects),
+	})
+	// The repositories collection is the router's own; access adds the key
+	// pairs'.
+	slashes := maps.Clone(slashCollections)
+	maps.Copy(slashes, SlashCollections())
 	// The registry exists before the middleware, whose challenge it writes.
 	registry := newRegistry(cfg, artSvc)
 	r.Use(
@@ -464,10 +478,10 @@ func New(cfg Config) http.Handler {
 		dockerhttp.APIVersion,
 		registry.Challenge,
 		middleware.NormalizeContentType(keepContentType),
-		middleware.CollectionSlash(slashCollections),
-		plusAsSpace,
+		middleware.CollectionSlash(slashes),
+		PlusAsSpace,
 		idempotencyRoutes,
-		apiRecoveryContext,
+		APIRecoveryContext,
 	)
 	limits := newLimitOptions(cfg.RequestLimits)
 	if cfg.RequestLimits != nil {
@@ -479,7 +493,7 @@ func New(cfg Config) http.Handler {
 	}
 	mounted = append(mounted, cfg.Protocols...)
 	if cfg.Auth != nil {
-		r.Use(authenticate(newAuthnOptions(cfg.Auth, cfg.Store, func(req *http.Request) bool {
+		r.Use(Authenticate(newAuthnOptions(cfg.Auth, cfg.Store, func(req *http.Request) bool {
 			if terraformbackendhttp.IsPath(req.URL.Path) {
 				return terraformbackendhttp.SkipsAuthentication(req)
 			}
@@ -491,7 +505,7 @@ func New(cfg Config) http.Handler {
 	// After authentication, which it needs, and ahead of routing, which
 	// cannot match it (helmPartialReindex).
 	if cfg.Store != nil {
-		r.Use(secAPI.checkAPIRestriction)
+		r.Use(accessHTTP.CheckAPIRestriction(healthRequest, writeLimitError))
 	}
 	if cfg.RequestLimits != nil {
 		r.Use(artSvc.limitPrincipal(limits))
@@ -522,7 +536,7 @@ func New(cfg Config) http.Handler {
 	artSvc.registerStorageRoutes(r)
 	artSvc.registerTrashRoutes(r)
 	artSvc.registerMultipartRoutes(r)
-	secAPI.registerTokenRoutes(r)
+	r.With(middleware.BodyLimit(managementBodyLimit)).Group(accessHTTP.RegisterRoutes)
 	artSvc.registerSearchRoutes(r)
 	artSvc.registerMavenRoutes(r)
 	// GitLab subgroup owners span path segments; the generated VCS routes
@@ -565,7 +579,7 @@ func New(cfg Config) http.Handler {
 		}
 		artgen.HandlerWithOptions(
 			artgen.NewStrictHandlerWithOptions(artifactoryServer{
-				securityAPI:        &secAPI,
+				SecurityAPI:        accessHTTP.Security,
 				systemAPI:          &sysAPI,
 				artifactoryService: &artSvc,
 			}, nil, strictOpts),
@@ -581,7 +595,7 @@ func New(cfg Config) http.Handler {
 		}
 		accessgen.HandlerWithOptions(
 			accessgen.NewStrictHandlerWithOptions(
-				accessServer{accessService: &accSvc},
+				accessServer{AccessService: accessHTTP.Access},
 				nil,
 				accessOpts,
 			),
@@ -683,7 +697,7 @@ func redactLoggedPath(path string) string {
 	return npmLoggedPath(luarockshttp.RedactAPIKey(path))
 }
 
-// newAuthnOptions returns authenticate's options as the router composes
+// newAuthnOptions returns Authenticate's options as the router composes
 // them: the multipart calls verify themselves, npm's login and logout are
 // skipped before the skips the caller adds, the registry decides where a
 // registry token is good and which paths challenge anonymous requests,
@@ -693,10 +707,10 @@ func newAuthnOptions(
 	a *authn.Authenticator,
 	st store.Store,
 	skip ...func(*http.Request) bool,
-) authnOptions {
-	public := maps.Clone(accessPublicRoutes)
+) AuthnOptions {
+	public := PublicRoutes()
 	maps.Copy(public, systemPublicRoutes)
-	return authnOptions{
+	return AuthnOptions{
 		Auth:               a,
 		Store:              st,
 		SelfAuthenticated:  selfAuthenticated,
@@ -712,25 +726,24 @@ func newAuthnOptions(
 
 // newLimitOptions returns the request-limit middleware's options as the
 // router composes them: the probes (healthRequest) and the recovery API
-// (apiRecoveryRequest) pass the shared limits.
+// (APIRecoveryRequest) pass the shared limits.
 func newLimitOptions(limits *apilimit.Service) limitOptions {
-	return limitOptions{Health: healthRequest, Recovery: apiRecoveryRequest, Limits: limits}
+	return limitOptions{Health: healthRequest, Recovery: APIRecoveryRequest, Limits: limits}
 }
 
 // newDetailOptions returns requestDetails' options as the router composes
-// them, from the contributions beside each handler: the property and GAVC
-// searches' raw queries, the policy body rewrite, and the raw bodies of
-// repository updates, permission creates, build-info publishes and
-// appends, and group updates.
+// them, from the contributions beside each handler, access's through
+// DetailRules: the property and GAVC searches' raw queries, the policy body
+// rewrite, and the raw bodies of repository updates, build-info publishes
+// and appends, permission creates and group updates.
 func newDetailOptions() detailOptions {
+	access := DetailRules()
 	return detailOptions{
 		SearchQuery: []func(*http.Request) bool{keepsSearchQuery},
-		Rewrite:     []func(*http.Request) error{rewritePolicyBody},
-		RawBody: []func(*http.Request) bool{
-			keepsRepositoryBody,
-			keepsPermissionBody,
-			keepsBuildBody,
-			keepsGroupUpdateBody,
-		},
+		Rewrite:     access.Rewrite,
+		RawBody: append(
+			[]func(*http.Request) bool{keepsRepositoryBody, keepsBuildBody},
+			access.RawBody...,
+		),
 	}
 }

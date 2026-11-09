@@ -7,7 +7,6 @@ import (
 	"net/http"
 
 	"github.com/weaveplatform/artifactweave/migration/access/core/roles"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -18,7 +17,7 @@ import (
 // issue #77). Every operation is admin only.
 
 // roleService checks the caller is an administrator and returns the service.
-func (s accessService) roleService(ctx context.Context) (roles.Service, error) {
+func (s AccessService) roleService(ctx context.Context) (roles.Service, error) {
 	if err := httpkit.AdminOnly(ctx); err != nil {
 		return roles.Service{}, err
 	}
@@ -28,15 +27,15 @@ func (s accessService) roleService(ctx context.Context) (roles.Service, error) {
 	}
 	return roles.Service{
 		Store:        st,
-		Repositories: repos.NewRepositories(st, s.cfg.Access.Keys, s.cfg.Access.Projects),
-		GlobalLimit:  s.cfg.GlobalEnvironmentLimit,
+		Repositories: s.deps.Repositories,
+		GlobalLimit:  s.deps.Settings.GlobalEnvironmentLimit,
 	}, nil
 }
 
 // roleError maps the service's errors to statuses. taken is the status of a
 // name already in use: 409 on create, 400 on rename (the spec lists no 409
 // there).
-func (s accessService) roleError(ctx context.Context, op string, err error, taken int) error {
+func (s AccessService) roleError(ctx context.Context, op string, err error, taken int) error {
 	switch {
 	case errors.Is(err, roles.ErrNotFound):
 		return apierror.New(http.StatusNotFound, err.Error())
@@ -50,7 +49,7 @@ func (s accessService) roleError(ctx context.Context, op string, err error, take
 	}
 }
 
-func (s accessService) GetGlobalEnvironments(
+func (s AccessService) GetGlobalEnvironments(
 	ctx context.Context,
 	_ accessgen.GetGlobalEnvironmentsRequestObject,
 ) (accessgen.GetGlobalEnvironmentsResponseObject, error) {
@@ -69,7 +68,7 @@ func (s accessService) GetGlobalEnvironments(
 	return out, nil
 }
 
-func (s accessService) CreateGlobalEnvironment(
+func (s AccessService) CreateGlobalEnvironment(
 	ctx context.Context,
 	req accessgen.CreateGlobalEnvironmentRequestObject,
 ) (accessgen.CreateGlobalEnvironmentResponseObject, error) {
@@ -86,7 +85,7 @@ func (s accessService) CreateGlobalEnvironment(
 	return accessgen.CreateGlobalEnvironment201JSONResponse{Name: req.Body.Name}, nil
 }
 
-func (s accessService) RenameGlobalEnvironment(
+func (s AccessService) RenameGlobalEnvironment(
 	ctx context.Context,
 	req accessgen.RenameGlobalEnvironmentRequestObject,
 ) (accessgen.RenameGlobalEnvironmentResponseObject, error) {
@@ -107,7 +106,7 @@ func (s accessService) RenameGlobalEnvironment(
 // DeleteGlobalEnvironment refuses DEV, PROD and environments still in use
 // with 400, as the operation's description says; its declared responses do
 // not list the 400, so the error carries it.
-func (s accessService) DeleteGlobalEnvironment(
+func (s AccessService) DeleteGlobalEnvironment(
 	ctx context.Context,
 	req accessgen.DeleteGlobalEnvironmentRequestObject,
 ) (accessgen.DeleteGlobalEnvironmentResponseObject, error) {
@@ -121,7 +120,7 @@ func (s accessService) DeleteGlobalEnvironment(
 	return accessgen.DeleteGlobalEnvironment204Response{}, nil
 }
 
-func (s accessService) GetAllGlobalRoles(
+func (s AccessService) GetAllGlobalRoles(
 	ctx context.Context,
 	_ accessgen.GetAllGlobalRolesRequestObject,
 ) (accessgen.GetAllGlobalRolesResponseObject, error) {
@@ -140,7 +139,7 @@ func (s accessService) GetAllGlobalRoles(
 	return out, nil
 }
 
-func (s accessService) GetGlobalRole(
+func (s AccessService) GetGlobalRole(
 	ctx context.Context,
 	req accessgen.GetGlobalRoleRequestObject,
 ) (accessgen.GetGlobalRoleResponseObject, error) {
@@ -158,7 +157,7 @@ func (s accessService) GetGlobalRole(
 // CreateGlobalRole answers 201 with {"code":"OK","message":"Role '<name>'
 // created"}, as JFrog's spec documents; the platform provider then reads the
 // role back.
-func (s accessService) CreateGlobalRole(
+func (s AccessService) CreateGlobalRole(
 	ctx context.Context,
 	req accessgen.CreateGlobalRoleRequestObject,
 ) (accessgen.CreateGlobalRoleResponseObject, error) {
@@ -183,7 +182,7 @@ func (s accessService) CreateGlobalRole(
 	}, nil
 }
 
-func (s accessService) UpdateGlobalRole(
+func (s AccessService) UpdateGlobalRole(
 	ctx context.Context,
 	req accessgen.UpdateGlobalRoleRequestObject,
 ) (accessgen.UpdateGlobalRoleResponseObject, error) {
@@ -206,7 +205,7 @@ func (s accessService) UpdateGlobalRole(
 	return accessgen.UpdateGlobalRole200Response{}, nil
 }
 
-func (s accessService) DeleteGlobalRole(
+func (s AccessService) DeleteGlobalRole(
 	ctx context.Context,
 	req accessgen.DeleteGlobalRoleRequestObject,
 ) (accessgen.DeleteGlobalRoleResponseObject, error) {

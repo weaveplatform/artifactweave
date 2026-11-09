@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"testing"
 
+	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -79,6 +80,26 @@ func (f faultyRepos) UsingKeypair(ctx context.Context, name string) ([]string, e
 	return f.RepoStore.UsingKeypair(ctx, name) //nolint:wrapcheck // test double
 }
 
+// repoStoreRepositories serves the Repositories methods that the key pair
+// code calls from a repository store, so that a test can fail any one of
+// them. The other methods are the nil interface's, which panic if called.
+type repoStoreRepositories struct {
+	artifactsapi.Repositories
+	repos store.RepoStore
+}
+
+func (r repoStoreRepositories) Get(ctx context.Context, key string) (repo.Config, error) {
+	return r.repos.Get(ctx, key) //nolint:wrapcheck // test double
+}
+
+func (r repoStoreRepositories) UsingKeypair(ctx context.Context, name string) ([]string, error) {
+	return r.repos.UsingKeypair(ctx, name) //nolint:wrapcheck // test double
+}
+
+func (r repoStoreRepositories) Update(ctx context.Context, c repo.Config) error {
+	return r.repos.Update(ctx, c) //nolint:wrapcheck // test double
+}
+
 // TestAccDropKeypairRefs clears a pair from the primary and the secondary
 // references that name it, leaves other pairs alone, and passes on a
 // failure at any step, which the delete answers 500 and undoes (#473).
@@ -95,7 +116,11 @@ func TestAccDropKeypairRefs(t *testing.T) {
 	}
 	for _, fail := range []string{"usingKeypair", "get", "update"} {
 		broken := faultyRepos{RepoStore: db.Repos(), fail: map[string]bool{fail: true}}
-		if err := dropKeypairRefs(ctx, broken, "kp"); !errors.Is(err, errBoom) {
+		if err := dropKeypairRefs(
+			ctx,
+			repoStoreRepositories{repos: broken},
+			"kp",
+		); !errors.Is(err, errBoom) {
 			t.Errorf("%s fails: %v", fail, err)
 		}
 	}
@@ -106,7 +131,7 @@ func TestAccDropKeypairRefs(t *testing.T) {
 		basic("admin", "pw"), ""), http.StatusInternalServerError, "a failed repository update")
 	mustStatus(t, do(t, h, http.MethodGet, "/artifactory/api/security/keypair/kp-used",
 		basic("admin", "pw"), ""), http.StatusOK, "the pair after the failed delete")
-	if err := dropKeypairRefs(ctx, db.Repos(), "kp"); err != nil {
+	if err := dropKeypairRefs(ctx, repoStoreRepositories{repos: db.Repos()}, "kp"); err != nil {
 		t.Fatal(err)
 	}
 	for key, want := range map[string][2]string{"both": {"", ""}, "second": {"other", ""}} {

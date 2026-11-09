@@ -68,13 +68,12 @@ const (
 
 // slashCollections are the collection paths the Terraform provider calls
 // with a trailing slash, which chi would otherwise read as a member with an
-// empty key: it lists repositories at /api/repositories/ (research 08) and
-// creates key pairs with POST /api/security/keypair/ (its KeypairEndPoint).
-// Only these exact paths are rewritten, because a trailing slash elsewhere
-// under /artifactory names a folder.
+// empty key: it lists repositories at /api/repositories/ (research 08), and
+// access adds the key pairs' (SlashCollections). Only these exact paths are
+// rewritten, because a trailing slash elsewhere under /artifactory names a
+// folder.
 var slashCollections = map[string]string{
-	"/artifactory/api/repositories/":     "/artifactory/api/repositories",
-	"/artifactory/api/security/keypair/": "/artifactory/api/security/keypair",
+	"/artifactory/api/repositories/": "/artifactory/api/repositories",
 }
 
 // detailOptions name the requests whose details requestDetails keeps. Each
