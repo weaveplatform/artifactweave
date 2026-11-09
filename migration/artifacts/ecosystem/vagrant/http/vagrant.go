@@ -1,5 +1,5 @@
-// Package vagrant serves the native Vagrant box catalog at Artifactory's prefix.
-package vagrant
+// Package vagranthttp serves the native Vagrant box catalog at Artifactory's prefix.
+package vagranthttp
 
 import (
 	"context"
@@ -13,10 +13,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	boxfmt "github.com/weaveplatform/artifactweave/internal/format/vagrant"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
+	boxfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/vagrant"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/store"

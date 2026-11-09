@@ -1,4 +1,4 @@
-package gems
+package gemshttp
 
 import (
 	"bytes"
@@ -9,14 +9,14 @@ import (
 	"testing"
 	"time"
 
-	gemfmt "github.com/weaveplatform/artifactweave/internal/format/gems"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	gemfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/gems"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 )
 
 func TestUnitRubyGemsDetailsAndVersionDocuments(t *testing.T) {
-	b := repopath.Read(t, "internal/format/gems/testdata/rake-12.3.1.gem")
+	b := repopath.Read(t, "migration/artifacts/ecosystem/gems/testdata/rake-12.3.1.gem")
 	p, err := gemfmt.Read(
 		context.Background(),
 		bytes.NewReader(b),

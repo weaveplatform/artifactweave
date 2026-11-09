@@ -1312,7 +1312,7 @@
   {
     "route": "DELETE /artifactory/api/gems/{repoKey}/api/v1/gems/yank",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/gems.handler.yank-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/gems/http.handler.yank-fm",
     "review_family": "native-gems",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -1331,7 +1331,7 @@
   {
     "route": "DELETE /artifactory/api/gems/{repoKey}/api/v1/yank",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/gems.handler.yank-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/gems/http.handler.yank-fm",
     "review_family": "native-gems",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -5547,7 +5547,7 @@
   {
     "route": "GET /artifactory/api/gems/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/gems.handler.read-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/gems/http.handler.read-fm",
     "review_family": "native-gems",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -9876,7 +9876,7 @@
   {
     "route": "GET /artifactory/api/vagrant/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/vagrant.handler.read-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/vagrant/http.handler.read-fm",
     "review_family": "native-vagrant",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12253,7 +12253,7 @@
   {
     "route": "HEAD /artifactory/api/gems/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/gems.handler.read-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/gems/http.handler.read-fm",
     "review_family": "native-gems",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12906,7 +12906,7 @@
   {
     "route": "HEAD /artifactory/api/vagrant/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/vagrant.handler.read-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/vagrant/http.handler.read-fm",
     "review_family": "native-vagrant",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -16078,7 +16078,7 @@
   {
     "route": "POST /artifactory/api/gems/{repoKey}/api/v1/gems",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/gems.handler.push-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/gems/http.handler.push-fm",
     "review_family": "native-gems",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16097,7 +16097,7 @@
   {
     "route": "POST /artifactory/api/gems/{repoKey}/api/v1/gems/",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/gems.handler.push-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/gems/http.handler.push-fm",
     "review_family": "native-gems",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",

@@ -56,7 +56,7 @@ defines the index and checksum fields; the
 `gem install` and `bundle install` against all four approved classes. The
 [Ruby client image](../../test/acceptance/clients/ruby.Dockerfile) pins
 Ruby 4.0.9 by digest. The genuine
-[`rake-12.3.1.gem`](../../internal/format/gems/testdata/rake-12.3.1.gem)
+[`rake-12.3.1.gem`](../../migration/artifacts/ecosystem/gems/testdata/rake-12.3.1.gem)
 was downloaded from RubyGems.org and has SHA256
 `cf37840d136743411e4bd601885363e34dce537675306464528b0cafe428b1c5`.
 

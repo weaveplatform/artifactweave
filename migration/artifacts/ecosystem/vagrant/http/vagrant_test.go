@@ -1,4 +1,4 @@
-package vagrant_test
+package vagranthttp_test
 
 import (
 	"archive/tar"

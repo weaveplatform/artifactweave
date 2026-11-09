@@ -20,13 +20,11 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	"github.com/weaveplatform/artifactweave/internal/server/aieditorextensions"
 	"github.com/weaveplatform/artifactweave/internal/server/ansible"
-	"github.com/weaveplatform/artifactweave/internal/server/gems"
 	"github.com/weaveplatform/artifactweave/internal/server/gitlfs"
 	"github.com/weaveplatform/artifactweave/internal/server/luarocks"
 	"github.com/weaveplatform/artifactweave/internal/server/machinelearning"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/server/skills"
-	"github.com/weaveplatform/artifactweave/internal/server/vagrant"
 	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
@@ -48,6 +46,7 @@ import (
 	conanhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conan/http"
 	condahttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conda/http"
 	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
+	gemshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/gems/http"
 	golanghttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang/http"
 	helmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm/http"
 	hexhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/hex/http"
@@ -63,6 +62,7 @@ import (
 	swifthttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/swift/http"
 	terraformhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/http"
 	terraformbackendhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend/http"
+	vagranthttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/vagrant/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -307,13 +307,13 @@ var protocols = []func(Config) pkgroute.Protocol{
 	func(cfg Config) pkgroute.Protocol { return nugethttp.V3(cfg.RemoteSources) },
 	func(cfg Config) pkgroute.Protocol { return nugethttp.V2(cfg.RemoteSources) },
 	func(cfg Config) pkgroute.Protocol {
-		return gems.Protocol(gems.Options{RemoteSources: cfg.RemoteSources})
+		return gemshttp.Protocol(gemshttp.Options{RemoteSources: cfg.RemoteSources})
 	},
 	func(cfg Config) pkgroute.Protocol {
 		return pubhttp.Protocol(pubhttp.Options{Blobs: cfg.Blobs, RemoteSources: cfg.RemoteSources})
 	},
 	func(Config) pkgroute.Protocol { return skills.Protocol() },
-	func(Config) pkgroute.Protocol { return vagrant.Protocol() },
+	func(Config) pkgroute.Protocol { return vagranthttp.Protocol() },
 	func(cfg Config) pkgroute.Protocol {
 		return swifthttp.Protocol(swifthttp.Options{RemoteSources: cfg.RemoteSources})
 	},

@@ -241,7 +241,7 @@
       "owner_issue": 764,
       "evidence": "test/acceptance/features/gems.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/rubygems-repositories",
-      "route_file": "internal/server/gems/gems.go",
+      "route_file": "migration/artifacts/ecosystem/gems/http/gems.go",
       "p9c": true
     },
     {
@@ -529,7 +529,7 @@
       "owner_issue": 785,
       "evidence": "test/acceptance/features/vagrant.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/vagrant-repositories",
-      "route_file": "internal/server/vagrant/vagrant.go",
+      "route_file": "migration/artifacts/ecosystem/vagrant/http/vagrant.go",
       "p9c": true
     },
     {

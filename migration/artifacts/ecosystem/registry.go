@@ -3,12 +3,10 @@ package ecosystem
 import (
 	"github.com/weaveplatform/artifactweave/internal/format/aieditorextensions"
 	"github.com/weaveplatform/artifactweave/internal/format/ansible"
-	"github.com/weaveplatform/artifactweave/internal/format/gems"
 	"github.com/weaveplatform/artifactweave/internal/format/gitlfs"
 	"github.com/weaveplatform/artifactweave/internal/format/luarocks"
 	"github.com/weaveplatform/artifactweave/internal/format/machinelearning"
 	"github.com/weaveplatform/artifactweave/internal/format/skills"
-	"github.com/weaveplatform/artifactweave/internal/format/vagrant"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/agentpackages"
@@ -25,6 +23,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cran"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/gems"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm"
@@ -42,6 +41,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/swift"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/vagrant"
 )
 
 // Settings are the server-wide options of the formats that take any, from

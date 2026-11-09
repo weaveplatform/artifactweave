@@ -49,14 +49,14 @@ var formats = map[string]formatImpact{
 	"agentpackages": {"./migration/artifacts/ecosystem/agentpackages/...", "@apm", []string{"apm"}},
 	"bower":         {"./migration/artifacts/ecosystem/bower/...", "@bower", []string{"bower"}},
 	"debian":        {"./migration/artifacts/ecosystem/debian/...", "@debian", []string{"debian"}},
-	"gems":          {"./internal/format/gems/...", "@gems", []string{"ruby"}},
+	"gems":          {"./migration/artifacts/ecosystem/gems/...", "@gems", []string{"ruby"}},
 	"gitlfs":        {"./internal/format/gitlfs/...", "@gitlfs", []string{"gitlfs"}},
 	"cocoapods": {
 		"./migration/artifacts/ecosystem/cocoapods/...",
 		"@cocoapods",
 		[]string{"cocoapods"},
 	},
-	"vagrant": {"./internal/format/vagrant/...", "@vagrant", []string{"vagrant"}},
+	"vagrant": {"./migration/artifacts/ecosystem/vagrant/...", "@vagrant", []string{"vagrant"}},
 	"agentplugins": {
 		"./migration/artifacts/ecosystem/agentplugins/...",
 		"@agentplugins,@agentplugins_clients",
