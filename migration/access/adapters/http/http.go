@@ -1,4 +1,4 @@
-package server
+package accesshttp
 
 import (
 	"log/slog"

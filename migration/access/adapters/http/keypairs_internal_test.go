@@ -1,4 +1,4 @@
-package server
+package accesshttp
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/server"
 	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -124,7 +125,7 @@ func TestAccDropKeypairRefs(t *testing.T) {
 			t.Errorf("%s fails: %v", fail, err)
 		}
 	}
-	h := statusFixture(t, false, func(c *Config) {
+	h := statusFixture(t, false, func(c *server.Config) {
 		c.Store = faultyStore{Store: c.Store.(*inmem.Store), fail: map[string]bool{"update": true}}
 	})
 	mustStatus(t, do(t, h, http.MethodDelete, "/artifactory/api/security/keypair/kp-used",

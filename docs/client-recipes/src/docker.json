@@ -70,7 +70,7 @@
       ]
     },
     {
-      "path": "internal/server/auth.go",
+      "path": "migration/access/adapters/http/authn_middleware.go",
       "contains": [
         "password (the user name must be the token's subject)"
       ]

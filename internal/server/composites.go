@@ -1,6 +1,7 @@
 package server
 
 import (
+	accesshttp "github.com/weaveplatform/artifactweave/migration/access/adapters/http"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	distributiongen "github.com/weaveplatform/artifactweave/migration/platform/gen/distribution"
@@ -26,7 +27,7 @@ type artifactoryStubs struct{ artgen.UnimplementedStrict }
 
 // artifactoryServer is the artifactory spec's strict server.
 type artifactoryServer struct {
-	*SecurityAPI
+	*accesshttp.SecurityAPI
 	*systemAPI
 	*artifactoryService
 	artifactoryStubs
@@ -37,7 +38,7 @@ type accessStubs struct{ accessgen.UnimplementedStrict }
 
 // accessServer is the access spec's strict server.
 type accessServer struct {
-	*AccessService
+	*accesshttp.AccessService
 	accessStubs
 }
 

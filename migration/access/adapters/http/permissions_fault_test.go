@@ -1,4 +1,4 @@
-package server
+package accesshttp
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -143,7 +144,7 @@ func newPermFaultWorld(t *testing.T) (http.Handler, *permFault) {
 		t.Fatal(err)
 	}
 	f := &permFault{}
-	return New(Config{
+	return server.New(server.Config{
 		BaseURL: "https://reg.example", CompatVersion: "7.155.0",
 		Store: permFaultStore{Store: db, f: f}, Auth: a,
 	}), f
@@ -293,7 +294,9 @@ func TestAccPermissionHandlerEdges(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bare := New(Config{BaseURL: "https://reg.example", CompatVersion: "7.155.0", Auth: a})
+	bare := server.New(
+		server.Config{BaseURL: "https://reg.example", CompatVersion: "7.155.0", Auth: a},
+	)
 	if rec := permRequest(
 		t,
 		bare,

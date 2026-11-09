@@ -21,6 +21,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-chi/chi/v5"
 
+	accesshttp "github.com/weaveplatform/artifactweave/migration/access/adapters/http"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 )
 
@@ -320,7 +321,7 @@ func apiReviewPolicy(e *apiReviewOperation) {
 	if healthRequest(r) {
 		e.Admission = "health exemption"
 	}
-	if APIRecoveryRequest(r) {
+	if accesshttp.APIRecoveryRequest(r) {
 		e.Admission = "administrator recovery reserve: 2 concurrent and 60/min per process; 5s deadline"
 	}
 	e.Effects = "resource mutation/action; see served contract and handler calls"
@@ -394,14 +395,14 @@ func apiReviewPolicy(e *apiReviewOperation) {
 func apiReviewPersistence(path string) (string, string, []string) {
 	if strings.HasPrefix(path, apiRestrictionPath) || path == apiRestrictionAuditPath {
 		return "restriction", "audit: default100/max1000, sequence DESC strict id<cursor; filter+administrator-bound cursor; other operations singular", []string{
-			"internal/server/api_restrictions.go",
+			"migration/access/adapters/http/api_restrictions.go",
 			"migration/access/adapters/sql/api_restriction.go",
 			"migration/access/adapters/storetest/api_restriction.go",
 		}
 	}
 	if path == "/access/api/v2/users" || path == "/access/api/v2/groups" {
 		return "identity-pages", "GET: default/max1000, indexed name keyset both directions, SQL filters and LIMIT+1; other methods singular mutations; existing name cursor retained", []string{
-			"internal/server/access_identity.go",
+			"migration/access/adapters/http/access_identity.go",
 			"migration/access/adapters/sql/identity_query.go",
 			"migration/access/adapters/storetest/identity_query.go",
 		}
@@ -409,8 +410,8 @@ func apiReviewPersistence(path string) (string, string, []string) {
 	if strings.HasPrefix(path, "/access/") ||
 		strings.HasPrefix(path, "/artifactory/api/security/") {
 		return "identity", "legacy full lists/collection aggregates remain; source contract declares paged variants; underlying store pages do not bound a collecting service", []string{
-			"internal/server/access_identity.go",
-			"internal/server/tokens.go",
+			"migration/access/adapters/http/access_identity.go",
+			"migration/access/adapters/http/tokens.go",
 			"migration/access/core/identity/identity.go",
 			"migration/access/core/token/token.go",
 			"migration/access/adapters/sql/identity.go",

@@ -36,10 +36,20 @@ func TestUnitCallerChecks(t *testing.T) {
 		t.Fatalf("Principal = %+v, %v", p, err)
 	}
 
-	if err := httpkit.Denied(kernel.Principal{Anonymous: true}); !errors.Is(err, kernel.ErrUnauthenticated) {
+	if err := httpkit.Denied(
+		kernel.Principal{Anonymous: true},
+	); !errors.Is(
+		err,
+		kernel.ErrUnauthenticated,
+	) {
 		t.Fatalf("Denied(anonymous) = %v", err)
 	}
-	if err := httpkit.Denied(kernel.Principal{Name: "deployer"}); !errors.Is(err, kernel.ErrForbidden) {
+	if err := httpkit.Denied(
+		kernel.Principal{Name: "deployer"},
+	); !errors.Is(
+		err,
+		kernel.ErrForbidden,
+	) {
 		t.Fatalf("Denied(user) = %v", err)
 	}
 

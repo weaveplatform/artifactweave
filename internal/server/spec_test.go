@@ -14,6 +14,8 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/api"
+	"github.com/weaveplatform/artifactweave/migration/access/adapters/http"
+	accesshttp "github.com/weaveplatform/artifactweave/migration/access/adapters/http"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
@@ -153,7 +155,7 @@ func TestAccHandwrittenRoutesNotGenerated(t *testing.T) {
 		{"artifactory.openapi.yaml", func(r chi.Router) {
 			artgen.HandlerWithOptions(
 				artgen.NewStrictHandler(artifactoryServer{
-					SecurityAPI:        &SecurityAPI{},
+					SecurityAPI:        &accesshttp.SecurityAPI{},
 					systemAPI:          &systemAPI{},
 					artifactoryService: &artifactoryService{},
 				}, nil),
@@ -162,7 +164,10 @@ func TestAccHandwrittenRoutesNotGenerated(t *testing.T) {
 		}},
 		{"access.openapi.yaml", func(r chi.Router) {
 			accessgen.HandlerWithOptions(
-				accessgen.NewStrictHandler(accessServer{AccessService: &AccessService{}}, nil),
+				accessgen.NewStrictHandler(
+					accessServer{AccessService: &accesshttp.AccessService{}},
+					nil,
+				),
 				accessgen.ChiServerOptions{BaseRouter: r},
 			)
 		}},

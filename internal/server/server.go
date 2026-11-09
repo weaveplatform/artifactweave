@@ -19,6 +19,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
+	accesshttp "github.com/weaveplatform/artifactweave/migration/access/adapters/http"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
@@ -448,7 +449,7 @@ func New(cfg Config) http.Handler {
 		),
 	}
 	sysAPI := systemAPI{cfg: cfg, instanceID: new(atomic.Pointer[string])}
-	accessHTTP := NewServer(Deps{
+	accessHTTP := accesshttp.NewServer(accesshttp.Deps{
 		API:           cfg.Access,
 		Store:         cfg.Store,
 		Authenticator: cfg.Auth,
@@ -465,7 +466,7 @@ func New(cfg Config) http.Handler {
 	// The repositories collection is the router's own; access adds the key
 	// pairs'.
 	slashes := maps.Clone(slashCollections)
-	maps.Copy(slashes, SlashCollections())
+	maps.Copy(slashes, accesshttp.SlashCollections())
 	// The registry exists before the middleware, whose challenge it writes.
 	registry := newRegistry(cfg, artSvc)
 	r.Use(
@@ -479,9 +480,9 @@ func New(cfg Config) http.Handler {
 		registry.Challenge,
 		middleware.NormalizeContentType(keepContentType),
 		middleware.CollectionSlash(slashes),
-		PlusAsSpace,
+		accesshttp.PlusAsSpace,
 		idempotencyRoutes,
-		APIRecoveryContext,
+		accesshttp.APIRecoveryContext,
 	)
 	limits := newLimitOptions(cfg.RequestLimits)
 	if cfg.RequestLimits != nil {
@@ -493,14 +494,18 @@ func New(cfg Config) http.Handler {
 	}
 	mounted = append(mounted, cfg.Protocols...)
 	if cfg.Auth != nil {
-		r.Use(Authenticate(newAuthnOptions(cfg.Auth, cfg.Store, func(req *http.Request) bool {
-			if terraformbackendhttp.IsPath(req.URL.Path) {
-				return terraformbackendhttp.SkipsAuthentication(req)
-			}
-			return slices.ContainsFunc(mounted, func(p pkgroute.Protocol) bool {
-				return p.SkipsAuthentication(req)
-			})
-		})))
+		r.Use(
+			accesshttp.Authenticate(
+				newAuthnOptions(cfg.Auth, cfg.Store, func(req *http.Request) bool {
+					if terraformbackendhttp.IsPath(req.URL.Path) {
+						return terraformbackendhttp.SkipsAuthentication(req)
+					}
+					return slices.ContainsFunc(mounted, func(p pkgroute.Protocol) bool {
+						return p.SkipsAuthentication(req)
+					})
+				}),
+			),
+		)
 	}
 	// After authentication, which it needs, and ahead of routing, which
 	// cannot match it (helmPartialReindex).
@@ -707,10 +712,10 @@ func newAuthnOptions(
 	a *authn.Authenticator,
 	st store.Store,
 	skip ...func(*http.Request) bool,
-) AuthnOptions {
-	public := PublicRoutes()
+) accesshttp.AuthnOptions {
+	public := accesshttp.PublicRoutes()
 	maps.Copy(public, systemPublicRoutes)
-	return AuthnOptions{
+	return accesshttp.AuthnOptions{
 		Auth:               a,
 		Store:              st,
 		SelfAuthenticated:  selfAuthenticated,
@@ -728,7 +733,11 @@ func newAuthnOptions(
 // router composes them: the probes (healthRequest) and the recovery API
 // (APIRecoveryRequest) pass the shared limits.
 func newLimitOptions(limits *apilimit.Service) limitOptions {
-	return limitOptions{Health: healthRequest, Recovery: APIRecoveryRequest, Limits: limits}
+	return limitOptions{
+		Health:   healthRequest,
+		Recovery: accesshttp.APIRecoveryRequest,
+		Limits:   limits,
+	}
 }
 
 // newDetailOptions returns requestDetails' options as the router composes
@@ -737,7 +746,7 @@ func newLimitOptions(limits *apilimit.Service) limitOptions {
 // rewrite, and the raw bodies of repository updates, build-info publishes
 // and appends, permission creates and group updates.
 func newDetailOptions() detailOptions {
-	access := DetailRules()
+	access := accesshttp.DetailRules()
 	return detailOptions{
 		SearchQuery: []func(*http.Request) bool{keepsSearchQuery},
 		Rewrite:     access.Rewrite,
