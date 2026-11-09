@@ -75,7 +75,7 @@ When a test file leaves a shared directory such as `internal/server`:
 | Skills | `migration/artifacts/ecosystem/skills/http` |
 | Terraform registry | `migration/artifacts/ecosystem/terraform/http`, `test/server/artifacts/terraform` |
 | Terraform backend | `migration/artifacts/ecosystem/terraformbackend/http`, `test/server/artifacts/terraformbackend` |
-| Shared | `internal/server`, `internal/server/pkgroute`, `test/server/access` |
+| Shared | `internal/server`, `internal/server/pkgroute`, `test/server/access`, `test/server/configuration` |
 
 `test/server/support` and the packages under it (`harness`, `agentcommon` and
 `registryfixture`) contain fixtures and helpers, not test suites. A change
@@ -94,12 +94,14 @@ in the inventory. A new direct root test cannot be treated as format-owned
 without review.
 
 Some shared API tests use a format-specific fixture. The inventory's
-`format_dependencies` records the format-to-root link as `internal/server/<file>`
-paths so #673 can include root tests when that format changes:
+`format_dependencies` records the link from a format to such a test as the
+test's repository path (`internal/server/<file>`, or `test/server/access/<file>`
+for the access suite's) so #673 can include those tests when that format
+changes:
 
-| Root tests | Shared behavior exercised |
+| Shared tests | Shared behavior exercised |
 | --- | --- |
-| `keypairs_test.go`, `permissions_test.go`, `storage_list_test.go` | Keypair, permission and storage APIs using Terraform fixtures |
+| `test/server/access`: `keypairs_test.go`, `permissions_test.go`; root: `storage_list_test.go` | Keypair, permission and storage APIs using Terraform fixtures |
 | `searches_upstream_test.go`, `searches_upstream_mapped_test.go` | Generic upstream search and cache mapping using Maven coordinates |
 | `reindex_test.go` | Generic reindex orchestration using PyPI and Helm cases |
 | `repositories_test.go` | Repository settings using NuGet contexts |

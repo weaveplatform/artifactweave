@@ -35,8 +35,14 @@ Docker and Helm OCI; `test/server/support/agentcommon` assembles the world of
 Agent Packages and Agent Plugins. Like the harness, they build the router, so
 `test/server/support` never imports them.
 
-`test/server/access` is the access module's suite and contains the full-router
-authentication assertion.
+`test/server/access` is the access module's suite: authentication, tokens,
+users and groups, permissions, roles and environments, key pairs and
+certificates, the OIDC exchange and API restrictions, through the full router.
+`test/server/configuration` is the configuration module's suite: the base URL
+behind a chain of proxies and the configured base URL. Each suite's
+`fixture_test.go` keeps the root helper names the tests call (`statusFixture`,
+`newItemWorld`, `tokenFixture`, `do`, `basic`) as adapters over the harness and
+`test/server/support`.
 `test/server/artifacts/nuget` contains the NuGet v2/v3 status table, route ×
 principal matrix, API-key and force-authentication cases, symbols lifecycle,
 remote status cases, and generated reindex method check.
@@ -70,6 +76,7 @@ with:
 
 ```sh
 go test ./test/server/access
+go test ./test/server/configuration
 go test ./test/server/artifacts/nuget
 go test ./test/server/artifacts/npm
 go test ./test/server/artifacts/golang
@@ -100,7 +107,10 @@ both a status and principal row. The shared P8 reindex
 envelope and generic v1 `encryptStates` repository read remain in root because
 they cover several formats.
 Its `statusFixture`, `matrixFixture`, and `newItemWorld` construct different
-repository matrices and remain for the shared root assertions. Their common auth, request, and package
+repository matrices and remain for the shared root assertions. The in-package
+fixtures that several root files share live in `fixtures_test.go`, and a suite
+split out of the package keeps its in-package part, which calls unexported
+server code, in `<name>_internal_test.go`. Their common auth, request, and package
 primitives now come from `test/server/support`. Keep a root wrapper where a
 shared helper has many existing callers; the wrapper must delegate rather than
 maintain another copy of fixture behavior.

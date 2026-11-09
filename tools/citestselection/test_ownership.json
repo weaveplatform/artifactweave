@@ -211,6 +211,7 @@
       "access_test.go",
       "api_restrictions_test.go",
       "auth_test.go",
+      "fixture_test.go",
       "keypairs_test.go",
       "oidc_test.go",
       "permissions_test.go",
@@ -221,6 +222,7 @@
       "tokens_test.go"
     ],
     "test/server/configuration": [
+      "fixture_test.go",
       "forwarded_test.go"
     ]
   },
