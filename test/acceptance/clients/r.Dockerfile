@@ -1,5 +1,5 @@
 # Client pins: R 4.6.2.
-FROM r-base:4.6.2@sha256:857b44eeca5a8c4f39b210d3912a879fa4cf4b47d9e57a5940b6a29d44c8f938
+FROM r-base:4.6.2@sha256:7bb56b8b7c849d1cea9a5cff981789622340326abdce817ed44c00ac45947a37
 
 RUN Rscript -e 'stopifnot(as.character(getRversion()) == "4.6.2")'
 

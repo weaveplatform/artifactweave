@@ -56,7 +56,7 @@
   "test/acceptance/clients/p2.Dockerfile": "bc887ec4a95227f7e062341022fde86f45e6be8fdce3fadc32dac0df82bf8c4b",
   "test/acceptance/clients/puppet/Dockerfile": "ca9a806b8b9da3dc5b14c78afa5b7d2071a150ae702b488e1f35f87fd92c36c4",
   "test/acceptance/clients/python.Dockerfile": "8b85151d6054209b421e6937f282f1e454dd891c0767f1da303b9793256ae758",
-  "test/acceptance/clients/r.Dockerfile": "8862de89e4f2eb1e5c85a5c6ed1a6597c41421023e055a804e7d2c3ad56da94b",
+  "test/acceptance/clients/r.Dockerfile": "ecf2e1657808cc519f547ebcb26ba9f1a9f742b4974b798b4d69986cdb3cd911",
   "test/acceptance/clients/ruby.Dockerfile": "ae2ce96966f118aef6a7923f0ebaed2a850d76c2f9ee4a3d4450ab58bffb9ac8",
   "test/acceptance/clients/sbt.Dockerfile": "ab5263207ed0d6cf33fe5662954a8218a5abe3407a7bbb4ea7038c43e4380edb",
   "test/acceptance/clients/swift.Dockerfile": "834491010a9e2d5d2c779261b1d0789f45730be7cf4a1f0cdf0d8c341dba84da",
