@@ -25,7 +25,7 @@ func TestUnitAffectedPlanChoosesOnlyOwnedChanges(t *testing.T) {
 		{"npm implementation and docs", []change{{status: "M", path: "migration/artifacts/ecosystem/npm/handler.go"}, {status: "M", path: "docs/testing/ci.md"}}, "format", "npm"},
 		{"new npm implementation", []change{{status: "A", path: "migration/artifacts/ecosystem/npm/new.go"}}, "format", "npm"},
 		{"Terraform fixture", []change{{status: "M", path: "migration/artifacts/ecosystem/terraform/terraformtest/fixture.go"}}, "format", "terraform"},
-		{"agent packages server adapter", []change{{status: "M", path: "internal/server/agentpackages/handler.go"}}, "format", "agentpackages"},
+		{"agent packages server adapter", []change{{status: "M", path: "migration/artifacts/ecosystem/agentpackages/http/handler.go"}}, "format", "agentpackages"},
 		{"Helm OCI test", []change{{status: "M", path: "test/server/artifacts/helmoci/push_test.go"}}, "format", "helmoci"},
 		{"deployment only", []change{{status: "M", path: "deploy/check.sh"}}, "deployment", ""},
 		{"docs only", []change{{status: "M", path: "README.md"}}, "docs", ""},
@@ -88,11 +88,13 @@ func TestUnitAffectedPlanChoosesOnlyOwnedChanges(t *testing.T) {
 		}
 	}
 	agent := proposeAffected(
-		[]change{{status: "M", path: "internal/server/agentpackages/handler.go"}},
+		[]change{
+			{status: "M", path: "migration/artifacts/ecosystem/agentpackages/http/handler.go"},
+		},
 	)
 	if !strings.Contains(
 		agent.coverpkg,
-		"github.com/weaveplatform/artifactweave/internal/server/agentpackages",
+		"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/agentpackages/http",
 	) {
 		t.Fatalf("changed production package is not instrumented: %+v", agent)
 	}

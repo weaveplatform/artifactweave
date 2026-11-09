@@ -90,6 +90,16 @@ type Store interface {
 	Bundles() BundleStore
 	Distribution() DistributionStore
 	Archive() ArchiveStore
+	// ArchivedItems, ColdBlobs and ColdReplicas are separate accessors, not
+	// part of Archive, because they are artifacts' records while archive
+	// policies and executions are retention's, and Go has no covariant
+	// returns: one Archive could not satisfy both modules' ports.
+	ArchivedItems() ArchivedItemStore
+	// ColdBlobs is the cold tier's blob index.
+	ColdBlobs() BlobIndex
+	// ColdReplicas is the cold tier's replica index, for a mirrored cold
+	// tier.
+	ColdReplicas() ReplicaIndex
 	Workers() WorkerStore
 
 	Builds() BuildStore

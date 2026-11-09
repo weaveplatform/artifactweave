@@ -50,7 +50,7 @@
   ],
   "evidence": [
     {
-      "path": "internal/server/swift/swift_test.go",
+      "path": "migration/artifacts/ecosystem/swift/http/swift_test.go",
       "contains": [
         "TestAccSwiftPMAuthenticatedPublish",
         "invalid SwiftPM credentials did not reach the native endpoint and receive 401",
@@ -60,7 +60,7 @@
       ]
     },
     {
-      "path": "internal/server/swift/remote_test.go",
+      "path": "migration/artifacts/ecosystem/swift/http/remote_test.go",
       "contains": [
         "TestAccSwiftPMRemoteVirtualAndOffline",
         "swiftpm-authenticated-reader",

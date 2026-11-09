@@ -12,13 +12,18 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// ColdBlobs implements store.ArchiveStore.
-func (a archiveStore) ColdBlobs() store.BlobIndex { return blobIndex{s: a.s, table: "cold_blobs"} }
+// ArchivedItems implements store.Store.
+func (s *Store) ArchivedItems() store.ArchivedItemStore { return archivedItemStore{s} }
 
-// ColdReplicas implements store.ArchiveStore.
-func (a archiveStore) ColdReplicas() store.ReplicaIndex {
-	return replicaIndex{s: a.s, table: "cold_blob_replicas"}
+// ColdBlobs implements store.Store.
+func (s *Store) ColdBlobs() store.BlobIndex { return blobIndex{s: s, table: "cold_blobs"} }
+
+// ColdReplicas implements store.Store.
+func (s *Store) ColdReplicas() store.ReplicaIndex {
+	return replicaIndex{s: s, table: "cold_blob_replicas"}
 }
+
+type archivedItemStore struct{ s *Store }
 
 var archivedCols = []string{
 	"namespace", "repo_key", "path", "name", "depth", "sha256", "sha512", "sha1", "md5", "size",
@@ -97,7 +102,7 @@ func scanArchived(r dialect.EntRow) (types.ArchivedItem, error) {
 	return a, dialect.FromJSON(stats, &a.Stats)
 }
 
-func (a archiveStore) AddItem(
+func (a archivedItemStore) AddItem(
 	ctx context.Context,
 	it types.ArchivedItem,
 ) (types.ArchivedItem, error) {
@@ -116,7 +121,7 @@ func (a archiveStore) AddItem(
 	return it, nil
 }
 
-func (a archiveStore) Item(ctx context.Context, id int64) (types.ArchivedItem, error) {
+func (a archivedItemStore) Item(ctx context.Context, id int64) (types.ArchivedItem, error) {
 	out, err := scanArchived(
 		a.s.Q(ctx).QueryRowContext(ctx, a.s.Dialect().Rebind(archivedSelect+" WHERE id = ?"), id),
 	)
@@ -124,7 +129,7 @@ func (a archiveStore) Item(ctx context.Context, id int64) (types.ArchivedItem, e
 }
 
 // archived runs an archived-item query.
-func (a archiveStore) archived(
+func (a archivedItemStore) archived(
 	ctx context.Context,
 	q string,
 	args ...any,
@@ -138,7 +143,7 @@ func (a archiveStore) archived(
 	return out, err
 }
 
-func (a archiveStore) FindItems(
+func (a archivedItemStore) FindItems(
 	ctx context.Context,
 	repoKey, fullPath string,
 ) ([]types.ArchivedItem, error) {
@@ -155,7 +160,7 @@ func (a archiveStore) FindItems(
 	)
 }
 
-func (a archiveStore) Items(
+func (a archivedItemStore) Items(
 	ctx context.Context, f store.ArchivedFilter, p store.Page,
 ) ([]types.ArchivedItem, string, error) {
 	p, err := p.Normalize()
@@ -194,7 +199,7 @@ func (a archiveStore) Items(
 	return page, next, nil
 }
 
-func (a archiveStore) DeleteItem(ctx context.Context, id int64) error {
+func (a archivedItemStore) DeleteItem(ctx context.Context, id int64) error {
 	return a.s.ExecOne(
 		ctx,
 		fmt.Sprintf("delete archived item %d", id),
@@ -203,7 +208,7 @@ func (a archiveStore) DeleteItem(ctx context.Context, id int64) error {
 	)
 }
 
-func (a archiveStore) ExpiredItems(
+func (a archivedItemStore) ExpiredItems(
 	ctx context.Context,
 	before time.Time,
 	limit int,

@@ -14,10 +14,10 @@ import (
 // runBlobs covers the blob index of both tiers (decisions 0004 and 0024).
 func runBlobs(t *testing.T, newStore Factory) {
 	t.Run("Blobs", func(t *testing.T) { testBlobs(t, newStore(t).Blobs()) })
-	t.Run("ColdBlobs", func(t *testing.T) { testBlobs(t, newStore(t).Archive().ColdBlobs()) })
+	t.Run("ColdBlobs", func(t *testing.T) { testBlobs(t, newStore(t).ColdBlobs()) })
 	t.Run("BlobDeletion", func(t *testing.T) { testBlobDeletion(t, newStore(t).Blobs()) })
 	t.Run("ColdBlobDeletion", func(t *testing.T) {
-		testBlobDeletion(t, newStore(t).Archive().ColdBlobs())
+		testBlobDeletion(t, newStore(t).ColdBlobs())
 	})
 	t.Run("BlobTiersSeparate", func(t *testing.T) { testBlobTiers(t, newStore(t)) })
 }
@@ -242,6 +242,6 @@ func testBlobDeletion(t *testing.T, b store.BlobIndex) {
 func testBlobTiers(t *testing.T, s store.Store) {
 	ctx := context.Background()
 	storekit.Get[types.Blob](t)(s.Blobs().Ref(ctx, blob(1), 1))
-	_, err := s.Archive().ColdBlobs().Get(ctx, blob(1).Checksums.SHA256)
+	_, err := s.ColdBlobs().Get(ctx, blob(1).Checksums.SHA256)
 	storekit.WantErr(t, err, store.ErrNotFound)
 }

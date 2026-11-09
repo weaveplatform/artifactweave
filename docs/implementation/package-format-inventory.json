@@ -33,7 +33,7 @@
       "owner_issue": 762,
       "evidence": "test/acceptance/features/cargo.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/cargo-repositories",
-      "route_file": "internal/server/cargo/cargo.go",
+      "route_file": "migration/artifacts/ecosystem/cargo/http/cargo.go",
       "p9c": true
     },
     {
@@ -49,7 +49,7 @@
       "owner_issue": 763,
       "evidence": "test/acceptance/features/composer.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/php-composer-repositories",
-      "route_file": "internal/server/composer/composer.go",
+      "route_file": "migration/artifacts/ecosystem/composer/http/composer.go",
       "p9c": true
     },
     {
@@ -81,7 +81,7 @@
       "owner_issue": 783,
       "evidence": "test/acceptance/features/chef.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/chef-repositories",
-      "route_file": "internal/server/chef/chef.go",
+      "route_file": "migration/artifacts/ecosystem/chef/http/chef.go",
       "p9c": true
     },
     {
@@ -241,7 +241,7 @@
       "owner_issue": 764,
       "evidence": "test/acceptance/features/gems.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/rubygems-repositories",
-      "route_file": "internal/server/gems/gems.go",
+      "route_file": "migration/artifacts/ecosystem/gems/http/gems.go",
       "p9c": true
     },
     {
@@ -257,7 +257,7 @@
       "owner_issue": 787,
       "evidence": "test/acceptance/features/gitlfs.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/git-lfs-repositories",
-      "route_file": "internal/server/gitlfs/protocol.go",
+      "route_file": "migration/artifacts/ecosystem/gitlfs/http/protocol.go",
       "p9c": true
     },
     {
@@ -401,7 +401,7 @@
       "owner_issue": 765,
       "evidence": "test/acceptance/features/pub.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/pub-repositories",
-      "route_file": "internal/server/pub/pub.go",
+      "route_file": "migration/artifacts/ecosystem/pub/http/pub.go",
       "p9c": true
     },
     {
@@ -417,7 +417,7 @@
       "owner_issue": 784,
       "evidence": "test/acceptance/features/puppet.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/puppet-repositories",
-      "route_file": "internal/server/puppet/puppet.go",
+      "route_file": "migration/artifacts/ecosystem/puppet/http/puppet.go",
       "p9c": true
     },
     {
@@ -479,9 +479,9 @@
       "lifecycle": "reindex, delete, restore",
       "status": "native",
       "owner_issue": 766,
-      "evidence": "internal/server/swift/swift_test.go",
+      "evidence": "migration/artifacts/ecosystem/swift/http/swift_test.go",
       "source": "https://docs.jfrog.com/artifactory/docs/swift-repositories",
-      "route_file": "internal/server/swift/swift.go",
+      "route_file": "migration/artifacts/ecosystem/swift/http/swift.go",
       "p9c": true
     },
     {
@@ -529,7 +529,7 @@
       "owner_issue": 785,
       "evidence": "test/acceptance/features/vagrant.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/vagrant-repositories",
-      "route_file": "internal/server/vagrant/vagrant.go",
+      "route_file": "migration/artifacts/ecosystem/vagrant/http/vagrant.go",
       "p9c": true
     },
     {
@@ -545,7 +545,7 @@
       "owner_issue": 782,
       "evidence": "test/acceptance/features/ansible.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/ansible-repositories",
-      "route_file": "internal/server/ansible/ansible.go",
+      "route_file": "migration/artifacts/ecosystem/ansible/http/ansible.go",
       "p9c": true
     },
     {
@@ -657,7 +657,7 @@
       "owner_issue": 780,
       "evidence": "test/acceptance/features/machinelearning.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/machine-learning-repositories",
-      "route_file": "internal/server/machinelearning/protocol.go",
+      "route_file": "migration/artifacts/ecosystem/machinelearning/http/protocol.go",
       "p9c": true
     },
     {
@@ -673,7 +673,7 @@
       "owner_issue": 775,
       "evidence": "test/acceptance/features/ai_editor_extensions.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/ai-editor-extension-repositories",
-      "route_file": "internal/server/aieditorextensions/aieditorextensions.go",
+      "route_file": "migration/artifacts/ecosystem/aieditorextensions/http/aieditorextensions.go",
       "p9c": true
     },
     {
@@ -722,7 +722,7 @@
       "owner_issue": 0,
       "evidence": "test/acceptance/features/luarocks_local.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
-      "route_file": "internal/server/luarocks/luarocks.go",
+      "route_file": "migration/artifacts/ecosystem/luarocks/http/luarocks.go",
       "p9c": false
     },
     {
@@ -754,7 +754,7 @@
       "owner_issue": 0,
       "evidence": "test/acceptance/features/skills.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
-      "route_file": "internal/server/skills/skills.go",
+      "route_file": "migration/artifacts/ecosystem/skills/http/skills.go",
       "p9c": false
     },
     {
@@ -786,7 +786,7 @@
       "owner_issue": 0,
       "evidence": "test/acceptance/features/agent_packages.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
-      "route_file": "internal/server/agentpackages/agentpackages.go",
+      "route_file": "migration/artifacts/ecosystem/agentpackages/http/agentpackages.go",
       "p9c": false
     }
   ]

@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"strings"
 
-	cheffmt "github.com/weaveplatform/artifactweave/internal/format/chef"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	cheffmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/chef"
 )
 
 // Cached metadata describes versions outside an individual caller's permission

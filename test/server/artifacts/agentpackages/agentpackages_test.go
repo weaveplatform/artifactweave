@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	apmfmt "github.com/weaveplatform/artifactweave/internal/format/agentpackages"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	apmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/agentpackages"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support/agentcommon"
 )

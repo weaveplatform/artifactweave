@@ -18,22 +18,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/idtoken"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
-	"github.com/weaveplatform/artifactweave/internal/server/agentpackages"
-	"github.com/weaveplatform/artifactweave/internal/server/aieditorextensions"
-	"github.com/weaveplatform/artifactweave/internal/server/ansible"
-	"github.com/weaveplatform/artifactweave/internal/server/cargo"
-	"github.com/weaveplatform/artifactweave/internal/server/chef"
-	"github.com/weaveplatform/artifactweave/internal/server/composer"
-	"github.com/weaveplatform/artifactweave/internal/server/gems"
-	"github.com/weaveplatform/artifactweave/internal/server/gitlfs"
-	"github.com/weaveplatform/artifactweave/internal/server/luarocks"
-	"github.com/weaveplatform/artifactweave/internal/server/machinelearning"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
-	"github.com/weaveplatform/artifactweave/internal/server/pub"
-	"github.com/weaveplatform/artifactweave/internal/server/puppet"
-	"github.com/weaveplatform/artifactweave/internal/server/skills"
-	"github.com/weaveplatform/artifactweave/internal/server/swift"
-	"github.com/weaveplatform/artifactweave/internal/server/vagrant"
 	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
@@ -45,24 +30,39 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	agentpackageshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/agentpackages/http"
+	aieditorextensionshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/aieditorextensions/http"
+	ansiblehttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/ansible/http"
 	bazelmoduleshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bazelmodules/http"
 	bowerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bower/http"
+	cargohttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cargo/http"
+	chefhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/chef/http"
 	cocoapodshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods/http"
+	composerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/composer/http"
 	conanhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conan/http"
 	condahttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conda/http"
 	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
+	gemshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/gems/http"
+	gitlfshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/gitlfs/http"
 	golanghttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang/http"
 	helmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm/http"
 	hexhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/hex/http"
 	huggingfacehttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface/http"
 	jetbrainspluginshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/jetbrainsplugins/http"
+	luarockshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/luarocks/http"
+	machinelearninghttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/machinelearning/http"
 	nimmodelhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nimmodel/http"
 	nixhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nix/http"
 	npmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm/http"
 	nugethttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget/http"
+	pubhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pub/http"
+	puppethttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/puppet/http"
 	pypihttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi/http"
+	skillshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/skills/http"
+	swifthttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/swift/http"
 	terraformhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/http"
 	terraformbackendhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend/http"
+	vagranthttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/vagrant/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -216,7 +216,9 @@ var protocols = []func(Config) pkgroute.Protocol{
 		})
 	},
 	func(cfg Config) pkgroute.Protocol {
-		return puppet.Protocol(puppet.Options{Blobs: cfg.Blobs, RemoteSources: cfg.RemoteSources})
+		return puppethttp.Protocol(
+			puppethttp.Options{Blobs: cfg.Blobs, RemoteSources: cfg.RemoteSources},
+		)
 	},
 	func(cfg Config) pkgroute.Protocol { return bazelmoduleshttp.Protocol(cfg.RemoteSources) },
 	func(cfg Config) pkgroute.Protocol {
@@ -225,10 +227,10 @@ var protocols = []func(Config) pkgroute.Protocol{
 	func(cfg Config) pkgroute.Protocol {
 		return condahttp.Protocol(cfg.RemoteSources, cfg.FormatSettings.Conda)
 	},
-	func(cfg Config) pkgroute.Protocol { return ansible.Protocol(cfg.RemoteSources) },
-	func(Config) pkgroute.Protocol { return machinelearning.Protocol() },
-	func(cfg Config) pkgroute.Protocol { return chef.Protocol(cfg.RemoteSources) },
-	func(cfg Config) pkgroute.Protocol { return aieditorextensions.Protocol(cfg.RemoteSources) },
+	func(cfg Config) pkgroute.Protocol { return ansiblehttp.Protocol(cfg.RemoteSources) },
+	func(Config) pkgroute.Protocol { return machinelearninghttp.Protocol() },
+	func(cfg Config) pkgroute.Protocol { return chefhttp.Protocol(cfg.RemoteSources) },
+	func(cfg Config) pkgroute.Protocol { return aieditorextensionshttp.Protocol(cfg.RemoteSources) },
 	func(cfg Config) pkgroute.Protocol {
 		return huggingfacehttp.Protocol(huggingfacehttp.Options{
 			XetEnabled:    cfg.HuggingFaceXetEnabled,
@@ -240,9 +242,9 @@ var protocols = []func(Config) pkgroute.Protocol{
 		})
 	},
 	func(cfg Config) pkgroute.Protocol {
-		return gitlfs.Protocol(gitlfs.Options{RemoteSources: cfg.RemoteSources})
+		return gitlfshttp.Protocol(gitlfshttp.Options{RemoteSources: cfg.RemoteSources})
 	},
-	func(Config) pkgroute.Protocol { return agentpackages.Protocol() },
+	func(Config) pkgroute.Protocol { return agentpackageshttp.Protocol() },
 	func(cfg Config) pkgroute.Protocol {
 		return conanhttp.Protocol(conanhttp.Options{
 			RemoteSources: cfg.RemoteSources, Tokens: cfg.Access.Tokens,
@@ -279,12 +281,12 @@ var protocols = []func(Config) pkgroute.Protocol{
 		)
 	},
 	func(cfg Config) pkgroute.Protocol {
-		return luarocks.Protocol(luarocks.Options{RemoteSources: cfg.RemoteSources})
+		return luarockshttp.Protocol(luarockshttp.Options{RemoteSources: cfg.RemoteSources})
 	},
-	func(cfg Config) pkgroute.Protocol { return cargo.Protocol(cfg.RemoteSources) },
+	func(cfg Config) pkgroute.Protocol { return cargohttp.Protocol(cfg.RemoteSources) },
 	func(cfg Config) pkgroute.Protocol {
-		return composer.Protocol(
-			composer.Options{Blobs: cfg.Blobs, RemoteSources: cfg.RemoteSources},
+		return composerhttp.Protocol(
+			composerhttp.Options{Blobs: cfg.Blobs, RemoteSources: cfg.RemoteSources},
 		)
 	},
 	func(cfg Config) pkgroute.Protocol {
@@ -305,15 +307,15 @@ var protocols = []func(Config) pkgroute.Protocol{
 	func(cfg Config) pkgroute.Protocol { return nugethttp.V3(cfg.RemoteSources) },
 	func(cfg Config) pkgroute.Protocol { return nugethttp.V2(cfg.RemoteSources) },
 	func(cfg Config) pkgroute.Protocol {
-		return gems.Protocol(gems.Options{RemoteSources: cfg.RemoteSources})
+		return gemshttp.Protocol(gemshttp.Options{RemoteSources: cfg.RemoteSources})
 	},
 	func(cfg Config) pkgroute.Protocol {
-		return pub.Protocol(pub.Options{Blobs: cfg.Blobs, RemoteSources: cfg.RemoteSources})
+		return pubhttp.Protocol(pubhttp.Options{Blobs: cfg.Blobs, RemoteSources: cfg.RemoteSources})
 	},
-	func(Config) pkgroute.Protocol { return skills.Protocol() },
-	func(Config) pkgroute.Protocol { return vagrant.Protocol() },
+	func(Config) pkgroute.Protocol { return skillshttp.Protocol() },
+	func(Config) pkgroute.Protocol { return vagranthttp.Protocol() },
 	func(cfg Config) pkgroute.Protocol {
-		return swift.Protocol(swift.Options{RemoteSources: cfg.RemoteSources})
+		return swifthttp.Protocol(swifthttp.Options{RemoteSources: cfg.RemoteSources})
 	},
 }
 

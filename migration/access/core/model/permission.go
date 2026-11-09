@@ -1,0 +1,61 @@
+package model
+
+import (
+	"maps"
+	"slices"
+	"time"
+
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+)
+
+// Grants map principal names to the actions they hold.
+type Grants struct {
+	Users  map[string]api.Actions `json:"users,omitempty"`
+	Groups map[string]api.Actions `json:"groups,omitempty"`
+}
+
+// Target scopes a resource to paths inside one repository or special target.
+type Target struct {
+	Include []string `json:"include_patterns"`
+	Exclude []string `json:"exclude_patterns"`
+}
+
+// Resource is one section of a permission: who may do what, where.
+type Resource struct {
+	Actions Grants            `json:"actions"`
+	Targets map[string]Target `json:"targets"`
+}
+
+// Permission is the single internal representation of every permission wire
+// form (decision 0006). Resources are stored as one JSON document in the
+// Access v2 shape; the grants are also flattened into a table the
+// authorizer queries by principal (research 15 section 4).
+type Permission struct {
+	Name        string
+	Description string
+	Resources   map[api.ResourceType]Resource
+	Created     time.Time
+	Updated     time.Time
+}
+
+// ResourceTypes returns the permission's sections in a stable order.
+func (p Permission) ResourceTypes() []api.ResourceType {
+	return slices.Sorted(maps.Keys(p.Resources))
+}
+
+// MatchesRepository reports whether target covers a repository of the given
+// key and class (local, remote, virtual, federated, distribution).
+func MatchesRepository(target, key, class string) bool {
+	switch target {
+	case api.TargetAny:
+		return true
+	case api.TargetAnyLocal:
+		return class == "local" || class == "federated"
+	case api.TargetAnyRemote:
+		return class == "remote"
+	case api.TargetAnyDistribution:
+		return class == "distribution"
+	default:
+		return target == key
+	}
+}

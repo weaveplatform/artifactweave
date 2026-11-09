@@ -7,8 +7,8 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
-	"github.com/weaveplatform/artifactweave/internal/server/puppet"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	puppethttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/puppet/http"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
@@ -19,7 +19,9 @@ func (s artifactoryService) registerPuppetMetadataRoutes(r chi.Router) {
 	pkgroute.Mount(
 		protocol,
 		s.protocolOptions(),
-		puppet.Protocol(puppet.Options{Blobs: s.cfg.Blobs, RemoteSources: s.cfg.RemoteSources}),
+		puppethttp.Protocol(
+			puppethttp.Options{Blobs: s.cfg.Blobs, RemoteSources: s.cfg.RemoteSources},
+		),
 	)
 	serve := func(w http.ResponseWriter, r *http.Request) {
 		ctx := context.WithValue(r.Context(), chi.RouteCtxKey, chi.NewRouteContext())

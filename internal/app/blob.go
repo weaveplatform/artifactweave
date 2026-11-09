@@ -59,7 +59,7 @@ func tiers(cfg config.Config, st store.Store) (hot, cold blobTier) {
 	cold = blobTier{
 		section: "cold_blob", cfg: cfg.ColdBlob,
 		root: coldRoot, storesDir: filepath.Join(cfg.DataDir, "cold-blob-stores"),
-		blobs: st.Archive().ColdBlobs(), replicas: st.Archive().ColdReplicas(),
+		blobs: st.ColdBlobs(), replicas: st.ColdReplicas(),
 		lease: "cold-blob-mirror-repair",
 	}
 	return hot, cold

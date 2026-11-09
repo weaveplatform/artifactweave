@@ -716,7 +716,7 @@ jobs:
           ARTIFACTWEAVE_SWIFT_IMAGE: artifactweave-accept-swift
         run: |
           timeout 10m bash -c 'until docker image inspect artifactweave-accept-swift >/dev/null 2>&1; do sleep 5; done'
-          go test ./internal/server/swift -run '^TestAccSwiftPM' -count=1 -v
+          go test ./migration/artifacts/ecosystem/swift/http -run '^TestAccSwiftPM' -count=1 -v
 
       - name: Hugging Face Hub, Xet and legacy migration native acceptance
         if: needs.impact.outputs.profile == 'full' || needs.impact.outputs.owner == 'huggingface'

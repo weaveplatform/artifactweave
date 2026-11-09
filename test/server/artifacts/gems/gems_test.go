@@ -17,7 +17,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
-	gemfmt "github.com/weaveplatform/artifactweave/internal/format/gems"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -25,6 +24,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	gemfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/gems"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
@@ -80,7 +80,7 @@ func newWorldWith(t *testing.T, configure harness.Tune) *world {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b := repopath.Read(t, "internal/format/gems/testdata/rake-12.3.1.gem")
+	b := repopath.Read(t, "migration/artifacts/ecosystem/gems/testdata/rake-12.3.1.gem")
 	cfg := harness.Config{Store: db, Blobs: blobs, Auth: a, BaseURL: "https://reg.example"}
 	if configure != nil {
 		configure(&cfg)

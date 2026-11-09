@@ -64,15 +64,15 @@ When a test file leaves a shared directory such as `internal/server`:
 | Go modules | `migration/artifacts/ecosystem/golang/http`, `test/server/artifacts/golang` |
 | Helm | `migration/artifacts/ecosystem/helm/http`, `test/server/artifacts/helm` |
 | Helm OCI | `test/server/artifacts/helmoci` |
-| LuaRocks | `internal/server/luarocks` |
+| LuaRocks | `migration/artifacts/ecosystem/luarocks/http` |
 | Maven | `test/server/artifacts/maven` |
 | NIM model | `migration/artifacts/ecosystem/nimmodel/http` |
 | npm | `migration/artifacts/ecosystem/npm/http`, `test/server/artifacts/npm` |
 | NuGet | `migration/artifacts/ecosystem/nuget/http`, `test/server/artifacts/nuget` |
 | PyPI | `migration/artifacts/ecosystem/pypi/http`, `test/server/artifacts/pypi` |
-| Dart pub | `internal/server/pub` |
-| RubyGems | `internal/server/gems`, `test/server/artifacts/gems` |
-| Skills | `internal/server/skills` |
+| Dart pub | `migration/artifacts/ecosystem/pub/http` |
+| RubyGems | `migration/artifacts/ecosystem/gems/http`, `test/server/artifacts/gems` |
+| Skills | `migration/artifacts/ecosystem/skills/http` |
 | Terraform registry | `migration/artifacts/ecosystem/terraform/http`, `test/server/artifacts/terraform` |
 | Terraform backend | `migration/artifacts/ecosystem/terraformbackend/http`, `test/server/artifacts/terraformbackend` |
 | Shared | `internal/server`, `internal/server/pkgroute`, `test/server/access` |
