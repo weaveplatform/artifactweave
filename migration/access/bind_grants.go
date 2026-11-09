@@ -17,7 +17,7 @@ var _ accessapi.Grants = grants{}
 // Hugging Face repository migration
 // (migration/artifacts/ecosystem/huggingface/http) ran themselves, with their
 // order and error texts.
-type grants struct{ st store.Store }
+type grants struct{ st Store }
 
 func (b grants) ItemGrants(
 	ctx context.Context,

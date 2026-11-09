@@ -94,7 +94,7 @@ func fatalOf(t *testing.T, fn func(tb testing.TB)) string {
 
 // noPermissions is a store whose permission lookups fail, so every
 // evaluation does.
-type noPermissions struct{ store.Store }
+type noPermissions struct{ accesstest.Store }
 
 func (s noPermissions) Permissions() store.PermissionStore {
 	return failingPermissions{s.Store.Permissions()}
@@ -111,7 +111,7 @@ func (failingPermissions) ForPrincipal(
 }
 
 // noIdentity is a store whose instance identity cannot be read.
-type noIdentity struct{ store.Store }
+type noIdentity struct{ accesstest.Store }
 
 func (s noIdentity) Instance() store.InstanceStore { return failingInstance{s.Store.Instance()} }
 
@@ -122,7 +122,7 @@ func (failingInstance) Get(context.Context) (types.InstanceIdentity, error) {
 }
 
 // noKeys is a store whose signing keys cannot be read.
-type noKeys struct{ store.Store }
+type noKeys struct{ accesstest.Store }
 
 func (s noKeys) Keys() store.KeyStore { return failingKeys{s.Store.Keys()} }
 
@@ -356,7 +356,7 @@ func TestUnitWithTokens(t *testing.T) {
 
 	for _, c := range []struct {
 		name string
-		st   store.Store
+		st   accesstest.Store
 		want string
 	}{
 		{"identity", noIdentity{inmem.New()}, "accesstest: instance identity: boom"},

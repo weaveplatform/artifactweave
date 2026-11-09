@@ -110,7 +110,7 @@ func TestUnitNew(t *testing.T) {
 
 	// Any call on this store panics, so New succeeding shows it does no I/O.
 	settings := accessapi.Settings{AllowBasicAuthTokens: true, GlobalEnvironmentLimit: 12}
-	m, err := access.New(access.Deps{Store: struct{ store.Store }{}, Settings: settings})
+	m, err := access.New(access.Deps{Store: struct{ access.Store }{}, Settings: settings})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -747,7 +747,7 @@ func permission(name string, targets map[string]types.Target, g types.Grants) ty
 }
 
 // module returns the API of a module over st with no services.
-func module(t *testing.T, st store.Store) accessapi.API {
+func module(t *testing.T, st access.Store) accessapi.API {
 	t.Helper()
 	m, err := access.New(access.Deps{Store: st})
 	if err != nil {
@@ -782,7 +782,7 @@ func second[T any](_ T, err error) error { return err }
 // scripted wraps a store: it records the targets that permission reads name
 // and the pages they ask for, and fails the reads a test names.
 type scripted struct {
-	store.Store
+	access.Store
 	targets *[]string
 	pages   *[]store.Page
 	// permErr fails ForPrincipal, List and WithTarget, the last only for

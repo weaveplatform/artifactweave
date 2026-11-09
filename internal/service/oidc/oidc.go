@@ -300,7 +300,9 @@ func hasKind(sc types.Scope, kind types.ScopeKind) bool {
 
 // Service manages providers and mappings and exchanges tokens.
 type Service struct {
-	Store  store.Store
+	// Store holds the providers and mappings as configuration documents.
+	// Each call joins the transaction ctx carries.
+	Store  interface{ Configs() configdoc.ConfigStore }
 	Tokens *token.Service
 	Keys   *idtoken.Verifier
 	// Now supplies the time; nil means time.Now.

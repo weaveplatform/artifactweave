@@ -18,7 +18,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/settings"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
@@ -57,7 +56,7 @@ func (r *seedRepositories) Get(_ context.Context, key string) (repo.Config, erro
 
 // checkSeeded asserts every built-in exists as seeded, and that admin can
 // log in with password.
-func checkSeeded(t *testing.T, st store.Store, repos *seedRepositories, password string) {
+func checkSeeded(t *testing.T, st SeedStore, repos *seedRepositories, password string) {
 	t.Helper()
 	ctx := context.Background()
 	admin, err := st.Users().Get(ctx, AdminUser)
@@ -104,7 +103,7 @@ func checkSeeded(t *testing.T, st store.Store, repos *seedRepositories, password
 
 // seedTwice seeds st, checks the result, then seeds again with another
 // password and checks nothing changed.
-func seedTwice(t *testing.T, st store.Store) {
+func seedTwice(t *testing.T, st SeedStore) {
 	t.Helper()
 	ctx := context.Background()
 	repos := newSeedRepositories()
@@ -146,11 +145,13 @@ func TestAccSeedPostgres(t *testing.T) {
 // racing hides the seeded marker from its first hide reads, as if another
 // instance committed its seed just after each of them.
 type racing struct {
-	store.Store
+	SeedStore
 	hide atomic.Int32
 }
 
-func (r *racing) Settings() settings.SettingsStore { return racingSettings{r.Store.Settings(), r} }
+func (r *racing) Settings() settings.SettingsStore {
+	return racingSettings{r.SeedStore.Settings(), r}
+}
 
 type racingSettings struct {
 	settings.SettingsStore
@@ -175,7 +176,7 @@ func TestUnitSeedLosesARace(t *testing.T) {
 	// after the creates conflict (two hidden reads). Either way this call
 	// did not seed and is not an error.
 	for hide := int32(1); hide <= 2; hide++ {
-		r := &racing{Store: db}
+		r := &racing{SeedStore: db}
 		r.hide.Store(hide)
 		if now, err := Seed(ctx, r, repos, "loser", seedTime); now || err != nil {
 			t.Fatalf("hide %d: Seed = %v, %v", hide, now, err)
@@ -185,9 +186,11 @@ func TestUnitSeedLosesARace(t *testing.T) {
 }
 
 // failingPut fails every settings write.
-type failingPut struct{ store.Store }
+type failingPut struct{ SeedStore }
 
-func (f failingPut) Settings() settings.SettingsStore { return putFails{f.Store.Settings()} }
+func (f failingPut) Settings() settings.SettingsStore {
+	return putFails{f.SeedStore.Settings()}
+}
 
 type putFails struct{ settings.SettingsStore }
 
@@ -197,17 +200,17 @@ func TestUnitSeedErrors(t *testing.T) {
 	ctx := context.Background()
 	// Each built-in already present (without the marker) conflicts, and
 	// the whole seed rolls back.
-	for name, pre := range map[string]func(store.Store, *seedRepositories) error{
-		"group": func(st store.Store, _ *seedRepositories) error {
+	for name, pre := range map[string]func(SeedStore, *seedRepositories) error{
+		"group": func(st SeedStore, _ *seedRepositories) error {
 			return st.Groups().Create(ctx, model.Group{Name: ReadersGroup})
 		},
-		"user": func(st store.Store, _ *seedRepositories) error {
+		"user": func(st SeedStore, _ *seedRepositories) error {
 			return st.Users().Create(ctx, model.User{Name: AdminUser})
 		},
-		"permission": func(st store.Store, _ *seedRepositories) error {
+		"permission": func(st SeedStore, _ *seedRepositories) error {
 			return st.Permissions().Create(ctx, model.Permission{Name: AnythingPermission})
 		},
-		"repository": func(_ store.Store, repos *seedRepositories) error {
+		"repository": func(_ SeedStore, repos *seedRepositories) error {
 			return repos.Create(ctx, repo.Config{
 				Key: accessapi.BuildInfoRepository, Class: repo.Local, PackageType: repo.Generic,
 			})
@@ -258,27 +261,27 @@ func TestUnitSeedErrors(t *testing.T) {
 		t.Fatal("Seed hid a settings failure")
 	}
 	// The marker read inside the transaction can fail on its own too.
-	r := &racingErr{Store: inmem.New()}
+	r := &racingErr{SeedStore: inmem.New()}
 	if _, err := Seed(ctx, r, newSeedRepositories(), "pw", seedTime); err == nil {
 		t.Fatal("Seed hid a settings failure inside its transaction")
 	}
 }
 
 // failingSettingsStore fails every settings read.
-type failingSettingsStore struct{ store.Store }
+type failingSettingsStore struct{ SeedStore }
 
 func (f failingSettingsStore) Settings() settings.SettingsStore {
-	return failingSettings{f.Store.Settings()}
+	return failingSettings{f.SeedStore.Settings()}
 }
 
 // racingErr answers the first marker read and fails the second.
 type racingErr struct {
-	store.Store
+	SeedStore
 	n atomic.Int32
 }
 
 func (r *racingErr) Settings() settings.SettingsStore {
-	return racingErrSettings{r.Store.Settings(), r}
+	return racingErrSettings{r.SeedStore.Settings(), r}
 }
 
 type racingErrSettings struct {

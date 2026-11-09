@@ -14,7 +14,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -46,7 +45,7 @@ type AuthnOptions struct {
 	// Auth verifies credentials and answers whether anonymous access is on.
 	Auth *authn.Authenticator
 	// Store holds the permissions each principal is authorised with.
-	Store store.Store
+	Store Store
 	// SelfAuthenticated holds "METHOD path" of the routes that verify their
 	// own credential, which pass untouched.
 	SelfAuthenticated map[string]bool
@@ -311,7 +310,7 @@ func expiredRefresh(
 // without a decider.
 func authorize(
 	ctx context.Context,
-	st store.Store,
+	st Store,
 	p kernel.Principal,
 	anonymous bool,
 ) (kernel.Principal, *authz.Decider, error) {

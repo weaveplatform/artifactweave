@@ -18,7 +18,7 @@ var _ accessapi.Authorizer = authorizer{}
 // authorizer evaluates permissions over the store's permissions and groups.
 // Every Decider it returns goes through authz.AsAPI, so a nil evaluator is a
 // nil interface, never a typed nil.
-type authorizer struct{ st store.Store }
+type authorizer struct{ st Store }
 
 // sources is what an evaluation reads, read through the caller's context.
 func (b authorizer) sources(anonymousEnabled bool) authz.Sources {

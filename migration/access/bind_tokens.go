@@ -6,7 +6,6 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 var _ accessapi.Tokens = tokens{}
@@ -17,7 +16,7 @@ var _ accessapi.Tokens = tokens{}
 // Errors pass through as the service gave them, for errors.Is.
 type tokens struct {
 	svc *token.Service
-	st  store.Store
+	st  Store
 }
 
 func (b tokens) Issue(

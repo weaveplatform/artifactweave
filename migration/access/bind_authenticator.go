@@ -6,7 +6,6 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 var _ accessapi.Authenticator = authenticator{}
@@ -17,7 +16,7 @@ var _ accessapi.Authenticator = authenticator{}
 // test its sentinels with errors.Is.
 type authenticator struct {
 	a  *authn.Authenticator
-	st store.Store
+	st Store
 }
 
 func (b authenticator) Basic(ctx context.Context, name, password string) (kernel.Principal, error) {

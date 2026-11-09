@@ -10,10 +10,28 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth/idtoken"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 )
+
+// Store is what the access handlers read and write: the access ports, the
+// settings and OIDC configuration documents they serve, and the transaction
+// a key pair delete runs in. The application passes its store aggregate,
+// and every call joins the transaction ctx carries. The adapter declares
+// its own rather than taking the module root's access.Store, because a
+// module package never imports a module root, and because the handlers
+// also serve the OIDC configuration documents, which no binding reads.
+type Store interface {
+	port.Store
+	// Settings holds the security policies, the basic authentication
+	// switch and the other access settings the handlers serve.
+	Settings() settings.SettingsStore
+	// Configs holds the OIDC providers and identity mappings.
+	Configs() configdoc.ConfigStore
+}
 
 // Deps is what the access handlers need, which the composition root
 // supplies. A nil Store leaves every operation that reads one answering 501,
@@ -23,8 +41,11 @@ type Deps struct {
 	// middleware did not authorise through its Authorizer.
 	API accessapi.API
 	// Store holds the users, groups, permissions, key pairs, certificates,
-	// tokens and API restrictions the handlers read and write.
-	Store store.Store
+	// tokens, API restrictions, settings and OIDC documents the handlers
+	// read and write. A nil store aggregate converts to a nil Store; a
+	// typed nil pointer would not, and the operations would call it instead
+	// of answering 501.
+	Store Store
 	// Authenticator forgets its cached password policies when the security
 	// API changes them, and recognises the expired access token a legacy
 	// refresh presents. Nil skips both.

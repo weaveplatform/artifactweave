@@ -14,7 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
@@ -26,7 +26,7 @@ var errBoom = errors.New("boom")
 var testHash = support.TestHash
 
 // cheapSeed seeds db with the built-in principals, admin's password "pw".
-func cheapSeed(t *testing.T, db store.Store) {
+func cheapSeed(t *testing.T, db *inmem.Store) {
 	t.Helper()
 	support.Seed(t, db)
 }
@@ -52,7 +52,7 @@ func basic(user, password string) map[string]string {
 // registry's or challenges anonymous requests, and skip are the caller's.
 func testAuthnOptions(
 	a *authn.Authenticator,
-	st store.Store,
+	st Store,
 	skip ...func(*http.Request) bool,
 ) AuthnOptions {
 	public := PublicRoutes()

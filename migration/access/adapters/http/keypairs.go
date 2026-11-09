@@ -81,7 +81,7 @@ func keypairFrom(in *artgen.KeyPairInput) (types.Keypair, error) {
 }
 
 // adminStore is the store of an admin-only operation.
-func (s SecurityAPI) adminStore(ctx context.Context) (store.Store, error) {
+func (s SecurityAPI) adminStore(ctx context.Context) (Store, error) {
 	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}

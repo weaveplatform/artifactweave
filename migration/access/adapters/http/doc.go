@@ -17,10 +17,12 @@
 //     PlusAsSpace, APIRecoveryContext and Server.CheckAPIRestriction, mounts
 //     Server.RegisterRoutes, and embeds Server.Access and Server.Security in
 //     the generated strict servers beside the generated stubs.
-//   - Deps, from the composition root: the access API, the store, the
+//   - Deps, from the composition root: the access API, the Store (the
+//     access ports, the settings and the configuration documents), the
 //     authenticator, the token service, the OIDC verifier, the settings,
 //     the password cost, the compatibility version, the logger and the
-//     artifacts module's Repositories.
+//     artifacts module's Repositories, through which the handlers read
+//     every repository.
 //   - From the router, as functions: the health predicate and limit error
 //     writer of CheckAPIRestriction, and the skips, registry predicates and
 //     credential keepers of AuthnOptions.
@@ -75,8 +77,8 @@
 // and Access APIs, permissions, tokens and the OIDC exchange; API
 // restrictions came with retry safety and bounded API execution (pull
 // request 905). P9d split them into partial strict servers (WEB-07) and
-// moved them here (WEB-09); ACC-14 narrows Deps.Store to the access port
-// aggregate.
+// moved them here (WEB-09) and narrowed Deps.Store to the adapter's own
+// Store (ACC-14).
 //
 // # Testing
 //

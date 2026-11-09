@@ -4,7 +4,6 @@ import (
 	"context"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 var _ accessapi.Identity = identity{}
@@ -12,7 +11,7 @@ var _ accessapi.Identity = identity{}
 // identity reads user accounts and the auto-join groups. Errors are the
 // store's, unwrapped, so errors.Is(err, kernel.ErrNotFound) and each caller's
 // own wrap still apply.
-type identity struct{ st store.Store }
+type identity struct{ st Store }
 
 func (b identity) User(ctx context.Context, name string) (accessapi.UserInfo, error) {
 	u, err := b.st.Users().Get(ctx, name)

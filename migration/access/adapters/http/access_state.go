@@ -58,7 +58,7 @@ func deciderFor(
 
 // content returns the store. A router built without one (tests of the
 // routing alone) answers like an unimplemented operation.
-func (s accessState) content() (store.Store, error) {
+func (s accessState) content() (Store, error) {
 	if s.deps.Store == nil {
 		return nil, apierror.ErrNotImplemented
 	}

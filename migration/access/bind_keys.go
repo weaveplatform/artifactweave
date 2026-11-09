@@ -4,7 +4,7 @@ import (
 	"context"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 )
 
 var _ accessapi.Keys = keys{}
@@ -12,7 +12,7 @@ var _ accessapi.Keys = keys{}
 // keys reads key pairs and certificates from the key store, which unseals
 // them. Errors are the store's, unwrapped, so errors.Is(err,
 // kernel.ErrNotFound) and each caller's own wrap still apply.
-type keys struct{ st store.Store }
+type keys struct{ st port.Store }
 
 func (b keys) Keypair(ctx context.Context, name string) (accessapi.Keypair, error) {
 	//nolint:wrapcheck // the store's errors are the contract's

@@ -6,14 +6,13 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 var _ accessapi.Restrictions = restrictions{}
 
 // restrictions checks the stored API restriction on every call, with no
 // cache, as the authenticator does (decision 0043).
-type restrictions struct{ st store.Store }
+type restrictions struct{ st Store }
 
 func (b restrictions) Check(ctx context.Context, user string, now time.Time) error {
 	//nolint:wrapcheck // auth wraps its own, and answers kernel.ErrAPIRestricted while restricted

@@ -4,7 +4,7 @@ import (
 	"context"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -13,7 +13,7 @@ var _ accessapi.Projects = projects{}
 // projects reads projects, their environments and their user members
 // (decision 0013). Errors are the store's, unwrapped, so errors.Is(err,
 // kernel.ErrNotFound) and each caller's own wrap still apply.
-type projects struct{ st store.Store }
+type projects struct{ st port.Store }
 
 func (b projects) Environments(ctx context.Context, project string) ([]string, error) {
 	envs, err := b.st.Projects().Environments(ctx, project)

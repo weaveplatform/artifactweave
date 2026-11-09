@@ -19,7 +19,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -35,7 +34,7 @@ const (
 	infoNoAPIKeys     = "No API key was revoked: API keys are retired, use access tokens" //nolint:gosec // a message, not a credential
 )
 
-func (s SecurityAPI) identity(st store.Store) *identity.Service {
+func (s SecurityAPI) identity(st Store) *identity.Service {
 	return &identity.Service{Store: st, Hash: s.deps.PasswordHash}
 }
 
