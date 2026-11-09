@@ -1,4 +1,3 @@
-// Package composer validates hosted Composer archives and their package identity.
 package composer
 
 import (
@@ -20,7 +19,10 @@ import (
 )
 
 const (
-	ArchiveLimit  = 128 << 20
+	// ArchiveLimit bounds a Composer archive at 128 MiB stored, each entry
+	// at 128 MiB inflated, and all its entries together at twice that.
+	ArchiveLimit = 128 << 20
+	// MetadataLimit bounds an archive's composer.json at 1 MiB.
 	MetadataLimit = 1 << 20
 )
 
@@ -41,8 +43,19 @@ var (
 	errVersionRequired   = errors.New("composer: composer version required")
 )
 
-func Serves(t repo.PackageType) bool   { return t == repo.Composer }
-func ValidName(name string) bool       { return nameRE.MatchString(name) && len(name) <= 255 }
+// Serves reports whether t is the Composer package type.
+func Serves(t repo.PackageType) bool { return t == repo.Composer }
+
+// ValidName reports whether name is a Composer package name the registry
+// accepts: a lowercase vendor/package of at most 255 bytes, each part a
+// letter or digit followed by letters, digits, underscores, dots and
+// hyphens.
+func ValidName(name string) bool { return nameRE.MatchString(name) && len(name) <= 255 }
+
+// ValidVersion reports whether version is a version the registry accepts:
+// a letter or digit followed by up to 127 ASCII letters, digits, dots,
+// underscores, pluses and hyphens. It checks the characters only, so a
+// branch version such as dev-main passes.
 func ValidVersion(version string) bool { return versionRE.MatchString(version) }
 
 // Package is the validated composer.json of one archive. Extra Composer fields
@@ -53,6 +66,10 @@ type Package struct {
 	Fields  map[string]json.RawMessage
 }
 
+// Document returns the package's composer.json as a catalog entry: every
+// retained field, with name and version set to the validated identity, so
+// the entry has a version even when a composer.version property supplied
+// it. A package without fields yields just the name and version.
 func (p Package) Document() map[string]any {
 	var doc map[string]any
 	data, _ := json.Marshal(p.Fields)
@@ -64,6 +81,15 @@ func (p Package) Document() map[string]any {
 	return doc
 }
 
+// ParseArchive reads a whole ZIP archive of size bytes from r and returns
+// its validated composer.json. The archive must hold 1 to 4,096 entries
+// within ArchiveLimit, with no absolute, backslashed or dot-segment path,
+// each read to its end, and exactly one composer.json, at the root or in
+// one top-level folder, within MetadataLimit and with a valid name
+// (ValidName). The version is the file's own, or override when the file
+// has none; a non-empty override must be valid and agree with the file's
+// version, and the result must have a valid version. It stops, wrapping
+// ctx's error, when ctx ends.
 func ParseArchive(ctx context.Context, r io.Reader, size int64, override string) (Package, error) {
 	if size <= 0 || size > ArchiveLimit || override != "" && !ValidVersion(override) {
 		return Package{}, errArchiveSize
@@ -165,6 +191,12 @@ func HostedPath(path, name string) bool {
 }
 
 type (
+	// Handler is the Composer format's hooks: it admits a ZIP archive to a
+	// local or federated repository only when its composer.json names the
+	// package its path does, and rechecks every stored file on reindex. It
+	// keeps no index, since the protocol reads the archives on every
+	// request. It embeds the generic hooks, so every path is classed as
+	// generic content is.
 	Handler    struct{ generic.Handler }
 	inspection struct {
 		sha string
@@ -172,6 +204,15 @@ type (
 	}
 )
 
+// Inspect reads and validates the stored archive of a write to a .zip path
+// before the write's transaction, and returns what it found for Admit, so
+// an archive is read once per write. A remote's cached content and any
+// other file inspect nothing. The archive must be valid (ParseArchive),
+// with the version from the write's composer.version property when it has
+// one, and must sit directly under its package's name (HostedPath);
+// otherwise the write is refused with 400, as is a write without content
+// or with more than one composer.version. An archive that cannot be opened
+// fails the write.
 func (Handler) Inspect(
 	ctx context.Context,
 	env format.Env,
@@ -212,6 +253,11 @@ func inspect(ctx context.Context, env format.Env, w format.Write) (inspection, e
 	return inspection{w.Checksums.SHA256, p}, nil
 }
 
+// Admit applies the generic deploy policy, wrapping its refusal, then
+// passes a remote's cached content and a checksum deploy. Any other write
+// must be a .zip archive in a local or federated repository (400) that
+// passes Inspect's checks. It reuses Inspect's reading when it covers the
+// same content, and reads the stored archive itself otherwise.
 func (Handler) Admit(
 	ctx context.Context,
 	env format.Env,
@@ -239,6 +285,10 @@ func (Handler) Admit(
 	return w, nil
 }
 
+// Reindex applies Inspect's checks to every stored file of a local or
+// federated repository and stops at the first that fails (400); any other
+// class is refused with 400. It writes nothing, since there is no index to
+// rebuild.
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	if c.Class != repo.Local && c.Class != repo.Federated {
 		return format.Rejectf(http.StatusBadRequest, "Composer reindex requires hosted repository")

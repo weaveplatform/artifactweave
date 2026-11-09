@@ -1,5 +1,3 @@
-// Package composerhttp serves Composer 1 local catalogs and Composer 2 metadata
-// through the native Artifactory Composer URL.
 package composerhttp
 
 import (
@@ -29,6 +27,11 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// Options configures the Composer protocol. Blobs opens the stored archives
+// the hosted catalogs are read from; without it a local or federated
+// repository's catalogs, archives and reindex answer 501. RemoteSources
+// serves remote repositories and fetches through them; nil leaves the
+// remote class without a source, so a remote repository answers 501.
 type Options struct {
 	Blobs         blob.Store
 	RemoteSources *source.Service
@@ -48,6 +51,19 @@ func (virtualSource) Item(
 	return pkgroute.Found{}, source.ErrUnsupported
 }
 
+// Protocol returns the Composer protocol for the router kit, under
+// /artifactory/api/composer/{repoKey}: GET and HEAD of packages.json, of a
+// package's Composer 2 metadata (p2/<vendor>/<package>.json, and
+// p2/<vendor>/<package>~dev.json for development versions) and of an
+// archive (dist/<vendor>/<package>/<version>.zip), and POST of reindex,
+// which needs Manage and verifies a local or federated repository's stored
+// archives. A key with the -cache suffix names a remote's cache, which
+// answers without contacting the upstream. Local and federated
+// repositories are served from their stored archives, virtual ones from
+// their members in order, and remote ones through o.RemoteSources when it
+// is set; a class without a source answers 501. The virtual class's source
+// supports no single-item lookup, because the protocol reads a virtual
+// repository's members itself.
 func Protocol(o Options) pkgroute.Protocol {
 	sources := map[repo.Class]pkgroute.Source{
 		repo.Local:     pkgroute.Local{},

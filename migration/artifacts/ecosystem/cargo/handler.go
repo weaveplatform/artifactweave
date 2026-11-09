@@ -14,8 +14,13 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// Serves reports whether t is the Cargo package type.
 func Serves(t repo.PackageType) bool { return t == repo.Cargo }
 
+// Handler is the Cargo format's hooks: it admits a crate archive only at
+// its canonical path and only when its Cargo.toml names the crate and
+// version that path does, and keeps each stored archive's index record. It
+// embeds the generic hooks, so every path is classed as generic content is.
 type Handler struct{ generic.Handler }
 
 type inspection struct{ sha, path, name, version string }
@@ -33,6 +38,11 @@ func inspect(ctx context.Context, env format.Env, sha, path string) (inspection,
 	return inspection{sha, path, n, v}, nil
 }
 
+// Inspect reads and validates the stored archive of a write to a .crate
+// path before the write's transaction, and returns what it found for Admit,
+// so an archive is read once per write. A checksum deploy and any other
+// file inspect nothing. An invalid crate is refused with 400; an archive
+// that cannot be opened fails the write.
 func (Handler) Inspect(
 	ctx context.Context,
 	env format.Env,
@@ -45,6 +55,12 @@ func (Handler) Inspect(
 	return inspect(ctx, env, w.Checksums.SHA256, w.Path)
 }
 
+// Admit applies the generic deploy policy, wrapping its refusal, then
+// passes a checksum deploy. Any other write must be at a crate path,
+// crates/<name>/<name>-<version>.crate (400), and its archive must be a
+// valid crate whose Cargo.toml names that crate and version (400). It
+// reuses Inspect's reading when it covers the same content and path, and
+// reads the stored archive itself otherwise.
 func (Handler) Admit(
 	ctx context.Context,
 	env format.Env,
@@ -73,6 +89,14 @@ func (Handler) Admit(
 	return w, nil
 }
 
+// Deployed keeps a stored crate's index record: it checks the archive at a
+// crate path again and writes RecordProperty as the record Encode makes,
+// taken from the record already there, as a native publish sets it, or
+// else from the path and checksum with no dependencies or features, with
+// the yank flag from YankedProperty. A record that is invalid or names
+// another crate, version or checksum is refused with 400, as is an archive
+// that no longer validates. Folders and files at other paths change
+// nothing.
 func (Handler) Deployed(ctx context.Context, env format.Env, _ repo.Config, it types.Item) error {
 	if it.Folder {
 		return nil
@@ -119,6 +143,9 @@ func (Handler) Deployed(ctx context.Context, env format.Env, _ repo.Config, it t
 	return nil
 }
 
+// Reindex runs Deployed over every stored .crate file of a local or
+// federated repository and stops at the first that fails; any other class
+// is refused with 400.
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	if c.Class != repo.Local && c.Class != repo.Federated {
 		return format.Rejectf(http.StatusBadRequest, "Cargo reindex requires a hosted repository")

@@ -1,4 +1,3 @@
-// Package cargo validates crates and supplies Cargo sparse-index records.
 package cargo
 
 import (
@@ -15,10 +14,23 @@ import (
 )
 
 const (
-	MaxCrate       = 64 << 20
-	maxExpanded    = 512 << 20
-	MaxIndex       = 16 << 20
+	// MaxCrate bounds a crate archive at 64 MiB compressed, however it
+	// arrives: a native publish, an item write or a remote's fetch.
+	MaxCrate = 64 << 20
+	// maxExpanded bounds a crate's decompressed TAR stream, and the sum of
+	// its entries' declared sizes, at 512 MiB, so a small archive cannot
+	// expand without limit.
+	maxExpanded = 512 << 20
+	// MaxIndex bounds an upstream sparse index document, config.json or an
+	// index file, that a remote repository reads, at 16 MiB.
+	MaxIndex = 16 << 20
+	// RecordProperty is the item property that holds a crate version's
+	// index record, the one JSON line Encode makes. Items keep the name, so
+	// it never changes.
 	RecordProperty = "cargo.index"
+	// YankedProperty is the item property that holds a crate version's yank
+	// flag, "true" or "false", which Deployed copies into the record. Items
+	// keep the name, so it never changes.
 	YankedProperty = "cargo.yanked"
 )
 
@@ -28,12 +40,26 @@ var (
 		`^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?(\+[A-Za-z0-9.-]+)?$`,
 	)
 	manifestValue = regexp.MustCompile(`^\s*(name|version)\s*=\s*"([^"\r\n]+)"\s*(#.*)?$`)
-	ErrInvalid    = errors.New("cargo: invalid cargo crate")
+	// ErrInvalid is the error Inspect and Encode return for a crate archive
+	// or index record they refuse; Inspect wraps it with the gzip or TAR
+	// reader's fault when one caused the refusal.
+	ErrInvalid = errors.New("cargo: invalid cargo crate")
 )
 
-func ValidName(s string) bool    { return namePattern.MatchString(s) }
+// ValidName reports whether s is a crate name the registry accepts: an ASCII
+// letter followed by up to 63 ASCII letters, digits, underscores and
+// hyphens.
+func ValidName(s string) bool { return namePattern.MatchString(s) }
+
+// ValidVersion reports whether s is a semantic version: major.minor.patch
+// with an optional pre-release and build metadata.
 func ValidVersion(s string) bool { return versionPattern.MatchString(s) }
 
+// IndexPath is the path of crate name's sparse index file below the index
+// root, from the lowercased name, as Cargo lays the index out: 1/<name> and
+// 2/<name> for names of one and two characters, 3/<first>/<name> for three,
+// and <first two>/<next two>/<name> for longer names. name must be valid
+// (ValidName).
 func IndexPath(name string) string {
 	n := strings.ToLower(name)
 	switch len(n) {
@@ -48,10 +74,16 @@ func IndexPath(name string) string {
 	}
 }
 
+// CratePath is the item path of the archive of crate name at version:
+// crates/<name>/<name>-<version>.crate. It keeps the case of name and
+// checks neither argument.
 func CratePath(name, version string) string {
 	return "crates/" + name + "/" + name + "-" + version + ".crate"
 }
 
+// ParseCratePath splits an item path into the crate name and version whose
+// archive it holds, and reports ok only when p is exactly CratePath(name,
+// version) with a valid name and version.
 func ParseCratePath(p string) (name, version string, ok bool) {
 	parts := strings.Split(p, "/")
 	if len(parts) != 3 || parts[0] != "crates" || !ValidName(parts[1]) ||
@@ -213,6 +245,12 @@ func Inspect(ctx context.Context, body io.Reader, size int64, p string) (string,
 	return name, version, nil
 }
 
+// Dependency is one entry of a record's deps, with the JSON fields of
+// Cargo's index format: the name the dependent crate uses for it, its
+// version requirement, its features, whether it is optional and whether
+// its default features are on, its target and its kind (normal, dev or
+// build), the index of the registry it comes from (nil for this one), and
+// Package, the crate's own name when the dependency renames it.
 type Dependency struct {
 	Name            string   `json:"name"`
 	Req             string   `json:"req"`
@@ -225,6 +263,11 @@ type Dependency struct {
 	Package         *string  `json:"package"`
 }
 
+// Record is one version's line in a crate's sparse index file, with the
+// JSON fields of Cargo's index format: the name and version, the
+// dependencies, the SHA-256 of the archive (cksum), the features, the yank
+// flag and the optional links and rust_version. RecordProperty holds it on
+// the archive's item.
 type Record struct {
 	Name        string              `json:"name"`
 	Version     string              `json:"vers"`
@@ -236,6 +279,11 @@ type Record struct {
 	RustVersion *string             `json:"rust_version,omitempty"`
 }
 
+// IsValid reports whether r may be kept and served: a valid name and
+// version, a checksum of 64 lowercase hexadecimal characters, deps and
+// features that are not nil, so they encode as [] and {} rather than null,
+// and dependencies with valid names and version requirements of 1 to 256
+// bytes.
 func (r Record) IsValid() bool {
 	if !ValidName(r.Name) || !ValidVersion(r.Version) || len(r.Checksum) != 64 || r.Deps == nil ||
 		r.Features == nil {
@@ -254,6 +302,8 @@ func (r Record) IsValid() bool {
 	return true
 }
 
+// Encode returns r as its index line, compact JSON without a trailing
+// newline, or ErrInvalid when r is not valid (IsValid).
 func Encode(r Record) (string, error) {
 	if !r.IsValid() {
 		return "", ErrInvalid

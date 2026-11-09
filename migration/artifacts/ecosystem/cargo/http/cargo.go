@@ -1,4 +1,3 @@
-// Package cargohttp serves the HTTP sparse registry and Cargo web API.
 package cargohttp
 
 import (
@@ -28,6 +27,16 @@ import (
 
 const maxPublishMetadata = 1 << 20
 
+// Protocol returns the Cargo sparse registry and web API for the router kit,
+// under /artifactory/api/cargo/{repoKey}: GET and HEAD of the sparse
+// index's config.json and index files (index/...), the native publish (PUT
+// api/v1/crates/new), GET and HEAD of a version's crate
+// (api/v1/crates/{name}/{version}/download), yank (DELETE .../yank) and
+// unyank (PUT .../unyank), and GET of a crate's versions
+// (api/v1/crates/{name}). Local and federated repositories are served from
+// their items, and remote ones through sources when it is not nil; any
+// other class answers 501. {repoKey}/reindex is reserved for JFrog's
+// reindex operation, which the server serves beside the protocol.
 func Protocol(sources *source.Service) pkgroute.Protocol {
 	classes := map[repo.Class]pkgroute.Source{
 		repo.Local:     pkgroute.Local{},
