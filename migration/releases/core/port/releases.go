@@ -18,7 +18,7 @@ type BundleFilter struct {
 // artifact lists, retention keep marks and audit, and exports.
 type BundleStore interface {
 	// Create stores b with its artifacts, whose BundleName and BundleVersion
-	// are set from b; ErrConflict when (name, version) exists or two
+	// are set from b; kernel.ErrConflict when (name, version) exists or two
 	// artifacts share a target path.
 	Create(ctx context.Context, b model.ReleaseBundle, artifacts []model.BundleArtifact) error
 	// Get returns one bundle version.
@@ -26,7 +26,8 @@ type BundleStore interface {
 	// Update replaces the bundle's record; its artifacts are unchanged.
 	Update(ctx context.Context, b model.ReleaseBundle) error
 	// ReplaceArtifacts replaces the artifact list of an open bundle;
-	// ErrConflict once the bundle is signed (types.BundleState.Editable).
+	// kernel.ErrConflict once the bundle is signed
+	// (model.BundleState.Editable).
 	ReplaceArtifacts(
 		ctx context.Context,
 		name, version string,
@@ -38,14 +39,14 @@ type BundleStore interface {
 	// List returns matching bundles ordered by (name, version).
 	List(ctx context.Context, f BundleFilter, p kernel.Page) ([]model.ReleaseBundle, string, error)
 	// Artifacts returns a bundle's artifacts ordered by target path;
-	// ErrNotFound when the bundle does not exist.
+	// kernel.ErrNotFound when the bundle does not exist.
 	Artifacts(ctx context.Context, name, version string) ([]model.BundleArtifact, error)
 
 	// SetKeep marks or unmarks a bundle version as kept from retention;
 	// marking twice or unmarking an unmarked version is not an error.
 	SetKeep(ctx context.Context, name, version string, keep bool) error
-	// Kept reports whether a bundle version is marked kept; ErrNotFound when
-	// the bundle does not exist.
+	// Kept reports whether a bundle version is marked kept;
+	// kernel.ErrNotFound when the bundle does not exist.
 	Kept(ctx context.Context, name, version string) (bool, error)
 	// AddAudit records a retention operation. The bundle need not exist:
 	// the audit outlives the versions retention deletes.
@@ -55,7 +56,7 @@ type BundleStore interface {
 	Audits(ctx context.Context, name string) ([]model.BundleRetentionAudit, error)
 
 	// PutExport creates or replaces a bundle version's export record;
-	// ErrNotFound when the bundle does not exist.
+	// kernel.ErrNotFound when the bundle does not exist.
 	PutExport(ctx context.Context, e model.BundleExport) error
 	// Export returns a bundle version's export record.
 	Export(ctx context.Context, name, version string) (model.BundleExport, error)
@@ -67,8 +68,8 @@ type BundleStore interface {
 // jobs.
 type DistributionStore interface {
 	// CreateTracker stores t with its jobs and returns it with its assigned
-	// ID; the jobs' TrackerID is set to it. ErrConflict when two jobs name
-	// the same peer.
+	// ID; the jobs' TrackerID is set to it. kernel.ErrConflict when two jobs
+	// name the same peer.
 	CreateTracker(
 		ctx context.Context, t model.DistributionTracker, jobs []model.DistributionJob,
 	) (model.DistributionTracker, error)
@@ -81,10 +82,10 @@ type DistributionStore interface {
 	// bundle.
 	Trackers(ctx context.Context, name, version string) ([]model.DistributionTracker, error)
 	// PutJob creates or replaces the job (j.TrackerID, j.PeerInstanceID);
-	// ErrNotFound when the tracker does not exist.
+	// kernel.ErrNotFound when the tracker does not exist.
 	PutJob(ctx context.Context, j model.DistributionJob) error
-	// Jobs returns a tracker's jobs ordered by peer; ErrNotFound when the
-	// tracker does not exist.
+	// Jobs returns a tracker's jobs ordered by peer; kernel.ErrNotFound when
+	// the tracker does not exist.
 	Jobs(ctx context.Context, trackerID int64) ([]model.DistributionJob, error)
 	// JobsForPeer returns a peer's jobs in any of statuses (all when empty),
 	// ordered by (tracker, peer).

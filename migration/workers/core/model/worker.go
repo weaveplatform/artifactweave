@@ -57,9 +57,10 @@ func (f WorkerFilter) Matches(repoKey string, c repo.Class, itemPath string) boo
 // matchPatterns is what the federation model's PatternFilter.Matches does
 // for an access federation target: name passes when it matches an include
 // glob (path.Match), or there is none, and no exclude glob. The workers
-// model keeps its own copy because layout row 11 lets a module import
-// another only through that module's api, and the federation api does not
-// carry PatternFilter. A change to the matching rule changes both.
+// model keeps its own copy because a module imports another only through
+// that module's api (decision 0044, dependency rule 6), and the federation
+// api does not carry PatternFilter. A change to the matching rule changes
+// both.
 func matchPatterns(include, exclude []string, name string) bool {
 	match := func(p string) bool { ok, err := path.Match(p, name); return err == nil && ok }
 	if len(include) > 0 && !slices.ContainsFunc(include, match) {

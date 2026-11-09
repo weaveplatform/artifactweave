@@ -18,7 +18,7 @@ type WorkerFilter struct {
 // WorkerStore persists Workers (decision 0026) with their key-value state,
 // sealed secrets and execution history.
 type WorkerStore interface {
-	// Create stores w; ErrConflict when the key exists.
+	// Create stores w; kernel.ErrConflict when the key exists.
 	Create(ctx context.Context, w model.Worker) error
 	// Get returns the worker.
 	Get(ctx context.Context, key string) (model.Worker, error)
@@ -29,28 +29,28 @@ type WorkerStore interface {
 	// List returns matching workers ordered by key.
 	List(ctx context.Context, f WorkerFilter) ([]model.Worker, error)
 
-	// State returns a worker's state entries; ErrNotFound when the worker
-	// does not exist.
+	// State returns a worker's state entries; kernel.ErrNotFound when the
+	// worker does not exist.
 	State(ctx context.Context, worker string) (map[string]string, error)
-	// SetState creates or replaces one entry; ErrNotFound when the worker
-	// does not exist. The per-worker limits are the caller's to apply
-	// (types.ValidateWorkerState).
+	// SetState creates or replaces one entry; kernel.ErrNotFound when the
+	// worker does not exist. The per-worker limits are the caller's to apply
+	// (model.ValidateWorkerState).
 	SetState(ctx context.Context, worker, key, value string) error
 	// DeleteState removes one entry; removing a missing entry is not an
 	// error.
 	DeleteState(ctx context.Context, worker, key string) error
 
-	// PutSecret creates or replaces a secret; ErrNotFound when the worker
-	// does not exist.
+	// PutSecret creates or replaces a secret; kernel.ErrNotFound when the
+	// worker does not exist.
 	PutSecret(ctx context.Context, worker, name, value string) error
-	// Secrets returns a worker's secrets by name; ErrNotFound when the
+	// Secrets returns a worker's secrets by name; kernel.ErrNotFound when the
 	// worker does not exist.
 	Secrets(ctx context.Context, worker string) (map[string]string, error)
 	// DeleteSecret removes a secret.
 	DeleteSecret(ctx context.Context, worker, name string) error
 
-	// AddExecution records an execution; ErrConflict when its ID exists,
-	// ErrNotFound when its worker does not.
+	// AddExecution records an execution; kernel.ErrConflict when its ID exists,
+	// kernel.ErrNotFound when its worker does not.
 	AddExecution(ctx context.Context, e model.WorkerExecution) error
 	// Execution returns one execution.
 	Execution(ctx context.Context, id string) (model.WorkerExecution, error)

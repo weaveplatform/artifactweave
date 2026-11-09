@@ -17,7 +17,7 @@ type ExecutionFilter struct {
 // 0024): archive policies of both families and their executions. The
 // archived items and the cold indexes have accessors of their own on Store.
 type ArchiveStore interface {
-	// CreatePolicy stores p; ErrConflict when the key exists.
+	// CreatePolicy stores p; kernel.ErrConflict when the key exists.
 	CreatePolicy(ctx context.Context, p model.ArchivePolicy) error
 	// Policy returns the policy.
 	Policy(ctx context.Context, key string) (model.ArchivePolicy, error)

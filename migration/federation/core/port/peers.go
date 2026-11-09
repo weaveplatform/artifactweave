@@ -25,12 +25,12 @@ type PeerStore interface {
 	// Delete removes the peer.
 	Delete(ctx context.Context, instanceID string) error
 
-	// AddNonce stores an issued pairing nonce; ErrConflict when its hash
-	// exists.
+	// AddNonce stores an issued pairing nonce; kernel.ErrConflict when its
+	// hash exists.
 	AddNonce(ctx context.Context, n model.PairingNonce) error
 	// RedeemNonce marks the nonce redeemed at now and returns it. A nonce is
-	// single-use: ErrNotFound when unknown or expired at now, ErrConflict
-	// when already redeemed.
+	// single-use: kernel.ErrNotFound when unknown or expired at now,
+	// kernel.ErrConflict when already redeemed.
 	RedeemNonce(ctx context.Context, hash []byte, now time.Time) (model.PairingNonce, error)
 	// PruneNonces removes nonces that expired before t and returns how many.
 	PruneNonces(ctx context.Context, before time.Time) (int64, error)
@@ -40,9 +40,9 @@ type PeerStore interface {
 // and full-sync runs.
 type FederationStore interface {
 	// SetMembers replaces a repository's members; each member's RepoKey is
-	// set to repoKey. ErrInvalid when a member has no PeerInstanceID
-	// (members are resolved to peers first), ErrConflict when two name the
-	// same peer.
+	// set to repoKey. kernel.ErrInvalid when a member has no PeerInstanceID
+	// (members are resolved to peers first), kernel.ErrConflict when two
+	// name the same peer.
 	SetMembers(ctx context.Context, repoKey string, members []model.FederationMember) error
 	// Members returns a repository's members ordered by peer.
 	Members(ctx context.Context, repoKey string) ([]model.FederationMember, error)
@@ -86,7 +86,7 @@ type PlatformStore interface {
 	DeleteFederation(ctx context.Context, id string) error
 
 	// PutTopology creates or replaces the topology with t.Key and its sites;
-	// ErrConflict when two sites share a name.
+	// kernel.ErrConflict when two sites share a name.
 	PutTopology(ctx context.Context, t model.Topology) error
 	// Topology returns one topology with its sites ordered by site name.
 	Topology(ctx context.Context, key string) (model.Topology, error)

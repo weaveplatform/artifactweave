@@ -9,8 +9,8 @@ import (
 // ReplicationStore persists replication targets and their run history. The
 // replication key is assigned by the caller; the password is sealed.
 type ReplicationStore interface {
-	// Put creates or replaces the replication with r.Key; ErrInvalid when
-	// the key is empty.
+	// Put creates or replaces the replication with r.Key; kernel.ErrInvalid
+	// when the key is empty.
 	Put(ctx context.Context, r model.Replication) error
 	// Get returns the replication with key.
 	Get(ctx context.Context, key string) (model.Replication, error)
@@ -23,7 +23,7 @@ type ReplicationStore interface {
 	// DeleteForRepo removes every replication of a repository.
 	DeleteForRepo(ctx context.Context, repoKey string) error
 	// PutRun creates or replaces the run (r.ReplicationKey, r.Started);
-	// ErrNotFound when the replication does not exist.
+	// kernel.ErrNotFound when the replication does not exist.
 	PutRun(ctx context.Context, r model.ReplicationRun) error
 	// LastRun returns a replication's most recent run.
 	LastRun(ctx context.Context, key string) (model.ReplicationRun, error)

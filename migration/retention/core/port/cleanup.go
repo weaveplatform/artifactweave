@@ -23,7 +23,7 @@ type RunFilter struct {
 
 // CleanupStore persists package and build cleanup policies and their runs.
 type CleanupStore interface {
-	// CreatePolicy stores p; ErrConflict when the key exists.
+	// CreatePolicy stores p; kernel.ErrConflict when the key exists.
 	CreatePolicy(ctx context.Context, p model.CleanupPolicy) error
 	// Policy returns the policy.
 	Policy(ctx context.Context, key string) (model.CleanupPolicy, error)

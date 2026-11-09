@@ -27,7 +27,7 @@ type DeliveryFilter struct {
 // WebhookStore persists event subscriptions and their delivery records.
 // Handler secrets are sealed.
 type WebhookStore interface {
-	// Create stores w; ErrConflict when the key exists.
+	// Create stores w; kernel.ErrConflict when the key exists.
 	Create(ctx context.Context, w model.WebhookSubscription) error
 	// Get returns the subscription, secrets included.
 	Get(ctx context.Context, key string) (model.WebhookSubscription, error)
@@ -38,10 +38,10 @@ type WebhookStore interface {
 	// List returns matching subscriptions ordered by key.
 	List(ctx context.Context, f WebhookFilter) ([]model.WebhookSubscription, error)
 	// AddDelivery records a delivery attempt and returns it with its ID;
-	// ErrNotFound when the subscription does not exist.
+	// kernel.ErrNotFound when the subscription does not exist.
 	AddDelivery(ctx context.Context, d model.WebhookDelivery) (model.WebhookDelivery, error)
 	// Deliveries returns matching records newest first, at most f.Limit
-	// (DefaultLimit when zero).
+	// (kernel.DefaultLimit when zero).
 	Deliveries(ctx context.Context, f DeliveryFilter) ([]model.WebhookDelivery, error)
 	// PruneDeliveries removes records attempted before t and returns how
 	// many.
