@@ -823,17 +823,17 @@
       "replacement": "\\g<1>{{sbt}}"
     },
     {
-      "path": "internal/server/huggingface_xet_native_test.go",
+      "path": "test/server/artifacts/huggingface/huggingface_xet_native_test.go",
       "pattern": "(assert version\\(\"huggingface_hub\"\\) == \")[0-9]+(?:\\.[0-9]+)*(\"$)",
       "replacement": "\\g<1>{{hf-hub}}\\g<2>"
     },
     {
-      "path": "internal/server/huggingface_xet_native_test.go",
+      "path": "test/server/artifacts/huggingface/huggingface_xet_native_test.go",
       "pattern": "(assert version\\(\"hf_xet\"\\) == \")[0-9]+(?:\\.[0-9]+)*(\"$)",
       "replacement": "\\g<1>{{hf-xet}}\\g<2>"
     },
     {
-      "path": "internal/server/huggingface_xet_native_test.go",
+      "path": "test/server/artifacts/huggingface/huggingface_xet_native_test.go",
       "pattern": "(print\\(\"native Hub )[0-9]+(?:\\.[0-9]+)*( / hf_xet )[0-9]+(?:\\.[0-9]+)*",
       "replacement": "\\g<1>{{hf-hub}}\\g<2>{{hf-xet}}"
     },

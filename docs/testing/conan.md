@@ -40,7 +40,7 @@ target and write permission on both the virtual repository and that target.
 
 ## Qualification
 
-`TestAccConanClients` in `internal/server/conan_client_test.go` uses pinned
+`TestAccConanClients` in `test/server/artifacts/conan/conan_client_test.go` uses pinned
 [Conan 2 and Conan 1 clients](ci-native-client-inventory.md) to create, upload and download real recipe and
 binary package revisions through local, one-node federated and virtual
 repositories after clearing each client cache. The Linux acceptance job
@@ -50,7 +50,7 @@ coverage. `TestAccConanRemoteClient`
 in `internal/app/conan_client_test.go` also downloads each client's published
 recipe and binary package through a remote cache backed by the production
 source policy. Local and remote/virtual protocol, uncommitted revision and
-generic-upload boundary tests are in `internal/server/conan_test.go`. Unit
+generic-upload boundary tests are in `test/server/artifacts/conan/conan_test.go`. Unit
 tests for paths, manifests, metadata and archive safety live in
 `migration/artifacts/ecosystem/conan` and
 `migration/artifacts/ecosystem/conan/http`. The production source/cache test

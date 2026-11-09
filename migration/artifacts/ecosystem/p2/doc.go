@@ -112,7 +112,7 @@
 //
 // testdata holds unmodified files of the published Eclipse GLSP 2.7.0
 // update site (p2.index, the content and artifacts metadata as .jar and
-// .xml.xz, and a source bundle), which the root internal/server/p2_test.go
+// .xml.xz, and a source bundle), which the root test/server/artifacts/p2/p2_test.go
 // and the acceptance steps also read. The protocol's native evidence is
 // the @p2 acceptance partition (test/acceptance/features/p2.feature),
 // which drives the Eclipse p2 director.

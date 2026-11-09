@@ -59,11 +59,11 @@ These are the pinned client definitions and executable evidence from which this 
 - Evidence: [test/acceptance/features/vcs.feature](../../test/acceptance/features/vcs.feature).
 - Evidence: [test/acceptance/vcs_steps_test.go](../../test/acceptance/vcs_steps_test.go).
 - Evidence: [test/acceptance/features/vcs_recipes.feature](../../test/acceptance/features/vcs_recipes.feature).
-- Evidence: [internal/server/vcs_routes_test.go](../../internal/server/vcs_routes_test.go).
+- Evidence: [test/server/artifacts/vcs/vcs_routes_test.go](../../test/server/artifacts/vcs/vcs_routes_test.go).
 - Evidence: [test/acceptance/features/vcs_legacy.feature](../../test/acceptance/features/vcs_legacy.feature).
-- Evidence: [internal/server/vcs_legacy_test.go](../../internal/server/vcs_legacy_test.go).
+- Evidence: [test/server/artifacts/vcs/vcs_legacy_test.go](../../test/server/artifacts/vcs/vcs_legacy_test.go).
 - Evidence: [docs/research/39-vcs-legacy.md](../../docs/research/39-vcs-legacy.md).
 - Evidence: [test/acceptance/vcs_legacy_steps_test.go](../../test/acceptance/vcs_legacy_steps_test.go).
 - Evidence: [migration/artifacts/ecosystem/vcs/http/archive_git_test.go](../../migration/artifacts/ecosystem/vcs/http/archive_git_test.go).
 - Evidence: [migration/artifacts/ecosystem/vcs/http/testdata/git-archives.json](../../migration/artifacts/ecosystem/vcs/http/testdata/git-archives.json).
-- Evidence: [internal/server/vcs_delivery_test.go](../../internal/server/vcs_delivery_test.go).
+- Evidence: [test/server/artifacts/vcs/vcs_delivery_test.go](../../test/server/artifacts/vcs/vcs_delivery_test.go).

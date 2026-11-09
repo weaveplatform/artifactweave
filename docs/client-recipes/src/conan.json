@@ -48,7 +48,7 @@
   ],
   "evidence": [
     {
-      "path": "internal/server/conan_client_test.go",
+      "path": "test/server/artifacts/conan/conan_client_test.go",
       "contains": [
         "\"remote\", \"login\", \"aw\"",
         "\"conan-local\", \"conan-fed\", \"conan-virtual\"",

@@ -1,4 +1,4 @@
-package server
+package debian
 
 import (
 	"net/http"

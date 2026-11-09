@@ -1,4 +1,4 @@
-package server
+package conda
 
 import (
 	"archive/zip"

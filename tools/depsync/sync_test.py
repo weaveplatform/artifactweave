@@ -143,7 +143,7 @@ class ReferenceTests(unittest.TestCase):
         self.set_pin("hf-xet", "99.3.0")
         sync.sync(self.root)
         self.assertIn("sbt.version=99.1.0", self.read("test/acceptance/sbt_steps_test.go"))
-        native = self.read("internal/server/huggingface_xet_native_test.go")
+        native = self.read("test/server/artifacts/huggingface/huggingface_xet_native_test.go")
         self.assertIn('assert version("huggingface_hub") == "99.2.0"', native)
         self.assertIn('assert version("hf_xet") == "99.3.0"', native)
         self.assertIn("native Hub 99.2.0 / hf_xet 99.3.0", native)

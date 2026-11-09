@@ -1,4 +1,4 @@
-package server
+package p2
 
 import (
 	"archive/zip"

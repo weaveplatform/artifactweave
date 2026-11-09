@@ -147,7 +147,7 @@
 // testdata holds the contract RPMs that build-contract-fixtures.sh makes
 // in the pinned Fedora 42 image, and the genuine Fedora 42 package
 // artifactweave-alpha-1.0-1.fc42.noarch.rpm with its alpha.spec, which the
-// root internal/server/rpm_test.go and the acceptance steps also read. The
+// root test/server/artifacts/rpm/rpm_test.go and the acceptance steps also read. The
 // protocol's native dnf evidence is the @rpm acceptance partition
 // (test/acceptance/features/rpm.feature).
 package rpm

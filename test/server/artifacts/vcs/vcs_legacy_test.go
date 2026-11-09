@@ -1,4 +1,4 @@
-package server
+package vcs
 
 import (
 	"bytes"

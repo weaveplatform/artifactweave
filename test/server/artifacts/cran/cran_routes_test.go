@@ -1,4 +1,4 @@
-package server
+package cran
 
 import (
 	"bytes"

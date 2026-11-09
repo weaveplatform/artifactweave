@@ -9,10 +9,6 @@
   "go.mod": "2993b4c1c9d9bc43cbd699052c4453034ac7e573c916f53dbc96cb9d2c162923",
   "internal/app/conan_client_test.go": "7a6f63d1fb25ee2b4678e00baae4ebd0d4a5592557cf94f634d65f60eec28ae6",
   "internal/server/auth.go": "e83996d74970f3197734abd58f193205cd7870ba86341b364893b4c845f6d468",
-  "internal/server/conan_client_test.go": "4c07413734cb0eec150604ef4420f26c73f90773d5ce6583d3d0b537f5848d31",
-  "internal/server/vcs_delivery_test.go": "28b12c4280814ed132dd31a3b6e201096880183f9b03f6f1246fe34ea38da4e3",
-  "internal/server/vcs_legacy_test.go": "f9c311ad9670391971191fa50e90a68c1c196984a10b5d124cb2b1b99616cce7",
-  "internal/server/vcs_routes_test.go": "c87224d99a440001a01aa14421ea8963170c58e52919c732d8ef8f8d219bf0ec",
   "migration/access/core/authn/token.go": "babe0157048fb63ffe7758df90769a88538e07364c54783f57c3f25559aab4a3",
   "migration/access/core/authn/token_test.go": "2d7c3c2cb63e8b2a9a0e89ec474d1f86c88c86318973be7f835659f28cb8820e",
   "migration/artifacts/ecosystem/bazelmodules/http/bazelmodules_test.go": "7167ca713183ec2237f3e5107d4811185cbf66d6d5a6b661d47f827d2f98d84d",
@@ -150,5 +146,9 @@
   "test/acceptance/terraform_provider_steps_test.go": "fd8c2de4991a75d5e1722864eba109a4ebfa87410841f054fa94b727da717d60",
   "test/acceptance/vagrant_steps_test.go": "11c7caa54766244dba9684d2849cbfd63dd45a96b2abc74dbdc7c95f5f831e7b",
   "test/acceptance/vcs_legacy_steps_test.go": "a20d5903e8df7abef71f4caba29366c13fce9055aaed8828aed1ec5b4cf008c5",
-  "test/acceptance/vcs_steps_test.go": "09ca06bde446dd78537416b6ce4e4b3c286f1ef3f9e7547bdb1508142a374f74"
+  "test/acceptance/vcs_steps_test.go": "09ca06bde446dd78537416b6ce4e4b3c286f1ef3f9e7547bdb1508142a374f74",
+  "test/server/artifacts/conan/conan_client_test.go": "d26a51421ab112b560b1ef04128d046f8ad7d320ea23afad41b5199d3f987612",
+  "test/server/artifacts/vcs/vcs_delivery_test.go": "9dd7bb355e91791f433809482223be87a6569f3ff9b0a2dac7c83457f0fdcd89",
+  "test/server/artifacts/vcs/vcs_legacy_test.go": "3cee3697f7f5d75a3c7d68411144362f948aa8a8098a24ced6ea7b51b5652fb0",
+  "test/server/artifacts/vcs/vcs_routes_test.go": "b7cad8d5f7e921d1ce5a496995d45e93a7db10506bc7ed73d320b7551be85e2f"
 }
