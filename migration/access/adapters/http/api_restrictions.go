@@ -150,6 +150,9 @@ func restrictionDocument(r store.APIRestriction) artgen.APIRestriction {
 	return out
 }
 
+// GetAPIRestriction returns a user's temporary API restriction to an
+// administrator, an inactive one when none was ever set (GET
+// /artifactory/api/artifactweave/api-restrictions/{userName}).
 func (s SecurityAPI) GetAPIRestriction(
 	ctx context.Context,
 	req artgen.GetAPIRestrictionRequestObject,
@@ -167,6 +170,9 @@ func (s SecurityAPI) GetAPIRestriction(
 	return artgen.GetAPIRestriction200JSONResponse(restrictionDocument(r)), nil
 }
 
+// SetAPIRestriction restricts a user's API access, for a reason and until a
+// time at most seven days ahead, for an administrator (PUT
+// /artifactory/api/artifactweave/api-restrictions/{userName}).
 func (s SecurityAPI) SetAPIRestriction(
 	ctx context.Context,
 	req artgen.SetAPIRestrictionRequestObject,
@@ -194,6 +200,9 @@ func (s SecurityAPI) SetAPIRestriction(
 	return artgen.SetAPIRestriction200JSONResponse(restrictionDocument(r)), nil
 }
 
+// ClearAPIRestriction lifts a user's temporary API restriction for an
+// administrator, recording who lifted it (DELETE
+// /artifactory/api/artifactweave/api-restrictions/{userName}).
 func (s SecurityAPI) ClearAPIRestriction(
 	ctx context.Context,
 	req artgen.ClearAPIRestrictionRequestObject,
@@ -212,6 +221,9 @@ func (s SecurityAPI) ClearAPIRestriction(
 	return artgen.ClearAPIRestriction204Response{}, nil
 }
 
+// GetAPIRestrictionAudit lists the changes to temporary API restrictions,
+// newest first and a page at a time, for an administrator (GET
+// /artifactory/api/artifactweave/api-restriction-audit).
 func (s SecurityAPI) GetAPIRestrictionAudit(
 	ctx context.Context,
 	req artgen.GetAPIRestrictionAuditRequestObject,

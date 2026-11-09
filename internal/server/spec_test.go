@@ -14,7 +14,6 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/api"
-	"github.com/weaveplatform/artifactweave/migration/access/adapters/http"
 	accesshttp "github.com/weaveplatform/artifactweave/migration/access/adapters/http"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"

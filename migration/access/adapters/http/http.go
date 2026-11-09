@@ -62,10 +62,10 @@ type Server struct {
 	Security *SecurityAPI
 }
 
-// NewServer returns the access partials over d. Without d.IDTokens it builds
+// New returns the access partials over d. Without d.IDTokens it builds
 // one verifier, which both partials share, so the providers' keys stay
 // cached between exchanges for the life of the handler.
-func NewServer(d Deps) *Server {
+func New(d Deps) *Server {
 	if d.IDTokens == nil {
 		d.IDTokens = idtoken.New(idtoken.Options{})
 	}

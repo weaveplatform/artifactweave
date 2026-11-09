@@ -90,6 +90,8 @@ func mappingBody(b *accessgen.OidcIdentityMapping) (oidc.Mapping, error) {
 	return recode[oidc.Mapping](b)
 }
 
+// GetAllOidcConfigurations lists the OIDC providers for an administrator
+// (GET /access/api/v1/oidc).
 func (s AccessService) GetAllOidcConfigurations(
 	ctx context.Context,
 	_ accessgen.GetAllOidcConfigurationsRequestObject,
@@ -136,6 +138,8 @@ func (s AccessService) CreateOidcConfiguration(
 	return out, nil
 }
 
+// GetOidcConfiguration returns an OIDC provider to an administrator (GET
+// /access/api/v1/oidc/{name}).
 func (s AccessService) GetOidcConfiguration(
 	ctx context.Context,
 	req accessgen.GetOidcConfigurationRequestObject,
@@ -155,6 +159,8 @@ func (s AccessService) GetOidcConfiguration(
 	return out, nil
 }
 
+// UpdateOidcConfiguration replaces an OIDC provider for an administrator
+// (PUT /access/api/v1/oidc/{name}).
 func (s AccessService) UpdateOidcConfiguration(
 	ctx context.Context,
 	req accessgen.UpdateOidcConfigurationRequestObject,
@@ -177,6 +183,8 @@ func (s AccessService) UpdateOidcConfiguration(
 	return out, nil
 }
 
+// DeleteOidcConfiguration deletes an OIDC provider for an administrator
+// (DELETE /access/api/v1/oidc/{name}).
 func (s AccessService) DeleteOidcConfiguration(
 	ctx context.Context,
 	req accessgen.DeleteOidcConfigurationRequestObject,
@@ -191,6 +199,9 @@ func (s AccessService) DeleteOidcConfiguration(
 	return accessgen.DeleteOidcConfiguration204Response{}, nil
 }
 
+// GetOidcIdentityMappings lists a provider's identity mappings, of one
+// project when the query names it, for an administrator (GET
+// /access/api/v1/oidc/{provider_name}/identity_mappings).
 func (s AccessService) GetOidcIdentityMappings(
 	ctx context.Context,
 	req accessgen.GetOidcIdentityMappingsRequestObject,
@@ -213,6 +224,9 @@ func (s AccessService) GetOidcIdentityMappings(
 	return out, nil
 }
 
+// CreateOidcIdentityMapping creates an identity mapping of a provider for an
+// administrator (POST
+// /access/api/v1/oidc/{provider_name}/identity_mappings).
 func (s AccessService) CreateOidcIdentityMapping(
 	ctx context.Context,
 	req accessgen.CreateOidcIdentityMappingRequestObject,
@@ -235,6 +249,9 @@ func (s AccessService) CreateOidcIdentityMapping(
 	return out, nil
 }
 
+// GetOidcIdentityMappingByName returns an identity mapping to an
+// administrator (GET
+// /access/api/v1/oidc/{provider_name}/identity_mappings/{mapping_name}).
 func (s AccessService) GetOidcIdentityMappingByName(
 	ctx context.Context,
 	req accessgen.GetOidcIdentityMappingByNameRequestObject,
@@ -254,6 +271,9 @@ func (s AccessService) GetOidcIdentityMappingByName(
 	return out, nil
 }
 
+// UpdateOidcIdentityMapping replaces an identity mapping for an
+// administrator (PUT
+// /access/api/v1/oidc/{provider_name}/identity_mappings/{mapping_name}).
 func (s AccessService) UpdateOidcIdentityMapping(
 	ctx context.Context,
 	req accessgen.UpdateOidcIdentityMappingRequestObject,
@@ -276,6 +296,9 @@ func (s AccessService) UpdateOidcIdentityMapping(
 	return out, nil
 }
 
+// DeleteOidcIdentityMapping deletes an identity mapping for an administrator
+// (DELETE
+// /access/api/v1/oidc/{provider_name}/identity_mappings/{mapping_name}).
 func (s AccessService) DeleteOidcIdentityMapping(
 	ctx context.Context,
 	req accessgen.DeleteOidcIdentityMappingRequestObject,

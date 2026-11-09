@@ -49,6 +49,8 @@ func (s AccessService) roleError(ctx context.Context, op string, err error, take
 	}
 }
 
+// GetGlobalEnvironments lists the global environments for an administrator
+// (GET /access/api/v1/environments).
 func (s AccessService) GetGlobalEnvironments(
 	ctx context.Context,
 	_ accessgen.GetGlobalEnvironmentsRequestObject,
@@ -68,6 +70,8 @@ func (s AccessService) GetGlobalEnvironments(
 	return out, nil
 }
 
+// CreateGlobalEnvironment creates a global environment for an administrator
+// (POST /access/api/v1/environments); a taken name is a 409.
 func (s AccessService) CreateGlobalEnvironment(
 	ctx context.Context,
 	req accessgen.CreateGlobalEnvironmentRequestObject,
@@ -85,6 +89,9 @@ func (s AccessService) CreateGlobalEnvironment(
 	return accessgen.CreateGlobalEnvironment201JSONResponse{Name: req.Body.Name}, nil
 }
 
+// RenameGlobalEnvironment renames a global environment for an administrator
+// (POST /access/api/v1/environments/{environmentName}/rename); a taken name
+// is a 400, because the spec lists no 409 there.
 func (s AccessService) RenameGlobalEnvironment(
 	ctx context.Context,
 	req accessgen.RenameGlobalEnvironmentRequestObject,
@@ -120,6 +127,8 @@ func (s AccessService) DeleteGlobalEnvironment(
 	return accessgen.DeleteGlobalEnvironment204Response{}, nil
 }
 
+// GetAllGlobalRoles lists the global roles for an administrator (GET
+// /access/api/v1/roles).
 func (s AccessService) GetAllGlobalRoles(
 	ctx context.Context,
 	_ accessgen.GetAllGlobalRolesRequestObject,
@@ -139,6 +148,8 @@ func (s AccessService) GetAllGlobalRoles(
 	return out, nil
 }
 
+// GetGlobalRole returns a global role to an administrator (GET
+// /access/api/v1/roles/{role}).
 func (s AccessService) GetGlobalRole(
 	ctx context.Context,
 	req accessgen.GetGlobalRoleRequestObject,
@@ -182,6 +193,8 @@ func (s AccessService) CreateGlobalRole(
 	}, nil
 }
 
+// UpdateGlobalRole replaces a global role for an administrator (PUT
+// /access/api/v1/roles/{role}).
 func (s AccessService) UpdateGlobalRole(
 	ctx context.Context,
 	req accessgen.UpdateGlobalRoleRequestObject,
@@ -205,6 +218,8 @@ func (s AccessService) UpdateGlobalRole(
 	return accessgen.UpdateGlobalRole200Response{}, nil
 }
 
+// DeleteGlobalRole deletes a global role for an administrator (DELETE
+// /access/api/v1/roles/{role}); a built-in role or one in use is a 400.
 func (s AccessService) DeleteGlobalRole(
 	ctx context.Context,
 	req accessgen.DeleteGlobalRoleRequestObject,

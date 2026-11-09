@@ -4,14 +4,16 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/server"
 	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
 // TestAccPublicKeyFile: the file name is the alias, the pair's type and pub,
@@ -25,15 +27,35 @@ func TestAccPublicKeyFile(t *testing.T) {
 			t.Errorf("publicKeyFile(%+v) = %q, want %q", k, got, want)
 		}
 	}
-	h := statusFixture(t, false)
-	admin := jsonAs(basic("admin", "pw"))
-	mustStatus(t, do(t, h, http.MethodPost, "/artifactory/api/security/keypair", admin,
-		keypairBody("kp-spaced", "my key", testKeys().public)), http.StatusCreated, "create")
-	mustStatus(t, do(t, h, http.MethodPut, "/artifactory/api/repositories/spaced", admin,
-		`{"rclass":"local","packageType":"alpine","primaryKeyPairRef":"kp-spaced"}`),
-		http.StatusOK, "repository")
-	rec := do(t, h, http.MethodGet,
-		"/artifactory/api/security/keypair/public/repositories/spaced", admin, "")
+	// The pair and the repository that signs with it are stored directly:
+	// the partial is called without the router, which the create routes
+	// need.
+	ctx := asAdmin(context.Background())
+	db := inmem.New()
+	if err := db.Keys().CreateKeypair(ctx, types.Keypair{
+		Name: "kp-spaced", Type: types.KeypairRSA, Alias: "my key",
+		PrivateKey: "private", PublicKey: "public",
+	}); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if err := db.Repos().Create(ctx, *repo.Defaults(&repo.Config{
+		Key: "spaced", Class: repo.Local, PackageType: repo.Alpine,
+		PrimaryKeyPairRef: "kp-spaced",
+	})); err != nil {
+		t.Fatalf("repository: %v", err)
+	}
+	s := New(Deps{Store: db, Repositories: support.Repositories(db)}).Security
+	res, err := s.GetKeyPairPublicKeyPerRepository(
+		ctx,
+		artgen.GetKeyPairPublicKeyPerRepositoryRequestObject{RepoKey: "spaced"},
+	)
+	if err != nil {
+		t.Fatalf("a spaced alias: %v", err)
+	}
+	rec := httptest.NewRecorder()
+	if err := res.VisitGetKeyPairPublicKeyPerRepositoryResponse(rec); err != nil {
+		t.Fatal(err)
+	}
 	if got := rec.Header().Get("Content-Disposition"); rec.Code != http.StatusOK ||
 		got != `attachment; filename="my key.rsa.pub"` {
 		t.Fatalf("a spaced alias: %d %q", rec.Code, got)
@@ -71,6 +93,29 @@ func TestAccPutKeypairRaces(t *testing.T) {
 	if err := putKeypair(ctx, broken, types.Keypair{Name: "kp"}); !errors.Is(err, errDown) {
 		t.Fatalf("a failed update: %v", err)
 	}
+}
+
+// faultyRepos fails the repository reads and writes named in fail with
+// errBoom.
+type faultyRepos struct {
+	store.RepoStore
+	fail map[string]bool
+}
+
+// Get fails under "get".
+func (f faultyRepos) Get(ctx context.Context, key string) (repo.Config, error) {
+	if f.fail["get"] {
+		return repo.Config{}, errBoom
+	}
+	return f.RepoStore.Get(ctx, key) //nolint:wrapcheck // test double
+}
+
+// Update fails under "update".
+func (f faultyRepos) Update(ctx context.Context, c repo.Config) error {
+	if f.fail["update"] {
+		return errBoom
+	}
+	return f.RepoStore.Update(ctx, c) //nolint:wrapcheck // test double
 }
 
 // UsingKeypair fails under "usingKeypair".
@@ -125,13 +170,21 @@ func TestAccDropKeypairRefs(t *testing.T) {
 			t.Errorf("%s fails: %v", fail, err)
 		}
 	}
-	h := statusFixture(t, false, func(c *server.Config) {
-		c.Store = faultyStore{Store: c.Store.(*inmem.Store), fail: map[string]bool{"update": true}}
-	})
-	mustStatus(t, do(t, h, http.MethodDelete, "/artifactory/api/security/keypair/kp-used",
-		basic("admin", "pw"), ""), http.StatusInternalServerError, "a failed repository update")
-	mustStatus(t, do(t, h, http.MethodGet, "/artifactory/api/security/keypair/kp-used",
-		basic("admin", "pw"), ""), http.StatusOK, "the pair after the failed delete")
+	used := usedKeypair(t)
+	s := New(Deps{Store: used, Repositories: repoStoreRepositories{
+		repos: faultyRepos{RepoStore: used.Repos(), fail: map[string]bool{"update": true}},
+	}}).Security
+	admin := asAdmin(ctx)
+	_, err := s.DeleteKeyPair(admin, artgen.DeleteKeyPairRequestObject{KeyPairName: "kp-used"})
+	if got := errStatus(err); got != http.StatusInternalServerError {
+		t.Fatalf("a failed repository update: status %d, want 500: %v", got, err)
+	}
+	if _, err := s.GetKeyPair(
+		admin,
+		artgen.GetKeyPairRequestObject{KeyPairName: "kp-used"},
+	); err != nil {
+		t.Fatalf("the pair after the failed delete: status %d, want 200: %v", errStatus(err), err)
+	}
 	if err := dropKeypairRefs(ctx, repoStoreRepositories{repos: db.Repos()}, "kp"); err != nil {
 		t.Fatal(err)
 	}
@@ -140,5 +193,61 @@ func TestAccDropKeypairRefs(t *testing.T) {
 		if err != nil || c.PrimaryKeyPairRef != want[0] || c.SecondaryKeyPairRef != want[1] {
 			t.Errorf("%s: %q %q, %v", key, c.PrimaryKeyPairRef, c.SecondaryKeyPairRef, err)
 		}
+	}
+}
+
+// usedKeypair is a store holding the pair kp-used and signed-local, a
+// repository that signs with it, as the root's status fixture seeds them.
+func usedKeypair(t *testing.T) *inmem.Store {
+	t.Helper()
+	ctx := context.Background()
+	db := inmem.New()
+	if err := db.Keys().CreateKeypair(ctx, types.Keypair{
+		Name: "kp-used", Type: types.KeypairRSA, Alias: "used",
+		PrivateKey: "private", PublicKey: "public",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Repos().Create(ctx, *repo.Defaults(&repo.Config{
+		Key: "signed-local", Class: repo.Local, PrimaryKeyPairRef: "kp-used",
+	})); err != nil {
+		t.Fatal(err)
+	}
+	return db
+}
+
+// keyDeleteFails is a store whose key pair delete fails with errBoom.
+type keyDeleteFails struct{ *inmem.Store }
+
+func (s keyDeleteFails) Keys() store.KeyStore { return failingKeyDelete{s.Store.Keys()} }
+
+type failingKeyDelete struct{ store.KeyStore }
+
+func (failingKeyDelete) DeleteKeypair(context.Context, string) error { return errBoom }
+
+// TestUnitDeleteKeyPairIsOneTransaction makes the delete of the pair fail
+// after the artifacts module's binding cleared the repository's reference
+// to it, and finds both as they were: the binding takes part in the
+// delete's transaction through its context, so the cleared reference rolls
+// back with it.
+func TestUnitDeleteKeyPairIsOneTransaction(t *testing.T) {
+	ctx := context.Background()
+	db := usedKeypair(t)
+	st := keyDeleteFails{db}
+	s := New(Deps{Store: st, Repositories: support.Repositories(st)}).Security
+	_, err := s.DeleteKeyPair(
+		asAdmin(ctx),
+		artgen.DeleteKeyPairRequestObject{KeyPairName: "kp-used"},
+	)
+	if got := errStatus(err); got != http.StatusInternalServerError {
+		t.Fatalf("a failed delete: status %d, want 500: %v", got, err)
+	}
+	if c, err := db.Repos().
+		Get(ctx, "signed-local"); err != nil ||
+		c.PrimaryKeyPairRef != "kp-used" {
+		t.Errorf("the reference after the failed delete: %q, %v", c.PrimaryKeyPairRef, err)
+	}
+	if _, err := db.Keys().Keypair(ctx, "kp-used"); err != nil {
+		t.Errorf("the pair after the failed delete: %v", err)
 	}
 }

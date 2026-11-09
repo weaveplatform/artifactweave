@@ -167,6 +167,7 @@
     "migration/access/adapters/http": [
       "access_identity_internal_test.go",
       "authn_middleware_test.go",
+      "fixture_test.go",
       "keypairs_internal_test.go",
       "permissions_fault_test.go",
       "roles_internal_test.go",
@@ -180,6 +181,7 @@
       "fixture_test.go",
       "keypairs_test.go",
       "oidc_test.go",
+      "permissions_fault_test.go",
       "permissions_test.go",
       "roles_status_test.go",
       "roles_test.go",

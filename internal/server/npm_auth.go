@@ -40,8 +40,8 @@ func npmUserPath(escaped string) bool {
 	return ok && key != "" && strings.HasPrefix(after, "-/user/")
 }
 
-// npmUserRequest is npmUserPath of r's escaped path, the skip authenticate
-// asks first.
+// npmUserRequest is npmUserPath of r's escaped path, the skip
+// accesshttp.Authenticate asks first.
 func npmUserRequest(r *http.Request) bool { return npmUserPath(r.URL.EscapedPath()) }
 
 // npmOperation reports whether path is one of the JFrog operations that

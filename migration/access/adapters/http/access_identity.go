@@ -112,6 +112,8 @@ func groupExists(name string) string { return fmt.Sprintf("Group '%s' already ex
 
 // --- Users -------------------------------------------------------------------
 
+// GetUserList lists users a page at a time for a caller that may read
+// identities (GET /access/api/v2/users).
 func (s AccessService) GetUserList(
 	ctx context.Context,
 	req accessgen.GetUserListRequestObject,
@@ -184,6 +186,8 @@ func (s AccessService) GetUserList(
 	return out, nil
 }
 
+// CreateUser creates a user for an administrator (POST
+// /access/api/v2/users).
 func (s AccessService) CreateUser(
 	ctx context.Context,
 	req accessgen.CreateUserRequestObject,
@@ -237,6 +241,8 @@ func (s AccessService) CreateUser(
 	return accessgen.CreateUser201JSONResponse(d), nil
 }
 
+// GetUserDetails returns a user to a caller that may read identities, and to
+// the user itself (GET /access/api/v2/users/{username}).
 func (s AccessService) GetUserDetails(
 	ctx context.Context,
 	req accessgen.GetUserDetailsRequestObject,
@@ -254,6 +260,8 @@ func (s AccessService) GetUserDetails(
 	return accessgen.GetUserDetails200JSONResponse(d), nil
 }
 
+// UpdateUser changes the fields a patch sends for an administrator (PATCH
+// /access/api/v2/users/{username}).
 func (s AccessService) UpdateUser(
 	ctx context.Context,
 	req accessgen.UpdateUserRequestObject,
@@ -300,6 +308,8 @@ func (s AccessService) UpdateUser(
 	return accessgen.UpdateUser200JSONResponse(d), nil
 }
 
+// DeleteUser deletes a user for an administrator (DELETE
+// /access/api/v2/users/{username}).
 func (s AccessService) DeleteUser(
 	ctx context.Context,
 	req accessgen.DeleteUserRequestObject,
@@ -315,6 +325,8 @@ func (s AccessService) DeleteUser(
 	return accessgen.DeleteUser204Response{}, nil
 }
 
+// UpdateUserGroups adds and removes a user's group memberships for an
+// administrator (PATCH /access/api/v2/users/{username}/groups).
 func (s AccessService) UpdateUserGroups(
 	ctx context.Context,
 	req accessgen.UpdateUserGroupsRequestObject,
@@ -335,6 +347,10 @@ func (s AccessService) UpdateUserGroups(
 	return accessgen.UpdateUserGroups200JSONResponse{Groups: nonNil(groups)}, nil
 }
 
+// ChangeUserPassword sets a user's password (PUT
+// /access/api/v2/users/{username}/password): an administrator sets anyone's,
+// and a user its own, even once it has expired, but not through a narrowed
+// token.
 func (s AccessService) ChangeUserPassword(
 	ctx context.Context,
 	req accessgen.ChangeUserPasswordRequestObject,
@@ -363,6 +379,8 @@ func (s AccessService) ChangeUserPassword(
 	return accessgen.ChangeUserPassword204Response{}, nil
 }
 
+// ExpireUserPassword expires a user's password for an administrator (POST
+// /access/api/v2/users/{username}/password/expire).
 func (s AccessService) ExpireUserPassword(
 	ctx context.Context,
 	req accessgen.ExpireUserPasswordRequestObject,
@@ -382,6 +400,8 @@ func (s AccessService) ExpireUserPassword(
 	return accessgen.ExpireUserPassword204Response{}, nil
 }
 
+// ExpirePasswordForAllUsers expires every internal user's password for an
+// administrator (POST /access/api/v2/users/expire_password_for_all_users).
 func (s AccessService) ExpirePasswordForAllUsers(
 	ctx context.Context,
 	_ accessgen.ExpirePasswordForAllUsersRequestObject,
@@ -396,6 +416,9 @@ func (s AccessService) ExpirePasswordForAllUsers(
 	return accessgen.ExpirePasswordForAllUsers200TextResponse("All passwords were expired"), nil
 }
 
+// UnexpirePasswordForAllUsers clears the expired flag on every password for
+// an administrator (POST
+// /access/api/v2/users/unexpire_password_for_all_users).
 func (s AccessService) UnexpirePasswordForAllUsers(
 	ctx context.Context,
 	_ accessgen.UnexpirePasswordForAllUsersRequestObject,
@@ -412,6 +435,9 @@ func (s AccessService) UnexpirePasswordForAllUsers(
 	), nil
 }
 
+// UnlockUser lifts a user's lockout for an administrator (POST
+// /access/api/v2/users/{username}/unlock); unlocking a user that is not
+// locked succeeds.
 func (s AccessService) UnlockUser(
 	ctx context.Context,
 	req accessgen.UnlockUserRequestObject,
@@ -476,6 +502,9 @@ func (s AccessService) userDetails(
 
 // --- Groups ------------------------------------------------------------------
 
+// GetGroupList lists groups a page at a time for a caller that may read
+// identities: an administrator, or a token whose scope covers identities:r
+// (GET /access/api/v2/groups).
 func (s AccessService) GetGroupList(
 	ctx context.Context,
 	req accessgen.GetGroupListRequestObject,
@@ -522,6 +551,8 @@ func (s AccessService) GetGroupList(
 	return out, nil
 }
 
+// CreateGroup creates a group for an administrator (POST
+// /access/api/v2/groups).
 func (s AccessService) CreateGroup(
 	ctx context.Context,
 	req accessgen.CreateGroupRequestObject,
@@ -579,6 +610,8 @@ func (s AccessService) CreateGroup(
 	return accessgen.CreateGroup201JSONResponse(d), nil
 }
 
+// GetGroupDetails returns a group to a caller that may read identities (GET
+// /access/api/v2/groups/{name}).
 func (s AccessService) GetGroupDetails(
 	ctx context.Context,
 	req accessgen.GetGroupDetailsRequestObject,
@@ -594,6 +627,9 @@ func (s AccessService) GetGroupDetails(
 	return accessgen.GetGroupDetails200JSONResponse(d), nil
 }
 
+// UpdateGroup changes the fields a patch sends for an administrator (PATCH
+// /access/api/v2/groups/{name}). The raw body (keepsGroupUpdateBody) tells a
+// field left out from one sent with its stored value.
 func (s AccessService) UpdateGroup(
 	ctx context.Context,
 	req accessgen.UpdateGroupRequestObject,
@@ -664,6 +700,8 @@ func fixedGroupFields(raw []byte, g types.Group) error {
 	return nil
 }
 
+// DeleteGroup deletes a group for an administrator (DELETE
+// /access/api/v2/groups/{name}).
 func (s AccessService) DeleteGroup(
 	ctx context.Context,
 	req accessgen.DeleteGroupRequestObject,
@@ -679,6 +717,8 @@ func (s AccessService) DeleteGroup(
 	return accessgen.DeleteGroup204Response{}, nil
 }
 
+// UpdateGroupMembers adds and removes a group's members for an administrator
+// (PATCH /access/api/v2/groups/{name}/members).
 func (s AccessService) UpdateGroupMembers(
 	ctx context.Context,
 	req accessgen.UpdateGroupMembersRequestObject,
@@ -743,6 +783,9 @@ func (s AccessService) groupDetails(
 
 // --- Configuration -------------------------------------------------------------
 
+// GetBasicAuthenticationStatus answers an administrator whether Basic
+// authentication with a password is on (GET
+// /access/api/v1/config/security/authentication/basic_authentication_enabled).
 func (s AccessService) GetBasicAuthenticationStatus(
 	ctx context.Context,
 	_ accessgen.GetBasicAuthenticationStatusRequestObject,

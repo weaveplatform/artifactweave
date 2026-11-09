@@ -8,6 +8,12 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// The API restriction routes, as access/adapters/http serves them.
+const (
+	apiRestrictionPath      = "/artifactory/api/artifactweave/api-restrictions/"
+	apiRestrictionAuditPath = "/artifactory/api/artifactweave/api-restriction-audit"
+)
+
 func restrictionBody() string {
 	return fmt.Sprintf(
 		`{"until":%q,"reason":"Stop expensive polling"}`,

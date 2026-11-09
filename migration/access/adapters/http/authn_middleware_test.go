@@ -26,7 +26,7 @@ func TestAccAuthenticatePrincipal(t *testing.T) {
 	}
 	var got *kernel.Principal
 	h := Authenticate(
-		newAuthnOptions(a, nil),
+		testAuthnOptions(a, nil),
 	)(
 		http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 			if p, ok := kernel.FromContext(r.Context()); ok {
@@ -90,7 +90,7 @@ func TestAccAuthenticateAttachesDecider(t *testing.T) {
 		d       accessapi.Decider
 	)
 	h := Authenticate(
-		newAuthnOptions(a, db, skip),
+		testAuthnOptions(a, db, skip),
 	)(
 		http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 			reached = true
@@ -151,7 +151,7 @@ func TestAccAuthenticateStoreFailures(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := Authenticate(
-		newAuthnOptions(a, nil),
+		testAuthnOptions(a, nil),
 	)(
 		http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 			t.Error("the request reached the handler")

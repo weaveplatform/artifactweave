@@ -219,9 +219,16 @@ func sortedReview(in []string) []string { sort.Strings(in); return slices.Compac
 
 func apiReviewHandlers(t *testing.T) map[string]apiReviewHandler {
 	t.Helper()
-	files, err := filepath.Glob("*.go")
-	if err != nil {
-		t.Fatal(err)
+	// The handlers live in the server root and in the modules' HTTP
+	// adapters, named by their paths from the repository root.
+	root := repopath.Root(t)
+	var files []string
+	for _, dir := range []string{"internal/server", "migration/access/adapters/http"} {
+		found, err := filepath.Glob(filepath.Join(root, dir, "*.go"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		files = append(files, found...)
 	}
 	// The artifactory spec's operations are split over partials
 	// (composites.go); each receiver keys its handlers by its spec.
@@ -235,6 +242,10 @@ func apiReviewHandlers(t *testing.T) map[string]apiReviewHandler {
 	for _, file := range files {
 		if strings.HasSuffix(file, "_test.go") {
 			continue
+		}
+		rel, err := filepath.Rel(root, file)
+		if err != nil {
+			t.Fatal(err)
 		}
 		fset := token.NewFileSet()
 		f, err := parser.ParseFile(fset, file, nil, 0)
@@ -264,7 +275,7 @@ func apiReviewHandlers(t *testing.T) map[string]apiReviewHandler {
 				return true
 			})
 			out[spec+":"+strings.ToLower(fn.Name.Name)] = apiReviewHandler{
-				Source: "internal/server/" + file + ": " + receiver.Name + "." + fn.Name.Name,
+				Source: filepath.ToSlash(rel) + ": " + receiver.Name + "." + fn.Name.Name,
 				Calls:  sortedReview(calls),
 			}
 		}

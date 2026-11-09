@@ -350,10 +350,10 @@ func newRegistry(cfg Config, artSvc artifactoryService) *dockerhttp.Registry {
 		SubdomainMatch: cfg.DockerSubdomainMatch,
 		BaseURL:        cfg.BaseURL,
 		// The middleware authenticates every request whenever an
-		// authenticator is configured (authenticate). cfg.Access holds one
-		// bound over that authenticator whenever there is a store; without
-		// one the registry serves no repository, so the setting decides
-		// nothing.
+		// authenticator is configured (accesshttp.Authenticate). cfg.Access
+		// holds one bound over that authenticator whenever there is a store;
+		// without one the registry serves no repository, so the setting
+		// decides nothing.
 		Authenticated: cfg.Access.Authenticator != nil,
 		Fault:         func(r *http.Request, err error) { httpkit.NoteCause(r.Context(), err) },
 		// The registry serves only docker, oci and helmoci repositories,
@@ -449,7 +449,7 @@ func New(cfg Config) http.Handler {
 		),
 	}
 	sysAPI := systemAPI{cfg: cfg, instanceID: new(atomic.Pointer[string])}
-	accessHTTP := accesshttp.NewServer(accesshttp.Deps{
+	accessHTTP := accesshttp.New(accesshttp.Deps{
 		API:           cfg.Access,
 		Store:         cfg.Store,
 		Authenticator: cfg.Auth,
