@@ -7,12 +7,17 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
+	platinmem "github.com/weaveplatform/artifactweave/migration/platform/store/inmem"
+	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
 )
 
 func TestUnitRecoveryReservedAllowance(t *testing.T) {
 	now := time.Date(2026, 10, 28, 12, 0, 15, 0, time.UTC)
-	s, err := apilimit.New(inmem.New(), apilimit.Default(), func() time.Time { return now })
+	s, err := apilimit.New(
+		platinmem.New(memtx.New()),
+		apilimit.Default(),
+		func() time.Time { return now },
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

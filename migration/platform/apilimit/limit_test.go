@@ -7,12 +7,12 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
+	platinmem "github.com/weaveplatform/artifactweave/migration/platform/store/inmem"
+	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
 )
 
 func TestUnitSharedRatesAndScopes(t *testing.T) {
-	st := inmem.New()
+	st := platinmem.New(memtx.New())
 	o := apilimit.Default()
 	o.PrincipalPerMinute, o.GlobalPerMinute = 2, 10
 	o.ExpensivePrincipalPerMinute, o.ExpensivePerMinute = 1, 2
@@ -65,7 +65,7 @@ func TestUnitSharedRatesAndScopes(t *testing.T) {
 func TestUnitBoundedConcurrency(t *testing.T) {
 	o := apilimit.Default()
 	o.MaxConcurrent, o.ExpensiveConcurrent, o.ExpensivePrincipalConcurrent = 2, 2, 1
-	s, err := apilimit.New(inmem.New(), o, nil)
+	s, err := apilimit.New(platinmem.New(memtx.New()), o, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,16 +119,16 @@ type stalledBudgets struct{}
 
 func (stalledBudgets) Take(
 	ctx context.Context,
-	_ store.BudgetRequest,
-) (store.BudgetDecision, error) {
+	_ apilimit.BudgetRequest,
+) (apilimit.BudgetDecision, error) {
 	<-ctx.Done()
-	return store.BudgetDecision{}, ctx.Err()
+	return apilimit.BudgetDecision{}, ctx.Err()
 }
 
 func TestUnitBudgetFailureIsClosedAndBounded(t *testing.T) {
 	o := apilimit.Default()
 	o.BudgetTimeout = time.Millisecond
-	s, err := apilimit.New(inmem.New(), o, nil)
+	s, err := apilimit.New(platinmem.New(memtx.New()), o, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +155,8 @@ func TestUnitAPIPolicyValidation(t *testing.T) {
 	} {
 		o := apilimit.Default()
 		change(&o)
-		if _, err := apilimit.New(inmem.New(), o, nil); !errors.Is(err, apilimit.ErrInvalid) {
+		st := platinmem.New(memtx.New())
+		if _, err := apilimit.New(st, o, nil); !errors.Is(err, apilimit.ErrInvalid) {
 			t.Fatalf("invalid policy accepted: %v", err)
 		}
 	}

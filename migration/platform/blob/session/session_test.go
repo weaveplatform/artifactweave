@@ -8,10 +8,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
+	platinmem "github.com/weaveplatform/artifactweave/migration/platform/store/inmem"
+	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
 )
 
 var errInjected = errors.New("injected")
@@ -305,7 +306,7 @@ func TestUnitMemoryCopies(t *testing.T) {
 // sessions, and each row names the store that owns it.
 func TestUnitInUploadsSeparatesStores(t *testing.T) {
 	ctx := context.Background()
-	uploads := inmem.New().Uploads()
+	uploads := platinmem.New(memtx.New()).Uploads()
 	hot := session.InUploads(uploads, "s3:hot")
 	cold := session.InUploads(uploads, "s3:cold")
 	a := begin(t, hot)
@@ -331,7 +332,7 @@ func TestUnitInUploadsSeparatesStores(t *testing.T) {
 
 func TestUnitInUploadsRoundTripKeepsStart(t *testing.T) {
 	ctx := context.Background()
-	uploads := inmem.New().Uploads()
+	uploads := platinmem.New(memtx.New()).Uploads()
 	st := session.InUploads(uploads, "gcs:main")
 	ss := begin(t, st)
 	first, err := uploads.Get(ctx, ss.ID)
@@ -376,7 +377,7 @@ func TestUnitInUploadsErrors(t *testing.T) {
 		t.Fatalf("Get: %v", err)
 	}
 	st = session.InUploads(
-		failingUploads{get: store.ErrNotFound, put: errInjected, del: errInjected},
+		failingUploads{get: kernel.ErrNotFound, put: errInjected, del: errInjected},
 		"azure:x",
 	)
 	if err := st.Put(ctx, "u", nil, 0); !errors.Is(err, errInjected) {
@@ -389,11 +390,11 @@ func TestUnitInUploadsErrors(t *testing.T) {
 
 type failingUploads struct{ get, put, del error }
 
-func (f failingUploads) Put(context.Context, store.Upload) error { return f.put }
-func (f failingUploads) Get(context.Context, string) (store.Upload, error) {
-	return store.Upload{}, f.get
+func (f failingUploads) Put(context.Context, session.Upload) error { return f.put }
+func (f failingUploads) Get(context.Context, string) (session.Upload, error) {
+	return session.Upload{}, f.get
 }
 func (f failingUploads) Delete(context.Context, string) error { return f.del }
-func (failingUploads) Stale(context.Context, time.Time, int) ([]store.Upload, error) {
+func (failingUploads) Stale(context.Context, time.Time, int) ([]session.Upload, error) {
 	return nil, nil
 }
