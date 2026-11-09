@@ -1,4 +1,4 @@
-package skills
+package skillshttp
 
 import (
 	"archive/zip"
@@ -18,8 +18,8 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	skillsfmt "github.com/weaveplatform/artifactweave/internal/format/skills"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	skillsfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/skills"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"

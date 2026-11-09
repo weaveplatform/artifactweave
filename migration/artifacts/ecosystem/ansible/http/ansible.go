@@ -1,6 +1,6 @@
-// Package ansible serves Galaxy v3 collection requests through the shared
+// Package ansiblehttp serves Galaxy v3 collection requests through the shared
 // package protocol, source and item boundaries.
-package ansible
+package ansiblehttp
 
 import (
 	"context"
@@ -22,10 +22,10 @@ import (
 	"golang.org/x/mod/semver"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	ansiblefmt "github.com/weaveplatform/artifactweave/internal/format/ansible"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	ansiblefmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/ansible"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/store"

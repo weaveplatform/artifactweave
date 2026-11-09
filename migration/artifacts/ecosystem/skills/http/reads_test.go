@@ -1,4 +1,4 @@
-package skills_test
+package skillshttp_test
 
 import (
 	"archive/zip"
@@ -14,8 +14,8 @@ import (
 	"strings"
 	"testing"
 
-	skillsfmt "github.com/weaveplatform/artifactweave/internal/format/skills"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	skillsfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/skills"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"

@@ -1,4 +1,4 @@
-package skills_test
+package skillshttp_test
 
 import (
 	"archive/zip"
@@ -15,14 +15,14 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	skillsfmt "github.com/weaveplatform/artifactweave/internal/format/skills"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
-	"github.com/weaveplatform/artifactweave/internal/server/skills"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	skillsfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/skills"
+	skillshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/skills/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -94,7 +94,7 @@ func newFixture(t *testing.T) *fixture {
 				return err
 			}
 		},
-	}, skills.Protocol())
+	}, skillshttp.Protocol())
 	return &fixture{t: t, h: router, db: db, items: items, repo: c}
 }
 

@@ -1,16 +1,15 @@
 package ecosystem
 
 import (
-	"github.com/weaveplatform/artifactweave/internal/format/ansible"
 	"github.com/weaveplatform/artifactweave/internal/format/gitlfs"
 	"github.com/weaveplatform/artifactweave/internal/format/machinelearning"
-	"github.com/weaveplatform/artifactweave/internal/format/skills"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/agentpackages"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/agentplugins"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/aieditorextensions"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/alpine"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/ansible"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bazelmodules"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bower"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cargo"
@@ -38,6 +37,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/puppet"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/rpm"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/skills"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/swift"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend"

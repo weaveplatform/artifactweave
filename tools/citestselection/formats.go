@@ -29,7 +29,7 @@ var formats = map[string]formatImpact{
 		[]string{"vscode"},
 	},
 	"chef":    {"./migration/artifacts/ecosystem/chef/...", "@chef", []string{"chef"}},
-	"ansible": {"./internal/format/ansible/...", "@ansible", []string{"ansible"}},
+	"ansible": {"./migration/artifacts/ecosystem/ansible/...", "@ansible", []string{"ansible"}},
 	"alpine":  {"./migration/artifacts/ecosystem/alpine/...", "@alpine", []string{"alpine"}},
 	"bazelmodules": {
 		"./migration/artifacts/ecosystem/bazelmodules/...",
@@ -112,7 +112,7 @@ var formats = map[string]formatImpact{
 		"@pypi,@package_wiring",
 		[]string{"python", "jf"},
 	},
-	"skills": {"./internal/format/skills/...", "@skills", []string{"jf"}},
+	"skills": {"./migration/artifacts/ecosystem/skills/...", "@skills", []string{"jf"}},
 	"swift":  {"./migration/artifacts/ecosystem/swift/...", "@swift", []string{"swift"}},
 	"terraform": {
 		"./migration/artifacts/ecosystem/terraform/...",

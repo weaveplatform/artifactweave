@@ -1,4 +1,4 @@
-package ansible_test
+package ansiblehttp_test
 
 import (
 	"bytes"
@@ -16,8 +16,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	ansiblefmt "github.com/weaveplatform/artifactweave/internal/format/ansible"
-	"github.com/weaveplatform/artifactweave/internal/server/ansible"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
@@ -28,6 +26,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	ansiblefmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/ansible"
+	ansiblehttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/ansible/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -63,7 +63,10 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	items := &item.Service{Store: db, Blobs: blobs, Formats: ecosystem.For}
-	data := repopath.Read(t, "internal/format/ansible/testdata/weave-sample-1.2.3.tar.gz")
+	data := repopath.Read(
+		t,
+		"migration/artifacts/ecosystem/ansible/testdata/weave-sample-1.2.3.tar.gz",
+	)
 	f := &fixture{t: t, db: db, items: items, repo: c, data: data}
 	f.mount(nil)
 	return f
@@ -109,7 +112,7 @@ func (f *fixture) mount(remote *source.Service) {
 			}
 			return err
 		},
-	}, ansible.Protocol(remote))
+	}, ansiblehttp.Protocol(remote))
 	f.h = router
 }
 

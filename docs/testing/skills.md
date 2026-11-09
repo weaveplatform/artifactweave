@@ -21,7 +21,7 @@ item-service writes, copies and restores run the same format hook; delete
 prunes the package index, and a full reindex rebuilds it from stored ZIPs.
 Versions sort by SemVer.
 
-`go test ./internal/format/skills ./internal/server/skills ./pkg/types`
+`go test ./migration/artifacts/ecosystem/skills ./migration/artifacts/ecosystem/skills/http ./pkg/types`
 checks multipart success and refusal, ZIP/path safety, metadata, package
 properties, delete/restore/copy, reindex and version ordering. Issue
 [#689](https://github.com/weaveplatform/artifactweave/issues/689) adds

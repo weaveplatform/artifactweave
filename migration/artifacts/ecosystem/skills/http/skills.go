@@ -1,5 +1,5 @@
-// Package skills serves the local ClawHub-compatible Skills publish API.
-package skills
+// Package skillshttp serves the local ClawHub-compatible Skills publish API.
+package skillshttp
 
 import (
 	"archive/zip"
@@ -16,9 +16,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	skillsfmt "github.com/weaveplatform/artifactweave/internal/format/skills"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	skillsfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/skills"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )

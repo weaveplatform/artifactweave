@@ -12,8 +12,8 @@ import (
 
 	"github.com/cucumber/godog"
 
-	ansiblefmt "github.com/weaveplatform/artifactweave/internal/format/ansible"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
+	ansiblefmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/ansible"
 )
 
 func (w *world) registerAnsible(sc *godog.ScenarioContext) {

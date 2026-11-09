@@ -545,7 +545,7 @@
       "owner_issue": 782,
       "evidence": "test/acceptance/features/ansible.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/ansible-repositories",
-      "route_file": "internal/server/ansible/ansible.go",
+      "route_file": "migration/artifacts/ecosystem/ansible/http/ansible.go",
       "p9c": true
     },
     {
@@ -754,7 +754,7 @@
       "owner_issue": 0,
       "evidence": "test/acceptance/features/skills.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
-      "route_file": "internal/server/skills/skills.go",
+      "route_file": "migration/artifacts/ecosystem/skills/http/skills.go",
       "p9c": false
     },
     {

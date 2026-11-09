@@ -72,7 +72,7 @@ When a test file leaves a shared directory such as `internal/server`:
 | PyPI | `migration/artifacts/ecosystem/pypi/http`, `test/server/artifacts/pypi` |
 | Dart pub | `migration/artifacts/ecosystem/pub/http` |
 | RubyGems | `migration/artifacts/ecosystem/gems/http`, `test/server/artifacts/gems` |
-| Skills | `internal/server/skills` |
+| Skills | `migration/artifacts/ecosystem/skills/http` |
 | Terraform registry | `migration/artifacts/ecosystem/terraform/http`, `test/server/artifacts/terraform` |
 | Terraform backend | `migration/artifacts/ecosystem/terraformbackend/http`, `test/server/artifacts/terraformbackend` |
 | Shared | `internal/server`, `internal/server/pkgroute`, `test/server/access` |

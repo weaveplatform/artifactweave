@@ -1,4 +1,4 @@
-package ansible_test
+package ansiblehttp_test
 
 import (
 	"context"

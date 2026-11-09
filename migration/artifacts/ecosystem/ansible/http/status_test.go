@@ -1,4 +1,4 @@
-package ansible_test
+package ansiblehttp_test
 
 import (
 	"archive/tar"
@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	ansiblefmt "github.com/weaveplatform/artifactweave/internal/format/ansible"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	ansiblefmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/ansible"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 

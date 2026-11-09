@@ -9,7 +9,7 @@ import (
 	"testing"
 	"testing/iotest"
 
-	"github.com/weaveplatform/artifactweave/internal/format/ansible"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/ansible"
 )
 
 func TestUnitArchiveRejectsUnsafeOrInconsistentContent(t *testing.T) {
