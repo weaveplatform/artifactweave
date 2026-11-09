@@ -39,7 +39,7 @@ func (w *world) cranRedirectArchive() error {
 }
 
 func cranTestdata(name string) string {
-	return filepath.Join(repoRoot, "internal/format/cran/testdata", name)
+	return filepath.Join(repoRoot, "migration/artifacts/ecosystem/cran/testdata", name)
 }
 
 func (w *world) cranFixture(folder string) error {

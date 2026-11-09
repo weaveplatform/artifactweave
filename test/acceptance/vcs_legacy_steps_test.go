@@ -121,7 +121,7 @@ func (w *world) vcsLegacyUpstream(provider, visibility, marker string) error {
 }
 
 func (w *world) vcsLegacyContent(marker string) error {
-	root := filepath.Join(repoRoot, "internal/server/vcs/testdata")
+	root := filepath.Join(repoRoot, "migration/artifacts/ecosystem/vcs/http/testdata")
 	manifest, err := os.ReadFile(filepath.Join(root, "git-archives.json"))
 	if err != nil {
 		return err
@@ -200,7 +200,10 @@ func (w *world) vcsLegacyFault(kind, fault string) error {
 	switch fault {
 	case "wrong-commit":
 		data, err := os.ReadFile(
-			filepath.Join(repoRoot, "internal/server/vcs/testdata/refreshed-vcs-archive.tar.gz"),
+			filepath.Join(
+				repoRoot,
+				"migration/artifacts/ecosystem/vcs/http/testdata/refreshed-vcs-archive.tar.gz",
+			),
 		)
 		if err != nil {
 			return err

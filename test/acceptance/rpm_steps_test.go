@@ -13,8 +13,8 @@ import (
 
 	"github.com/cucumber/godog"
 
-	"github.com/weaveplatform/artifactweave/internal/format/rpm"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/rpm"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/terraformtest"
 )
 
@@ -177,7 +177,7 @@ func (w *world) prepareRPMFixture() error {
 		return err
 	}
 	body, err := os.ReadFile(
-		filepath.Join(repoRoot, "internal/format/rpm/testdata", rpmFixture),
+		filepath.Join(repoRoot, "migration/artifacts/ecosystem/rpm/testdata", rpmFixture),
 	)
 	if err != nil {
 		return err

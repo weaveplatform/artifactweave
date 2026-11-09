@@ -21,27 +21,18 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/agentpackages"
 	"github.com/weaveplatform/artifactweave/internal/server/aieditorextensions"
 	"github.com/weaveplatform/artifactweave/internal/server/ansible"
-	"github.com/weaveplatform/artifactweave/internal/server/bazelmodules"
-	"github.com/weaveplatform/artifactweave/internal/server/bower"
 	"github.com/weaveplatform/artifactweave/internal/server/cargo"
 	"github.com/weaveplatform/artifactweave/internal/server/chef"
 	"github.com/weaveplatform/artifactweave/internal/server/composer"
-	"github.com/weaveplatform/artifactweave/internal/server/conan"
-	"github.com/weaveplatform/artifactweave/internal/server/conda"
 	"github.com/weaveplatform/artifactweave/internal/server/gems"
 	"github.com/weaveplatform/artifactweave/internal/server/gitlfs"
-	"github.com/weaveplatform/artifactweave/internal/server/hex"
-	"github.com/weaveplatform/artifactweave/internal/server/huggingface"
-	"github.com/weaveplatform/artifactweave/internal/server/jetbrainsplugins"
 	"github.com/weaveplatform/artifactweave/internal/server/luarocks"
 	"github.com/weaveplatform/artifactweave/internal/server/machinelearning"
-	"github.com/weaveplatform/artifactweave/internal/server/nix"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/server/pub"
 	"github.com/weaveplatform/artifactweave/internal/server/puppet"
 	"github.com/weaveplatform/artifactweave/internal/server/skills"
 	"github.com/weaveplatform/artifactweave/internal/server/swift"
-	"github.com/weaveplatform/artifactweave/internal/server/terraformbackend"
 	"github.com/weaveplatform/artifactweave/internal/server/vagrant"
 	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
@@ -54,15 +45,24 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	bazelmoduleshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bazelmodules/http"
+	bowerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bower/http"
 	cocoapodshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods/http"
+	conanhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conan/http"
+	condahttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conda/http"
 	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
 	golanghttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang/http"
 	helmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm/http"
+	hexhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/hex/http"
+	huggingfacehttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface/http"
+	jetbrainspluginshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/jetbrainsplugins/http"
 	nimmodelhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nimmodel/http"
+	nixhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nix/http"
 	npmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm/http"
 	nugethttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget/http"
 	pypihttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi/http"
 	terraformhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/http"
+	terraformbackendhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -209,7 +209,7 @@ type Config struct {
 // constructor here.
 var protocols = []func(Config) pkgroute.Protocol{
 	func(cfg Config) pkgroute.Protocol {
-		return nix.Protocol(nix.Options{
+		return nixhttp.Protocol(nixhttp.Options{
 			RemoteSources: cfg.RemoteSources,
 			Authorizer:    cfg.Access.Authorizer,
 			KeyPairs:      cfg.Access.Keys,
@@ -218,17 +218,19 @@ var protocols = []func(Config) pkgroute.Protocol{
 	func(cfg Config) pkgroute.Protocol {
 		return puppet.Protocol(puppet.Options{Blobs: cfg.Blobs, RemoteSources: cfg.RemoteSources})
 	},
-	func(cfg Config) pkgroute.Protocol { return bazelmodules.Protocol(cfg.RemoteSources) },
+	func(cfg Config) pkgroute.Protocol { return bazelmoduleshttp.Protocol(cfg.RemoteSources) },
 	func(cfg Config) pkgroute.Protocol {
-		return bower.Protocol(bower.Options{RemoteSources: cfg.RemoteSources})
+		return bowerhttp.Protocol(bowerhttp.Options{RemoteSources: cfg.RemoteSources})
 	},
-	func(cfg Config) pkgroute.Protocol { return conda.Protocol(cfg.RemoteSources, cfg.FormatSettings.Conda) },
+	func(cfg Config) pkgroute.Protocol {
+		return condahttp.Protocol(cfg.RemoteSources, cfg.FormatSettings.Conda)
+	},
 	func(cfg Config) pkgroute.Protocol { return ansible.Protocol(cfg.RemoteSources) },
 	func(Config) pkgroute.Protocol { return machinelearning.Protocol() },
 	func(cfg Config) pkgroute.Protocol { return chef.Protocol(cfg.RemoteSources) },
 	func(cfg Config) pkgroute.Protocol { return aieditorextensions.Protocol(cfg.RemoteSources) },
 	func(cfg Config) pkgroute.Protocol {
-		return huggingface.Protocol(huggingface.Options{
+		return huggingfacehttp.Protocol(huggingfacehttp.Options{
 			XetEnabled:    cfg.HuggingFaceXetEnabled,
 			Authenticator: cfg.Access.Authenticator,
 			Authorizer:    cfg.Access.Authorizer,
@@ -242,7 +244,7 @@ var protocols = []func(Config) pkgroute.Protocol{
 	},
 	func(Config) pkgroute.Protocol { return agentpackages.Protocol() },
 	func(cfg Config) pkgroute.Protocol {
-		return conan.Protocol(conan.Options{
+		return conanhttp.Protocol(conanhttp.Options{
 			RemoteSources: cfg.RemoteSources, Tokens: cfg.Access.Tokens,
 		})
 	},
@@ -272,8 +274,8 @@ var protocols = []func(Config) pkgroute.Protocol{
 		)
 	},
 	func(cfg Config) pkgroute.Protocol {
-		return hex.Protocol(
-			hex.Options{RemoteSources: cfg.RemoteSources, KeyPairs: cfg.Access.Keys},
+		return hexhttp.Protocol(
+			hexhttp.Options{RemoteSources: cfg.RemoteSources, KeyPairs: cfg.Access.Keys},
 		)
 	},
 	func(cfg Config) pkgroute.Protocol {
@@ -289,7 +291,7 @@ var protocols = []func(Config) pkgroute.Protocol{
 		return nimmodelhttp.Protocol(cfg.RemoteSources)
 	},
 	func(cfg Config) pkgroute.Protocol {
-		return jetbrainsplugins.Protocol(cfg.RemoteSources)
+		return jetbrainspluginshttp.Protocol(cfg.RemoteSources)
 	},
 	func(Config) pkgroute.Protocol { return golanghttp.Protocol() },
 	func(cfg Config) pkgroute.Protocol {
@@ -466,8 +468,8 @@ func New(cfg Config) http.Handler {
 	mounted = append(mounted, cfg.Protocols...)
 	if cfg.Auth != nil {
 		r.Use(authenticate(cfg.Auth, cfg.Store, func(req *http.Request) bool {
-			if terraformbackend.IsPath(req.URL.Path) {
-				return terraformbackend.SkipsAuthentication(req)
+			if terraformbackendhttp.IsPath(req.URL.Path) {
+				return terraformbackendhttp.SkipsAuthentication(req)
 			}
 			return slices.ContainsFunc(mounted, func(p pkgroute.Protocol) bool {
 				return p.SkipsAuthentication(req)
@@ -518,9 +520,9 @@ func New(cfg Config) http.Handler {
 	// handle the ordinary one-segment forms.
 	r.Get("/artifactory/api/vcs/*", artSvc.vcsNested)
 	registry.Register(r)
-	terraformbackend.Register(
+	terraformbackendhttp.Register(
 		r,
-		terraformbackend.Options{
+		terraformbackendhttp.Options{
 			Items:        artSvc.items(cfg.Store),
 			Keys:         cfg.Keys,
 			Fault:        func(r *http.Request, err error) { noteCause(r.Context(), err) },

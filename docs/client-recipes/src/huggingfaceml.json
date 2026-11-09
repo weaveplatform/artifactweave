@@ -70,7 +70,7 @@
       ]
     },
     {
-      "path": "internal/server/huggingface/migration_test.go",
+      "path": "migration/artifacts/ecosystem/huggingface/http/migration_test.go",
       "contains": [
         "TestAccPinnedClientReadsMigratedLegacyRevisions",
         "TestAccLegacyMigrationPreservesRevisionsBytesPropertiesAndPolicy",
@@ -78,7 +78,7 @@
       ]
     },
     {
-      "path": "internal/server/huggingface/migration_scope_test.go",
+      "path": "migration/artifacts/ecosystem/huggingface/http/migration_scope_test.go",
       "contains": [
         "TestAccLegacyMigrationHonorsAdministratorTokenScopes"
       ]

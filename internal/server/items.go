@@ -16,9 +16,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/format/alpine"
-	"github.com/weaveplatform/artifactweave/internal/format/debian"
-	"github.com/weaveplatform/artifactweave/internal/format/rpm"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -27,8 +24,11 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/reindexauth"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/alpine"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/rpm"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"

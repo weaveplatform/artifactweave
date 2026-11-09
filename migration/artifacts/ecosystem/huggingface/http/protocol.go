@@ -1,0 +1,183 @@
+package huggingfacehttp
+
+import (
+	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/go-chi/chi/v5"
+
+	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	format "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface"
+	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
+	"github.com/weaveplatform/artifactweave/pkg/store"
+)
+
+const signingPurpose = "huggingfaceml-lfs-upload-v1"
+
+// Options configures the Hugging Face protocol. Its access contracts read
+// through the request's context, so a server binds them over the store the
+// router kit serves, and the migration's permission scan joins the
+// migration's transaction.
+type Options struct {
+	XetEnabled bool
+	// Authenticator rechecks the credential that a Xet token or an LFS
+	// upload grant names, against current state, before the grant is
+	// honoured. Nil, as on a server without authentication, answers a Xet
+	// token request 501 and refuses the Xet CAS routes and an LFS batch
+	// upload 403.
+	Authenticator accessapi.Authenticator
+	// Authorizer evaluates the permissions of the principal that
+	// Authenticator restores. It is required whenever Authenticator is set.
+	Authorizer accessapi.Authorizer
+	// Grants reports a permission target whose access a legacy layout
+	// migration would change. The migration route requires it.
+	Grants        accessapi.Grants
+	RemoteSources *source.Service
+	Keys          *crypt.Keyring
+	Now           func() time.Time
+}
+
+type virtualSource struct{}
+
+func (virtualSource) Item(
+	_ context.Context,
+	_ store.Store,
+	_ repo.Config,
+	_ string,
+) (pkgroute.Found, error) {
+	return pkgroute.Found{}, source.ErrUnsupported
+}
+
+// Protocol returns the Hugging Face protocol for the router kit, for
+// repositories of package type huggingfaceml: the Hub API for models and
+// datasets, resolve downloads, Git LFS, the Xet CAS routes and the legacy
+// layout migration. Local and federated repositories serve their own
+// items; a virtual one serves a revision only from the member it selects;
+// a remote one is served through o.RemoteSources and its cache, and answers
+// 501 while that is nil. Its Signed answers true for the Xet CAS routes and
+// a signed LFS upload, whose own capability the handlers verify.
+func Protocol(o Options) pkgroute.Protocol {
+	sources := map[repo.Class]pkgroute.Source{
+		repo.Local:     pkgroute.Local{},
+		repo.Federated: pkgroute.Local{},
+		repo.Virtual:   virtualSource{},
+	}
+	if o.RemoteSources != nil {
+		sources[repo.Remote] = pkgroute.Remote{Service: o.RemoteSources}
+	}
+	return pkgroute.Protocol{
+		Name: "huggingfaceml", Types: []repo.PackageType{repo.HuggingFaceML},
+		ErrorProfile: apierror.ProfileArtifactory, Sources: sources,
+		Signed: func(r *http.Request) bool {
+			path := strings.TrimPrefix(r.URL.EscapedPath(), "/artifactory/api/huggingfaceml/")
+			_, path, ok := strings.Cut(path, "/")
+			return ok && (strings.HasPrefix(path, "xet/") || r.Method == http.MethodPut &&
+				strings.HasPrefix(path, "lfs/upload/") &&
+				r.URL.Query().Has("sig"))
+		},
+		Routes: func(r chi.Router, k *pkgroute.Kit) {
+			h := handler{k: k, o: o, xetCache: new(xetMetadataCache)}
+			r.Post("/api/artifactweave/migrations/legacy-layout", h.migrateLegacy)
+			r.Post("/api/repos/create", h.createRepo)
+			for _, kind := range []string{"models", "datasets"} {
+				prefix := "/api/" + kind + "/{owner}/{name}"
+				r.Get(prefix, h.info)
+				r.Get(prefix+"/revision/{revision}", h.info)
+				r.Post(prefix+"/branch/{revision}", h.createBranch)
+				r.Get(prefix+"/tree/{revision}", h.tree)
+				r.Get(prefix+"/tree/{revision}/*", h.tree)
+				r.Post(prefix+"/preupload/{revision}", h.preupload)
+				r.Post(prefix+"/commit/{revision}", h.commit)
+				r.Get(prefix+"/xet-read-token/{revision}", h.xetReadToken)
+				r.Get(prefix+"/xet-write-token/{revision}", h.xetWriteToken)
+			}
+			r.Get("/{owner}/{name}/resolve/{revision}/*", h.resolve)
+			r.Head("/{owner}/{name}/resolve/{revision}/*", h.resolve)
+			r.Get("/datasets/{owner}/{name}/resolve/{revision}/*", h.resolve)
+			r.Head("/datasets/{owner}/{name}/resolve/{revision}/*", h.resolve)
+			r.Post("/{owner}/{name}.git/info/lfs/objects/batch", h.lfsBatch)
+			r.Post("/datasets/{owner}/{name}.git/info/lfs/objects/batch", h.lfsBatch)
+			r.Put("/lfs/upload/{oid}", h.lfsUpload)
+			h.xetRoutes(r)
+		},
+	}
+}
+
+type handler struct {
+	xetCache *xetMetadataCache
+	k        *pkgroute.Kit
+	o        Options
+}
+
+func (h handler) now() time.Time {
+	if h.o.Now != nil {
+		return h.o.Now()
+	}
+	return time.Now()
+}
+
+func identity(r *http.Request) (format.Identity, bool) {
+	kind := "models"
+	if strings.HasPrefix(pkgroute.RequestFrom(r).Rest, "api/datasets/") ||
+		strings.HasPrefix(pkgroute.RequestFrom(r).Rest, "datasets/") {
+		kind = "datasets"
+	}
+	return format.ParseIdentity(kind, chi.URLParam(r, "owner"), chi.URLParam(r, "name"))
+}
+
+func (h handler) xetUnavailable(w http.ResponseWriter, r *http.Request) {
+	h.k.Error(
+		w,
+		r,
+		apierror.New(http.StatusNotImplemented, "Xet CAS is not enabled for this repository"),
+	)
+}
+
+func (h handler) signedUpload(repoKey, oid string, size, expiry int64) string {
+	if h.o.Keys == nil {
+		return ""
+	}
+	mac := hmac.New(sha256.New, h.o.Keys.Derive(signingPurpose))
+	_, _ = fmt.Fprintf(mac, "%s\n%s\n%d\n%d", repoKey, oid, size, expiry)
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+func (h handler) verifyUpload(r *http.Request, oid string) (int64, bool) {
+	q := r.URL.Query()
+	if h.o.Keys == nil || !formatSHA256(oid) || len(q) != 4 || len(q["grant"]) != 1 ||
+		len(q["size"]) != 1 || len(q["exp"]) != 1 || len(q["sig"]) != 1 ||
+		q.Get("sig") == "" {
+		return 0, false
+	}
+	size, err1 := strconv.ParseInt(r.URL.Query().Get("size"), 10, 64)
+	exp, err2 := strconv.ParseInt(r.URL.Query().Get("exp"), 10, 64)
+	if err1 != nil || err2 != nil || size <= 0 || size > 10<<30 ||
+		exp <= h.now().Unix() || exp > h.now().Add(10*time.Minute).Unix() {
+		return 0, false
+	}
+	want, err := hex.DecodeString(h.signedUpload(pkgroute.RequestFrom(r).Repo.Key, oid, size, exp))
+	if err != nil {
+		return 0, false
+	}
+	got, err := hex.DecodeString(r.URL.Query().Get("sig"))
+	return size, err == nil && hmac.Equal(got, want)
+}
+
+func formatSHA256(s string) bool {
+	if len(s) != 64 || strings.ToLower(s) != s {
+		return false
+	}
+	_, err := hex.DecodeString(s)
+	return err == nil
+}

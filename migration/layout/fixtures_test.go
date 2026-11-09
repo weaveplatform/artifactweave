@@ -51,13 +51,13 @@ const parentPrefix = ".." + "/"
 // each with its reason. An entry that excuses nothing is itself a violation,
 // so a moved or rewritten test cannot leave its entry behind.
 var traversalInputs = map[exemption]string{
-	{"internal/format/rpm/corruption_test.go", parentPrefix}: "prefixes a package location " +
+	{"migration/artifacts/ecosystem/rpm/corruption_test.go", parentPrefix}: "prefixes a package location " +
 		"that ReadPackage must reject",
-	{"internal/format/rpm/decode_test.go", parentPrefix}: "prefixes a package location that " +
+	{"migration/artifacts/ecosystem/rpm/decode_test.go", parentPrefix}: "prefixes a package location that " +
 		"the metadata decoder must reject",
-	{"internal/server/bower/archive_fault_test.go", parentPrefix}: "a tar directory entry " +
+	{"migration/artifacts/ecosystem/bower/http/archive_fault_test.go", parentPrefix}: "a tar directory entry " +
 		"that climbs out of the archive, which the upload must reject",
-	{"internal/server/conda/shards_test.go", parentPrefix}: "a relative shard base URL that " +
+	{"migration/artifacts/ecosystem/conda/http/shards_test.go", parentPrefix}: "a relative shard base URL that " +
 		"climbs out of the channel, which shardURLs must reject",
 	{"migration/artifacts/core/registry/registry_test.go", parentPrefix}: "prefixes an id that Status " +
 		"must not resolve",

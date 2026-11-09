@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/format/huggingface/xet"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface/xet"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -32,7 +32,7 @@ type xetTestToken struct {
 
 func xetFixture(t *testing.T, name string) []byte {
 	t.Helper()
-	return repopath.Read(t, "internal/format/huggingface/xet/testdata/"+name)
+	return repopath.Read(t, "migration/artifacts/ecosystem/huggingface/xet/testdata/"+name)
 }
 
 func newXetWorld(t *testing.T) *itemWorld {

@@ -74,7 +74,7 @@ When a test file leaves a shared directory such as `internal/server`:
 | RubyGems | `internal/server/gems`, `test/server/artifacts/gems` |
 | Skills | `internal/server/skills` |
 | Terraform registry | `migration/artifacts/ecosystem/terraform/http`, `test/server/artifacts/terraform` |
-| Terraform backend | `internal/server/terraformbackend`, `test/server/artifacts/terraformbackend` |
+| Terraform backend | `migration/artifacts/ecosystem/terraformbackend/http`, `test/server/artifacts/terraformbackend` |
 | Shared | `internal/server`, `internal/server/pkgroute`, `test/server/access` |
 
 `test/server/support` and the packages under it (`harness`, `agentcommon` and

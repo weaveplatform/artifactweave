@@ -4,44 +4,44 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/agentpackages"
 	"github.com/weaveplatform/artifactweave/internal/format/agentplugins"
 	"github.com/weaveplatform/artifactweave/internal/format/aieditorextensions"
-	"github.com/weaveplatform/artifactweave/internal/format/alpine"
 	"github.com/weaveplatform/artifactweave/internal/format/ansible"
-	"github.com/weaveplatform/artifactweave/internal/format/bazelmodules"
-	"github.com/weaveplatform/artifactweave/internal/format/bower"
 	"github.com/weaveplatform/artifactweave/internal/format/cargo"
 	"github.com/weaveplatform/artifactweave/internal/format/chef"
 	"github.com/weaveplatform/artifactweave/internal/format/composer"
-	"github.com/weaveplatform/artifactweave/internal/format/conan"
-	"github.com/weaveplatform/artifactweave/internal/format/conda"
-	"github.com/weaveplatform/artifactweave/internal/format/cran"
-	"github.com/weaveplatform/artifactweave/internal/format/debian"
 	"github.com/weaveplatform/artifactweave/internal/format/gems"
 	"github.com/weaveplatform/artifactweave/internal/format/gitlfs"
-	"github.com/weaveplatform/artifactweave/internal/format/hex"
-	"github.com/weaveplatform/artifactweave/internal/format/huggingface"
 	"github.com/weaveplatform/artifactweave/internal/format/luarocks"
 	"github.com/weaveplatform/artifactweave/internal/format/machinelearning"
-	"github.com/weaveplatform/artifactweave/internal/format/nix"
-	"github.com/weaveplatform/artifactweave/internal/format/opkg"
 	"github.com/weaveplatform/artifactweave/internal/format/pub"
 	"github.com/weaveplatform/artifactweave/internal/format/puppet"
-	"github.com/weaveplatform/artifactweave/internal/format/rpm"
 	"github.com/weaveplatform/artifactweave/internal/format/skills"
 	"github.com/weaveplatform/artifactweave/internal/format/swift"
-	"github.com/weaveplatform/artifactweave/internal/format/terraformbackend"
 	"github.com/weaveplatform/artifactweave/internal/format/vagrant"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/alpine"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bazelmodules"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bower"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conan"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conda"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cran"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/hex"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nix"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/opkg"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/rpm"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend"
 )
 
 // Settings are the server-wide options of the formats that take any, from
@@ -72,7 +72,9 @@ var handlers = []struct {
 }{
 	{
 		aieditorextensions.Serves,
-		func(Settings) format.Handler { return aieditorextensions.Handler{} },
+		func(Settings) format.Handler {
+			return aieditorextensions.Handler{}
+		},
 	},
 	{alpine.Serves, func(Settings) format.Handler { return alpine.Handler{} }},
 	{chef.Serves, func(Settings) format.Handler { return chef.Handler{} }},

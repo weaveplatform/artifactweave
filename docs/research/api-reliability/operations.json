@@ -59,7 +59,7 @@
   {
     "route": "CONNECT /artifactory/api/conan/{repoKey}/",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/conan.handler.serve-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/conan/http.handler.serve-fm",
     "review_family": "native-conan",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -78,7 +78,7 @@
   {
     "route": "CONNECT /artifactory/api/conan/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/conan.handler.serve-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/conan/http.handler.serve-fm",
     "review_family": "native-conan",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -1143,7 +1143,7 @@
   {
     "route": "DELETE /artifactory/api/conan/{repoKey}/",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/conan.handler.serve-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/conan/http.handler.serve-fm",
     "review_family": "native-conan",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -1162,7 +1162,7 @@
   {
     "route": "DELETE /artifactory/api/conan/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/conan.handler.serve-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/conan/http.handler.serve-fm",
     "review_family": "native-conan",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -1350,7 +1350,7 @@
   {
     "route": "DELETE /artifactory/api/nix/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/nix.handler.remove-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/nix/http.handler.remove-fm",
     "review_family": "native-nix",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -1895,7 +1895,7 @@
   {
     "route": "DELETE /artifactory/api/terraform/remote/v2/organizations/{repo}/workspaces/{name}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -1914,7 +1914,7 @@
   {
     "route": "DELETE /artifactory/api/terraform/remote/v2/workspaces/{id}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -4251,7 +4251,7 @@
   {
     "route": "GET /artifactory/api/bazelmodules/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/bazelmodules.handler.read-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/bazelmodules/http.handler.read-fm",
     "review_family": "native-bazelmodules",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -4270,7 +4270,7 @@
   {
     "route": "GET /artifactory/api/bower/{repoKey}/binaries/{owner}/{git}/{tag}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/bower.handler.binary-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/bower/http.handler.binary-fm",
     "review_family": "native-bower",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -4289,7 +4289,7 @@
   {
     "route": "GET /artifactory/api/bower/{repoKey}/packages",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/bower.handler.packages-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/bower/http.handler.packages-fm",
     "review_family": "native-bower",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -4308,7 +4308,7 @@
   {
     "route": "GET /artifactory/api/bower/{repoKey}/packages/search/{name}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/bower.handler.search-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/bower/http.handler.search-fm",
     "review_family": "native-bower",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -4327,7 +4327,7 @@
   {
     "route": "GET /artifactory/api/bower/{repoKey}/packages/{name}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/bower.handler.packageByName-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/bower/http.handler.packageByName-fm",
     "review_family": "native-bower",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -4346,7 +4346,7 @@
   {
     "route": "GET /artifactory/api/bower/{repoKey}/refs/{owner}/{name}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/bower.handler.refs-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/bower/http.handler.refs-fm",
     "review_family": "native-bower",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -5052,7 +5052,7 @@
   {
     "route": "GET /artifactory/api/conan/{repoKey}/",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/conan.handler.serve-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/conan/http.handler.serve-fm",
     "review_family": "native-conan",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -5071,7 +5071,7 @@
   {
     "route": "GET /artifactory/api/conan/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/conan.handler.serve-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/conan/http.handler.serve-fm",
     "review_family": "native-conan",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -5090,7 +5090,7 @@
   {
     "route": "GET /artifactory/api/conda/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/conda.handler.read-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/conda/http.handler.read-fm",
     "review_family": "native-conda",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -5749,7 +5749,7 @@
   {
     "route": "GET /artifactory/api/hex/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/hex.handler.read-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/hex/http.handler.read-fm",
     "review_family": "native-hex",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -5768,7 +5768,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/api/datasets/{owner}/{name}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.info-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.info-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -5787,7 +5787,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/api/datasets/{owner}/{name}/revision/{revision}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.info-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.info-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -5806,7 +5806,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/api/datasets/{owner}/{name}/tree/{revision}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.tree-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.tree-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -5825,7 +5825,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/api/datasets/{owner}/{name}/tree/{revision}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.tree-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.tree-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -5844,7 +5844,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/api/datasets/{owner}/{name}/xet-read-token/{revision}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.xetReadToken-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.xetReadToken-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -5863,7 +5863,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/api/datasets/{owner}/{name}/xet-write-token/{revision}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.xetWriteToken-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.xetWriteToken-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -5882,7 +5882,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/api/models/{owner}/{name}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.info-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.info-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -5901,7 +5901,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/api/models/{owner}/{name}/revision/{revision}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.info-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.info-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -5920,7 +5920,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/api/models/{owner}/{name}/tree/{revision}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.tree-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.tree-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -5939,7 +5939,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/api/models/{owner}/{name}/tree/{revision}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.tree-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.tree-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -5958,7 +5958,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/api/models/{owner}/{name}/xet-read-token/{revision}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.xetReadToken-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.xetReadToken-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -5977,7 +5977,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/api/models/{owner}/{name}/xet-write-token/{revision}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.xetWriteToken-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.xetWriteToken-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -5996,7 +5996,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/datasets/{owner}/{name}/resolve/{revision}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.resolve-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.resolve-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6015,7 +6015,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/xet/{kind}/{owner}/{name}/{revision}/data/{hash}/{segment}/{start}/{end}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.xetData-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.xetData-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6034,7 +6034,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/xet/{kind}/{owner}/{name}/{revision}/v1/chunks/{prefix}/{hash}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.xetDedup-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.xetDedup-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6053,7 +6053,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/xet/{kind}/{owner}/{name}/{revision}/v1/reconstructions/{hash}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.xetReconstruction-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.xetReconstruction-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6072,7 +6072,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/xet/{kind}/{owner}/{name}/{revision}/v2/reconstructions/{hash}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.xetReconstruction-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.xetReconstruction-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6091,7 +6091,7 @@
   {
     "route": "GET /artifactory/api/huggingfaceml/{repoKey}/{owner}/{name}/resolve/{revision}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.resolve-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.resolve-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6127,7 +6127,7 @@
   {
     "route": "GET /artifactory/api/jetbrainsplugins/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/jetbrainsplugins.handler.read-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/jetbrainsplugins/http.handler.read-fm",
     "review_family": "native-jetbrainsplugins",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6298,7 +6298,7 @@
   {
     "route": "GET /artifactory/api/nix/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/nix.handler.read-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/nix/http.handler.read-fm",
     "review_family": "native-nix",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -9233,7 +9233,7 @@
   {
     "route": "GET /artifactory/api/terraform/remote/v2/account/details",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -9252,7 +9252,7 @@
   {
     "route": "GET /artifactory/api/terraform/remote/v2/organizations/{repo}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -9271,7 +9271,7 @@
   {
     "route": "GET /artifactory/api/terraform/remote/v2/organizations/{repo}/entitlement-set",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -9290,7 +9290,7 @@
   {
     "route": "GET /artifactory/api/terraform/remote/v2/organizations/{repo}/workspaces",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -9309,7 +9309,7 @@
   {
     "route": "GET /artifactory/api/terraform/remote/v2/organizations/{repo}/workspaces/{name}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -9328,7 +9328,7 @@
   {
     "route": "GET /artifactory/api/terraform/remote/v2/ping",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.Register.func1.2",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.Register.func1.2",
     "review_family": "native-terraform",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -9347,7 +9347,7 @@
   {
     "route": "GET /artifactory/api/terraform/remote/v2/state-versions",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -9366,7 +9366,7 @@
   {
     "route": "GET /artifactory/api/terraform/remote/v2/state-versions/{id}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -9385,7 +9385,7 @@
   {
     "route": "GET /artifactory/api/terraform/remote/v2/state-versions/{id}/download",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -9404,7 +9404,7 @@
   {
     "route": "GET /artifactory/api/terraform/remote/v2/workspaces/{id}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -9423,7 +9423,7 @@
   {
     "route": "GET /artifactory/api/terraform/remote/v2/workspaces/{id}/current-state-version",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -11816,7 +11816,7 @@
   {
     "route": "HEAD /artifactory/api/bazelmodules/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/bazelmodules.handler.read-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/bazelmodules/http.handler.read-fm",
     "review_family": "native-bazelmodules",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -11835,7 +11835,7 @@
   {
     "route": "HEAD /artifactory/api/bower/{repoKey}/binaries/{owner}/{git}/{tag}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/bower.handler.binary-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/bower/http.handler.binary-fm",
     "review_family": "native-bower",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -11854,7 +11854,7 @@
   {
     "route": "HEAD /artifactory/api/bower/{repoKey}/packages",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/bower.handler.packages-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/bower/http.handler.packages-fm",
     "review_family": "native-bower",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -11873,7 +11873,7 @@
   {
     "route": "HEAD /artifactory/api/bower/{repoKey}/packages/search/{name}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/bower.handler.search-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/bower/http.handler.search-fm",
     "review_family": "native-bower",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -11892,7 +11892,7 @@
   {
     "route": "HEAD /artifactory/api/bower/{repoKey}/packages/{name}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/bower.handler.packageByName-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/bower/http.handler.packageByName-fm",
     "review_family": "native-bower",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -11911,7 +11911,7 @@
   {
     "route": "HEAD /artifactory/api/bower/{repoKey}/refs/{owner}/{name}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/bower.handler.refs-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/bower/http.handler.refs-fm",
     "review_family": "native-bower",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12101,7 +12101,7 @@
   {
     "route": "HEAD /artifactory/api/conan/{repoKey}/",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/conan.handler.serve-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/conan/http.handler.serve-fm",
     "review_family": "native-conan",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12120,7 +12120,7 @@
   {
     "route": "HEAD /artifactory/api/conan/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/conan.handler.serve-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/conan/http.handler.serve-fm",
     "review_family": "native-conan",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12139,7 +12139,7 @@
   {
     "route": "HEAD /artifactory/api/conda/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/conda.handler.read-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/conda/http.handler.read-fm",
     "review_family": "native-conda",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12329,7 +12329,7 @@
   {
     "route": "HEAD /artifactory/api/hex/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/hex.handler.read-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/hex/http.handler.read-fm",
     "review_family": "native-hex",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12348,7 +12348,7 @@
   {
     "route": "HEAD /artifactory/api/huggingfaceml/{repoKey}/datasets/{owner}/{name}/resolve/{revision}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.resolve-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.resolve-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12367,7 +12367,7 @@
   {
     "route": "HEAD /artifactory/api/huggingfaceml/{repoKey}/xet/{kind}/{owner}/{name}/{revision}/v1/xorbs/default/{hash}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.xetXorbExists-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.xetXorbExists-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12386,7 +12386,7 @@
   {
     "route": "HEAD /artifactory/api/huggingfaceml/{repoKey}/{owner}/{name}/resolve/{revision}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.resolve-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.resolve-fm",
     "review_family": "native-huggingfaceml",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12405,7 +12405,7 @@
   {
     "route": "HEAD /artifactory/api/jetbrainsplugins/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/jetbrainsplugins.handler.read-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/jetbrainsplugins/http.handler.read-fm",
     "review_family": "native-jetbrainsplugins",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12481,7 +12481,7 @@
   {
     "route": "HEAD /artifactory/api/nix/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/nix.handler.read-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/nix/http.handler.read-fm",
     "review_family": "native-nix",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -13189,7 +13189,7 @@
   {
     "route": "OPTIONS /artifactory/api/conan/{repoKey}/",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/conan.handler.serve-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/conan/http.handler.serve-fm",
     "review_family": "native-conan",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -13208,7 +13208,7 @@
   {
     "route": "OPTIONS /artifactory/api/conan/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/conan.handler.serve-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/conan/http.handler.serve-fm",
     "review_family": "native-conan",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -13743,7 +13743,7 @@
   {
     "route": "PATCH /artifactory/api/conan/{repoKey}/",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/conan.handler.serve-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/conan/http.handler.serve-fm",
     "review_family": "native-conan",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -13762,7 +13762,7 @@
   {
     "route": "PATCH /artifactory/api/conan/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/conan.handler.serve-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/conan/http.handler.serve-fm",
     "review_family": "native-conan",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -15066,7 +15066,7 @@
   {
     "route": "POST /artifactory/api/bower/{repoKey}/packages",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/bower.handler.register-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/bower/http.handler.register-fm",
     "review_family": "native-bower",
     "effects": "create immutable repository/name Git registration; virtual routing selects an eligible remote member; duplicate returns native 403",
     "retry": "no Idempotency-Key or response replay; repository/name uniqueness prevents duplicates; reconcile registry lookup after ambiguous completion or 403",
@@ -15078,7 +15078,7 @@
       "internal/server/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "internal/sqlstore/sqlcommon/content_items.go",
-      "internal/server/bower/register.go",
+      "migration/artifacts/ecosystem/bower/http/register.go",
       "pkg/store/storetest/bower.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
@@ -15526,7 +15526,7 @@
   {
     "route": "POST /artifactory/api/conan/{repoKey}/",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/conan.handler.serve-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/conan/http.handler.serve-fm",
     "review_family": "native-conan",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -15545,7 +15545,7 @@
   {
     "route": "POST /artifactory/api/conan/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/conan.handler.serve-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/conan/http.handler.serve-fm",
     "review_family": "native-conan",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16202,7 +16202,7 @@
   {
     "route": "POST /artifactory/api/huggingfaceml/{repoKey}/api/artifactweave/migrations/legacy-layout",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.migrateLegacy-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.migrateLegacy-fm",
     "review_family": "native-huggingfaceml",
     "effects": "administrator-only bounded copy of one legacy revision; atomic item/index publication preserves source bytes/properties/access policy; quiesced writes/configuration required",
     "retry": "no key required; repeat the identical mapping with dry_run=true after ambiguous completion: ready permits apply, complete is a no-op; conflicting destinations return 409; reapply never rewinds an advanced ref",
@@ -16214,9 +16214,9 @@
       "internal/server/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "internal/sqlstore/sqlcommon/content_items.go",
-      "internal/server/huggingface/migration.go",
-      "internal/server/huggingface/migration_publish.go",
-      "internal/server/huggingface/migration_scope_test.go",
+      "migration/artifacts/ecosystem/huggingface/http/migration.go",
+      "migration/artifacts/ecosystem/huggingface/http/migration_publish.go",
+      "migration/artifacts/ecosystem/huggingface/http/migration_scope_test.go",
       "docs/operations/huggingface-migration.md",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
@@ -16225,7 +16225,7 @@
   {
     "route": "POST /artifactory/api/huggingfaceml/{repoKey}/api/datasets/{owner}/{name}/branch/{revision}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.createBranch-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.createBranch-fm",
     "review_family": "native-huggingfaceml",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16244,7 +16244,7 @@
   {
     "route": "POST /artifactory/api/huggingfaceml/{repoKey}/api/datasets/{owner}/{name}/commit/{revision}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.commit-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.commit-fm",
     "review_family": "native-huggingfaceml",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16263,7 +16263,7 @@
   {
     "route": "POST /artifactory/api/huggingfaceml/{repoKey}/api/datasets/{owner}/{name}/preupload/{revision}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.preupload-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.preupload-fm",
     "review_family": "native-huggingfaceml",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16282,7 +16282,7 @@
   {
     "route": "POST /artifactory/api/huggingfaceml/{repoKey}/api/models/{owner}/{name}/branch/{revision}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.createBranch-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.createBranch-fm",
     "review_family": "native-huggingfaceml",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16301,7 +16301,7 @@
   {
     "route": "POST /artifactory/api/huggingfaceml/{repoKey}/api/models/{owner}/{name}/commit/{revision}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.commit-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.commit-fm",
     "review_family": "native-huggingfaceml",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16320,7 +16320,7 @@
   {
     "route": "POST /artifactory/api/huggingfaceml/{repoKey}/api/models/{owner}/{name}/preupload/{revision}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.preupload-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.preupload-fm",
     "review_family": "native-huggingfaceml",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16339,7 +16339,7 @@
   {
     "route": "POST /artifactory/api/huggingfaceml/{repoKey}/api/repos/create",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.createRepo-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.createRepo-fm",
     "review_family": "native-huggingfaceml",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16358,7 +16358,7 @@
   {
     "route": "POST /artifactory/api/huggingfaceml/{repoKey}/datasets/{owner}/{name}.git/info/lfs/objects/batch",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.lfsBatch-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.lfsBatch-fm",
     "review_family": "native-huggingfaceml",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16377,7 +16377,7 @@
   {
     "route": "POST /artifactory/api/huggingfaceml/{repoKey}/xet/{kind}/{owner}/{name}/{revision}/v1/shards",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.xetUploadShard-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.xetUploadShard-fm",
     "review_family": "native-huggingfaceml",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16396,7 +16396,7 @@
   {
     "route": "POST /artifactory/api/huggingfaceml/{repoKey}/xet/{kind}/{owner}/{name}/{revision}/v1/xorbs/default/{hash}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.xetUploadXorb-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.xetUploadXorb-fm",
     "review_family": "native-huggingfaceml",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16415,7 +16415,7 @@
   {
     "route": "POST /artifactory/api/huggingfaceml/{repoKey}/xet/{kind}/{owner}/{name}/{revision}/v2/shards",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.xetUploadShard-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.xetUploadShard-fm",
     "review_family": "native-huggingfaceml",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16434,7 +16434,7 @@
   {
     "route": "POST /artifactory/api/huggingfaceml/{repoKey}/{owner}/{name}.git/info/lfs/objects/batch",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.lfsBatch-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.lfsBatch-fm",
     "review_family": "native-huggingfaceml",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16837,7 +16837,7 @@
   {
     "route": "POST /artifactory/api/nix/{repoKey}/reindex",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/nix.handler.reindex-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/nix/http.handler.reindex-fm",
     "review_family": "native-nix",
     "effects": "resource mutation/action; see served contract and handler calls; index rebuild/possibly queued work; queue coalescing is not a replay guarantee",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -18368,7 +18368,7 @@
   {
     "route": "POST /artifactory/api/terraform/remote/v2/organizations/{repo}/workspaces",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -18387,7 +18387,7 @@
   {
     "route": "POST /artifactory/api/terraform/remote/v2/workspaces/{id}/actions/force-unlock",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -18406,7 +18406,7 @@
   {
     "route": "POST /artifactory/api/terraform/remote/v2/workspaces/{id}/actions/lock",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -18425,7 +18425,7 @@
   {
     "route": "POST /artifactory/api/terraform/remote/v2/workspaces/{id}/actions/unlock",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -18444,7 +18444,7 @@
   {
     "route": "POST /artifactory/api/terraform/remote/v2/workspaces/{id}/state-versions",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -20781,7 +20781,7 @@
   {
     "route": "PUT /artifactory/api/conan/{repoKey}/",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/conan.handler.serve-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/conan/http.handler.serve-fm",
     "review_family": "native-conan",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -20800,7 +20800,7 @@
   {
     "route": "PUT /artifactory/api/conan/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/conan.handler.serve-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/conan/http.handler.serve-fm",
     "review_family": "native-conan",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -21050,7 +21050,7 @@
   {
     "route": "PUT /artifactory/api/huggingfaceml/{repoKey}/lfs/upload/{oid}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/huggingface.handler.lfsUpload-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/huggingface/http.handler.lfsUpload-fm",
     "review_family": "native-huggingfaceml",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -21126,7 +21126,7 @@
   {
     "route": "PUT /artifactory/api/nix/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/nix.handler.put-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/nix/http.handler.put-fm",
     "review_family": "native-nix",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -21722,7 +21722,7 @@
   {
     "route": "PUT /artifactory/api/terraform/remote/v2/state-versions/{id}/content",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/terraformbackend/terraformbackend.go: internal/server/terraformbackend.handler.wrap.1",
+    "handler": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go: migration/artifacts/ecosystem/terraformbackend/http.handler.wrap.1",
     "review_family": "native-terraform",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -22315,7 +22315,7 @@
   {
     "route": "QUERY /artifactory/api/conan/{repoKey}/",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/conan.handler.serve-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/conan/http.handler.serve-fm",
     "review_family": "native-conan",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -22334,7 +22334,7 @@
   {
     "route": "QUERY /artifactory/api/conan/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/conan.handler.serve-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/conan/http.handler.serve-fm",
     "review_family": "native-conan",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -22619,7 +22619,7 @@
   {
     "route": "TRACE /artifactory/api/conan/{repoKey}/",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/conan.handler.serve-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/conan/http.handler.serve-fm",
     "review_family": "native-conan",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -22638,7 +22638,7 @@
   {
     "route": "TRACE /artifactory/api/conan/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/conan.handler.serve-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/conan/http.handler.serve-fm",
     "review_family": "native-conan",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",

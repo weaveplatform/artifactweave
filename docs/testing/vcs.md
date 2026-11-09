@@ -94,7 +94,7 @@ permissions, and malformed requests. Focused local checks:
 
 ```sh
 ARTIFACTWEAVE_REQUIRE_CURL=1 go test ./internal/server -run '^TestAccVCSRemoteRESTAndSubgroup$' -count=1 -v
-go test ./internal/server/vcs -count=1
+go test ./migration/artifacts/ecosystem/vcs/http -count=1
 ```
 
 Run the complete pinned-client provider checks locally:

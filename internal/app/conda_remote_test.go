@@ -12,11 +12,11 @@ import (
 	"testing"
 	"time"
 
-	condafmt "github.com/weaveplatform/artifactweave/internal/format/conda"
 	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	condafmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conda"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
@@ -40,7 +40,7 @@ func newCondaRemoteWorld(t *testing.T) (*remoteWorld, map[string][]byte, string)
 		},
 	)
 	const name = "artifactweave-conda-fixture-1.0.0-0.tar.bz2"
-	body := repopath.Read(t, "internal/format/conda/testdata/"+name)
+	body := repopath.Read(t, "migration/artifacts/ecosystem/conda/testdata/"+name)
 	id, _ := condafmt.ParsePackagePath("noarch/" + name)
 	record, err := condafmt.ReadPackage(t.Context(), bytes.NewReader(body), int64(len(body)), id)
 	if err != nil {

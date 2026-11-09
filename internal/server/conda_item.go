@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"strings"
 
-	condafmt "github.com/weaveplatform/artifactweave/internal/format/conda"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	condafmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conda"
 )
 
 // Stored shards and CAS containers can span several read grants. Their native

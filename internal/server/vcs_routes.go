@@ -10,10 +10,10 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
-	"github.com/weaveplatform/artifactweave/internal/server/vcs"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	vcshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/vcs/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -31,7 +31,7 @@ func (s artifactoryService) vcsRepository(
 	ctx context.Context,
 	key, owner, name string,
 ) (vcsAccess, error) {
-	if !vcs.ValidProject(owner, name) {
+	if !vcshttp.ValidProject(owner, name) {
 		return vcsAccess{}, apierror.New(http.StatusBadRequest, "invalid VCS repository path")
 	}
 	st, err := s.content()
@@ -140,27 +140,27 @@ func (s artifactoryService) vcsResultBytes(
 func (s artifactoryService) vcsRefs(
 	ctx context.Context,
 	key, owner, name string,
-) ([]vcs.Ref, vcsAccess, error) {
+) ([]vcshttp.Ref, vcsAccess, error) {
 	a, err := s.vcsRepository(ctx, key, owner, name)
 	if err != nil {
 		return nil, a, err
 	}
-	endpoints, err := vcs.RefEndpoints(a.repo, owner, name)
+	endpoints, err := vcshttp.RefEndpoints(a.repo, owner, name)
 	if err != nil {
 		return nil, a, apierror.New(http.StatusBadRequest, "invalid VCS upstream")
 	}
-	var refs []vcs.Ref
+	var refs []vcshttp.Ref
 	for _, endpoint := range endpoints {
 		found, err := s.vcsReadRefs(ctx, a, owner, name, endpoint)
 		if err != nil {
 			return nil, a, err
 		}
-		if len(found) > vcs.MaxRefs-len(refs) {
+		if len(found) > vcshttp.MaxRefs-len(refs) {
 			return nil, a, apierror.New(http.StatusBadGateway, "too many VCS references")
 		}
 		refs = append(refs, found...)
 	}
-	filtered := make([]vcs.Ref, 0, len(refs))
+	filtered := make([]vcshttp.Ref, 0, len(refs))
 	for _, ref := range refs {
 		kind := "tags"
 		if ref.Branch {
@@ -174,8 +174,8 @@ func (s artifactoryService) vcsRefs(
 }
 
 func (s artifactoryService) vcsReadRefs(
-	ctx context.Context, a vcsAccess, owner, name string, endpoint vcs.RefEndpoint,
-) ([]vcs.Ref, error) {
+	ctx context.Context, a vcsAccess, owner, name string, endpoint vcshttp.RefEndpoint,
+) ([]vcshttp.Ref, error) {
 	resource := source.Resource{
 		Kind:              source.ResourceKindVersions,
 		Path:              owner + "/" + name + "/refs",
@@ -187,10 +187,10 @@ func (s artifactoryService) vcsReadRefs(
 		PermissionPath:    owner + "/" + name,
 		Variant:           endpoint.Variant(),
 		ValidateMetadata: func(_ context.Context, r io.ReadSeeker, size int64, _ source.MetadataResponse) error {
-			if size <= 0 || size > vcs.MaxRefsBytes {
+			if size <= 0 || size > vcshttp.MaxRefsBytes {
 				return source.ErrInvalidResult
 			}
-			data, readErr := io.ReadAll(io.LimitReader(r, vcs.MaxRefsBytes+1))
+			data, readErr := io.ReadAll(io.LimitReader(r, vcshttp.MaxRefsBytes+1))
 			if readErr != nil || int64(len(data)) != size {
 				return source.ErrInvalidResult
 			}
@@ -204,7 +204,7 @@ func (s artifactoryService) vcsReadRefs(
 	if err != nil {
 		return nil, err
 	}
-	data, err := s.vcsResultBytes(ctx, result, vcs.MaxRefsBytes)
+	data, err := s.vcsResultBytes(ctx, result, vcshttp.MaxRefsBytes)
 	if err != nil {
 		return nil, s.itemError(ctx, "VCS references", err)
 	}

@@ -14,11 +14,11 @@ import (
 	"strings"
 	"testing"
 
-	condafmt "github.com/weaveplatform/artifactweave/internal/format/conda"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	condafmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conda"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
@@ -101,7 +101,7 @@ func condaFixture(t *testing.T) []byte {
 	t.Helper()
 	return repopath.Read(
 		t,
-		"internal/format/conda/testdata/artifactweave-conda-fixture-1.0.0-0.tar.bz2",
+		"migration/artifacts/ecosystem/conda/testdata/artifactweave-conda-fixture-1.0.0-0.tar.bz2",
 	)
 }
 
@@ -179,7 +179,7 @@ func TestUnitCondaChannelRejectsUnsafeRequestsAndVirtualCycles(t *testing.T) {
 
 func TestUnitCondaRemoteModernPackageIsFilteredByCurrentSourceAuthority(t *testing.T) {
 	const name = "ca-certificates-2026.7.22-hbd8a1cb_0.conda"
-	body := repopath.Read(t, "internal/format/conda/testdata/"+name)
+	body := repopath.Read(t, "migration/artifacts/ecosystem/conda/testdata/"+name)
 	id, _ := condafmt.ParsePackagePath("noarch/" + name)
 	rec, err := condafmt.ReadPackage(t.Context(), bytes.NewReader(body), int64(len(body)), id)
 	if err != nil {
@@ -668,7 +668,7 @@ func TestUnitCondaLocalAndVirtualNativeChannel(t *testing.T) {
 		"/artifactory/api/conda/conda-virtual/noarch/"+filename, "user", ""),
 		http.StatusForbidden)
 	const modernName = "ca-certificates-2026.7.22-hbd8a1cb_0.conda"
-	modern := repopath.Read(t, "internal/format/conda/testdata/"+modernName)
+	modern := repopath.Read(t, "migration/artifacts/ecosystem/conda/testdata/"+modernName)
 	wantStatus(t, w.do(http.MethodPut, "/artifactory/conda-fed/noarch/"+modernName,
 		"admin", string(modern)), http.StatusCreated)
 	if err := q.EnsureFresh(t.Context(), condafmt.KindIndex, "conda-fed"); err != nil {

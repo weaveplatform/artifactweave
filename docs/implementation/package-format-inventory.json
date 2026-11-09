@@ -65,7 +65,7 @@
       "owner_issue": 768,
       "evidence": "test/acceptance/features/bower.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/bower-repositories",
-      "route_file": "internal/server/bower/bower.go",
+      "route_file": "migration/artifacts/ecosystem/bower/http/bower.go",
       "p9c": true
     },
     {
@@ -113,7 +113,7 @@
       "owner_issue": 770,
       "evidence": "docs/testing/conan.md",
       "source": "https://docs.jfrog.com/artifactory/docs/conan-repositories",
-      "route_file": "internal/server/conan/conan.go",
+      "route_file": "migration/artifacts/ecosystem/conan/http/conan.go",
       "p9c": true
     },
     {
@@ -129,7 +129,7 @@
       "owner_issue": 777,
       "evidence": "test/acceptance/features/conda.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/conda-repositories",
-      "route_file": "internal/server/conda/conda.go",
+      "route_file": "migration/artifacts/ecosystem/conda/http/conda.go",
       "p9c": true
     },
     {
@@ -225,7 +225,7 @@
       "owner_issue": 779,
       "evidence": "test/acceptance/features/huggingface_xet.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/hugging-face-repositories",
-      "route_file": "internal/server/huggingface/protocol.go",
+      "route_file": "migration/artifacts/ecosystem/huggingface/http/protocol.go",
       "p9c": true
     },
     {
@@ -513,7 +513,7 @@
       "owner_issue": 0,
       "evidence": "test/acceptance/features/terraform_backend.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
-      "route_file": "internal/server/terraformbackend/terraformbackend.go",
+      "route_file": "migration/artifacts/ecosystem/terraformbackend/http/terraformbackend.go",
       "p9c": false
     },
     {
@@ -559,9 +559,9 @@
       "lifecycle": "reindex, delete, restore",
       "status": "native",
       "owner_issue": 772,
-      "evidence": "internal/server/bazelmodules/bazelmodules_test.go",
+      "evidence": "migration/artifacts/ecosystem/bazelmodules/http/bazelmodules_test.go",
       "source": "https://docs.jfrog.com/artifactory/docs/bazel-modules-repositories",
-      "route_file": "internal/server/bazelmodules/bazelmodules.go",
+      "route_file": "migration/artifacts/ecosystem/bazelmodules/http/bazelmodules.go",
       "p9c": true
     },
     {
@@ -625,7 +625,7 @@
       "owner_issue": 767,
       "evidence": "test/acceptance/features/hex.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/hex-repositories",
-      "route_file": "internal/server/hex/hex.go",
+      "route_file": "migration/artifacts/ecosystem/hex/http/hex.go",
       "p9c": true
     },
     {
@@ -641,7 +641,7 @@
       "owner_issue": 788,
       "evidence": "test/acceptance/features/nix.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/nix-repositories",
-      "route_file": "internal/server/nix/nix.go",
+      "route_file": "migration/artifacts/ecosystem/nix/http/nix.go",
       "p9c": true
     },
     {
@@ -689,7 +689,7 @@
       "owner_issue": 774,
       "evidence": "test/acceptance/features/jetbrainsplugins.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/jetbrains-plugins-repositories",
-      "route_file": "internal/server/jetbrainsplugins/protocol.go",
+      "route_file": "migration/artifacts/ecosystem/jetbrainsplugins/http/protocol.go",
       "p9c": true
     },
     {

@@ -74,7 +74,7 @@ func v(p auth.Principal, ref kernel.CredentialReference, r [32]byte) {
 		"internal/nested/n.go":             uses,
 		".worktrees/copy/internal/x/x.go":  uses,
 		"internal/server/unrelated/u.go":   "package u\n",
-		"internal/server/huggingface/xet.go": file(
+		"migration/artifacts/ecosystem/huggingface/http/xet.go": file(
 			`	_ = []auth.DownloadCredential{{Kind: "password", PasswordRevision: r}}`,
 		),
 		"internal/server/queue/queue_test.go": file(

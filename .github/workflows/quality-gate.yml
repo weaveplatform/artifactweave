@@ -722,7 +722,7 @@ jobs:
         if: needs.impact.outputs.profile == 'full' || needs.impact.outputs.owner == 'huggingface'
         run: |
           HF_CLIENT_PYTHON="$RUNNER_TEMP/huggingface-hub/bin/python" \
-            go test ./internal/server/huggingface -run '^TestAccPinnedClient' -count=1 -timeout=5m -v
+            go test ./migration/artifacts/ecosystem/huggingface/http -run '^TestAccPinnedClient' -count=1 -timeout=5m -v
           HF_XET_PYTHON="$RUNNER_TEMP/huggingface-hub/bin/python" \
             go test ./internal/server -run '^TestAccHuggingFaceNativeXet$' -count=1 -timeout=5m -v
 
@@ -738,7 +738,7 @@ jobs:
         if: needs.impact.outputs.profile == 'full' || contains(format(',{0},', needs.impact.outputs.clients), ',bazel,')
         env:
           ARTIFACTWEAVE_BAZEL_CLIENT: '1'
-        run: go test ./internal/server/bazelmodules -run '^TestAccBazelClient$' -count=1 -timeout=7m -v
+        run: go test ./migration/artifacts/ecosystem/bazelmodules/http -run '^TestAccBazelClient$' -count=1 -timeout=7m -v
 
       - name: Record native client image identities
         if: always()

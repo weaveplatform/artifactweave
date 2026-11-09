@@ -29,7 +29,7 @@ func TestAccDebianRemoteSourceRejectsInvalidPackages(t *testing.T) {
 		if err != nil || q.Resource.Validate == nil || q.Resource.Variant == "" {
 			t.Fatalf("%s: missing remote validator: %v", tc.path, err)
 		}
-		body := repopath.Read(t, "internal/format/debian/testdata/"+tc.fixture)
+		body := repopath.Read(t, "migration/artifacts/ecosystem/debian/testdata/"+tc.fixture)
 		if err := q.Resource.Validate(
 			t.Context(),
 			bytes.NewReader(body),

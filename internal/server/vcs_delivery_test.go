@@ -12,10 +12,12 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 )
 
 func TestAccVCSCustomRootlessFilePrecedesNestedBasename(t *testing.T) {
-	data, err := os.ReadFile("vcs/testdata/legacy-vcs-archive.tar.gz")
+	data, err := os.ReadFile(repopath.Path(t,
+		"migration/artifacts/ecosystem/vcs/http/testdata/legacy-vcs-archive.tar.gz"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +88,8 @@ func TestAccVCSCustomRootlessFilePrecedesNestedBasename(t *testing.T) {
 }
 
 func TestAccVCSPeerFileUsageRequiresSuccessfulDelivery(t *testing.T) {
-	data, err := os.ReadFile("vcs/testdata/legacy-vcs-readme.zip")
+	data, err := os.ReadFile(repopath.Path(t,
+		"migration/artifacts/ecosystem/vcs/http/testdata/legacy-vcs-readme.zip"))
 	if err != nil {
 		t.Fatal(err)
 	}

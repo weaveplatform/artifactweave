@@ -19,12 +19,12 @@ PLATFORMS ?= linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 win
 # platform-scenarios.yml, against a deployment, and is evidence rather than coverage.
 UNIT_PKGS = $(shell GOWORK=off $(GO) list ./... | grep -v -e /test/acceptance -e /test/platform)
 ACC_PKGS ?= $(UNIT_PKGS)
-FUZZ_PKGS ?= ./migration/kernel/antpath ./internal/format/huggingface/xet ./migration/artifacts/ecosystem/nuget ./migration/kernel
+FUZZ_PKGS ?= ./migration/kernel/antpath ./migration/artifacts/ecosystem/huggingface/xet ./migration/artifacts/ecosystem/nuget ./migration/kernel
 UNIT_RUN ?= ^TestUnit
 ACC_RUN ?= ^TestAcc
 ACCEPT_RUN ?= ^TestAcc
 COVERPKG ?= $(MODULE)/...
-CONAN_COVERPKG ?= $(MODULE)/internal/format/conan/...,$(MODULE)/internal/server/conan/...
+CONAN_COVERPKG ?= $(MODULE)/migration/artifacts/ecosystem/conan/...,$(MODULE)/migration/artifacts/ecosystem/conan/http/...
 ACCEPT_TIMEOUT ?= 15m
 
 ## help: list targets

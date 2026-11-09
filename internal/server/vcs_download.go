@@ -11,9 +11,9 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
-	"github.com/weaveplatform/artifactweave/internal/server/vcs"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	vcshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/vcs/http"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -112,14 +112,14 @@ func (s artifactoryService) vcsArchive(
 	ctx context.Context,
 	key, owner, name, kind, ref, ext, propertyFilter string,
 ) (io.ReadCloser, int64, error) {
-	if !vcs.ValidExtension(ext) || kind != "tags" && kind != "heads" && kind != "commits" {
+	if !vcshttp.ValidExtension(ext) || kind != "tags" && kind != "heads" && kind != "commits" {
 		return nil, 0, apierror.New(http.StatusBadRequest, "invalid VCS archive request")
 	}
 	a, err := s.vcsRepository(ctx, key, owner, name)
 	if err != nil {
 		return nil, 0, err
 	}
-	if !vcs.ValidRef(ref) || kind == "commits" && !vcs.ValidCommitID(ref) {
+	if !vcshttp.ValidRef(ref) || kind == "commits" && !vcshttp.ValidCommitID(ref) {
 		return nil, 0, apierror.New(http.StatusBadRequest, "invalid VCS reference")
 	}
 	commit := ref
@@ -147,7 +147,7 @@ func (s artifactoryService) vcsArchive(
 			pkgroute.SourceError(source.ErrDenied, a.principal.Anonymous),
 		)
 	}
-	target, err := vcs.ArchiveURL(a.repo, owner, name, commit, ext)
+	target, err := vcshttp.ArchiveURL(a.repo, owner, name, commit, ext)
 	if err != nil {
 		return nil, 0, apierror.New(http.StatusBadRequest, "invalid VCS archive source")
 	}
@@ -160,7 +160,7 @@ func (s artifactoryService) vcsArchive(
 		Method:            http.MethodGet,
 		Variant:           "vcs-archive-v2-" + ext,
 		Validate: func(ctx context.Context, body io.ReadSeeker, size int64) error {
-			if err := vcs.ValidateCommitArchive(ctx, body, size, ext, commit); err != nil {
+			if err := vcshttp.ValidateCommitArchive(ctx, body, size, ext, commit); err != nil {
 				return source.ErrInvalidResult
 			}
 			return nil
@@ -446,7 +446,7 @@ func (s artifactoryService) vcsFile(
 	key, owner, name, kind, selector string,
 ) (io.Reader, int64, error) {
 	ref, filename, ok := strings.Cut(selector, "!")
-	if !ok || !vcs.ValidRef(ref) || !vcs.ValidFilePath(filename) {
+	if !ok || !vcshttp.ValidRef(ref) || !vcshttp.ValidFilePath(filename) {
 		return nil, 0, apierror.New(http.StatusBadRequest, "invalid VCS file path")
 	}
 	a, err := s.vcsRepository(ctx, key, owner, name)
@@ -466,20 +466,20 @@ func (s artifactoryService) vcsFile(
 	if err != nil {
 		return nil, 0, err
 	}
-	archive, err := io.ReadAll(io.LimitReader(body, vcs.MaxArchiveBytes+1))
+	archive, err := io.ReadAll(io.LimitReader(body, vcshttp.MaxArchiveBytes+1))
 	closeErr := body.Close()
-	if err != nil || closeErr != nil || len(archive) > vcs.MaxArchiveBytes {
+	if err != nil || closeErr != nil || len(archive) > vcshttp.MaxArchiveBytes {
 		return nil, 0, apierror.New(http.StatusBadGateway, "invalid VCS archive")
 	}
-	selectFile := vcs.WrappedFileZIP
+	selectFile := vcshttp.WrappedFileZIP
 	switch a.repo.VCSGitProvider {
 	case repo.Stash, repo.OldStash:
-		selectFile = vcs.FileZIP
+		selectFile = vcshttp.FileZIP
 	case repo.CustomVCS:
-		selectFile = vcs.CustomFileZIP
+		selectFile = vcshttp.CustomFileZIP
 	}
 	data, err := selectFile(ctx, archive, "tar.gz", filename)
-	if errors.Is(err, vcs.ErrInvalidPath) {
+	if errors.Is(err, vcshttp.ErrInvalidPath) {
 		return nil, 0, apierror.New(http.StatusNotFound, "VCS file not found")
 	}
 	if err != nil {

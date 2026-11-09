@@ -188,7 +188,7 @@ func (w *world) p2ArchiveUpstream() error {
 }
 
 func p2PublishedFile(name string) ([]byte, error) {
-	return os.ReadFile(filepath.Join(repoRoot, "internal/format/p2/testdata", name))
+	return os.ReadFile(filepath.Join(repoRoot, "migration/artifacts/ecosystem/p2/testdata", name))
 }
 
 func (w *world) p2Upstream() error {

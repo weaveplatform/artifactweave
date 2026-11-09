@@ -63,16 +63,18 @@ func TestUnitAffectedPlanChoosesOnlyOwnedChanges(t *testing.T) {
 			t.Errorf("npm plan omitted %s", pkg)
 		}
 	}
-	conan := proposeAffected([]change{{status: "M", path: "internal/server/conan/remote.go"}})
+	conan := proposeAffected(
+		[]change{{status: "M", path: "migration/artifacts/ecosystem/conan/http/remote.go"}},
+	)
 	if conan.profile != "format" || conan.owner != "conan" {
 		t.Fatalf("Conan source selection = %+v", conan)
 	}
-	for _, pkg := range []string{"./internal/format/conan/...", "./internal/server/conan", "./internal/server"} {
+	for _, pkg := range []string{"./migration/artifacts/ecosystem/conan/...", "./migration/artifacts/ecosystem/conan/http", "./internal/server"} {
 		if !slices.Contains(conan.units, pkg) {
 			t.Errorf("Conan plan omitted %s", pkg)
 		}
 	}
-	for _, pkg := range []string{"internal/format/conan/...", "internal/server/conan/..."} {
+	for _, pkg := range []string{"migration/artifacts/ecosystem/conan/...", "migration/artifacts/ecosystem/conan/http/..."} {
 		if !strings.Contains(conan.coverpkg, pkg) {
 			t.Errorf("Conan plan did not instrument %s", pkg)
 		}

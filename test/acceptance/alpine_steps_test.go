@@ -25,8 +25,8 @@ import (
 
 	"github.com/cucumber/godog"
 
-	"github.com/weaveplatform/artifactweave/internal/format/alpine"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/alpine"
 )
 
 func (w *world) registerAlpine(sc *godog.ScenarioContext) {

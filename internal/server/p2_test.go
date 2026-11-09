@@ -10,11 +10,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/format/p2"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/p2"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -142,7 +142,7 @@ func TestAccP2ArchiveSuffixIsBoundedAndPermissionChecked(t *testing.T) {
 
 func p2Fixture(t *testing.T, name string) []byte {
 	t.Helper()
-	return repopath.Read(t, "internal/format/p2/testdata/"+name)
+	return repopath.Read(t, "migration/artifacts/ecosystem/p2/testdata/"+name)
 }
 
 func TestUnitP2SourceAdmission(t *testing.T) {

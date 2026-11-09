@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
-	tfbe "github.com/weaveplatform/artifactweave/internal/format/terraformbackend"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/terraformstate"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
+	tfbe "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	testfault "github.com/weaveplatform/artifactweave/migration/platform/testkit/fault"
 	"github.com/weaveplatform/artifactweave/pkg/store"

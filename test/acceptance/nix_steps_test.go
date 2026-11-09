@@ -16,8 +16,8 @@ import (
 
 	"github.com/cucumber/godog"
 
-	nixfmt "github.com/weaveplatform/artifactweave/internal/format/nix"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
+	nixfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nix"
 )
 
 func (w *world) registerNix(sc *godog.ScenarioContext) {
@@ -140,7 +140,7 @@ cat "/tmp/nix-consumer$3/message"
 
 func (w *world) nixUpstream() error {
 	const path = "fyli4q2yj6vh01bs0jxqbvj5hir5zvqc.narinfo"
-	root := filepath.Join(repoRoot, "internal/format/nix/testdata/cache")
+	root := filepath.Join(repoRoot, "migration/artifacts/ecosystem/nix/testdata/cache")
 	data, err := os.ReadFile(filepath.Join(root, path))
 	if err != nil {
 		return err

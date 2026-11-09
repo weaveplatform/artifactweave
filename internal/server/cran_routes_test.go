@@ -24,7 +24,7 @@ import (
 
 func cranFixtureBytes(t *testing.T, name string) []byte {
 	t.Helper()
-	return repopath.Read(t, "internal/format/cran/testdata/"+name)
+	return repopath.Read(t, "migration/artifacts/ecosystem/cran/testdata/"+name)
 }
 
 func TestUnitCRANRemoteIndexPackageAndInvalidMetadata(t *testing.T) {

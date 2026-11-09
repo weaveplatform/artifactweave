@@ -6,15 +6,15 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/weaveplatform/artifactweave/internal/server/vcs"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	vcshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/vcs/http"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
 func (s artifactoryService) vcsPeerFile(
 	ctx context.Context, a vcsAccess, owner, name, kind, ref, filename string,
 ) (io.Reader, int64, error) {
-	target, err := vcs.PeerFileURL(a.repo, owner, name, kind, ref, filename)
+	target, err := vcshttp.PeerFileURL(a.repo, owner, name, kind, ref, filename)
 	if err != nil {
 		return nil, 0, apierror.New(http.StatusBadRequest, "invalid VCS peer file source")
 	}
@@ -30,7 +30,7 @@ func (s artifactoryService) vcsPeerFile(
 		PermissionPath:    permissionPath,
 		Variant:           "vcs-peer-file-v1",
 		Validate: func(ctx context.Context, body io.ReadSeeker, size int64) error {
-			if err := vcs.ValidateFileZIP(ctx, body, size, filename); err != nil {
+			if err := vcshttp.ValidateFileZIP(ctx, body, size, filename); err != nil {
 				return source.ErrInvalidResult
 			}
 			return nil
@@ -40,7 +40,7 @@ func (s artifactoryService) vcsPeerFile(
 	if err != nil {
 		return nil, 0, err
 	}
-	data, err := s.vcsResultBytes(ctx, result, vcs.MaxFileZIPBytes)
+	data, err := s.vcsResultBytes(ctx, result, vcshttp.MaxFileZIPBytes)
 	if err != nil {
 		return nil, 0, err
 	}

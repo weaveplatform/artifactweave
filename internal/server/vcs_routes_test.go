@@ -19,9 +19,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/server/vcs"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	vcshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/vcs/http"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -229,7 +229,7 @@ func TestAccVCSRemoteRESTAndSubgroup(t *testing.T) {
 			)
 		}
 	}
-	if vcs.ValidExtension("exe") || vcs.ValidProject("team/../admin", "project") {
+	if vcshttp.ValidExtension("exe") || vcshttp.ValidProject("team/../admin", "project") {
 		t.Fatal("VCS path validation admitted escape")
 	}
 }
@@ -874,7 +874,7 @@ func TestUnitVCSArchiveURLPolicyMalformedBaseFallsBackToExactURL(t *testing.T) {
 	if err := check(t.Context(), next); !errors.Is(err, source.ErrDenied) {
 		t.Fatalf("malformed configured base accepted redirect: %v", err)
 	}
-	if !vcs.ValidCommitID(vcsTestOID) {
+	if !vcshttp.ValidCommitID(vcsTestOID) {
 		t.Fatal("test commit ID is invalid")
 	}
 }

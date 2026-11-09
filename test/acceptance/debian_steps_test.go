@@ -18,8 +18,8 @@ import (
 
 	"github.com/cucumber/godog"
 
-	"github.com/weaveplatform/artifactweave/internal/format/debian"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/terraformtest"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -102,8 +102,10 @@ func (w *world) debianUpstream(name, version string) error {
 	if strings.ContainsAny(name+version, "/\\") {
 		return fmt.Errorf("unsafe Debian fixture coordinates")
 	}
-	archive, err := os.ReadFile(filepath.Join(repoRoot, "internal/format/debian/testdata",
-		name+"_"+version+"_amd64_0.deb"))
+	archive, err := os.ReadFile(
+		filepath.Join(repoRoot, "migration/artifacts/ecosystem/debian/testdata",
+			name+"_"+version+"_amd64_0.deb"),
+	)
 	if err != nil {
 		return err
 	}
@@ -175,7 +177,9 @@ func (w *world) debianSourceUpstream() error {
 	files := map[string][]byte{}
 	checksums := map[string]types.Checksums{}
 	for _, name := range names {
-		body, err := os.ReadFile(filepath.Join(repoRoot, "internal/format/debian/testdata", name))
+		body, err := os.ReadFile(
+			filepath.Join(repoRoot, "migration/artifacts/ecosystem/debian/testdata", name),
+		)
 		if err != nil {
 			return err
 		}
@@ -253,8 +257,10 @@ func (w *world) debianRedirect(name, version string) error {
 	if strings.ContainsAny(name+version, "/\\") {
 		return fmt.Errorf("unsafe Debian fixture coordinates")
 	}
-	archive, err := os.ReadFile(filepath.Join(repoRoot, "internal/format/debian/testdata",
-		name+"_"+version+"_amd64_0.deb"))
+	archive, err := os.ReadFile(
+		filepath.Join(repoRoot, "migration/artifacts/ecosystem/debian/testdata",
+			name+"_"+version+"_amd64_0.deb"),
+	)
 	if err != nil {
 		return err
 	}
@@ -315,8 +321,10 @@ func (w *world) copyDebianPackageVariant(name, version, variant, folder string) 
 	if variant != "0" && variant != "1" {
 		return fmt.Errorf("unknown Debian fixture variant")
 	}
-	content, err := os.ReadFile(filepath.Join(repoRoot, "internal/format/debian/testdata",
-		name+"_"+version+"_amd64_"+variant+".deb"))
+	content, err := os.ReadFile(
+		filepath.Join(repoRoot, "migration/artifacts/ecosystem/debian/testdata",
+			name+"_"+version+"_amd64_"+variant+".deb"),
+	)
 	if err != nil {
 		return err
 	}
@@ -390,7 +398,7 @@ func (w *world) copyDebianSource(folder string) error {
 		"alpha_1.0-1.dsc", "alpha_1.0.orig.tar.gz", "alpha_1.0-1.debian.tar.xz",
 	} {
 		content, err := os.ReadFile(
-			filepath.Join(repoRoot, "internal/format/debian/testdata", name),
+			filepath.Join(repoRoot, "migration/artifacts/ecosystem/debian/testdata", name),
 		)
 		if err != nil {
 			return err
