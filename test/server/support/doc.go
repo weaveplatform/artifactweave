@@ -25,7 +25,8 @@
 //     password).
 //   - Format fixtures: npm publish bodies and tarballs, NuGet packages and
 //     PDBs, Helm charts, OCI images and manifests, Terraform repositories and
-//     the backend keyring.
+//     the backend keyring, and the gzip-compressed tar archives of Conan and
+//     CRAN (TarGz).
 //
 // # References
 //

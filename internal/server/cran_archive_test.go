@@ -18,12 +18,6 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-const (
-	cranLegacyPath  = "src/contrib/Archive/assertthat/0.2.1/assertthat_0.2.1.tar.gz"
-	cranArchivePath = "src/contrib/Archive/assertthat/assertthat_0.2.1.tar.gz"
-	cranMoveURL     = "/artifactory/api/cran/cran-migrate/move-archives"
-)
-
 func TestAccCRANArchiveMigration(t *testing.T) {
 	for _, class := range []repo.Class{repo.Local, repo.Federated} {
 		t.Run(string(class), func(t *testing.T) {

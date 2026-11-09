@@ -51,6 +51,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
+	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -1574,4 +1575,107 @@ func (f faultyChecksumSearch) FindByChecksum(
 		return nil, "", errBoom
 	}
 	return f.ItemStore.FindByChecksum(ctx, c, p)
+}
+
+const (
+	p2ExternalComposite          = `<?xml version="1.0"?><repository type="org.eclipse.equinox.internal.p2.metadata.repository.CompositeMetadataRepository"><children size="1"><child location="https://child.example/site"/></children></repository>`
+	p2ExternalArtifactsComposite = `<?xml version="1.0"?><repository type="org.eclipse.equinox.internal.p2.artifact.repository.CompositeArtifactRepository"><children size="1"><child location="https://child.example/site"/></children></repository>`
+)
+
+const (
+	cranLegacyPath  = "src/contrib/Archive/assertthat/0.2.1/assertthat_0.2.1.tar.gz"
+	cranArchivePath = "src/contrib/Archive/assertthat/assertthat_0.2.1.tar.gz"
+	cranMoveURL     = "/artifactory/api/cran/cran-migrate/move-archives"
+)
+
+const (
+	xetFixtureHash = "4f7ccc9872630143f6a4a26904b5255fef96e6c75cf78f0449114d77a94fd197"
+	xetFixtureFile = "869fb7b9851f0c53b04e946381db72f24d74462c24cbe4737856e41992386def"
+)
+
+type xetTestToken struct {
+	CAS   string `json:"casUrl"`
+	Token string `json:"accessToken"`
+}
+
+func xetFixture(t *testing.T, name string) []byte {
+	t.Helper()
+	return repopath.Read(t, "migration/artifacts/ecosystem/huggingface/xet/testdata/"+name)
+}
+
+func newXetWorld(t *testing.T) *itemWorld {
+	t.Helper()
+	w := newItemWorld(
+		t,
+		false,
+		func(c *Config) { c.HuggingFaceXetEnabled = true; c.Keys = support.TerraformBackendKeys(t) },
+	)
+	for _, c := range []repo.Config{{Key: "hf", Class: repo.Local, PackageType: repo.HuggingFaceML}, {Key: "hf-f", Class: repo.Federated, PackageType: repo.HuggingFaceML}, {Key: "hf-v", Class: repo.Virtual, PackageType: repo.HuggingFaceML, Repositories: []string{"hf"}, DefaultDeploymentRepo: "hf"}} {
+		if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return w
+}
+
+func xetTokenFor(t *testing.T, w *itemWorld, key, identity, mode, as string) xetTestToken {
+	t.Helper()
+	r := w.do(
+		"GET",
+		"/artifactory/api/huggingfaceml/"+key+"/api/models/"+identity+"/xet-"+mode+"-token/main",
+		as,
+		"",
+	)
+	wantStatus(t, r, 200)
+	var token xetTestToken
+	if e := json.Unmarshal(r.Body.Bytes(), &token); e != nil {
+		t.Fatal(e)
+	}
+	return token
+}
+
+func xetCall(
+	w *itemWorld,
+	token xetTestToken,
+	method, path string,
+	body []byte,
+) *httptest.ResponseRecorder {
+	return w.do(method, token.CAS+path, "", string(body), "Authorization", "Bearer "+token.Token)
+}
+
+func publishXetFixture(t *testing.T, w *itemWorld, key string) (xetTestToken, string) {
+	t.Helper()
+	write := xetTokenFor(t, w, key, "acme/demo", "write", "admin")
+	wantStatus(
+		t,
+		xetCall(w, write, "POST", "/v1/xorbs/default/"+xetFixtureHash, xetFixture(t, "large.xorb")),
+		200,
+	)
+	wantStatus(t, xetCall(w, write, "POST", "/v2/shards", xetFixture(t, "large.shard")), 200)
+	data := make([]byte, 1280000)
+	for i := range data {
+		data[i] = byte(i)
+	}
+	sum := sha256.Sum256(data)
+	body := fmt.Sprintf(
+		"{\"key\":\"header\",\"value\":{\"summary\":\"native Xet\"}}\n{\"key\":\"lfsFile\",\"value\":{\"path\":\"weights.bin\",\"algo\":\"sha256\",\"oid\":\"%x\",\"size\":%d}}\n",
+		sum,
+		len(data),
+	)
+	commit := w.do(
+		"POST",
+		"/artifactory/api/huggingfaceml/"+key+"/api/models/acme/demo/commit/main",
+		"admin",
+		body,
+		"Content-Type",
+		"application/x-ndjson",
+	)
+	wantStatus(t, commit, 200)
+	var result struct {
+		OID string `json:"commitOid"`
+	}
+	if e := json.Unmarshal(commit.Body.Bytes(), &result); e != nil {
+		t.Fatal(e)
+	}
+	return write, result.OID
 }

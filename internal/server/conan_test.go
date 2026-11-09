@@ -1,9 +1,7 @@
 package server
 
 import (
-	"archive/tar"
 	"bytes"
-	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -17,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
 func conanTestArchive(t *testing.T, name, content string) string {
@@ -25,26 +24,7 @@ func conanTestArchive(t *testing.T, name, content string) string {
 
 func conanTestArchiveEntries(t *testing.T, entries map[string]string) string {
 	t.Helper()
-	var body bytes.Buffer
-	gz := gzip.NewWriter(&body)
-	tw := tar.NewWriter(gz)
-	for name, content := range entries {
-		if err := tw.WriteHeader(
-			&tar.Header{Name: name, Mode: 0o600, Size: int64(len(content))},
-		); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := tw.Write([]byte(content)); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := tw.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if err := gz.Close(); err != nil {
-		t.Fatal(err)
-	}
-	return body.String()
+	return support.TarGz(t, entries)
 }
 
 func TestAccConanSearchAndPackageDeletion(t *testing.T) {

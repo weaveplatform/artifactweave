@@ -18,11 +18,6 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-const (
-	p2ExternalComposite          = `<?xml version="1.0"?><repository type="org.eclipse.equinox.internal.p2.metadata.repository.CompositeMetadataRepository"><children size="1"><child location="https://child.example/site"/></children></repository>`
-	p2ExternalArtifactsComposite = `<?xml version="1.0"?><repository type="org.eclipse.equinox.internal.p2.artifact.repository.CompositeArtifactRepository"><children size="1"><child location="https://child.example/site"/></children></repository>`
-)
-
 func TestAccP2ExternalCompositeChildIsOwnedAndParentBound(t *testing.T) {
 	parent := []byte(p2ExternalComposite)
 	childFault := false
