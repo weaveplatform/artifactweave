@@ -1,4 +1,4 @@
-package swift_test
+package swifthttp_test
 
 import (
 	"bytes"
@@ -13,13 +13,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/server/swift"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	swifthttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/swift/http"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -33,7 +33,7 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 	t.Helper()
 	up := fakeupstream.New(t, fakeupstream.Options{})
 	clock := fakeupstream.NewClock(time.Date(2026, 10, 24, 0, 0, 0, 0, time.UTC))
-	f := newFixture(t, repo.Remote, func(items *item.Service, db *inmem.Store) swift.Options {
+	f := newFixture(t, repo.Remote, func(items *item.Service, db *inmem.Store) swifthttp.Options {
 		c, err := db.Repos().Get(t.Context(), "packages")
 		if err != nil {
 			t.Fatal(err)
@@ -74,7 +74,7 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 				return db.RemoteCache().Source(ctx, c.Key)
 			},
 		}
-		return swift.Options{RemoteSources: svc}
+		return swifthttp.Options{RemoteSources: svc}
 	})
 	return &remoteFixture{fixture: f, up: up}
 }

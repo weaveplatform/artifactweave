@@ -401,7 +401,7 @@
       "owner_issue": 765,
       "evidence": "test/acceptance/features/pub.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/pub-repositories",
-      "route_file": "internal/server/pub/pub.go",
+      "route_file": "migration/artifacts/ecosystem/pub/http/pub.go",
       "p9c": true
     },
     {
@@ -479,9 +479,9 @@
       "lifecycle": "reindex, delete, restore",
       "status": "native",
       "owner_issue": 766,
-      "evidence": "internal/server/swift/swift_test.go",
+      "evidence": "migration/artifacts/ecosystem/swift/http/swift_test.go",
       "source": "https://docs.jfrog.com/artifactory/docs/swift-repositories",
-      "route_file": "internal/server/swift/swift.go",
+      "route_file": "migration/artifacts/ecosystem/swift/http/swift.go",
       "p9c": true
     },
     {

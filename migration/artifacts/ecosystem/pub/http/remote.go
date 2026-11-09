@@ -1,4 +1,4 @@
-package pub
+package pubhttp
 
 import (
 	"bytes"
@@ -13,10 +13,10 @@ import (
 	"net/url"
 	"strings"
 
-	pubfmt "github.com/weaveplatform/artifactweave/internal/format/pub"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	pubfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pub"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )

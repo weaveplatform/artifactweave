@@ -1,4 +1,4 @@
-package swift
+package swifthttp
 
 import (
 	"bytes"
@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	swiftfmt "github.com/weaveplatform/artifactweave/internal/format/swift"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	swiftfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/swift"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"

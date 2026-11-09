@@ -6681,7 +6681,7 @@
   {
     "route": "GET /artifactory/api/pub/{repoKey}/api/packages/versions/new",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/pub.handler.publishStart-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/pub/http.handler.publishStart-fm",
     "review_family": "native-pub",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6700,7 +6700,7 @@
   {
     "route": "GET /artifactory/api/pub/{repoKey}/api/packages/versions/new/complete",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/pub.handler.publishComplete-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/pub/http.handler.publishComplete-fm",
     "review_family": "native-pub",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6719,7 +6719,7 @@
   {
     "route": "GET /artifactory/api/pub/{repoKey}/api/packages/{package}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/pub.handler.versions-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/pub/http.handler.versions-fm",
     "review_family": "native-pub",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6738,7 +6738,7 @@
   {
     "route": "GET /artifactory/api/pub/{repoKey}/api/packages/{package}/versions/{version}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/pub.handler.version-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/pub/http.handler.version-fm",
     "review_family": "native-pub",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6757,7 +6757,7 @@
   {
     "route": "GET /artifactory/api/pub/{repoKey}/packages/{package}/versions/{archive}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/pub.handler.archive-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/pub/http.handler.archive-fm",
     "review_family": "native-pub",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -8754,7 +8754,7 @@
   {
     "route": "GET /artifactory/api/swift/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/swift.handler.read-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/swift/http.handler.read-fm",
     "review_family": "native-swift",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12690,7 +12690,7 @@
   {
     "route": "HEAD /artifactory/api/pub/{repoKey}/api/packages/{package}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/pub.handler.versions-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/pub/http.handler.versions-fm",
     "review_family": "native-pub",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12709,7 +12709,7 @@
   {
     "route": "HEAD /artifactory/api/pub/{repoKey}/packages/{package}/versions/{archive}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/pub.handler.archive-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/pub/http.handler.archive-fm",
     "review_family": "native-pub",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12842,7 +12842,7 @@
   {
     "route": "HEAD /artifactory/api/swift/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/swift.handler.read-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/swift/http.handler.read-fm",
     "review_family": "native-swift",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -16935,7 +16935,7 @@
   {
     "route": "POST /artifactory/api/pub/{repoKey}/api/packages/versions/new",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/pub.handler.publishUpload-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/pub/http.handler.publishUpload-fm",
     "review_family": "native-pub",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -21662,7 +21662,7 @@
   {
     "route": "PUT /artifactory/api/swift/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/swift.handler.publish-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/swift/http.handler.publish-fm",
     "review_family": "native-swift",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",

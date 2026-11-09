@@ -1,4 +1,4 @@
-package pub
+package pubhttp
 
 import (
 	"errors"
@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"net/url"
 
-	pubfmt "github.com/weaveplatform/artifactweave/internal/format/pub"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	pubfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pub"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/store"

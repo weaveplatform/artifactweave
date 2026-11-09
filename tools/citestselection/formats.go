@@ -45,7 +45,7 @@ var formats = map[string]formatImpact{
 	"cran":          {"./migration/artifacts/ecosystem/cran/...", "@cran", []string{"r"}},
 	"nix":           {"./migration/artifacts/ecosystem/nix/...", "@nix", []string{"nix"}},
 	"puppet":        {"./migration/artifacts/ecosystem/puppet/...", "@puppet", []string{"puppet"}},
-	"pub":           {"./internal/format/pub/...", "@pub", []string{"dart"}},
+	"pub":           {"./migration/artifacts/ecosystem/pub/...", "@pub", []string{"dart"}},
 	"agentpackages": {"./migration/artifacts/ecosystem/agentpackages/...", "@apm", []string{"apm"}},
 	"bower":         {"./migration/artifacts/ecosystem/bower/...", "@bower", []string{"bower"}},
 	"debian":        {"./migration/artifacts/ecosystem/debian/...", "@debian", []string{"debian"}},
@@ -109,7 +109,7 @@ var formats = map[string]formatImpact{
 		[]string{"python", "jf"},
 	},
 	"skills": {"./internal/format/skills/...", "@skills", []string{"jf"}},
-	"swift":  {"./internal/format/swift/...", "@swift", []string{"swift"}},
+	"swift":  {"./migration/artifacts/ecosystem/swift/...", "@swift", []string{"swift"}},
 	"terraform": {
 		"./migration/artifacts/ecosystem/terraform/...",
 		"@terraform&&~@terraform_backend&&~@terraform_backend_api,@package_wiring",

@@ -25,9 +25,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/luarocks"
 	"github.com/weaveplatform/artifactweave/internal/server/machinelearning"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
-	"github.com/weaveplatform/artifactweave/internal/server/pub"
 	"github.com/weaveplatform/artifactweave/internal/server/skills"
-	"github.com/weaveplatform/artifactweave/internal/server/swift"
 	"github.com/weaveplatform/artifactweave/internal/server/vagrant"
 	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
@@ -59,8 +57,10 @@ import (
 	nixhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nix/http"
 	npmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm/http"
 	nugethttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget/http"
+	pubhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pub/http"
 	puppethttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/puppet/http"
 	pypihttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi/http"
+	swifthttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/swift/http"
 	terraformhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/http"
 	terraformbackendhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -310,12 +310,12 @@ var protocols = []func(Config) pkgroute.Protocol{
 		return gems.Protocol(gems.Options{RemoteSources: cfg.RemoteSources})
 	},
 	func(cfg Config) pkgroute.Protocol {
-		return pub.Protocol(pub.Options{Blobs: cfg.Blobs, RemoteSources: cfg.RemoteSources})
+		return pubhttp.Protocol(pubhttp.Options{Blobs: cfg.Blobs, RemoteSources: cfg.RemoteSources})
 	},
 	func(Config) pkgroute.Protocol { return skills.Protocol() },
 	func(Config) pkgroute.Protocol { return vagrant.Protocol() },
 	func(cfg Config) pkgroute.Protocol {
-		return swift.Protocol(swift.Options{RemoteSources: cfg.RemoteSources})
+		return swifthttp.Protocol(swifthttp.Options{RemoteSources: cfg.RemoteSources})
 	},
 }
 

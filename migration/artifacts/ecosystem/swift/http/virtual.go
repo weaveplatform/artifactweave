@@ -1,4 +1,4 @@
-package swift
+package swifthttp
 
 import (
 	"errors"

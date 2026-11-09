@@ -1,4 +1,4 @@
-package pub_test
+package pubhttp_test
 
 import (
 	"archive/tar"
@@ -20,13 +20,13 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
-	"github.com/weaveplatform/artifactweave/internal/server/pub"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	pubhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pub/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -78,7 +78,7 @@ func newFixtureWith(t *testing.T, class repo.Class, tune func(*pkgroute.Protocol
 		name := r.Header.Get("X-User")
 		return kernel.Principal{Name: name, Admin: name == "admin", Anonymous: name == ""}
 	}))
-	p := pub.Protocol(pub.Options{Blobs: blobs})
+	p := pubhttp.Protocol(pubhttp.Options{Blobs: blobs})
 	if tune != nil {
 		tune(&p)
 	}

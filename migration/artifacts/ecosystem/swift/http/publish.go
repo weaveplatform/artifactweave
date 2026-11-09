@@ -1,4 +1,4 @@
-package swift
+package swifthttp
 
 import (
 	"encoding/base64"
@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"strings"
 
-	swiftfmt "github.com/weaveplatform/artifactweave/internal/format/swift"
+	swiftfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/swift"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )

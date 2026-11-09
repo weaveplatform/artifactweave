@@ -1,6 +1,6 @@
-// Package pub serves the hosted Dart pub protocol through Artifactory's
+// Package pubhttp serves the hosted Dart pub protocol through Artifactory's
 // /artifactory/api/pub/{repo} URL.
-package pub
+package pubhttp
 
 import (
 	"context"
@@ -15,10 +15,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	"golang.org/x/mod/semver"
 
-	pubfmt "github.com/weaveplatform/artifactweave/internal/format/pub"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	pubfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pub"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"

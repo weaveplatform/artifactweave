@@ -1,4 +1,4 @@
-package swift_test
+package swifthttp_test
 
 import (
 	"archive/zip"
@@ -23,12 +23,12 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
-	"github.com/weaveplatform/artifactweave/internal/server/swift"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	swifthttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/swift/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -55,7 +55,7 @@ type fixture struct {
 func newFixture(
 	t *testing.T,
 	class repo.Class,
-	configure ...func(*item.Service, *inmem.Store) swift.Options,
+	configure ...func(*item.Service, *inmem.Store) swifthttp.Options,
 ) *fixture {
 	t.Helper()
 	db := inmem.New()
@@ -105,7 +105,7 @@ func newFixture(
 			authorized.ServeHTTP(w, r)
 		})
 	})
-	var protocol swift.Options
+	var protocol swifthttp.Options
 	if len(configure) != 0 {
 		protocol = configure[0](items, db)
 	}
@@ -128,7 +128,7 @@ func newFixture(
 				_, _ = io.Copy(w, rc)
 			}
 		},
-	}, swift.Protocol(protocol))
+	}, swifthttp.Protocol(protocol))
 	return &fixture{t: t, r: r, db: db, items: items, requests: counts, mu: countsMu}
 }
 

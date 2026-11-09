@@ -1,4 +1,4 @@
-package swift_test
+package swifthttp_test
 
 import (
 	"archive/zip"

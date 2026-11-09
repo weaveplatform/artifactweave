@@ -48,8 +48,8 @@ package. The client runs against a TLS front with a temporary test
 CA installed in its container trust store; the entrypoint drops back to the
 runner's UID before writing the client cache.
 
-`internal/format/pub` validates bounded gzip/TAR and YAML, safe archive
-entries and package/version identity. `internal/server/pub` filters remote
+`migration/artifacts/ecosystem/pub` validates bounded gzip/TAR and YAML, safe archive
+entries and package/version identity. `migration/artifacts/ecosystem/pub/http` filters remote
 metadata by exact artifact read permission, checks current source authority
 before delivery and validates downloaded archive identity and SHA-256. These
 tests use controlled fixtures; they do not claim parity with an unobserved
