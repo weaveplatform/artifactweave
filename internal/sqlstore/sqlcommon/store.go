@@ -25,7 +25,6 @@ import (
 	artsql "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/sql"
 	fedsql "github.com/weaveplatform/artifactweave/migration/federation/adapters/sql"
 	ntfsql "github.com/weaveplatform/artifactweave/migration/notifications/adapters/sql"
-	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	platsql "github.com/weaveplatform/artifactweave/migration/platform/store/sql"
@@ -95,19 +94,14 @@ func Open(ctx context.Context, db *sql.DB, d Dialect, o Options) (*Store, error)
 	return s, nil
 }
 
-// New wraps an open, migrated pool. It registers the layout fence with the
-// platform's config store: a layout document that is created, changed or
-// deleted fences the remote repositories that use it, in the same
-// transaction (decision 0007).
+// New wraps an open, migrated pool. It registers the artifacts module's
+// layout watch with the platform's config store: a layout document that is
+// created, changed or deleted fences the remote repositories that use it,
+// in the same transaction (decision 0007).
 func New(db *sql.DB, d Dialect, keys *crypt.Keyring) *Store {
 	s := &Store{Store: dialect.New(db, d, keys)}
-	s.platform = platsql.New(s.Store, configdoc.Watch{
-		Kind: configdoc.ConfigLayout,
-		Changed: func(ctx context.Context, key string) error {
-			return store.FenceLayoutSources(ctx, s, remoteRecords{s}, key)
-		},
-	})
 	s.artifacts = artsql.New(s.Store)
+	s.platform = platsql.New(s.Store, s.artifacts.LayoutWatch())
 	s.access = accsql.New(s.Store)
 	s.notifications = ntfsql.New(s.Store)
 	s.retention = retsql.New(s.Store)
@@ -146,6 +140,14 @@ func (s *Store) Replays() store.ReplayStore { return s.platform.Replays() }
 // store.
 func (s *Store) RequestBudgets() store.RequestBudgetStore { return s.platform.RequestBudgets() }
 
+// Repos implements store.Store with the artifacts module's repository
+// store.
+func (s *Store) Repos() store.RepoStore { return s.artifacts.Repos() }
+
+// RemoteCache implements store.Store with the artifacts module's remote
+// cache store.
+func (s *Store) RemoteCache() store.RemoteCacheStore { return s.artifacts.RemoteCache() }
+
 // Items implements store.Store with the artifacts module's item store.
 func (s *Store) Items() store.ItemStore { return s.artifacts.Items() }
 
@@ -162,6 +164,19 @@ func (s *Store) Blobs() store.BlobIndex { return s.artifacts.Blobs() }
 // Replicas implements store.Store with the artifacts module's replica
 // index.
 func (s *Store) Replicas() store.ReplicaIndex { return s.artifacts.Replicas() }
+
+// GitLFSLocks implements store.Store with the artifacts module's Git LFS
+// lock store.
+func (s *Store) GitLFSLocks() store.GitLFSLockStore { return s.artifacts.GitLFSLocks() }
+
+// BowerRegistrations implements store.Store with the artifacts module's
+// Bower registration store.
+func (s *Store) BowerRegistrations() store.BowerRegistrationStore {
+	return s.artifacts.BowerRegistrations()
+}
+
+// Builds implements store.Store with the artifacts module's build store.
+func (s *Store) Builds() store.BuildStore { return s.artifacts.Builds() }
 
 // ArchivedItems implements store.Store with the artifacts module's
 // archived-item store.

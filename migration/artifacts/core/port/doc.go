@@ -7,12 +7,10 @@
 // # Role
 //
 // artifacts module, core layer, driven store ports. The module's adapters
-// (adapters/sql and adapters/inmem) implement the item, trash, package and
-// archived-item stores and the blob and replica indexes of both tiers, and
-// the in-memory build store; the metadata store's SQL and in-memory stores
-// delegate those to them, still implement the rest, and both satisfy Store.
-// STO-18 moves the rest into the adapters. The ports take and return the
-// module's core/model values, repository configurations
+// (adapters/sql and adapters/inmem) implement every port here, and each
+// satisfies Store; the metadata store's SQL and in-memory stores delegate
+// every artifacts accessor to them and satisfy Store too. The ports take
+// and return the module's core/model values, repository configurations
 // (artifacts/api/repo), AQL queries and hits (core/aql), kernel.Page, the
 // platform's blob row and the mirror's replica rows. The metadata store
 // aliases every name here but Store (its bridge_artifacts_port.go) until

@@ -966,7 +966,7 @@
     "evidence": [
       "internal/server/builds.go",
       "migration/artifacts/core/build/build.go",
-      "internal/sqlstore/sqlcommon/builds.go",
+      "migration/artifacts/adapters/sql/builds.go",
       "internal/server/builds_status_test.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
@@ -1509,7 +1509,7 @@
     "evidence": [
       "internal/server/repositories.go",
       "migration/artifacts/core/repos/repos.go",
-      "internal/sqlstore/sqlcommon/content.go",
+      "migration/artifacts/adapters/sql/content.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -2049,7 +2049,7 @@
     "evidence": [
       "internal/server/repositories.go",
       "migration/artifacts/core/repos/repos.go",
-      "internal/sqlstore/sqlcommon/content.go",
+      "migration/artifacts/adapters/sql/content.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -4386,7 +4386,7 @@
     "evidence": [
       "internal/server/builds.go",
       "migration/artifacts/core/build/build.go",
-      "internal/sqlstore/sqlcommon/builds.go",
+      "migration/artifacts/adapters/sql/builds.go",
       "internal/server/builds_status_test.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
@@ -4416,7 +4416,7 @@
     "evidence": [
       "internal/server/builds.go",
       "migration/artifacts/core/build/build.go",
-      "internal/sqlstore/sqlcommon/builds.go",
+      "migration/artifacts/adapters/sql/builds.go",
       "internal/server/builds_status_test.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
@@ -4451,7 +4451,7 @@
     "evidence": [
       "internal/server/builds.go",
       "migration/artifacts/core/build/build.go",
-      "internal/sqlstore/sqlcommon/builds.go",
+      "migration/artifacts/adapters/sql/builds.go",
       "internal/server/builds_status_test.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
@@ -4481,7 +4481,7 @@
     "evidence": [
       "internal/server/builds.go",
       "migration/artifacts/core/build/build.go",
-      "internal/sqlstore/sqlcommon/builds.go",
+      "migration/artifacts/adapters/sql/builds.go",
       "internal/server/builds_status_test.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
@@ -7203,7 +7203,7 @@
     "evidence": [
       "internal/server/repositories.go",
       "migration/artifacts/core/repos/repos.go",
-      "internal/sqlstore/sqlcommon/content.go",
+      "migration/artifacts/adapters/sql/content.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -7246,7 +7246,7 @@
     "evidence": [
       "internal/server/repositories.go",
       "migration/artifacts/core/repos/repos.go",
-      "internal/sqlstore/sqlcommon/content.go",
+      "migration/artifacts/adapters/sql/content.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -7277,7 +7277,7 @@
     "evidence": [
       "internal/server/repositories.go",
       "migration/artifacts/core/repos/repos.go",
-      "internal/sqlstore/sqlcommon/content.go",
+      "migration/artifacts/adapters/sql/content.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -7311,7 +7311,7 @@
     "evidence": [
       "internal/server/repositories.go",
       "migration/artifacts/core/repos/repos.go",
-      "internal/sqlstore/sqlcommon/content.go",
+      "migration/artifacts/adapters/sql/content.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -7353,7 +7353,7 @@
     "evidence": [
       "internal/server/repositories.go",
       "migration/artifacts/core/repos/repos.go",
-      "internal/sqlstore/sqlcommon/content.go",
+      "migration/artifacts/adapters/sql/content.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -9647,7 +9647,7 @@
     "evidence": [
       "internal/server/repositories.go",
       "migration/artifacts/core/repos/repos.go",
-      "internal/sqlstore/sqlcommon/content.go",
+      "migration/artifacts/adapters/sql/content.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -9695,7 +9695,7 @@
     "evidence": [
       "internal/server/repositories.go",
       "migration/artifacts/core/repos/repos.go",
-      "internal/sqlstore/sqlcommon/content.go",
+      "migration/artifacts/adapters/sql/content.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -15122,7 +15122,7 @@
     "evidence": [
       "internal/server/builds.go",
       "migration/artifacts/core/build/build.go",
-      "internal/sqlstore/sqlcommon/builds.go",
+      "migration/artifacts/adapters/sql/builds.go",
       "internal/server/builds_status_test.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
@@ -15147,7 +15147,7 @@
     "evidence": [
       "internal/server/builds.go",
       "migration/artifacts/core/build/build.go",
-      "internal/sqlstore/sqlcommon/builds.go",
+      "migration/artifacts/adapters/sql/builds.go",
       "internal/server/builds_status_test.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
@@ -15185,7 +15185,7 @@
     "evidence": [
       "internal/server/builds.go",
       "migration/artifacts/core/build/build.go",
-      "internal/sqlstore/sqlcommon/builds.go",
+      "migration/artifacts/adapters/sql/builds.go",
       "internal/server/builds_status_test.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
@@ -15215,7 +15215,7 @@
     "evidence": [
       "internal/server/builds.go",
       "migration/artifacts/core/build/build.go",
-      "internal/sqlstore/sqlcommon/builds.go",
+      "migration/artifacts/adapters/sql/builds.go",
       "internal/server/builds_status_test.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
@@ -15246,7 +15246,7 @@
     "evidence": [
       "internal/server/builds.go",
       "migration/artifacts/core/build/build.go",
-      "internal/sqlstore/sqlcommon/builds.go",
+      "migration/artifacts/adapters/sql/builds.go",
       "internal/server/builds_status_test.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
@@ -17189,7 +17189,7 @@
     "evidence": [
       "internal/server/repositories.go",
       "migration/artifacts/core/repos/repos.go",
-      "internal/sqlstore/sqlcommon/content.go",
+      "migration/artifacts/adapters/sql/content.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -18887,7 +18887,7 @@
     "evidence": [
       "internal/server/repositories.go",
       "migration/artifacts/core/repos/repos.go",
-      "internal/sqlstore/sqlcommon/content.go",
+      "migration/artifacts/adapters/sql/content.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -20517,7 +20517,7 @@
     "evidence": [
       "internal/server/builds.go",
       "migration/artifacts/core/build/build.go",
-      "internal/sqlstore/sqlcommon/builds.go",
+      "migration/artifacts/adapters/sql/builds.go",
       "internal/server/builds_status_test.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
@@ -21358,7 +21358,7 @@
     "evidence": [
       "internal/server/repositories.go",
       "migration/artifacts/core/repos/repos.go",
-      "internal/sqlstore/sqlcommon/content.go",
+      "migration/artifacts/adapters/sql/content.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]
@@ -21836,7 +21836,7 @@
     "evidence": [
       "internal/server/repositories.go",
       "migration/artifacts/core/repos/repos.go",
-      "internal/sqlstore/sqlcommon/content.go",
+      "migration/artifacts/adapters/sql/content.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/server/request_limits.go"
     ]

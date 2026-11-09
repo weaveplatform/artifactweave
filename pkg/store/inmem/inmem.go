@@ -4,24 +4,21 @@
 //
 // Store embeds a *memtx.Store, the in-memory unit of work, so the gate, the
 // transactions with their snapshots, the row copies and the paging are
-// memtx's, and so are Tx, AfterCommit and Close. Each entity store here
-// keeps its rows in memtx tables and makes every call through Do; the
-// platform's stores are migration/platform/store/inmem's, the artifacts
-// module's item, trash, package, build and archived-item stores and blob
-// and replica indexes are migration/artifacts/adapters/inmem's, and the
-// access, notifications, retention, federation, releases and workers stores
-// are those modules' adapters/inmem's, all over the same memtx.Store. It
-// serves unit tests and embedders that need no durability.
+// memtx's, and so are Tx, AfterCommit and Close. Store keeps no rows of its
+// own: the platform's stores are migration/platform/store/inmem's, the
+// artifacts module's stores and indexes are
+// migration/artifacts/adapters/inmem's, and the access, notifications,
+// retention, federation, releases and workers stores are those modules'
+// adapters/inmem's, all over the same memtx.Store, each keeping its rows in
+// memtx tables and making every call through Do. It serves unit tests and
+// embedders that need no durability.
 package inmem
 
 import (
-	"context"
-
 	accinmem "github.com/weaveplatform/artifactweave/migration/access/adapters/inmem"
 	artinmem "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/inmem"
 	fedinmem "github.com/weaveplatform/artifactweave/migration/federation/adapters/inmem"
 	ntfinmem "github.com/weaveplatform/artifactweave/migration/notifications/adapters/inmem"
-	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
 	platinmem "github.com/weaveplatform/artifactweave/migration/platform/store/inmem"
 	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
 	relinmem "github.com/weaveplatform/artifactweave/migration/releases/adapters/inmem"
@@ -48,19 +45,14 @@ type Store struct {
 
 var _ store.Store = (*Store)(nil)
 
-// New returns an empty store. It registers the layout fence with the
-// platform's config store: a layout document that is created, changed or
-// deleted fences the remote repositories that use it, in the same
-// transaction (decision 0007).
+// New returns an empty store. It registers the artifacts module's layout
+// watch with the platform's config store: a layout document that is
+// created, changed or deleted fences the remote repositories that use it,
+// in the same transaction (decision 0007).
 func New() *Store {
 	s := &Store{Store: memtx.New()}
-	s.platform = platinmem.New(s.Store, configdoc.Watch{
-		Kind: configdoc.ConfigLayout,
-		Changed: func(ctx context.Context, key string) error {
-			return store.FenceLayoutSources(ctx, s, remoteRecords{s}, key)
-		},
-	})
 	s.artifacts = artinmem.New(s.Store)
+	s.platform = platinmem.New(s.Store, s.artifacts.LayoutWatch())
 	s.access = accinmem.New(s.Store)
 	s.notifications = ntfinmem.New(s.Store)
 	s.retention = retinmem.New(s.Store)
@@ -99,6 +91,14 @@ func (s *Store) Replays() store.ReplayStore { return s.platform.Replays() }
 // store.
 func (s *Store) RequestBudgets() store.RequestBudgetStore { return s.platform.RequestBudgets() }
 
+// Repos implements store.Store with the artifacts module's repository
+// store.
+func (s *Store) Repos() store.RepoStore { return s.artifacts.Repos() }
+
+// RemoteCache implements store.Store with the artifacts module's remote
+// cache store.
+func (s *Store) RemoteCache() store.RemoteCacheStore { return s.artifacts.RemoteCache() }
+
 // Items implements store.Store with the artifacts module's item store.
 func (s *Store) Items() store.ItemStore { return s.artifacts.Items() }
 
@@ -115,6 +115,16 @@ func (s *Store) Blobs() store.BlobIndex { return s.artifacts.Blobs() }
 // Replicas implements store.Store with the artifacts module's replica
 // index.
 func (s *Store) Replicas() store.ReplicaIndex { return s.artifacts.Replicas() }
+
+// GitLFSLocks implements store.Store with the artifacts module's Git LFS
+// lock store.
+func (s *Store) GitLFSLocks() store.GitLFSLockStore { return s.artifacts.GitLFSLocks() }
+
+// BowerRegistrations implements store.Store with the artifacts module's
+// Bower registration store.
+func (s *Store) BowerRegistrations() store.BowerRegistrationStore {
+	return s.artifacts.BowerRegistrations()
+}
 
 // Builds implements store.Store with the artifacts module's build store.
 func (s *Store) Builds() store.BuildStore { return s.artifacts.Builds() }
