@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -75,7 +75,7 @@ func newItemWorld(t *testing.T, anonymous bool, tune ...func(*Config)) *itemWorl
 	cheapSeed(t, db)
 	hash := cheapHash
 	for _, u := range []types.User{
-		{Name: "reader", PasswordHash: hash, Groups: []string{auth.ReadersGroup}},
+		{Name: "reader", PasswordHash: hash, Groups: []string{authn.ReadersGroup}},
 		{Name: "deployer", PasswordHash: hash},
 		{Name: "user", PasswordHash: hash},
 	} {
@@ -133,7 +133,7 @@ func newItemWorld(t *testing.T, anonymous bool, tune ...func(*Config)) *itemWorl
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{Hash: testHash})
+	a, err := authn.NewAuthenticator(db.Users(), db.Settings(), authn.Options{Hash: testHash})
 	if err != nil {
 		t.Fatal(err)
 	}

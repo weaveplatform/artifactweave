@@ -26,7 +26,7 @@
 //     results and writes errors; the remote source service, which fetches a
 //     remote's upstream Galaxy metadata and archives into the remote cache;
 //     the request's base URL (platform/httpkit/baseurl), onto which download
-//     URLs are rewritten; the caller's principal (internal/auth, through its
+//     URLs are rewritten; the caller's principal (migration/access/core/authn, through its
 //     kernel bridge), which makes a denied source read answer 401 for an
 //     anonymous caller and 403 for any other; and the format package, whose
 //     rules check every identity, version, dependency range and archive.

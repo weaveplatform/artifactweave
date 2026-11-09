@@ -69,7 +69,7 @@
       ]
     },
     {
-      "path": "internal/auth/token_test.go",
+      "path": "migration/access/core/authn/token_test.go",
       "contains": [
         "dev's token as a Basic password"
       ]

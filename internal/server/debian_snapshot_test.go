@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
@@ -213,7 +213,7 @@ func TestUnitDebianSnapshotWorkUsesCurrentPermissions(t *testing.T) {
 	}, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
-	a, err := auth.NewAuthenticator(st.Users(), st.Settings(), auth.Options{Hash: testHash})
+	a, err := authn.NewAuthenticator(st.Users(), st.Settings(), authn.Options{Hash: testHash})
 	if err != nil {
 		t.Fatal(err)
 	}

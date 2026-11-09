@@ -99,7 +99,7 @@
 //     PrincipalBinding returns the pointer that WithPrincipal stored.
 //   - WithDecider never stores a typed nil: a nil decider, or one holding a
 //     nil pointer, is stored as none, so DeciderFrom never returns a decider
-//     that is nil inside. Until the bridges go, internal/auth's
+//     that is nil inside. Until the bridges go, migration/access/core/authn's
 //     WithAuthorized and DeciderFrom use these same accessors, so a decider
 //     stored through either package is visible through both.
 //   - TokenRequest and RegistryTokenRequest carry every field of the token
@@ -163,6 +163,6 @@
 //   - TestUnitDeciderContext: a decider answers for the WithPrincipal call
 //     it was bound to, through derived contexts and never after a later
 //     WithPrincipal; a nil or typed-nil decider hides an outer one.
-//     internal/auth's TestUnitDeciderSharedWithAccessAPI checks that the
+//     migration/access/core/authn's TestUnitDeciderSharedWithAccessAPI checks that the
 //     legacy accessors share the context key.
 package api

@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
@@ -54,7 +54,7 @@ func TestUnitIssueRegistry(t *testing.T) {
 		rec.ID != out.Record.ID {
 		t.Fatalf("record %+v", rec)
 	}
-	if _, err := s.VerifyExpired(ctx, out.AccessToken); !errors.Is(err, auth.ErrInvalidToken) {
+	if _, err := s.VerifyExpired(ctx, out.AccessToken); !errors.Is(err, authn.ErrInvalidToken) {
 		t.Fatalf("refresh with a registry token: %v", err)
 	}
 	c.add(10 * time.Minute)
@@ -99,7 +99,7 @@ func TestUnitRegistryRecordRefuses(t *testing.T) {
 		"bad scope": {Scp: "nonsense:", Exp: 1, Registry: ok.Registry},
 		"identity":  {Scp: ok.Scp, Exp: 1, Registry: ok.Registry, Idn: "borrowed"},
 	} {
-		if _, err := registryClaims(c, false); !errors.Is(err, auth.ErrInvalidToken) {
+		if _, err := registryClaims(c, false); !errors.Is(err, authn.ErrInvalidToken) {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
@@ -189,7 +189,7 @@ func TestUnitRegistryTokenParentUnreadable(t *testing.T) {
 	}
 	fs.fail = map[string]bool{"tokens.get": true}
 	if _, err := s.Verify(ctx, child.AccessToken); !errors.Is(err, errBoom) ||
-		errors.Is(err, auth.ErrInvalidToken) {
+		errors.Is(err, authn.ErrInvalidToken) {
 		t.Fatalf("an unreadable parent is not a bad credential: %v", err)
 	}
 }

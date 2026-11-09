@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/service/identity"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -143,7 +143,7 @@ func TestUnitStoreFailures(t *testing.T) {
 			return err
 		},
 		"users.list": func() error {
-			return s.PatchUser(ctx, auth.AdminUser, identity.UserPatch{Admin: &no})
+			return s.PatchUser(ctx, authn.AdminUser, identity.UserPatch{Admin: &no})
 		},
 		"tokens.list":   func() error { return s.DeleteUser(ctx, "eve") },
 		"tokens.delete": func() error { return s.DeleteUser(ctx, "eve") },

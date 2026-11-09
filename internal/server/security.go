@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/service/identity"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
@@ -490,7 +490,7 @@ func (s artifactoryService) ConfigureUserLockPolicy(
 	}
 	p := types.UserLockPolicy{
 		Enabled:       req.Body.Enabled != nil && *req.Body.Enabled,
-		LoginAttempts: auth.DefaultLoginAttempts,
+		LoginAttempts: authn.DefaultLoginAttempts,
 	}
 	if req.Body.LoginAttempts != nil {
 		if p.LoginAttempts = *req.Body.LoginAttempts; p.LoginAttempts < 1 {
@@ -540,7 +540,7 @@ func (s artifactoryService) SetPasswordExpirationPolicy(
 		return nil, badRequestf("a password expiration policy is required")
 	}
 	p := types.PasswordExpirationPolicy{
-		MaxAgeDays:    auth.DefaultPasswordMaxAgeDays,
+		MaxAgeDays:    authn.DefaultPasswordMaxAgeDays,
 		NotifyByEmail: true,
 	}
 	if req.Body.Enabled != nil {

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
@@ -137,7 +137,7 @@ func newPermFaultWorld(t *testing.T) (http.Handler, *permFault) {
 			t.Fatal(err)
 		}
 	}
-	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{Hash: testHash})
+	a, err := authn.NewAuthenticator(db.Users(), db.Settings(), authn.Options{Hash: testHash})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -288,7 +288,7 @@ func TestAccPermissionHandlerEdges(t *testing.T) {
 
 	db := inmem.New()
 	cheapSeed(t, db)
-	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{Hash: testHash})
+	a, err := authn.NewAuthenticator(db.Users(), db.Settings(), authn.Options{Hash: testHash})
 	if err != nil {
 		t.Fatal(err)
 	}

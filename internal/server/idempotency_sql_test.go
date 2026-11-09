@@ -13,11 +13,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/postgres"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	artclient "github.com/weaveplatform/artifactweave/pkg/client/artifactory"
 )
@@ -57,10 +57,10 @@ func TestAccAppendReplayDurability(t *testing.T) {
 			}
 			handler := func(s *sqlcommon.Store) http.Handler {
 				t.Helper()
-				a, err := auth.NewAuthenticator(
+				a, err := authn.NewAuthenticator(
 					s.Users(),
 					s.Settings(),
-					auth.Options{Hash: testHash},
+					authn.Options{Hash: testHash},
 				)
 				if err != nil {
 					t.Fatal(err)

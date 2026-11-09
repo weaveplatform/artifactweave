@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -257,7 +257,7 @@ func TestUnitRecordMismatches(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Refresh(ctx, "r"); !errors.Is(err, auth.ErrInvalidToken) {
+	if _, err := s.Refresh(ctx, "r"); !errors.Is(err, authn.ErrInvalidToken) {
 		t.Fatalf("refresh of a bad subject: %v", err)
 	}
 	if err := db.Settings().Put(ctx, settings.SettingDefaultTokenExpiry, "soon"); err != nil {

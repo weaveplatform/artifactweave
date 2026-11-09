@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authz"
 	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -84,7 +84,7 @@ const refreshRoute = "POST /access/api/v1/tokens"
 // which check the password and the token they carry themselves
 // (npmUserPath).
 func authenticate(
-	a *auth.Authenticator,
+	a *authn.Authenticator,
 	st store.Store,
 	skip func(r *http.Request) bool,
 ) func(http.Handler) http.Handler {
@@ -109,7 +109,7 @@ func authenticate(
 				if err == nil {
 					p, d, err = authorize(ctx, st, p, p.Anonymous)
 				} else if who, ok := expiredRefresh(ctx, a, r, err); ok {
-					next.ServeHTTP(w, r.WithContext(auth.WithExpiredToken(ctx, who)))
+					next.ServeHTTP(w, r.WithContext(authn.WithExpiredToken(ctx, who)))
 					return
 				}
 				if err != nil {
@@ -119,7 +119,7 @@ func authenticate(
 				noteUser(ctx, p.Name)
 				next.ServeHTTP(
 					w,
-					r.WithContext(auth.WithAuthorized(keepNPMCredential(ctx, r, p), p, d)),
+					r.WithContext(authn.WithAuthorized(keepNPMCredential(ctx, r, p), p, d)),
 				)
 				return
 			}
@@ -144,7 +144,7 @@ func authenticate(
 					return
 				}
 				noteUser(ctx, p.Name)
-				next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(ctx, p, d)))
+				next.ServeHTTP(w, r.WithContext(authn.WithAuthorized(ctx, p, d)))
 			case publicRoutes[r.Method+" "+r.URL.Path]:
 				next.ServeHTTP(w, r)
 			default:
@@ -182,7 +182,7 @@ func ownPasswordChange(r *http.Request, user string) bool {
 // than quietly becoming anonymous.
 func credentials(
 	ctx context.Context,
-	a *auth.Authenticator,
+	a *authn.Authenticator,
 	r *http.Request,
 ) (p kernel.Principal, presented bool, err error) {
 	if user, password, ok := r.BasicAuth(); ok {
@@ -233,7 +233,7 @@ func credentials(
 // password, or an access or reference token whose subject is the user.
 func basicCredentials(
 	ctx context.Context,
-	a *auth.Authenticator,
+	a *authn.Authenticator,
 	user, secret string,
 ) (kernel.Principal, error) {
 	if accessapi.LooksLikeToken(secret) {
@@ -273,16 +273,16 @@ func nugetAPIKey(r *http.Request) (string, string, bool) {
 // revoked and forged tokens still answer 401.
 func expiredRefresh(
 	ctx context.Context,
-	a *auth.Authenticator,
+	a *authn.Authenticator,
 	r *http.Request,
 	err error,
-) (auth.Refresher, bool) {
+) (authn.Refresher, bool) {
 	if !errors.Is(err, kernel.ErrBadCredentials) || r.Method+" "+r.URL.Path != refreshRoute {
-		return auth.Refresher{}, false
+		return authn.Refresher{}, false
 	}
 	scheme, raw, _ := strings.Cut(r.Header.Get("Authorization"), " ")
 	if !strings.EqualFold(scheme, "Bearer") {
-		return auth.Refresher{}, false
+		return authn.Refresher{}, false
 	}
 	return a.ExpiredToken(ctx, strings.TrimSpace(raw))
 }
@@ -300,7 +300,7 @@ func authorize(
 	if st == nil {
 		return p, nil, nil
 	}
-	return auth.Authorize(ctx, authz.Sources{ //nolint:wrapcheck // auth wraps its own errors
+	return authn.Authorize(ctx, authz.Sources{ //nolint:wrapcheck // auth wraps its own errors
 		Permissions: st.Permissions(), Groups: st.Groups(), AnonymousEnabled: anonymous,
 	}, p)
 }

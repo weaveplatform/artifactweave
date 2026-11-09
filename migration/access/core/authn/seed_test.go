@@ -1,4 +1,4 @@
-package auth
+package authn
 
 import (
 	"context"
@@ -83,7 +83,8 @@ func checkSeeded(t *testing.T, st store.Store, repos *seedRepos, password string
 		t.Fatalf("Anything = %+v, %v", anything, err)
 	}
 	remote, err := st.Permissions().Get(ctx, AnyRemotePermission)
-	if r := remote.Resources[accessapi.ResourceArtifact]; err != nil || len(remote.Resources) != 1 ||
+	if r := remote.Resources[accessapi.ResourceArtifact]; err != nil ||
+		len(remote.Resources) != 1 ||
 		len(r.Actions.Users) != 0 ||
 		len(r.Actions.Groups) != 0 ||
 		!slices.Equal(r.Targets[accessapi.TargetAnyRemote].Include, []string{"**"}) {

@@ -69,4 +69,4 @@ These are the pinned client definitions and executable evidence from which this 
 - Client pin: [test/acceptance/clients/composer.Dockerfile](../../test/acceptance/clients/composer.Dockerfile).
 - Evidence: [test/acceptance/features/composer.feature](../../test/acceptance/features/composer.feature).
 - Evidence: [test/acceptance/composer_steps_test.go](../../test/acceptance/composer_steps_test.go).
-- Evidence: [internal/auth/token.go](../../internal/auth/token.go).
+- Evidence: [migration/access/core/authn/token.go](../../migration/access/core/authn/token.go).

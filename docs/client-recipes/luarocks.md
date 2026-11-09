@@ -81,4 +81,4 @@ These are the pinned client definitions and executable evidence from which this 
 - Client pin: [test/acceptance/clients/luarocks.Dockerfile](../../test/acceptance/clients/luarocks.Dockerfile).
 - Evidence: [test/acceptance/features/luarocks_local.feature](../../test/acceptance/features/luarocks_local.feature).
 - Evidence: [test/acceptance/luarocks_steps_test.go](../../test/acceptance/luarocks_steps_test.go).
-- Evidence: [internal/auth/token.go](../../internal/auth/token.go).
+- Evidence: [migration/access/core/authn/token.go](../../migration/access/core/authn/token.go).

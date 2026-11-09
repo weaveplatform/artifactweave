@@ -77,5 +77,5 @@ These are the pinned client definitions and executable evidence from which this 
 - Client pin: [test/acceptance/clients/python.Dockerfile](../../test/acceptance/clients/python.Dockerfile).
 - Evidence: [test/acceptance/features/pypi_clients.feature](../../test/acceptance/features/pypi_clients.feature).
 - Evidence: [test/acceptance/features/pypi_uploads.feature](../../test/acceptance/features/pypi_uploads.feature).
-- Evidence: [internal/auth/token.go](../../internal/auth/token.go).
+- Evidence: [migration/access/core/authn/token.go](../../migration/access/core/authn/token.go).
 - Evidence: [test/acceptance/features/pypi_remote.feature](../../test/acceptance/features/pypi_remote.feature).

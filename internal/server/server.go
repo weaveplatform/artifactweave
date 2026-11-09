@@ -15,12 +15,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/idtoken"
-	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
@@ -123,7 +123,7 @@ type Config struct {
 	// Auth verifies credentials. Nil serves every route without
 	// authentication, which only tests do: such a handler has no store and
 	// answers just the system endpoints and the stubs.
-	Auth *auth.Authenticator
+	Auth *authn.Authenticator
 	// Mirrors administers the blob mirrors; nil when no tier is a mirror.
 	Mirrors Mirrors
 	// RemoteStatus serves artifactweave-only, administrator-only diagnostics.
@@ -148,7 +148,7 @@ type Config struct {
 	// PasswordHash is the cost of passwords the security API sets; the zero
 	// value is production's. Only Go code can choose another: tests use a
 	// tiny cost.
-	PasswordHash auth.HashParams
+	PasswordHash authn.HashParams
 	// Redirect tunes downloadRedirect and cdnRedirect (decision 0029).
 	Redirect Redirect
 	// FolderDownloadMaxConcurrent is how many folder archive downloads run

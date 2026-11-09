@@ -9,8 +9,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth/idtoken"
 	"github.com/weaveplatform/artifactweave/internal/auth/idtoken/idtokentest"
-	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	"github.com/weaveplatform/artifactweave/internal/service/oidc"
+	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"

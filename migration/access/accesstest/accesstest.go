@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	"github.com/weaveplatform/artifactweave/migration/access"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/instance"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -23,7 +23,7 @@ import (
 // HashPassword, the cost test/server/support's TestHash has. The production
 // cost, 64 MiB and three passes for each hash, would make every login in a
 // test slow, under the race detector most of all.
-var cheap = auth.HashParams{MemoryKiB: 64, Time: 1, Threads: 1}
+var cheap = authn.HashParams{MemoryKiB: 64, Time: 1, Threads: 1}
 
 // keyBits is the RSA size of the token service's signing keys. A key of the
 // production size takes long enough to generate that building a kit for
@@ -44,7 +44,7 @@ var identity = instance.InstanceIdentity{
 // the authenticator's own sentinel, the same value, re-exported because the
 // kernel declares no such sentinel: a test outside access asserts it without
 // importing access internals.
-var ErrLoginSuspended = auth.ErrLoginSuspended
+var ErrLoginSuspended = authn.ErrLoginSuspended
 
 // Kit is the access module a running server would build, over one store: the
 // real authenticator, permission evaluator and, with WithTokens, token
@@ -64,7 +64,7 @@ type Option func(*options)
 type options struct {
 	now      func() time.Time
 	tokens   bool
-	verifier auth.TokenVerifier
+	verifier authn.TokenVerifier
 	settings accessapi.Settings
 }
 
@@ -86,7 +86,7 @@ func WithTokens() Option { return func(o *options) { o.tokens = true } }
 // tokens with v, such as a stub that answers a fixed token record. Without
 // WithTokens, API().Tokens stays nil; with it, v still answers the
 // authenticator, and the token service issues tokens and serves Verify.
-func WithTokenVerifier(v auth.TokenVerifier) Option {
+func WithTokenVerifier(v authn.TokenVerifier) Option {
 	return func(o *options) { o.verifier = v }
 }
 
@@ -132,7 +132,7 @@ func Over(tb testing.TB, st store.Store, opts ...Option) *Kit {
 			verifier = svc
 		}
 	}
-	authn, authErr := auth.NewAuthenticator(st.Users(), st.Settings(), auth.Options{
+	authn, authErr := authn.NewAuthenticator(st.Users(), st.Settings(), authn.Options{
 		Now: o.now, Hash: cheap, Tokens: verifier, Groups: st.Groups(),
 		APIRestrictions: st.APIRestrictions(),
 	})
@@ -262,7 +262,7 @@ func (k *Kit) Verify(ctx context.Context, raw string) (types.Token, error) {
 // fails.
 func HashPassword(tb testing.TB, password string) []byte {
 	tb.Helper()
-	h, err := auth.HashPasswordWith(cheap, password)
+	h, err := authn.HashPasswordWith(cheap, password)
 	fatalIf(tb, err)
 	return h
 }

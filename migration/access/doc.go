@@ -9,7 +9,7 @@
 // bindings wrap the evaluator in access/core/authz and, until access core
 // holds the authenticator and the token service
 // (https://github.com/weaveplatform/artifactweave/issues/1064), the legacy
-// internal/auth and internal/auth/token, so consumers can move onto
+// migration/access/core/authn and migration/access/core/token, so consumers can move onto
 // access/api first.
 //
 // # Inputs

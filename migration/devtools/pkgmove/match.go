@@ -50,7 +50,7 @@ type matcher struct {
 	// moves.
 	region func(dir string) bool
 	// isFile reports whether a path names a file of the tree, so that
-	// "internal/auth/token.go" is not read as the package internal/auth/token
+	// "migration/access/core/authn/token.go" is not read as the package migration/access/core/token
 	// followed by ".go".
 	isFile func(path string) bool
 	// fileEntry reports whether a path is, or lies in, the old path of a

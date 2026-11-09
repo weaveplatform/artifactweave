@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
@@ -33,10 +33,10 @@ func TestAccConanClients(t *testing.T) {
 				w := newItemWorld(t, false, func(cfg *Config) {
 					cfg.Tokens, _ = seedTokens(t, cfg.Store)
 					var err error
-					cfg.Auth, err = auth.NewAuthenticator(
+					cfg.Auth, err = authn.NewAuthenticator(
 						cfg.Store.Users(),
 						cfg.Store.Settings(),
-						auth.Options{Hash: testHash, Tokens: cfg.Tokens},
+						authn.Options{Hash: testHash, Tokens: cfg.Tokens},
 					)
 					if err != nil {
 						t.Fatal(err)

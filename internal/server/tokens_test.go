@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
@@ -399,7 +399,7 @@ func TestAccRevokeNonRevocable(t *testing.T) {
 // transient user joins the auto-join groups (readers, which Anything lets
 // read every repository) as it does in the running server.
 func withAutoJoin(c *Config) {
-	a, err := auth.NewAuthenticator(c.Store.Users(), c.Store.Settings(), auth.Options{
+	a, err := authn.NewAuthenticator(c.Store.Users(), c.Store.Settings(), authn.Options{
 		Hash: testHash, Tokens: c.Tokens, Groups: c.Store.Groups(),
 	})
 	if err != nil {

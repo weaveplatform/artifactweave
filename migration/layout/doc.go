@@ -64,7 +64,7 @@
 //   - TestUnitFixtureReadsAreRootRelative,
 //     TestUnitFixtureReadRuleDetectsViolations: tests read repository
 //     fixtures through repopath.
-//   - TestUnitPrincipalInternals: outside internal/auth and the staged
+//   - TestUnitPrincipalInternals: outside migration/access/core/authn and the staged
 //     kernel and access trees, no Go file selects IsTokenAuthenticated,
 //     TokenSubject or PasswordRevision, the Principal fields that access
 //     trusts when it rechecks a credential, or sets one in a composite
@@ -79,7 +79,7 @@
 //     naming it is caught.
 //   - TestUnitTestsAvoidAccessInternals,
 //     TestUnitAccessInternalsRuleDetectsViolations: outside access, no test
-//     imports internal/auth, internal/auth/token or a package of access
+//     imports migration/access/core/authn, migration/access/core/token or a package of access
 //     core, such as the evaluator, other than test support. Only the server
 //     root, internal/app and the test/server harnesses may import the
 //     authenticator and the token service, until TST-04 to TST-07 and WEB-22

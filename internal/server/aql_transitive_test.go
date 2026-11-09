@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -304,7 +304,7 @@ func TestAccTransitiveAQLBoundsFailuresAndCurrentFences(t *testing.T) {
 					u.PasswordHash = []byte("changed")
 					return w.db.Users().Update(t.Context(), u)
 				case "permission":
-					return w.db.Groups().Delete(t.Context(), auth.ReadersGroup)
+					return w.db.Groups().Delete(t.Context(), authn.ReadersGroup)
 				case "source":
 					c := q.Repo
 					c.URL = "https://changed.example/artifactory/source"

@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -77,7 +77,7 @@ func dur(d time.Duration) *time.Duration { return &d }
 
 func invalid(t *testing.T, s *Service, raw, why string) {
 	t.Helper()
-	if _, err := s.Verify(context.Background(), raw); !errors.Is(err, auth.ErrInvalidToken) {
+	if _, err := s.Verify(context.Background(), raw); !errors.Is(err, authn.ErrInvalidToken) {
 		t.Errorf("%s: verify = %v, want ErrInvalidToken", why, err)
 	}
 }
@@ -297,7 +297,7 @@ func TestUnitRevoke(t *testing.T) {
 		t.Fatalf("revoke a refreshable token by id: %v", err)
 	}
 	invalid(t, s, refreshable.AccessToken, "a revoked refreshable token")
-	if _, err := s.Refresh(ctx, refreshable.RefreshToken); !errors.Is(err, auth.ErrInvalidToken) {
+	if _, err := s.Refresh(ctx, refreshable.RefreshToken); !errors.Is(err, authn.ErrInvalidToken) {
 		t.Fatalf("the refresh token of a revoked token: %v", err)
 	}
 	refreshable = issue(t, s, Request{Refreshable: true, ExpiresIn: dur(time.Hour)})
@@ -332,11 +332,11 @@ func TestUnitRefresh(t *testing.T) {
 	if _, err := s.Verify(ctx, next.AccessToken); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Refresh(ctx, first.RefreshToken); !errors.Is(err, auth.ErrInvalidToken) {
+	if _, err := s.Refresh(ctx, first.RefreshToken); !errors.Is(err, authn.ErrInvalidToken) {
 		t.Fatalf("a used refresh token: %v", err)
 	}
 	c.add(2*time.Hour + model.DefaultRefreshGrace)
-	if _, err := s.Refresh(ctx, next.RefreshToken); !errors.Is(err, auth.ErrInvalidToken) {
+	if _, err := s.Refresh(ctx, next.RefreshToken); !errors.Is(err, authn.ErrInvalidToken) {
 		t.Fatalf("after the grace: %v", err)
 	}
 }
@@ -448,20 +448,20 @@ func TestUnitVerifyExpired(t *testing.T) {
 	if err != nil || rec.ID != out.Record.ID {
 		t.Fatalf("VerifyExpired = %+v, %v", rec, err)
 	}
-	if _, err := s.VerifyExpired(ctx, out.ReferenceToken); !errors.Is(err, auth.ErrInvalidToken) {
+	if _, err := s.VerifyExpired(ctx, out.ReferenceToken); !errors.Is(err, authn.ErrInvalidToken) {
 		t.Fatalf("a reference token: %v", err)
 	}
 	parts := strings.Split(out.AccessToken, ".")
 	forged := parts[0] + "." + b64.EncodeToString([]byte(strings.Replace(
 		string(decodePayload(t, out.AccessToken)), "/users/alice", "/users/admin", 1,
 	))) + "." + parts[2]
-	if _, err := s.VerifyExpired(ctx, forged); !errors.Is(err, auth.ErrInvalidToken) {
+	if _, err := s.VerifyExpired(ctx, forged); !errors.Is(err, authn.ErrInvalidToken) {
 		t.Fatalf("a forged expired token: %v", err)
 	}
 	if err := s.Revoke(ctx, out.Record.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.VerifyExpired(ctx, out.AccessToken); !errors.Is(err, auth.ErrInvalidToken) {
+	if _, err := s.VerifyExpired(ctx, out.AccessToken); !errors.Is(err, authn.ErrInvalidToken) {
 		t.Fatalf("a revoked expired token: %v", err)
 	}
 }
@@ -484,7 +484,7 @@ func TestUnitRefreshAs(t *testing.T) {
 		"another token's": {
 			other.RefreshToken,
 			RefreshCheck{Username: "alice", TokenID: mine.Record.ID},
-			auth.ErrInvalidToken,
+			authn.ErrInvalidToken,
 		},
 		"another user's": {bobs.RefreshToken, RefreshCheck{Username: "alice"}, ErrRefreshOtherUser},
 		"another user's, naming a token": {
@@ -492,7 +492,7 @@ func TestUnitRefreshAs(t *testing.T) {
 			RefreshCheck{Username: "alice", TokenID: mine.Record.ID},
 			ErrRefreshOtherUser,
 		},
-		"unknown": {"nope", RefreshCheck{Username: "alice"}, auth.ErrInvalidToken},
+		"unknown": {"nope", RefreshCheck{Username: "alice"}, authn.ErrInvalidToken},
 	} {
 		if _, err := s.RefreshAs(ctx, r.refresh, r.check); !errors.Is(err, r.expected) {
 			t.Errorf("%s: %v, want %v", what, err, r.expected)

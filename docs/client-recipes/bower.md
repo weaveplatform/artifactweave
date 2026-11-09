@@ -95,5 +95,5 @@ These are the pinned client definitions and executable evidence from which this 
 - Client pin: [test/acceptance/clients/bower.Dockerfile](../../test/acceptance/clients/bower.Dockerfile).
 - Evidence: [test/acceptance/bower_steps_test.go](../../test/acceptance/bower_steps_test.go).
 - Evidence: [test/acceptance/features/bower.feature](../../test/acceptance/features/bower.feature).
-- Evidence: [internal/auth/token.go](../../internal/auth/token.go).
+- Evidence: [migration/access/core/authn/token.go](../../migration/access/core/authn/token.go).
 - Evidence: [test/acceptance/bower_private_steps_test.go](../../test/acceptance/bower_private_steps_test.go).

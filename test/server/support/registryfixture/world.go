@@ -8,7 +8,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -54,7 +54,7 @@ func New(t *testing.T, anonymous bool, tune ...harness.Tune) *World {
 	db := inmem.New()
 	support.Seed(t, db)
 	for _, user := range []types.User{
-		{Name: "reader", PasswordHash: support.CheapHash, Groups: []string{auth.ReadersGroup}},
+		{Name: "reader", PasswordHash: support.CheapHash, Groups: []string{authn.ReadersGroup}},
 		{Name: "deployer", PasswordHash: support.CheapHash},
 		{Name: "user", PasswordHash: support.CheapHash},
 	} {
@@ -111,7 +111,11 @@ func New(t *testing.T, anonymous bool, tune ...harness.Tune) *World {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{Hash: support.TestHash})
+	a, err := authn.NewAuthenticator(
+		db.Users(),
+		db.Settings(),
+		authn.Options{Hash: support.TestHash},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -17,8 +17,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -43,7 +43,7 @@ var (
 	// access token being refreshed" (createtoken.json, which answers 403).
 	ErrRefreshOtherUser = errors.New("token: the refresh token belongs to another user")
 
-	errMalformed = fmt.Errorf("%w: malformed", auth.ErrInvalidToken)
+	errMalformed = fmt.Errorf("%w: malformed", authn.ErrInvalidToken)
 	errBadKey    = errors.New("token: bad signing key")
 )
 
@@ -185,7 +185,7 @@ func (s *Service) Issue(ctx context.Context, r Request) (Issued, error) {
 	}
 	// OIDC and refresh grants authenticate their own credential, so they do
 	// not necessarily arrive through the request's principal middleware.
-	if err := auth.CheckAPIRestriction(
+	if err := authn.CheckAPIRestriction(
 		ctx,
 		s.st.APIRestrictions(),
 		r.Username,
@@ -379,7 +379,7 @@ func (s *Service) Verify(ctx context.Context, raw string) (model.Token, error) {
 	}
 	now := s.now()
 	if rec.Expired(now) {
-		return model.Token{}, fmt.Errorf("%w: expired", auth.ErrInvalidToken)
+		return model.Token{}, fmt.Errorf("%w: expired", authn.ErrInvalidToken)
 	}
 	if rec.Registry == nil && now.Sub(rec.LastUsed) >= touchEvery {
 		// Best effort: a failed write must not fail the request.
@@ -397,7 +397,7 @@ func (s *Service) Verify(ctx context.Context, raw string) (model.Token, error) {
 // expiry this succeeds.
 func (s *Service) VerifyExpired(ctx context.Context, raw string) (model.Token, error) {
 	if accessapi.IsReferenceToken(raw) {
-		return model.Token{}, fmt.Errorf("%w: not an access token", auth.ErrInvalidToken)
+		return model.Token{}, fmt.Errorf("%w: not an access token", authn.ErrInvalidToken)
 	}
 	return s.verifyJWT(ctx, raw, true)
 }
@@ -412,34 +412,34 @@ func (s *Service) verifyJWT(
 		return model.Token{}, err
 	}
 	if p.header.Alg != algRS256 {
-		return model.Token{}, fmt.Errorf("%w: algorithm %q", auth.ErrInvalidToken, p.header.Alg)
+		return model.Token{}, fmt.Errorf("%w: algorithm %q", authn.ErrInvalidToken, p.header.Alg)
 	}
 	key, err := s.publicKey(ctx, p.header.Kid)
 	if err != nil {
 		return model.Token{}, err
 	}
 	if !p.verify(key) {
-		return model.Token{}, fmt.Errorf("%w: signature", auth.ErrInvalidToken)
+		return model.Token{}, fmt.Errorf("%w: signature", authn.ErrInvalidToken)
 	}
 	var c claims
 	if err := json.Unmarshal(p.payload, &c); err != nil {
 		return model.Token{}, errMalformed
 	}
 	if !allowExpired && c.Exp != 0 && !s.now().Before(time.Unix(c.Exp, 0)) {
-		return model.Token{}, fmt.Errorf("%w: expired", auth.ErrInvalidToken)
+		return model.Token{}, fmt.Errorf("%w: expired", authn.ErrInvalidToken)
 	}
 	if c.Registry != nil {
 		return s.registryRecord(ctx, c, allowExpired)
 	}
 	rec, err := s.st.Tokens().Get(ctx, c.Jti)
 	if errors.Is(err, kernel.ErrNotFound) {
-		return model.Token{}, fmt.Errorf("%w: revoked", auth.ErrInvalidToken)
+		return model.Token{}, fmt.Errorf("%w: revoked", authn.ErrInvalidToken)
 	}
 	if err != nil {
 		return model.Token{}, fmt.Errorf("token: %w", err)
 	}
 	if rec.Subject != c.Sub {
-		return model.Token{}, fmt.Errorf("%w: subject", auth.ErrInvalidToken)
+		return model.Token{}, fmt.Errorf("%w: subject", authn.ErrInvalidToken)
 	}
 	return rec, nil
 }
@@ -458,7 +458,7 @@ func (s *Service) registryRecord(
 	}
 	_, err = s.st.Tokens().Get(ctx, rec.Parent)
 	if errors.Is(err, kernel.ErrNotFound) {
-		return model.Token{}, fmt.Errorf("%w: its parent token was revoked", auth.ErrInvalidToken)
+		return model.Token{}, fmt.Errorf("%w: its parent token was revoked", authn.ErrInvalidToken)
 	}
 	if err != nil {
 		return model.Token{}, fmt.Errorf("token: parent of a registry token: %w", err)
@@ -471,7 +471,7 @@ func (s *Service) registryRecord(
 // here.
 func registryClaims(c claims, allowExpired bool) (model.Token, error) {
 	if allowExpired || c.Exp == 0 {
-		return model.Token{}, fmt.Errorf("%w: registry token", auth.ErrInvalidToken)
+		return model.Token{}, fmt.Errorf("%w: registry token", authn.ErrInvalidToken)
 	}
 	scope, err := kernel.ParseScope(c.Scp)
 	if err != nil || !knownIdentity(c.Idn) {
@@ -505,7 +505,7 @@ func (s *Service) publicKey(ctx context.Context, kid string) (*rsa.PublicKey, er
 	if k, ok := s.keys.public[kid]; ok {
 		return k, nil
 	}
-	return nil, fmt.Errorf("%w: unknown key", auth.ErrInvalidToken)
+	return nil, fmt.Errorf("%w: unknown key", authn.ErrInvalidToken)
 }
 
 func (s *Service) byDigest(
@@ -515,7 +515,7 @@ func (s *Service) byDigest(
 ) (model.Token, error) {
 	rec, err := s.st.Tokens().ByDigest(ctx, kind, digest(raw))
 	if errors.Is(err, kernel.ErrNotFound) {
-		return model.Token{}, fmt.Errorf("%w: unknown token", auth.ErrInvalidToken)
+		return model.Token{}, fmt.Errorf("%w: unknown token", authn.ErrInvalidToken)
 	}
 	if err != nil {
 		return model.Token{}, fmt.Errorf("token: %w", err)
@@ -557,19 +557,19 @@ func (s *Service) RefreshAs(
 		}
 		if !old.ExpiresAt.IsZero() &&
 			!s.now().Before(old.ExpiresAt.Add(model.DefaultRefreshGrace)) {
-			return fmt.Errorf("%w: refresh token expired", auth.ErrInvalidToken)
+			return fmt.Errorf("%w: refresh token expired", authn.ErrInvalidToken)
 		}
 		sub, err := model.ParseSubject(old.Subject)
 		if err != nil {
-			return fmt.Errorf("%w: %w", auth.ErrInvalidToken, err)
+			return fmt.Errorf("%w: %w", authn.ErrInvalidToken, err)
 		}
 		if c.Username != "" && sub.Name != c.Username {
 			return ErrRefreshOtherUser
 		}
 		if c.TokenID != "" && old.ID != c.TokenID {
-			return fmt.Errorf("%w: refresh token of another token", auth.ErrInvalidToken)
+			return fmt.Errorf("%w: refresh token of another token", authn.ErrInvalidToken)
 		}
-		if err := auth.CheckAPIRestriction(
+		if err := authn.CheckAPIRestriction(
 			ctx,
 			s.st.APIRestrictions(),
 			sub.Name,

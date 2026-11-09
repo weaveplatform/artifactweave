@@ -1,8 +1,8 @@
-// Package auth authenticates requests and seeds the built-in principals
+// Package authn authenticates requests and seeds the built-in principals
 // (decision 0005). Passwords are Argon2id hashes in PHC string form, so the
 // cost parameters travel with each hash and can be raised without breaking
 // the hashes already stored.
-package auth
+package authn
 
 import (
 	"crypto/rand"

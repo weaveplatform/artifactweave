@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	"github.com/weaveplatform/artifactweave/migration/access"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authz"
+	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -21,7 +21,7 @@ import (
 )
 
 // testHash keeps password checks cheap; the bindings add nothing to them.
-var testHash = auth.HashParams{MemoryKiB: 64, Time: 1, Threads: 1}
+var testHash = authn.HashParams{MemoryKiB: 64, Time: 1, Threads: 1}
 
 var (
 	errBoom     = errors.New("boom")
@@ -51,7 +51,7 @@ func newWorld(t *testing.T) world {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	hash, err := auth.HashPasswordWith(testHash, "secret")
+	hash, err := authn.HashPasswordWith(testHash, "secret")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func newWorld(t *testing.T) world {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, err := auth.NewAuthenticator(st.Users(), st.Settings(), auth.Options{
+	a, err := authn.NewAuthenticator(st.Users(), st.Settings(), authn.Options{
 		Hash: testHash, Now: clock, Tokens: tokens, Groups: st.Groups(),
 		APIRestrictions: st.APIRestrictions(),
 	})
@@ -241,7 +241,7 @@ func TestUnitAuthorizerBinding(t *testing.T) {
 
 	// Authorize is auth.Authorize, with the evaluator itself as the Decider.
 	p, d, err := az.Authorize(ctx, ann, false)
-	wantP, _, wantErr := auth.Authorize(ctx, src, ann)
+	wantP, _, wantErr := authn.Authorize(ctx, src, ann)
 	if err != nil || wantErr != nil || !reflect.DeepEqual(p, wantP) {
 		t.Fatalf("Authorize = %+v, %v; want %+v, %v", p, err, wantP, wantErr)
 	}
@@ -327,7 +327,7 @@ func TestUnitAuthorizerErrors(t *testing.T) {
 	az := module(t, bad).Authorizer
 	src := authz.Sources{Permissions: bad.Permissions(), Groups: bad.Groups()}
 	_, evalErr := authz.New(ctx, src, accessapi.SubjectOf(ann))
-	_, _, authorizeErr := auth.Authorize(ctx, src, ann)
+	_, _, authorizeErr := authn.Authorize(ctx, src, ann)
 	if evalErr == nil || authorizeErr == nil {
 		t.Fatal("the failing store did not fail the evaluator")
 	}
@@ -564,11 +564,11 @@ func TestUnitStoreBindings(t *testing.T) {
 			t.Errorf("Check at %v = %v, want %v", at, err, want)
 		}
 	}
-	if err := r.Check(auth.WithAPIRecovery(ctx), "ann", now); err != nil {
+	if err := r.Check(authn.WithAPIRecovery(ctx), "ann", now); err != nil {
 		t.Errorf("Check on a recovery route = %v, want nil", err)
 	}
 	sameError(t, "Check with a canceled context", r.Check(canceled, "ann", now),
-		auth.CheckAPIRestriction(canceled, st.APIRestrictions(), "ann", now))
+		authn.CheckAPIRestriction(canceled, st.APIRestrictions(), "ann", now))
 }
 
 // ItemGrants unions the actions of the permissions whose artifact targets

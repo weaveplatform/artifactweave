@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
@@ -50,7 +50,11 @@ func NewWorld(t *testing.T) *World {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{Hash: support.TestHash})
+	a, err := authn.NewAuthenticator(
+		db.Users(),
+		db.Settings(),
+		authn.Options{Hash: support.TestHash},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

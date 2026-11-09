@@ -85,4 +85,4 @@ These are the pinned client definitions and executable evidence from which this 
 - Client pin: [.github/actions/jfrog-cli/action.yml](../../.github/actions/jfrog-cli/action.yml).
 - Evidence: [test/acceptance/features/go.feature](../../test/acceptance/features/go.feature).
 - Evidence: [test/acceptance/client_steps_test.go](../../test/acceptance/client_steps_test.go).
-- Evidence: [internal/auth/token.go](../../internal/auth/token.go).
+- Evidence: [migration/access/core/authn/token.go](../../migration/access/core/authn/token.go).

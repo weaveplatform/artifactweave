@@ -13,9 +13,9 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/postgres"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/storetest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
@@ -66,7 +66,7 @@ func propertyServer(t *testing.T, db store.Store) http.Handler {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{Hash: testHash})
+	a, err := authn.NewAuthenticator(db.Users(), db.Settings(), authn.Options{Hash: testHash})
 	if err != nil {
 		t.Fatal(err)
 	}

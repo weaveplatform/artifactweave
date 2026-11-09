@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authz"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -32,7 +32,7 @@ func (b authorizer) Authorize(
 	p kernel.Principal,
 	anonymousEnabled bool,
 ) (kernel.Principal, accessapi.Decider, error) {
-	p, d, err := auth.Authorize(ctx, b.sources(anonymousEnabled), p)
+	p, d, err := authn.Authorize(ctx, b.sources(anonymousEnabled), p)
 	//nolint:wrapcheck // auth.Authorize wraps its own as "auth: permissions: %w"
 	return p, authz.AsAPI(d), err
 }

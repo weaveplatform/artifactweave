@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/auth/token"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -50,7 +50,7 @@ func newNPMAuthWorld(t *testing.T) *npmAuthWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{
+	a, err := authn.NewAuthenticator(db.Users(), db.Settings(), authn.Options{
 		Hash: testHash, Tokens: tokens,
 	})
 	if err != nil {
@@ -305,7 +305,7 @@ func TestAccNPMCredentialWithoutOne(t *testing.T) {
 	if err := db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
 		t.Fatal(err)
 	}
-	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{Hash: testHash})
+	a, err := authn.NewAuthenticator(db.Users(), db.Settings(), authn.Options{Hash: testHash})
 	if err != nil {
 		t.Fatal(err)
 	}

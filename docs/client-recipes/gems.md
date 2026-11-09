@@ -80,4 +80,4 @@ These are the pinned client definitions and executable evidence from which this 
 - Client pin: [test/acceptance/clients/ruby.Dockerfile](../../test/acceptance/clients/ruby.Dockerfile).
 - Evidence: [test/acceptance/features/gems.feature](../../test/acceptance/features/gems.feature).
 - Evidence: [test/acceptance/gems_steps_test.go](../../test/acceptance/gems_steps_test.go).
-- Evidence: [internal/auth/token.go](../../internal/auth/token.go).
+- Evidence: [migration/access/core/authn/token.go](../../migration/access/core/authn/token.go).

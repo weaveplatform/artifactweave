@@ -405,7 +405,7 @@ decodes them; string spellings such as `"true"` and `"60"` are accepted on write
   Unlocking (one, several or all users) and disabling the policy clear locks.
   `secondsToUnlock` (default 1) is stored and returned only: a lock lasts until an
   administrator lifts it.
-- **The temporary login suspension** (`internal/auth/suspension.go`, #408) is the second
+- **The temporary login suspension** (`migration/access/core/authn/suspension.go`, #408) is the second
   defence, independent of the lock. From the second failed Basic login in a row for a user
   name (`maxLoginDelayIncorrectAttempts`), every Basic login with that name answers `403`
   "This request is blocked due to recurrent login failures, please try again in N seconds"

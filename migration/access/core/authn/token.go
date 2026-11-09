@@ -1,4 +1,4 @@
-package auth
+package authn
 
 import (
 	"context"
@@ -17,13 +17,13 @@ import (
 var ErrInvalidToken = errors.New("auth: invalid token")
 
 // TokenVerifier resolves an access token (a JWT) or a reference token to its
-// stored record. internal/auth/token implements it.
+// stored record. migration/access/core/token implements it.
 type TokenVerifier interface {
 	Verify(ctx context.Context, raw string) (model.Token, error)
 }
 
 // ExpiredVerifier is a TokenVerifier that also verifies an access token
-// whose only fault is its expiry. internal/auth/token implements it.
+// whose only fault is its expiry. migration/access/core/token implements it.
 type ExpiredVerifier interface {
 	VerifyExpired(ctx context.Context, raw string) (model.Token, error)
 }

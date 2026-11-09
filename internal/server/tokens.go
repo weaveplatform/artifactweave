@@ -12,9 +12,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
@@ -24,7 +24,7 @@ import (
 )
 
 // The Access token API (#79) and Artifactory's legacy token endpoints, over
-// the token service (internal/auth/token). Both surfaces share mint and the
+// the token service (migration/access/core/token). Both surfaces share mint and the
 // visibility rules, so a token issued through one is the same token in the
 // other.
 
@@ -199,7 +199,7 @@ func (t tokenAPI) refresh(
 	if p, ok := kernel.FromContext(ctx); ok && !p.Anonymous {
 		check.Username = p.Name
 	}
-	of, presented := auth.ExpiredTokenFrom(ctx)
+	of, presented := authn.ExpiredTokenFrom(ctx)
 	if m.isLegacy {
 		// jfrog-client-go sends the legacy refresh with no credentials and the
 		// token being refreshed, possibly expired, as access_token
@@ -228,7 +228,7 @@ func (t tokenAPI) refresh(
 		return token.Issued{}, kernel.ErrAPIRestricted
 	case errors.Is(err, token.ErrRefreshOtherUser):
 		return token.Issued{}, errRefreshOtherUser
-	case errors.Is(err, auth.ErrInvalidToken):
+	case errors.Is(err, authn.ErrInvalidToken):
 		return token.Issued{}, badRequestf("The refresh token is not valid")
 	case err != nil:
 		return token.Issued{}, t.internalError(ctx, "refresh token", err)
@@ -572,7 +572,7 @@ func (s accessService) RevokeTokenByValue(
 	// Verify resolves either form and refuses expired and revoked tokens,
 	// which the route answers 404.
 	rec, err := svc.Verify(ctx, *req.Body.Token)
-	if errors.Is(err, auth.ErrInvalidToken) {
+	if errors.Is(err, authn.ErrInvalidToken) {
 		return nil, errNotRevocable
 	}
 	if err != nil {
@@ -760,7 +760,7 @@ func (s artifactoryService) revokeLegacyToken(w http.ResponseWriter, r *http.Req
 	}
 	if value != "" {
 		rec, err := svc.Verify(ctx, value)
-		if errors.Is(err, auth.ErrInvalidToken) {
+		if errors.Is(err, authn.ErrInvalidToken) {
 			writeText(w, "Token not found or already revoked")
 			return
 		}

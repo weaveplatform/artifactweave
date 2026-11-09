@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/service/identity"
 	"github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -18,19 +18,19 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-var cheap = auth.HashParams{MemoryKiB: 64, Time: 1, Threads: 1}
+var cheap = authn.HashParams{MemoryKiB: 64, Time: 1, Threads: 1}
 
 var clock = time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)
 
 func newService(t *testing.T) (*identity.Service, *inmem.Store) {
 	t.Helper()
 	db := inmem.New()
-	hash, err := auth.HashPasswordWith(cheap, "pw")
+	hash, err := authn.HashPasswordWith(cheap, "pw")
 	if err != nil {
 		t.Fatal(err)
 	}
 	repositories := repos.NewRepositories(db, access.KeysOf(db), access.ProjectsOf(db))
-	if _, err := auth.SeedHashed(context.Background(), db, repositories, hash, clock); err != nil {
+	if _, err := authn.SeedHashed(context.Background(), db, repositories, hash, clock); err != nil {
 		t.Fatal(err)
 	}
 	return &identity.Service{Store: db, Hash: cheap, Now: func() time.Time { return clock }}, db
@@ -64,18 +64,18 @@ func TestUnitPutUser(t *testing.T) {
 	_, err := s.PutGroup(ctx, types.Group{Name: "joiners", AutoJoin: true}, nil)
 	must(err)
 
-	created, err := s.PutUser(ctx, newUser("ann", auth.ReadersGroup), "Ann-pass1")
+	created, err := s.PutUser(ctx, newUser("ann", authn.ReadersGroup), "Ann-pass1")
 	if err != nil || !created {
 		t.Fatalf("create: %v %v", created, err)
 	}
 	ann, err := s.User(ctx, "ann")
 	must(err)
-	if !slices.Equal(ann.Groups, []string{"joiners", auth.ReadersGroup}) ||
+	if !slices.Equal(ann.Groups, []string{"joiners", authn.ReadersGroup}) ||
 		ann.Status != types.UserEnabled || ann.Realm != types.RealmInternal ||
 		!ann.PasswordChanged.Equal(clock) || len(ann.PasswordHash) == 0 {
 		t.Fatalf("created user: %+v", ann)
 	}
-	if ok, err := auth.CheckPassword(ann.PasswordHash, "Ann-pass1"); err != nil || !ok {
+	if ok, err := authn.CheckPassword(ann.PasswordHash, "Ann-pass1"); err != nil || !ok {
 		t.Fatalf("the stored hash does not verify: %v %v", ok, err)
 	}
 
@@ -117,7 +117,7 @@ func TestUnitPatchUser(t *testing.T) {
 		t.Fatal(err)
 	}
 	email, pw, admin := "b@example.org", "Ben-pass2", true
-	groups := []string{auth.ReadersGroup}
+	groups := []string{authn.ReadersGroup}
 	if err := s.PatchUser(ctx, "ben", identity.UserPatch{
 		Email: &email, Password: &pw, Admin: &admin, Groups: &groups,
 	}); err != nil {
@@ -145,9 +145,9 @@ func TestUnitLastAdminAndDeletion(t *testing.T) {
 	wantInvalid(
 		t,
 		"demote the last admin",
-		s.PatchUser(ctx, auth.AdminUser, identity.UserPatch{Admin: &no}),
+		s.PatchUser(ctx, authn.AdminUser, identity.UserPatch{Admin: &no}),
 	)
-	wantInvalid(t, "delete admin", s.DeleteUser(ctx, auth.AdminUser))
+	wantInvalid(t, "delete admin", s.DeleteUser(ctx, authn.AdminUser))
 	wantInvalid(t, "delete anonymous", s.DeleteUser(ctx, kernel.AnonymousUser))
 
 	boss := newUser("boss")
@@ -252,14 +252,14 @@ func TestUnitGroups(t *testing.T) {
 		t.Fatal(err)
 	}
 	// The seeded readers group goes like any other, and its grant with it.
-	if err := s.DeleteGroup(ctx, auth.ReadersGroup); err != nil {
+	if err := s.DeleteGroup(ctx, authn.ReadersGroup); err != nil {
 		t.Fatalf("delete readers: %v", err)
 	}
 	groups, err := s.Groups(ctx)
 	if err != nil || len(groups) != 0 {
 		t.Fatalf("groups: %v %v", groups, err)
 	}
-	anything, err := db.Permissions().Get(ctx, auth.AnythingPermission)
+	anything, err := db.Permissions().Get(ctx, authn.AnythingPermission)
 	if err != nil || len(anything.Resources[types.ResourceArtifact].Actions.Groups) != 0 {
 		t.Fatalf("Anything after deleting readers: %+v %v", anything, err)
 	}
@@ -316,7 +316,7 @@ func TestUnitPolicies(t *testing.T) {
 	ctx := context.Background()
 	s, db := newService(t)
 	lock, err := s.LockPolicy(ctx)
-	if err != nil || lock.Enabled || lock.LoginAttempts != auth.DefaultLoginAttempts {
+	if err != nil || lock.Enabled || lock.LoginAttempts != authn.DefaultLoginAttempts {
 		t.Fatalf("default lock policy: %+v %v", lock, err)
 	}
 	if err := s.SetLockPolicy(ctx, types.UserLockPolicy{Enabled: true}); err != nil {
@@ -325,7 +325,7 @@ func TestUnitPolicies(t *testing.T) {
 	if lock, _ := s.LockPolicy(
 		ctx,
 	); !lock.Enabled ||
-		lock.LoginAttempts != auth.DefaultLoginAttempts {
+		lock.LoginAttempts != authn.DefaultLoginAttempts {
 		t.Fatalf("a zero limit takes the default: %+v", lock)
 	}
 	wantInvalid(
@@ -334,7 +334,7 @@ func TestUnitPolicies(t *testing.T) {
 		s.SetLockPolicy(ctx, types.UserLockPolicy{LoginAttempts: -1}),
 	)
 	// Disabling the policy unlocks everyone.
-	if _, err := db.Users().RecordFailedLogin(ctx, auth.AdminUser, 1); err != nil {
+	if _, err := db.Users().RecordFailedLogin(ctx, authn.AdminUser, 1); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.SetLockPolicy(ctx, types.UserLockPolicy{}); err != nil {
@@ -345,7 +345,7 @@ func TestUnitPolicies(t *testing.T) {
 	}
 
 	exp, err := s.ExpirationPolicy(ctx)
-	if err != nil || exp.Enabled || exp.MaxAgeDays != auth.DefaultPasswordMaxAgeDays ||
+	if err != nil || exp.Enabled || exp.MaxAgeDays != authn.DefaultPasswordMaxAgeDays ||
 		!exp.NotifyByEmail {
 		t.Fatalf("default expiration policy: %+v %v", exp, err)
 	}
@@ -391,7 +391,7 @@ func TestUnitAccessLockPolicy(t *testing.T) {
 		t.Fatalf("the Artifactory policies: %+v %+v", lock, expiry)
 	}
 	// 0 turns both off, keeps their limits, and unlocks everyone.
-	if _, err := db.Users().RecordFailedLogin(ctx, auth.AdminUser, 1); err != nil {
+	if _, err := db.Users().RecordFailedLogin(ctx, authn.AdminUser, 1); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.SetAccessLockPolicy(ctx, identity.AccessLockPolicy{}); err != nil {
@@ -524,7 +524,7 @@ func TestUnitChangePassword(t *testing.T) {
 	if err != nil || dan.PasswordExpired || !dan.PasswordChanged.Equal(clock) {
 		t.Fatalf("after the change: %+v %v", dan, err)
 	}
-	if ok, err := auth.CheckPassword(dan.PasswordHash, "Dan-pass2"); err != nil || !ok {
+	if ok, err := authn.CheckPassword(dan.PasswordHash, "Dan-pass2"); err != nil || !ok {
 		t.Fatalf("the new password does not verify: %v", err)
 	}
 

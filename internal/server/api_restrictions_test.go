@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
@@ -29,10 +29,10 @@ func TestAccAPIRestrictionRecovery(t *testing.T) {
 	var limits *apilimit.Service
 	w := newItemWorld(t, false, func(c *Config) {
 		var err error
-		c.Auth, err = auth.NewAuthenticator(
+		c.Auth, err = authn.NewAuthenticator(
 			c.Store.Users(),
 			c.Store.Settings(),
-			auth.Options{Hash: testHash, APIRestrictions: c.Store.APIRestrictions()},
+			authn.Options{Hash: testHash, APIRestrictions: c.Store.APIRestrictions()},
 		)
 		if err != nil {
 			t.Fatal(err)

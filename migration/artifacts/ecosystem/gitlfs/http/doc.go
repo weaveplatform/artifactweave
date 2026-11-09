@@ -25,7 +25,7 @@
 //     batch answers, objects and lock pages for a remote, with the caller's
 //     access subject and decider (access/api); the request's base URL
 //     (platform/httpkit/baseurl), onto which action URLs point; the caller's
-//     principal and the kernel's errors (internal/auth, through its kernel
+//     principal and the kernel's errors (migration/access/core/authn, through its kernel
 //     and access/api bridges), which lock owners and statuses come from;
 //     the generic download rule (artifacts/ecosystem/generic), which every
 //     object read meets first, so a blacked-out repository or an excluded

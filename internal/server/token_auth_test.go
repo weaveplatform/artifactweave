@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/auth/token"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -28,7 +28,7 @@ func tokenHandler(t *testing.T) (http.Handler, *token.Service) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{
+	a, err := authn.NewAuthenticator(db.Users(), db.Settings(), authn.Options{
 		Hash: testHash, Tokens: tokens,
 	})
 	if err != nil {

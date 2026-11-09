@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -30,7 +30,7 @@ func actionWorld(t *testing.T, tune ...func(*Config)) *itemWorld {
 		"annotator": {types.ActionRead | types.ActionAnnotate, "a/*.jar"},
 	} {
 		if err := w.db.Users().Create(ctx, types.User{
-			Name: name, PasswordHash: cheapHash, Groups: []string{auth.ReadersGroup},
+			Name: name, PasswordHash: cheapHash, Groups: []string{authn.ReadersGroup},
 		}); err != nil {
 			t.Fatal(err)
 		}

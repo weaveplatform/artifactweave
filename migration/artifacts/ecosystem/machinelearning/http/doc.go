@@ -23,7 +23,7 @@
 //     items, properties and blobs, runs a commit in one metadata
 //     transaction and writes errors; the request's base URL
 //     (platform/httpkit/baseurl), onto which download URLs point; the
-//     caller's principal (internal/auth, through its kernel bridge), who
+//     caller's principal (migration/access/core/authn, through its kernel bridge), who
 //     owns a transaction; and the format package, which checks identities,
 //     decodes, reads and verifies manifests, rechecks a transaction's owner
 //     and expiry and rebuilds the index.

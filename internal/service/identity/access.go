@@ -8,7 +8,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -240,8 +240,8 @@ func (s *Service) checkPolicy(ctx context.Context, u types.User, password string
 		return invalidf("the password must contain at least %d special characters", p.SpecialChar)
 	}
 	if p.NotMatchOld && len(u.PasswordHash) > 0 {
-		same, err := auth.CheckPassword(u.PasswordHash, password)
-		if err != nil && !errors.Is(err, auth.ErrHashFormat) {
+		same, err := authn.CheckPassword(u.PasswordHash, password)
+		if err != nil && !errors.Is(err, authn.ErrHashFormat) {
 			return fmt.Errorf("identity: compare passwords: %w", err)
 		}
 		if same {

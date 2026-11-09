@@ -140,7 +140,7 @@ These are choices made where no source documents Artifactory's behaviour:
   - `applied-permissions/groups:…` acts through every group it names, whether or not the
     subject belongs to it, and drops the user's direct grants. The evaluator keeps only the
     named groups the subject has, so `auth.Principal.Subject` first adds the named groups to
-    the subject (`internal/auth/principal.go`). Access documents the same: a groups-only
+    the subject (`migration/access/core/authn/principal.go`). Access documents the same: a groups-only
     token acts through "Explicitly mapped groups only"
     ([access tokens](https://docs.jfrog.com/administration/docs/access-tokens), "Transient
     Users and Auto Join Groups").
@@ -324,7 +324,7 @@ undocumented.
   "Changes to Anonymous Access" in the
   [7.84.10 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-78410-self-managed)).
   artifactweave seeds `Anything` with read for the `readers` group on `ANY`, and `Any Remote`
-  on `ANY REMOTE` with no grants (`internal/auth/seed.go`). With anonymous access on, a request
+  on `ANY REMOTE` with no grants (`migration/access/core/authn/seed.go`). With anonymous access on, a request
   without credentials reads only what a permission an administrator writes for `anonymous`
   grants, as JFrog advises.
   - *Inferred:* the pages name no user or group in place of `anonymous`, so `Any Remote`

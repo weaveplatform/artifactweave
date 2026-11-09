@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -31,7 +31,7 @@ func TestAccRemoteReindexRechecksCurrentAuthority(t *testing.T) {
 						t.Fatal(err)
 					}
 					if mutation == "password" {
-						u.PasswordHash, err = auth.HashPasswordWith(testHash, "changed")
+						u.PasswordHash, err = authn.HashPasswordWith(testHash, "changed")
 						if err != nil {
 							t.Fatal(err)
 						}

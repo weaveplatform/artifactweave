@@ -78,4 +78,4 @@ These are the pinned client definitions and executable evidence from which this 
 - Client pin: [test/acceptance/clients/cocoapods.Dockerfile](../../test/acceptance/clients/cocoapods.Dockerfile).
 - Evidence: [test/acceptance/cocoapods_steps_test.go](../../test/acceptance/cocoapods_steps_test.go).
 - Evidence: [test/acceptance/features/cocoapods.feature](../../test/acceptance/features/cocoapods.feature).
-- Evidence: [internal/auth/token.go](../../internal/auth/token.go).
+- Evidence: [migration/access/core/authn/token.go](../../migration/access/core/authn/token.go).

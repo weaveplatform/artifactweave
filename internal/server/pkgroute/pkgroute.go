@@ -27,8 +27,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -552,7 +552,7 @@ func (k *Kit) Can(r *http.Request, path string, want types.Actions) bool {
 }
 
 func can(r *http.Request, c repo.Config, path string, want types.Actions) bool {
-	d := auth.DeciderFrom(r.Context())
+	d := authn.DeciderFrom(r.Context())
 	if d == nil {
 		return false
 	}
@@ -599,7 +599,7 @@ func (k *Kit) RequireFolder(
 // on a path below it, for a handler that accepts more than one right
 // before it knows which the request needs.
 func (k *Kit) CanFolder(r *http.Request, path string, want types.Actions) bool {
-	d := auth.DeciderFrom(r.Context())
+	d := authn.DeciderFrom(r.Context())
 	if d == nil {
 		return false
 	}

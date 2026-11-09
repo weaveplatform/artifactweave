@@ -21,20 +21,20 @@ import (
 // core, and the token service, which ACC-12 moves there. Staged access
 // core, the evaluator among it, is judged by its path instead
 // (accessInternal).
-var accessInternals = []string{"internal/auth", "internal/auth/token"}
+var accessInternals = []string{"migration/access/core/authn", "migration/access/core/token"}
 
 // accessSplits are the legacy access packages whose ledger entries split
 // them, so ledger.Translate names no target that places their tests in
 // access.
-var accessSplits = []string{"internal/auth"}
+var accessSplits = []string{"migration/access/core/authn"}
 
 // allowlistedInternals are the access internals that an allowlisted file may
 // import: the authenticator and the token service, which the server root,
 // the composition root and the server harnesses wire themselves, and the
 // access core packages ACC-12 moves them to. The evaluator is never one.
 var allowlistedInternals = []string{
-	"internal/auth",
-	"internal/auth/token",
+	"migration/access/core/authn",
+	"migration/access/core/token",
 	root + "/access/core/authn",
 	root + "/access/core/token",
 }
@@ -192,7 +192,7 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 				Action: ledger.ActionMove,
 				To:     "artifacts/ecosystem/npm/http",
 			},
-			{From: "internal/auth", Action: ledger.ActionSplit},
+			{From: "migration/access/core/authn", Action: ledger.ActionSplit},
 		},
 	}
 	allow := []accessAllowance{
@@ -214,7 +214,7 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 		// Access's own tests: staged, in a split legacy package, and in a
 		// legacy package whose entry moves it into access.
 		root + "/access/core/authn/authn_test.go":    file(evaluator, authenticator),
-		"internal/auth/auth_test.go":                 file(evaluator),
+		"migration/access/core/authn/auth_test.go":   file(evaluator),
 		"internal/service/identity/identity_test.go": file(evaluator, tokens),
 		// The published contracts and access test support, staged and legacy.
 		"internal/server/xyz/npm_test.go": file(

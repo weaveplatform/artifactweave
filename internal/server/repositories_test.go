@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
@@ -42,12 +42,12 @@ func newRepoWorld(t *testing.T) *repoWorld {
 	reader := types.User{
 		Name:         "reader",
 		PasswordHash: cheapHash,
-		Groups:       []string{auth.ReadersGroup},
+		Groups:       []string{authn.ReadersGroup},
 	}
 	if err := db.Users().Create(ctx, reader); err != nil {
 		t.Fatal(err)
 	}
-	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{Hash: testHash})
+	a, err := authn.NewAuthenticator(db.Users(), db.Settings(), authn.Options{Hash: testHash})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -400,7 +400,7 @@ func apiReviewPersistence(path string) (string, string, []string) {
 			"internal/server/access_identity.go",
 			"internal/server/tokens.go",
 			"internal/service/identity/identity.go",
-			"internal/auth/token/token.go",
+			"migration/access/core/token/token.go",
 			"migration/access/adapters/sql/identity.go",
 			"migration/access/adapters/sql/projects.go",
 		}

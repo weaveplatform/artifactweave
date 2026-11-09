@@ -67,4 +67,4 @@ These are the pinned client definitions and executable evidence from which this 
 - Client pin: [test/acceptance/clients/r.Dockerfile](../../test/acceptance/clients/r.Dockerfile).
 - Evidence: [test/acceptance/cran_steps_test.go](../../test/acceptance/cran_steps_test.go).
 - Evidence: [test/acceptance/features/cran.feature](../../test/acceptance/features/cran.feature).
-- Evidence: [internal/auth/token.go](../../internal/auth/token.go).
+- Evidence: [migration/access/core/authn/token.go](../../migration/access/core/authn/token.go).

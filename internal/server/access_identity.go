@@ -10,9 +10,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/service/identity"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -723,7 +723,7 @@ func (s accessService) GetBasicAuthenticationStatus(
 	if err != nil {
 		return nil, err
 	}
-	on, err := auth.BasicAuthEnabled(ctx, svc.Store.Settings())
+	on, err := authn.BasicAuthEnabled(ctx, svc.Store.Settings())
 	if err != nil {
 		return nil, s.identityErr(ctx, "read basic authentication switch", "", err)
 	}

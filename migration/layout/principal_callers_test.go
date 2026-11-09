@@ -55,7 +55,7 @@ func TestUnitWithPrincipalCallers(t *testing.T) {
 import (
 	"context"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
@@ -125,10 +125,10 @@ func WithPrincipal(ctx context.Context, p any) context.Context { return ctx }
 			want: v + ":11: names WithPrincipal",
 		},
 		{
-			name: "unqualified call in internal/auth",
-			file: "internal/auth/x.go",
+			name: "unqualified call in migration/access/core/authn",
+			file: "migration/access/core/authn/x.go",
 			src:  file(`	_ = WithPrincipal(ctx, p)`),
-			want: "internal/auth/x.go:11: names WithPrincipal",
+			want: "migration/access/core/authn/x.go:11: names WithPrincipal",
 		},
 		{
 			name: "unqualified call elsewhere in the kernel",

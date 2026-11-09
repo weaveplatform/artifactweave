@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	"github.com/weaveplatform/artifactweave/internal/service/oidc"
 	"github.com/weaveplatform/artifactweave/internal/service/roles"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
@@ -1643,7 +1643,7 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 	}
 
 	tokens, secrets := seedMatrixTokens(t, db)
-	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{
+	a, err := authn.NewAuthenticator(db.Users(), db.Settings(), authn.Options{
 		Hash: testHash, Tokens: tokens,
 	})
 	must(err)

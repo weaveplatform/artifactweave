@@ -75,7 +75,7 @@ bounded current state without changing Artifactory Storage responses.
 
 Controlled-peer/native evidence: `smart_remote.feature` (curl/JFrog CLI), Smart tests in
 `migration/artifacts/core/remote/smart`, registry credential round-trip/revocation tests
-in `internal/auth`, source and Maven contract tests, server authentication/status tests,
+in `migration/access/core/authn`, source and Maven contract tests, server authentication/status tests,
 item ownership regressions, and shared in-memory/SQLite/PostgreSQL Smart-cache
 contracts. Fake peer success is not a vendor parity claim.
 

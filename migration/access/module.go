@@ -5,9 +5,9 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
@@ -23,7 +23,7 @@ type Deps struct {
 	Store store.Store
 	// Authenticator verifies credentials; nil leaves API().Authenticator nil,
 	// as a server without authentication has none.
-	Authenticator *auth.Authenticator
+	Authenticator *authn.Authenticator
 	// Tokens issues and revokes access tokens; nil leaves API().Tokens nil,
 	// which the token endpoints answer 501.
 	Tokens *token.Service
