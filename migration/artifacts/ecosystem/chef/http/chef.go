@@ -1,4 +1,3 @@
-// Package chefhttp serves the Chef Supermarket cookbook protocol.
 package chefhttp
 
 import (
@@ -33,6 +32,17 @@ const (
 
 type handler struct{ k *pkgroute.Kit }
 
+// Protocol returns the Chef Supermarket protocol for the router kit, under
+// /artifactory/api/chef/{repoKey}/api/v1: GET and HEAD of the catalog
+// (cookbooks, and search with q), a cookbook (cookbooks/{name}), a version
+// (cookbooks/{name}/versions/{version}, where latest names the highest
+// readable one) and its archive (.../download); POST of a cookbook, raw as
+// knife-art sends it (cookbooks/{name}.tgz) or as the Supermarket multipart
+// form (cookbooks); and DELETE of a version, as knife-art's unshare
+// (cookbooks/{name}/{version}) or the Supermarket's, or of a whole
+// cookbook. Publish and delete need a local or federated repository (405).
+// Remote repositories are served through remote when it is set; without it
+// a remote repository answers 501.
 func Protocol(remote *source.Service) pkgroute.Protocol {
 	sources := map[repo.Class]pkgroute.Source{
 		repo.Local:     pkgroute.Local{},

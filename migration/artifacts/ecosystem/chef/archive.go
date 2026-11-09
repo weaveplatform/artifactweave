@@ -1,4 +1,3 @@
-// Package chef validates Chef cookbook archives and maintains their native index.
 package chef
 
 import (
@@ -14,13 +13,22 @@ import (
 )
 
 const (
-	MaxArchiveBytes  = 64 << 20
+	// MaxArchiveBytes bounds a cookbook archive, published or fetched, at
+	// 64 MiB compressed.
+	MaxArchiveBytes = 64 << 20
+	// MaxUnpackedBytes bounds an archive's decompressed TAR stream at
+	// 128 MiB, so a small archive cannot expand without limit.
 	MaxUnpackedBytes = 128 << 20
+	// MaxManifestBytes bounds an archive's metadata.json at 1 MiB.
 	MaxManifestBytes = 1 << 20
-	MaxFiles         = 4096
+	// MaxFiles bounds an archive at 4,096 TAR entries, folders included.
+	MaxFiles = 4096
 )
 
 var (
+	// ErrArchive is what ReadArchive, the manifest decoder and UniqueFields
+	// return for every archive, manifest or document they refuse; Deployed
+	// and Reindex wrap it when a stored archive no longer matches its path.
 	ErrArchive  = errors.New("chef: invalid cookbook archive")
 	namePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$`)
 )
@@ -36,6 +44,12 @@ type Manifest struct {
 	Dependencies map[string]string `json:"dependencies"`
 	Platforms    map[string]string `json:"platforms"`
 }
+
+// Metadata is what the package index keeps for a cookbook version, as
+// JSON, and what the protocol answers from: the cookbook's name and
+// version, its validated manifest, and the stored archive's item path,
+// SHA-256 and size. ReadArchive fills all but the path and SHA-256, which
+// Deployed and Reindex take from the stored item.
 type Metadata struct {
 	Name     string   `json:"name"`
 	Version  string   `json:"version"`
@@ -54,6 +68,12 @@ var (
 	)
 )
 
+// ValidateManifest reports whether m may enter the native index: a valid
+// name and version, and at most 256 dependencies and 256 platforms, each
+// keyed by a valid name, a dependency never the cookbook itself, with a
+// constraint of at most 128 bytes: an optional operator (=, <, >, <=, >= or
+// ~>) before a two- or three-part version. The client resolves the
+// constraints; the registry bounds only their syntax.
 func ValidateManifest(m Manifest) bool {
 	if !ValidName(m.Name) || !ValidVersion(m.Version) || len(m.Dependencies) > 256 ||
 		len(m.Platforms) > 256 {
@@ -73,14 +93,25 @@ func ValidateManifest(m Manifest) bool {
 	return true
 }
 
+// ValidName reports whether name is a cookbook name the registry accepts:
+// a letter or digit followed by up to 127 letters, digits, underscores and
+// hyphens.
 func ValidName(name string) bool { return namePattern.MatchString(name) }
 
+// ValidVersion reports whether version is a cookbook version the registry
+// accepts: two or three dot-separated numbers, each at most nine digits
+// with no leading zero.
 func ValidVersion(version string) bool { return versionPattern.MatchString(version) }
 
+// Path is the item path of the archive of cookbook name at version:
+// <name>/<name>-<version>.tar.gz.
 func Path(name, version string) string {
 	return name + "/" + name + "-" + version + ".tar.gz"
 }
 
+// ParsePath splits an item path into the cookbook name and version whose
+// archive it holds, and reports ok only when p is exactly Path(name,
+// version) with a valid name and version.
 func ParsePath(p string) (name, version string, ok bool) {
 	name, file, found := strings.Cut(p, "/")
 	if !found || !ValidName(name) || !strings.HasPrefix(file, name+"-") ||
@@ -224,6 +255,13 @@ func (m *Manifest) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// UniqueFields checks that data is exactly one JSON object whose keys are
+// unique when compared without case, and that a key naming one of the
+// known fields spells it exactly; it returns ErrArchive otherwise.
+// encoding/json matches field names without case, so a repeated or
+// case-aliased key would let the registry and a native client read
+// different values. The protocol checks upstream Supermarket documents
+// with it too.
 func UniqueFields(data []byte, known ...string) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	token, err := dec.Token()

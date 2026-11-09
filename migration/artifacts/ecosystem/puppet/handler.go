@@ -15,14 +15,25 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// The item properties Deployed and Reindex keep on every stored module
+// archive, from its verified metadata.json. The items keep these names, so
+// they never change.
 const (
-	PropName    = "puppet.name"
+	// PropName is the property that holds an archive's module name.
+	PropName = "puppet.name"
+	// PropVersion is the property that holds an archive's module version.
 	PropVersion = "puppet.version"
-	PropSHA256  = "puppet.sha256"
+	// PropSHA256 is the property that holds an archive's SHA-256.
+	PropSHA256 = "puppet.sha256"
 )
 
+// Serves reports whether t is the Puppet package type.
 func Serves(t repo.PackageType) bool { return t == repo.Puppet }
 
+// Handler is the Puppet format's hooks: it admits a module archive only
+// when its metadata.json matches its path, and indexes each stored archive
+// as a version of its module. It embeds the generic hooks, so every path is
+// classed as generic content is.
 type Handler struct{ generic.Handler }
 
 type inspection struct {
@@ -30,6 +41,11 @@ type inspection struct {
 	meta Metadata
 }
 
+// Inspect reads and validates the stored archive of a write to a .tar.gz
+// path before the write's transaction, and returns its metadata for Admit
+// and Deployed, so an archive is read once per write. A checksum deploy and
+// any other file inspect nothing. An invalid archive is refused with 400;
+// an archive that cannot be opened fails the write.
 func (Handler) Inspect(
 	ctx context.Context, env format.Env, _ repo.Config, w format.Write,
 ) (any, error) {
@@ -43,6 +59,13 @@ func (Handler) Inspect(
 	return inspection{sha: w.Checksums.SHA256, meta: meta}, nil
 }
 
+// Admit applies the generic deploy policy, wrapping its refusal, then
+// passes a checksum deploy and a remote's cached release metadata
+// (v3/releases/<module>). Any other write must go to a local or federated
+// repository or be a remote's cached content (400), at a module archive
+// path (400), and the archive's metadata.json must name the module and
+// version its path does (409). It reuses Inspect's reading when it covers
+// the same content, and reads the stored archive itself otherwise.
 func (Handler) Admit(
 	ctx context.Context, env format.Env, c repo.Config, w format.Write,
 ) (format.Write, error) {
@@ -79,6 +102,11 @@ func (Handler) Admit(
 	return w, nil
 }
 
+// Deployed indexes a stored module archive: it sets the archive's
+// puppet.* properties, creates the module's package when it is new, and
+// links the version to the archive, with its Metadata as the version's
+// metadata. Folders and files at other paths change nothing. An archive
+// whose metadata.json no longer matches its path fails with ErrArchive.
 func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
 	if it.Folder {
 		return nil
@@ -114,7 +142,12 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 	return err //nolint:wrapcheck // pkgindex names the version
 }
 
-func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error  { return nil }
+// Deleting does nothing: the item service drops a removed archive's
+// version link with it.
+func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error { return nil }
+
+// Deleted does nothing: a version is one archive, so the item service's
+// pruning of versions left without files is all a delete needs.
 func (Handler) Deleted(context.Context, format.Env, repo.Config, []types.Item) error { return nil }
 
 func cachedMetadataPath(p string) bool {

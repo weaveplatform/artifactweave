@@ -1,4 +1,3 @@
-// Package puppet validates Puppet module archives and maintains their native index.
 package puppet
 
 import (
@@ -16,13 +15,22 @@ import (
 )
 
 const (
-	MaxArchiveBytes  = 64 << 20
+	// MaxArchiveBytes bounds a module archive, uploaded or fetched, at
+	// 64 MiB compressed.
+	MaxArchiveBytes = 64 << 20
+	// MaxUnpackedBytes bounds an archive's decompressed TAR stream at
+	// 128 MiB, so a small archive cannot expand without limit.
 	MaxUnpackedBytes = 128 << 20
+	// MaxManifestBytes bounds an archive's metadata.json at 1 MiB.
 	MaxManifestBytes = 1 << 20
-	MaxFiles         = 4096
+	// MaxFiles bounds an archive at 4,096 TAR entries, folders included.
+	MaxFiles = 4096
 )
 
 var (
+	// ErrArchive is what ReadArchive and the manifest decoders return for
+	// every archive or manifest they refuse; Deployed and Reindex wrap it
+	// when a stored archive no longer matches its path.
 	ErrArchive  = errors.New("puppet: invalid module archive")
 	namePattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}-[a-z][a-z0-9_]{0,63}$`)
 )
@@ -37,10 +45,20 @@ type Manifest struct {
 	Source       string       `json:"source,omitempty"`
 	Dependencies []Dependency `json:"dependencies"`
 }
+
+// Dependency is one entry of a manifest's dependencies: the module it
+// needs, named <owner>/<module> or <owner>-<module>, and the version
+// requirement the Puppet client resolves.
 type Dependency struct {
 	Name               string `json:"name"`
 	VersionRequirement string `json:"version_requirement"`
 }
+
+// Metadata is what the package index keeps for a module version, as JSON,
+// and what the protocol answers from: the module's name and version, its
+// validated manifest, and the stored archive's item path, SHA-256 and
+// size. ReadArchive fills all but the path and SHA-256, which Deployed and
+// Reindex take from the stored item.
 type Metadata struct {
 	Name     string   `json:"name"`
 	Version  string   `json:"version"`
@@ -115,8 +133,14 @@ func validRequirement(value string) bool {
 	return true
 }
 
+// ValidName reports whether name is a Puppet module name the registry
+// accepts: <owner>-<module>, each a lowercase letter followed by up to 63
+// lowercase letters, digits and underscores.
 func ValidName(name string) bool { return namePattern.MatchString(name) }
 
+// ValidVersion reports whether version is a full semantic version of at
+// most 128 bytes, major.minor.patch with an optional pre-release and build,
+// written without a leading v.
 func ValidVersion(version string) bool {
 	core, _, _ := strings.Cut(version, "-")
 	core, _, _ = strings.Cut(core, "+")
@@ -124,10 +148,15 @@ func ValidVersion(version string) bool {
 		semver.IsValid("v"+version) && !strings.HasPrefix(version, "v")
 }
 
+// Path is the item path of the archive of module name at version:
+// <name>/<name>-<version>.tar.gz.
 func Path(name, version string) string {
 	return name + "/" + name + "-" + version + ".tar.gz"
 }
 
+// ParsePath splits an item path into the module name and version whose
+// archive it holds, and reports ok only when p is exactly Path(name,
+// version) with a valid name and version.
 func ParsePath(p string) (name, version string, ok bool) {
 	name, file, found := strings.Cut(p, "/")
 	if !found || !ValidName(name) || !strings.HasPrefix(file, name+"-") ||
@@ -261,6 +290,9 @@ func (m *Manifest) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// UnmarshalJSON decodes a dependency, refusing a repeated or case-aliased
+// key or invalid JSON with ErrArchive, so the registry and the Puppet
+// client cannot read different values from one entry.
 func (d *Dependency) UnmarshalJSON(data []byte) error {
 	if err := uniqueFields(data, "name", "version_requirement"); err != nil {
 		return err

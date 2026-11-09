@@ -1,4 +1,3 @@
-// Package puppethttp serves the Forge v3 module protocol.
 package puppethttp
 
 import (
@@ -28,6 +27,12 @@ import (
 
 const mediaType = "application/json"
 
+// Options configures the Puppet protocol. Blobs opens a remote's cached
+// release metadata when the remote source answers from its cache; without
+// it such an answer fails as invalid upstream metadata (502).
+// RemoteSources serves remote repositories and fetches through them; nil
+// leaves the remote class without a source, so a remote repository answers
+// 501.
 type Options struct {
 	Blobs         blob.Store
 	RemoteSources *source.Service
@@ -49,6 +54,16 @@ func (virtualSource) Item(
 	return pkgroute.Found{}, source.ErrUnsupported
 }
 
+// Protocol returns the Forge v3 protocol for the router kit, under
+// /artifactory/api/puppet/{repoKey}: GET and HEAD of the release list of
+// one module (v3/releases?module=), a release (v3/releases/{slug}), a
+// module (v3/modules/{name}), the exact-name module search
+// (v3/modules?query=) and a release's archive (v3/files/{file}). Local and
+// federated repositories are served from their package index, virtual
+// ones from their members in order, and remote ones through
+// o.RemoteSources when it is set; a class without a source answers 501.
+// The virtual class's source supports no single-item lookup, because the
+// protocol reads a virtual repository's members itself.
 func Protocol(o Options) pkgroute.Protocol {
 	sources := map[repo.Class]pkgroute.Source{
 		repo.Local:     pkgroute.Local{},
