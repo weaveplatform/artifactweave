@@ -136,6 +136,13 @@ linters:
       # classifies a transport failure as one. Format rules in the ecosystem
       # slices return them as core remote does; a wrap would change the text
       # and hide the source.HTTPError a caller inspects.
+      #
+      # The caller checks of platform/httpkit (AdminOnly, Principal, Denied
+      # and BadRequestf) return the kernel's typed errors or an apierror
+      # value, whose status and message the response carries. Handlers
+      # return them as they did while the checks were the server root's own
+      # functions; a wrap would add text that no response or log shows.
+      # Without these lines wrapcheck reports 236 returns in the server root.
       extra-ignore-sigs:
         - apierror.New(
         - format.Rejectf(
@@ -153,6 +160,10 @@ linters:
         - postgres.OpenDB(
         - remote.PolicyError(
         - remote.ResponseError(
+        - httpkit.AdminOnly(
+        - httpkit.Principal(
+        - httpkit.Denied(
+        - httpkit.BadRequestf(
 
   # 4) Issue-filtering (not disabling analysis, just silencing reports)
   exclusions:

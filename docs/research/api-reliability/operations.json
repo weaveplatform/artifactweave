@@ -698,6 +698,8 @@
     "handler": "internal/server/tokens.go: accessService.RevokeTokenByValue",
     "direct_calls": [
       "errors.Is",
+      "httpkit.AdminOnly",
+      "httpkit.BadRequestf",
       "httpkit.Deref",
       "s.tokenAPI",
       "svc.Revoke",
@@ -730,6 +732,7 @@
     "handler": "internal/server/tokens.go: accessService.RevokeTokenById",
     "direct_calls": [
       "errors.Is",
+      "httpkit.BadRequestf",
       "s.tokenAPI",
       "svc.Revoke",
       "t.internalError",
@@ -1269,6 +1272,8 @@
       "dockerhttp.ValidName",
       "errors.Is",
       "fmt.Sprintf",
+      "httpkit.BadRequestf",
+      "httpkit.Denied",
       "layout.ReservedTag",
       "layout.ValidTag",
       "s.content",
@@ -1540,6 +1545,7 @@
     "contract": "Revokes the caller's key, or every key when deleteAll=1 and the caller is an admin. There are no keys to revoke, so the operation always answers 200 with an informational message.",
     "handler": "internal/server/security.go: securityAPI.RevokeApiKey",
     "direct_calls": [
+      "httpkit.AdminOnly",
       "kernel.RequireAuthenticated"
     ],
     "review_family": "identity",
@@ -1834,6 +1840,7 @@
     "direct_calls": [
       "errors.Is",
       "fmt.Sprintf",
+      "httpkit.BadRequestf",
       "s.adminStore",
       "s.internalError",
       "st.Keys",
@@ -2631,6 +2638,7 @@
     "handler": "internal/server/tokens.go: accessService.GetTokenDefaultExpiry",
     "direct_calls": [
       "errors.Is",
+      "httpkit.AdminOnly",
       "s.content",
       "s.tokenAPI",
       "st.Settings",
@@ -3620,6 +3628,7 @@
     "direct_calls": [
       "baseurl.From",
       "errors.Is",
+      "httpkit.BadRequestf",
       "httpkit.Deref",
       "s.identityErr",
       "s.readerIdentity",
@@ -3691,6 +3700,7 @@
       "c.svc.FoldUsers",
       "c.svc.Granting",
       "c.svc.List",
+      "httpkit.BadRequestf",
       "pr.Narrow",
       "s.caller",
       "s.errOf",
@@ -3814,6 +3824,7 @@
     "direct_calls": [
       "baseurl.From",
       "errors.Is",
+      "httpkit.BadRequestf",
       "httpkit.Deref",
       "s.identityErr",
       "s.readerIdentity",
@@ -4181,6 +4192,7 @@
       "errors.Is",
       "expression.Key",
       "fmt.Errorf",
+      "httpkit.BadRequestf",
       "httpkit.Deref",
       "kernel.RequireAdmin",
       "s.cfg.Store.APIRestrictions",
@@ -4442,6 +4454,7 @@
       "apierror.New",
       "b.Started.Before",
       "fmt.Sprintf",
+      "httpkit.BadRequestf",
       "httpkit.Deref",
       "s.buildCaller",
       "s.buildError",
@@ -6457,6 +6470,7 @@
     "direct_calls": [
       "artgen.GetNpmScopeAuth200TextResponse",
       "baseurl.From",
+      "httpkit.BadRequestf",
       "npmhttp.ScopeAuthLines",
       "npmhttp.ValidScope",
       "s.content",
@@ -7231,6 +7245,7 @@
       "artgen.GetAllRepositoryConfigurations200ApplicationVndOrgJfrogArtifactoryRepositoriesRepositoryConfigurationsListPlusJSONResponse",
       "classes.has",
       "httpkit.Accepts",
+      "httpkit.AdminOnly",
       "packageTypes.has",
       "repo.Masked",
       "repo.Relevant",
@@ -7272,6 +7287,7 @@
     "contract": "Reports whether at least one repository of the given classes exists, optionally within one project. Admin only.",
     "handler": "internal/server/repositories.go: artifactoryService.CheckIfRepositoryExists",
     "direct_calls": [
+      "httpkit.AdminOnly",
       "s.content",
       "s.internalError",
       "slices.ContainsFunc",
@@ -7307,6 +7323,8 @@
       "errors.Is",
       "fmt.Sprintf",
       "httpkit.Accepts",
+      "httpkit.Denied",
+      "httpkit.Principal",
       "json.Marshal",
       "json.Unmarshal",
       "maps.DeleteFunc",
@@ -7504,6 +7522,7 @@
     "contract": "Finds files whose name contains the given text. Only local repositories and remote caches are searched; a virtual repository key in repos is ignored. Anonymous callers may search when anonymous access is enabled. Each result is a file info URI unless X-Result-Detail asks for more.",
     "handler": "internal/server/searches.go: artifactoryService.SearchArtifact",
     "direct_calls": [
+      "httpkit.BadRequestf",
       "r.repoScope",
       "r.uriSearch",
       "s.newSearch"
@@ -7534,6 +7553,7 @@
     "contract": "Finds items whose checksum declared by the uploading client differs from the computed one, or was never declared. The search covers local repositories, remote caches and virtual repositories and returns at most 10,000 results. Anonymous callers may search when anonymous access is enabled.",
     "handler": "internal/server/searches.go: artifactoryService.SearchBadChecksum",
     "direct_calls": [
+      "httpkit.BadRequestf",
       "r.capped",
       "r.collect",
       "r.repoScope",
@@ -7567,6 +7587,7 @@
     "handler": "internal/server/searches.go: artifactoryService.SearchChecksum",
     "direct_calls": [
       "expression.MatchString",
+      "httpkit.BadRequestf",
       "r.repoScope",
       "r.uriSearch",
       "s.newSearch",
@@ -7634,6 +7655,7 @@
     "contract": "Finds items for which at least one of the requested date fields falls inside the window. Only local repositories and remote caches are searched. A named user is required. The fields named in dateFields are the ones returned on each result.",
     "handler": "internal/server/searches.go: artifactoryService.SearchDates",
     "direct_calls": [
+      "httpkit.BadRequestf",
       "r.collect",
       "r.repoScope",
       "r.uri",
@@ -7674,6 +7696,7 @@
       "a.Build",
       "expression.DocumentItem",
       "expression.MatchString",
+      "httpkit.BadRequestf",
       "r.capped",
       "r.st.Builds",
       "r.st.Builds().FindDependencies",
@@ -7714,6 +7737,7 @@
       "f.Item.ReportedRepoKey",
       "f.Version",
       "hit.Item.FullPath",
+      "httpkit.BadRequestf",
       "httpkit.Deref",
       "ls.find",
       "r.entries",
@@ -7810,6 +7834,7 @@
       "antpath.CompilePattern",
       "baseurl.From",
       "h.Item.FullPath",
+      "httpkit.BadRequestf",
       "r.capped",
       "r.collect",
       "r.repoScope",
@@ -8005,6 +8030,7 @@
     "direct_calls": [
       "artgen.GetUserEncryptedPassword200TextResponse",
       "fmt.Errorf",
+      "httpkit.BadRequestf",
       "kernel.RequireAuthenticated",
       "svc.EncryptedPassword",
       "t.internalError",
@@ -8896,6 +8922,9 @@
     "state": "implemented",
     "contract": "Returns the licence details of this server, which has no licence tiers. Admin only.",
     "handler": "internal/server/system.go: systemAPI.GetSystemLicense",
+    "direct_calls": [
+      "httpkit.AdminOnly"
+    ],
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -9089,6 +9118,7 @@
     "handler": "internal/server/system.go: systemAPI.GetServiceId",
     "direct_calls": [
       "artgen.GetServiceId200TextResponse",
+      "httpkit.AdminOnly",
       "s.cfg.Store.Instance",
       "s.cfg.Store.Instance().Get",
       "s.internalError"
@@ -9649,6 +9679,7 @@
     "handler": "internal/server/repositories.go: artifactoryService.GetBatchOfRepositoriesByName",
     "direct_calls": [
       "errors.Is",
+      "httpkit.BadRequestf",
       "s.content",
       "s.internalError",
       "s.readerFor",
@@ -13668,6 +13699,7 @@
     "handler": "internal/server/access_identity.go: accessService.UpdateUser",
     "direct_calls": [
       "accessgen.UpdateUser200JSONResponse",
+      "httpkit.BadRequestf",
       "s.adminIdentity",
       "s.identityErr",
       "s.userDetails",
@@ -14139,6 +14171,7 @@
     "contract": "Creates an environment and returns it with status 201. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. At most 10 global environments may exist by default, DEV and PROD among them; once that many exist, another answers 400. Admin only.",
     "handler": "internal/server/roles.go: accessService.CreateGlobalEnvironment",
     "direct_calls": [
+      "httpkit.BadRequestf",
       "s.roleError",
       "s.roleService",
       "svc.CreateEnvironment"
@@ -14167,6 +14200,7 @@
     "contract": "Renames the environment and updates every repository and role that references it. The built-in DEV and PROD cannot be renamed. Admin only. Answers 200 with the environment under its new name.",
     "handler": "internal/server/roles.go: accessService.RenameGlobalEnvironment",
     "direct_calls": [
+      "httpkit.BadRequestf",
       "s.roleError",
       "s.roleService",
       "svc.RenameEnvironment"
@@ -14346,6 +14380,7 @@
     "handler": "internal/server/oidc.go: accessService.OidcTokenExchange",
     "direct_calls": [
       "got.Record.Scope.String",
+      "httpkit.BadRequestf",
       "httpkit.Deref",
       "httpkit.PtrTo",
       "s.oidc",
@@ -14477,6 +14512,7 @@
     "handler": "internal/server/roles.go: accessService.CreateGlobalRole",
     "direct_calls": [
       "fmt.Sprintf",
+      "httpkit.BadRequestf",
       "httpkit.Deref",
       "s.roleError",
       "s.roleService",
@@ -14653,6 +14689,7 @@
     "contract": "With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A transient user, the subject of a token minted for a name that is no stored user or of an OIDC exchange, mints for itself a token with its own token's scope that resolves to the same transient user. That token expires no later than the caller's own token, and may be refreshable only when the caller's own token is, or the request is refused with 403. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.",
     "handler": "internal/server/tokens.go: accessService.CreateToken",
     "direct_calls": [
+      "httpkit.BadRequestf",
       "httpkit.Deref",
       "issued.Record.Scope.String",
       "s.tokenAPI",
@@ -14702,6 +14739,7 @@
       "accessgen.CreateGroup201JSONResponse",
       "apierror.New",
       "errors.Is",
+      "httpkit.BadRequestf",
       "httpkit.Deref",
       "httpkit.DerefSlice",
       "s.adminIdentity",
@@ -14766,6 +14804,7 @@
     "handler": "internal/server/access_identity.go: accessService.CreateUser",
     "direct_calls": [
       "accessgen.CreateUser201JSONResponse",
+      "httpkit.BadRequestf",
       "httpkit.Deref",
       "httpkit.DerefSlice",
       "s.adminIdentity",
@@ -15783,6 +15822,7 @@
       "debian.WithSnapshotWrite",
       "errors.Is",
       "fmt.Errorf",
+      "httpkit.Denied",
       "s.debianSnapshotFiles",
       "s.items",
       "s.items().Deploy",
@@ -17213,6 +17253,8 @@
       "errors.Is",
       "fmt.Errorf",
       "fmt.Sprintf",
+      "httpkit.AdminOnly",
+      "httpkit.BadRequestf",
       "json.Unmarshal",
       "repos.Merge",
       "s.checkReferences",
@@ -17441,6 +17483,7 @@
     "handler": "internal/server/searches_builds.go: artifactoryService.SearchBuildArtifacts",
     "direct_calls": [
       "apierror.New",
+      "httpkit.BadRequestf",
       "httpkit.Deref",
       "it.FullPath",
       "it.ReportedRepoKey",
@@ -17482,6 +17525,7 @@
     "contract": "Legacy API-key creation, which is disabled. Always answers 400 with the message \"API key creation is disabled\". Use an access token or a reference token from /access/api/v1/tokens instead.",
     "handler": "internal/server/security.go: securityAPI.CreateApiKey",
     "direct_calls": [
+      "httpkit.BadRequestf",
       "kernel.RequireAuthenticated"
     ],
     "review_family": "identity",
@@ -17565,7 +17609,8 @@
     "contract": "Checks that the private and public keys in the body belong together and that the passphrase, if given, unlocks the private key. Nothing is stored. Admin only. A mismatch is a 400 whose message names the problem.",
     "handler": "internal/server/keypairs.go: securityAPI.VerifyKeyPair",
     "direct_calls": [
-      "artgen.VerifyKeyPair200TextResponse"
+      "artgen.VerifyKeyPair200TextResponse",
+      "httpkit.AdminOnly"
     ],
     "review_family": "identity",
     "effects": "resource mutation/action; see served contract and handler calls",
@@ -17747,6 +17792,7 @@
     "handler": "internal/server/security.go: securityAPI.ChangePassword",
     "direct_calls": [
       "artgen.ChangePassword200TextResponse",
+      "httpkit.BadRequestf",
       "kernel.RequireAuthenticated",
       "s.content",
       "s.identity",
@@ -17777,6 +17823,7 @@
     "contract": "Forces each named user to change their password at the next login. Admin only. Unknown users are reported in the message rather than failing the call.",
     "handler": "internal/server/security.go: securityAPI.ExpirePasswordForMultipleUsers",
     "direct_calls": [
+      "httpkit.BadRequestf",
       "s.adminStore",
       "s.identity",
       "s.identity().ExpirePasswords",
@@ -17982,7 +18029,8 @@
     "contract": "Acknowledges a recalculation of the storage summary with 202. The summary is computed on every request, so there is nothing to recalculate. Admin only.",
     "handler": "internal/server/storageinfo.go: artifactoryService.RefreshStorageSummaryInfo",
     "direct_calls": [
-      "artgen.RefreshStorageSummaryInfo202TextResponse"
+      "artgen.RefreshStorageSummaryInfo202TextResponse",
+      "httpkit.AdminOnly"
     ],
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls; index rebuild/possibly queued work; queue coalescing is not a replay guarantee",
@@ -18218,6 +18266,7 @@
     "direct_calls": [
       "err.Error",
       "fmt.Sprintf",
+      "httpkit.BadRequestf",
       "io.LimitReader",
       "io.ReadAll",
       "keymaterial.ParseBundle",
@@ -18254,6 +18303,7 @@
     "handler": "internal/server/trash.go: artifactoryService.RunGarbageCollection",
     "direct_calls": [
       "c.Run",
+      "httpkit.AdminOnly",
       "s.collector",
       "s.internalError"
     ],
@@ -18281,6 +18331,7 @@
     "handler": "internal/server/storageinfo.go: artifactoryService.OptimizeSystemStorage",
     "direct_calls": [
       "artgen.OptimizeSystemStorage200TextResponse",
+      "httpkit.AdminOnly",
       "s.cfg.Mirrors.Optimize"
     ],
     "review_family": "content-and-configuration",
@@ -18536,6 +18587,7 @@
     "contract": "Permanently removes every trashed item. Admin only. Answers 202 because the deletion runs in the background; blobs are reclaimed by the next garbage collection pass.",
     "handler": "internal/server/trash.go: artifactoryService.EmptyTrashCan",
     "direct_calls": [
+      "httpkit.Principal",
       "s.content",
       "s.internalError",
       "s.trashService",
@@ -18728,6 +18780,7 @@
     "handler": "internal/server/npm_operations.go: artifactoryService.ResumeNpmRepositoryMigration",
     "direct_calls": [
       "errors.Is",
+      "httpkit.BadRequestf",
       "s.enqueue",
       "s.internalError",
       "s.npmOperation",
@@ -18912,6 +18965,8 @@
       "errors.Is",
       "fmt.Errorf",
       "fmt.Sprintf",
+      "httpkit.AdminOnly",
+      "httpkit.BadRequestf",
       "json.Unmarshal",
       "repos.Merge",
       "s.checkReferences",
@@ -19813,6 +19868,7 @@
     "contract": "Turns acceptance of usernames and passwords over HTTP Basic on or off for the whole instance, from the next request on. Returns 200 with no body. Requires a platform admin.",
     "handler": "internal/server/access_identity.go: accessService.SetBasicAuthenticationStatus",
     "direct_calls": [
+      "httpkit.BadRequestf",
       "s.adminIdentity",
       "s.forgetPolicies",
       "s.identityErr",
@@ -19873,6 +19929,7 @@
     "handler": "internal/server/access_identity.go: accessService.ConfigureAccessUserLockPolicy",
     "direct_calls": [
       "accessgen.ConfigureAccessUserLockPolicy200JSONResponse",
+      "httpkit.BadRequestf",
       "s.adminIdentity",
       "s.forgetPolicies",
       "s.identityErr",
@@ -19902,6 +19959,8 @@
     "contract": "Changes the lifetime given to access tokens created without expires_in. Tokens already issued keep their expiry. Returns 200 with no body. Requires a platform admin.",
     "handler": "internal/server/tokens.go: accessService.SetTokenDefaultExpiry",
     "direct_calls": [
+      "httpkit.AdminOnly",
+      "httpkit.BadRequestf",
       "s.content",
       "s.tokenAPI",
       "st.Settings",
@@ -20185,6 +20244,7 @@
     "contract": "Replaces the description, environments and actions of a CUSTOM_GLOBAL role, or the environments and actions of a PREDEFINED one. The name in the body must equal the path name and the type must stay the same; the ADMIN role cannot be changed. Each of these answers 400. Admin only. Answers 200 with no body.",
     "handler": "internal/server/roles.go: accessService.UpdateGlobalRole",
     "direct_calls": [
+      "httpkit.BadRequestf",
       "httpkit.Deref",
       "s.roleError",
       "s.roleService",
@@ -20353,6 +20413,7 @@
     "contract": "Replaces the user's internal password. A platform admin may set any user's password; any user may set their own. The new value must satisfy the password policy and, when the policy forbids reuse, differ from the current one. Answers 204 with no body.",
     "handler": "internal/server/access_identity.go: accessService.ChangeUserPassword",
     "direct_calls": [
+      "httpkit.BadRequestf",
       "kernel.RequireAuthenticated",
       "s.identity",
       "s.identityErr",
@@ -20516,6 +20577,7 @@
     "handler": "internal/server/api_restrictions.go: securityAPI.SetAPIRestriction",
     "direct_calls": [
       "artgen.SetAPIRestriction200JSONResponse",
+      "httpkit.BadRequestf",
       "now.Add",
       "req.Body.Until.After",
       "s.cfg.Store.APIRestrictions",
@@ -21386,6 +21448,8 @@
       "errors.Is",
       "fmt.Errorf",
       "fmt.Sprintf",
+      "httpkit.AdminOnly",
+      "httpkit.BadRequestf",
       "repos.CheckEnvironments",
       "repos.CheckKeypairs",
       "repos.CheckMembers",
@@ -21443,6 +21507,7 @@
     "contract": "Legacy key rotation, which is disabled. Always answers 400 \"API key creation is disabled\"; no user holds a key.",
     "handler": "internal/server/security.go: securityAPI.RegenerateApiKey",
     "direct_calls": [
+      "httpkit.BadRequestf",
       "kernel.RequireAuthenticated"
     ],
     "review_family": "identity",
@@ -21470,6 +21535,7 @@
     "handler": "internal/server/security.go: securityAPI.SetPasswordExpirationPolicy",
     "direct_calls": [
       "artgen.SetPasswordExpirationPolicy200JSONResponse",
+      "httpkit.BadRequestf",
       "s.adminStore",
       "s.forgetPolicies",
       "s.identity",
@@ -21500,6 +21566,7 @@
     "contract": "Creates the group or replaces every field of an existing one, including the membership when userNames is present. Admin only. Always answers 201, both on create and on replace.",
     "handler": "internal/server/security.go: securityAPI.CreateOrReplaceGroup",
     "direct_calls": [
+      "httpkit.BadRequestf",
       "s.adminStore",
       "s.identity",
       "s.identity().PutGroup",
@@ -21564,6 +21631,7 @@
       "c.admin",
       "c.svc.PutResource",
       "fmt.Sprintf",
+      "httpkit.BadRequestf",
       "s.internalError",
       "s.permissionError",
       "types.PermissionFromV1"
@@ -21593,6 +21661,7 @@
     "handler": "internal/server/security.go: securityAPI.ConfigureUserLockPolicy",
     "direct_calls": [
       "artgen.ConfigureUserLockPolicy200TextResponse",
+      "httpkit.BadRequestf",
       "s.adminStore",
       "s.forgetPolicies",
       "s.identity",
@@ -21623,6 +21692,7 @@
     "contract": "Creates the user, or replaces every field of an existing one. Admin only. name, email and password are required (password may be omitted only with internalPasswordDisabled true). Answers 201 whether the user was created or replaced. Deprecated in favour of POST /access/api/v2/users.",
     "handler": "internal/server/security.go: securityAPI.CreateOrReplaceUser",
     "direct_calls": [
+      "httpkit.BadRequestf",
       "s.adminStore",
       "s.identity",
       "s.identity().PutUser",
@@ -21860,6 +21930,8 @@
       "errors.Is",
       "fmt.Errorf",
       "fmt.Sprintf",
+      "httpkit.AdminOnly",
+      "httpkit.BadRequestf",
       "repos.CheckEnvironments",
       "repos.CheckKeypairs",
       "repos.CheckMembers",

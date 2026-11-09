@@ -1,7 +1,8 @@
 // Package httpkit holds the HTTP helpers every module's handlers share: the
 // request context values the middleware leaves for handlers, the selection
 // of an error response profile by ordered path rules, error and JSON
-// writing, and the conversion of OpenAPI path templates to chi patterns.
+// writing, the caller checks handlers start with, and the conversion of
+// OpenAPI path templates to chi patterns.
 //
 // # Role
 //
@@ -34,6 +35,8 @@
 //   - Error profiles: ProfileRule, ProfileFor, ErrorProfiles, ErrorProfile
 //     and WithProfileRules.
 //   - Writing: WriteErr, WriteJSON, EscapePath and FormatTime.
+//   - Callers: AdminOnly, Principal, Denied and BadRequestf, over the
+//     kernel's principal helpers.
 //   - Routes: ChiPatterns and NotAPI. Pointers: Deref, DerefSlice and
 //     PtrTo, for the optional fields of generated types.
 //
@@ -48,6 +51,10 @@
 //     500.
 //   - NoteCause and NoteUser do nothing on a context that never passed the
 //     access log, so a handler called on its own neither panics nor logs.
+//   - The caller checks answer with the kernel's typed errors
+//     (kernel.ErrUnauthenticated, kernel.ErrForbidden), which carry their
+//     status; AdminOnly wraps them as "repositories: %w", text clients
+//     have always seen.
 //   - It imports no module, as the platform layer must not.
 //
 // # References
@@ -64,7 +71,8 @@
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     lines 158 to 163 (platform/httpkit and its middleware) and lines 40 and
 //     41 (dependency rule 4).
-//   - https://github.com/weaveplatform/artifactweave/issues/1069
+//   - https://github.com/weaveplatform/artifactweave/issues/1069 and
+//     https://github.com/weaveplatform/artifactweave/issues/1071
 //
 // # Status
 //
@@ -72,7 +80,8 @@
 // and JSON and error writing from the baseline, the access log's cause and
 // user slots and the property search's raw query in later phases. P9d
 // (WEB-03) moved them here and turned the server's error-profile switch into
-// ordered rules carried on the request context.
+// ordered rules carried on the request context; WEB-07 added the caller
+// checks.
 //
 // # Testing
 //
@@ -81,5 +90,6 @@
 // TestAccStubsAndEnvelopes check the profiles the rules choose. The unit
 // tests here cover the branches those suites do not reach: rule order and
 // the default, a request without rules, the context values on a bare
-// context, the pointers' nil cases and the route patterns.
+// context, the pointers' nil cases, the route patterns and each caller
+// check's answers.
 package httpkit
