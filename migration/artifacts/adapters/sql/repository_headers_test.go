@@ -1,4 +1,4 @@
-package sqlcommon_test
+package sql_test
 
 import (
 	"encoding/json"
@@ -7,11 +7,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
 )
 
 func headerConfig() repo.Config {
@@ -34,12 +35,12 @@ func headerConfig() repo.Config {
 func TestAccRepositoryHeaderWriteFailureRollsBack(t *testing.T) {
 	for _, operation := range []string{"INSERT", "DELETE"} {
 		t.Run(operation, func(t *testing.T) {
-			s := openContent(t, filepath.Join(t.TempDir(), "headers.db"), contentKeys(t))
+			s := mustOpenFile(t, filepath.Join(t.TempDir(), "headers.db"), testKeys(t))
 			config := headerConfig()
 			if err := s.Repos().Create(t.Context(), config); err != nil {
 				t.Fatal(err)
 			}
-			failBefore(t, s, operation, "repository_header_secrets")
+			sqltest.Exec(t, s.DB(), sqltest.FailTrigger(operation, "repository_header_secrets"))
 			config.CustomHTTPHeaders[0].Value = "replacement-value"
 			if err := s.Repos().Update(t.Context(), config); err == nil {
 				t.Fatal("injected write failure ignored")
@@ -58,7 +59,7 @@ func TestAccRepositoryHeaderWriteFailureRollsBack(t *testing.T) {
 			if _, err := s.Repos().
 				Get(t.Context(), config.Key); !errors.Is(
 				err,
-				store.ErrNotFound,
+				kernel.ErrNotFound,
 			) {
 				t.Fatal("failed create retained repository", err)
 			}
@@ -77,17 +78,17 @@ func TestAccRepositoryHeaderCorruptionFailsClosed(t *testing.T) {
 		`UPDATE repositories SET doc = replace(doc, '"value":""', '"value":"older-writer-plaintext"')`,
 	} {
 		t.Run(mutation, func(t *testing.T) {
-			s := openContent(t, filepath.Join(t.TempDir(), "headers.db"), contentKeys(t))
+			s := mustOpenFile(t, filepath.Join(t.TempDir(), "headers.db"), testKeys(t))
 			config := headerConfig()
 			if err := s.Repos().Create(t.Context(), config); err != nil {
 				t.Fatal(err)
 			}
-			execSQL(t, s, mutation)
+			sqltest.Exec(t, s.DB(), mutation)
 			if _, err := s.Repos().Get(t.Context(), config.Key); err == nil {
 				t.Fatal("corrupt header read succeeded")
 			}
 			if got, err := s.Repos().
-				List(t.Context(), store.RepoFilter{}); err == nil ||
+				List(t.Context(), port.RepoFilter{}); err == nil ||
 				got != nil {
 				t.Fatal("corrupt listing exposed partial configs", err)
 			}
@@ -97,8 +98,8 @@ func TestAccRepositoryHeaderCorruptionFailsClosed(t *testing.T) {
 
 func TestAccRepositoryHeaderBackfillFailureAndRetry(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "headers.db")
-	keys := contentKeys(t)
-	s := openContent(t, path, keys)
+	keys := testKeys(t)
+	s := mustOpenFile(t, path, keys)
 	config := headerConfig()
 	if err := s.Repos().Create(t.Context(), config); err != nil {
 		t.Fatal(err)
@@ -111,24 +112,13 @@ func TestAccRepositoryHeaderBackfillFailureAndRetry(t *testing.T) {
 		ExecContext(t.Context(), `UPDATE repositories SET doc = ?, header_secrets_version = 0`, string(doc)); err != nil {
 		t.Fatal(err)
 	}
-	execSQL(t, s, `DELETE FROM repository_header_secrets`)
-	failBefore(t, s, "INSERT", "repository_header_secrets")
+	sqltest.Exec(t, s.DB(), `DELETE FROM repository_header_secrets`)
+	sqltest.Exec(t, s.DB(), sqltest.FailTrigger("INSERT", "repository_header_secrets"))
 	s.Close()
-	if _, err = sqlite.Open(
-		t.Context(),
-		path,
-		sqlite.Options{Options: sqlcommon.Options{Keyring: keys}},
-	); err == nil {
+	if _, err = openFile(t, path, keys); err == nil {
 		t.Fatal("store opened after failed backfill")
 	}
-	raw, err := sqlite.Open(
-		t.Context(),
-		path,
-		sqlite.Options{Options: sqlcommon.Options{SkipMigrate: true, Keyring: keys}},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	raw := rawFile(t, path, keys)
 	var stored string
 	var version, count int
 	if err = raw.DB().
@@ -145,9 +135,10 @@ func TestAccRepositoryHeaderBackfillFailureAndRetry(t *testing.T) {
 		count != 0 {
 		t.Fatal("failed migration retained partial secrets", err)
 	}
-	execSQL(t, raw, `DROP TRIGGER fail_repository_header_secrets`)
+	// The trigger sqltest.FailTrigger("INSERT", "repository_header_secrets") made.
+	sqltest.Exec(t, raw.DB(), `DROP TRIGGER ops_fail_insert_repository_header_secrets`)
 	raw.Close()
-	retry := openContent(t, path, keys)
+	retry := mustOpenFile(t, path, keys)
 	got, err := retry.Repos().Get(t.Context(), config.Key)
 	if err != nil || got.CustomHTTPHeaders[0].Value != "sensitive-value" {
 		t.Fatal("migration retry failed", err)
@@ -164,14 +155,14 @@ func TestAccRepositoryHeaderBackfillFailureAndRetry(t *testing.T) {
 
 func TestAccRepositoryHeaderResealPlainValuesAndWrongKey(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "headers.db")
-	s := openContent(t, path, nil)
+	s := mustOpenFile(t, path, nil)
 	config := headerConfig()
 	if err := s.Repos().Create(t.Context(), config); err != nil {
 		t.Fatal(err)
 	}
 	s.Close()
-	encrypted := openContent(t, path, contentKeys(t))
-	if n, err := encrypted.Reseal(t.Context()); err != nil || n != 2 {
+	encrypted := mustOpenFile(t, path, testKeys(t))
+	if n, err := reseal(t.Context(), encrypted); err != nil || n != 2 {
 		t.Fatal(n, err)
 	}
 	var sealed []byte
@@ -184,18 +175,18 @@ func TestAccRepositoryHeaderResealPlainValuesAndWrongKey(t *testing.T) {
 		t.Fatal("plaintext header not sealed")
 	}
 	encrypted.Close()
-	wrong := openContent(t, path, contentKeysOther(t))
+	wrong := mustOpenFile(t, path, otherKeys(t))
 	if _, err := wrong.Repos().Get(t.Context(), config.Key); !errors.Is(err, crypt.ErrWrongKey) {
 		t.Fatal(err)
 	}
-	if _, err := wrong.Reseal(t.Context()); err == nil {
+	if _, err := reseal(t.Context(), wrong); err == nil {
 		t.Fatal("wrong key resealed header")
 	}
-	without := openContent(t, path, nil)
+	without := mustOpenFile(t, path, nil)
 	if _, err := without.Repos().
 		Get(t.Context(), config.Key); !errors.Is(
 		err,
-		sqlcommon.ErrNoKeyring,
+		dialect.ErrNoKeyring,
 	) {
 		t.Fatal(err)
 	}
@@ -203,7 +194,7 @@ func TestAccRepositoryHeaderResealPlainValuesAndWrongKey(t *testing.T) {
 
 func TestAccRepositoryHeaderBackfillRejectsWrongExistingKey(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "headers.db")
-	s := openContent(t, path, contentKeys(t))
+	s := mustOpenFile(t, path, testKeys(t))
 	config := headerConfig()
 	config.Password = "repository-password"
 	if err := s.Repos().Create(t.Context(), config); err != nil {
@@ -219,16 +210,12 @@ func TestAccRepositoryHeaderBackfillRejectsWrongExistingKey(t *testing.T) {
 		t.Fatal(err)
 	}
 	s.Close()
-	for _, keys := range []*crypt.Keyring{nil, contentKeysOther(t)} {
-		if _, err := sqlite.Open(
-			t.Context(),
-			path,
-			sqlite.Options{Options: sqlcommon.Options{Keyring: keys}},
-		); err == nil {
+	for _, keys := range []*crypt.Keyring{nil, otherKeys(t)} {
+		if _, err := openFile(t, path, keys); err == nil {
 			t.Fatal("legacy header was sealed under an unverified key")
 		}
 	}
-	correct := openContent(t, path, contentKeys(t))
+	correct := mustOpenFile(t, path, testKeys(t))
 	got, err := correct.Repos().Get(t.Context(), config.Key)
 	if err != nil || got.CustomHTTPHeaders[0].Value != "sensitive-value" {
 		t.Fatal(err)

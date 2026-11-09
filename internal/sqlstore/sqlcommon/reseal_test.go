@@ -120,6 +120,38 @@ func TestAccResealSealsPlainValues(t *testing.T) {
 	}
 }
 
+// contentKeys is the version-1 keyring the contract runs seal with.
+func contentKeys(t *testing.T) *crypt.Keyring {
+	t.Helper()
+	k, err := crypt.New([]byte("0123456789abcdef0123456789abcdef"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return k
+}
+
+// openContent opens a migrated SQLite store at path.
+func openContent(t *testing.T, path string, k *crypt.Keyring) *sqlcommon.Store {
+	t.Helper()
+	s, err := sqlite.Open(
+		context.Background(),
+		path,
+		sqlite.Options{Options: sqlcommon.Options{Keyring: k}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	return s
+}
+
+func execSQL(t *testing.T, s *sqlcommon.Store, q string) {
+	t.Helper()
+	if _, err := s.DB().ExecContext(context.Background(), q); err != nil {
+		t.Fatalf("%s: %v", q, err)
+	}
+}
+
 // contentKeysOther is a version-1 keyring under a different master key.
 func contentKeysOther(t *testing.T) *crypt.Keyring {
 	t.Helper()

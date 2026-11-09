@@ -1,12 +1,9 @@
 package sqltest
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
-	"strings"
 	"testing"
-	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -14,75 +11,24 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// RemoteCachePersistence checks that each repository keeps a durable
-// lifetime of its own, and that the lifetime and the completed and in-flight
-// retrieval records survive reopening the backend.
-func RemoteCachePersistence(t *testing.T, s *sqlcommon.Store, reopen func() *sqlcommon.Store) {
+// The artifacts module's tests run the remote cache persistence suite on its
+// SQL adapter alone. What stays here needs the whole metadata store: a layout
+// document, which the platform's config store keeps and whose edit fences the
+// remote sources that use it.
+
+// RemoteLayoutPersistence checks that a layout edit fences the remote source
+// of a repository that uses the layout, and that the layout and the new
+// source generation survive reopening the backend together.
+func RemoteLayoutPersistence(t *testing.T, s *sqlcommon.Store, reopen func() *sqlcommon.Store) {
 	t.Helper()
-	ctx := context.Background()
 	Reset(t, s.DB(), s.Dialect())
-	for _, key := range []string{"first", "second"} {
-		c := repo.Config{
-			Key:         key,
-			Class:       repo.Remote,
-			PackageType: repo.Generic,
-			URL:         "https://upstream.example",
-		}
-		if err := s.Repos().Create(ctx, c); err != nil {
-			t.Fatal(err)
-		}
-	}
-	source, err := s.RemoteCache().Source(ctx, "first")
-	if err != nil {
+	if err := s.Repos().Create(t.Context(), repo.Config{
+		Key:         "first",
+		Class:       repo.Remote,
+		PackageType: repo.Generic,
+		URL:         "https://upstream.example",
+	}); err != nil {
 		t.Fatal(err)
-	}
-	other, err := s.RemoteCache().Source(ctx, "second")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if source.Repository == "" || source.Repository == other.Repository || source.Generation == "" {
-		t.Fatal("the repositories did not get distinct durable lifetimes")
-	}
-	k := types.RemoteCacheKey{RepoKey: "first", Path: "index.json", Variant: "raw"}
-	token, err := s.RemoteCache().Begin(ctx, k)
-	if err != nil {
-		t.Fatal(err)
-	}
-	now := time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC)
-	e, err := s.RemoteCache().
-		Put(ctx, token, types.RemoteCacheEntry{Kind: types.RemoteMetadata, Blob: types.Blob{Checksums: types.Checksums{SHA256: strings.Repeat("a", 64)}, Size: 123, Created: now}, ETag: "v1", FetchedAt: now, ValidatedAt: now})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = s.RemoteCache().Negative(ctx, e.Token, now.Add(time.Minute)); err != nil {
-		t.Fatal(err)
-	}
-	pendingKey := k
-	pendingKey.Path = "pending"
-	pending, err := s.RemoteCache().Begin(ctx, pendingKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = s.Close(); err != nil {
-		t.Fatal(err)
-	}
-	s = reopen()
-	got, err := s.RemoteCache().Source(ctx, "first")
-	if err != nil || got != source {
-		t.Fatal("restart changed lifetime", got, err)
-	}
-	saved, err := s.RemoteCache().Read(ctx, k)
-	if err != nil || saved.ETag != "v1" || !saved.NegativeUntil.Equal(now.Add(time.Minute)) {
-		t.Fatal("restart lost cache state", saved, err)
-	}
-	if err = s.RemoteCache().Check(ctx, pending); err != nil {
-		t.Fatal("restart lost in-flight fence", err)
-	}
-	if _, err = s.RemoteCache().Invalidate(ctx, "first", "pending", false); err != nil {
-		t.Fatal(err)
-	}
-	if err = s.RemoteCache().Check(ctx, pending); !errors.Is(err, store.ErrConflict) {
-		t.Fatal("restart invalidation did not fence", err)
 	}
 	remoteLayoutPersistence(t, s, reopen)
 }
