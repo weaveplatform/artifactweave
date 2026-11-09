@@ -19,7 +19,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	formatapi "github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	format "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface"

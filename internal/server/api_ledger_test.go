@@ -460,7 +460,7 @@ func apiReviewPersistence(path string) (string, string, []string) {
 			return "native-" + protocol, "native wire contract retained: complete indexes, catalog/offset/cursor variants and streaming files differ by route; see family review for exact execution and limits", []string{
 				"docs/research/api-reliability/README.md#native-protocols",
 				"internal/server/server.go",
-				"internal/server/pkgroute/pkgroute.go",
+				"migration/artifacts/adapters/http/pkgroute/pkgroute.go",
 				"migration/artifacts/core/item/item.go",
 				"migration/artifacts/adapters/sql/content_items.go",
 			}

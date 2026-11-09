@@ -3,7 +3,7 @@ package conanhttp
 import (
 	"net/http"
 
-	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	conanfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conan"
 )

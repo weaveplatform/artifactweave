@@ -3,8 +3,8 @@
   "packages": {
     "internal/app": "shared",
     "internal/server": "shared",
-    "internal/server/pkgroute": "shared",
     "migration/access/adapters/http": "shared",
+    "migration/artifacts/adapters/http/pkgroute": "shared",
     "migration/artifacts/ecosystem/aieditorextensions/http": "aieditorextensions",
     "migration/artifacts/ecosystem/ansible/http": "ansible",
     "migration/artifacts/ecosystem/bazelmodules/http": "bazelmodules",

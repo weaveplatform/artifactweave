@@ -87,7 +87,7 @@ When a test file leaves a shared directory such as `internal/server`:
 | Terraform registry | `migration/artifacts/ecosystem/terraform/http`, `test/server/artifacts/terraform` |
 | Terraform backend | `migration/artifacts/ecosystem/terraformbackend/http`, `test/server/artifacts/terraformbackend` |
 | VCS | `migration/artifacts/ecosystem/vcs/http`, `test/server/artifacts/vcs` |
-| Shared | `internal/server`, `internal/server/pkgroute`, `test/server/access`, `test/server/artifacts`, `test/server/configuration` |
+| Shared | `internal/server`, `migration/artifacts/adapters/http/pkgroute`, `test/server/access`, `test/server/artifacts`, `test/server/configuration` |
 
 `test/server/support` and the packages under it (`harness`, `agentcommon` and
 `registryfixture`) contain fixtures and helpers, not test suites. A change

@@ -14,7 +14,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	condafmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conda"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"

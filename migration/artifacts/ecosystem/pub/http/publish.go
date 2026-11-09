@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	pubfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pub"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"

@@ -2,7 +2,7 @@
   {
     "route": "CONNECT /.well-known/terraform.json",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pkgroute/pkgroute.go: internal/server/pkgroute.Mount.func3",
+    "handler": "migration/artifacts/adapters/http/pkgroute/pkgroute.go: migration/artifacts/adapters/http/pkgroute.Mount.func3",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -40,7 +40,7 @@
   {
     "route": "CONNECT /artifactory/api/composer/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pkgroute/pkgroute.go: internal/server/pkgroute.(*Kit).resolve.func1",
+    "handler": "migration/artifacts/adapters/http/pkgroute/pkgroute.go: migration/artifacts/adapters/http/pkgroute.(*Kit).resolve.func1",
     "review_family": "native-composer",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -49,7 +49,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -68,7 +68,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -87,7 +87,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -106,7 +106,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -125,7 +125,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -144,7 +144,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -163,7 +163,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -173,7 +173,7 @@
   {
     "route": "CONNECT /artifactory/api/terraform/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pkgroute/pkgroute.go: internal/server/pkgroute.(*Kit).resolve.func1",
+    "handler": "migration/artifacts/adapters/http/pkgroute/pkgroute.go: migration/artifacts/adapters/http/pkgroute.(*Kit).resolve.func1",
     "review_family": "native-terraform",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -182,7 +182,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -277,7 +277,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -306,7 +306,7 @@
   {
     "route": "DELETE /.well-known/terraform.json",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pkgroute/pkgroute.go: internal/server/pkgroute.Mount.func3",
+    "handler": "migration/artifacts/adapters/http/pkgroute/pkgroute.go: migration/artifacts/adapters/http/pkgroute.Mount.func3",
     "review_family": "content-and-configuration",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -991,7 +991,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -1010,7 +1010,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -1029,7 +1029,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -1048,7 +1048,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -1067,7 +1067,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -1128,7 +1128,7 @@
   {
     "route": "DELETE /artifactory/api/composer/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pkgroute/pkgroute.go: internal/server/pkgroute.(*Kit).resolve.func1",
+    "handler": "migration/artifacts/adapters/http/pkgroute/pkgroute.go: migration/artifacts/adapters/http/pkgroute.(*Kit).resolve.func1",
     "review_family": "native-composer",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -1137,7 +1137,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -1156,7 +1156,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -1175,7 +1175,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -1194,7 +1194,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -1213,7 +1213,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -1232,7 +1232,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -1251,7 +1251,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -1291,7 +1291,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -1327,7 +1327,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -1346,7 +1346,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -1365,7 +1365,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -1384,7 +1384,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -1403,7 +1403,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -1422,7 +1422,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -1441,7 +1441,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -1882,7 +1882,7 @@
   {
     "route": "DELETE /artifactory/api/terraform/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pkgroute/pkgroute.go: internal/server/pkgroute.(*Kit).resolve.func1",
+    "handler": "migration/artifacts/adapters/http/pkgroute/pkgroute.go: migration/artifacts/adapters/http/pkgroute.(*Kit).resolve.func1",
     "review_family": "native-terraform",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -1891,7 +1891,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -1910,7 +1910,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -1929,7 +1929,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -2456,7 +2456,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -2502,7 +2502,7 @@
   {
     "route": "GET /.well-known/terraform.json",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pkgroute/pkgroute.go: internal/server/pkgroute.Mount.func3",
+    "handler": "migration/artifacts/adapters/http/pkgroute/pkgroute.go: migration/artifacts/adapters/http/pkgroute.Mount.func3",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -3914,7 +3914,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -3933,7 +3933,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -3952,7 +3952,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -3971,7 +3971,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -3990,7 +3990,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -4009,7 +4009,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -4028,7 +4028,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -4275,7 +4275,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -4294,7 +4294,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -4313,7 +4313,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -4332,7 +4332,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -4351,7 +4351,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -4370,7 +4370,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -4524,7 +4524,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -4546,7 +4546,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -4565,7 +4565,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -4584,7 +4584,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -4603,7 +4603,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -4625,7 +4625,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -4647,7 +4647,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -4666,7 +4666,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -4685,7 +4685,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -4704,7 +4704,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -4723,7 +4723,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -4742,7 +4742,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -4989,7 +4989,7 @@
   {
     "route": "GET /artifactory/api/composer/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pkgroute/pkgroute.go: internal/server/pkgroute.(*Kit).resolve.func1",
+    "handler": "migration/artifacts/adapters/http/pkgroute/pkgroute.go: migration/artifacts/adapters/http/pkgroute.(*Kit).resolve.func1",
     "review_family": "native-composer",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -4998,7 +4998,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5020,7 +5020,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5042,7 +5042,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5064,7 +5064,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5083,7 +5083,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5102,7 +5102,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5121,7 +5121,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5169,7 +5169,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5205,7 +5205,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5234,7 +5234,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5263,7 +5263,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5282,7 +5282,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5301,7 +5301,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5320,7 +5320,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5578,7 +5578,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5603,7 +5603,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5624,7 +5624,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5645,7 +5645,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5666,7 +5666,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5687,7 +5687,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5706,7 +5706,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5742,7 +5742,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5761,7 +5761,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5780,7 +5780,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5799,7 +5799,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5818,7 +5818,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5837,7 +5837,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5856,7 +5856,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5875,7 +5875,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5894,7 +5894,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5913,7 +5913,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5932,7 +5932,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5951,7 +5951,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5970,7 +5970,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -5989,7 +5989,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6008,7 +6008,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6027,7 +6027,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6046,7 +6046,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6065,7 +6065,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6084,7 +6084,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6103,7 +6103,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6122,7 +6122,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6158,7 +6158,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6177,7 +6177,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6196,7 +6196,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6215,7 +6215,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6234,7 +6234,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6253,7 +6253,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6272,7 +6272,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6291,7 +6291,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6310,7 +6310,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6329,7 +6329,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6356,7 +6356,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6375,7 +6375,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6394,7 +6394,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6413,7 +6413,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6432,7 +6432,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6451,7 +6451,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6485,7 +6485,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6504,7 +6504,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6523,7 +6523,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6542,7 +6542,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6561,7 +6561,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6580,7 +6580,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6599,7 +6599,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6618,7 +6618,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6637,7 +6637,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6656,7 +6656,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6675,7 +6675,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6694,7 +6694,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6713,7 +6713,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6732,7 +6732,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6751,7 +6751,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6770,7 +6770,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6789,7 +6789,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6808,7 +6808,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6833,7 +6833,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6852,7 +6852,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6874,7 +6874,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6899,7 +6899,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6918,7 +6918,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6940,7 +6940,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6959,7 +6959,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6978,7 +6978,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -6997,7 +6997,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -8477,7 +8477,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -8496,7 +8496,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -8515,7 +8515,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -8534,7 +8534,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -8553,7 +8553,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -8572,7 +8572,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -8591,7 +8591,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -8610,7 +8610,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -8629,7 +8629,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -8648,7 +8648,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -8805,7 +8805,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -9260,7 +9260,7 @@
   {
     "route": "GET /artifactory/api/terraform/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pkgroute/pkgroute.go: internal/server/pkgroute.(*Kit).resolve.func1",
+    "handler": "migration/artifacts/adapters/http/pkgroute/pkgroute.go: migration/artifacts/adapters/http/pkgroute.(*Kit).resolve.func1",
     "review_family": "native-terraform",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -9269,7 +9269,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -9288,7 +9288,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -9307,7 +9307,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -9326,7 +9326,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -9345,7 +9345,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -9364,7 +9364,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -9383,7 +9383,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -9402,7 +9402,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -9421,7 +9421,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -9440,7 +9440,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -9459,7 +9459,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -9478,7 +9478,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -9933,7 +9933,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -9952,7 +9952,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -9980,7 +9980,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -10005,7 +10005,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -10030,7 +10030,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -10055,7 +10055,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -10080,7 +10080,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -10105,7 +10105,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -10130,7 +10130,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -10155,7 +10155,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -10180,7 +10180,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -10205,7 +10205,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -10230,7 +10230,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -10255,7 +10255,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -10280,7 +10280,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -10305,7 +10305,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -10330,7 +10330,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -10358,7 +10358,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -10386,7 +10386,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -11505,7 +11505,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -11693,7 +11693,7 @@
   {
     "route": "HEAD /.well-known/terraform.json",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pkgroute/pkgroute.go: internal/server/pkgroute.Mount.func3",
+    "handler": "migration/artifacts/adapters/http/pkgroute/pkgroute.go: migration/artifacts/adapters/http/pkgroute.Mount.func3",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -11740,7 +11740,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -11759,7 +11759,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -11778,7 +11778,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -11797,7 +11797,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -11816,7 +11816,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -11835,7 +11835,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -11854,7 +11854,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -11873,7 +11873,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -11892,7 +11892,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -11911,7 +11911,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -11930,7 +11930,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -11949,7 +11949,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -11968,7 +11968,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -11987,7 +11987,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12006,7 +12006,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12025,7 +12025,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12044,7 +12044,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12063,7 +12063,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12082,7 +12082,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12101,7 +12101,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12120,7 +12120,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12130,7 +12130,7 @@
   {
     "route": "HEAD /artifactory/api/composer/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pkgroute/pkgroute.go: internal/server/pkgroute.(*Kit).resolve.func1",
+    "handler": "migration/artifacts/adapters/http/pkgroute/pkgroute.go: migration/artifacts/adapters/http/pkgroute.(*Kit).resolve.func1",
     "review_family": "native-composer",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12139,7 +12139,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12158,7 +12158,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12177,7 +12177,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12196,7 +12196,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12215,7 +12215,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12234,7 +12234,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12253,7 +12253,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12272,7 +12272,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12291,7 +12291,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12310,7 +12310,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12329,7 +12329,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12348,7 +12348,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12367,7 +12367,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12386,7 +12386,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12405,7 +12405,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12424,7 +12424,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12443,7 +12443,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12462,7 +12462,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12481,7 +12481,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12500,7 +12500,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12519,7 +12519,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12538,7 +12538,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12557,7 +12557,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12576,7 +12576,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12595,7 +12595,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12614,7 +12614,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12633,7 +12633,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12652,7 +12652,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12671,7 +12671,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12690,7 +12690,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12709,7 +12709,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12728,7 +12728,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12747,7 +12747,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12766,7 +12766,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12785,7 +12785,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12804,7 +12804,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12823,7 +12823,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12842,7 +12842,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12861,7 +12861,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12880,7 +12880,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12899,7 +12899,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12909,7 +12909,7 @@
   {
     "route": "HEAD /artifactory/api/terraform/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pkgroute/pkgroute.go: internal/server/pkgroute.(*Kit).resolve.func1",
+    "handler": "migration/artifacts/adapters/http/pkgroute/pkgroute.go: migration/artifacts/adapters/http/pkgroute.(*Kit).resolve.func1",
     "review_family": "native-terraform",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12918,7 +12918,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -12963,7 +12963,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -13151,7 +13151,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -13180,7 +13180,7 @@
   {
     "route": "OPTIONS /.well-known/terraform.json",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pkgroute/pkgroute.go: internal/server/pkgroute.Mount.func3",
+    "handler": "migration/artifacts/adapters/http/pkgroute/pkgroute.go: migration/artifacts/adapters/http/pkgroute.Mount.func3",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -13218,7 +13218,7 @@
   {
     "route": "OPTIONS /artifactory/api/composer/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pkgroute/pkgroute.go: internal/server/pkgroute.(*Kit).resolve.func1",
+    "handler": "migration/artifacts/adapters/http/pkgroute/pkgroute.go: migration/artifacts/adapters/http/pkgroute.(*Kit).resolve.func1",
     "review_family": "native-composer",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -13227,7 +13227,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -13246,7 +13246,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -13265,7 +13265,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -13284,7 +13284,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -13303,7 +13303,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -13322,7 +13322,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -13341,7 +13341,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -13351,7 +13351,7 @@
   {
     "route": "OPTIONS /artifactory/api/terraform/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pkgroute/pkgroute.go: internal/server/pkgroute.(*Kit).resolve.func1",
+    "handler": "migration/artifacts/adapters/http/pkgroute/pkgroute.go: migration/artifacts/adapters/http/pkgroute.(*Kit).resolve.func1",
     "review_family": "native-terraform",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -13360,7 +13360,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -13455,7 +13455,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -13484,7 +13484,7 @@
   {
     "route": "PATCH /.well-known/terraform.json",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pkgroute/pkgroute.go: internal/server/pkgroute.Mount.func3",
+    "handler": "migration/artifacts/adapters/http/pkgroute/pkgroute.go: migration/artifacts/adapters/http/pkgroute.Mount.func3",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -13776,7 +13776,7 @@
   {
     "route": "PATCH /artifactory/api/composer/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pkgroute/pkgroute.go: internal/server/pkgroute.(*Kit).resolve.func1",
+    "handler": "migration/artifacts/adapters/http/pkgroute/pkgroute.go: migration/artifacts/adapters/http/pkgroute.(*Kit).resolve.func1",
     "review_family": "native-composer",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -13785,7 +13785,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -13804,7 +13804,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -13823,7 +13823,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -13842,7 +13842,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -13861,7 +13861,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -13880,7 +13880,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -13899,7 +13899,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -13991,7 +13991,7 @@
   {
     "route": "PATCH /artifactory/api/terraform/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pkgroute/pkgroute.go: internal/server/pkgroute.(*Kit).resolve.func1",
+    "handler": "migration/artifacts/adapters/http/pkgroute/pkgroute.go: migration/artifacts/adapters/http/pkgroute.(*Kit).resolve.func1",
     "review_family": "native-terraform",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -14000,7 +14000,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -14115,7 +14115,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -14144,7 +14144,7 @@
   {
     "route": "POST /.well-known/terraform.json",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pkgroute/pkgroute.go: internal/server/pkgroute.Mount.func3",
+    "handler": "migration/artifacts/adapters/http/pkgroute/pkgroute.go: migration/artifacts/adapters/http/pkgroute.Mount.func3",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -14973,7 +14973,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -15009,7 +15009,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -15028,7 +15028,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -15142,7 +15142,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "migration/artifacts/ecosystem/bower/http/register.go",
@@ -15375,7 +15375,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -15394,7 +15394,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -15413,7 +15413,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -15562,7 +15562,7 @@
   {
     "route": "POST /artifactory/api/composer/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pkgroute/pkgroute.go: internal/server/pkgroute.(*Kit).resolve.func1",
+    "handler": "migration/artifacts/adapters/http/pkgroute/pkgroute.go: migration/artifacts/adapters/http/pkgroute.(*Kit).resolve.func1",
     "review_family": "native-composer",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -15571,7 +15571,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -15593,7 +15593,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -15612,7 +15612,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -15631,7 +15631,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -15745,7 +15745,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -15764,7 +15764,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -15840,7 +15840,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -15893,7 +15893,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -15949,7 +15949,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -15968,7 +15968,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -15987,7 +15987,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16165,7 +16165,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16184,7 +16184,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16222,7 +16222,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16248,7 +16248,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16270,7 +16270,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16289,7 +16289,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "migration/artifacts/ecosystem/huggingface/http/migration.go",
@@ -16312,7 +16312,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16331,7 +16331,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16350,7 +16350,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16369,7 +16369,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16388,7 +16388,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16407,7 +16407,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16426,7 +16426,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16445,7 +16445,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16464,7 +16464,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16483,7 +16483,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16502,7 +16502,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16521,7 +16521,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16574,7 +16574,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16593,7 +16593,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16612,7 +16612,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16631,7 +16631,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16650,7 +16650,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16669,7 +16669,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16688,7 +16688,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16707,7 +16707,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16726,7 +16726,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16745,7 +16745,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16781,7 +16781,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16803,7 +16803,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16822,7 +16822,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16844,7 +16844,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16924,7 +16924,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16950,7 +16950,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -16969,7 +16969,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -17022,7 +17022,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -17058,7 +17058,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -17077,7 +17077,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -17096,7 +17096,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -17122,7 +17122,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -18011,7 +18011,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -18439,7 +18439,7 @@
   {
     "route": "POST /artifactory/api/terraform/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pkgroute/pkgroute.go: internal/server/pkgroute.(*Kit).resolve.func1",
+    "handler": "migration/artifacts/adapters/http/pkgroute/pkgroute.go: migration/artifacts/adapters/http/pkgroute.(*Kit).resolve.func1",
     "review_family": "native-terraform",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -18448,7 +18448,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -18467,7 +18467,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -18486,7 +18486,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -18505,7 +18505,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -18524,7 +18524,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -18543,7 +18543,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -18569,7 +18569,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -19710,7 +19710,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -19824,7 +19824,7 @@
   {
     "route": "PUT /.well-known/terraform.json",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pkgroute/pkgroute.go: internal/server/pkgroute.Mount.func3",
+    "handler": "migration/artifacts/adapters/http/pkgroute/pkgroute.go: migration/artifacts/adapters/http/pkgroute.Mount.func3",
     "review_family": "content-and-configuration",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -20463,7 +20463,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -20643,7 +20643,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -20665,7 +20665,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -20684,7 +20684,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -20867,7 +20867,7 @@
   {
     "route": "PUT /artifactory/api/composer/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pkgroute/pkgroute.go: internal/server/pkgroute.(*Kit).resolve.func1",
+    "handler": "migration/artifacts/adapters/http/pkgroute/pkgroute.go: migration/artifacts/adapters/http/pkgroute.(*Kit).resolve.func1",
     "review_family": "native-composer",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -20876,7 +20876,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -20895,7 +20895,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -20914,7 +20914,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -20967,7 +20967,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -20986,7 +20986,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -21005,7 +21005,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -21024,7 +21024,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -21094,7 +21094,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -21164,7 +21164,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -21183,7 +21183,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -21202,7 +21202,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -21221,7 +21221,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -21240,7 +21240,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -21259,7 +21259,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -21278,7 +21278,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -21297,7 +21297,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -21316,7 +21316,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -21335,7 +21335,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -21354,7 +21354,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -21373,7 +21373,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -21392,7 +21392,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -21784,7 +21784,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -21816,7 +21816,7 @@
   {
     "route": "PUT /artifactory/api/terraform/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pkgroute/pkgroute.go: internal/server/pkgroute.(*Kit).resolve.func1",
+    "handler": "migration/artifacts/adapters/http/pkgroute/pkgroute.go: migration/artifacts/adapters/http/pkgroute.(*Kit).resolve.func1",
     "review_family": "native-terraform",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -21825,7 +21825,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -21844,7 +21844,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -22327,7 +22327,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -22373,7 +22373,7 @@
   {
     "route": "QUERY /.well-known/terraform.json",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pkgroute/pkgroute.go: internal/server/pkgroute.Mount.func3",
+    "handler": "migration/artifacts/adapters/http/pkgroute/pkgroute.go: migration/artifacts/adapters/http/pkgroute.Mount.func3",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -22411,7 +22411,7 @@
   {
     "route": "QUERY /artifactory/api/composer/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pkgroute/pkgroute.go: internal/server/pkgroute.(*Kit).resolve.func1",
+    "handler": "migration/artifacts/adapters/http/pkgroute/pkgroute.go: migration/artifacts/adapters/http/pkgroute.(*Kit).resolve.func1",
     "review_family": "native-composer",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -22420,7 +22420,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -22439,7 +22439,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -22458,7 +22458,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -22477,7 +22477,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -22496,7 +22496,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -22515,7 +22515,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -22534,7 +22534,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -22544,7 +22544,7 @@
   {
     "route": "QUERY /artifactory/api/terraform/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pkgroute/pkgroute.go: internal/server/pkgroute.(*Kit).resolve.func1",
+    "handler": "migration/artifacts/adapters/http/pkgroute/pkgroute.go: migration/artifacts/adapters/http/pkgroute.(*Kit).resolve.func1",
     "review_family": "native-terraform",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -22553,7 +22553,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -22648,7 +22648,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -22677,7 +22677,7 @@
   {
     "route": "TRACE /.well-known/terraform.json",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pkgroute/pkgroute.go: internal/server/pkgroute.Mount.func3",
+    "handler": "migration/artifacts/adapters/http/pkgroute/pkgroute.go: migration/artifacts/adapters/http/pkgroute.Mount.func3",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -22715,7 +22715,7 @@
   {
     "route": "TRACE /artifactory/api/composer/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pkgroute/pkgroute.go: internal/server/pkgroute.(*Kit).resolve.func1",
+    "handler": "migration/artifacts/adapters/http/pkgroute/pkgroute.go: migration/artifacts/adapters/http/pkgroute.(*Kit).resolve.func1",
     "review_family": "native-composer",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -22724,7 +22724,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -22743,7 +22743,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -22762,7 +22762,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -22781,7 +22781,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -22800,7 +22800,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -22819,7 +22819,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -22838,7 +22838,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -22848,7 +22848,7 @@
   {
     "route": "TRACE /artifactory/api/terraform/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pkgroute/pkgroute.go: internal/server/pkgroute.(*Kit).resolve.func1",
+    "handler": "migration/artifacts/adapters/http/pkgroute/pkgroute.go: migration/artifacts/adapters/http/pkgroute.(*Kit).resolve.func1",
     "review_family": "native-terraform",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -22857,7 +22857,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
@@ -22952,7 +22952,7 @@
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/server/server.go",
-      "internal/server/pkgroute/pkgroute.go",
+      "migration/artifacts/adapters/http/pkgroute/pkgroute.go",
       "migration/artifacts/core/item/item.go",
       "migration/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
