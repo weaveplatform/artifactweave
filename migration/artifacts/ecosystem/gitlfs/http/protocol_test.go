@@ -1,4 +1,4 @@
-package gitlfs_test
+package gitlfshttp_test
 
 import (
 	"bytes"
@@ -14,12 +14,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/server/gitlfs"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	gitlfshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/gitlfs/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
@@ -97,7 +97,7 @@ func newFixture(t *testing.T, class repo.Class) *fixture {
 				_, _ = io.Copy(w, rc)
 			}
 		},
-	}, gitlfs.Protocol(gitlfs.Options{}))
+	}, gitlfshttp.Protocol(gitlfshttp.Options{}))
 	f := &fixture{t: t, db: db, items: items, server: httptest.NewServer(r)}
 	t.Cleanup(f.server.Close)
 	return f

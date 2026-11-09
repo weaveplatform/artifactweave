@@ -19,7 +19,7 @@ type formatImpact struct {
 
 var formats = map[string]formatImpact{
 	"machinelearning": {
-		"./internal/format/machinelearning/...",
+		"./migration/artifacts/ecosystem/machinelearning/...",
 		"@machinelearning",
 		[]string{"frogml"},
 	},
@@ -50,7 +50,7 @@ var formats = map[string]formatImpact{
 	"bower":         {"./migration/artifacts/ecosystem/bower/...", "@bower", []string{"bower"}},
 	"debian":        {"./migration/artifacts/ecosystem/debian/...", "@debian", []string{"debian"}},
 	"gems":          {"./migration/artifacts/ecosystem/gems/...", "@gems", []string{"ruby"}},
-	"gitlfs":        {"./internal/format/gitlfs/...", "@gitlfs", []string{"gitlfs"}},
+	"gitlfs":        {"./migration/artifacts/ecosystem/gitlfs/...", "@gitlfs", []string{"gitlfs"}},
 	"cocoapods": {
 		"./migration/artifacts/ecosystem/cocoapods/...",
 		"@cocoapods",

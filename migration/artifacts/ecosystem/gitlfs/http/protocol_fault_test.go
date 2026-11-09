@@ -1,4 +1,4 @@
-package gitlfs_test
+package gitlfshttp_test
 
 import (
 	"bytes"

@@ -1,4 +1,4 @@
-package machinelearning_test
+package machinelearninghttp_test
 
 import (
 	"archive/zip"
@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	ml "github.com/weaveplatform/artifactweave/internal/format/machinelearning"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	ml "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/machinelearning"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 

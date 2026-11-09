@@ -1,4 +1,4 @@
-package machinelearning
+package machinelearninghttp
 
 import (
 	"bytes"

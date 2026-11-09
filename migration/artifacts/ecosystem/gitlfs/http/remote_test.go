@@ -1,4 +1,4 @@
-package gitlfs_test
+package gitlfshttp_test
 
 import (
 	"bytes"
@@ -17,7 +17,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/server/gitlfs"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
@@ -26,6 +25,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	gitlfshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/gitlfs/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
@@ -249,7 +249,7 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 				}
 			},
 		},
-		gitlfs.Protocol(gitlfs.Options{RemoteSources: svc}),
+		gitlfshttp.Protocol(gitlfshttp.Options{RemoteSources: svc}),
 	)
 	f.server = httptest.NewServer(router)
 	t.Cleanup(f.server.Close)

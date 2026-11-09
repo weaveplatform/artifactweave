@@ -1,4 +1,4 @@
-package gitlfs
+package gitlfshttp
 
 import (
 	"context"

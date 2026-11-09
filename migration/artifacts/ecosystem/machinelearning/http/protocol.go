@@ -1,6 +1,6 @@
-// Package machinelearning implements the FrogML SDK's Artifactory model
+// Package machinelearninghttp implements the FrogML SDK's Artifactory model
 // transaction and manifest API on local and one-node federated repositories.
-package machinelearning
+package machinelearninghttp
 
 import (
 	"bytes"
@@ -15,10 +15,10 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	ml "github.com/weaveplatform/artifactweave/internal/format/machinelearning"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	ml "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/machinelearning"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/store"

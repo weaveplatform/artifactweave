@@ -6146,7 +6146,7 @@
   {
     "route": "GET /artifactory/api/lfs/{repoKey}/locks",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/gitlfs.handler.listLocks-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/gitlfs/http.handler.listLocks-fm",
     "review_family": "native-lfs",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6165,7 +6165,7 @@
   {
     "route": "GET /artifactory/api/lfs/{repoKey}/objects/{oid}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/gitlfs.handler.download-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/gitlfs/http.handler.download-fm",
     "review_family": "native-lfs",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6241,7 +6241,7 @@
   {
     "route": "GET /artifactory/api/machinelearning/{repoKey}/model/entity-manifest/{namespace}/{name}/{version}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/machinelearning.handler.manifest-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/machinelearning/http.handler.manifest-fm",
     "review_family": "native-machinelearning",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6260,7 +6260,7 @@
   {
     "route": "GET /artifactory/api/machinelearning/{repoKey}/model/entity-manifest/{name}/{version}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/machinelearning.handler.manifest-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/machinelearning/http.handler.manifest-fm",
     "review_family": "native-machinelearning",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12424,7 +12424,7 @@
   {
     "route": "HEAD /artifactory/api/lfs/{repoKey}/objects/{oid}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/gitlfs.handler.download-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/gitlfs/http.handler.download-fm",
     "review_family": "native-lfs",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -16487,7 +16487,7 @@
   {
     "route": "POST /artifactory/api/lfs/{repoKey}/locks",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/gitlfs.handler.createLock-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/gitlfs/http.handler.createLock-fm",
     "review_family": "native-lfs",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16506,7 +16506,7 @@
   {
     "route": "POST /artifactory/api/lfs/{repoKey}/locks/verify",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/gitlfs.handler.verifyLocks-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/gitlfs/http.handler.verifyLocks-fm",
     "review_family": "native-lfs",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16525,7 +16525,7 @@
   {
     "route": "POST /artifactory/api/lfs/{repoKey}/locks/{id}/unlock",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/gitlfs.handler.unlockLock-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/gitlfs/http.handler.unlockLock-fm",
     "review_family": "native-lfs",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16544,7 +16544,7 @@
   {
     "route": "POST /artifactory/api/lfs/{repoKey}/objects/batch",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/gitlfs.handler.batch-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/gitlfs/http.handler.batch-fm",
     "review_family": "native-lfs",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16601,7 +16601,7 @@
   {
     "route": "POST /artifactory/api/machinelearning/{repoKey}/model/{namespace}/{name}/start-transaction",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/machinelearning.handler.start-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/machinelearning/http.handler.start-fm",
     "review_family": "native-machinelearning",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16620,7 +16620,7 @@
   {
     "route": "POST /artifactory/api/machinelearning/{repoKey}/model/{namespace}/{name}/start-transaction/{version}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/machinelearning.handler.start-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/machinelearning/http.handler.start-fm",
     "review_family": "native-machinelearning",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16639,7 +16639,7 @@
   {
     "route": "POST /artifactory/api/machinelearning/{repoKey}/model/{name}/start-transaction",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/machinelearning.handler.start-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/machinelearning/http.handler.start-fm",
     "review_family": "native-machinelearning",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16658,7 +16658,7 @@
   {
     "route": "POST /artifactory/api/machinelearning/{repoKey}/model/{name}/start-transaction/{version}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/machinelearning.handler.start-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/machinelearning/http.handler.start-fm",
     "review_family": "native-machinelearning",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -21069,7 +21069,7 @@
   {
     "route": "PUT /artifactory/api/lfs/{repoKey}/objects/{oid}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/gitlfs.handler.upload-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/gitlfs/http.handler.upload-fm",
     "review_family": "native-lfs",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -21088,7 +21088,7 @@
   {
     "route": "PUT /artifactory/api/machinelearning/{repoKey}/model/entity-manifest/{namespace}/{name}/{version}/{transaction}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/machinelearning.handler.commit-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/machinelearning/http.handler.commit-fm",
     "review_family": "native-machinelearning",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -21107,7 +21107,7 @@
   {
     "route": "PUT /artifactory/api/machinelearning/{repoKey}/model/entity-manifest/{name}/{version}/{transaction}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server/machinelearning.handler.commit-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/machinelearning/http.handler.commit-fm",
     "review_family": "native-machinelearning",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",

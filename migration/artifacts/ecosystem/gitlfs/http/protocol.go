@@ -1,5 +1,5 @@
-// Package gitlfs serves Git LFS batch and basic object transfers.
-package gitlfs
+// Package gitlfshttp serves Git LFS batch and basic object transfers.
+package gitlfshttp
 
 import (
 	"context"
@@ -18,12 +18,12 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
-	format "github.com/weaveplatform/artifactweave/internal/format/gitlfs"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	baseformat "github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
+	format "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/gitlfs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/store"

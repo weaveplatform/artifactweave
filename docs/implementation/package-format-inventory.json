@@ -257,7 +257,7 @@
       "owner_issue": 787,
       "evidence": "test/acceptance/features/gitlfs.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/git-lfs-repositories",
-      "route_file": "internal/server/gitlfs/protocol.go",
+      "route_file": "migration/artifacts/ecosystem/gitlfs/http/protocol.go",
       "p9c": true
     },
     {
@@ -657,7 +657,7 @@
       "owner_issue": 780,
       "evidence": "test/acceptance/features/machinelearning.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/machine-learning-repositories",
-      "route_file": "internal/server/machinelearning/protocol.go",
+      "route_file": "migration/artifacts/ecosystem/machinelearning/http/protocol.go",
       "p9c": true
     },
     {

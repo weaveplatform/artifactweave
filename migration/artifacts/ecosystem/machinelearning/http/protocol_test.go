@@ -1,4 +1,4 @@
-package machinelearning_test
+package machinelearninghttp_test
 
 import (
 	"bytes"
@@ -13,12 +13,12 @@ import (
 	"testing"
 	"time"
 
-	ml "github.com/weaveplatform/artifactweave/internal/format/machinelearning"
 	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	ml "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/machinelearning"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"

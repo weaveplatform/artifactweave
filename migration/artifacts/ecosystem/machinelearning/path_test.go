@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	ml "github.com/weaveplatform/artifactweave/internal/format/machinelearning"
+	ml "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/machinelearning"
 )
 
 func TestUnitModelNamesVersionsAndFilePaths(t *testing.T) {

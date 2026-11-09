@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	ml "github.com/weaveplatform/artifactweave/internal/format/machinelearning"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	ml "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/machinelearning"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )

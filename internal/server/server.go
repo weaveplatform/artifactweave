@@ -18,8 +18,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/idtoken"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
-	"github.com/weaveplatform/artifactweave/internal/server/gitlfs"
-	"github.com/weaveplatform/artifactweave/internal/server/machinelearning"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
@@ -45,12 +43,14 @@ import (
 	condahttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conda/http"
 	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
 	gemshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/gems/http"
+	gitlfshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/gitlfs/http"
 	golanghttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang/http"
 	helmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm/http"
 	hexhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/hex/http"
 	huggingfacehttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface/http"
 	jetbrainspluginshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/jetbrainsplugins/http"
 	luarockshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/luarocks/http"
+	machinelearninghttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/machinelearning/http"
 	nimmodelhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nimmodel/http"
 	nixhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nix/http"
 	npmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm/http"
@@ -228,7 +228,7 @@ var protocols = []func(Config) pkgroute.Protocol{
 		return condahttp.Protocol(cfg.RemoteSources, cfg.FormatSettings.Conda)
 	},
 	func(cfg Config) pkgroute.Protocol { return ansiblehttp.Protocol(cfg.RemoteSources) },
-	func(Config) pkgroute.Protocol { return machinelearning.Protocol() },
+	func(Config) pkgroute.Protocol { return machinelearninghttp.Protocol() },
 	func(cfg Config) pkgroute.Protocol { return chefhttp.Protocol(cfg.RemoteSources) },
 	func(cfg Config) pkgroute.Protocol { return aieditorextensionshttp.Protocol(cfg.RemoteSources) },
 	func(cfg Config) pkgroute.Protocol {
@@ -242,7 +242,7 @@ var protocols = []func(Config) pkgroute.Protocol{
 		})
 	},
 	func(cfg Config) pkgroute.Protocol {
-		return gitlfs.Protocol(gitlfs.Options{RemoteSources: cfg.RemoteSources})
+		return gitlfshttp.Protocol(gitlfshttp.Options{RemoteSources: cfg.RemoteSources})
 	},
 	func(Config) pkgroute.Protocol { return agentpackageshttp.Protocol() },
 	func(cfg Config) pkgroute.Protocol {
