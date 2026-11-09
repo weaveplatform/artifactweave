@@ -28,8 +28,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/s3"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
 	"github.com/weaveplatform/artifactweave/pkg/containertest"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Part sizes are the smallest each backend accepts from outside its package
@@ -84,8 +82,8 @@ func outages(t *testing.T, c *clouds) {
 	if info.Digests.SHA256 != sha || info.Size != int64(len(body)) {
 		t.Fatalf("(a) committed %+v, want %s of %d bytes", info, sha, len(body))
 	}
-	r.wantStates(t, sha, map[string]types.ReplicaState{
-		"aws": types.ReplicaPresent, "gcp": types.ReplicaPresent, "az": types.ReplicaPending,
+	r.wantStates(t, sha, map[string]mirror.ReplicaState{
+		"aws": mirror.ReplicaPresent, "gcp": mirror.ReplicaPresent, "az": mirror.ReplicaPending,
 	})
 	if ok, err := r.raw["az"].Exists(ctx, sha); err != nil || ok {
 		t.Fatalf("(a) Azure holds the blob it was down for: %v %v", ok, err)
@@ -96,8 +94,8 @@ func outages(t *testing.T, c *clouds) {
 	if err != nil || rep.Copied != 1 || rep.Failed != 0 {
 		t.Fatalf("(b) repair: %+v %v", rep, err)
 	}
-	r.wantStates(t, sha, map[string]types.ReplicaState{
-		"aws": types.ReplicaPresent, "gcp": types.ReplicaPresent, "az": types.ReplicaPresent,
+	r.wantStates(t, sha, map[string]mirror.ReplicaState{
+		"aws": mirror.ReplicaPresent, "gcp": mirror.ReplicaPresent, "az": mirror.ReplicaPresent,
 	})
 	if got := readAll(t, r.raw["az"], sha); !bytes.Equal(got, body) {
 		t.Fatalf("(b) Azure's copy differs: %d bytes, want %d", len(got), len(body))
@@ -196,7 +194,7 @@ func startClouds(t *testing.T) *clouds {
 // each, and the metadata store behind it.
 type rig struct {
 	m  *mirror.Store
-	db *inmem.Store
+	db *testDB
 	// raw are the members' own stores, to check what each cloud holds
 	// without going through the mirror or the switch.
 	raw map[string]blob.Store
@@ -210,7 +208,7 @@ func (c *clouds) mirror(t *testing.T) *rig {
 	t.Helper()
 	ctx := context.Background()
 	name := "mirror-" + strconv.FormatInt(c.n.Add(1), 10)
-	r := &rig{db: inmem.New(), raw: map[string]blob.Store{}, sw: map[string]*outage{}}
+	r := &rig{db: newTestDB(), raw: map[string]blob.Store{}, sw: map[string]*outage{}}
 
 	if _, err := c.s3.CreateBucket(
 		ctx,
@@ -310,13 +308,13 @@ func (r *rig) idle(t *testing.T) {
 	}
 }
 
-func (r *rig) wantStates(t *testing.T, sha string, want map[string]types.ReplicaState) {
+func (r *rig) wantStates(t *testing.T, sha string, want map[string]mirror.ReplicaState) {
 	t.Helper()
 	recs, err := r.db.Replicas().ForBlob(context.Background(), sha)
 	if err != nil {
 		t.Fatal(err)
 	}
-	got := map[string]types.ReplicaState{}
+	got := map[string]mirror.ReplicaState{}
 	for _, rec := range recs {
 		got[rec.Member] = rec.State
 	}

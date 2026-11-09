@@ -9,11 +9,10 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
-// These names open the mirror's internals to its tests, which are the
-// external test package mirror_test: they build mirrors over the in-memory
-// metadata store and its row types, whose packages alias this package's
-// declarations, so an in-package test importing them would be an import
-// cycle. Each one reads or replaces exactly what the tests reached before.
+// These names open the mirror's internals to its tests. The tests are the
+// external package mirror_test, so they drive the mirror through its
+// exported API as its callers do and reach past it only through these
+// names, each of which reads or replaces one internal.
 
 // ChunkSize is chunkSize, the fan-out chunk New derives from the members'
 // part sizes.
