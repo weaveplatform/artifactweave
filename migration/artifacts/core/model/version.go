@@ -431,6 +431,7 @@ func rankQualifier(known []string, q string) string {
 			return string(rune('0' + i))
 		}
 	}
+	//nolint:gosec // G115: known is mavenQualifiers or mercuryQualifiers, seven names, so this is a digit
 	return string(rune('0'+len(known))) + "-" + q
 }
 

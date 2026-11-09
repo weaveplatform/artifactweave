@@ -9,7 +9,7 @@ import (
 
 // CleanProperties is how the stores keep properties, one row per value:
 // keys without values dropped, each value cut to limit
-// (types.TruncatePropertyValue), and the values sorted and unique, so two
+// (model.TruncatePropertyValue), and the values sorted and unique, so two
 // values that differ only past the limit become one.
 func CleanProperties(props model.Properties, limit int) model.Properties {
 	out := model.Properties{}
@@ -26,10 +26,10 @@ func CleanProperties(props model.Properties, limit int) model.Properties {
 	return out
 }
 
-// CheckPropertyKeys returns ErrInvalid, wrapping types.ErrPropertyKeyTooLong,
-// when a key of props is longer than types.PropertyKeyMax. Every store
-// checks before it writes, so a property write either stores every key or
-// none, whichever route it came by.
+// CheckPropertyKeys returns kernel.ErrInvalid, wrapping
+// model.ErrPropertyKeyTooLong, when a key of props is longer than
+// model.PropertyKeyMax. Every store checks before it writes, so a property
+// write either stores every key or none, whichever route it came by.
 func CheckPropertyKeys(props model.Properties) error {
 	for k := range props {
 		if err := model.CheckPropertyKeyLength(k); err != nil {

@@ -22,13 +22,13 @@ type ArchivedFilter struct {
 // (ArchiveStore).
 type ArchivedItemStore interface {
 	// AddItem stores an archived item and returns it with its assigned ID;
-	// ErrInvalid when the item's full path does not split
-	// (types.SplitItemPath).
+	// kernel.ErrInvalid when the item's full path does not split
+	// (kernel.SplitItemPath).
 	AddItem(ctx context.Context, a model.ArchivedItem) (model.ArchivedItem, error)
 	// Item returns the archived item with id.
 	Item(ctx context.Context, id int64) (model.ArchivedItem, error)
 	// FindItems returns the archived copies of an original repository and
-	// full path, newest first by ID; ErrInvalid for a path that does not
+	// full path, newest first by ID; kernel.ErrInvalid for a path that does not
 	// split.
 	FindItems(ctx context.Context, repoKey, fullPath string) ([]model.ArchivedItem, error)
 	// Items returns matching archived items ordered by ID; a zero
@@ -41,6 +41,6 @@ type ArchivedItemStore interface {
 	// DeleteItem removes an archived item.
 	DeleteItem(ctx context.Context, id int64) error
 	// ExpiredItems returns items whose ExpiresAt is set and before t,
-	// oldest first, at most limit (DefaultLimit when zero).
+	// oldest first, at most limit (kernel.DefaultLimit when zero).
 	ExpiredItems(ctx context.Context, before time.Time, limit int) ([]model.ArchivedItem, error)
 }

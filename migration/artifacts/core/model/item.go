@@ -31,7 +31,7 @@ const CacheSuffix = "-cache"
 //
 // PropertiesModified is when the item's properties last changed, zero while
 // it has none; the storage API lists it as mdTimestamps.properties. Only
-// the property methods of store.ItemStore set it. Put keeps the stored value
+// the property methods of port.ItemStore set it. Put keeps the stored value
 // whatever the caller passes, so a trash record or a copied item cannot
 // carry another item's time onto the one written.
 type Item struct {
@@ -244,7 +244,7 @@ type TrashRecord struct {
 	// deleted from, recorded then because the trash can still shows it once
 	// that repository is gone, when it tells an administrator what type of
 	// repository to recreate for a restore.
-	PackageType string `json:"packageType,omitempty"`
+	PackageType string `json:"packageType,omitempty"` //nolint:tagliatelle // stored in trash records
 }
 
 // TrashEntry is one deleted item awaiting restore or purge.

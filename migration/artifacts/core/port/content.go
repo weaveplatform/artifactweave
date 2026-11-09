@@ -21,15 +21,15 @@ type RepoFilter struct {
 }
 
 // RepoStore persists repository configurations. Remote passwords and sensitive
-// HTTP header values are sealed outside their documents; the virtual member list and the key pair
-// references are mirrored into tables so Including and UsingKeypair are
-// indexed lookups.
+// HTTP header values are sealed outside their documents; the virtual member
+// list and the key pair references are mirrored into tables so Including and
+// UsingKeypair are indexed lookups.
 type RepoStore interface {
-	// Create stores c; ErrConflict when the key exists.
+	// Create stores c; kernel.ErrConflict when the key exists.
 	Create(ctx context.Context, c repo.Config) error
 	// Get returns the configuration, including passwords and sensitive headers.
 	Get(ctx context.Context, key string) (repo.Config, error)
-	// Update replaces the stored configuration; ErrNotFound when absent.
+	// Update replaces the stored configuration; kernel.ErrNotFound when absent.
 	Update(ctx context.Context, c repo.Config) error
 	// Delete removes the configuration only. Content is removed through
 	// ItemStore.Delete and the package index through PackageStore.
@@ -82,20 +82,20 @@ type RepoUsage struct {
 // repository-relative without a leading slash; "" and "." both name the
 // repository root.
 //
-// A repository root has a record (types.RootItem) once properties are set
+// A repository root has a record (model.RootItem) once properties are set
 // on it, so they are kept and found by item ID like any item's. Only Root,
 // EnsureRoot, GetByID and Search return it; Get, Children, Descendants,
 // FindByChecksum and Usage leave it out, as does the result of Delete.
 type ItemStore interface {
 	// Create inserts an item only if its natural key is absent. A collision
-	// returns ErrConflict without changing the existing item. Path handling
-	// and assigned IDs are the same as Put.
+	// returns kernel.ErrConflict without changing the existing item. Path
+	// handling and assigned IDs are the same as Put.
 	Create(ctx context.Context, it model.Item) (model.Item, error)
 	// Put creates the item or replaces the one at the same natural key,
 	// keeping that item's ID, and returns it as stored. The store derives
 	// Path, Name and Depth from FullPath, so callers may set either Path and
-	// Name or a full path in Name; ErrInvalid when it does not split
-	// (types.SplitItemPath). Parent folders are not created.
+	// Name or a full path in Name; kernel.ErrInvalid when it does not split
+	// (kernel.SplitItemPath). Parent folders are not created.
 	Put(ctx context.Context, it model.Item) (model.Item, error)
 	// Get returns the item at fullPath.
 	Get(ctx context.Context, repoKey string, cached bool, fullPath string) (model.Item, error)
@@ -109,19 +109,19 @@ type ItemStore interface {
 	Descendants(
 		ctx context.Context, repoKey string, cached bool, folder string, p kernel.Page,
 	) ([]model.Item, string, error)
-	// Delete removes the item at fullPath and, for a folder, everything
-	// below it, with their properties and statistics. A root path removes
-	// all of (repoKey, cached) but the root's record, which belongs to the
-	// repository rather than its content, and returns a zero result for an
-	// empty repository; any other path returns ErrNotFound when nothing is
+	// Delete removes the item at fullPath and, for a folder, everything below
+	// it, with their properties and statistics. A root path removes all of
+	// (repoKey, cached) but the root's record, which belongs to the repository
+	// rather than its content, and returns a zero result for an empty
+	// repository; any other path returns kernel.ErrNotFound when nothing is
 	// there.
 	Delete(ctx context.Context, repoKey string, cached bool, fullPath string) (DeleteResult, error)
-	// Root returns the record of the root of (repoKey, cached), ErrNotFound
-	// while it has none.
+	// Root returns the record of the root of (repoKey, cached),
+	// kernel.ErrNotFound while it has none.
 	Root(ctx context.Context, repoKey string, cached bool) (model.Item, error)
 	// EnsureRoot returns the record of the root of (r.RepoKey, r.Cached),
-	// creating it as types.RootItem with r's times and actors when absent;
-	// ErrInvalid without a repository key.
+	// creating it as model.RootItem with r's times and actors when absent;
+	// kernel.ErrInvalid without a repository key.
 	EnsureRoot(ctx context.Context, r model.Item) (model.Item, error)
 	// DeleteRoot removes the record of the root of (repoKey, cached) with
 	// its properties, when the repository itself is removed. A root without
@@ -145,13 +145,13 @@ type ItemStore interface {
 	// order as aql.Select.
 	Search(ctx context.Context, q *aql.Query, o aql.Options) ([]aql.Hit, error)
 
-	// Properties returns the item's properties (empty when it has none).
-	// This and the other property and statistics methods return ErrNotFound
+	// Properties returns the item's properties (empty when it has none). This
+	// and the other property and statistics methods return kernel.ErrNotFound
 	// for a missing item. A key given with no values is not stored.
 	//
-	// SetProperties and PatchProperties take the time of the write, at. A
-	// write that changes the properties sets the item's PropertiesModified to at,
-	// or to zero when it leaves none; a write that changes nothing leaves it
+	// SetProperties and PatchProperties take the time of the write, at. A write
+	// that changes the properties sets the item's PropertiesModified to at, or
+	// to zero when it leaves none; a write that changes nothing leaves it
 	// alone, as Artifactory 6.20 touches its node_meta_infos row only when
 	// PropertiesService.setProperties reports a change.
 	Properties(ctx context.Context, id int64) (model.Properties, error)
@@ -187,11 +187,11 @@ var ErrDeleting = errors.New("store: blob is being deleted")
 // content went, so a deploy that wrote the same content just before it was
 // removed finds out and never references missing content.
 type BlobIndex interface {
-	// Ref adds n references to b and returns the row as updated. An absent
-	// row is created live; a tombstone is revived, keeping Deleted.
-	// ErrDeleting while the row is deleting; ErrConflict when the stored size
-	// or checksums differ from b's, which means two different contents claim
-	// one sha256.
+	// Ref adds n references to b and returns the row as updated. An absent row
+	// is created live; a tombstone is revived, keeping Deleted. ErrDeleting
+	// while the row is deleting; kernel.ErrConflict when the stored size or
+	// checksums differ from b's, which means two different contents claim one
+	// sha256.
 	Ref(ctx context.Context, b blob.Blob, n int64) (blob.Blob, error)
 	// Unref removes n references, never going below zero, and returns the
 	// row as updated.
@@ -207,11 +207,11 @@ type BlobIndex interface {
 	// MarkDeleting starts removing b's content: an unreferenced live row or a
 	// tombstone becomes deleting at at, and content the index has no row for
 	// gets a deleting row from b. A row already deleting is returned as it
-	// is. ErrConflict while the row is referenced.
+	// is. kernel.ErrConflict while the row is referenced.
 	MarkDeleting(ctx context.Context, b blob.Blob, at time.Time) (blob.Blob, error)
 	// FinishDelete turns a deleting row into a tombstone deleted at at, once
-	// its content is gone. A tombstone is left as it is; ErrConflict for a
-	// live row, ErrNotFound when there is no row.
+	// its content is gone. A tombstone is left as it is; kernel.ErrConflict for
+	// a live row, kernel.ErrNotFound when there is no row.
 	FinishDelete(ctx context.Context, sha256 string, at time.Time) error
 	// Deleting lists the rows being deleted, ordered by sha256, so a pass
 	// can finish what a crashed one started.
@@ -226,8 +226,8 @@ type BlobIndex interface {
 // ReplicaIndex records which mirror members hold which blobs (decision 0028):
 // the blob_replicas table, and cold_blob_replicas for the archive tier.
 type ReplicaIndex interface {
-	// Put creates or replaces the record (r.SHA256, r.Member); ErrInvalid
-	// without both.
+	// Put creates or replaces the record (r.SHA256, r.Member);
+	// kernel.ErrInvalid without both.
 	Put(ctx context.Context, r mirror.BlobReplica) error
 	// Get returns one record.
 	Get(ctx context.Context, sha256, member string) (mirror.BlobReplica, error)
@@ -281,7 +281,7 @@ type TrashStore interface {
 	// Delete removes an entry.
 	Delete(ctx context.Context, id int64) error
 	// Expired returns entries deleted before t, oldest first, at most limit
-	// (DefaultLimit when zero).
+	// (kernel.DefaultLimit when zero).
 	Expired(ctx context.Context, before time.Time, limit int) ([]model.TrashEntry, error)
 }
 
@@ -301,7 +301,7 @@ type PackageStore interface {
 
 	// PutVersion creates or replaces version (v.PackageID, v.Version), then
 	// recomputes OrderKey for every version of the package with the
-	// package type's comparator (types.ComparatorFor), and returns v as
+	// package type's comparator (model.ComparatorFor), and returns v as
 	// stored.
 	PutVersion(ctx context.Context, v model.PackageVersion) (model.PackageVersion, error)
 	// Version returns one version of a package.
@@ -313,7 +313,7 @@ type PackageStore interface {
 	// order keys of the rest.
 	DeleteVersion(ctx context.Context, id int64) error
 	// LinkFile records that an item belongs to a version; linking twice is
-	// not an error. ErrNotFound when the version or the item is missing.
+	// not an error. kernel.ErrNotFound when the version or the item is missing.
 	LinkFile(ctx context.Context, f model.VersionFile) error
 	// Files returns the item IDs of a version, ordered.
 	Files(ctx context.Context, versionID int64) ([]int64, error)

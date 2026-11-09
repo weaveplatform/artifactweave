@@ -19,12 +19,14 @@ import (
 
 // RemoteCacheStore persists raw upstream representations and their CAS fences.
 // All writes join Store.Tx. Begin precedes network I/O; Check/Put run in the
-// publication transaction. ErrConflict means the caller must start a new read.
+// publication transaction. kernel.ErrConflict means the caller must start a new
+// read.
 type RemoteCacheStore interface {
 	Source(ctx context.Context, repoKey string) (model.SourceIdentity, error)
 	Begin(ctx context.Context, key model.RemoteCacheKey) (model.RemoteCacheToken, error)
 	Read(ctx context.Context, key model.RemoteCacheKey) (model.RemoteCacheEntry, error)
-	// List includes raw metadata, negatives and tombstones, ordered by opaque key.
+	// List includes raw metadata, negatives and tombstones, ordered by opaque
+	// key.
 	List(
 		ctx context.Context,
 		repoKey, prefix string,
@@ -121,6 +123,8 @@ func RemotePathMatches(path, prefix string) bool {
 }
 
 // ValidateRemoteEntry refuses impossible body references and unknown kinds.
+//
+//nolint:gocyclo // Each branch refuses one field of an entry before it is stored.
 func ValidateRemoteEntry(e model.RemoteCacheEntry) error {
 	if s := e.Smart; s != nil {
 		if e.ItemID == 0 || s.Downloads < 0 || s.Claimed < 0 || s.Claimed > s.Downloads ||

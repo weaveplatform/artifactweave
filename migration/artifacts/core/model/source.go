@@ -14,7 +14,12 @@ type SourceGeneration string
 type SourceKind string
 
 const (
-	ExternalHTTP      SourceKind = "external-http"
+	// ExternalHTTP is an upstream reached over HTTP, the one kind the source
+	// boundary reads from (docs/implementation/source-boundary.md).
+	ExternalHTTP SourceKind = "external-http"
+	// ProjectRepository is a repository of another project on this instance,
+	// which project sharing (P11) will read; until then a read of this kind
+	// fails before any cache or network access.
 	ProjectRepository SourceKind = "project-repository"
 )
 
