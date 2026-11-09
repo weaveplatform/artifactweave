@@ -5,27 +5,27 @@ import (
 	"context"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/retention/core/model"
+	"github.com/weaveplatform/artifactweave/migration/retention/core/port"
 )
 
-// Archive implements store.Store.
-func (s *Store) Archive() store.ArchiveStore { return archiveStore{s} }
-
-// --- Archive ---------------------------------------------------------------
+// Archive returns the archive policy and execution store (decision
+// 0024).
+func (s *Store) Archive() port.ArchiveStore { return archiveStore{s} }
 
 type archiveStore struct{ s *Store }
 
-func (a archiveStore) policies() *memtx.Table[string, types.ArchivePolicy] {
-	return memtx.TableOf[string, types.ArchivePolicy](a.s.Store, "archive_policies")
+func (a archiveStore) policies() *memtx.Table[string, model.ArchivePolicy] {
+	return memtx.TableOf[string, model.ArchivePolicy](a.s.Store, "archive_policies")
 }
 
-func (a archiveStore) executions() *memtx.Table[int64, types.ArchiveExecution] {
-	return memtx.TableOf[int64, types.ArchiveExecution](a.s.Store, "archive_executions")
+func (a archiveStore) executions() *memtx.Table[int64, model.ArchiveExecution] {
+	return memtx.TableOf[int64, model.ArchiveExecution](a.s.Store, "archive_executions")
 }
 
-func (a archiveStore) CreatePolicy(ctx context.Context, p types.ArchivePolicy) error {
+func (a archiveStore) CreatePolicy(ctx context.Context, p model.ArchivePolicy) error {
 	return a.s.Do(ctx, func() error {
 		if a.policies().Has(p.Key) {
 			return memtx.Conflict("archive policy", p.Key)
@@ -35,8 +35,8 @@ func (a archiveStore) CreatePolicy(ctx context.Context, p types.ArchivePolicy) e
 	})
 }
 
-func (a archiveStore) Policy(ctx context.Context, key string) (types.ArchivePolicy, error) {
-	var out types.ArchivePolicy
+func (a archiveStore) Policy(ctx context.Context, key string) (model.ArchivePolicy, error) {
+	var out model.ArchivePolicy
 	err := a.s.Do(ctx, func() error {
 		var ok bool
 		if out, ok = a.policies().Get(key); !ok {
@@ -47,7 +47,7 @@ func (a archiveStore) Policy(ctx context.Context, key string) (types.ArchivePoli
 	return out, err
 }
 
-func (a archiveStore) UpdatePolicy(ctx context.Context, p types.ArchivePolicy) error {
+func (a archiveStore) UpdatePolicy(ctx context.Context, p model.ArchivePolicy) error {
 	return a.s.Do(ctx, func() error {
 		if !a.policies().Has(p.Key) {
 			return memtx.NotFound("archive policy", p.Key)
@@ -68,13 +68,13 @@ func (a archiveStore) DeletePolicy(ctx context.Context, key string) error {
 
 func (a archiveStore) Policies(
 	ctx context.Context,
-	family types.ArchiveFamily,
-) ([]types.ArchivePolicy, error) {
-	var out []types.ArchivePolicy
+	family model.ArchiveFamily,
+) ([]model.ArchivePolicy, error) {
+	var out []model.ArchivePolicy
 	err := a.s.Do(ctx, func() error {
-		out = a.policies().All(func(_ string, v types.ArchivePolicy) bool {
+		out = a.policies().All(func(_ string, v model.ArchivePolicy) bool {
 			return family == "" || v.Family == family
-		}, func(x, y types.ArchivePolicy) int { return strings.Compare(x.Key, y.Key) })
+		}, func(x, y model.ArchivePolicy) int { return strings.Compare(x.Key, y.Key) })
 		return nil
 	})
 	return out, err
@@ -82,9 +82,9 @@ func (a archiveStore) Policies(
 
 func (a archiveStore) CreateExecution(
 	ctx context.Context,
-	e types.ArchiveExecution,
-) (types.ArchiveExecution, error) {
-	var out types.ArchiveExecution
+	e model.ArchiveExecution,
+) (model.ArchiveExecution, error) {
+	var out model.ArchiveExecution
 	err := a.s.Do(ctx, func() error {
 		e.ID = a.s.NextID("archive_executions")
 		a.executions().Put(e.ID, e)
@@ -94,8 +94,8 @@ func (a archiveStore) CreateExecution(
 	return out, err
 }
 
-func (a archiveStore) Execution(ctx context.Context, id int64) (types.ArchiveExecution, error) {
-	var out types.ArchiveExecution
+func (a archiveStore) Execution(ctx context.Context, id int64) (model.ArchiveExecution, error) {
+	var out model.ArchiveExecution
 	err := a.s.Do(ctx, func() error {
 		var ok bool
 		if out, ok = a.executions().Get(id); !ok {
@@ -106,7 +106,7 @@ func (a archiveStore) Execution(ctx context.Context, id int64) (types.ArchiveExe
 	return out, err
 }
 
-func (a archiveStore) UpdateExecution(ctx context.Context, e types.ArchiveExecution) error {
+func (a archiveStore) UpdateExecution(ctx context.Context, e model.ArchiveExecution) error {
 	return a.s.Do(ctx, func() error {
 		if !a.executions().Has(e.ID) {
 			return memtx.NotFound("archive execution", e.ID)
@@ -117,25 +117,25 @@ func (a archiveStore) UpdateExecution(ctx context.Context, e types.ArchiveExecut
 }
 
 func (a archiveStore) Executions(
-	ctx context.Context, f store.ExecutionFilter, p store.Page,
-) ([]types.ArchiveExecution, string, error) {
+	ctx context.Context, f port.ExecutionFilter, p kernel.Page,
+) ([]model.ArchiveExecution, string, error) {
 	var (
-		out  []types.ArchiveExecution
+		out  []model.ArchiveExecution
 		next string
 	)
 	err := a.s.Do(ctx, func() error {
-		rows := a.executions().All(func(_ int64, v types.ArchiveExecution) bool {
+		rows := a.executions().All(func(_ int64, v model.ArchiveExecution) bool {
 			return (f.PolicyKey == "" || v.PolicyKey == f.PolicyKey) &&
 				(f.Kind == "" || v.Kind == f.Kind)
-		}, func(x, y types.ArchiveExecution) int { return cmp.Compare(y.ID, x.ID) })
+		}, func(x, y model.ArchiveExecution) int { return cmp.Compare(y.ID, x.ID) })
 		var err error
 		out, next, err = memtx.Paginate(
 			rows,
 			p,
 			true,
-			func(v types.ArchiveExecution) []any { return []any{v.ID} },
+			func(v model.ArchiveExecution) []any { return []any{v.ID} },
 		)
-		return err
+		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
 	})
 	return out, next, err
 }

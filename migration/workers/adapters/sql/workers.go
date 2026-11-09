@@ -7,15 +7,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/workers/core/model"
+	"github.com/weaveplatform/artifactweave/migration/workers/core/port"
 )
 
-// Workers implements store.Store.
-func (s *Store) Workers() store.WorkerStore { return workerStore{s} }
-
-// --- Workers ---------------------------------------------------------------
+// Workers returns the worker store: definitions, state, sealed secrets
+// and executions (decision 0026).
+func (s *Store) Workers() port.WorkerStore { return workerStore{s} }
 
 type workerStore struct{ s *Store }
 
@@ -28,7 +28,7 @@ var workerCols = []string{
 	"program_hash", "failures", "blocked_until", "created_at", "updated_at", "filter_doc",
 }
 
-func workerRow(w types.Worker) []any {
+func workerRow(w model.Worker) []any {
 	return []any{
 		w.Key,
 		string(w.Action),
@@ -47,9 +47,9 @@ func workerRow(w types.Worker) []any {
 	}
 }
 
-func scanWorker(r dialect.EntRow) (types.Worker, error) {
+func scanWorker(r dialect.EntRow) (model.Worker, error) {
 	var (
-		w                         types.Worker
+		w                         model.Worker
 		action                    string
 		blocked, created, updated sql.NullInt64
 		filter                    sql.NullString
@@ -72,7 +72,7 @@ func scanWorker(r dialect.EntRow) (types.Worker, error) {
 	); err != nil {
 		return w, err //nolint:wrapcheck // wrapped by the caller
 	}
-	w.Action = types.WorkerAction(action)
+	w.Action = model.WorkerAction(action)
 	w.BlockedUntil, w.Created, w.Updated = dialect.FromMicros(
 		blocked,
 	), dialect.FromMicros(
@@ -83,18 +83,22 @@ func scanWorker(r dialect.EntRow) (types.Worker, error) {
 	return w, dialect.FromJSON(filter, &w.Filter)
 }
 
-func (w workerStore) Create(ctx context.Context, v types.Worker) error {
-	_, err := w.s.Exec(ctx, "create worker "+v.Key, Insert("workers", workerCols), workerRow(v)...)
+func (w workerStore) Create(ctx context.Context, v model.Worker) error {
+	_, err := w.s.Exec(
+		ctx,
+		"create worker "+v.Key,
+		dialect.Insert("workers", workerCols),
+		workerRow(v)...)
 	return err
 }
 
-func (w workerStore) Get(ctx context.Context, key string) (types.Worker, error) {
+func (w workerStore) Get(ctx context.Context, key string) (model.Worker, error) {
 	out, err := scanWorker(w.s.Q(ctx).QueryRowContext(ctx, w.s.Dialect().Rebind(
 		"SELECT "+strings.Join(workerCols, ", ")+" FROM workers WHERE key = ?"), key))
 	return out, w.s.Wrap("get worker "+key, err)
 }
 
-func (w workerStore) Update(ctx context.Context, v types.Worker) error {
+func (w workerStore) Update(ctx context.Context, v model.Worker) error {
 	row := workerRow(v)
 	sets := make([]string, 0, len(workerCols)-1)
 	for _, c := range workerCols[1:] {
@@ -109,7 +113,7 @@ func (w workerStore) Delete(ctx context.Context, key string) error {
 	return w.s.ExecOne(ctx, "delete worker "+key, "DELETE FROM workers WHERE key = ?", key)
 }
 
-func (w workerStore) List(ctx context.Context, f store.WorkerFilter) ([]types.Worker, error) {
+func (w workerStore) List(ctx context.Context, f port.WorkerFilter) ([]model.Worker, error) {
 	q := "SELECT " + strings.Join(workerCols, ", ") + " FROM workers WHERE 1 = 1"
 	var args []any
 	if f.Action != "" {
@@ -124,7 +128,7 @@ func (w workerStore) List(ctx context.Context, f store.WorkerFilter) ([]types.Wo
 		q += " AND enabled = ?"
 		args = append(args, true)
 	}
-	var out []types.Worker
+	var out []model.Worker
 	err := w.s.Rows(ctx, "list workers", q+" ORDER BY key", args, func(r *sql.Rows) error {
 		v, err := scanWorker(r)
 		out = append(out, v)
@@ -140,7 +144,7 @@ func (w workerStore) requireWorker(ctx context.Context, key string) error {
 		return err
 	}
 	if !ok {
-		return fmt.Errorf("worker %s: %w", key, store.ErrNotFound)
+		return fmt.Errorf("worker %s: %w", key, kernel.ErrNotFound)
 	}
 	return nil
 }
@@ -175,7 +179,7 @@ func (w workerStore) SetState(ctx context.Context, worker, key, value string) er
 		_, err := w.s.Exec(
 			ctx,
 			"set worker state",
-			Upsert(
+			dialect.Upsert(
 				"worker_state",
 				[]string{"worker_key", "key", "value"},
 				[]string{"worker_key", "key"},
@@ -206,7 +210,7 @@ func (w workerStore) PutSecret(ctx context.Context, worker, name, value string) 
 		_, err := w.s.Exec(
 			ctx,
 			"put worker secret",
-			Upsert(
+			dialect.Upsert(
 				"worker_secrets",
 				[]string{"worker_key", "name", "value"},
 				[]string{"worker_key", "name"},
@@ -255,9 +259,9 @@ var workerExecutionCols = []string{
 	"payload", "result", "logs", "error",
 }
 
-func scanWorkerExecution(r dialect.EntRow) (types.WorkerExecution, error) {
+func scanWorkerExecution(r dialect.EntRow) (model.WorkerExecution, error) {
 	var (
-		e                types.WorkerExecution
+		e                model.WorkerExecution
 		action, trigger  string
 		started, elapsed int64
 	)
@@ -265,12 +269,12 @@ func scanWorkerExecution(r dialect.EntRow) (types.WorkerExecution, error) {
 		&e.Payload, &e.Result, &e.Logs, &e.Error); err != nil {
 		return e, err //nolint:wrapcheck // wrapped by the caller
 	}
-	e.Action, e.Trigger = types.WorkerAction(action), types.WorkerTrigger(trigger)
+	e.Action, e.Trigger = model.WorkerAction(action), model.WorkerTrigger(trigger)
 	e.Started, e.Duration = time.UnixMicro(started).UTC(), dialect.FromMillis(elapsed)
 	return e, nil
 }
 
-func (w workerStore) AddExecution(ctx context.Context, e types.WorkerExecution) error {
+func (w workerStore) AddExecution(ctx context.Context, e model.WorkerExecution) error {
 	return w.s.Tx(ctx, func(ctx context.Context) error {
 		if err := w.requireWorker(ctx, e.WorkerKey); err != nil {
 			return err
@@ -280,7 +284,7 @@ func (w workerStore) AddExecution(ctx context.Context, e types.WorkerExecution) 
 		_, err := w.s.Exec(
 			ctx,
 			"add worker execution "+e.ID,
-			Insert("worker_executions", workerExecutionCols),
+			dialect.Insert("worker_executions", workerExecutionCols),
 			e.ID,
 			e.WorkerKey,
 			string(e.Action),
@@ -297,7 +301,7 @@ func (w workerStore) AddExecution(ctx context.Context, e types.WorkerExecution) 
 	})
 }
 
-func (w workerStore) Execution(ctx context.Context, id string) (types.WorkerExecution, error) {
+func (w workerStore) Execution(ctx context.Context, id string) (model.WorkerExecution, error) {
 	out, err := scanWorkerExecution(w.s.Q(ctx).QueryRowContext(ctx, w.s.Dialect().Rebind(
 		"SELECT "+strings.Join(
 			workerExecutionCols,
@@ -308,8 +312,8 @@ func (w workerStore) Execution(ctx context.Context, id string) (types.WorkerExec
 }
 
 func (w workerStore) Executions(
-	ctx context.Context, worker string, p store.Page,
-) ([]types.WorkerExecution, string, error) {
+	ctx context.Context, worker string, p kernel.Page,
+) ([]model.WorkerExecution, string, error) {
 	p, err := p.Normalize()
 	if err != nil {
 		return nil, "", err //nolint:wrapcheck // already a store sentinel
@@ -323,7 +327,7 @@ func (w workerStore) Executions(
 		cond += " AND worker_key = ?"
 		args = append(args, worker)
 	}
-	var out []types.WorkerExecution
+	var out []model.WorkerExecution
 	err = w.s.Rows(ctx, "list worker executions",
 		"SELECT "+strings.Join(workerExecutionCols, ", ")+" FROM worker_executions WHERE "+cond+
 			dialect.OrderBy(order, true)+" LIMIT ?",
@@ -336,7 +340,7 @@ func (w workerStore) Executions(
 	if err != nil {
 		return nil, "", err
 	}
-	page, next := store.Trim(out, p.Limit, func(v types.WorkerExecution) []string {
+	page, next := kernel.Trim(out, p.Limit, func(v model.WorkerExecution) []string {
 		return []string{dialect.Itoa(v.Started.UnixMicro()), v.ID}
 	})
 	return page, next, nil

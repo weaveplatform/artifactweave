@@ -7,13 +7,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/notifications/core/model"
+	"github.com/weaveplatform/artifactweave/migration/notifications/core/port"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// Webhooks implements store.Store.
-func (s *Store) Webhooks() store.WebhookStore { return webhookStore{s} }
+// Webhooks returns the webhook store: subscriptions, their handlers' sealed
+// secrets and the delivery records (decision 0011).
+func (s *Store) Webhooks() port.WebhookStore { return webhookStore{s} }
 
 // webhookStore keeps webhooks, webhook_secrets and webhook_deliveries.
 type webhookStore struct{ s *Store }
@@ -25,13 +27,13 @@ const purposeWebhookSecret = "webhook_secrets.value" // #nosec G101 -- a column 
 // secret values are tagged out of JSON, so the document never holds one.
 type webhookDoc struct {
 	EventTypes []string               `json:"event_types,omitempty"`
-	Criteria   types.WebhookCriteria  `json:"criteria"`
-	Handlers   []types.WebhookHandler `json:"handlers,omitempty"`
+	Criteria   model.WebhookCriteria  `json:"criteria"`
+	Handlers   []model.WebhookHandler `json:"handlers,omitempty"`
 }
 
 const webhookCols = "key, project_key, description, enabled, debug, domain, created_at, updated_at, doc"
 
-func webhookArgs(w types.WebhookSubscription) ([]any, error) {
+func webhookArgs(w model.WebhookSubscription) ([]any, error) {
 	doc, err := dialect.ToJSON(
 		webhookDoc{EventTypes: w.EventTypes, Criteria: w.Criteria, Handlers: w.Handlers},
 	)
@@ -51,7 +53,7 @@ func secretID(key string, handler int, name string) string {
 
 // putSecrets replaces a subscription's sealed secrets: each handler's single
 // secret under the name "" and each custom webhook secret under its name.
-func (w webhookStore) putSecrets(ctx context.Context, v types.WebhookSubscription) error {
+func (w webhookStore) putSecrets(ctx context.Context, v model.WebhookSubscription) error {
 	if _, err := w.s.Exec(ctx, "put webhook secrets "+v.Key,
 		"DELETE FROM webhook_secrets WHERE webhook_key = ?", v.Key); err != nil {
 		return err
@@ -64,7 +66,7 @@ func (w webhookStore) putSecrets(ctx context.Context, v types.WebhookSubscriptio
 		if err != nil {
 			return err
 		}
-		_, err = w.s.Exec(ctx, "put webhook secret "+v.Key, Upsert("webhook_secrets",
+		_, err = w.s.Exec(ctx, "put webhook secret "+v.Key, dialect.Upsert("webhook_secrets",
 			[]string{"webhook_key", "handler_index", "name", "value"},
 			[]string{"webhook_key", "handler_index", "name"}), v.Key, i, name, sealed)
 		return err
@@ -83,7 +85,7 @@ func (w webhookStore) putSecrets(ctx context.Context, v types.WebhookSubscriptio
 }
 
 // fillSecrets opens a subscription's sealed secrets into its handlers.
-func (w webhookStore) fillSecrets(ctx context.Context, v *types.WebhookSubscription) error {
+func (w webhookStore) fillSecrets(ctx context.Context, v *model.WebhookSubscription) error {
 	type slot struct {
 		handler int
 		name    string
@@ -124,9 +126,9 @@ func (w webhookStore) fillSecrets(ctx context.Context, v *types.WebhookSubscript
 	return nil
 }
 
-func scanWebhook(row interface{ Scan(...any) error }) (types.WebhookSubscription, error) {
+func scanWebhook(row interface{ Scan(...any) error }) (model.WebhookSubscription, error) {
 	var (
-		v                types.WebhookSubscription
+		v                model.WebhookSubscription
 		created, updated sql.NullInt64
 		raw              sql.NullString
 		doc              webhookDoc
@@ -141,7 +143,7 @@ func scanWebhook(row interface{ Scan(...any) error }) (types.WebhookSubscription
 	return v, err
 }
 
-func (w webhookStore) Create(ctx context.Context, v types.WebhookSubscription) error {
+func (w webhookStore) Create(ctx context.Context, v model.WebhookSubscription) error {
 	args, err := webhookArgs(v)
 	if err != nil {
 		return err
@@ -150,7 +152,7 @@ func (w webhookStore) Create(ctx context.Context, v types.WebhookSubscription) e
 		if _, err := w.s.Exec(
 			ctx,
 			"create webhook "+v.Key,
-			Insert("webhooks", dialect.OpsCols(webhookCols)),
+			dialect.Insert("webhooks", dialect.OpsCols(webhookCols)),
 			args...); err != nil {
 			return err
 		}
@@ -158,7 +160,7 @@ func (w webhookStore) Create(ctx context.Context, v types.WebhookSubscription) e
 	})
 }
 
-func (w webhookStore) Get(ctx context.Context, key string) (types.WebhookSubscription, error) {
+func (w webhookStore) Get(ctx context.Context, key string) (model.WebhookSubscription, error) {
 	v, err := scanWebhook(w.s.Q(ctx).QueryRowContext(ctx,
 		w.s.Dialect().Rebind("SELECT "+webhookCols+" FROM webhooks WHERE key = ?"), key))
 	if err != nil {
@@ -167,7 +169,7 @@ func (w webhookStore) Get(ctx context.Context, key string) (types.WebhookSubscri
 	return v, w.fillSecrets(ctx, &v)
 }
 
-func (w webhookStore) Update(ctx context.Context, v types.WebhookSubscription) error {
+func (w webhookStore) Update(ctx context.Context, v model.WebhookSubscription) error {
 	args, err := webhookArgs(v)
 	if err != nil {
 		return err
@@ -201,8 +203,8 @@ func (w webhookStore) Delete(ctx context.Context, key string) error {
 
 func (w webhookStore) List(
 	ctx context.Context,
-	f store.WebhookFilter,
-) ([]types.WebhookSubscription, error) {
+	f port.WebhookFilter,
+) ([]model.WebhookSubscription, error) {
 	where := []string{"1 = 1"}
 	var args []any
 	if f.Domain != "" {
@@ -214,7 +216,7 @@ func (w webhookStore) List(
 	if f.EnabledOnly {
 		where, args = append(where, "enabled = ?"), append(args, true)
 	}
-	var out []types.WebhookSubscription
+	var out []model.WebhookSubscription
 	err := w.s.Rows(ctx, "list webhooks", "SELECT "+webhookCols+" FROM webhooks WHERE "+
 		strings.Join(where, " AND ")+" ORDER BY key", args, func(r *sql.Rows) error {
 		v, err := scanWebhook(r)
@@ -236,8 +238,8 @@ const deliveryCols = "webhook_key, event_id, event_type, attempted_at, status, e
 
 func (w webhookStore) AddDelivery(
 	ctx context.Context,
-	d types.WebhookDelivery,
-) (types.WebhookDelivery, error) {
+	d model.WebhookDelivery,
+) (model.WebhookDelivery, error) {
 	err := w.s.Tx(ctx, func(ctx context.Context) error {
 		ok, err := w.s.Exists(
 			ctx,
@@ -249,12 +251,12 @@ func (w webhookStore) AddDelivery(
 			return err
 		}
 		if !ok {
-			return fmt.Errorf("webhook %s: %w", d.WebhookKey, store.ErrNotFound)
+			return fmt.Errorf("webhook %s: %w", d.WebhookKey, kernel.ErrNotFound)
 		}
 		d.ID, err = w.s.InsertID(
 			ctx,
 			"add delivery",
-			Insert("webhook_deliveries", dialect.OpsCols(deliveryCols)),
+			dialect.Insert("webhook_deliveries", dialect.OpsCols(deliveryCols)),
 			d.WebhookKey,
 			d.EventID,
 			d.EventType,
@@ -267,15 +269,15 @@ func (w webhookStore) AddDelivery(
 		return err
 	})
 	if err != nil {
-		return types.WebhookDelivery{}, err
+		return model.WebhookDelivery{}, err
 	}
-	return store.Normalise(d), nil
+	return kernel.Normalise(d), nil
 }
 
 func (w webhookStore) Deliveries(
 	ctx context.Context,
-	f store.DeliveryFilter,
-) ([]types.WebhookDelivery, error) {
+	f port.DeliveryFilter,
+) ([]model.WebhookDelivery, error) {
 	where := []string{"1 = 1"}
 	var args []any
 	if f.WebhookKey != "" {
@@ -287,7 +289,7 @@ func (w webhookStore) Deliveries(
 	if !f.To.IsZero() {
 		where, args = append(where, "attempted_at < ?"), append(args, f.To.UnixMicro())
 	}
-	var out []types.WebhookDelivery
+	var out []model.WebhookDelivery
 	err := w.s.Rows(
 		ctx,
 		"list deliveries",
@@ -299,7 +301,7 @@ func (w webhookStore) Deliveries(
 		append(args, dialect.LimitOr(f.Limit)),
 		func(r *sql.Rows) error {
 			var (
-				v         types.WebhookDelivery
+				v         model.WebhookDelivery
 				attempted sql.NullInt64
 				elapsed   int64
 				req, resp sql.NullString

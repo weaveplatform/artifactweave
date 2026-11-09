@@ -6,15 +6,15 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/retention/core/model"
+	"github.com/weaveplatform/artifactweave/migration/retention/core/port"
 )
 
-// Archive implements store.Store.
-func (s *Store) Archive() store.ArchiveStore { return archiveStore{s} }
-
-// --- Archive ---------------------------------------------------------------
+// Archive returns the archive policy and execution store (decision
+// 0024).
+func (s *Store) Archive() port.ArchiveStore { return archiveStore{s} }
 
 type archiveStore struct{ s *Store }
 
@@ -23,7 +23,7 @@ var archivePolicyCols = []string{
 	"expiration_months", "skip_trashcan", "created_at", "updated_at", "criteria",
 }
 
-func archivePolicyRow(p types.ArchivePolicy) []any {
+func archivePolicyRow(p model.ArchivePolicy) []any {
 	return []any{
 		p.Key,
 		string(p.Family),
@@ -40,9 +40,9 @@ func archivePolicyRow(p types.ArchivePolicy) []any {
 	}
 }
 
-func scanArchivePolicy(r dialect.EntRow) (types.ArchivePolicy, error) {
+func scanArchivePolicy(r dialect.EntRow) (model.ArchivePolicy, error) {
 	var (
-		p                types.ArchivePolicy
+		p                model.ArchivePolicy
 		family           string
 		created, updated sql.NullInt64
 		criteria         sql.NullString
@@ -63,7 +63,7 @@ func scanArchivePolicy(r dialect.EntRow) (types.ArchivePolicy, error) {
 	); err != nil {
 		return p, err //nolint:wrapcheck // wrapped by the caller
 	}
-	p.Family, p.Created, p.Updated = types.ArchiveFamily(
+	p.Family, p.Created, p.Updated = model.ArchiveFamily(
 		family,
 	), dialect.FromMicros(
 		created,
@@ -74,13 +74,13 @@ func scanArchivePolicy(r dialect.EntRow) (types.ArchivePolicy, error) {
 	return p, nil
 }
 
-func (a archiveStore) CreatePolicy(ctx context.Context, p types.ArchivePolicy) error {
+func (a archiveStore) CreatePolicy(ctx context.Context, p model.ArchivePolicy) error {
 	_, err := a.s.Exec(ctx, "create archive policy "+p.Key,
-		Insert("archive_policies", archivePolicyCols), archivePolicyRow(p)...)
+		dialect.Insert("archive_policies", archivePolicyCols), archivePolicyRow(p)...)
 	return err
 }
 
-func (a archiveStore) Policy(ctx context.Context, key string) (types.ArchivePolicy, error) {
+func (a archiveStore) Policy(ctx context.Context, key string) (model.ArchivePolicy, error) {
 	out, err := scanArchivePolicy(a.s.Q(ctx).QueryRowContext(ctx, a.s.Dialect().Rebind(
 		"SELECT "+strings.Join(
 			archivePolicyCols,
@@ -90,7 +90,7 @@ func (a archiveStore) Policy(ctx context.Context, key string) (types.ArchivePoli
 	return out, a.s.Wrap("get archive policy "+key, err)
 }
 
-func (a archiveStore) UpdatePolicy(ctx context.Context, p types.ArchivePolicy) error {
+func (a archiveStore) UpdatePolicy(ctx context.Context, p model.ArchivePolicy) error {
 	sets := make([]string, 0, len(archivePolicyCols)-1)
 	for _, c := range archivePolicyCols[1:] {
 		sets = append(sets, c+" = ?")
@@ -117,15 +117,15 @@ func (a archiveStore) DeletePolicy(ctx context.Context, key string) error {
 
 func (a archiveStore) Policies(
 	ctx context.Context,
-	family types.ArchiveFamily,
-) ([]types.ArchivePolicy, error) {
+	family model.ArchiveFamily,
+) ([]model.ArchivePolicy, error) {
 	q := "SELECT " + strings.Join(archivePolicyCols, ", ") + " FROM archive_policies"
 	var args []any
 	if family != "" {
 		q += " WHERE family = ?"
 		args = append(args, string(family))
 	}
-	var out []types.ArchivePolicy
+	var out []model.ArchivePolicy
 	err := a.s.Rows(ctx, "list archive policies", q+" ORDER BY key", args, func(r *sql.Rows) error {
 		v, err := scanArchivePolicy(r)
 		out = append(out, v)
@@ -139,7 +139,7 @@ var executionCols = []string{
 	"total_bytes", "success_bytes", "failure_bytes", "triggered_by", "destination",
 }
 
-func executionRow(e types.ArchiveExecution) []any {
+func executionRow(e model.ArchiveExecution) []any {
 	return []any{
 		e.PolicyKey,
 		string(e.Kind),
@@ -157,9 +157,9 @@ func executionRow(e types.ArchiveExecution) []any {
 	}
 }
 
-func scanExecution(r dialect.EntRow) (types.ArchiveExecution, error) {
+func scanExecution(r dialect.EntRow) (model.ArchiveExecution, error) {
 	var (
-		e                 types.ArchiveExecution
+		e                 model.ArchiveExecution
 		kind, state       string
 		started, finished sql.NullInt64
 		destination       sql.NullString
@@ -182,7 +182,7 @@ func scanExecution(r dialect.EntRow) (types.ArchiveExecution, error) {
 	); err != nil {
 		return e, err //nolint:wrapcheck // wrapped by the caller
 	}
-	e.Kind, e.State = types.ExecutionKind(kind), types.ExecutionState(state)
+	e.Kind, e.State = model.ExecutionKind(kind), model.ExecutionState(state)
 	e.Started, e.Finished, e.Destination = dialect.FromMicros(
 		started,
 	), dialect.FromMicros(
@@ -195,19 +195,19 @@ func scanExecution(r dialect.EntRow) (types.ArchiveExecution, error) {
 
 func (a archiveStore) CreateExecution(
 	ctx context.Context,
-	e types.ArchiveExecution,
-) (types.ArchiveExecution, error) {
-	e = store.Normalise(e)
+	e model.ArchiveExecution,
+) (model.ArchiveExecution, error) {
+	e = kernel.Normalise(e)
 	id, err := a.s.InsertID(ctx, "create archive execution",
-		Insert("archive_executions", executionCols), executionRow(e)...)
+		dialect.Insert("archive_executions", executionCols), executionRow(e)...)
 	if err != nil {
-		return types.ArchiveExecution{}, err
+		return model.ArchiveExecution{}, err
 	}
 	e.ID = id
 	return e, nil
 }
 
-func (a archiveStore) Execution(ctx context.Context, id int64) (types.ArchiveExecution, error) {
+func (a archiveStore) Execution(ctx context.Context, id int64) (model.ArchiveExecution, error) {
 	out, err := scanExecution(a.s.Q(ctx).QueryRowContext(ctx, a.s.Dialect().Rebind(
 		"SELECT id, "+strings.Join(
 			executionCols,
@@ -217,7 +217,7 @@ func (a archiveStore) Execution(ctx context.Context, id int64) (types.ArchiveExe
 	return out, a.s.Wrap(fmt.Sprintf("get archive execution %d", id), err)
 }
 
-func (a archiveStore) UpdateExecution(ctx context.Context, e types.ArchiveExecution) error {
+func (a archiveStore) UpdateExecution(ctx context.Context, e model.ArchiveExecution) error {
 	sets := make([]string, 0, len(executionCols))
 	for _, c := range executionCols {
 		sets = append(sets, c+" = ?")
@@ -228,8 +228,8 @@ func (a archiveStore) UpdateExecution(ctx context.Context, e types.ArchiveExecut
 }
 
 func (a archiveStore) Executions(
-	ctx context.Context, f store.ExecutionFilter, p store.Page,
-) ([]types.ArchiveExecution, string, error) {
+	ctx context.Context, f port.ExecutionFilter, p kernel.Page,
+) ([]model.ArchiveExecution, string, error) {
 	p, err := p.Normalize()
 	if err != nil {
 		return nil, "", err //nolint:wrapcheck // already a store sentinel
@@ -247,7 +247,7 @@ func (a archiveStore) Executions(
 		where = append(where, "kind = ?")
 		args = append(args, string(f.Kind))
 	}
-	var out []types.ArchiveExecution
+	var out []model.ArchiveExecution
 	err = a.s.Rows(ctx, "list archive executions",
 		"SELECT id, "+strings.Join(executionCols, ", ")+" FROM archive_executions WHERE "+
 			strings.Join(where, " AND ")+" ORDER BY id DESC LIMIT ?",
@@ -260,10 +260,10 @@ func (a archiveStore) Executions(
 	if err != nil {
 		return nil, "", err
 	}
-	page, next := store.Trim(
+	page, next := kernel.Trim(
 		out,
 		p.Limit,
-		func(v types.ArchiveExecution) []string { return []string{dialect.Itoa(v.ID)} },
+		func(v model.ArchiveExecution) []string { return []string{dialect.Itoa(v.ID)} },
 	)
 	return page, next, nil
 }

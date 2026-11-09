@@ -6,25 +6,27 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/notifications/core/model"
+	"github.com/weaveplatform/artifactweave/migration/notifications/core/port"
 	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// Webhooks implements store.Store.
-func (s *Store) Webhooks() store.WebhookStore { return webhookStore{s} }
+// Webhooks returns the webhook store: subscriptions, their handlers' sealed
+// secrets and the delivery records (decision 0011).
+func (s *Store) Webhooks() port.WebhookStore { return webhookStore{s} }
 
 type webhookStore struct{ s *Store }
 
-func (w webhookStore) hooks() *memtx.Table[string, types.WebhookSubscription] {
-	return memtx.TableOf[string, types.WebhookSubscription](w.s.Store, "webhooks")
+func (w webhookStore) hooks() *memtx.Table[string, model.WebhookSubscription] {
+	return memtx.TableOf[string, model.WebhookSubscription](w.s.Store, "webhooks")
 }
 
-func (w webhookStore) deliveries() *memtx.Table[int64, types.WebhookDelivery] {
-	return memtx.TableOf[int64, types.WebhookDelivery](w.s.Store, "webhook_deliveries")
+func (w webhookStore) deliveries() *memtx.Table[int64, model.WebhookDelivery] {
+	return memtx.TableOf[int64, model.WebhookDelivery](w.s.Store, "webhook_deliveries")
 }
 
-func (w webhookStore) Create(ctx context.Context, v types.WebhookSubscription) error {
+func (w webhookStore) Create(ctx context.Context, v model.WebhookSubscription) error {
 	return w.s.Do(ctx, func() error {
 		if w.hooks().Has(v.Key) {
 			return memtx.Conflict("webhook", v.Key)
@@ -34,8 +36,8 @@ func (w webhookStore) Create(ctx context.Context, v types.WebhookSubscription) e
 	})
 }
 
-func (w webhookStore) Get(ctx context.Context, key string) (types.WebhookSubscription, error) {
-	var out types.WebhookSubscription
+func (w webhookStore) Get(ctx context.Context, key string) (model.WebhookSubscription, error) {
+	var out model.WebhookSubscription
 	err := w.s.Do(ctx, func() error {
 		var ok bool
 		if out, ok = w.hooks().Get(key); !ok {
@@ -46,7 +48,7 @@ func (w webhookStore) Get(ctx context.Context, key string) (types.WebhookSubscri
 	return out, err
 }
 
-func (w webhookStore) Update(ctx context.Context, v types.WebhookSubscription) error {
+func (w webhookStore) Update(ctx context.Context, v model.WebhookSubscription) error {
 	return w.s.Do(ctx, func() error {
 		if !w.hooks().Has(v.Key) {
 			return memtx.NotFound("webhook", v.Key)
@@ -62,22 +64,22 @@ func (w webhookStore) Delete(ctx context.Context, key string) error {
 			return memtx.NotFound("webhook", key)
 		}
 		w.deliveries().
-			DeleteWhere(func(_ int64, d types.WebhookDelivery) bool { return d.WebhookKey == key })
+			DeleteWhere(func(_ int64, d model.WebhookDelivery) bool { return d.WebhookKey == key })
 		return nil
 	})
 }
 
 func (w webhookStore) List(
 	ctx context.Context,
-	f store.WebhookFilter,
-) ([]types.WebhookSubscription, error) {
-	var out []types.WebhookSubscription
+	f port.WebhookFilter,
+) ([]model.WebhookSubscription, error) {
+	var out []model.WebhookSubscription
 	err := w.s.Do(ctx, func() error {
-		out = w.hooks().All(func(_ string, v types.WebhookSubscription) bool {
+		out = w.hooks().All(func(_ string, v model.WebhookSubscription) bool {
 			return (f.Domain == "" || v.Domain == f.Domain) &&
 				(f.ProjectKey == "" || v.ProjectKey == f.ProjectKey) &&
 				(!f.EnabledOnly || v.Enabled)
-		}, func(a, b types.WebhookSubscription) int { return strings.Compare(a.Key, b.Key) })
+		}, func(a, b model.WebhookSubscription) int { return strings.Compare(a.Key, b.Key) })
 		return nil
 	})
 	return out, err
@@ -85,9 +87,9 @@ func (w webhookStore) List(
 
 func (w webhookStore) AddDelivery(
 	ctx context.Context,
-	d types.WebhookDelivery,
-) (types.WebhookDelivery, error) {
-	var out types.WebhookDelivery
+	d model.WebhookDelivery,
+) (model.WebhookDelivery, error) {
+	var out model.WebhookDelivery
 	err := w.s.Do(ctx, func() error {
 		if !w.hooks().Has(d.WebhookKey) {
 			return memtx.NotFound("webhook", d.WebhookKey)
@@ -111,17 +113,17 @@ func attemptKey(t time.Time) int64 {
 
 func (w webhookStore) Deliveries(
 	ctx context.Context,
-	f store.DeliveryFilter,
-) ([]types.WebhookDelivery, error) {
-	var out []types.WebhookDelivery
+	f port.DeliveryFilter,
+) ([]model.WebhookDelivery, error) {
+	var out []model.WebhookDelivery
 	err := w.s.Do(ctx, func() error {
-		out = w.deliveries().All(func(_ int64, d types.WebhookDelivery) bool {
+		out = w.deliveries().All(func(_ int64, d model.WebhookDelivery) bool {
 			// Bounds compare at stored precision, as the SQL stores do.
 			at := d.AttemptedAt
 			return (f.WebhookKey == "" || d.WebhookKey == f.WebhookKey) &&
 				(f.From.IsZero() || (!at.IsZero() && at.UnixMicro() >= f.From.UnixMicro())) &&
 				(f.To.IsZero() || (!at.IsZero() && at.UnixMicro() < f.To.UnixMicro()))
-		}, func(a, b types.WebhookDelivery) int {
+		}, func(a, b model.WebhookDelivery) int {
 			if c := cmp.Compare(attemptKey(b.AttemptedAt), attemptKey(a.AttemptedAt)); c != 0 {
 				return c
 			}
@@ -136,15 +138,15 @@ func (w webhookStore) Deliveries(
 // deliveryLimit applies the default limit to a delivery listing.
 func deliveryLimit(limit int) int {
 	if limit <= 0 {
-		return store.DefaultLimit
+		return kernel.DefaultLimit
 	}
-	return min(limit, store.MaxLimit)
+	return min(limit, kernel.MaxLimit)
 }
 
 func (w webhookStore) PruneDeliveries(ctx context.Context, before time.Time) (int64, error) {
 	var n int64
 	err := w.s.Do(ctx, func() error {
-		n = w.deliveries().DeleteWhere(func(_ int64, d types.WebhookDelivery) bool {
+		n = w.deliveries().DeleteWhere(func(_ int64, d model.WebhookDelivery) bool {
 			return !d.AttemptedAt.IsZero() && d.AttemptedAt.UnixMicro() < before.UnixMicro()
 		})
 		return nil

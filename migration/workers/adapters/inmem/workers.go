@@ -6,23 +6,23 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/workers/core/model"
+	"github.com/weaveplatform/artifactweave/migration/workers/core/port"
 )
 
 // workerEntry identifies one state entry or secret of a worker.
 type workerEntry struct{ Worker, Name string }
 
-// Workers implements store.Store.
-func (s *Store) Workers() store.WorkerStore { return workerStore{s} }
-
-// --- Workers ---------------------------------------------------------------
+// Workers returns the worker store: definitions, state, sealed secrets
+// and executions (decision 0026).
+func (s *Store) Workers() port.WorkerStore { return workerStore{s} }
 
 type workerStore struct{ s *Store }
 
-func (w workerStore) workers() *memtx.Table[string, types.Worker] {
-	return memtx.TableOf[string, types.Worker](w.s.Store, "workers")
+func (w workerStore) workers() *memtx.Table[string, model.Worker] {
+	return memtx.TableOf[string, model.Worker](w.s.Store, "workers")
 }
 
 func (w workerStore) state() *memtx.Table[workerEntry, string] {
@@ -33,19 +33,19 @@ func (w workerStore) secrets() *memtx.Table[workerEntry, string] {
 	return memtx.TableOf[workerEntry, string](w.s.Store, "worker_secrets")
 }
 
-func (w workerStore) executions() *memtx.Table[string, types.WorkerExecution] {
-	return memtx.TableOf[string, types.WorkerExecution](w.s.Store, "worker_executions")
+func (w workerStore) executions() *memtx.Table[string, model.WorkerExecution] {
+	return memtx.TableOf[string, model.WorkerExecution](w.s.Store, "worker_executions")
 }
 
 // exists fails with ErrNotFound when the worker does not exist.
 func (w workerStore) exists(key string) error {
 	if !w.workers().Has(key) {
-		return memtx.NotFound("worker", key)
+		return memtx.NotFound("worker", key) //nolint:wrapcheck // wraps kernel.ErrNotFound
 	}
 	return nil
 }
 
-func (w workerStore) Create(ctx context.Context, v types.Worker) error {
+func (w workerStore) Create(ctx context.Context, v model.Worker) error {
 	return w.s.Do(ctx, func() error {
 		if w.workers().Has(v.Key) {
 			return memtx.Conflict("worker", v.Key)
@@ -55,8 +55,8 @@ func (w workerStore) Create(ctx context.Context, v types.Worker) error {
 	})
 }
 
-func (w workerStore) Get(ctx context.Context, key string) (types.Worker, error) {
-	var out types.Worker
+func (w workerStore) Get(ctx context.Context, key string) (model.Worker, error) {
+	var out model.Worker
 	err := w.s.Do(ctx, func() error {
 		var ok bool
 		if out, ok = w.workers().Get(key); !ok {
@@ -67,7 +67,7 @@ func (w workerStore) Get(ctx context.Context, key string) (types.Worker, error) 
 	return out, err
 }
 
-func (w workerStore) Update(ctx context.Context, v types.Worker) error {
+func (w workerStore) Update(ctx context.Context, v model.Worker) error {
 	return w.s.Do(ctx, func() error {
 		if err := w.exists(v.Key); err != nil {
 			return err
@@ -86,19 +86,19 @@ func (w workerStore) Delete(ctx context.Context, key string) error {
 		w.state().DeleteWhere(owned)
 		w.secrets().DeleteWhere(owned)
 		w.executions().
-			DeleteWhere(func(_ string, v types.WorkerExecution) bool { return v.WorkerKey == key })
+			DeleteWhere(func(_ string, v model.WorkerExecution) bool { return v.WorkerKey == key })
 		return nil
 	})
 }
 
-func (w workerStore) List(ctx context.Context, f store.WorkerFilter) ([]types.Worker, error) {
-	var out []types.Worker
+func (w workerStore) List(ctx context.Context, f port.WorkerFilter) ([]model.Worker, error) {
+	var out []model.Worker
 	err := w.s.Do(ctx, func() error {
-		out = w.workers().All(func(_ string, v types.Worker) bool {
+		out = w.workers().All(func(_ string, v model.Worker) bool {
 			return (f.Action == "" || v.Action == f.Action) &&
 				(f.ProjectKey == "" || v.ProjectKey == f.ProjectKey) &&
 				(!f.EnabledOnly || v.Enabled)
-		}, func(x, y types.Worker) int { return strings.Compare(x.Key, y.Key) })
+		}, func(x, y model.Worker) int { return strings.Compare(x.Key, y.Key) })
 		return nil
 	})
 	return out, err
@@ -175,7 +175,7 @@ func (w workerStore) DeleteSecret(ctx context.Context, worker, name string) erro
 	})
 }
 
-func (w workerStore) AddExecution(ctx context.Context, e types.WorkerExecution) error {
+func (w workerStore) AddExecution(ctx context.Context, e model.WorkerExecution) error {
 	return w.s.Do(ctx, func() error {
 		if w.executions().Has(e.ID) {
 			return memtx.Conflict("worker execution", e.ID)
@@ -188,8 +188,8 @@ func (w workerStore) AddExecution(ctx context.Context, e types.WorkerExecution) 
 	})
 }
 
-func (w workerStore) Execution(ctx context.Context, id string) (types.WorkerExecution, error) {
-	var out types.WorkerExecution
+func (w workerStore) Execution(ctx context.Context, id string) (model.WorkerExecution, error) {
+	var out model.WorkerExecution
 	err := w.s.Do(ctx, func() error {
 		var ok bool
 		if out, ok = w.executions().Get(id); !ok {
@@ -201,23 +201,23 @@ func (w workerStore) Execution(ctx context.Context, id string) (types.WorkerExec
 }
 
 func (w workerStore) Executions(
-	ctx context.Context, worker string, p store.Page,
-) ([]types.WorkerExecution, string, error) {
+	ctx context.Context, worker string, p kernel.Page,
+) ([]model.WorkerExecution, string, error) {
 	var (
-		out  []types.WorkerExecution
+		out  []model.WorkerExecution
 		next string
 	)
 	err := w.s.Do(ctx, func() error {
-		rows := w.executions().All(func(_ string, v types.WorkerExecution) bool {
+		rows := w.executions().All(func(_ string, v model.WorkerExecution) bool {
 			return worker == "" || v.WorkerKey == worker
-		}, func(x, y types.WorkerExecution) int {
+		}, func(x, y model.WorkerExecution) int {
 			return cmp.Or(y.Started.Compare(x.Started), strings.Compare(y.ID, x.ID))
 		})
 		var err error
-		out, next, err = memtx.Paginate(rows, p, true, func(v types.WorkerExecution) []any {
+		out, next, err = memtx.Paginate(rows, p, true, func(v model.WorkerExecution) []any {
 			return []any{v.Started.UnixMicro(), v.ID}
 		})
-		return err
+		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
 	})
 	return out, next, err
 }
@@ -227,7 +227,7 @@ func (w workerStore) PruneExecutions(ctx context.Context, before time.Time) (int
 	var n int64
 	err := w.s.Do(ctx, func() error {
 		n = w.executions().
-			DeleteWhere(func(_ string, v types.WorkerExecution) bool { return v.Started.Before(before) })
+			DeleteWhere(func(_ string, v model.WorkerExecution) bool { return v.Started.Before(before) })
 		return nil
 	})
 	return n, err

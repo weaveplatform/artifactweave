@@ -7,12 +7,12 @@ import (
 	accmigrations "github.com/weaveplatform/artifactweave/migration/access/adapters/sql/migrations"
 	artmigrations "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/sql/migrations"
 	fedmigrations "github.com/weaveplatform/artifactweave/migration/federation/adapters/sql/migrations"
-	ntfmigrations "github.com/weaveplatform/artifactweave/migration/notifications/adapters/sql/migrations"
+	ntfsql "github.com/weaveplatform/artifactweave/migration/notifications/adapters/sql"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	platsql "github.com/weaveplatform/artifactweave/migration/platform/store/sql"
 	relmigrations "github.com/weaveplatform/artifactweave/migration/releases/adapters/sql/migrations"
-	retmigrations "github.com/weaveplatform/artifactweave/migration/retention/adapters/sql/migrations"
-	wrkmigrations "github.com/weaveplatform/artifactweave/migration/workers/adapters/sql/migrations"
+	retsql "github.com/weaveplatform/artifactweave/migration/retention/adapters/sql"
+	wrksql "github.com/weaveplatform/artifactweave/migration/workers/adapters/sql"
 )
 
 // Modules returns every module's registration with the SQL layer, in the
@@ -94,17 +94,8 @@ func Modules() []dialect.Module {
 				},
 			},
 		},
-		{Name: "notifications", Migrations: ntfmigrations.FS, Sealed: []dialect.SealedColumn{
-			{
-				Table: "webhook_secrets", Column: "value", Purpose: purposeWebhookSecret,
-				Keys: []string{"webhook_key", "handler_index", "name"},
-				RowID: func(k []string) string {
-					i, _ := strconv.Atoi(k[1]) // an INTEGER column always reads back as digits
-					return secretID(k[0], i, k[2])
-				},
-			},
-		}},
-		{Name: "retention", Migrations: retmigrations.FS},
+		ntfsql.Module,
+		retsql.Module,
 		{Name: "federation", Migrations: fedmigrations.FS, Sealed: []dialect.SealedColumn{
 			{
 				Table: "replications", Column: "password", Purpose: purposeReplicationPassword,
@@ -112,13 +103,7 @@ func Modules() []dialect.Module {
 			},
 		}},
 		{Name: "releases", Migrations: relmigrations.FS},
-		{Name: "workers", Migrations: wrkmigrations.FS, Sealed: []dialect.SealedColumn{
-			{
-				Table: "worker_secrets", Column: "value", Purpose: purposeWorkerSecret,
-				Keys:  []string{"worker_key", "name"},
-				RowID: func(k []string) string { return k[0] + "/" + k[1] },
-			},
-		}},
+		wrksql.Module,
 	}
 }
 

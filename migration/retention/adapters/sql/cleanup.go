@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/retention/core/model"
+	"github.com/weaveplatform/artifactweave/migration/retention/core/port"
 )
 
-// Cleanup implements store.Store.
-func (s *Store) Cleanup() store.CleanupStore { return cleanupStore{s} }
+// Cleanup returns the cleanup policy and run store (decision 0010).
+func (s *Store) Cleanup() port.CleanupStore { return cleanupStore{s} }
 
 // cleanupStore keeps cleanup_policies and cleanup_runs.
 type cleanupStore struct{ s *Store }
@@ -20,7 +21,7 @@ type cleanupStore struct{ s *Store }
 const policyCols = "key, description, cron_exp, project_key, item_type, duration_minutes, enabled, " +
 	"skip_trashcan, criteria, created_at, created_by, updated_at, updated_by"
 
-func policyArgs(p types.CleanupPolicy) ([]any, error) {
+func policyArgs(p model.CleanupPolicy) ([]any, error) {
 	criteria, err := dialect.ToJSON(p.Criteria)
 	if err != nil {
 		return nil, err
@@ -32,9 +33,9 @@ func policyArgs(p types.CleanupPolicy) ([]any, error) {
 	}, nil
 }
 
-func scanPolicy(row interface{ Scan(...any) error }) (types.CleanupPolicy, error) {
+func scanPolicy(row interface{ Scan(...any) error }) (model.CleanupPolicy, error) {
 	var (
-		p                types.CleanupPolicy
+		p                model.CleanupPolicy
 		criteria         sql.NullString
 		created, updated sql.NullInt64
 	)
@@ -59,7 +60,7 @@ func scanPolicy(row interface{ Scan(...any) error }) (types.CleanupPolicy, error
 	return p, dialect.FromJSON(criteria, &p.Criteria)
 }
 
-func (c cleanupStore) CreatePolicy(ctx context.Context, p types.CleanupPolicy) error {
+func (c cleanupStore) CreatePolicy(ctx context.Context, p model.CleanupPolicy) error {
 	args, err := policyArgs(p)
 	if err != nil {
 		return err
@@ -67,18 +68,18 @@ func (c cleanupStore) CreatePolicy(ctx context.Context, p types.CleanupPolicy) e
 	_, err = c.s.Exec(
 		ctx,
 		"create cleanup policy "+p.Key,
-		Insert("cleanup_policies", dialect.OpsCols(policyCols)),
+		dialect.Insert("cleanup_policies", dialect.OpsCols(policyCols)),
 		args...)
 	return err
 }
 
-func (c cleanupStore) Policy(ctx context.Context, key string) (types.CleanupPolicy, error) {
+func (c cleanupStore) Policy(ctx context.Context, key string) (model.CleanupPolicy, error) {
 	p, err := scanPolicy(c.s.Q(ctx).QueryRowContext(ctx,
 		c.s.Dialect().Rebind("SELECT "+policyCols+" FROM cleanup_policies WHERE key = ?"), key))
 	return p, c.s.Wrap("get cleanup policy "+key, err)
 }
 
-func (c cleanupStore) UpdatePolicy(ctx context.Context, p types.CleanupPolicy) error {
+func (c cleanupStore) UpdatePolicy(ctx context.Context, p model.CleanupPolicy) error {
 	args, err := policyArgs(p)
 	if err != nil {
 		return err
@@ -108,8 +109,8 @@ func (c cleanupStore) DeletePolicy(ctx context.Context, key string) error {
 
 func (c cleanupStore) Policies(
 	ctx context.Context,
-	f store.PolicyFilter,
-) ([]types.CleanupPolicy, error) {
+	f port.PolicyFilter,
+) ([]model.CleanupPolicy, error) {
 	where := []string{"1 = 1"}
 	var args []any
 	if f.ItemType != "" {
@@ -118,7 +119,7 @@ func (c cleanupStore) Policies(
 	if f.ProjectKey != "" {
 		where, args = append(where, "project_key = ?"), append(args, f.ProjectKey)
 	}
-	var out []types.CleanupPolicy
+	var out []model.CleanupPolicy
 	err := c.s.Rows(
 		ctx,
 		"list cleanup policies",
@@ -137,7 +138,7 @@ func (c cleanupStore) Policies(
 const runCols = "policy_key, trigger_id, item_type, status, dry_run, manual, triggered_by, started_at, ended_at, " +
 	"total_items, cleaned_items, cleaned_size, report"
 
-func runArgs(r types.CleanupRun) []any {
+func runArgs(r model.CleanupRun) []any {
 	return []any{
 		r.PolicyKey,
 		r.TriggerID,
@@ -157,9 +158,9 @@ func runArgs(r types.CleanupRun) []any {
 	}
 }
 
-func scanRun(row interface{ Scan(...any) error }) (types.CleanupRun, error) {
+func scanRun(row interface{ Scan(...any) error }) (model.CleanupRun, error) {
 	var (
-		r              types.CleanupRun
+		r              model.CleanupRun
 		started, ended sql.NullInt64
 		report         sql.NullString
 	)
@@ -186,26 +187,26 @@ func scanRun(row interface{ Scan(...any) error }) (types.CleanupRun, error) {
 	return r, nil
 }
 
-func (c cleanupStore) CreateRun(ctx context.Context, r types.CleanupRun) (types.CleanupRun, error) {
+func (c cleanupStore) CreateRun(ctx context.Context, r model.CleanupRun) (model.CleanupRun, error) {
 	id, err := c.s.InsertID(
 		ctx,
 		"create cleanup run "+r.PolicyKey,
-		Insert("cleanup_runs", dialect.OpsCols(runCols)),
+		dialect.Insert("cleanup_runs", dialect.OpsCols(runCols)),
 		runArgs(r)...)
 	if err != nil {
-		return types.CleanupRun{}, err
+		return model.CleanupRun{}, err
 	}
 	r.ID = id
-	return store.Normalise(r), nil
+	return kernel.Normalise(r), nil
 }
 
-func (c cleanupStore) Run(ctx context.Context, id int64) (types.CleanupRun, error) {
+func (c cleanupStore) Run(ctx context.Context, id int64) (model.CleanupRun, error) {
 	r, err := scanRun(c.s.Q(ctx).QueryRowContext(ctx,
 		c.s.Dialect().Rebind("SELECT id, "+runCols+" FROM cleanup_runs WHERE id = ?"), id))
 	return r, c.s.Wrap(fmt.Sprintf("get cleanup run %d", id), err)
 }
 
-func (c cleanupStore) UpdateRun(ctx context.Context, r types.CleanupRun) error {
+func (c cleanupStore) UpdateRun(ctx context.Context, r model.CleanupRun) error {
 	sets := make([]string, 0, 13)
 	for _, col := range dialect.OpsCols(runCols) {
 		sets = append(sets, col+" = ?")
@@ -222,9 +223,9 @@ func (c cleanupStore) UpdateRun(ctx context.Context, r types.CleanupRun) error {
 
 func (c cleanupStore) Runs(
 	ctx context.Context,
-	f store.RunFilter,
-	p store.Page,
-) ([]types.CleanupRun, string, error) {
+	f port.RunFilter,
+	p kernel.Page,
+) ([]model.CleanupRun, string, error) {
 	p, err := p.Normalize()
 	if err != nil {
 		return nil, "", err //nolint:wrapcheck // already a store sentinel
@@ -241,12 +242,12 @@ func (c cleanupStore) Runs(
 		where, args = append(where, "item_type = ?"), append(args, f.ItemType)
 	}
 	if len(f.Statuses) > 0 {
-		where = append(where, "status IN ("+Placeholders(len(f.Statuses))+")")
+		where = append(where, "status IN ("+dialect.Placeholders(len(f.Statuses))+")")
 		for _, st := range f.Statuses {
 			args = append(args, st)
 		}
 	}
-	var out []types.CleanupRun
+	var out []model.CleanupRun
 	err = c.s.Rows(ctx, "list cleanup runs", "SELECT id, "+runCols+" FROM cleanup_runs WHERE "+
 		strings.Join(
 			where,
@@ -260,15 +261,15 @@ func (c cleanupStore) Runs(
 	if err != nil {
 		return nil, "", err
 	}
-	page, next := store.Trim(
+	page, next := kernel.Trim(
 		out,
 		p.Limit,
-		func(r types.CleanupRun) []string { return []string{dialect.Itoa(r.ID)} },
+		func(r model.CleanupRun) []string { return []string{dialect.Itoa(r.ID)} },
 	)
 	return page, next, nil
 }
 
-func (c cleanupStore) LastRun(ctx context.Context, policyKey string) (types.CleanupRun, error) {
+func (c cleanupStore) LastRun(ctx context.Context, policyKey string) (model.CleanupRun, error) {
 	r, err := scanRun(c.s.Q(ctx).QueryRowContext(ctx, c.s.Dialect().Rebind(
 		"SELECT id, "+runCols+" FROM cleanup_runs WHERE policy_key = ? ORDER BY id DESC LIMIT 1",
 	), policyKey))
