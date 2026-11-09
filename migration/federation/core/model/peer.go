@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/weaveplatform/artifactweave/migration/platform/outbox"
 )
 
 // ErrInvalidStream reports a stream name with an unknown form.
@@ -108,7 +110,7 @@ func (n PairingNonce) Usable(now time.Time) bool {
 
 // Stamp is an event's position for conflict resolution.
 type Stamp struct {
-	Time   HLC
+	Time   outbox.HLC
 	Origin string
 }
 

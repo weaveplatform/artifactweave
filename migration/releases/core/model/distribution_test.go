@@ -5,72 +5,72 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/releases/core/model"
 )
 
 func TestUnitDistribution(t *testing.T) {
-	if !types.BundleOpen.Editable() || types.BundleSigned.Editable() {
+	if !model.BundleOpen.Editable() || model.BundleSigned.Editable() {
 		t.Error("Editable")
 	}
-	targets := []types.DistributionTarget{
+	targets := []model.DistributionTarget{
 		{PeerInstanceID: "a", SiteName: "edge-london", CityName: "London", CountryCode: "GB"},
 		{PeerInstanceID: "b", SiteName: "edge-paris", CityName: "Paris", CountryCode: "FR"},
 		{PeerInstanceID: "c", SiteName: "core", CityName: "London", CountryCode: "GB"},
 	}
 	cases := []struct {
-		rules []types.DistributionRule
+		rules []model.DistributionRule
 		want  []string
 	}{
-		{[]types.DistributionRule{{SiteName: "edge-*"}}, []string{"a", "b"}},
-		{[]types.DistributionRule{{CityName: "london"}}, []string{"a", "c"}},
-		{[]types.DistributionRule{{CountryCodes: []string{"fr"}}}, []string{"b"}},
+		{[]model.DistributionRule{{SiteName: "edge-*"}}, []string{"a", "b"}},
+		{[]model.DistributionRule{{CityName: "london"}}, []string{"a", "c"}},
+		{[]model.DistributionRule{{CountryCodes: []string{"fr"}}}, []string{"b"}},
 		{
-			[]types.DistributionRule{{SiteName: "edge-*", CountryCodes: []string{"GB"}}},
+			[]model.DistributionRule{{SiteName: "edge-*", CountryCodes: []string{"GB"}}},
 			[]string{"a"},
 		},
-		{[]types.DistributionRule{{SiteName: "["}}, nil},
-		{[]types.DistributionRule{{}}, []string{"a", "b", "c"}},
+		{[]model.DistributionRule{{SiteName: "["}}, nil},
+		{[]model.DistributionRule{{}}, []string{"a", "b", "c"}},
 		{nil, nil},
 	}
 	for _, c := range cases {
 		var got []string
-		for _, tg := range types.SelectTargets(c.rules, targets) {
+		for _, tg := range model.SelectTargets(c.rules, targets) {
 			got = append(got, tg.PeerInstanceID)
 		}
 		if diff := cmp.Diff(c.want, got); diff != "" {
 			t.Errorf("%+v (-want +got):\n%s", c.rules, diff)
 		}
 	}
-	job := func(s types.JobStatus) types.DistributionJob { return types.DistributionJob{Status: s} }
+	job := func(s model.JobStatus) model.DistributionJob { return model.DistributionJob{Status: s} }
 	statuses := []struct {
-		jobs []types.DistributionJob
-		want types.JobStatus
+		jobs []model.DistributionJob
+		want model.JobStatus
 	}{
-		{nil, types.JobNotDistributed},
+		{nil, model.JobNotDistributed},
 		{
-			[]types.DistributionJob{job(types.JobCompleted), job(types.JobCompleted)},
-			types.JobCompleted,
+			[]model.DistributionJob{job(model.JobCompleted), job(model.JobCompleted)},
+			model.JobCompleted,
 		},
 		{
-			[]types.DistributionJob{job(types.JobCompleted), job(types.JobInProgress)},
-			types.JobInProgress,
+			[]model.DistributionJob{job(model.JobCompleted), job(model.JobInProgress)},
+			model.JobInProgress,
 		},
 		{
-			[]types.DistributionJob{job(types.JobAborted), job(types.JobInProgress)},
-			types.JobAborted,
+			[]model.DistributionJob{job(model.JobAborted), job(model.JobInProgress)},
+			model.JobAborted,
 		},
 		{
-			[]types.DistributionJob{job(types.JobInProgress), job(types.JobAborted)},
-			types.JobAborted,
+			[]model.DistributionJob{job(model.JobInProgress), job(model.JobAborted)},
+			model.JobAborted,
 		},
-		{[]types.DistributionJob{job(types.JobAborted), job(types.JobFailed)}, types.JobFailed},
+		{[]model.DistributionJob{job(model.JobAborted), job(model.JobFailed)}, model.JobFailed},
 		{
-			[]types.DistributionJob{job(types.JobCompleted), job(types.JobInQueue)},
-			types.JobInProgress,
+			[]model.DistributionJob{job(model.JobCompleted), job(model.JobInQueue)},
+			model.JobInProgress,
 		},
 	}
 	for _, s := range statuses {
-		if got := types.TrackerStatus(s.jobs); got != s.want {
+		if got := model.TrackerStatus(s.jobs); got != s.want {
 			t.Errorf("%+v = %s, want %s", s.jobs, got, s.want)
 		}
 	}

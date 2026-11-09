@@ -4,12 +4,12 @@ import (
 	"context"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/notifications/core/model"
 )
 
 // WebhookFilter narrows subscription listings.
 type WebhookFilter struct {
-	Domain      types.WebhookDomain
+	Domain      model.WebhookDomain
 	ProjectKey  string
 	EnabledOnly bool
 }
@@ -28,21 +28,21 @@ type DeliveryFilter struct {
 // Handler secrets are sealed.
 type WebhookStore interface {
 	// Create stores w; ErrConflict when the key exists.
-	Create(ctx context.Context, w types.WebhookSubscription) error
+	Create(ctx context.Context, w model.WebhookSubscription) error
 	// Get returns the subscription, secrets included.
-	Get(ctx context.Context, key string) (types.WebhookSubscription, error)
+	Get(ctx context.Context, key string) (model.WebhookSubscription, error)
 	// Update replaces the subscription.
-	Update(ctx context.Context, w types.WebhookSubscription) error
+	Update(ctx context.Context, w model.WebhookSubscription) error
 	// Delete removes the subscription and its delivery records.
 	Delete(ctx context.Context, key string) error
 	// List returns matching subscriptions ordered by key.
-	List(ctx context.Context, f WebhookFilter) ([]types.WebhookSubscription, error)
+	List(ctx context.Context, f WebhookFilter) ([]model.WebhookSubscription, error)
 	// AddDelivery records a delivery attempt and returns it with its ID;
 	// ErrNotFound when the subscription does not exist.
-	AddDelivery(ctx context.Context, d types.WebhookDelivery) (types.WebhookDelivery, error)
+	AddDelivery(ctx context.Context, d model.WebhookDelivery) (model.WebhookDelivery, error)
 	// Deliveries returns matching records newest first, at most f.Limit
 	// (DefaultLimit when zero).
-	Deliveries(ctx context.Context, f DeliveryFilter) ([]types.WebhookDelivery, error)
+	Deliveries(ctx context.Context, f DeliveryFilter) ([]model.WebhookDelivery, error)
 	// PruneDeliveries removes records attempted before t and returns how
 	// many.
 	PruneDeliveries(ctx context.Context, before time.Time) (int64, error)

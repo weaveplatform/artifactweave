@@ -4,12 +4,13 @@ import (
 	"context"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/workers/core/model"
 )
 
 // WorkerFilter narrows worker listings.
 type WorkerFilter struct {
-	Action      types.WorkerAction
+	Action      model.WorkerAction
 	ProjectKey  string
 	EnabledOnly bool
 }
@@ -18,15 +19,15 @@ type WorkerFilter struct {
 // sealed secrets and execution history.
 type WorkerStore interface {
 	// Create stores w; ErrConflict when the key exists.
-	Create(ctx context.Context, w types.Worker) error
+	Create(ctx context.Context, w model.Worker) error
 	// Get returns the worker.
-	Get(ctx context.Context, key string) (types.Worker, error)
+	Get(ctx context.Context, key string) (model.Worker, error)
 	// Update replaces the worker.
-	Update(ctx context.Context, w types.Worker) error
+	Update(ctx context.Context, w model.Worker) error
 	// Delete removes the worker with its state, secrets and executions.
 	Delete(ctx context.Context, key string) error
 	// List returns matching workers ordered by key.
-	List(ctx context.Context, f WorkerFilter) ([]types.Worker, error)
+	List(ctx context.Context, f WorkerFilter) ([]model.Worker, error)
 
 	// State returns a worker's state entries; ErrNotFound when the worker
 	// does not exist.
@@ -50,12 +51,16 @@ type WorkerStore interface {
 
 	// AddExecution records an execution; ErrConflict when its ID exists,
 	// ErrNotFound when its worker does not.
-	AddExecution(ctx context.Context, e types.WorkerExecution) error
+	AddExecution(ctx context.Context, e model.WorkerExecution) error
 	// Execution returns one execution.
-	Execution(ctx context.Context, id string) (types.WorkerExecution, error)
+	Execution(ctx context.Context, id string) (model.WorkerExecution, error)
 	// Executions returns a worker's executions ("" for every worker) newest
 	// first, by (Started, ID).
-	Executions(ctx context.Context, worker string, p Page) ([]types.WorkerExecution, string, error)
+	Executions(
+		ctx context.Context,
+		worker string,
+		p kernel.Page,
+	) ([]model.WorkerExecution, string, error)
 	// PruneExecutions removes executions started before t and returns how
 	// many.
 	PruneExecutions(ctx context.Context, before time.Time) (int64, error)

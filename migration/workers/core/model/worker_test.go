@@ -7,15 +7,19 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/workers/core/model"
 )
 
+// t0 is the fixed instant of the domain tests in pkg/types, which keep their
+// own copy (domain_shared_test.go).
+var t0 = time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)
+
 func TestUnitWorkers(t *testing.T) {
-	if !types.WorkerAction("BEFORE_DOWNLOAD").Before() ||
-		types.WorkerAction("AFTER_CREATE").Before() {
+	if !model.WorkerAction("BEFORE_DOWNLOAD").Before() ||
+		model.WorkerAction("AFTER_CREATE").Before() {
 		t.Error("WorkerAction.Before")
 	}
-	wf := types.WorkerFilter{
+	wf := model.WorkerFilter{
 		RepoKeys:        []string{"libs"},
 		AnyRemote:       true,
 		ExcludePatterns: []string{"*.tmp"},
@@ -37,41 +41,41 @@ func TestUnitWorkers(t *testing.T) {
 			t.Errorf("%+v = %v", c, got)
 		}
 	}
-	if !(types.WorkerFilter{AnyLocal: true, AnyFederated: true}).Matches(
+	if !(model.WorkerFilter{AnyLocal: true, AnyFederated: true}).Matches(
 		"fed",
 		repo.Federated,
 		"x",
 	) {
 		t.Error("AnyFederated")
 	}
-	w := types.Worker{BlockedUntil: t0}
+	w := model.Worker{BlockedUntil: t0}
 	if !w.Blocked(t0.Add(-time.Second)) || w.Blocked(t0) {
 		t.Error("Blocked")
 	}
-	if err := types.ValidateWorkerSource("export default async () => ({status: 1})"); err != nil {
+	if err := model.ValidateWorkerSource("export default async () => ({status: 1})"); err != nil {
 		t.Error(err)
 	}
-	for _, src := range []string{"", strings.Repeat("x", types.MaxWorkerSource+1)} {
-		if err := types.ValidateWorkerSource(src); !errors.Is(err, types.ErrInvalidWorker) {
+	for _, src := range []string{"", strings.Repeat("x", model.MaxWorkerSource+1)} {
+		if err := model.ValidateWorkerSource(src); !errors.Is(err, model.ErrInvalidWorker) {
 			t.Errorf("len %d: %v", len(src), err)
 		}
 	}
-	if err := types.ValidateWorkerState(
-		map[string]string{"k": strings.Repeat("é", types.MaxWorkerStateValue)},
+	if err := model.ValidateWorkerState(
+		map[string]string{"k": strings.Repeat("é", model.MaxWorkerStateValue)},
 	); err != nil {
 		t.Errorf("limits count characters, not bytes: %v", err)
 	}
 	tooMany := map[string]string{}
-	for i := range types.MaxWorkerStateItems + 1 {
+	for i := range model.MaxWorkerStateItems + 1 {
 		tooMany[strings.Repeat("k", i+1)] = "v"
 	}
 	for _, bad := range []map[string]string{
 		tooMany,
 		{"": "v"},
-		{strings.Repeat("k", types.MaxWorkerStateKey+1): "v"},
-		{"k": strings.Repeat("v", types.MaxWorkerStateValue+1)},
+		{strings.Repeat("k", model.MaxWorkerStateKey+1): "v"},
+		{"k": strings.Repeat("v", model.MaxWorkerStateValue+1)},
 	} {
-		if err := types.ValidateWorkerState(bad); !errors.Is(err, types.ErrInvalidWorker) {
+		if err := model.ValidateWorkerState(bad); !errors.Is(err, model.ErrInvalidWorker) {
 			t.Errorf("%d items: %v", len(bad), err)
 		}
 	}

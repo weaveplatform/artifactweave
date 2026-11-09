@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // BundleState is a release bundle version's lifecycle state (decision 0023).
@@ -90,7 +92,7 @@ type BundleArtifact struct {
 	BundleVersion string
 	SourcePath    string
 	TargetPath    string
-	Checksums     Checksums
+	Checksums     kernel.Checksums
 	Size          int64
 	Props         []PropertyValues
 }

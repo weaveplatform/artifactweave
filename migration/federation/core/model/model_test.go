@@ -9,28 +9,33 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/federation/core/model"
+	"github.com/weaveplatform/artifactweave/migration/platform/outbox"
 )
 
+// t0 is the fixed instant of the domain tests in pkg/types, which keep their
+// own copy (domain_shared_test.go).
+var t0 = time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)
+
 func TestUnitDirectionFor(t *testing.T) {
-	for c, want := range map[repo.Class]types.ReplicationDirection{repo.Local: types.ReplicationPush, repo.Remote: types.ReplicationPull} {
-		if got, ok := types.DirectionFor(c); !ok || got != want {
+	for c, want := range map[repo.Class]model.ReplicationDirection{repo.Local: model.ReplicationPush, repo.Remote: model.ReplicationPull} {
+		if got, ok := model.DirectionFor(c); !ok || got != want {
 			t.Errorf("%s: %s %v", c, got, ok)
 		}
 	}
-	if _, ok := types.DirectionFor(repo.Virtual); ok {
+	if _, ok := model.DirectionFor(repo.Virtual); ok {
 		t.Error("virtual repositories do not replicate")
 	}
 }
 
 func TestUnitPeer(t *testing.T) {
-	for _, u := range []types.UseCase{types.UseFederation, types.UseDistribution, types.UseAccessFederation, types.UsePlatformFederation} {
-		if !types.KnownUseCase(u) {
+	for _, u := range []model.UseCase{model.UseFederation, model.UseDistribution, model.UseAccessFederation, model.UsePlatformFederation} {
+		if !model.KnownUseCase(u) {
 			t.Errorf("%s should be known", u)
 		}
 	}
-	for _, u := range []types.UseCase{"mission-control", "bridge", "artifactory-cold"} {
-		if types.KnownUseCase(u) {
+	for _, u := range []model.UseCase{"mission-control", "bridge", "artifactory-cold"} {
+		if model.KnownUseCase(u) {
 			t.Errorf("%s should answer 404", u)
 		}
 	}
@@ -38,8 +43,8 @@ func TestUnitPeer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := types.Peer{PublicKey: pub, UseCases: []types.UseCase{types.UseFederation}, LastSeen: t0}
-	if !p.Has(types.UseFederation) || p.Has(types.UseDistribution) {
+	p := model.Peer{PublicKey: pub, UseCases: []model.UseCase{model.UseFederation}, LastSeen: t0}
+	if !p.Has(model.UseFederation) || p.Has(model.UseDistribution) {
 		t.Error("Peer.Has")
 	}
 	stale := 5 * time.Minute
@@ -47,23 +52,23 @@ func TestUnitPeer(t *testing.T) {
 		now      time.Time
 		rejected bool
 		failing  int
-		want     types.PeerStatus
+		want     model.PeerStatus
 	}{
-		{t0, true, 0, types.PeerUnauthorized},
-		{t0.Add(10 * time.Minute), false, 0, types.PeerOffline},
-		{t0.Add(time.Minute), false, 1, types.PeerPartial},
-		{t0.Add(time.Minute), false, 0, types.PeerOnline},
+		{t0, true, 0, model.PeerUnauthorized},
+		{t0.Add(10 * time.Minute), false, 0, model.PeerOffline},
+		{t0.Add(time.Minute), false, 1, model.PeerPartial},
+		{t0.Add(time.Minute), false, 0, model.PeerOnline},
 	}
 	for _, c := range cases {
 		if got := p.DeriveStatus(c.now, stale, c.rejected, c.failing); got != c.want {
 			t.Errorf("%+v = %s", c, got)
 		}
 	}
-	if (types.Peer{}).DeriveStatus(t0, stale, false, 0) != types.PeerOffline {
+	if (model.Peer{}).DeriveStatus(t0, stale, false, 0) != model.PeerOffline {
 		t.Error("a never-seen peer is offline")
 	}
-	n := types.PairingNonce{ExpiresAt: t0.Add(types.PairingTokenTTL)}
-	if !n.Usable(t0) || n.Usable(t0.Add(types.PairingTokenTTL)) {
+	n := model.PairingNonce{ExpiresAt: t0.Add(model.PairingTokenTTL)}
+	if !n.Usable(t0) || n.Usable(t0.Add(model.PairingTokenTTL)) {
 		t.Error("expiry")
 	}
 	n.RedeemedAt = t0
@@ -73,52 +78,52 @@ func TestUnitPeer(t *testing.T) {
 }
 
 func TestUnitStreams(t *testing.T) {
-	if types.RepositoryStream("libs") != "repo:libs" ||
-		types.DistributionStream(42, "jfrt@x") != "distribution:42:jfrt@x" {
+	if model.RepositoryStream("libs") != "repo:libs" ||
+		model.DistributionStream(42, "jfrt@x") != "distribution:42:jfrt@x" {
 		t.Error("stream names")
 	}
 	cases := []struct {
 		in   string
-		kind types.StreamKind
+		kind model.StreamKind
 		rest string
 	}{
-		{"repo:libs", types.StreamRepository, "libs"},
-		{"access", types.StreamAccess, ""},
-		{"distribution:42:jfrt@x", types.StreamDistribution, "42:jfrt@x"},
+		{"repo:libs", model.StreamRepository, "libs"},
+		{"access", model.StreamAccess, ""},
+		{"distribution:42:jfrt@x", model.StreamDistribution, "42:jfrt@x"},
 	}
 	for _, c := range cases {
-		kind, rest, err := types.ParseStream(c.in)
+		kind, rest, err := model.ParseStream(c.in)
 		if err != nil || kind != c.kind || rest != c.rest {
 			t.Errorf("%q = %s %q %v", c.in, kind, rest, err)
 		}
 	}
 	for _, bad := range []string{"repo:", "repo", "other:x", ""} {
-		if _, _, err := types.ParseStream(bad); !errors.Is(err, types.ErrInvalidStream) {
+		if _, _, err := model.ParseStream(bad); !errors.Is(err, model.ErrInvalidStream) {
 			t.Errorf("%q: %v", bad, err)
 		}
 	}
 }
 
 func TestUnitStamp(t *testing.T) {
-	x := types.Stamp{Time: types.HLC{Wall: 5}, Origin: "jfrt@a"}
-	y := types.Stamp{Time: types.HLC{Wall: 5}, Origin: "jfrt@b"}
-	z := types.Stamp{Time: types.HLC{Wall: 6}, Origin: "jfrt@a"}
+	x := model.Stamp{Time: outbox.HLC{Wall: 5}, Origin: "jfrt@a"}
+	y := model.Stamp{Time: outbox.HLC{Wall: 5}, Origin: "jfrt@b"}
+	z := model.Stamp{Time: outbox.HLC{Wall: 6}, Origin: "jfrt@a"}
 	if !y.After(x) || x.After(y) || !z.After(y) || y.After(z) {
 		t.Error("last writer wins with origin tie-break")
 	}
 }
 
 func TestUnitFederation(t *testing.T) {
-	base, key, err := types.ParseMemberURL("https://a.example.com/artifactory/generic-fed/")
+	base, key, err := model.ParseMemberURL("https://a.example.com/artifactory/generic-fed/")
 	if err != nil || base != "https://a.example.com" || key != "generic-fed" {
 		t.Errorf("%q %q %v", base, key, err)
 	}
-	base, _, err = types.ParseMemberURL("https://a.example.com/prefix/artifactory/libs?x=1")
+	base, _, err = model.ParseMemberURL("https://a.example.com/prefix/artifactory/libs?x=1")
 	if err != nil || base != "https://a.example.com/prefix" {
 		t.Errorf("prefixed base: %q %v", base, err)
 	}
 	for _, bad := range []string{"not a url", "/artifactory/x", "https://h/repo/x", "https://h/artifactory/", "https://h/artifactory/a/b", "%zz"} {
-		if _, _, err := types.ParseMemberURL(bad); !errors.Is(err, types.ErrInvalidMemberURL) {
+		if _, _, err := model.ParseMemberURL(bad); !errors.Is(err, model.ErrInvalidMemberURL) {
 			t.Errorf("%q: %v", bad, err)
 		}
 	}
@@ -127,11 +132,11 @@ func TestUnitFederation(t *testing.T) {
 		{URL: "https://a.example.com/artifactory/generic-fed"},
 		{URL: "https://b.example.com/artifactory/other", Enabled: repo.Flex(false)},
 	}}
-	members, err := types.MembersOf(cfg, "https://self.example.com/")
+	members, err := model.MembersOf(cfg, "https://self.example.com/")
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []types.FederationMember{
+	want := []model.FederationMember{
 		{
 			RepoKey:       "generic-fed",
 			BaseURL:       "https://a.example.com",
@@ -149,48 +154,48 @@ func TestUnitFederation(t *testing.T) {
 		t.Error(diff)
 	}
 	cfg.Members = append(cfg.Members, repo.Member{URL: "nonsense"})
-	if _, err := types.MembersOf(cfg, ""); !errors.Is(err, types.ErrInvalidMemberURL) {
+	if _, err := model.MembersOf(cfg, ""); !errors.Is(err, model.ErrInvalidMemberURL) {
 		t.Errorf("want ErrInvalidMemberURL, got %v", err)
 	}
 	th := time.Minute
 	cases := []struct {
-		s       types.FederationSettings
+		s       model.FederationSettings
 		running bool
 		lags    []time.Duration
-		want    types.SyncStatus
+		want    model.SyncStatus
 	}{
-		{types.FederationSettings{Disabled: true}, true, nil, types.SyncDisabled},
-		{types.FederationSettings{}, true, nil, types.SyncFullSyncRunning},
+		{model.FederationSettings{Disabled: true}, true, nil, model.SyncDisabled},
+		{model.FederationSettings{}, true, nil, model.SyncFullSyncRunning},
 		{
-			types.FederationSettings{},
+			model.FederationSettings{},
 			false,
 			[]time.Duration{time.Second, 2 * time.Minute},
-			types.SyncOutOfSync,
+			model.SyncOutOfSync,
 		},
-		{types.FederationSettings{}, false, []time.Duration{time.Second}, types.SyncSyncing},
+		{model.FederationSettings{}, false, []time.Duration{time.Second}, model.SyncSyncing},
 	}
 	for _, c := range cases {
-		if got := types.DeriveSyncStatus(c.s, c.running, c.lags, th); got != c.want {
+		if got := model.DeriveSyncStatus(c.s, c.running, c.lags, th); got != c.want {
 			t.Errorf("%+v = %s", c, got)
 		}
 	}
 }
 
 func TestUnitPlatformFederation(t *testing.T) {
-	f := types.PatternFilter{Include: []string{"team-*"}, Exclude: []string{"team-secret"}}
+	f := model.PatternFilter{Include: []string{"team-*"}, Exclude: []string{"team-secret"}}
 	if !f.Matches("team-a") || f.Matches("team-secret") || f.Matches("other") ||
-		!(types.PatternFilter{}).Matches("x") {
+		!(model.PatternFilter{}).Matches("x") {
 		t.Error("PatternFilter")
 	}
-	target := types.AccessFederationTarget{
+	target := model.AccessFederationTarget{
 		Active:   true,
-		Entities: []types.FederatedEntity{types.EntityUsers},
+		Entities: []model.FederatedEntity{model.EntityUsers},
 	}
-	if !target.Streams(types.EntityUsers) || target.Streams(types.EntityTokens) {
+	if !target.Streams(model.EntityUsers) || target.Streams(model.EntityTokens) {
 		t.Error("Streams")
 	}
 	target.Active = false
-	if target.Streams(types.EntityUsers) {
+	if target.Streams(model.EntityUsers) {
 		t.Error("an inactive target receives nothing")
 	}
 }

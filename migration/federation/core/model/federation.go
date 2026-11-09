@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	retentionapi "github.com/weaveplatform/artifactweave/migration/retention/api"
 )
 
 // ErrInvalidMemberURL reports a federation member URL that does not name a
@@ -130,6 +131,6 @@ type FullSyncRun struct {
 	SnapshotSeq    int64
 	Started        time.Time
 	Finished       time.Time
-	Status         RunStatus
+	Status         retentionapi.RunStatus
 	ResultPaths    []string
 }

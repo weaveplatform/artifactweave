@@ -3,6 +3,7 @@ package model
 import (
 	"errors"
 	"fmt"
+	"path"
 	"slices"
 	"strings"
 	"time"
@@ -50,7 +51,21 @@ func (f WorkerFilter) Matches(repoKey string, c repo.Class, itemPath string) boo
 	if !repoOK {
 		return false
 	}
-	return PatternFilter{Include: f.IncludePatterns, Exclude: f.ExcludePatterns}.Matches(itemPath)
+	return matchPatterns(f.IncludePatterns, f.ExcludePatterns, itemPath)
+}
+
+// matchPatterns is what the federation model's PatternFilter.Matches does
+// for an access federation target: name passes when it matches an include
+// glob (path.Match), or there is none, and no exclude glob. The workers
+// model keeps its own copy because layout row 11 lets a module import
+// another only through that module's api, and the federation api does not
+// carry PatternFilter. A change to the matching rule changes both.
+func matchPatterns(include, exclude []string, name string) bool {
+	match := func(p string) bool { ok, err := path.Match(p, name); return err == nil && ok }
+	if len(include) > 0 && !slices.ContainsFunc(include, match) {
+		return false
+	}
+	return !slices.ContainsFunc(exclude, match)
 }
 
 // Worker is a TypeScript hook run by the embedded runtime.

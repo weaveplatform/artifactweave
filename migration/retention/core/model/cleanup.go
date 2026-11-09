@@ -1,6 +1,10 @@
 package model
 
-import "time"
+import (
+	"time"
+
+	"github.com/weaveplatform/artifactweave/migration/retention/api"
+)
 
 // CleanupItemType is what a cleanup policy deletes.
 type CleanupItemType string
@@ -57,7 +61,7 @@ type CleanupRun struct {
 	PolicyKey    string
 	TriggerID    int64
 	ItemType     CleanupItemType
-	Status       RunStatus
+	Status       api.RunStatus
 	DryRun       bool
 	Manual       bool
 	TriggeredBy  string
