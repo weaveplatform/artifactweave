@@ -362,7 +362,7 @@ func apiReviewPolicy(e *apiReviewOperation) {
 		e.Evidence = append(
 			e.Evidence,
 			"migration/artifacts/ecosystem/bower/http/register.go",
-			"pkg/store/storetest/bower.go",
+			"migration/artifacts/adapters/storetest/bower.go",
 		)
 	}
 	e.Evidence = append(
@@ -426,7 +426,7 @@ func apiReviewPersistence(path string) (string, string, []string) {
 		return "search", "AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches collect authorized results from batches; no new keyset promise", []string{
 			"internal/server/searches.go",
 			"internal/server/aql.go",
-			"internal/sqlstore/sqlcommon/content_items.go",
+			"migration/artifacts/adapters/sql/content_items.go",
 			"docs/research/decisions/0012-search-and-aql.md",
 		}
 	}
@@ -438,7 +438,7 @@ func apiReviewPersistence(path string) (string, string, []string) {
 				"internal/server/server.go",
 				"internal/server/pkgroute/pkgroute.go",
 				"migration/artifacts/core/item/item.go",
-				"internal/sqlstore/sqlcommon/content_items.go",
+				"migration/artifacts/adapters/sql/content_items.go",
 			}
 		}
 	}
@@ -446,7 +446,7 @@ func apiReviewPersistence(path string) (string, string, []string) {
 		"internal/server/server.go",
 		"internal/server/items.go",
 		"internal/server/storage.go",
-		"internal/sqlstore/sqlcommon/content_items.go",
+		"migration/artifacts/adapters/sql/content_items.go",
 		"migration/access/adapters/sql/projects.go",
 	}
 }
