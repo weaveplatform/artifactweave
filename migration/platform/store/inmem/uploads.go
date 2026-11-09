@@ -6,24 +6,23 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
 	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
-// Uploads implements store.Store.
-func (s *Store) Uploads() store.UploadStore { return uploads{s} }
-
-// --- Uploads ---------------------------------------------------------------
+// Uploads returns the upload session store (decision 0027).
+func (s *Store) Uploads() session.UploadStore { return uploads{s} }
 
 type uploads struct{ s *Store }
 
-func (u uploads) t() *memtx.Table[string, store.Upload] {
-	return memtx.TableOf[string, store.Upload](u.s.Store, "uploads")
+func (u uploads) t() *memtx.Table[string, session.Upload] {
+	return memtx.TableOf[string, session.Upload](u.s.Store, "uploads")
 }
 
-func (u uploads) Put(ctx context.Context, up store.Upload) error {
+func (u uploads) Put(ctx context.Context, up session.Upload) error {
 	if up.ID == "" {
-		return fmt.Errorf("put upload: id is required: %w", store.ErrInvalid)
+		return fmt.Errorf("put upload: id is required: %w", kernel.ErrInvalid)
 	}
 	return u.s.Do(ctx, func() error {
 		if len(up.State) == 0 {
@@ -34,8 +33,8 @@ func (u uploads) Put(ctx context.Context, up store.Upload) error {
 	})
 }
 
-func (u uploads) Get(ctx context.Context, id string) (store.Upload, error) {
-	var out store.Upload
+func (u uploads) Get(ctx context.Context, id string) (session.Upload, error) {
+	var out session.Upload
 	err := u.s.Do(ctx, func() error {
 		var ok bool
 		if out, ok = u.t().Get(id); !ok {
@@ -57,7 +56,7 @@ func (u uploads) Delete(ctx context.Context, id string) error {
 
 // lastActive is when a session was last touched for staleness, in the SQL
 // column's terms: Updated, else Started, else the epoch.
-func lastActive(up store.Upload) int64 {
+func lastActive(up session.Upload) int64 {
 	switch {
 	case !up.Updated.IsZero():
 		return up.Updated.UnixMicro()
@@ -68,12 +67,12 @@ func lastActive(up store.Upload) int64 {
 	}
 }
 
-func (u uploads) Stale(ctx context.Context, before time.Time, limit int) ([]store.Upload, error) {
-	var out []store.Upload
+func (u uploads) Stale(ctx context.Context, before time.Time, limit int) ([]session.Upload, error) {
+	var out []session.Upload
 	err := u.s.Do(ctx, func() error {
 		cutoff := before.UnixMicro()
-		out = u.t().All(func(_ string, up store.Upload) bool { return lastActive(up) < cutoff },
-			func(a, b store.Upload) int {
+		out = u.t().All(func(_ string, up session.Upload) bool { return lastActive(up) < cutoff },
+			func(a, b session.Upload) int {
 				return cmp.Or(cmp.Compare(lastActive(a), lastActive(b)), cmp.Compare(a.ID, b.ID))
 			})
 		out = out[:min(len(out), limitOr(limit))]

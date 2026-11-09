@@ -7,11 +7,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 )
 
-// RequestBudgets implements store.Store.
-func (s *Store) RequestBudgets() store.RequestBudgetStore { return requestBudgets{s} }
+// RequestBudgets returns the request budget store (decision 0043).
+func (s *Store) RequestBudgets() apilimit.RequestBudgetStore { return requestBudgets{s} }
 
 type (
 	requestBudgets struct{ s *Store }
@@ -23,9 +24,9 @@ type (
 
 func (b requestBudgets) Take(
 	ctx context.Context,
-	r store.BudgetRequest,
-) (store.BudgetDecision, error) {
-	var out store.BudgetDecision
+	r apilimit.BudgetRequest,
+) (apilimit.BudgetDecision, error) {
+	var out apilimit.BudgetDecision
 	var full bool
 	if err := r.Validate(); err != nil {
 		return out, fmt.Errorf("request budget: %w", err)
@@ -48,7 +49,7 @@ func (b requestBudgets) Take(
 			return err
 		}
 		out.Allowed = true
-		out.Balances = make([]store.BudgetBalance, len(r.Budgets))
+		out.Balances = make([]apilimit.BudgetBalance, len(r.Budgets))
 		windows := make([]budgetWindow, len(r.Budgets))
 		newKeys := 0
 		for i, budget := range r.Budgets {
@@ -64,7 +65,7 @@ func (b requestBudgets) Take(
 			}
 			windows[i] = v
 			remaining := max(0, budget.Limit-v.used)
-			out.Balances[i] = store.BudgetBalance{
+			out.Balances[i] = apilimit.BudgetBalance{
 				Remaining: remaining,
 				Reset:     time.UnixMicro(v.reset).UTC(),
 			}
@@ -74,7 +75,7 @@ func (b requestBudgets) Take(
 			return nil
 		}
 		if err := b.capacity(ctx, newKeys, r.MaxKeys); err != nil {
-			if errors.Is(err, store.ErrBudgetCapacity) {
+			if errors.Is(err, apilimit.ErrBudgetCapacity) {
 				full = true
 				return nil
 			}
@@ -84,7 +85,7 @@ func (b requestBudgets) Take(
 			if _, err := b.s.Exec(
 				ctx,
 				"charge request budget",
-				Upsert(
+				dialect.Upsert(
 					"request_budgets",
 					[]string{"key_hash", "used", "resets_at"},
 					[]string{"key_hash"},
@@ -100,7 +101,7 @@ func (b requestBudgets) Take(
 		return nil
 	})
 	if err == nil && full {
-		err = store.ErrBudgetCapacity
+		err = apilimit.ErrBudgetCapacity
 	}
 	if err != nil {
 		out.Allowed = false
@@ -130,7 +131,7 @@ func (b requestBudgets) capacity(ctx context.Context, newKeys, maxKeys int) erro
 		return b.s.Wrap("count request budgets", err)
 	}
 	if count+newKeys > maxKeys {
-		return store.ErrBudgetCapacity
+		return apilimit.ErrBudgetCapacity
 	}
 	return nil
 }

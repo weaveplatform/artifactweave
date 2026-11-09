@@ -5,21 +5,23 @@ import (
 	"database/sql"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/outbox"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// Outbox implements store.Store.
-func (s *Store) Outbox() store.OutboxStore { return outboxStore{s} }
+// Outbox returns the federation outbox store: the outbox with its
+// sequences, peer cursors, applied markers and failed blob fetches
+// (decision 0021).
+func (s *Store) Outbox() outbox.OutboxStore { return outboxStore{s} }
 
 type outboxStore struct{ s *Store }
 
 const outboxCols = "origin, stream, seq, hlc_wall, hlc_logical, event_type, payload, blob_sha256, blob_size, created_at"
 
-func scanOutbox(r dialect.PeersScanner) (types.OutboxEntry, error) {
+func scanOutbox(r dialect.PeersScanner) (outbox.OutboxEntry, error) {
 	var (
-		e       types.OutboxEntry
+		e       outbox.OutboxEntry
 		logical int64
 		created sql.NullInt64
 	)
@@ -33,12 +35,12 @@ func scanOutbox(r dialect.PeersScanner) (types.OutboxEntry, error) {
 	return e, err //nolint:wrapcheck // wrapped by the caller
 }
 
-func (o outboxStore) Append(ctx context.Context, e types.OutboxEntry) (types.OutboxEntry, error) {
+func (o outboxStore) Append(ctx context.Context, e outbox.OutboxEntry) (outbox.OutboxEntry, error) {
 	err := o.s.Tx(ctx, func(ctx context.Context) error {
 		// The sequence row serialises appenders: the UPDATE holds its lock
 		// until commit, so two transactions never draw the same number and a
 		// rolled-back append returns its number with it.
-		if _, err := o.s.Exec(ctx, "append outbox", InsertIgnore("outbox_sequences",
+		if _, err := o.s.Exec(ctx, "append outbox", dialect.InsertIgnore("outbox_sequences",
 			[]string{"origin", "stream", "last_seq"}, []string{"origin", "stream"}),
 			e.Origin, e.Stream, 0); err != nil {
 			return err
@@ -52,7 +54,7 @@ func (o outboxStore) Append(ctx context.Context, e types.OutboxEntry) (types.Out
 		_, err := o.s.Exec(
 			ctx,
 			"append outbox",
-			Insert("outbox", strings.Split(outboxCols, ", ")),
+			dialect.Insert("outbox", strings.Split(outboxCols, ", ")),
 			e.Origin,
 			e.Stream,
 			e.Seq,
@@ -67,9 +69,9 @@ func (o outboxStore) Append(ctx context.Context, e types.OutboxEntry) (types.Out
 		return err
 	})
 	if err != nil {
-		return types.OutboxEntry{}, err
+		return outbox.OutboxEntry{}, err
 	}
-	return store.Normalise(e), nil
+	return kernel.Normalise(e), nil
 }
 
 // peersBytes stores an empty byte slice as NULL.
@@ -82,8 +84,8 @@ func peersBytes(b []byte) any {
 
 func (o outboxStore) Read(
 	ctx context.Context, origin, stream string, after int64, limit int,
-) ([]types.OutboxEntry, error) {
-	var out []types.OutboxEntry
+) ([]outbox.OutboxEntry, error) {
+	var out []outbox.OutboxEntry
 	err := o.s.Rows(ctx, "read outbox", "SELECT "+outboxCols+" FROM outbox "+
 		"WHERE origin = ? AND stream = ? AND seq > ? ORDER BY seq LIMIT ?",
 		[]any{origin, stream, after, dialect.LimitOr(limit)},
@@ -123,9 +125,9 @@ func (o outboxStore) Prune(ctx context.Context, origin, stream string, upTo int6
 
 const peerCursorCols = "peer, stream, acked_seq, last_sent_at, last_error"
 
-func scanPeerCursor(r dialect.PeersScanner) (types.PeerCursor, error) {
+func scanPeerCursor(r dialect.PeersScanner) (outbox.PeerCursor, error) {
 	var (
-		c    types.PeerCursor
+		c    outbox.PeerCursor
 		sent sql.NullInt64
 	)
 	err := r.Scan(&c.PeerInstanceID, &c.Stream, &c.AckedSeq, &sent, &c.LastError)
@@ -133,28 +135,39 @@ func scanPeerCursor(r dialect.PeersScanner) (types.PeerCursor, error) {
 	return c, err //nolint:wrapcheck // wrapped by the caller
 }
 
-func (o outboxStore) PutCursor(ctx context.Context, c types.PeerCursor) error {
-	_, err := o.s.Exec(ctx, "put peer cursor",
-		Upsert("peer_cursors", strings.Split(peerCursorCols, ", "), []string{"peer", "stream"}),
-		c.PeerInstanceID, c.Stream, c.AckedSeq, dialect.Micros(c.LastSent), c.LastError)
+func (o outboxStore) PutCursor(ctx context.Context, c outbox.PeerCursor) error {
+	_, err := o.s.Exec(
+		ctx,
+		"put peer cursor",
+		dialect.Upsert(
+			"peer_cursors",
+			strings.Split(peerCursorCols, ", "),
+			[]string{"peer", "stream"},
+		),
+		c.PeerInstanceID,
+		c.Stream,
+		c.AckedSeq,
+		dialect.Micros(c.LastSent),
+		c.LastError,
+	)
 	return err
 }
 
-func (o outboxStore) Cursor(ctx context.Context, peer, stream string) (types.PeerCursor, error) {
+func (o outboxStore) Cursor(ctx context.Context, peer, stream string) (outbox.PeerCursor, error) {
 	c, err := scanPeerCursor(o.s.Q(ctx).QueryRowContext(ctx, o.s.Dialect().Rebind(
 		"SELECT "+peerCursorCols+" FROM peer_cursors WHERE peer = ? AND stream = ?"), peer, stream))
 	if err != nil {
-		return types.PeerCursor{}, o.s.Wrap("get peer cursor "+peer+" "+stream, err)
+		return outbox.PeerCursor{}, o.s.Wrap("get peer cursor "+peer+" "+stream, err)
 	}
 	return c, nil
 }
 
-func (o outboxStore) Cursors(ctx context.Context, peer string) ([]types.PeerCursor, error) {
+func (o outboxStore) Cursors(ctx context.Context, peer string) ([]outbox.PeerCursor, error) {
 	where, args := "", []any(nil)
 	if peer != "" {
 		where, args = " WHERE peer = ?", []any{peer}
 	}
-	var out []types.PeerCursor
+	var out []outbox.PeerCursor
 	err := o.s.Rows(ctx, "list peer cursors",
 		"SELECT "+peerCursorCols+" FROM peer_cursors"+where+" ORDER BY peer, stream", args,
 		func(r *sql.Rows) error {
@@ -173,19 +186,19 @@ func (o outboxStore) DeleteCursors(ctx context.Context, peer string) error {
 func (o outboxStore) Applied(
 	ctx context.Context,
 	origin, stream string,
-) (types.AppliedMarker, error) {
-	m := types.AppliedMarker{Origin: origin, Stream: stream}
+) (outbox.AppliedMarker, error) {
+	m := outbox.AppliedMarker{Origin: origin, Stream: stream}
 	err := o.s.Q(ctx).QueryRowContext(ctx, o.s.Dialect().Rebind(
 		"SELECT COALESCE(MAX(last_seq), 0) FROM applied_markers WHERE origin = ? AND stream = ?"),
 		origin, stream).Scan(&m.LastSeq)
 	return m, o.s.Wrap("get applied marker", err)
 }
 
-func (o outboxStore) SetApplied(ctx context.Context, m types.AppliedMarker) error {
+func (o outboxStore) SetApplied(ctx context.Context, m outbox.AppliedMarker) error {
 	_, err := o.s.Exec(
 		ctx,
 		"set applied marker",
-		Upsert(
+		dialect.Upsert(
 			"applied_markers",
 			[]string{"origin", "stream", "last_seq"},
 			[]string{"origin", "stream"},
@@ -199,9 +212,9 @@ func (o outboxStore) SetApplied(ctx context.Context, m types.AppliedMarker) erro
 
 const failedFetchCols = "stream, sha256, sha1, repo_key, first_failed_at, failures, last_error"
 
-func scanFailedFetch(r dialect.PeersScanner) (types.FailedBlobFetch, error) {
+func scanFailedFetch(r dialect.PeersScanner) (outbox.FailedBlobFetch, error) {
 	var (
-		f     types.FailedBlobFetch
+		f     outbox.FailedBlobFetch
 		first sql.NullInt64
 	)
 	err := r.Scan(&f.Stream, &f.SHA256, &f.SHA1, &f.RepoKey, &first, &f.Failures, &f.LastError)
@@ -211,16 +224,16 @@ func scanFailedFetch(r dialect.PeersScanner) (types.FailedBlobFetch, error) {
 
 func (o outboxStore) RecordFailedFetch(
 	ctx context.Context,
-	f types.FailedBlobFetch,
-) (types.FailedBlobFetch, error) {
-	var out types.FailedBlobFetch
+	f outbox.FailedBlobFetch,
+) (outbox.FailedBlobFetch, error) {
+	var out outbox.FailedBlobFetch
 	err := o.s.Tx(ctx, func(ctx context.Context) error {
 		// Insert-if-absent with no failures, then count this one, so two
 		// first failures racing on PostgreSQL both land on one row.
 		if _, err := o.s.Exec(
 			ctx,
 			"record failed fetch",
-			InsertIgnore(
+			dialect.InsertIgnore(
 				"failed_blob_fetches",
 				strings.Split(failedFetchCols, ", "),
 				[]string{"stream", "sha256"},
@@ -247,7 +260,7 @@ func (o outboxStore) RecordFailedFetch(
 		return o.s.Wrap("record failed fetch", err)
 	})
 	if err != nil {
-		return types.FailedBlobFetch{}, err
+		return outbox.FailedBlobFetch{}, err
 	}
 	return out, nil
 }
@@ -255,12 +268,12 @@ func (o outboxStore) RecordFailedFetch(
 func (o outboxStore) FailedFetches(
 	ctx context.Context,
 	stream string,
-) ([]types.FailedBlobFetch, error) {
+) ([]outbox.FailedBlobFetch, error) {
 	where, args := "", []any(nil)
 	if stream != "" {
 		where, args = " WHERE stream = ?", []any{stream}
 	}
-	var out []types.FailedBlobFetch
+	var out []outbox.FailedBlobFetch
 	err := o.s.Rows(
 		ctx,
 		"list failed fetches",

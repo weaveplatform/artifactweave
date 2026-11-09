@@ -3,26 +3,31 @@ package storetest
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/idempotency"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/storekit"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
+
+// errReceipt reports a receipt that names the wrong resource or expiry.
+var errReceipt = errors.New("unexpected replay receipt")
 
 func replayDigest(value string) string { return fmt.Sprintf("%x", sha256.Sum256([]byte(value))) }
 
-func replayRequest() store.ReplayRequest {
-	return store.ReplayRequest{
+func replayRequest() idempotency.ReplayRequest {
+	return idempotency.ReplayRequest{
 		Scope: replayDigest("principal+operation+resource"), Key: replayDigest("random-key"),
 		Fingerprint: replayDigest("request"), Now: storekit.Base, Expires: storekit.At(60),
 	}
 }
 
-func runReplays(t *testing.T, factory Factory) {
+func runReplays(t *testing.T, factory func(*testing.T) Store) {
 	t.Run("Replays", func(t *testing.T) {
 		s := factory(t)
 		ctx := t.Context()
@@ -31,7 +36,7 @@ func runReplays(t *testing.T, factory Factory) {
 		effect := func(ctx context.Context) (int64, error) {
 			calls.Add(1)
 			if err := s.Settings().Put(ctx, "replay-effect", true); err != nil {
-				return 0, err
+				return 0, err //nolint:wrapcheck // Must reports it
 			}
 			return 42, nil
 		}
@@ -42,8 +47,8 @@ func runReplays(t *testing.T, factory Factory) {
 			wg.Go(func() {
 				out, err := s.Replays().Do(ctx, r, effect)
 				if err == nil &&
-					(out.ResourceID != 42 || !out.Expires.Equal(store.Normalise(r.Expires))) {
-					err = fmt.Errorf("unexpected replay receipt: %+v", out)
+					(out.ResourceID != 42 || !out.Expires.Equal(kernel.Normalise(r.Expires))) {
+					err = fmt.Errorf("%w: %+v", errReceipt, out)
 				}
 				errs <- err
 			})
@@ -56,19 +61,19 @@ func runReplays(t *testing.T, factory Factory) {
 		if calls.Load() != 1 {
 			t.Fatalf("committed effect called %d times", calls.Load())
 		}
-		out := storekit.Get[store.ReplayReceipt](t)(s.Replays().Do(ctx, r, effect))
+		out := storekit.Get[idempotency.ReplayReceipt](t)(s.Replays().Do(ctx, r, effect))
 		if !out.Replayed {
 			t.Fatal("duplicate did not replay")
 		}
 		changed := r
 		changed.Fingerprint = replayDigest("different body")
 		_, err := s.Replays().Do(ctx, changed, effect)
-		storekit.WantErr(t, err, store.ErrReplayMismatch)
+		storekit.WantErr(t, err, idempotency.ErrReplayMismatch)
 		changed.Scope = replayDigest("another credential")
-		storekit.Get[store.ReplayReceipt](t)(s.Replays().Do(ctx, changed, effect))
+		storekit.Get[idempotency.ReplayReceipt](t)(s.Replays().Do(ctx, changed, effect))
 		changed = r
 		changed.Now, changed.Expires = r.Expires, storekit.At(120)
-		out = storekit.Get[store.ReplayReceipt](t)(s.Replays().Do(ctx, changed, effect))
+		out = storekit.Get[idempotency.ReplayReceipt](t)(s.Replays().Do(ctx, changed, effect))
 		if out.Replayed || calls.Load() != 3 {
 			t.Fatalf("expired key did not perform new effect: %+v, calls %d", out, calls.Load())
 		}
@@ -78,22 +83,22 @@ func runReplays(t *testing.T, factory Factory) {
 		if n := storekit.Get[int64](t)(s.Replays().Prune(ctx, storekit.At(180), 100)); n != 1 {
 			t.Fatalf("remaining prune removed %d", n)
 		}
-		for _, limit := range []int{0, store.MaxLimit + 1} {
+		for _, limit := range []int{0, kernel.MaxLimit + 1} {
 			_, err := s.Replays().Prune(ctx, storekit.Base, limit)
-			storekit.WantErr(t, err, store.ErrInvalid)
+			storekit.WantErr(t, err, kernel.ErrInvalid)
 		}
-		for _, bad := range []store.ReplayRequest{
+		for _, bad := range []idempotency.ReplayRequest{
 			{},
 			{Scope: r.Scope, Key: "bad", Fingerprint: r.Fingerprint, Now: r.Now, Expires: r.Expires},
 			{Scope: r.Scope, Key: r.Key, Fingerprint: r.Fingerprint, Now: r.Now, Expires: r.Now},
 		} {
 			_, err := s.Replays().Do(ctx, bad, effect)
-			storekit.WantErr(t, err, store.ErrInvalid)
+			storekit.WantErr(t, err, kernel.ErrInvalid)
 		}
 		_, err = s.Replays().Do(ctx, r, nil)
-		storekit.WantErr(t, err, store.ErrInvalid)
+		storekit.WantErr(t, err, kernel.ErrInvalid)
 		_, err = s.Replays().Do(ctx, r, func(context.Context) (int64, error) { return 0, nil })
-		storekit.WantErr(t, err, store.ErrInvalid)
+		storekit.WantErr(t, err, kernel.ErrInvalid)
 	})
 	t.Run("ReplayRollback", func(t *testing.T) {
 		s := factory(t)
@@ -106,19 +111,19 @@ func runReplays(t *testing.T, factory Factory) {
 			if _, err := write(ctx); err != nil {
 				return 0, err
 			}
-			return 0, store.ErrConflict
+			return 0, kernel.ErrConflict
 		})
-		storekit.WantErr(t, err, store.ErrConflict)
+		storekit.WantErr(t, err, kernel.ErrConflict)
 		var value bool
-		storekit.WantErr(t, s.Settings().Get(ctx, "replay-rollback", &value), store.ErrNotFound)
+		storekit.WantErr(t, s.Settings().Get(ctx, "replay-rollback", &value), kernel.ErrNotFound)
 		err = s.Tx(ctx, func(ctx context.Context) error {
 			if _, err := s.Replays().Do(ctx, r, write); err != nil {
-				return err
+				return err //nolint:wrapcheck // WantErr reports any error but ErrConflict
 			}
-			return store.ErrConflict
+			return kernel.ErrConflict
 		})
-		storekit.WantErr(t, err, store.ErrConflict)
-		storekit.WantErr(t, s.Settings().Get(ctx, "replay-rollback", &value), store.ErrNotFound)
+		storekit.WantErr(t, err, kernel.ErrConflict)
+		storekit.WantErr(t, s.Settings().Get(ctx, "replay-rollback", &value), kernel.ErrNotFound)
 		cancelCtx, cancel := context.WithCancel(ctx)
 		_, err = s.Replays().Do(cancelCtx, r, func(ctx context.Context) (int64, error) {
 			id, err := write(ctx)
@@ -127,8 +132,8 @@ func runReplays(t *testing.T, factory Factory) {
 		})
 		cancel()
 		storekit.WantErr(t, err, context.Canceled)
-		storekit.WantErr(t, s.Settings().Get(ctx, "replay-rollback", &value), store.ErrNotFound)
-		out := storekit.Get[store.ReplayReceipt](t)(s.Replays().Do(ctx, r, write))
+		storekit.WantErr(t, s.Settings().Get(ctx, "replay-rollback", &value), kernel.ErrNotFound)
+		out := storekit.Get[idempotency.ReplayReceipt](t)(s.Replays().Do(ctx, r, write))
 		if out.Replayed {
 			t.Fatal("rolled-back receipt survived")
 		}

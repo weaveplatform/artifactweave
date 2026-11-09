@@ -3,8 +3,12 @@ package storetest
 import (
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
 	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
+	"github.com/weaveplatform/artifactweave/migration/platform/idempotency"
 	"github.com/weaveplatform/artifactweave/migration/platform/instance"
+	"github.com/weaveplatform/artifactweave/migration/platform/outbox"
 	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/migration/platform/tx"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
@@ -19,6 +23,10 @@ type Store interface {
 	WorkQueue() work.WorkQueue
 	Configs() configdoc.ConfigStore
 	Instance() instance.InstanceStore
+	Outbox() outbox.OutboxStore
+	Uploads() session.UploadStore
+	Replays() idempotency.ReplayStore
+	RequestBudgets() apilimit.RequestBudgetStore
 }
 
 // Factory returns a fresh, empty store whose config store notifies
@@ -42,4 +50,8 @@ func RunWithoutWatches(t *testing.T, newStore func(t *testing.T) Store) {
 	runPlatformOperations(t, newStore)
 	runWork(t, newStore)
 	runInstance(t, newStore)
+	runOutbox(t, newStore)
+	runUploads(t, newStore)
+	runReplays(t, newStore)
+	runRequestBudgets(t, newStore)
 }

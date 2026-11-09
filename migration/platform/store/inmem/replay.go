@@ -5,18 +5,21 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/idempotency"
 	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
-func (s *Store) Replays() store.ReplayStore { return replayStore{s} }
+// Replays returns the API replay store, which commits an effect and its
+// receipt in one transaction (decision 0043).
+func (s *Store) Replays() idempotency.ReplayStore { return replayStore{s} }
 
 type (
 	replayStore  struct{ s *Store }
 	replayKey    struct{ scope, key string }
 	replayRecord struct {
 		fingerprint string
-		receipt     store.ReplayReceipt
+		receipt     idempotency.ReplayReceipt
 	}
 )
 
@@ -26,22 +29,22 @@ func (s replayStore) rows() *memtx.Table[replayKey, replayRecord] {
 
 func (s replayStore) Do(
 	ctx context.Context,
-	r store.ReplayRequest,
+	r idempotency.ReplayRequest,
 	effect func(context.Context) (int64, error),
-) (store.ReplayReceipt, error) {
-	var out store.ReplayReceipt
+) (idempotency.ReplayReceipt, error) {
+	var out idempotency.ReplayReceipt
 	if err := r.Validate(); err != nil {
-		return out, err
+		return out, err //nolint:wrapcheck // Validate's error names the replay
 	}
 	if effect == nil {
-		return out, fmt.Errorf("replay effect is required: %w", store.ErrInvalid)
+		return out, fmt.Errorf("replay effect is required: %w", kernel.ErrInvalid)
 	}
 	err := s.s.Tx(ctx, func(ctx context.Context) error {
 		key := replayKey{r.Scope, r.Key}
 		cur, ok := s.rows().Rows[key]
 		if ok && cur.receipt.Expires.UnixMicro() > r.Now.UnixMicro() {
 			if cur.fingerprint != r.Fingerprint {
-				return store.ErrReplayMismatch
+				return idempotency.ErrReplayMismatch
 			}
 			out = cur.receipt
 			out.Replayed = true
@@ -52,12 +55,12 @@ func (s replayStore) Do(
 			return err
 		}
 		if id <= 0 {
-			return fmt.Errorf("replay resource ID must be positive: %w", store.ErrInvalid)
+			return fmt.Errorf("replay resource ID must be positive: %w", kernel.ErrInvalid)
 		}
 		if err := ctx.Err(); err != nil {
 			return fmt.Errorf("replay: %w", err)
 		}
-		out = store.ReplayReceipt{ResourceID: id, Expires: store.Normalise(r.Expires)}
+		out = idempotency.ReplayReceipt{ResourceID: id, Expires: kernel.Normalise(r.Expires)}
 		s.rows().Rows[key] = replayRecord{r.Fingerprint, out}
 		return nil
 	})
@@ -65,8 +68,8 @@ func (s replayStore) Do(
 }
 
 func (s replayStore) Prune(ctx context.Context, now time.Time, limit int) (int64, error) {
-	if limit < 1 || limit > store.MaxLimit {
-		return 0, fmt.Errorf("replay prune limit: %w", store.ErrInvalid)
+	if limit < 1 || limit > kernel.MaxLimit {
+		return 0, fmt.Errorf("replay prune limit: %w", kernel.ErrInvalid)
 	}
 	var n int64
 	err := s.s.Do(ctx, func() error {

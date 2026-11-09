@@ -4,11 +4,13 @@ import (
 	"context"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
 	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
-func (s *Store) RequestBudgets() store.RequestBudgetStore { return requestBudgets{s} }
+// RequestBudgets returns the request budget store (decision 0043).
+func (s *Store) RequestBudgets() apilimit.RequestBudgetStore { return requestBudgets{s} }
 
 type (
 	requestBudgets struct{ s *Store }
@@ -24,11 +26,11 @@ func (b requestBudgets) rows() *memtx.Table[string, budgetWindow] {
 
 func (b requestBudgets) Take(
 	ctx context.Context,
-	r store.BudgetRequest,
-) (store.BudgetDecision, error) {
-	var out store.BudgetDecision
+	r apilimit.BudgetRequest,
+) (apilimit.BudgetDecision, error) {
+	var out apilimit.BudgetDecision
 	if err := r.Validate(); err != nil {
-		return out, err
+		return out, err //nolint:wrapcheck // Validate's error names the request budget
 	}
 	err := b.s.Do(ctx, func() error {
 		rows := b.rows().Rows
@@ -43,7 +45,7 @@ func (b requestBudgets) Take(
 			}
 		}
 		out.Allowed = true
-		out.Balances = make([]store.BudgetBalance, len(r.Budgets))
+		out.Balances = make([]apilimit.BudgetBalance, len(r.Budgets))
 		windows := make([]budgetWindow, len(r.Budgets))
 		newKeys := 0
 		for i, budget := range r.Budgets {
@@ -52,18 +54,18 @@ func (b requestBudgets) Take(
 				newKeys++
 			}
 			if !ok || v.reset.UnixMicro() <= r.Now.UnixMicro() {
-				v = budgetWindow{reset: store.Normalise(budget.Reset)}
+				v = budgetWindow{reset: kernel.Normalise(budget.Reset)}
 			}
 			windows[i] = v
 			remaining := max(0, budget.Limit-v.used)
-			out.Balances[i] = store.BudgetBalance{Remaining: remaining, Reset: v.reset}
+			out.Balances[i] = apilimit.BudgetBalance{Remaining: remaining, Reset: v.reset}
 			out.Allowed = out.Allowed && remaining > 0
 		}
 		if !out.Allowed {
 			return nil
 		}
 		if len(rows)+newKeys > r.MaxKeys {
-			return store.ErrBudgetCapacity
+			return apilimit.ErrBudgetCapacity
 		}
 		for i, budget := range r.Budgets {
 			windows[i].used++

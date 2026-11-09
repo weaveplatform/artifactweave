@@ -6,12 +6,11 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/outbox"
 	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// Table names of the peers group; the same names as the SQL tables.
+// The tables have the SQL tables' names.
 const (
 	tOutbox        = "outbox"
 	tOutboxSeqs    = "outbox_sequences"
@@ -20,39 +19,45 @@ const (
 	tFailedFetches = "failed_blob_fetches"
 )
 
+// peersPair is a key of two strings: an origin or a peer and a stream, or a
+// stream and a blob digest.
+type peersPair struct{ a, b string }
+
 // outboxKey identifies one outbox entry.
 type outboxKey struct {
 	origin, stream string
 	seq            int64
 }
 
-// Outbox implements store.Store.
-func (s *Store) Outbox() store.OutboxStore { return outboxStore{s} }
+// Outbox returns the federation outbox store: the outbox with its
+// sequences, peer cursors, applied markers and failed blob fetches
+// (decision 0021).
+func (s *Store) Outbox() outbox.OutboxStore { return outboxStore{s} }
 
 type outboxStore struct{ s *Store }
 
-func (o outboxStore) entries() *memtx.Table[outboxKey, types.OutboxEntry] {
-	return memtx.TableOf[outboxKey, types.OutboxEntry](o.s.Store, tOutbox)
+func (o outboxStore) entries() *memtx.Table[outboxKey, outbox.OutboxEntry] {
+	return memtx.TableOf[outboxKey, outbox.OutboxEntry](o.s.Store, tOutbox)
 }
 
 func (o outboxStore) seqs() *memtx.Table[peersPair, int64] {
 	return memtx.TableOf[peersPair, int64](o.s.Store, tOutboxSeqs)
 }
 
-func (o outboxStore) cursors() *memtx.Table[peersPair, types.PeerCursor] {
-	return memtx.TableOf[peersPair, types.PeerCursor](o.s.Store, tPeerCursors)
+func (o outboxStore) cursors() *memtx.Table[peersPair, outbox.PeerCursor] {
+	return memtx.TableOf[peersPair, outbox.PeerCursor](o.s.Store, tPeerCursors)
 }
 
-func (o outboxStore) applied() *memtx.Table[peersPair, types.AppliedMarker] {
-	return memtx.TableOf[peersPair, types.AppliedMarker](o.s.Store, tApplied)
+func (o outboxStore) applied() *memtx.Table[peersPair, outbox.AppliedMarker] {
+	return memtx.TableOf[peersPair, outbox.AppliedMarker](o.s.Store, tApplied)
 }
 
-func (o outboxStore) failed() *memtx.Table[peersPair, types.FailedBlobFetch] {
-	return memtx.TableOf[peersPair, types.FailedBlobFetch](o.s.Store, tFailedFetches)
+func (o outboxStore) failed() *memtx.Table[peersPair, outbox.FailedBlobFetch] {
+	return memtx.TableOf[peersPair, outbox.FailedBlobFetch](o.s.Store, tFailedFetches)
 }
 
-func (o outboxStore) Append(ctx context.Context, e types.OutboxEntry) (types.OutboxEntry, error) {
-	var out types.OutboxEntry
+func (o outboxStore) Append(ctx context.Context, e outbox.OutboxEntry) (outbox.OutboxEntry, error) {
+	var out outbox.OutboxEntry
 	err := o.s.Do(ctx, func() error {
 		k := peersPair{e.Origin, e.Stream}
 		seq, _ := o.seqs().Get(k)
@@ -68,24 +73,16 @@ func (o outboxStore) Append(ctx context.Context, e types.OutboxEntry) (types.Out
 
 func (o outboxStore) Read(
 	ctx context.Context, origin, stream string, after int64, limit int,
-) ([]types.OutboxEntry, error) {
-	var out []types.OutboxEntry
+) ([]outbox.OutboxEntry, error) {
+	var out []outbox.OutboxEntry
 	err := o.s.Do(ctx, func() error {
-		out = o.entries().All(func(k outboxKey, _ types.OutboxEntry) bool {
+		out = o.entries().All(func(k outboxKey, _ outbox.OutboxEntry) bool {
 			return k.origin == origin && k.stream == stream && k.seq > after
-		}, func(a, b types.OutboxEntry) int { return cmp.Compare(a.Seq, b.Seq) })
-		out = out[:min(len(out), peersLimit(limit))]
+		}, func(a, b outbox.OutboxEntry) int { return cmp.Compare(a.Seq, b.Seq) })
+		out = out[:min(len(out), limitOr(limit))]
 		return nil
 	})
 	return out, err
-}
-
-// peersLimit applies the default limit for "at most limit" reads.
-func peersLimit(limit int) int {
-	if limit <= 0 {
-		return store.DefaultLimit
-	}
-	return min(limit, store.MaxLimit)
 }
 
 func (o outboxStore) LastSeq(ctx context.Context, origin, stream string) (int64, error) {
@@ -114,7 +111,7 @@ func (o outboxStore) Streams(ctx context.Context, origin string) ([]string, erro
 func (o outboxStore) Prune(ctx context.Context, origin, stream string, upTo int64) (int64, error) {
 	var n int64
 	err := o.s.Do(ctx, func() error {
-		n = o.entries().DeleteWhere(func(k outboxKey, _ types.OutboxEntry) bool {
+		n = o.entries().DeleteWhere(func(k outboxKey, _ outbox.OutboxEntry) bool {
 			return k.origin == origin && k.stream == stream && k.seq <= upTo
 		})
 		return nil
@@ -122,15 +119,15 @@ func (o outboxStore) Prune(ctx context.Context, origin, stream string, upTo int6
 	return n, err
 }
 
-func (o outboxStore) PutCursor(ctx context.Context, c types.PeerCursor) error {
+func (o outboxStore) PutCursor(ctx context.Context, c outbox.PeerCursor) error {
 	return o.s.Do(ctx, func() error {
 		o.cursors().Put(peersPair{c.PeerInstanceID, c.Stream}, c)
 		return nil
 	})
 }
 
-func (o outboxStore) Cursor(ctx context.Context, peer, stream string) (types.PeerCursor, error) {
-	var out types.PeerCursor
+func (o outboxStore) Cursor(ctx context.Context, peer, stream string) (outbox.PeerCursor, error) {
+	var out outbox.PeerCursor
 	err := o.s.Do(ctx, func() error {
 		var ok bool
 		if out, ok = o.cursors().Get(peersPair{peer, stream}); !ok {
@@ -141,12 +138,12 @@ func (o outboxStore) Cursor(ctx context.Context, peer, stream string) (types.Pee
 	return out, err
 }
 
-func (o outboxStore) Cursors(ctx context.Context, peer string) ([]types.PeerCursor, error) {
-	var out []types.PeerCursor
+func (o outboxStore) Cursors(ctx context.Context, peer string) ([]outbox.PeerCursor, error) {
+	var out []outbox.PeerCursor
 	err := o.s.Do(ctx, func() error {
-		out = o.cursors().All(func(k peersPair, _ types.PeerCursor) bool {
+		out = o.cursors().All(func(k peersPair, _ outbox.PeerCursor) bool {
 			return peer == "" || k.a == peer
-		}, func(a, b types.PeerCursor) int {
+		}, func(a, b outbox.PeerCursor) int {
 			return cmp.Or(
 				strings.Compare(a.PeerInstanceID, b.PeerInstanceID),
 				strings.Compare(a.Stream, b.Stream),
@@ -159,7 +156,7 @@ func (o outboxStore) Cursors(ctx context.Context, peer string) ([]types.PeerCurs
 
 func (o outboxStore) DeleteCursors(ctx context.Context, peer string) error {
 	return o.s.Do(ctx, func() error {
-		o.cursors().DeleteWhere(func(k peersPair, _ types.PeerCursor) bool { return k.a == peer })
+		o.cursors().DeleteWhere(func(k peersPair, _ outbox.PeerCursor) bool { return k.a == peer })
 		return nil
 	})
 }
@@ -167,8 +164,8 @@ func (o outboxStore) DeleteCursors(ctx context.Context, peer string) error {
 func (o outboxStore) Applied(
 	ctx context.Context,
 	origin, stream string,
-) (types.AppliedMarker, error) {
-	out := types.AppliedMarker{Origin: origin, Stream: stream}
+) (outbox.AppliedMarker, error) {
+	out := outbox.AppliedMarker{Origin: origin, Stream: stream}
 	err := o.s.Do(ctx, func() error {
 		if m, ok := o.applied().Get(peersPair{origin, stream}); ok {
 			out = m
@@ -178,7 +175,7 @@ func (o outboxStore) Applied(
 	return out, err
 }
 
-func (o outboxStore) SetApplied(ctx context.Context, m types.AppliedMarker) error {
+func (o outboxStore) SetApplied(ctx context.Context, m outbox.AppliedMarker) error {
 	return o.s.Do(ctx, func() error {
 		o.applied().Put(peersPair{m.Origin, m.Stream}, m)
 		return nil
@@ -187,9 +184,9 @@ func (o outboxStore) SetApplied(ctx context.Context, m types.AppliedMarker) erro
 
 func (o outboxStore) RecordFailedFetch(
 	ctx context.Context,
-	f types.FailedBlobFetch,
-) (types.FailedBlobFetch, error) {
-	var out types.FailedBlobFetch
+	f outbox.FailedBlobFetch,
+) (outbox.FailedBlobFetch, error) {
+	var out outbox.FailedBlobFetch
 	err := o.s.Do(ctx, func() error {
 		k := peersPair{f.Stream, f.SHA256}
 		cur, ok := o.failed().Get(k)
@@ -210,12 +207,12 @@ func (o outboxStore) RecordFailedFetch(
 func (o outboxStore) FailedFetches(
 	ctx context.Context,
 	stream string,
-) ([]types.FailedBlobFetch, error) {
-	var out []types.FailedBlobFetch
+) ([]outbox.FailedBlobFetch, error) {
+	var out []outbox.FailedBlobFetch
 	err := o.s.Do(ctx, func() error {
-		out = o.failed().All(func(k peersPair, _ types.FailedBlobFetch) bool {
+		out = o.failed().All(func(k peersPair, _ outbox.FailedBlobFetch) bool {
 			return stream == "" || k.a == stream
-		}, func(a, b types.FailedBlobFetch) int {
+		}, func(a, b outbox.FailedBlobFetch) int {
 			return cmp.Or(strings.Compare(a.Stream, b.Stream), strings.Compare(a.SHA256, b.SHA256))
 		})
 		return nil

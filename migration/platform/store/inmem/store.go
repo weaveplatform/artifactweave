@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
 )
@@ -34,4 +35,12 @@ func (s *Store) notify(ctx context.Context, kind configdoc.ConfigKind, key strin
 		}
 	}
 	return nil
+}
+
+// limitOr applies the default limit for "at most limit" queries.
+func limitOr(limit int) int {
+	if limit <= 0 {
+		return kernel.DefaultLimit
+	}
+	return min(limit, kernel.MaxLimit)
 }
