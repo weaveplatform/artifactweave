@@ -1,8 +1,3 @@
-// Package permission manages permission documents (decision 0006): the
-// single internal shape behind the v1 and v2 permission-target APIs and the
-// Access v2 permissions API. Each API converts its wire form with pkg/types
-// and calls the service, so validation and storage happen once whichever
-// form a client writes.
 package permission
 
 import (
@@ -81,7 +76,8 @@ type Store interface {
 	port.Store
 }
 
-// Service manages permissions over a store.
+// Service validates permission documents and reads and writes them in Store,
+// checking the repositories they name through Repositories.
 type Service struct {
 	// Store holds the permissions and the users and groups they name. Every
 	// write runs in one Tx of Store, and the calls it makes join it through

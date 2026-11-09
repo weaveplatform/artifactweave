@@ -13,7 +13,7 @@
   "internal/server/vcs_delivery_test.go": "28b12c4280814ed132dd31a3b6e201096880183f9b03f6f1246fe34ea38da4e3",
   "internal/server/vcs_legacy_test.go": "f9c311ad9670391971191fa50e90a68c1c196984a10b5d124cb2b1b99616cce7",
   "internal/server/vcs_routes_test.go": "c87224d99a440001a01aa14421ea8963170c58e52919c732d8ef8f8d219bf0ec",
-  "migration/access/core/authn/token.go": "aedd9f2ee1533b0f983b386187de58b7dd4297bd2df969fc9ab95ea4d371ad04",
+  "migration/access/core/authn/token.go": "babe0157048fb63ffe7758df90769a88538e07364c54783f57c3f25559aab4a3",
   "migration/access/core/authn/token_test.go": "2d7c3c2cb63e8b2a9a0e89ec474d1f86c88c86318973be7f835659f28cb8820e",
   "migration/artifacts/ecosystem/bazelmodules/http/bazelmodules_test.go": "7167ca713183ec2237f3e5107d4811185cbf66d6d5a6b661d47f827d2f98d84d",
   "migration/artifacts/ecosystem/huggingface/http/migration_scope_test.go": "cee71d100db6e1ba4016586ed70f31f5a42eba03cce99072c83401945fababa6",

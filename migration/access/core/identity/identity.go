@@ -1,8 +1,3 @@
-// Package identity manages internal users and groups and the account
-// policies (decision 0005): creation and replacement with hashed passwords,
-// group membership and auto-join, the user lock and password expiration
-// policies, locks and forced password changes. The legacy security API and
-// Access v2 serve it in their own shapes.
 package identity
 
 import (
@@ -364,7 +359,7 @@ func (s *Service) revokeTokens(ctx context.Context, name string) error {
 }
 
 // revokeEncryptedPasswords deletes the named users' encrypted passwords
-// (types.TokenPurposeEncryptedPassword tokens); the next request for one
+// (model.TokenPurposeEncryptedPassword tokens); the next request for one
 // issues a new value. Each user holds at most one, so the list is one entry
 // per user who ever asked, not every token.
 func (s *Service) revokeEncryptedPasswords(ctx context.Context, names ...string) error {

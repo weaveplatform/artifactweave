@@ -1,9 +1,3 @@
-// Package roles manages global roles and global environments: the Access
-// API's /api/v1/roles and /api/v1/environments (issue #77, decision 0013).
-// The built-in roles and environments (types.BuiltinGlobalRoles,
-// types.BuiltinEnvironments) are not stored; this package merges them with
-// the stored custom ones, and it is how the permission evaluator reads a
-// global role (Role, then types.RoleActions).
 package roles
 
 import (

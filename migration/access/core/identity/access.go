@@ -20,7 +20,7 @@ import (
 
 // CreateGroup creates g with members, as PutGroup does for a new name, and
 // answers ErrExists when the name is taken instead of replacing the group.
-// An unknown member is store.ErrNotFound, which Access v2 documents as 404;
+// An unknown member is kernel.ErrNotFound, which Access v2 documents as 404;
 // the legacy PutGroup answers it 400.
 func (s *Service) CreateGroup(ctx context.Context, g model.Group, members []string) error {
 	if err := validName("group", g.Name); err != nil {
@@ -63,7 +63,7 @@ func (s *Service) UpdateUserGroups(
 
 // UpdateGroupMembers applies add, then remove, to the group's members and
 // returns the resulting member list. Unknown users in add are
-// store.ErrNotFound, which Access v2 answers 404.
+// kernel.ErrNotFound, which Access v2 answers 404.
 func (s *Service) UpdateGroupMembers(
 	ctx context.Context,
 	name string,
@@ -175,7 +175,7 @@ func (s *Service) forEachUser(
 
 // --- Password policy -----------------------------------------------------------
 
-// PasswordPolicy returns the stored policy, or types.DefaultPasswordPolicy
+// PasswordPolicy returns the stored policy, or model.DefaultPasswordPolicy
 // while none is stored.
 func (s *Service) PasswordPolicy(ctx context.Context) (model.PasswordPolicy, error) {
 	var p model.PasswordPolicy

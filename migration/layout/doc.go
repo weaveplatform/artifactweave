@@ -81,8 +81,8 @@
 //     imports a package of access core, such as the evaluator, other than
 //     test support, or the legacy internal/auth and internal/auth/token,
 //     which hold only bridges. Only the server root, internal/app and the
-//     test/server harnesses may import the authenticator and the token
-//     service, until TST-04 to TST-07 and WEB-22 remove the reason, and an
-//     allowlist entry that no file uses fails; the second proves each rule
-//     can fail.
+//     test/server harnesses may import the authenticator, the token service
+//     and the roles service, until TST-04 to TST-07 and WEB-22 remove the
+//     reason, and an allowlist entry that no file uses fails; the second
+//     proves each rule can fail.
 package layout

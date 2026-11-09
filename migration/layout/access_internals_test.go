@@ -26,9 +26,16 @@ var accessInternals = []string{"internal/auth", "internal/auth/token"}
 
 // allowlistedInternals are the access internals that an allowlisted file may
 // import: the authenticator and the token service, which the server root,
-// the composition root and the server harnesses wire themselves. The
-// evaluator is never one, and neither is a legacy path of them.
-var allowlistedInternals = []string{root + "/access/core/authn", root + "/access/core/token"}
+// the composition root and the server harnesses wire themselves, and the
+// roles service, which the server root's route and principal matrix creates
+// its principals' environments and roles with and whose errors the root's
+// role handler test maps. The evaluator is never one, and neither is a
+// legacy path of them.
+var allowlistedInternals = []string{
+	root + "/access/core/authn",
+	root + "/access/core/token",
+	root + "/access/core/roles",
+}
 
 // accessAllowance names files that may still import allowlistedInternals,
 // and the tickets whose work removes the entry.
@@ -174,9 +181,9 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 		StagingRoot: root,
 		Packages: []ledger.Package{
 			{
-				From:   "migration/access/core/identity",
+				From:   "internal/service/accounts",
 				Action: ledger.ActionMove,
-				To:     "access/core/identity",
+				To:     "access/core/accounts",
 			},
 			{
 				From:   "internal/server/xyz",
@@ -204,9 +211,9 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 		"test/server/support/assemble.go": file(tokens),
 		// Access's own tests: staged, and in legacy packages whose entries
 		// move them into access, the bridges' among them.
-		root + "/access/core/authn/authn_test.go":         file(evaluator, authenticator),
-		"internal/auth/bridge_kernel_test.go":             file(evaluator, authenticator, legacy),
-		"migration/access/core/identity/identity_test.go": file(evaluator, tokens),
+		root + "/access/core/authn/authn_test.go":    file(evaluator, authenticator),
+		"internal/auth/bridge_kernel_test.go":        file(evaluator, authenticator, legacy),
+		"internal/service/accounts/accounts_test.go": file(evaluator, tokens),
 		// The published contracts and access test support, staged and legacy.
 		"internal/server/xyz/npm_test.go": file(
 			root+"/access",
