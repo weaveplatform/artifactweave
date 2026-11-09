@@ -1,4 +1,3 @@
-// Package gitlfshttp serves Git LFS batch and basic object transfers.
 package gitlfshttp
 
 import (
@@ -37,8 +36,19 @@ const (
 	maxObjectBytes = int64(math.MaxInt64 - 1)
 )
 
+// Options configures Protocol. RemoteSources is the remote source service;
+// nil leaves the remote class without a source, so a remote repository
+// answers 501.
 type Options struct{ RemoteSources *source.Service }
 
+// Protocol returns the Git LFS protocol for gitlfs repositories: the batch
+// API (POST objects/batch), basic object transfers (GET, HEAD and PUT of
+// objects/{oid}) and the locking API (POST and GET locks, POST
+// locks/verify and POST locks/{id}/unlock), with the Artifactory error
+// profile. Local and federated repositories read their own items, and a
+// remote reads through the remote source service. A virtual repository's
+// source supports no single-item lookup, because the handlers read its
+// members themselves.
 func Protocol(o Options) pkgroute.Protocol {
 	sources := map[repo.Class]pkgroute.Source{
 		repo.Local: pkgroute.Local{}, repo.Federated: pkgroute.Local{},

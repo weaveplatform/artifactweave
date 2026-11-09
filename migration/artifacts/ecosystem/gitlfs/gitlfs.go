@@ -1,4 +1,3 @@
-// Package gitlfs owns the content-addressed object layout of Git LFS repositories.
 package gitlfs
 
 import (
@@ -12,8 +11,13 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 )
 
+// Serves reports whether t is the Git LFS package type.
 func Serves(t repo.PackageType) bool { return t == repo.GitLFS }
 
+// Handler is the Git LFS format's hooks: it admits a write only as an
+// object at the path its SHA-256 OID gives, and keeps no index beyond the
+// object tree. It embeds the generic hooks, whose deploy policy Admit
+// applies after its own checks.
 type Handler struct{ generic.Handler }
 
 // ObjectPath is Artifactory's two-level SHA-256 object layout.
@@ -29,6 +33,10 @@ func ObjectPath(oid string) (string, bool) {
 	return "objects/" + oid[:2] + "/" + oid[2:4] + "/" + oid, true
 }
 
+// Admit refuses (409) a checksum sidecar upload, which an object never
+// takes, and any write that is not of an object at the ObjectPath of its
+// file name with that SHA-256. Every other write then meets the generic
+// deploy policy, whose refusal it wraps.
 func (h Handler) Admit(
 	ctx context.Context,
 	env format.Env,
@@ -53,6 +61,7 @@ func (h Handler) Admit(
 	return w, nil
 }
 
-// The object tree is the native index. Delete and restore change the batch
-// view directly, so reindex has no derived metadata to rebuild.
+// Reindex does nothing: the object tree is the native index. Delete and
+// restore change the batch view directly, so there is no derived metadata
+// to rebuild.
 func (Handler) Reindex(context.Context, format.Env, repo.Config) error { return nil }

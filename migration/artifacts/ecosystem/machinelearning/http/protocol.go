@@ -1,5 +1,3 @@
-// Package machinelearninghttp implements the FrogML SDK's Artifactory model
-// transaction and manifest API on local and one-node federated repositories.
 package machinelearninghttp
 
 import (
@@ -25,6 +23,15 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// Protocol returns the FrogML model protocol for machinelearning
+// repositories, with the Artifactory error profile. For a model named
+// {name} or {namespace}/{name}, POST model/.../start-transaction, with or
+// without a version, starts an upload transaction; PUT
+// model/entity-manifest/.../{version}/{transaction} commits its manifest;
+// and GET model/entity-manifest/.../{version} reads a published manifest.
+// It sets no sources, so local and federated repositories serve their own
+// items and any other class, which configuration refuses for this type,
+// answers 501.
 func Protocol() pkgroute.Protocol {
 	return pkgroute.Protocol{
 		Name:         "machinelearning",

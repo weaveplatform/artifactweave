@@ -18,15 +18,23 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// Checksums is a declared file's digest. The SDK calls its SHA-256 "sha2".
 type Checksums struct {
 	SHA256 string `json:"sha2"`
 }
+
+// Artifact is one declared file: its path within its category, its size and
+// SHA-256, and the download URL that only the manifest GET's answer carries.
 type Artifact struct {
 	Path        string    `json:"artifact_path"`
 	Size        int64     `json:"size"`
 	Checksums   Checksums `json:"checksums"`
 	DownloadURL string    `json:"download_url,omitempty"`
 }
+
+// Serialization is the model's format metadata. Every field but the
+// framework version is required, and none may exceed 128 bytes or hold a
+// NUL, CR or LF.
 type Serialization struct {
 	Framework        string `json:"framework"`
 	FrameworkVersion string `json:"framework_version"`
@@ -34,6 +42,10 @@ type Serialization struct {
 	Runtime          string `json:"runtime"`
 	RuntimeVersion   string `json:"runtime_version"`
 }
+
+// Manifest is the FrogML SDK's model manifest: the creation time, the model,
+// dependency and code artifacts, the serialization metadata, and the
+// model's name (ID) and version, which a stored manifest must repeat (Read).
 type Manifest struct {
 	Created      string        `json:"created_date"`
 	Artifacts    []Artifact    `json:"model_artifacts"`
@@ -43,11 +55,17 @@ type Manifest struct {
 	ID           string        `json:"id,omitempty"`
 	Version      string        `json:"version,omitempty"`
 }
+
+// FileEntry is a declared file's path below the version's folder, category
+// included, and the artifact that declares it.
 type FileEntry struct {
 	Path     string
 	Artifact Artifact
 }
 
+// Files lists the declared files in manifest order: the model artifacts
+// under files/, the dependencies under dependencies/ and the code artifact
+// under code/.
 func (m Manifest) Files() []FileEntry {
 	files := make([]FileEntry, 0, len(m.Artifacts)+len(m.Dependencies)+1)
 	for _, a := range m.Artifacts {
@@ -62,6 +80,13 @@ func (m Manifest) Files() []FileEntry {
 	return files
 }
 
+// Decode reads one manifest of at most MaxManifestSize bytes and refuses
+// (400) one that is malformed, ambiguous or out of bounds: a duplicate or
+// upper-case key, nesting deeper than 32 levels, a creation time in neither
+// RFC 3339 nor the SDK's zone-less UTC form, no model artifact or more than
+// MaxFiles files, missing or invalid serialization metadata, or a file with
+// an invalid path, a size outside 0 to MaxFileSize, a SHA-256 that is not
+// 64 lower-case hexadecimal characters, or a path declared twice.
 func Decode(body io.Reader) (Manifest, error) {
 	var m Manifest
 	data, err := io.ReadAll(io.LimitReader(body, MaxManifestSize+1))
@@ -160,6 +185,9 @@ func Verify(
 	return files, nil
 }
 
+// Missing reports whether err, from Read or Verify, means an item is not
+// stored (store.ErrNotFound): the version has no manifest or has lost a
+// declared file, so it is unpublished or withdrawn rather than broken.
 func Missing(err error) bool { return errors.Is(err, store.ErrNotFound) }
 
 func sdkTimestamp(s string) bool {

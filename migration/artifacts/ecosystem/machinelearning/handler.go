@@ -17,10 +17,17 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// Serves reports whether t is the Machine Learning package type.
 func Serves(t repo.PackageType) bool { return t == repo.MachineLearning }
 
 type (
-	Handler        struct{ generic.Handler }
+	// Handler is the Machine Learning format's hooks: a model version is
+	// written only through a FrogML transaction, private records are never
+	// served, copied or moved, and only complete, verified versions are
+	// published. It embeds the generic hooks, whose deploy policy Admit
+	// applies first.
+	Handler struct{ generic.Handler }
+
 	publicationKey struct{}
 )
 
@@ -30,6 +37,13 @@ func Publication(ctx context.Context) context.Context {
 	return context.WithValue(ctx, publicationKey{}, true)
 }
 
+// Admit applies the generic deploy policy, whose refusal it wraps, and then
+// refuses (400) a path outside the model layout (ParsePath), a cache write
+// and a file over MaxFileSize. Writes inside the native transaction
+// (Publication) pass. Any other write must deploy a file into a staging
+// folder (409 otherwise, so no published file or transaction record is
+// written directly) whose transaction is live and the writer's own
+// (CheckTransaction: 403 for another principal, 409 once it has expired).
 func (Handler) Admit(
 	ctx context.Context,
 	env format.Env,
@@ -88,6 +102,12 @@ func CheckTransaction(
 	return nil
 }
 
+// Deployed lets folders, writes inside the native transaction and staging
+// files pass, and refuses (400) any other path outside the model layout. A
+// published file stored again, as by a restore, must be one its version's
+// manifest declares, with that size and SHA-256, whenever the manifest is
+// stored (409). The index is then rebuilt (Reindex), so a version made
+// complete again is published again.
 func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
 	if it.Folder || ctx.Value(publicationKey{}) == true {
 		return nil
@@ -123,6 +143,8 @@ func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it
 	return h.Reindex(ctx, env, c)
 }
 
+// Deleted rebuilds the index (Reindex) after any delete outside the native
+// transaction, so removing a declared file withdraws its version at once.
 func (h Handler) Deleted(ctx context.Context, env format.Env, c repo.Config, _ []types.Item) error {
 	if ctx.Value(publicationKey{}) == true {
 		return nil
@@ -130,6 +152,10 @@ func (h Handler) Deleted(ctx context.Context, env format.Env, c repo.Config, _ [
 	return h.Reindex(ctx, env, c)
 }
 
+// GuardTransferSource refuses (403) to copy or move a private record (a
+// staging file or a manifest, Private), and lets a published file go only
+// while its version's manifest is stored and every declared file verifies
+// (Verify).
 func (Handler) GuardTransferSource(
 	ctx context.Context,
 	env format.Env,
@@ -154,6 +180,11 @@ func (Handler) GuardTransferSource(
 	return err
 }
 
+// Resolve serves a model file only from a complete published version:
+// staging files, the manifest and any path its version's manifest does not
+// declare answer 404, and a download also fails while a declared file is
+// missing or differs (Verify). The manifest GET is the manifest's only
+// reader.
 func (Handler) Resolve(
 	ctx context.Context,
 	env format.Env,
@@ -258,6 +289,8 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 	return nil
 }
 
+// Classify marks a private record (a staging file or a manifest, Private) as
+// metadata, and every published model file as unique content.
 func (Handler) Classify(_ repo.Config, p string) format.Class {
 	if Private(p) {
 		return format.ClassMetadata
