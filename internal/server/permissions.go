@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/service/permission"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authz"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
@@ -90,7 +91,10 @@ func permissionCaller(ctx context.Context, cfg Config) (permCaller, error) {
 		)
 	}
 	return permCaller{
-		svc:                permission.Service{Store: st},
+		svc: permission.Service{
+			Store:        st,
+			Repositories: repos.NewRepositories(st, cfg.Access.Keys, cfg.Access.Projects),
+		},
 		dec:                dec,
 		canManageResources: resources,
 	}, nil

@@ -3,24 +3,27 @@ package roles_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/service/roles"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var errBoom = errors.New("boom")
 
-// failing is a store whose project and repository methods fail when named.
+// failing is a store whose project methods fail when named; the
+// repositories it is paired with fail Repos.List and Repos.Update the same
+// way.
 type failing struct {
-	store.Store
+	roles.Store
 	fail string
 }
 
 func (f failing) Projects() store.ProjectStore { return failingProjects{f.Store.Projects(), f.fail} }
-func (f failing) Repos() store.RepoStore       { return failingRepos{f.Store.Repos(), f.fail} }
 
 func (f failing) Tx(ctx context.Context, fn func(context.Context) error) error {
 	return f.Store.Tx(ctx, fn) //nolint:wrapcheck // test double
@@ -142,33 +145,14 @@ func (p failingProjects) DeleteMember(
 	return p.ProjectStore.DeleteMember(ctx, key, typ, name) //nolint:wrapcheck // test double
 }
 
-type failingRepos struct {
-	store.RepoStore
-	fail string
-}
-
-func (r failingRepos) List(ctx context.Context, f store.RepoFilter) ([]repo.Config, error) {
-	if r.fail == "Repos.List" {
-		return nil, errBoom
-	}
-	return r.RepoStore.List(ctx, f) //nolint:wrapcheck // test double
-}
-
-func (r failingRepos) Update(ctx context.Context, c repo.Config) error {
-	if r.fail == "Repos.Update" {
-		return errBoom
-	}
-	return r.RepoStore.Update(ctx, c) //nolint:wrapcheck // test double
-}
-
 // TestUnitStoreFailures drives every operation into each store failure it can
 // meet; none may be mistaken for a client error.
 func TestUnitStoreFailures(t *testing.T) {
 	ctx := context.Background()
-	setup := func(t *testing.T) (*failing, roles.Service) {
+	setup := func(t *testing.T) (*failing, roles.Service, *inmem.Store) {
 		t.Helper()
 		_, db := world(t)
-		s := roles.Service{Store: db}
+		s := roles.Service{Store: db, Repositories: repositories{db: db}}
 		must(t, s.CreateEnvironment(ctx, "QA"))
 		must(
 			t,
@@ -192,7 +176,7 @@ func TestUnitStoreFailures(t *testing.T) {
 			ProjectKey: "p", Type: types.PrincipalGroup, Name: "devs", Roles: []string{"ci"},
 		}))
 		f := &failing{Store: db}
-		return f, roles.Service{Store: f}
+		return f, roles.Service{Store: f, Repositories: repositories{db: db, fail: &f.fail}}, db
 	}
 	// Each case: the method to fail and the operation that must meet it.
 	cases := []struct {
@@ -261,7 +245,7 @@ func TestUnitStoreFailures(t *testing.T) {
 		{"DeleteMember", func(s roles.Service) error { return s.DeleteRole(ctx, "ci") }},
 	}
 	for _, c := range cases {
-		f, s := setup(t)
+		f, s, _ := setup(t)
 		f.fail = c.fail
 		if err := c.op(s); !errors.Is(err, errBoom) {
 			t.Errorf("failing %s: %v", c.fail, err)
@@ -270,22 +254,90 @@ func TestUnitStoreFailures(t *testing.T) {
 
 	// Deleting QA: free it first, then fail the steps after the in-use check.
 	for _, fail := range []string{"Assignments", "Roles", "DeleteEnvironment"} {
-		f, s := setup(t)
-		c, _ := f.Store.Repos().Get(ctx, "r")
+		f, s, db := setup(t)
+		c, _ := db.Repos().Get(ctx, "r")
 		c.Environments = nil
-		must(t, f.Store.Repos().Update(ctx, c))
+		must(t, db.Repos().Update(ctx, c))
 		f.fail = fail
 		if err := s.DeleteEnvironment(ctx, "QA"); !errors.Is(err, errBoom) {
 			t.Errorf("delete failing %s: %v", fail, err)
 		}
 	}
 	// The project listing inside the in-use check.
-	f, s := setup(t)
-	c, _ := f.Store.Repos().Get(ctx, "r")
+	f, s, db := setup(t)
+	c, _ := db.Repos().Get(ctx, "r")
 	c.Environments = nil
-	must(t, f.Store.Repos().Update(ctx, c))
+	must(t, db.Repos().Update(ctx, c))
 	f.fail = "List"
 	if err := s.DeleteEnvironment(ctx, "QA"); !errors.Is(err, errBoom) {
 		t.Errorf("delete failing the project listing: %v", err)
+	}
+}
+
+// secondUpdateFails passes the first repository update through and fails
+// the second with errBoom.
+type secondUpdateFails struct {
+	repositories
+	updates int
+}
+
+func (r *secondUpdateFails) Update(ctx context.Context, c repo.Config) error {
+	r.updates++
+	if r.updates == 2 {
+		return errBoom
+	}
+	return r.repositories.Update(ctx, c)
+}
+
+// TestUnitRenameEnvironmentRollsBackRepositoryUpdates fails the second of
+// two repository updates in a rename. The artifacts module made the first
+// one in the rename's transaction, so the rollback takes it back with the
+// environment, the role and the project assignment the rename changed
+// (decision 0013).
+func TestUnitRenameEnvironmentRollsBackRepositoryUpdates(t *testing.T) {
+	ctx := context.Background()
+	s, db := world(t)
+	must(t, s.CreateEnvironment(ctx, "QA"))
+	for _, key := range []string{"a", "b"} {
+		must(t, db.Repos().Create(ctx, repo.Config{
+			Key: key, Class: repo.Local, Environments: []string{"QA"},
+		}))
+	}
+	must(t, s.CreateRole(ctx, types.Role{
+		Name: "ci", Type: types.RoleCustomGlobal, Environments: []string{"QA"},
+	}))
+	must(t, db.Projects().PutAssignment(ctx, types.RepositoryAssignment{
+		RepoKey: "a", ProjectKey: "p", Environments: []string{"QA"},
+	}))
+	updates := &secondUpdateFails{repositories: repositories{db: db}}
+	s.Repositories = updates
+	if err := s.RenameEnvironment(ctx, "QA", "STAGE"); !errors.Is(err, errBoom) {
+		t.Fatalf("rename with the second repository update failing: %v", err)
+	}
+	if updates.updates != 2 {
+		t.Fatalf("%d repository updates, want 2", updates.updates)
+	}
+
+	envs, err := s.Environments(ctx)
+	must(t, err)
+	if !slices.Contains(envs, "QA") || slices.Contains(envs, "STAGE") {
+		t.Errorf("environments %v, want QA and no STAGE", envs)
+	}
+	role, err := s.Role(ctx, "ci")
+	must(t, err)
+	if !slices.Equal(role.Environments, []string{"QA"}) {
+		t.Errorf("role environments %v, want [QA]", role.Environments)
+	}
+	a, err := db.Projects().Assignment(ctx, "a")
+	must(t, err)
+	if !slices.Equal(a.Environments, []string{"QA"}) {
+		t.Errorf("assignment environments %v, want [QA]", a.Environments)
+	}
+	for _, key := range []string{"a", "b"} {
+		c, err := db.Repos().Get(ctx, key)
+		must(t, err)
+		if !slices.Equal(c.Environments, []string{"QA"}) {
+			t.Errorf("repository %s environments %v, want [QA]", key, c.Environments)
+		}
 	}
 }

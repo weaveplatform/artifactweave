@@ -9,8 +9,9 @@ import (
 	"unicode"
 
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 )
 
 // The operations Access v2 adds (issue #81): create-only groups, membership
@@ -21,14 +22,14 @@ import (
 // answers ErrExists when the name is taken instead of replacing the group.
 // An unknown member is store.ErrNotFound, which Access v2 documents as 404;
 // the legacy PutGroup answers it 400.
-func (s *Service) CreateGroup(ctx context.Context, g types.Group, members []string) error {
+func (s *Service) CreateGroup(ctx context.Context, g model.Group, members []string) error {
 	if err := validName("group", g.Name); err != nil {
 		return err
 	}
 	next := g
-	next.Realm, next.Members = types.RealmInternal, sortedUnique(members)
+	next.Realm, next.Members = model.RealmInternal, sortedUnique(members)
 	err := s.Store.Groups().Create(ctx, next)
-	if errors.Is(err, store.ErrConflict) {
+	if errors.Is(err, kernel.ErrConflict) {
 		return fmt.Errorf("%w: group %q", ErrExists, g.Name)
 	}
 	return err //nolint:wrapcheck // ErrNotFound names the unknown member
@@ -117,7 +118,7 @@ func (s *Service) SetPassword(ctx context.Context, name, password string) error 
 // UnexpireAllPasswords cannot bring an old one back; users whose internal
 // password is disabled are unaffected.
 func (s *Service) ExpireAllPasswords(ctx context.Context) error {
-	return s.forEachUser(ctx, func(u *types.User) bool {
+	return s.forEachUser(ctx, func(u *model.User) bool {
 		if u.InternalPasswordDisabled || u.PasswordExpired {
 			return false
 		}
@@ -133,7 +134,7 @@ func (s *Service) ExpireAllPasswords(ctx context.Context) error {
 // at once.
 func (s *Service) UnexpireAllPasswords(ctx context.Context) error {
 	now := s.now()
-	return s.forEachUser(ctx, func(u *types.User) bool {
+	return s.forEachUser(ctx, func(u *model.User) bool {
 		if !u.PasswordExpired {
 			return false
 		}
@@ -147,7 +148,7 @@ func (s *Service) UnexpireAllPasswords(ctx context.Context) error {
 // with their names.
 func (s *Service) forEachUser(
 	ctx context.Context,
-	change func(*types.User) bool,
+	change func(*model.User) bool,
 	then func(ctx context.Context, changed []string) error,
 ) error {
 	return s.tx(ctx, func(ctx context.Context) error {
@@ -176,12 +177,12 @@ func (s *Service) forEachUser(
 
 // PasswordPolicy returns the stored policy, or types.DefaultPasswordPolicy
 // while none is stored.
-func (s *Service) PasswordPolicy(ctx context.Context) (types.PasswordPolicy, error) {
-	var p types.PasswordPolicy
-	err := s.Store.Settings().Get(ctx, types.SettingPasswordPolicy, &p)
+func (s *Service) PasswordPolicy(ctx context.Context) (model.PasswordPolicy, error) {
+	var p model.PasswordPolicy
+	err := s.Store.Settings().Get(ctx, settings.SettingPasswordPolicy, &p)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
-		return types.DefaultPasswordPolicy(), nil
+	case errors.Is(err, kernel.ErrNotFound):
+		return model.DefaultPasswordPolicy(), nil
 	case err != nil:
 		return p, fmt.Errorf("identity: password policy: %w", err)
 	}
@@ -190,7 +191,7 @@ func (s *Service) PasswordPolicy(ctx context.Context) (types.PasswordPolicy, err
 
 // SetPasswordPolicy stores p. The policy applies when a password is set or
 // changed, not to passwords already stored.
-func (s *Service) SetPasswordPolicy(ctx context.Context, p types.PasswordPolicy) error {
+func (s *Service) SetPasswordPolicy(ctx context.Context, p model.PasswordPolicy) error {
 	for name, v := range map[string]int{
 		"uppercase": p.Uppercase, "lowercase": p.Lowercase, "digit": p.Digit,
 		"special_char": p.SpecialChar, "length": p.Length,
@@ -199,7 +200,7 @@ func (s *Service) SetPasswordPolicy(ctx context.Context, p types.PasswordPolicy)
 			return invalidf("%s must not be negative", name)
 		}
 	}
-	if err := s.Store.Settings().Put(ctx, types.SettingPasswordPolicy, p); err != nil {
+	if err := s.Store.Settings().Put(ctx, settings.SettingPasswordPolicy, p); err != nil {
 		return err //nolint:wrapcheck // a store error
 	}
 	return nil
@@ -207,7 +208,7 @@ func (s *Service) SetPasswordPolicy(ctx context.Context, p types.PasswordPolicy)
 
 // checkPolicy refuses a password the policy rejects. u is the user as
 // stored, so not_match_old compares against the current password.
-func (s *Service) checkPolicy(ctx context.Context, u types.User, password string) error {
+func (s *Service) checkPolicy(ctx context.Context, u model.User, password string) error {
 	p, err := s.PasswordPolicy(ctx)
 	if err != nil {
 		return err

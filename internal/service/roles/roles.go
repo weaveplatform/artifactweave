@@ -13,8 +13,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
+	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // Errors the handlers map to statuses. The Access API returns their text
@@ -39,9 +41,30 @@ var (
 // global environments").
 const DefaultGlobalEnvironmentLimit = 10
 
-// Service reads and writes global roles and environments in Store.
+// Store is what the roles service reads and writes: the access module's
+// stores, the project store among them, which holds the stored global roles
+// and environments and the project assignments, and their unit of work
+// (port.Store's Tx). The application passes its store aggregate, which
+// satisfies it. Store holds no repository store: repository configurations
+// belong to the artifacts module, which the service reaches only through
+// Service.Repositories.
+type Store interface {
+	port.Store
+}
+
+// Service reads and writes global roles and environments in Store, and the
+// environment names of repository configurations through Repositories.
 type Service struct {
-	Store store.Store
+	// Store holds the roles, environments and project assignments. Every
+	// change runs in one Tx of Store, and the calls it makes join it through
+	// the context.
+	Store Store
+	// Repositories lists and updates repository configurations. Its calls
+	// take the context of Store's transaction, so it must be the artifacts
+	// module's binding over the same unit of work: a rename's repository
+	// updates then commit or roll back with the roles and assignments it
+	// renames (decision 0013).
+	Repositories artifactsapi.Repositories
 	// GlobalLimit caps the global environments, DEV and PROD included;
 	// zero means DefaultGlobalEnvironmentLimit.
 	GlobalLimit int
@@ -61,7 +84,7 @@ func (s Service) Environments(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("roles: environments: %w", err)
 	}
-	out := slices.Clone(types.BuiltinEnvironments)
+	out := slices.Clone(model.BuiltinEnvironments)
 	for _, e := range stored {
 		out = append(out, e.Name)
 	}
@@ -87,7 +110,7 @@ func (s Service) environment(ctx context.Context, name string) (string, error) {
 // project, without regard to case: the store keeps names unique only as
 // given.
 func (s Service) taken(ctx context.Context, name string) (bool, error) {
-	if types.IsBuiltinEnvironment(name) {
+	if model.IsBuiltinEnvironment(name) {
 		return true, nil
 	}
 	keys := []string{""}
@@ -103,7 +126,7 @@ func (s Service) taken(ctx context.Context, name string) (bool, error) {
 		if err != nil {
 			return false, fmt.Errorf("roles: environments: %w", err)
 		}
-		if slices.ContainsFunc(envs, func(e types.Environment) bool {
+		if slices.ContainsFunc(envs, func(e model.Environment) bool {
 			return strings.EqualFold(e.Name, name)
 		}) {
 			return true, nil
@@ -115,7 +138,7 @@ func (s Service) taken(ctx context.Context, name string) (bool, error) {
 // CreateEnvironment adds a global environment, while fewer than the limit
 // exist.
 func (s Service) CreateEnvironment(ctx context.Context, name string) error {
-	if !types.ValidEnvironmentName(name) {
+	if !model.ValidEnvironmentName(name) {
 		return fmt.Errorf(
 			"environment name %q must be 1 to 32 letters, digits, hyphens or underscores: %w",
 			name,
@@ -137,8 +160,8 @@ func (s Service) CreateEnvironment(ctx context.Context, name string) error {
 		if limit := s.globalLimit(); len(all) >= limit {
 			return fmt.Errorf("at most %d global environments may exist: %w", limit, ErrInvalid)
 		}
-		err = s.Store.Projects().CreateEnvironment(ctx, types.Environment{Name: name})
-		if errors.Is(err, store.ErrConflict) {
+		err = s.Store.Projects().CreateEnvironment(ctx, model.Environment{Name: name})
+		if errors.Is(err, kernel.ErrConflict) {
 			return fmt.Errorf("environment %q: %w", name, ErrConflict)
 		}
 		if err != nil {
@@ -151,10 +174,10 @@ func (s Service) CreateEnvironment(ctx context.Context, name string) error {
 // RenameEnvironment renames a global environment and every repository and
 // role that names it.
 func (s Service) RenameEnvironment(ctx context.Context, name, to string) error {
-	if types.IsBuiltinEnvironment(name) {
+	if model.IsBuiltinEnvironment(name) {
 		return fmt.Errorf("environment %q cannot be renamed: %w", name, ErrBuiltin)
 	}
-	if !types.ValidEnvironmentName(to) {
+	if !model.ValidEnvironmentName(to) {
 		return fmt.Errorf(
 			"environment name %q must be 1 to 32 letters, digits, hyphens or underscores: %w",
 			to,
@@ -188,7 +211,7 @@ func (s Service) RenameEnvironment(ctx context.Context, name, to string) error {
 // DeleteEnvironment removes a global environment that no repository or global
 // role names.
 func (s Service) DeleteEnvironment(ctx context.Context, name string) error {
-	if types.IsBuiltinEnvironment(name) {
+	if model.IsBuiltinEnvironment(name) {
 		return fmt.Errorf("environment %q cannot be deleted: %w", name, ErrBuiltin)
 	}
 	return s.tx(ctx, func(ctx context.Context) error {
@@ -225,7 +248,7 @@ func (s Service) DeleteEnvironment(ctx context.Context, name string) error {
 // inUse refuses an environment a repository belongs to, through its
 // configuration or a project assignment.
 func (s Service) inUse(ctx context.Context, env string) error {
-	repos, err := s.Store.Repos().List(ctx, store.RepoFilter{})
+	repos, err := s.Repositories.List(ctx, artifactsapi.RepoFilter{})
 	if err != nil {
 		return fmt.Errorf("roles: repositories: %w", err)
 	}
@@ -261,7 +284,7 @@ func (s Service) inUse(ctx context.Context, env string) error {
 // renameInRepositories renames from to to in every repository configuration
 // that names it.
 func (s Service) renameInRepositories(ctx context.Context, from, to string) error {
-	repos, err := s.Store.Repos().List(ctx, store.RepoFilter{})
+	repos, err := s.Repositories.List(ctx, artifactsapi.RepoFilter{})
 	if err != nil {
 		return fmt.Errorf("roles: repositories: %w", err)
 	}
@@ -272,7 +295,7 @@ func (s Service) renameInRepositories(ctx context.Context, from, to string) erro
 		}
 		c.Environments = slices.Clone(c.Environments)
 		c.Environments[i] = to
-		if err := s.Store.Repos().Update(ctx, c); err != nil {
+		if err := s.Repositories.Update(ctx, c); err != nil {
 			return fmt.Errorf("roles: update repository %s: %w", c.Key, err)
 		}
 	}
@@ -281,15 +304,15 @@ func (s Service) renameInRepositories(ctx context.Context, from, to string) erro
 
 // stored splits the stored global roles into the overrides of predefined
 // roles, by name, and the custom roles.
-func (s Service) stored(ctx context.Context) (map[string]types.Role, []types.Role, error) {
+func (s Service) stored(ctx context.Context) (map[string]model.Role, []model.Role, error) {
 	rows, err := s.Store.Projects().Roles(ctx, "")
 	if err != nil {
 		return nil, nil, fmt.Errorf("roles: roles: %w", err)
 	}
-	overrides := map[string]types.Role{}
-	var custom []types.Role
+	overrides := map[string]model.Role{}
+	var custom []model.Role
 	for _, r := range rows {
-		if _, ok := types.BuiltinGlobalRole(r.Name); ok {
+		if _, ok := model.BuiltinGlobalRole(r.Name); ok {
 			overrides[r.Name] = r
 			continue
 		}
@@ -300,12 +323,12 @@ func (s Service) stored(ctx context.Context) (map[string]types.Role, []types.Rol
 
 // Roles returns the built-in global roles, with any stored changes to the
 // predefined ones, then the custom ones by name.
-func (s Service) Roles(ctx context.Context) ([]types.Role, error) {
+func (s Service) Roles(ctx context.Context) ([]model.Role, error) {
 	overrides, custom, err := s.stored(ctx)
 	if err != nil {
 		return nil, err
 	}
-	out := types.BuiltinGlobalRoles()
+	out := model.BuiltinGlobalRoles()
 	for i, b := range out {
 		if o, ok := overrides[b.Name]; ok {
 			out[i].Actions, out[i].Environments = o.Actions, o.Environments
@@ -316,18 +339,18 @@ func (s Service) Roles(ctx context.Context) ([]types.Role, error) {
 
 // Role returns the global role called name: a built-in one with any stored
 // change to its actions and environments, or a custom one.
-func (s Service) Role(ctx context.Context, name string) (types.Role, error) {
+func (s Service) Role(ctx context.Context, name string) (model.Role, error) {
 	r, err := s.Store.Projects().Role(ctx, "", name)
-	if b, ok := types.BuiltinGlobalRole(name); ok {
+	if b, ok := model.BuiltinGlobalRole(name); ok {
 		switch {
 		case err == nil:
 			b.Actions, b.Environments = r.Actions, r.Environments
-		case !errors.Is(err, store.ErrNotFound):
+		case !errors.Is(err, kernel.ErrNotFound):
 			return b, fmt.Errorf("roles: role %s: %w", name, err)
 		}
 		return b, nil
 	}
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return r, fmt.Errorf("role %q: %w", name, ErrNotFound)
 	}
 	if err != nil {
@@ -337,24 +360,24 @@ func (s Service) Role(ctx context.Context, name string) (types.Role, error) {
 }
 
 // CreateRole adds a CUSTOM_GLOBAL role.
-func (s Service) CreateRole(ctx context.Context, r types.Role) error {
+func (s Service) CreateRole(ctx context.Context, r model.Role) error {
 	return s.tx(ctx, func(ctx context.Context) error {
-		if err := s.check(ctx, &r, types.RoleCustomGlobal); err != nil {
+		if err := s.check(ctx, &r, model.RoleCustomGlobal); err != nil {
 			return err
 		}
-		if _, ok := types.BuiltinGlobalRole(r.Name); ok {
+		if _, ok := model.BuiltinGlobalRole(r.Name); ok {
 			return fmt.Errorf("role %q: %w", r.Name, ErrConflict)
 		}
 		_, custom, err := s.stored(ctx)
 		if err != nil {
 			return err
 		}
-		if slices.ContainsFunc(custom, func(c types.Role) bool { return c.Name == r.Name }) {
+		if slices.ContainsFunc(custom, func(c model.Role) bool { return c.Name == r.Name }) {
 			return fmt.Errorf("role %q: %w", r.Name, ErrConflict)
 		}
-		if len(custom) >= types.MaxCustomGlobalRoles {
+		if len(custom) >= model.MaxCustomGlobalRoles {
 			return fmt.Errorf("at most %d custom global roles may exist: %w",
-				types.MaxCustomGlobalRoles, ErrInvalid)
+				model.MaxCustomGlobalRoles, ErrInvalid)
 		}
 		return s.put(ctx, r)
 	})
@@ -364,7 +387,7 @@ func (s Service) CreateRole(ctx context.Context, r types.Role) error {
 // changes its description, actions and environments; a PREDEFINED one only
 // its actions and environments, stored over the built-in defaults. No role
 // is renamed or changes type, and the ADMIN role does not change at all.
-func (s Service) UpdateRole(ctx context.Context, name string, r types.Role) error {
+func (s Service) UpdateRole(ctx context.Context, name string, r model.Role) error {
 	if r.Name != name {
 		return fmt.Errorf(
 			"the role name %q differs from %q in the path: %w",
@@ -373,13 +396,13 @@ func (s Service) UpdateRole(ctx context.Context, name string, r types.Role) erro
 			ErrInvalid,
 		)
 	}
-	b, builtin := types.BuiltinGlobalRole(name)
-	if builtin && b.Type == types.RoleAdmin {
+	b, builtin := model.BuiltinGlobalRole(name)
+	if builtin && b.Type == model.RoleAdmin {
 		return fmt.Errorf("role %q cannot be changed: %w", name, ErrBuiltin)
 	}
 	return s.tx(ctx, func(ctx context.Context) error {
 		if builtin {
-			if err := s.check(ctx, &r, types.RolePredefined); err != nil {
+			if err := s.check(ctx, &r, model.RolePredefined); err != nil {
 				return err
 			}
 			r.Description = b.Description
@@ -388,7 +411,7 @@ func (s Service) UpdateRole(ctx context.Context, name string, r types.Role) erro
 		if _, err := s.Role(ctx, name); err != nil {
 			return err
 		}
-		if err := s.check(ctx, &r, types.RoleCustomGlobal); err != nil {
+		if err := s.check(ctx, &r, model.RoleCustomGlobal); err != nil {
 			return err
 		}
 		return s.put(ctx, r)
@@ -398,12 +421,12 @@ func (s Service) UpdateRole(ctx context.Context, name string, r types.Role) erro
 // DeleteRole removes a custom global role and every project membership's
 // assignment of it.
 func (s Service) DeleteRole(ctx context.Context, name string) error {
-	if _, ok := types.BuiltinGlobalRole(name); ok {
+	if _, ok := model.BuiltinGlobalRole(name); ok {
 		return fmt.Errorf("role %q cannot be deleted: %w", name, ErrBuiltin)
 	}
 	return s.tx(ctx, func(ctx context.Context) error {
 		err := s.Store.Projects().DeleteRole(ctx, "", name)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			return fmt.Errorf("role %q: %w", name, ErrNotFound)
 		}
 		if err != nil {
@@ -422,7 +445,7 @@ func (s Service) unassign(ctx context.Context, role string) error {
 	}
 	ps := s.Store.Projects()
 	for _, p := range projects {
-		for _, typ := range []types.PrincipalType{types.PrincipalUser, types.PrincipalGroup} {
+		for _, typ := range []model.PrincipalType{model.PrincipalUser, model.PrincipalGroup} {
 			members, err := ps.Members(ctx, p.Key, typ)
 			if err != nil {
 				return fmt.Errorf("roles: members of %s: %w", p.Key, err)
@@ -450,7 +473,7 @@ func (s Service) unassign(ctx context.Context, role string) error {
 // check validates a global role of type typ and canonicalises its
 // environment names; actions and environments keep their order without
 // duplicates.
-func (s Service) check(ctx context.Context, r *types.Role, typ types.RoleType) error {
+func (s Service) check(ctx context.Context, r *model.Role, typ model.RoleType) error {
 	if strings.TrimSpace(r.Name) == "" {
 		return fmt.Errorf("a role name is required: %w", ErrInvalid)
 	}
@@ -464,7 +487,7 @@ func (s Service) check(ctx context.Context, r *types.Role, typ types.RoleType) e
 	}
 	actions := make([]string, 0, len(r.Actions))
 	for _, a := range r.Actions {
-		if !types.IsGlobalRoleAction(a) {
+		if !model.IsGlobalRoleAction(a) {
 			return fmt.Errorf("action %q is not a global role action: %w", a, ErrInvalid)
 		}
 		if !slices.Contains(actions, a) {
@@ -488,7 +511,7 @@ func (s Service) check(ctx context.Context, r *types.Role, typ types.RoleType) e
 	return nil
 }
 
-func (s Service) put(ctx context.Context, r types.Role) error {
+func (s Service) put(ctx context.Context, r model.Role) error {
 	if err := s.Store.Projects().PutRole(ctx, r); err != nil {
 		return fmt.Errorf("roles: put role %s: %w", r.Name, err)
 	}

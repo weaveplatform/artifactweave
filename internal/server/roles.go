@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/weaveplatform/artifactweave/internal/service/roles"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -24,7 +25,11 @@ func (s accessService) roleService(ctx context.Context) (roles.Service, error) {
 	if err != nil {
 		return roles.Service{}, err
 	}
-	return roles.Service{Store: st, GlobalLimit: s.cfg.GlobalEnvironmentLimit}, nil
+	return roles.Service{
+		Store:        st,
+		Repositories: repos.NewRepositories(st, s.cfg.Access.Keys, s.cfg.Access.Projects),
+		GlobalLimit:  s.cfg.GlobalEnvironmentLimit,
+	}, nil
 }
 
 // roleError maps the service's errors to statuses. taken is the status of a

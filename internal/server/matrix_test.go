@@ -11,11 +11,13 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/service/oidc"
 	"github.com/weaveplatform/artifactweave/internal/service/roles"
+	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -1472,6 +1474,21 @@ func (f *matrixFixture) deploy(t *testing.T, key, path string, body []byte) repo
 // for each principal's E-{p} and the N-{p} the administrators create.
 const matrixEnvironmentLimit = 1000
 
+// matrixRoles is the roles service the fixture creates the principals'
+// environments and roles with, over db and the artifacts module's
+// repositories in db.
+func matrixRoles(db *inmem.Store) roles.Service {
+	return roles.Service{
+		Store: db,
+		Repositories: repos.NewRepositories(
+			db,
+			accessmodule.KeysOf(db),
+			accessmodule.ProjectsOf(db),
+		),
+		GlobalLimit: matrixEnvironmentLimit,
+	}
+}
+
 func newMatrixFixture(t *testing.T) *matrixFixture {
 	t.Helper()
 	ctx := context.Background()
@@ -1614,7 +1631,7 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 	k := testKeys()
 	// Every principal has a global environment of its own, more than the
 	// default limit of ten allows; matrixEnvironmentLimit lifts it.
-	rs := roles.Service{Store: db, GlobalLimit: matrixEnvironmentLimit}
+	rs := matrixRoles(db)
 	for _, p := range names {
 		must(db.Keys().CreateKeypair(ctx, types.Keypair{
 			Name: "kp-" + p, Type: types.KeypairRSA, Alias: "a-" + p,

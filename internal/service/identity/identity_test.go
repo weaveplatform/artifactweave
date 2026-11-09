@@ -9,9 +9,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/service/identity"
-	"github.com/weaveplatform/artifactweave/migration/access"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -29,8 +27,9 @@ func newService(t *testing.T) (*identity.Service, *inmem.Store) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	repositories := repos.NewRepositories(db, access.KeysOf(db), access.ProjectsOf(db))
-	if _, err := authn.SeedHashed(context.Background(), db, repositories, hash, clock); err != nil {
+	if _, err := authn.SeedHashed(
+		context.Background(), db, repositories{db: db}, hash, clock,
+	); err != nil {
 		t.Fatal(err)
 	}
 	return &identity.Service{Store: db, Hash: cheap, Now: func() time.Time { return clock }}, db

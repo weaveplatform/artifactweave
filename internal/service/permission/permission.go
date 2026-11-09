@@ -15,8 +15,12 @@ import (
 	"time"
 	"unicode/utf8"
 
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
+	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -50,23 +54,45 @@ var listPage = 500
 // resourceTypes are the sections an Access v2 permission may carry. The
 // platform provider sends destination and pipeline_source; they are stored
 // and echoed but grant nothing in artifactweave.
-var resourceTypes = []types.ResourceType{
-	types.ResourceArtifact, types.ResourceBuild, types.ResourceReleaseBundle,
-	types.ResourceDestination, types.ResourcePipelineSource,
+var resourceTypes = []accessapi.ResourceType{
+	accessapi.ResourceArtifact, accessapi.ResourceBuild, accessapi.ResourceReleaseBundle,
+	accessapi.ResourceDestination, accessapi.ResourcePipelineSource,
 }
 
 // specialTargets are the artifact targets that name a class of
 // repositories rather than one repository.
 var specialTargets = []string{
-	types.TargetAny, types.TargetAnyLocal, types.TargetAnyRemote, types.TargetAnyDistribution,
+	accessapi.TargetAny,
+	accessapi.TargetAnyLocal,
+	accessapi.TargetAnyRemote,
+	accessapi.TargetAnyDistribution,
 }
 
 // ValidResourceType reports whether rt names a section the API accepts.
-func ValidResourceType(rt types.ResourceType) bool { return slices.Contains(resourceTypes, rt) }
+func ValidResourceType(rt accessapi.ResourceType) bool { return slices.Contains(resourceTypes, rt) }
+
+// Store is what the permission service reads and writes: the access
+// module's stores, of which it uses the permission, user and group stores,
+// and their unit of work (port.Store's Tx). The application passes its store
+// aggregate, which satisfies it. Store holds no repository store: the
+// repositories a permission names belong to the artifacts module, which the
+// service reaches only through Service.Repositories.
+type Store interface {
+	port.Store
+}
 
 // Service manages permissions over a store.
 type Service struct {
-	Store store.Store
+	// Store holds the permissions and the users and groups they name. Every
+	// write runs in one Tx of Store, and the calls it makes join it through
+	// the context.
+	Store Store
+	// Repositories reads the repositories a permission's artifact section
+	// names. Its errors come back unwrapped, so kernel.ErrNotFound still
+	// means a missing repository, and its calls take the context of Store's
+	// transaction, so it must be the artifacts module's binding over the same
+	// unit of work.
+	Repositories artifactsapi.Repositories
 	// Now supplies the time; nil means time.Now.
 	Now func() time.Time
 }
@@ -109,9 +135,9 @@ func ValidName(name string) error {
 }
 
 // List returns every permission, ordered by name.
-func (s Service) List(ctx context.Context) ([]types.Permission, error) {
-	var out []types.Permission
-	page := store.Page{Limit: listPage}
+func (s Service) List(ctx context.Context) ([]model.Permission, error) {
+	var out []model.Permission
+	page := kernel.Page{Limit: listPage}
 	for {
 		ps, next, err := s.Store.Permissions().List(ctx, page)
 		if err != nil {
@@ -126,13 +152,13 @@ func (s Service) List(ctx context.Context) ([]types.Permission, error) {
 }
 
 // Get returns one permission.
-func (s Service) Get(ctx context.Context, name string) (types.Permission, error) {
+func (s Service) Get(ctx context.Context, name string) (model.Permission, error) {
 	p, err := s.Store.Permissions().Get(ctx, name)
-	if errors.Is(err, store.ErrNotFound) {
-		return types.Permission{}, notFound(name)
+	if errors.Is(err, kernel.ErrNotFound) {
+		return model.Permission{}, notFound(name)
 	}
 	if err != nil {
-		return types.Permission{}, fmt.Errorf("permission: get %s: %w", name, err)
+		return model.Permission{}, fmt.Errorf("permission: get %s: %w", name, err)
 	}
 	return p, nil
 }
@@ -147,11 +173,11 @@ type Principals struct {
 // Narrow returns p with only the grants it makes to pr. An expanded
 // listing shows what the requested principals hold, not what the
 // permission grants to others (getpermissions.json).
-func (pr Principals) Narrow(p types.Permission) types.Permission {
+func (pr Principals) Narrow(p model.Permission) model.Permission {
 	out := p
-	out.Resources = make(map[types.ResourceType]types.Resource, len(p.Resources))
+	out.Resources = make(map[accessapi.ResourceType]model.Resource, len(p.Resources))
 	for rt, r := range p.Resources {
-		r.Actions = types.Grants{
+		r.Actions = model.Grants{
 			Users:  only(r.Actions.Users, pr.Users),
 			Groups: only(r.Actions.Groups, pr.Groups),
 		}
@@ -160,12 +186,12 @@ func (pr Principals) Narrow(p types.Permission) types.Permission {
 	return out
 }
 
-func only(grants map[string]types.Actions, names []string) map[string]types.Actions {
-	var out map[string]types.Actions
+func only(grants map[string]accessapi.Actions, names []string) map[string]accessapi.Actions {
+	var out map[string]accessapi.Actions
 	for _, n := range names {
 		if a, ok := grants[n]; ok {
 			if out == nil {
-				out = map[string]types.Actions{}
+				out = map[string]accessapi.Actions{}
 			}
 			out[n] = a
 		}
@@ -184,7 +210,7 @@ func (s Service) FoldUsers(ctx context.Context, names []string) ([]string, error
 	}
 	matched := make([]bool, len(names))
 	var out []string
-	page := store.Page{Limit: listPage}
+	page := kernel.Page{Limit: listPage}
 	for {
 		us, next, err := s.Store.Users().List(ctx, page)
 		if err != nil {
@@ -218,9 +244,9 @@ func (s Service) Granting(
 	ctx context.Context,
 	users, groups []string,
 	inherited bool,
-) ([]types.Permission, Principals, error) {
+) ([]model.Permission, Principals, error) {
 	var pr Principals
-	byName := map[string]types.Permission{}
+	byName := map[string]model.Permission{}
 	collect := func(user string, gs []string) error {
 		ps, err := s.Store.Permissions().ForPrincipal(ctx, user, gs)
 		if err != nil {
@@ -233,7 +259,7 @@ func (s Service) Granting(
 	}
 	for _, name := range users {
 		u, err := s.Store.Users().Get(ctx, name)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			return nil, Principals{}, fmt.Errorf("%w: User '%s' does not exist", ErrNotFound, name)
 		}
 		if err != nil {
@@ -250,7 +276,7 @@ func (s Service) Granting(
 		pr.Groups = append(pr.Groups, gs...)
 	}
 	for _, name := range groups {
-		if _, err := s.Store.Groups().Get(ctx, name); errors.Is(err, store.ErrNotFound) {
+		if _, err := s.Store.Groups().Get(ctx, name); errors.Is(err, kernel.ErrNotFound) {
 			return nil, Principals{}, fmt.Errorf("%w: Group '%s' does not exist", ErrNotFound, name)
 		} else if err != nil {
 			return nil, Principals{}, fmt.Errorf("permission: group %s: %w", name, err)
@@ -263,19 +289,19 @@ func (s Service) Granting(
 	slices.Sort(pr.Groups)
 	pr.Groups = slices.Compact(pr.Groups)
 	out := slices.Collect(maps.Values(byName))
-	slices.SortFunc(out, func(a, b types.Permission) int { return strings.Compare(a.Name, b.Name) })
+	slices.SortFunc(out, func(a, b model.Permission) int { return strings.Compare(a.Name, b.Name) })
 	return out, pr, nil
 }
 
 // Create stores a new permission; ErrConflict when the name is taken.
-func (s Service) Create(ctx context.Context, p types.Permission) error {
+func (s Service) Create(ctx context.Context, p model.Permission) error {
 	if err := s.Validate(ctx, p); err != nil {
 		return err
 	}
 	return s.tx(ctx, func(ctx context.Context) error {
 		if _, err := s.Store.Permissions().Get(ctx, p.Name); err == nil {
 			return fmt.Errorf("%w: Permission '%s' already exists", ErrConflict, p.Name)
-		} else if !errors.Is(err, store.ErrNotFound) {
+		} else if !errors.Is(err, kernel.ErrNotFound) {
 			return fmt.Errorf("permission: get %s: %w", p.Name, err)
 		}
 		now := s.now()
@@ -293,7 +319,7 @@ func (s Service) Create(ctx context.Context, p types.Permission) error {
 func (s Service) Write(
 	ctx context.Context,
 	name string,
-	change func(old types.Permission, exists bool) (types.Permission, error),
+	change func(old model.Permission, exists bool) (model.Permission, error),
 ) (bool, error) {
 	return s.write(ctx, name, change)
 }
@@ -303,7 +329,7 @@ func (s Service) Write(
 type Manager interface {
 	// Grantable returns the actions it may grant or revoke in a section
 	// whose stored grants are g.
-	Grantable(g types.Grants) types.Actions
+	Grantable(g model.Grants) accessapi.Actions
 	// Self returns its user name and the groups whose entries are its own.
 	Self() (user string, groups []string)
 }
@@ -319,8 +345,8 @@ type Manager interface {
 // judged on p's grants instead, a holder could first give itself an action
 // and then pass it on.
 func CheckManagerEdit(
-	old, p types.Permission,
-	sections []types.ResourceType,
+	old, p model.Permission,
+	sections []accessapi.ResourceType,
 	m Manager,
 ) error {
 	user, groups := m.Self()
@@ -353,8 +379,8 @@ func CheckManagerEdit(
 
 // changed is every action granted or revoked between two grant maps, over
 // all principals; a principal added or removed changes all of its actions.
-func changed(was, now map[string]types.Actions) types.Actions {
-	var out types.Actions
+func changed(was, now map[string]accessapi.Actions) accessapi.Actions {
+	var out accessapi.Actions
 	for name, a := range was {
 		out |= a ^ now[name]
 	}
@@ -368,15 +394,15 @@ func changed(was, now map[string]types.Actions) types.Actions {
 
 // sameTargets reports whether two sections name the same targets with the
 // same patterns.
-func sameTargets(a, b map[string]types.Target) bool {
-	return maps.EqualFunc(a, b, func(x, y types.Target) bool {
+func sameTargets(a, b map[string]model.Target) bool {
+	return maps.EqualFunc(a, b, func(x, y model.Target) bool {
 		return slices.Equal(includes(x), includes(y)) && slices.Equal(x.Exclude, y.Exclude)
 	})
 }
 
 // includes are a target's include patterns; none means everything, which
 // the v2 form spells "**", so the two compare equal.
-func includes(t types.Target) []string {
+func includes(t model.Target) []string {
 	if len(t.Include) == 0 {
 		return []string{"**"}
 	}
@@ -385,8 +411,8 @@ func includes(t types.Target) []string {
 
 // Put creates p or replaces the stored permission of that name whole, and
 // reports whether it created it.
-func (s Service) Put(ctx context.Context, p types.Permission) (bool, error) {
-	return s.write(ctx, p.Name, func(types.Permission, bool) (types.Permission, error) {
+func (s Service) Put(ctx context.Context, p model.Permission) (bool, error) {
+	return s.write(ctx, p.Name, func(model.Permission, bool) (model.Permission, error) {
 		return p, nil
 	})
 }
@@ -398,18 +424,18 @@ func (s Service) Put(ctx context.Context, p types.Permission) (bool, error) {
 func (s Service) PutResource(
 	ctx context.Context,
 	name string,
-	rt types.ResourceType,
-	r types.Resource,
+	rt accessapi.ResourceType,
+	r model.Resource,
 	create bool,
 ) (bool, error) {
-	return s.write(ctx, name, func(old types.Permission, exists bool) (types.Permission, error) {
+	return s.write(ctx, name, func(old model.Permission, exists bool) (model.Permission, error) {
 		if !exists && !create {
-			return types.Permission{}, notFound(name)
+			return model.Permission{}, notFound(name)
 		}
-		p := types.Permission{Name: name, Description: old.Description}
+		p := model.Permission{Name: name, Description: old.Description}
 		p.Resources = maps.Clone(old.Resources)
 		if p.Resources == nil {
-			p.Resources = map[types.ResourceType]types.Resource{}
+			p.Resources = map[accessapi.ResourceType]model.Resource{}
 		}
 		p.Resources[rt] = r
 		return p, nil
@@ -421,21 +447,21 @@ func (s Service) PutResource(
 func (s Service) MergeResource(
 	ctx context.Context,
 	name string,
-	rt types.ResourceType,
-	patch types.Resource,
-) (types.Resource, error) {
-	var merged types.Resource
-	_, err := s.write(ctx, name, func(old types.Permission, exists bool) (types.Permission, error) {
+	rt accessapi.ResourceType,
+	patch model.Resource,
+) (model.Resource, error) {
+	var merged model.Resource
+	_, err := s.write(ctx, name, func(old model.Permission, exists bool) (model.Permission, error) {
 		if !exists {
-			return types.Permission{}, notFound(name)
+			return model.Permission{}, notFound(name)
 		}
 		cur, ok := old.Resources[rt]
 		if !ok {
-			return types.Permission{}, fmt.Errorf("%w: Permission '%s' has no %s resource",
+			return model.Permission{}, fmt.Errorf("%w: Permission '%s' has no %s resource",
 				ErrNotFound, name, rt)
 		}
-		merged = types.Resource{
-			Actions: types.Grants{
+		merged = model.Resource{
+			Actions: model.Grants{
 				Users:  mergeMap(cur.Actions.Users, patch.Actions.Users),
 				Groups: mergeMap(cur.Actions.Groups, patch.Actions.Groups),
 			},
@@ -462,13 +488,13 @@ func mergeMap[V any](base, over map[string]V) map[string]V {
 }
 
 // DeleteResource removes one section; the permission stays, even empty.
-func (s Service) DeleteResource(ctx context.Context, name string, rt types.ResourceType) error {
-	_, err := s.write(ctx, name, func(old types.Permission, exists bool) (types.Permission, error) {
+func (s Service) DeleteResource(ctx context.Context, name string, rt accessapi.ResourceType) error {
+	_, err := s.write(ctx, name, func(old model.Permission, exists bool) (model.Permission, error) {
 		if !exists {
-			return types.Permission{}, notFound(name)
+			return model.Permission{}, notFound(name)
 		}
 		if _, ok := old.Resources[rt]; !ok {
-			return types.Permission{}, fmt.Errorf("%w: Permission '%s' has no %s resource",
+			return model.Permission{}, fmt.Errorf("%w: Permission '%s' has no %s resource",
 				ErrNotFound, name, rt)
 		}
 		p := old
@@ -482,7 +508,7 @@ func (s Service) DeleteResource(ctx context.Context, name string, rt types.Resou
 // Delete removes the permission.
 func (s Service) Delete(ctx context.Context, name string) error {
 	err := s.Store.Permissions().Delete(ctx, name)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return notFound(name)
 	}
 	if err != nil {
@@ -497,7 +523,7 @@ func (s Service) Delete(ctx context.Context, name string) error {
 func (s Service) write(
 	ctx context.Context,
 	name string,
-	change func(old types.Permission, exists bool) (types.Permission, error),
+	change func(old model.Permission, exists bool) (model.Permission, error),
 ) (bool, error) {
 	if err := ValidName(name); err != nil {
 		return false, err
@@ -506,7 +532,7 @@ func (s Service) write(
 	err := s.tx(ctx, func(ctx context.Context) error {
 		old, err := s.Store.Permissions().Get(ctx, name)
 		exists := err == nil
-		if err != nil && !errors.Is(err, store.ErrNotFound) {
+		if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 			return fmt.Errorf("permission: get %s: %w", name, err)
 		}
 		p, err := change(old, exists)
@@ -532,7 +558,7 @@ func (s Service) write(
 // Validate checks a permission against the rules every API shares: a valid
 // name, known resource types, targets that exist and are not virtual,
 // patterns within length, and principals that exist.
-func (s Service) Validate(ctx context.Context, p types.Permission) error {
+func (s Service) Validate(ctx context.Context, p model.Permission) error {
 	if err := ValidName(p.Name); err != nil {
 		return err
 	}
@@ -553,14 +579,14 @@ func (s Service) Validate(ctx context.Context, p types.Permission) error {
 		}
 	}
 	for _, u := range slices.Sorted(maps.Keys(users)) {
-		if _, err := s.Store.Users().Get(ctx, u); errors.Is(err, store.ErrNotFound) {
+		if _, err := s.Store.Users().Get(ctx, u); errors.Is(err, kernel.ErrNotFound) {
 			return invalidf("User '%s' does not exist", u)
 		} else if err != nil {
 			return fmt.Errorf("permission: user %s: %w", u, err)
 		}
 	}
 	for _, g := range slices.Sorted(maps.Keys(groups)) {
-		if _, err := s.Store.Groups().Get(ctx, g); errors.Is(err, store.ErrNotFound) {
+		if _, err := s.Store.Groups().Get(ctx, g); errors.Is(err, kernel.ErrNotFound) {
 			return invalidf("Group '%s' does not exist", g)
 		} else if err != nil {
 			return fmt.Errorf("permission: group %s: %w", g, err)
@@ -571,18 +597,18 @@ func (s Service) Validate(ctx context.Context, p types.Permission) error {
 
 func (s Service) validTargets(
 	ctx context.Context,
-	rt types.ResourceType,
-	targets map[string]types.Target,
+	rt accessapi.ResourceType,
+	targets map[string]model.Target,
 ) error {
-	if rt == types.ResourceBuild {
+	if rt == accessapi.ResourceBuild {
 		if len(targets) > 1 {
 			return invalidf("The build resource takes exactly one target, %s",
-				types.BuildInfoRepository)
+				accessapi.BuildInfoRepository)
 		}
 		for key := range targets {
-			if key != types.BuildInfoRepository {
+			if key != accessapi.BuildInfoRepository {
 				return invalidf("The build resource's target must be %s, not '%s'",
-					types.BuildInfoRepository, key)
+					accessapi.BuildInfoRepository, key)
 			}
 		}
 	}
@@ -594,7 +620,7 @@ func (s Service) validTargets(
 					key, MaxPatternLength)
 			}
 		}
-		if rt == types.ResourceArtifact {
+		if rt == accessapi.ResourceArtifact {
 			if err := s.validRepository(ctx, key); err != nil {
 				return err
 			}
@@ -611,15 +637,15 @@ func (s Service) validRepository(ctx context.Context, key string) error {
 		return nil
 	}
 	// The key as given first: a repository may itself be named "x-cache".
-	cfg, err := s.Store.Repos().Get(ctx, key)
-	if name, cached := types.ResolveRepoKey(key); cached && errors.Is(err, store.ErrNotFound) {
-		cfg, err = s.Store.Repos().Get(ctx, name)
+	cfg, err := s.Repositories.Get(ctx, key)
+	if name, cached := types.ResolveRepoKey(key); cached && errors.Is(err, kernel.ErrNotFound) {
+		cfg, err = s.Repositories.Get(ctx, name)
 		if err == nil && cfg.Class != repo.Remote {
-			err = store.ErrNotFound
+			err = kernel.ErrNotFound
 		}
 	}
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return invalidf("Repository '%s' does not exist", key)
 	case err != nil:
 		return fmt.Errorf("permission: repository %s: %w", key, err)

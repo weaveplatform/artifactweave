@@ -25,7 +25,7 @@ func world(t *testing.T) (roles.Service, *inmem.Store) {
 		CreateEnvironment(ctx, types.Environment{ProjectKey: "p", Name: "PENV"}); err != nil {
 		t.Fatal(err)
 	}
-	return roles.Service{Store: db}, db
+	return roles.Service{Store: db, Repositories: repositories{db: db}}, db
 }
 
 func must(t *testing.T, err error) {

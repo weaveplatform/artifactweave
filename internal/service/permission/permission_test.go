@@ -12,7 +12,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/service/permission"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -52,8 +51,12 @@ func seeded(t *testing.T) *inmem.Store {
 	return db
 }
 
-func service(db store.Store) permission.Service {
-	return permission.Service{Store: db, Now: func() time.Time { return clock }}
+func service(db *inmem.Store) permission.Service {
+	return permission.Service{
+		Store:        db,
+		Repositories: repositories{db: db},
+		Now:          func() time.Time { return clock },
+	}
 }
 
 func artifact(

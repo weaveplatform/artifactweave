@@ -15,9 +15,10 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	platformsettings "github.com/weaveplatform/artifactweave/migration/platform/settings"
 )
 
 // ErrInvalid reports a request the caller must change: a missing or
@@ -33,9 +34,24 @@ var ErrProtected = errors.New("identity: protected")
 // ErrExists answers a create-only call for a name already taken (409).
 var ErrExists = errors.New("identity: already exists")
 
+// Store is what the identity service reads and writes: the access module's
+// stores, of which it uses the user, group, permission and token stores,
+// their unit of work (port.Store's Tx), and the settings that hold the
+// account policies. The application passes its store aggregate, which
+// satisfies it.
+type Store interface {
+	port.Store
+	// Settings returns the settings store, which holds the user lock,
+	// password expiration and password policies. Its calls join the
+	// transaction the context carries.
+	Settings() platformsettings.SettingsStore
+}
+
 // Service manages users, groups and the account policies.
 type Service struct {
-	Store store.Store
+	// Store holds the users, groups and policies. Every change runs in one
+	// Tx of Store, and the calls it makes join it through the context.
+	Store Store
 	// Hash is the password hash cost; the zero value is production's.
 	Hash authn.HashParams
 	// Now supplies the time; nil means time.Now.
@@ -95,7 +111,7 @@ type UserPatch struct {
 // carries, and reports whether it created it. password is the clear-text
 // password, required unless u.InternalPasswordDisabled. A new user also
 // joins every auto-join group.
-func (s *Service) PutUser(ctx context.Context, u types.User, password string) (bool, error) {
+func (s *Service) PutUser(ctx context.Context, u model.User, password string) (bool, error) {
 	if err := validName("user", u.Name); err != nil {
 		return false, err
 	}
@@ -109,14 +125,14 @@ func (s *Service) PutUser(ctx context.Context, u types.User, password string) (b
 	err := s.tx(ctx, func(ctx context.Context) error {
 		old, err := s.Store.Users().Get(ctx, u.Name)
 		switch {
-		case errors.Is(err, store.ErrNotFound):
+		case errors.Is(err, kernel.ErrNotFound):
 			created = true
 		case err != nil:
 			return err //nolint:wrapcheck // a store error, mapped by the handler
 		}
 		now := s.now()
 		next := u
-		next.Realm, next.MFA = types.RealmInternal, types.MFANone
+		next.Realm, next.MFA = model.RealmInternal, model.MFANone
 		if created {
 			if next, err = s.newUser(ctx, u, now); err != nil {
 				return err
@@ -146,7 +162,7 @@ func (s *Service) PutUser(ctx context.Context, u types.User, password string) (b
 
 // CreateUser creates u with password, as PutUser does for a new name, and
 // answers ErrExists when the name is taken instead of replacing the user.
-func (s *Service) CreateUser(ctx context.Context, u types.User, password string) error {
+func (s *Service) CreateUser(ctx context.Context, u model.User, password string) error {
 	if err := validName("user", u.Name); err != nil {
 		return err
 	}
@@ -166,7 +182,7 @@ func (s *Service) CreateUser(ctx context.Context, u types.User, password string)
 			return err
 		}
 		err = s.Store.Users().Create(ctx, next)
-		if errors.Is(err, store.ErrConflict) {
+		if errors.Is(err, kernel.ErrConflict) {
 			return fmt.Errorf("%w: user %q", ErrExists, u.Name)
 		}
 		return groupsError(err)
@@ -175,10 +191,10 @@ func (s *Service) CreateUser(ctx context.Context, u types.User, password string)
 
 // newUser is u as first stored: an enabled internal user that also joins
 // every auto-join group.
-func (s *Service) newUser(ctx context.Context, u types.User, now time.Time) (types.User, error) {
+func (s *Service) newUser(ctx context.Context, u model.User, now time.Time) (model.User, error) {
 	next := u
-	next.Realm, next.MFA = types.RealmInternal, types.MFANone
-	next.Status, next.Created = types.UserEnabled, now
+	next.Realm, next.MFA = model.RealmInternal, model.MFANone
+	next.Status, next.Created = model.UserEnabled, now
 	auto, err := s.Store.Groups().AutoJoin(ctx)
 	if err != nil {
 		return next, err //nolint:wrapcheck // a store error
@@ -242,7 +258,7 @@ func (s *Service) PatchUser(ctx context.Context, name string, p UserPatch) error
 // password change endpoint passes false, so there it is a reuse.
 func (s *Service) setPassword(
 	ctx context.Context,
-	u *types.User,
+	u *model.User,
 	password string,
 	now time.Time,
 	keepSame bool,
@@ -268,7 +284,7 @@ func (s *Service) setPassword(
 
 // keepAnAdmin refuses demoting the last administrator: without one, nothing
 // could manage the instance again.
-func (s *Service) keepAnAdmin(ctx context.Context, old, next types.User) error {
+func (s *Service) keepAnAdmin(ctx context.Context, old, next model.User) error {
 	if !old.Admin || next.Admin {
 		return nil
 	}
@@ -312,7 +328,7 @@ func (s *Service) DeleteUser(ctx context.Context, name string) error {
 		if err != nil {
 			return err //nolint:wrapcheck // ErrNotFound is the handler's 404
 		}
-		if err := s.keepAnAdmin(ctx, u, types.User{}); err != nil {
+		if err := s.keepAnAdmin(ctx, u, model.User{}); err != nil {
 			return err
 		}
 		if err := s.revokeTokens(ctx, name); err != nil {
@@ -326,16 +342,16 @@ func (s *Service) DeleteUser(ctx context.Context, name string) error {
 // jfac@<service id>/users/<name> (decision 0005).
 func (s *Service) revokeTokens(ctx context.Context, name string) error {
 	suffix := "/users/" + name
-	var page store.Page
+	var page kernel.Page
 	for {
-		tokens, next, err := s.Store.Tokens().List(ctx, store.TokenFilter{}, page)
+		tokens, next, err := s.Store.Tokens().List(ctx, port.TokenFilter{}, page)
 		if err != nil {
 			return err //nolint:wrapcheck // a store error
 		}
 		for _, t := range tokens {
 			if strings.HasSuffix(t.Subject, suffix) {
 				if err := s.Store.Tokens().Delete(ctx, t.ID); err != nil &&
-					!errors.Is(err, store.ErrNotFound) {
+					!errors.Is(err, kernel.ErrNotFound) {
 					return err //nolint:wrapcheck // a store error
 				}
 			}
@@ -352,21 +368,21 @@ func (s *Service) revokeTokens(ctx context.Context, name string) error {
 // issues a new value. Each user holds at most one, so the list is one entry
 // per user who ever asked, not every token.
 func (s *Service) revokeEncryptedPasswords(ctx context.Context, names ...string) error {
-	var page store.Page
+	var page kernel.Page
 	for {
 		tokens, next, err := s.Store.Tokens().List(
-			ctx, store.TokenFilter{Purpose: types.TokenPurposeEncryptedPassword}, page,
+			ctx, port.TokenFilter{Purpose: model.TokenPurposeEncryptedPassword}, page,
 		)
 		if err != nil {
 			return err //nolint:wrapcheck // a store error
 		}
 		for _, t := range tokens {
-			sub, err := types.ParseSubject(t.Subject)
+			sub, err := model.ParseSubject(t.Subject)
 			if err != nil || sub.Kind != "users" || !slices.Contains(names, sub.Name) {
 				continue
 			}
 			if err := s.Store.Tokens().Delete(ctx, t.ID); err != nil &&
-				!errors.Is(err, store.ErrNotFound) {
+				!errors.Is(err, kernel.ErrNotFound) {
 				return err //nolint:wrapcheck // a store error
 			}
 		}
@@ -378,12 +394,12 @@ func (s *Service) revokeEncryptedPasswords(ctx context.Context, names ...string)
 }
 
 // User returns one user.
-func (s *Service) User(ctx context.Context, name string) (types.User, error) {
+func (s *Service) User(ctx context.Context, name string) (model.User, error) {
 	return s.Store.Users().Get(ctx, name) //nolint:wrapcheck // ErrNotFound is the handler's 404
 }
 
 // Users returns every user, ordered by name.
-func (s *Service) Users(ctx context.Context) ([]types.User, error) {
+func (s *Service) Users(ctx context.Context) ([]model.User, error) {
 	return all(ctx, s.Store.Users().List)
 }
 
@@ -408,7 +424,7 @@ type GroupPatch struct {
 // PutGroup creates g, or replaces every field of an existing group, and
 // reports whether it created it. members, when not nil, replaces the
 // membership; otherwise an existing group keeps its members.
-func (s *Service) PutGroup(ctx context.Context, g types.Group, members *[]string) (bool, error) {
+func (s *Service) PutGroup(ctx context.Context, g model.Group, members *[]string) (bool, error) {
 	if err := validName("group", g.Name); err != nil {
 		return false, err
 	}
@@ -416,13 +432,13 @@ func (s *Service) PutGroup(ctx context.Context, g types.Group, members *[]string
 	err := s.tx(ctx, func(ctx context.Context) error {
 		old, err := s.Store.Groups().Get(ctx, g.Name)
 		switch {
-		case errors.Is(err, store.ErrNotFound):
+		case errors.Is(err, kernel.ErrNotFound):
 			created = true
 		case err != nil:
 			return err //nolint:wrapcheck // a store error
 		}
 		next := g
-		next.Realm, next.Members = types.RealmInternal, nil
+		next.Realm, next.Members = model.RealmInternal, nil
 		switch {
 		case members != nil:
 			next.Members = sortedUnique(*members)
@@ -493,7 +509,7 @@ func (s *Service) DeleteGroup(ctx context.Context, name string) error {
 
 // dropGroupGrants removes group's grants from p and reports whether it had
 // any.
-func dropGroupGrants(p types.Permission, group string) bool {
+func dropGroupGrants(p model.Permission, group string) bool {
 	dropped := false
 	for _, r := range p.Resources {
 		if _, ok := r.Actions.Groups[group]; ok {
@@ -505,12 +521,12 @@ func dropGroupGrants(p types.Permission, group string) bool {
 }
 
 // Group returns one group with its members.
-func (s *Service) Group(ctx context.Context, name string) (types.Group, error) {
+func (s *Service) Group(ctx context.Context, name string) (model.Group, error) {
 	return s.Store.Groups().Get(ctx, name) //nolint:wrapcheck // ErrNotFound is the handler's 404
 }
 
 // Groups returns every group, ordered by name.
-func (s *Service) Groups(ctx context.Context) ([]types.Group, error) {
+func (s *Service) Groups(ctx context.Context) ([]model.Group, error) {
 	return all(ctx, s.Store.Groups().List)
 }
 
@@ -526,7 +542,7 @@ func (s *Service) ExpirePasswords(ctx context.Context, names []string) ([]string
 		var expired []string
 		for _, n := range sortedUnique(names) {
 			u, err := s.Store.Users().Get(ctx, n)
-			if errors.Is(err, store.ErrNotFound) {
+			if errors.Is(err, kernel.ErrNotFound) {
 				unknown = append(unknown, n)
 				continue
 			}
@@ -579,7 +595,7 @@ func (s *Service) ChangePassword(
 	if err != nil {
 		return err //nolint:wrapcheck // ErrNotFound is the handler's 404
 	}
-	if u.Status == types.UserLocked {
+	if u.Status == model.UserLocked {
 		return invalidf("user %q is locked", name)
 	}
 	if !passwordMatches(u, oldPassword) {
@@ -613,9 +629,9 @@ func (s *Service) ChangePassword(
 // passwordMatches reports whether password is u's internal password, for a
 // user who may sign in with one at all. CheckPassword's only error is a
 // stored hash it cannot read, which matches nothing.
-func passwordMatches(u types.User, password string) bool {
+func passwordMatches(u model.User, password string) bool {
 	if len(u.PasswordHash) == 0 || u.InternalPasswordDisabled ||
-		(u.Status != "" && u.Status != types.UserEnabled) {
+		(u.Status != "" && u.Status != model.UserEnabled) {
 		return false
 	}
 	same, err := authn.CheckPassword(u.PasswordHash, password)
@@ -653,13 +669,13 @@ func (s *Service) UnlockAll(ctx context.Context) error {
 }
 
 // LockPolicy returns the user lock policy.
-func (s *Service) LockPolicy(ctx context.Context) (types.UserLockPolicy, error) {
+func (s *Service) LockPolicy(ctx context.Context) (model.UserLockPolicy, error) {
 	return authn.LockPolicy(ctx, s.Store.Settings()) //nolint:wrapcheck // already wrapped
 }
 
 // SetLockPolicy stores p. Disabling the policy also clears every lock, as
 // Artifactory does, so turning it off is never a way to strand users.
-func (s *Service) SetLockPolicy(ctx context.Context, p types.UserLockPolicy) error {
+func (s *Service) SetLockPolicy(ctx context.Context, p model.UserLockPolicy) error {
 	if p.LoginAttempts == 0 {
 		p.LoginAttempts = authn.DefaultLoginAttempts
 	}
@@ -667,7 +683,8 @@ func (s *Service) SetLockPolicy(ctx context.Context, p types.UserLockPolicy) err
 		return invalidf("loginAttempts must be at least 1")
 	}
 	return s.tx(ctx, func(ctx context.Context) error {
-		if err := s.Store.Settings().Put(ctx, types.SettingUserLockPolicy, p); err != nil {
+		if err := s.Store.Settings().
+			Put(ctx, platformsettings.SettingUserLockPolicy, p); err != nil {
 			return err //nolint:wrapcheck // a store error
 		}
 		if !p.Enabled {
@@ -678,19 +695,20 @@ func (s *Service) SetLockPolicy(ctx context.Context, p types.UserLockPolicy) err
 }
 
 // ExpirationPolicy returns the password expiration policy.
-func (s *Service) ExpirationPolicy(ctx context.Context) (types.PasswordExpirationPolicy, error) {
+func (s *Service) ExpirationPolicy(ctx context.Context) (model.PasswordExpirationPolicy, error) {
 	return authn.ExpirationPolicy(ctx, s.Store.Settings()) //nolint:wrapcheck // already wrapped
 }
 
 // SetExpirationPolicy stores p and returns what was stored.
 func (s *Service) SetExpirationPolicy(
 	ctx context.Context,
-	p types.PasswordExpirationPolicy,
-) (types.PasswordExpirationPolicy, error) {
+	p model.PasswordExpirationPolicy,
+) (model.PasswordExpirationPolicy, error) {
 	if p.MaxAgeDays < 1 {
 		return p, invalidf("passwordMaxAge must be at least 1 day")
 	}
-	if err := s.Store.Settings().Put(ctx, types.SettingPasswordExpirationPolicy, p); err != nil {
+	if err := s.Store.Settings().
+		Put(ctx, platformsettings.SettingPasswordExpirationPolicy, p); err != nil {
 		return p, err //nolint:wrapcheck // a store error
 	}
 	return p, nil
@@ -705,7 +723,7 @@ type AccessLockPolicy struct {
 	// PasswordExpiryDays is the maximum password age while expiry is on,
 	// and 0 while it is off.
 	PasswordExpiryDays int
-	types.AccessLockSettings
+	model.AccessLockSettings
 }
 
 // AccessLockPolicy returns the Access view of the policies, mapped as JFrog
@@ -770,9 +788,9 @@ func (s *Service) SetAccessLockPolicy(
 			key string
 			v   any
 		}{
-			{types.SettingUserLockPolicy, lock},
-			{types.SettingPasswordExpirationPolicy, expiry},
-			{types.SettingAccessLockSettings, p.AccessLockSettings},
+			{platformsettings.SettingUserLockPolicy, lock},
+			{platformsettings.SettingPasswordExpirationPolicy, expiry},
+			{platformsettings.SettingAccessLockSettings, p.AccessLockSettings},
 		} {
 			if err := settings.Put(ctx, w.key, w.v); err != nil {
 				return err //nolint:wrapcheck // a store error
@@ -802,7 +820,7 @@ func sortedUnique(names []string) []string {
 // groupsError turns the store's "no such group" into the 400 the API
 // documents for unknown groups.
 func groupsError(err error) error {
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return invalidf("%v", err)
 	}
 	return err
@@ -811,7 +829,7 @@ func groupsError(err error) error {
 // membersError turns the store's "no such user" into a 400 for unknown
 // members.
 func membersError(err error) error {
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return invalidf("%v", err)
 	}
 	return err
@@ -820,11 +838,11 @@ func membersError(err error) error {
 // all collects every page of a list.
 func all[T any](
 	ctx context.Context,
-	list func(context.Context, store.Page) ([]T, string, error),
+	list func(context.Context, kernel.Page) ([]T, string, error),
 ) ([]T, error) {
 	var (
 		out  []T
-		page store.Page
+		page kernel.Page
 	)
 	for {
 		items, next, err := list(ctx, page)

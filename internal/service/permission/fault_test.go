@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/service/permission"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -109,7 +111,11 @@ func (r faultyRepos) Get(ctx context.Context, key string) (repo.Config, error) {
 func TestUnitStoreFailures(t *testing.T) {
 	ctx := context.Background()
 	f := &faulty{Store: seeded(t)}
-	svc := service(f)
+	svc := permission.Service{
+		Store:        f,
+		Repositories: repositories{db: f},
+		Now:          func() time.Time { return clock },
+	}
 	grants := perm("g", map[types.ResourceType]types.Resource{
 		types.ResourceArtifact: artifact(everywhere("libs-local"),
 			map[string]types.Actions{"bob": r}, map[string]types.Actions{"devs": r}),
