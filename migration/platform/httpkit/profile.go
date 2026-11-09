@@ -37,9 +37,9 @@ func WithProfileRules(ctx context.Context, rules []ProfileRule) context.Context 
 }
 
 // ErrorProfiles is middleware that carries rules on each request's context,
-// so the helpers below the router choose the error profile without knowing
-// which ecosystem a path belongs to. It must be installed first, ahead of
-// any middleware that can answer with an error.
+// so that WriteErr and the middleware choose the error profile without
+// knowing which ecosystem a path belongs to. It must be installed first,
+// ahead of any middleware that can answer with an error.
 func ErrorProfiles(rules []ProfileRule) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

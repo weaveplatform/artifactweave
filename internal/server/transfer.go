@@ -28,7 +28,7 @@ const copyOrMoveType = "application/vnd.org.jfrog.artifactory.storage.CopyOrMove
 
 // registerTransferRoutes serves copy, move, folder archive download and
 // archive entries, all hand-written in the spec, under the patterns
-// chiPatterns derives so they replace the 501 stubs. An archive entry in a
+// httpkit.ChiPatterns derives so they replace the 501 stubs. An archive entry in a
 // nested folder does not fit the entry pattern (a chi parameter is one
 // segment) and reaches getItem through the plain item route instead.
 func (s artifactoryService) registerTransferRoutes(r chi.Router) {

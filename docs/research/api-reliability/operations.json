@@ -698,6 +698,7 @@
     "handler": "internal/server/tokens.go: accessService.RevokeTokenByValue",
     "direct_calls": [
       "errors.Is",
+      "httpkit.Deref",
       "s.tokenAPI",
       "svc.Revoke",
       "svc.Verify",
@@ -2875,6 +2876,7 @@
     "contract": "Returns the identity mappings of one provider, optionally only those of one project. Requires a platform admin.",
     "handler": "internal/server/oidc.go: accessService.GetOidcIdentityMappings",
     "direct_calls": [
+      "httpkit.Deref",
       "s.oidcError",
       "s.oidcService",
       "svc.Mappings"
@@ -3618,6 +3620,7 @@
     "direct_calls": [
       "baseurl.From",
       "errors.Is",
+      "httpkit.Deref",
       "s.identityErr",
       "s.readerIdentity",
       "svc.Store.Groups",
@@ -3811,6 +3814,7 @@
     "direct_calls": [
       "baseurl.From",
       "errors.Is",
+      "httpkit.Deref",
       "s.identityErr",
       "s.readerIdentity",
       "slices.Contains",
@@ -4177,6 +4181,7 @@
       "errors.Is",
       "expression.Key",
       "fmt.Errorf",
+      "httpkit.Deref",
       "kernel.RequireAdmin",
       "s.cfg.Store.APIRestrictions",
       "s.cfg.Store.APIRestrictions().History",
@@ -4371,6 +4376,8 @@
     "handler": "internal/server/builds.go: artifactoryService.GetAllBuilds",
     "direct_calls": [
       "build.FormatStarted",
+      "httpkit.Deref",
+      "httpkit.PtrTo",
       "s.buildCaller",
       "s.buildError",
       "svc.Names"
@@ -4401,6 +4408,8 @@
     "handler": "internal/server/builds.go: artifactoryService.GetBuildRuns",
     "direct_calls": [
       "build.FormatStarted",
+      "httpkit.Deref",
+      "httpkit.PtrTo",
       "s.buildCaller",
       "s.buildError",
       "svc.Runs"
@@ -4433,6 +4442,7 @@
       "apierror.New",
       "b.Started.Before",
       "fmt.Sprintf",
+      "httpkit.Deref",
       "s.buildCaller",
       "s.buildError",
       "svc.Run"
@@ -4465,6 +4475,7 @@
     "contract": "Lists where each artifact of a run is stored. Needs read permission on the build.",
     "handler": "internal/server/builds.go: artifactoryService.GetBuildArtifacts",
     "direct_calls": [
+      "httpkit.PtrTo",
       "it.ReportedRepoKey",
       "s.buildCaller",
       "s.buildError",
@@ -7180,6 +7191,7 @@
     "direct_calls": [
       "artgen.GetRepositoriesByTypeAndProject200ApplicationVndOrgJfrogArtifactoryRepositoriesRepositoryDetailsListPlusJSONResponse",
       "baseurl.From",
+      "httpkit.Accepts",
       "repo.Class",
       "repo.PackageTypeName",
       "s.content",
@@ -7218,6 +7230,7 @@
     "direct_calls": [
       "artgen.GetAllRepositoryConfigurations200ApplicationVndOrgJfrogArtifactoryRepositoriesRepositoryConfigurationsListPlusJSONResponse",
       "classes.has",
+      "httpkit.Accepts",
       "packageTypes.has",
       "repo.Masked",
       "repo.Relevant",
@@ -7293,6 +7306,7 @@
       "apierror.New",
       "errors.Is",
       "fmt.Sprintf",
+      "httpkit.Accepts",
       "json.Marshal",
       "json.Unmarshal",
       "maps.DeleteFunc",
@@ -7584,6 +7598,7 @@
     "contract": "Finds items created between two instants. Only local repositories and remote caches are searched. A named user is required; anonymous callers receive 401.",
     "handler": "internal/server/searches.go: artifactoryService.SearchCreation",
     "direct_calls": [
+      "httpkit.FormatTime",
       "r.collect",
       "r.repoScope",
       "r.uri",
@@ -7699,6 +7714,7 @@
       "f.Item.ReportedRepoKey",
       "f.Version",
       "hit.Item.FullPath",
+      "httpkit.Deref",
       "ls.find",
       "r.entries",
       "r.layoutScope",
@@ -7740,6 +7756,7 @@
     "direct_calls": [
       "apierror.New",
       "artgen.SearchLatestVersion200TextResponse",
+      "httpkit.Deref",
       "r.moduleScope",
       "r.upstreamSearch",
       "s.newSearch",
@@ -7831,6 +7848,7 @@
     "contract": "Finds items by property values. Every query parameter except repos is read as a property key with a comma-separated list of values; a key without a value matches any value. The search covers local repositories, remote caches and virtual repositories. Anonymous callers may search when anonymous access is enabled.",
     "handler": "internal/server/searches.go: artifactoryService.SearchProperty",
     "direct_calls": [
+      "httpkit.RawSearchQuery",
       "r.repoScope",
       "r.uriSearch",
       "s.newSearch"
@@ -7896,6 +7914,7 @@
     "handler": "internal/server/searches_layout.go: artifactoryService.SearchVersions",
     "direct_calls": [
       "apierror.New",
+      "httpkit.Deref",
       "r.moduleScope",
       "r.upstreamSearch",
       "s.newSearch",
@@ -9665,6 +9684,7 @@
       "artgen.GetRepositoryConfigurationV2200ApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONResponse",
       "artgen.GetRepositoryConfigurationV2200ApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONResponse",
       "artgen.GetRepositoryConfigurationV2200JSONResponse",
+      "httpkit.Accepts",
       "repo.Relevant",
       "s.readOne"
     ],
@@ -13548,6 +13568,7 @@
     "handler": "internal/server/access_identity.go: accessService.UpdateGroup",
     "direct_calls": [
       "accessgen.UpdateGroup200JSONResponse",
+      "httpkit.RawBody",
       "s.adminIdentity",
       "s.groupDetails",
       "s.identityErr",
@@ -13583,6 +13604,7 @@
     "direct_calls": [
       "apierror.New",
       "errors.Is",
+      "httpkit.DerefSlice",
       "s.adminIdentity",
       "s.identityErr",
       "svc.Group",
@@ -13679,6 +13701,7 @@
     "contract": "Applies the add list then the remove list to the user's memberships and returns the resulting full membership. Names that are already present (add) or already absent (remove) are ignored; a name in both lists ends up removed. Admin only.",
     "handler": "internal/server/access_identity.go: accessService.UpdateUserGroups",
     "direct_calls": [
+      "httpkit.DerefSlice",
       "s.adminIdentity",
       "s.identityErr",
       "svc.UpdateUserGroups"
@@ -14323,6 +14346,8 @@
     "handler": "internal/server/oidc.go: accessService.OidcTokenExchange",
     "direct_calls": [
       "got.Record.Scope.String",
+      "httpkit.Deref",
+      "httpkit.PtrTo",
       "s.oidc",
       "s.oidcError",
       "svc.Exchange"
@@ -14452,6 +14477,7 @@
     "handler": "internal/server/roles.go: accessService.CreateGlobalRole",
     "direct_calls": [
       "fmt.Sprintf",
+      "httpkit.Deref",
       "s.roleError",
       "s.roleService",
       "svc.CreateRole",
@@ -14627,6 +14653,7 @@
     "contract": "With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A transient user, the subject of a token minted for a name that is no stored user or of an OIDC exchange, mints for itself a token with its own token's scope that resolves to the same transient user. That token expires no later than the caller's own token, and may be refreshable only when the caller's own token is, or the request is refused with 403. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.",
     "handler": "internal/server/tokens.go: accessService.CreateToken",
     "direct_calls": [
+      "httpkit.Deref",
       "issued.Record.Scope.String",
       "s.tokenAPI",
       "s.tokenAPI().mint"
@@ -14675,6 +14702,8 @@
       "accessgen.CreateGroup201JSONResponse",
       "apierror.New",
       "errors.Is",
+      "httpkit.Deref",
+      "httpkit.DerefSlice",
       "s.adminIdentity",
       "s.groupDetails",
       "s.identityErr",
@@ -14737,6 +14766,8 @@
     "handler": "internal/server/access_identity.go: accessService.CreateUser",
     "direct_calls": [
       "accessgen.CreateUser201JSONResponse",
+      "httpkit.Deref",
+      "httpkit.DerefSlice",
       "s.adminIdentity",
       "s.identityErr",
       "s.userDetails",
@@ -15109,6 +15140,8 @@
     "contract": "Adds modules to an existing run and stores the extended document. Needs deploy and delete permission on the build.",
     "handler": "internal/server/builds.go: artifactoryService.AppendBuild",
     "direct_calls": [
+      "httpkit.Deref",
+      "httpkit.RawBody",
       "s.appendOnce",
       "s.buildCaller",
       "s.buildError",
@@ -15137,6 +15170,8 @@
     "handler": "internal/server/builds.go: artifactoryService.DeleteBuildsMultiple",
     "direct_calls": [
       "artgen.DeleteBuildsMultiple200TextResponse",
+      "httpkit.Deref",
+      "httpkit.DerefSlice",
       "s.deleteBuilds"
     ],
     "review_family": "build",
@@ -15168,6 +15203,8 @@
       "err.Error",
       "errors.Is",
       "fmt.Sprintf",
+      "httpkit.Deref",
+      "httpkit.DerefSlice",
       "s.buildCaller",
       "s.buildError",
       "strings.TrimPrefix",
@@ -15203,6 +15240,7 @@
       "artgen.RenameBuild200TextResponse",
       "errors.Is",
       "fmt.Sprintf",
+      "httpkit.Deref",
       "s.buildCaller",
       "s.buildError",
       "svc.Rename"
@@ -15231,6 +15269,9 @@
     "direct_calls": [
       "context.WithoutCancel",
       "expression.Retention",
+      "httpkit.Deref",
+      "httpkit.DerefSlice",
+      "httpkit.RequestIDFrom",
       "s.buildCaller",
       "s.buildError",
       "s.log",
@@ -17400,6 +17441,7 @@
     "handler": "internal/server/searches_builds.go: artifactoryService.SearchBuildArtifacts",
     "direct_calls": [
       "apierror.New",
+      "httpkit.Deref",
       "it.FullPath",
       "it.ReportedRepoKey",
       "r.capped",
@@ -20143,6 +20185,7 @@
     "contract": "Replaces the description, environments and actions of a CUSTOM_GLOBAL role, or the environments and actions of a PREDEFINED one. The name in the body must equal the path name and the type must stay the same; the ADMIN role cannot be changed. Each of these answers 400. Admin only. Answers 200 with no body.",
     "handler": "internal/server/roles.go: accessService.UpdateGlobalRole",
     "direct_calls": [
+      "httpkit.Deref",
       "s.roleError",
       "s.roleService",
       "svc.UpdateRole",
@@ -20503,6 +20546,9 @@
     "contract": "Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The body may use the vendor media type or application/json.",
     "handler": "internal/server/builds.go: artifactoryService.UploadBuild",
     "direct_calls": [
+      "httpkit.Deref",
+      "httpkit.RawBody",
+      "httpkit.RequestIDFrom",
       "s.buildCaller",
       "s.buildError",
       "s.log",

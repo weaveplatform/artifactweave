@@ -76,7 +76,7 @@ const refreshRoute = "POST /access/api/v1/tokens"
 // evaluated for the request, and the principal is stored with that
 // evaluator (authn.WithAuthorized), which handlers ask every question
 // through authn.DeciderFrom. The principal's name goes to the access log
-// (noteUser). A request skip reports passes untouched, credentials or not: a
+// (httpkit.NoteUser). A request skip reports passes untouched, credentials or not: a
 // protocol's absent path, such as Go's checksum database, which its router
 // answers 404 whoever asks, a host route served to anyone, such as
 // Terraform's discovery document, and a signed URL, such as Terraform's

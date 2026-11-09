@@ -83,7 +83,7 @@ var slashCollections = map[string]string{
 // update. repo.Config cannot tell a field left out (keep the stored value)
 // from one sent as null (reset it to its default), and an update needs both.
 // A build-info publish or append keeps its raw body too, because the
-// document is stored as published (decision 0014). It runs after bodyLimit,
+// document is stored as published (decision 0014). It runs after middleware.BodyLimit,
 // so the copy is bounded.
 func requestDetails(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

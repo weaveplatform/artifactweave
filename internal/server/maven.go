@@ -34,7 +34,7 @@ const calculateMetadataActions = types.ActionManage | types.ActionDelete | types
 	types.ActionAnnotate | types.ActionRead
 
 // registerMavenRoutes serves the Maven REST operations, hand-written in
-// the spec, under the patterns chiPatterns derives so they replace the 501
+// the spec, under the patterns httpkit.ChiPatterns derives so they replace the 501
 // stubs (decision 0036).
 func (s artifactoryService) registerMavenRoutes(r chi.Router) {
 	for _, p := range httpkit.ChiPatterns(mavenCalculatePrefix + "{repoKey}/{folderPath}") {

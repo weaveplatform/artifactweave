@@ -219,9 +219,9 @@ const sinkBodyLimit = 1 << 20
 
 // sinkHandler drains and discards telemetry posted by the JFrog CLI and the
 // Terraform providers (usage reports, jfconnect metrics). It runs behind
-// bodyLimit(sinkBodyLimit). Reading a body within the limit to EOF lets the
+// middleware.BodyLimit(sinkBodyLimit). Reading a body within the limit to EOF lets the
 // connection be reused; a body without a declared length that runs past the
-// limit stops the read there and answers 413, as bodyLimit answers a
+// limit stops the read there and answers 413, as middleware.BodyLimit answers a
 // declared one, and the server then closes the connection rather than
 // drain the rest.
 func sinkHandler(w http.ResponseWriter, r *http.Request) {

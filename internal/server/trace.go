@@ -90,7 +90,7 @@ func (s artifactoryService) traceItem(w http.ResponseWriter, r *http.Request) {
 		var e *apierror.Error
 		if !errors.As(err, &e) {
 			// A failure the download would answer with a bare 500: its
-			// cause goes to the access log, as writeErr sends it.
+			// cause goes to the access log, as httpkit.WriteErr sends it.
 			httpkit.NoteCause(ctx, err)
 			e = apierror.New(http.StatusInternalServerError, "internal error")
 		}

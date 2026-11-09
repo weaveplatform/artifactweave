@@ -3,6 +3,7 @@ package middleware
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -298,4 +299,16 @@ var accessProfile = []httpkit.ProfileRule{{
 // server's predicate does.
 func keepLFS(r *http.Request) bool {
 	return strings.HasPrefix(r.URL.Path, "/artifactory/api/lfs/")
+}
+
+// itemNotFound is a typed error as the server's handlers return one.
+func itemNotFound() error { return apierror.New(http.StatusNotFound, "Could not find resource") }
+
+func decode(t *testing.T, body string) any {
+	t.Helper()
+	var v any
+	if err := json.Unmarshal([]byte(body), &v); err != nil {
+		t.Fatalf("decode %q: %v", body, err)
+	}
+	return v
 }
