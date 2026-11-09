@@ -9,6 +9,8 @@ import (
 	"time"
 	"unicode/utf16"
 	"unicode/utf8"
+
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // ErrInvalidPropertyKey reports a property key that the matrix-parameter and
@@ -33,23 +35,23 @@ const CacheSuffix = "-cache"
 // whatever the caller passes, so a trash record or a copied item cannot
 // carry another item's time onto the one written.
 type Item struct {
-	ID         int64     `json:"id"`
-	RepoKey    string    `json:"repo_key"`
-	Path       string    `json:"path"`
-	Name       string    `json:"name"`
-	Depth      int       `json:"depth"`
-	Folder     bool      `json:"folder"`
-	Cached     bool      `json:"cached"`
-	Size       int64     `json:"size"`
-	Actual     Checksums `json:"actual"`
-	Original   Checksums `json:"original"`
-	MimeType   string    `json:"mime_type,omitempty"`
-	Created    time.Time `json:"created"`
-	CreatedBy  string    `json:"created_by,omitempty"`
-	Modified   time.Time `json:"modified"`
-	ModifiedBy string    `json:"modified_by,omitempty"`
-	Updated    time.Time `json:"updated"`
-	RemoteURL  string    `json:"remote_url,omitempty"`
+	ID         int64            `json:"id"`
+	RepoKey    string           `json:"repo_key"`
+	Path       string           `json:"path"`
+	Name       string           `json:"name"`
+	Depth      int              `json:"depth"`
+	Folder     bool             `json:"folder"`
+	Cached     bool             `json:"cached"`
+	Size       int64            `json:"size"`
+	Actual     kernel.Checksums `json:"actual"`
+	Original   kernel.Checksums `json:"original"`
+	MimeType   string           `json:"mime_type,omitempty"`
+	Created    time.Time        `json:"created"`
+	CreatedBy  string           `json:"created_by,omitempty"`
+	Modified   time.Time        `json:"modified"`
+	ModifiedBy string           `json:"modified_by,omitempty"`
+	Updated    time.Time        `json:"updated"`
+	RemoteURL  string           `json:"remote_url,omitempty"`
 
 	PropertiesModified time.Time `json:"properties_modified,omitzero"`
 }
@@ -59,11 +61,17 @@ type Item struct {
 // and its name and a depth of 0, so the record is stored that way; no other
 // item can be named ".", because SplitItemPath refuses the segment.
 func RootItem(repoKey string, cached bool) Item {
-	return Item{RepoKey: repoKey, Cached: cached, Path: RootPath, Name: RootPath, Folder: true}
+	return Item{
+		RepoKey: repoKey,
+		Cached:  cached,
+		Path:    kernel.RootPath,
+		Name:    kernel.RootPath,
+		Folder:  true,
+	}
 }
 
 // IsRoot reports whether i is a repository root's record (RootItem).
-func (i Item) IsRoot() bool { return i.Path == RootPath && i.Name == RootPath }
+func (i Item) IsRoot() bool { return i.Path == kernel.RootPath && i.Name == kernel.RootPath }
 
 // FullPath is the item's path inside its repository without a leading slash,
 // "" for a repository root.
@@ -71,7 +79,7 @@ func (i Item) FullPath() string {
 	switch {
 	case i.IsRoot():
 		return ""
-	case i.Path == RootPath || i.Path == "":
+	case i.Path == kernel.RootPath || i.Path == "":
 		return i.Name
 	}
 	return i.Path + "/" + i.Name

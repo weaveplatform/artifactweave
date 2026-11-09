@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // Build is one run of a build (decision 0014). One name and number may be
@@ -146,7 +148,7 @@ type BuildFile struct {
 	Path string
 	// Scopes are a dependency's scopes; artifacts have none.
 	Scopes    []string
-	Checksums Checksums
+	Checksums kernel.Checksums
 }
 
 // BuildFileRef is a build file found by checksum, with the run and module

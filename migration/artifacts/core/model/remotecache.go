@@ -1,6 +1,11 @@
 package model
 
-import "time"
+import (
+	"time"
+
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+)
 
 // RemoteKind distinguishes freshness from the metadata-only zap policy.
 type RemoteKind string
@@ -45,11 +50,11 @@ type RemoteCacheEntry struct {
 	MetadataBaseURL string `json:"metadata_base_url,omitempty"`
 	// OriginalChecksums retains unverified upstream claims for pass-thru delivery.
 	// Blob.Checksums always identifies the bytes actually ingested.
-	OriginalChecksums Checksums        `json:"original_checksums,omitempty"`
+	OriginalChecksums kernel.Checksums `json:"original_checksums,omitempty"`
 	Token             RemoteCacheToken `json:"token"`
 	Kind              RemoteKind       `json:"kind"`
 	ItemID            int64            `json:"item_id"`
-	Blob              Blob             `json:"blob"`
+	Blob              blob.Blob        `json:"blob"`
 	ETag              string           `json:"etag"`
 	LastModified      string           `json:"last_modified"`
 	ContentType       string           `json:"content_type"`

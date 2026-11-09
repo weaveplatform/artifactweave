@@ -4,7 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // ArchivedFilter narrows archived item listings.
@@ -23,19 +24,23 @@ type ArchivedItemStore interface {
 	// AddItem stores an archived item and returns it with its assigned ID;
 	// ErrInvalid when the item's full path does not split
 	// (types.SplitItemPath).
-	AddItem(ctx context.Context, a types.ArchivedItem) (types.ArchivedItem, error)
+	AddItem(ctx context.Context, a model.ArchivedItem) (model.ArchivedItem, error)
 	// Item returns the archived item with id.
-	Item(ctx context.Context, id int64) (types.ArchivedItem, error)
+	Item(ctx context.Context, id int64) (model.ArchivedItem, error)
 	// FindItems returns the archived copies of an original repository and
 	// full path, newest first by ID; ErrInvalid for a path that does not
 	// split.
-	FindItems(ctx context.Context, repoKey, fullPath string) ([]types.ArchivedItem, error)
+	FindItems(ctx context.Context, repoKey, fullPath string) ([]model.ArchivedItem, error)
 	// Items returns matching archived items ordered by ID; a zero
 	// ExecutionID matches every execution.
-	Items(ctx context.Context, f ArchivedFilter, p Page) ([]types.ArchivedItem, string, error)
+	Items(
+		ctx context.Context,
+		f ArchivedFilter,
+		p kernel.Page,
+	) ([]model.ArchivedItem, string, error)
 	// DeleteItem removes an archived item.
 	DeleteItem(ctx context.Context, id int64) error
 	// ExpiredItems returns items whose ExpiresAt is set and before t,
 	// oldest first, at most limit (DefaultLimit when zero).
-	ExpiredItems(ctx context.Context, before time.Time, limit int) ([]types.ArchivedItem, error)
+	ExpiredItems(ctx context.Context, before time.Time, limit int) ([]model.ArchivedItem, error)
 }

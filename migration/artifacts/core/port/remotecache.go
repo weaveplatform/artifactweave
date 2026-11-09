@@ -13,60 +13,61 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // RemoteCacheStore persists raw upstream representations and their CAS fences.
 // All writes join Store.Tx. Begin precedes network I/O; Check/Put run in the
 // publication transaction. ErrConflict means the caller must start a new read.
 type RemoteCacheStore interface {
-	Source(ctx context.Context, repoKey string) (types.SourceIdentity, error)
-	Begin(ctx context.Context, key types.RemoteCacheKey) (types.RemoteCacheToken, error)
-	Read(ctx context.Context, key types.RemoteCacheKey) (types.RemoteCacheEntry, error)
+	Source(ctx context.Context, repoKey string) (model.SourceIdentity, error)
+	Begin(ctx context.Context, key model.RemoteCacheKey) (model.RemoteCacheToken, error)
+	Read(ctx context.Context, key model.RemoteCacheKey) (model.RemoteCacheEntry, error)
 	// List includes raw metadata, negatives and tombstones, ordered by opaque key.
 	List(
 		ctx context.Context,
 		repoKey, prefix string,
-		p Page,
-	) ([]types.RemoteCacheEntry, string, error)
+		p kernel.Page,
+	) ([]model.RemoteCacheEntry, string, error)
 	// Exact lists only this canonical path, never its descendants.
 	Exact(
 		ctx context.Context,
 		repoKey, path string,
-		p Page,
-	) ([]types.RemoteCacheEntry, string, error)
-	Check(ctx context.Context, token types.RemoteCacheToken) error
+		p kernel.Page,
+	) ([]model.RemoteCacheEntry, string, error)
+	Check(ctx context.Context, token model.RemoteCacheToken) error
 	// Put replaces state after checking the token, advances Revision, and owns
 	// the raw metadata blob reference when ItemID is zero. Item-backed entries
 	// do not add another reference. Empty entries are durable path tombstones.
 	Put(
 		ctx context.Context,
-		token types.RemoteCacheToken,
-		entry types.RemoteCacheEntry,
-	) (types.RemoteCacheEntry, error)
-	Negative(ctx context.Context, token types.RemoteCacheToken, until time.Time) error
-	Revalidate(ctx context.Context, token types.RemoteCacheToken, at time.Time) error
-	Touch(ctx context.Context, token types.RemoteCacheToken, at time.Time) error
+		token model.RemoteCacheToken,
+		entry model.RemoteCacheEntry,
+	) (model.RemoteCacheEntry, error)
+	Negative(ctx context.Context, token model.RemoteCacheToken, until time.Time) error
+	Revalidate(ctx context.Context, token model.RemoteCacheToken, at time.Time) error
+	Touch(ctx context.Context, token model.RemoteCacheToken, at time.Time) error
 	// Evict clears exactly this representation and advances its epoch. It
 	// releases raw references; callers remove item-backed content separately.
-	Evict(ctx context.Context, token types.RemoteCacheToken) error
+	Evict(ctx context.Context, token model.RemoteCacheToken) error
 	// Invalidate fences every matching path, including empty in-flight entries.
 	// MetadataOnly expires metadata and clears negatives, preserving binaries.
 	// Otherwise entries become tombstones and release raw metadata references.
 	Invalidate(ctx context.Context, repoKey, prefix string, metadataOnly bool) (int64, error)
-	State(ctx context.Context, repoKey string) (types.RemoteSourceState, error)
-	PutState(ctx context.Context, repoKey string, state types.RemoteSourceState) error
+	State(ctx context.Context, repoKey string) (model.RemoteSourceState, error)
+	PutState(ctx context.Context, repoKey string, state model.RemoteSourceState) error
 }
 
 // NewRemoteSource creates a durable identity, never a configuration hash.
-func NewRemoteSource(key string) types.SourceIdentity {
-	return types.SourceIdentity{
-		Kind: types.ExternalHTTP,
+func NewRemoteSource(key string) model.SourceIdentity {
+	return model.SourceIdentity{
+		Kind: model.ExternalHTTP,
 		ID:   key,
-		Repository: types.RepositoryIncarnation(
+		Repository: model.RepositoryIncarnation(
 			rand.Text(),
 		),
-		Generation: types.SourceGeneration(rand.Text()),
+		Generation: model.SourceGeneration(rand.Text()),
 	}
 }
 
@@ -97,19 +98,19 @@ func RemotePolicyChanged(a, b repo.Config) bool {
 
 // RemoteCacheID bounds a SQL key independently of path length. The actual key
 // is stored and compared, so a hash collision cannot reuse a representation.
-func RemoteCacheID(k types.RemoteCacheKey) string {
+func RemoteCacheID(k model.RemoteCacheKey) string {
 	b, _ := json.Marshal(k)
 	h := sha256.Sum256(b)
 	return hex.EncodeToString(h[:])
 }
 
 // ValidateRemoteKey requires canonical paths and non-secret bounded variants.
-func ValidateRemoteKey(k types.RemoteCacheKey) error {
-	_, _, _, err := types.SplitItemPath(k.Path)
+func ValidateRemoteKey(k model.RemoteCacheKey) error {
+	_, _, _, err := kernel.SplitItemPath(k.Path)
 	if k.RepoKey == "" || err != nil || strings.Trim(k.Path, "/") != k.Path ||
 		len(k.Variant) > 512 ||
 		len(k.SettingsRevision) > 512 {
-		return fmt.Errorf("remote cache key: %w", ErrInvalid)
+		return fmt.Errorf("remote cache key: %w", kernel.ErrInvalid)
 	}
 	return nil
 }
@@ -120,38 +121,38 @@ func RemotePathMatches(path, prefix string) bool {
 }
 
 // ValidateRemoteEntry refuses impossible body references and unknown kinds.
-func ValidateRemoteEntry(e types.RemoteCacheEntry) error {
+func ValidateRemoteEntry(e model.RemoteCacheEntry) error {
 	if s := e.Smart; s != nil {
 		if e.ItemID == 0 || s.Downloads < 0 || s.Claimed < 0 || s.Claimed > s.Downloads ||
 			s.Uncertain < 0 || s.Uncertain > s.Claimed || len(s.OwnedProperties) > 1024 || len(s.LocalProperties) > 4096 {
-			return fmt.Errorf("remote Smart state: %w", ErrInvalid)
+			return fmt.Errorf("remote Smart state: %w", kernel.ErrInvalid)
 		}
 		for key, values := range s.OwnedProperties {
-			if types.ValidatePropertyKey(key) != nil || len(values) == 0 || len(values) > 64 {
-				return fmt.Errorf("remote Smart property: %w", ErrInvalid)
+			if model.ValidatePropertyKey(key) != nil || len(values) == 0 || len(values) > 64 {
+				return fmt.Errorf("remote Smart property: %w", kernel.ErrInvalid)
 			}
 		}
 		for key := range s.LocalProperties {
-			if types.ValidatePropertyKey(key) != nil {
-				return fmt.Errorf("remote Smart property ownership: %w", ErrInvalid)
+			if model.ValidatePropertyKey(key) != nil {
+				return fmt.Errorf("remote Smart property ownership: %w", kernel.ErrInvalid)
 			}
 		}
 	}
 	switch e.Kind {
-	case "", types.RemoteUnique, types.RemoteMutable, types.RemoteMetadata, types.RemoteDerived:
+	case "", model.RemoteUnique, model.RemoteMutable, model.RemoteMetadata, model.RemoteDerived:
 	default:
-		return fmt.Errorf("remote cache kind: %w", ErrInvalid)
+		return fmt.Errorf("remote cache kind: %w", kernel.ErrInvalid)
 	}
 	if e.MetadataBaseURL != "" {
 		u, err := url.Parse(e.MetadataBaseURL)
-		if err != nil || e.Kind != types.RemoteMetadata || u.Hostname() == "" ||
+		if err != nil || e.Kind != model.RemoteMetadata || u.Hostname() == "" ||
 			(u.Scheme != "https" && u.Scheme != "http") || u.User != nil ||
 			u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || u.Opaque != "" {
-			return fmt.Errorf("remote metadata response base: %w", ErrInvalid)
+			return fmt.Errorf("remote metadata response base: %w", kernel.ErrInvalid)
 		}
 	}
 	if e.ItemID < 0 || e.Blob.Size < 0 || (e.ItemID > 0 && e.Blob.Checksums.SHA256 == "") {
-		return fmt.Errorf("remote cache body: %w", ErrInvalid)
+		return fmt.Errorf("remote cache body: %w", kernel.ErrInvalid)
 	}
 	return nil
 }

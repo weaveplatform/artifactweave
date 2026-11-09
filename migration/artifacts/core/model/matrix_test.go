@@ -3,35 +3,35 @@ package model_test
 import (
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 func TestUnitMatrixMatches(t *testing.T) {
-	props := types.Properties{"os": {"linux"}, "arch": {"amd64", "arm64"}}
+	props := model.Properties{"os": {"linux"}, "arch": {"amd64", "arm64"}}
 	for _, tc := range []struct {
 		name string
-		m    types.Matrix
+		m    model.Matrix
 		want bool
 	}{
-		{"no parameters", types.Matrix{}, true},
-		{"a carried value", types.Matrix{Props: types.Properties{"os": {"linux"}}}, true},
-		{"one of the values", types.Matrix{Props: types.Properties{"arch": {"arm64"}}}, true},
-		{"one of the asked", types.Matrix{Props: types.Properties{"os": {"mac", "linux"}}}, true},
-		{"another value", types.Matrix{Props: types.Properties{"os": {"mac"}}}, false},
-		{"a key not carried", types.Matrix{Props: types.Properties{"tier": {"gold"}}}, true},
+		{"no parameters", model.Matrix{}, true},
+		{"a carried value", model.Matrix{Props: model.Properties{"os": {"linux"}}}, true},
+		{"one of the values", model.Matrix{Props: model.Properties{"arch": {"arm64"}}}, true},
+		{"one of the asked", model.Matrix{Props: model.Properties{"os": {"mac", "linux"}}}, true},
+		{"another value", model.Matrix{Props: model.Properties{"os": {"mac"}}}, false},
+		{"a key not carried", model.Matrix{Props: model.Properties{"tier": {"gold"}}}, true},
 		{
 			"a mandatory key not carried",
-			types.Matrix{Props: types.Properties{"tier": {"gold"}}, Mandatory: map[string]bool{"tier": true}},
+			model.Matrix{Props: model.Properties{"tier": {"gold"}}, Mandatory: map[string]bool{"tier": true}},
 			false,
 		},
 		{
 			"a mandatory key carried",
-			types.Matrix{Props: types.Properties{"os": {"linux"}}, Mandatory: map[string]bool{"os": true}},
+			model.Matrix{Props: model.Properties{"os": {"linux"}}, Mandatory: map[string]bool{"os": true}},
 			true,
 		},
 		{
 			"one key of two fails",
-			types.Matrix{Props: types.Properties{"os": {"linux"}, "arch": {"386"}}},
+			model.Matrix{Props: model.Properties{"os": {"linux"}, "arch": {"386"}}},
 			false,
 		},
 	} {
