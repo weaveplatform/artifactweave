@@ -240,6 +240,7 @@
         {"from":"internal/server/builds_routes_test.go","action":"move","to":"test/server/artifacts","scope":"repo","ticket":"TST-05"},
         {"from":"internal/server/builds_test.go","action":"move","to":"test/server/artifacts","scope":"repo","ticket":"TST-05"},
         {"from":"internal/server/cache_maintenance_test.go","action":"move","to":"test/server/artifacts","scope":"repo","ticket":"TST-05"},
+        {"from":"internal/server/caller_httpkit.go","action":"move","to":"platform/httpkit","file":"caller.go","ticket":"WEB-07"},
         {"from":"internal/server/checksum_files_test.go","action":"move","to":"test/server/artifacts","scope":"repo","ticket":"TST-05"},
         {"from":"internal/server/chef_item_test.go","action":"move","to":"test/server/artifacts/chef","scope":"repo","ticket":"TST-06"},
         {"from":"internal/server/conan_client_test.go","action":"move","to":"test/server/artifacts/conan","scope":"repo","ticket":"TST-06"},
