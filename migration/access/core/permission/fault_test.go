@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/access/core/permission"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -21,15 +21,14 @@ type faulty struct {
 	fail string
 }
 
-func (f *faulty) Permissions() store.PermissionStore {
+func (f *faulty) Permissions() port.PermissionStore {
 	return faultyPerms{f.Store.Permissions(), f}
 }
-func (f *faulty) Users() store.UserStore   { return faultyUsers{f.Store.Users(), f} }
-func (f *faulty) Groups() store.GroupStore { return faultyGroups{f.Store.Groups(), f} }
-func (f *faulty) Repos() store.RepoStore   { return faultyRepos{f.Store.Repos(), f} }
+func (f *faulty) Users() port.UserStore   { return faultyUsers{f.Store.Users(), f} }
+func (f *faulty) Groups() port.GroupStore { return faultyGroups{f.Store.Groups(), f} }
 
 type faultyPerms struct {
-	store.PermissionStore
+	port.PermissionStore
 	f *faulty
 }
 
@@ -40,7 +39,7 @@ func (p faultyPerms) Get(ctx context.Context, name string) (types.Permission, er
 	return p.PermissionStore.Get(ctx, name) //nolint:wrapcheck // test double
 }
 
-func (p faultyPerms) List(ctx context.Context, pg store.Page) ([]types.Permission, string, error) {
+func (p faultyPerms) List(ctx context.Context, pg kernel.Page) ([]types.Permission, string, error) {
 	if p.f.fail == "perms.list" {
 		return nil, "", errBoom
 	}
@@ -66,7 +65,7 @@ func (p faultyPerms) ForPrincipal(
 }
 
 type faultyUsers struct {
-	store.UserStore
+	port.UserStore
 	f *faulty
 }
 
@@ -77,7 +76,7 @@ func (u faultyUsers) Get(ctx context.Context, name string) (types.User, error) {
 	return u.UserStore.Get(ctx, name) //nolint:wrapcheck // test double
 }
 
-func (u faultyUsers) List(ctx context.Context, pg store.Page) ([]types.User, string, error) {
+func (u faultyUsers) List(ctx context.Context, pg kernel.Page) ([]types.User, string, error) {
 	if u.f.fail == "users.list" {
 		return nil, "", errBoom
 	}
@@ -85,7 +84,7 @@ func (u faultyUsers) List(ctx context.Context, pg store.Page) ([]types.User, str
 }
 
 type faultyGroups struct {
-	store.GroupStore
+	port.GroupStore
 	f *faulty
 }
 
@@ -96,24 +95,12 @@ func (g faultyGroups) Get(ctx context.Context, name string) (types.Group, error)
 	return g.GroupStore.Get(ctx, name) //nolint:wrapcheck // test double
 }
 
-type faultyRepos struct {
-	store.RepoStore
-	f *faulty
-}
-
-func (r faultyRepos) Get(ctx context.Context, key string) (repo.Config, error) {
-	if r.f.fail == "repos.get" {
-		return repo.Config{}, errBoom
-	}
-	return r.RepoStore.Get(ctx, key) //nolint:wrapcheck // test double
-}
-
 func TestUnitStoreFailures(t *testing.T) {
 	ctx := context.Background()
 	f := &faulty{Store: seeded(t)}
 	svc := permission.Service{
 		Store:        f,
-		Repositories: repositories{db: f},
+		Repositories: repositories{db: f.Store, fail: &f.fail},
 		Now:          func() time.Time { return clock },
 	}
 	grants := perm("g", map[types.ResourceType]types.Resource{

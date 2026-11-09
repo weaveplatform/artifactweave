@@ -9,9 +9,10 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -130,13 +131,13 @@ func TestAccAuthenticateAttachesDecider(t *testing.T) {
 	}
 }
 
-type brokenUsers struct{ store.UserStore }
+type brokenUsers struct{ port.UserStore }
 
 func (brokenUsers) Get(context.Context, string) (types.User, error) {
 	return types.User{}, errors.New("database down")
 }
 
-type brokenSettings struct{ store.SettingsStore }
+type brokenSettings struct{ settings.SettingsStore }
 
 func (brokenSettings) Get(context.Context, string, any) error { return errors.New("database down") }
 

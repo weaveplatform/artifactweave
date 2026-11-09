@@ -13,9 +13,10 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authz"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -554,7 +555,7 @@ func TestUnitStoreBindings(t *testing.T) {
 	if err := r.Check(ctx, "ann", now); err != nil {
 		t.Errorf("Check, unrestricted = %v, want nil", err)
 	}
-	if _, err := st.APIRestrictions().Put(ctx, store.APIRestriction{
+	if _, err := st.APIRestrictions().Put(ctx, port.APIRestriction{
 		User: "ann", Actor: "admin", Reason: "audit", Until: now.Add(time.Hour), Changed: now,
 	}); err != nil {
 		t.Fatal(err)
@@ -710,7 +711,7 @@ func TestUnitAccessChange(t *testing.T) {
 		for _, p := range c.perms {
 			must(t, st.Permissions().Create(ctx, p))
 		}
-		var pages []store.Page
+		var pages []kernel.Page
 		g := module(t, scripted{Store: st, pages: &pages}).Grants
 		got, err := g.AccessChange(ctx, "hf-local", c.class, pairs, c.limit)
 		if got != c.want || !errors.Is(err, c.err) || (c.err == nil) != (err == nil) {
@@ -784,7 +785,7 @@ func second[T any](_ T, err error) error { return err }
 type scripted struct {
 	access.Store
 	targets *[]string
-	pages   *[]store.Page
+	pages   *[]kernel.Page
 	// permErr fails ForPrincipal, List and WithTarget, the last only for
 	// failTarget when that is set.
 	permErr    error
@@ -793,16 +794,16 @@ type scripted struct {
 	settingsErr error
 }
 
-func (s scripted) Permissions() store.PermissionStore {
+func (s scripted) Permissions() port.PermissionStore {
 	return scriptedPermissions{PermissionStore: s.Store.Permissions(), s: s}
 }
 
-func (s scripted) Settings() store.SettingsStore {
+func (s scripted) Settings() settings.SettingsStore {
 	return scriptedSettings{SettingsStore: s.Store.Settings(), err: s.settingsErr}
 }
 
 type scriptedPermissions struct {
-	store.PermissionStore
+	port.PermissionStore
 	s scripted
 }
 
@@ -824,7 +825,7 @@ func (p scriptedPermissions) WithTarget(
 
 func (p scriptedPermissions) List(
 	ctx context.Context,
-	page store.Page,
+	page kernel.Page,
 ) ([]types.Permission, string, error) {
 	if p.s.pages != nil {
 		*p.s.pages = append(*p.s.pages, page)
@@ -851,7 +852,7 @@ func (p scriptedPermissions) ForPrincipal(
 }
 
 type scriptedSettings struct {
-	store.SettingsStore
+	settings.SettingsStore
 	err error
 }
 

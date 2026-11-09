@@ -9,7 +9,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/core/roles"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -225,7 +225,7 @@ func TestUnitRoles(t *testing.T) {
 	if _, err := db.Projects().
 		Member(ctx, "p", types.PrincipalGroup, "devs"); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatalf("devs kept with no role: %v", err)
 	}

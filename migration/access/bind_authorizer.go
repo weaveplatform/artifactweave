@@ -9,7 +9,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authz"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -42,7 +41,7 @@ func (b authorizer) Authorize(
 func (b authorizer) For(ctx context.Context, p kernel.Principal) (accessapi.Decider, error) {
 	var on bool
 	err := b.st.Settings().Get(ctx, types.SettingAnonymousAccess, &on)
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
+	if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 		return nil, fmt.Errorf("anonymous access setting: %w", err)
 	}
 	d, err := authz.New(ctx, b.sources(on), accessapi.SubjectOf(p))

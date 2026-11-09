@@ -7,10 +7,10 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -38,12 +38,12 @@ type permFaultStore struct {
 	f *permFault
 }
 
-func (s permFaultStore) Permissions() store.PermissionStore {
+func (s permFaultStore) Permissions() port.PermissionStore {
 	return permFaultPerms{s.Store.Permissions(), s.f}
 }
 
 type permFaultPerms struct {
-	store.PermissionStore
+	port.PermissionStore
 	f *permFault
 }
 
@@ -77,7 +77,7 @@ func (p permFaultPerms) Delete(ctx context.Context, name string) error {
 
 func (p permFaultPerms) List(
 	ctx context.Context,
-	pg store.Page,
+	pg kernel.Page,
 ) ([]types.Permission, string, error) {
 	if err := p.f.hit("list"); err != nil {
 		return nil, "", err

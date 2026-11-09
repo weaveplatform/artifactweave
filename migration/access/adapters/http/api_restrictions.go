@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 const (
@@ -119,7 +119,7 @@ func (s SecurityAPI) restrictionCaller(
 }
 
 func restrictionStoreError(err error) error {
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return apierror.New(http.StatusNotFound, "The managed user does not exist")
 	}
 	if err == nil {
@@ -133,7 +133,7 @@ func restrictionStoreError(err error) error {
 	return e
 }
 
-func restrictionDocument(r store.APIRestriction) artgen.APIRestriction {
+func restrictionDocument(r port.APIRestriction) artgen.APIRestriction {
 	out := artgen.APIRestriction{
 		User:     r.User,
 		Actor:    r.Actor,
@@ -161,8 +161,8 @@ func (s SecurityAPI) GetAPIRestriction(
 		return nil, err
 	}
 	r, err := s.deps.Store.APIRestrictions().Get(ctx, req.UserName)
-	if errors.Is(err, store.ErrNotFound) {
-		r, err = store.APIRestriction{User: req.UserName}, nil
+	if errors.Is(err, kernel.ErrNotFound) {
+		r, err = port.APIRestriction{User: req.UserName}, nil
 	}
 	if err != nil {
 		return nil, restrictionStoreError(err)
@@ -190,7 +190,7 @@ func (s SecurityAPI) SetAPIRestriction(
 			"Supply a reason of 1 to 1024 bytes and an expiry within the next seven days",
 		)
 	}
-	r, err := s.deps.Store.APIRestrictions().Put(ctx, store.APIRestriction{
+	r, err := s.deps.Store.APIRestrictions().Put(ctx, port.APIRestriction{
 		User: req.UserName, Actor: p.Name,
 		Reason: strings.TrimSpace(req.Body.Reason), Until: req.Body.Until, Changed: now,
 	})
@@ -211,7 +211,7 @@ func (s SecurityAPI) ClearAPIRestriction(
 	if err != nil {
 		return nil, err
 	}
-	_, err = s.deps.Store.APIRestrictions().Put(ctx, store.APIRestriction{
+	_, err = s.deps.Store.APIRestrictions().Put(ctx, port.APIRestriction{
 		User: req.UserName, Actor: p.Name,
 		Reason: "Restriction cleared", Changed: time.Now().UTC(),
 	})
@@ -246,9 +246,9 @@ func (s SecurityAPI) GetAPIRestrictionAudit(
 	if limit < 1 || limit > 1000 {
 		return nil, httpkit.BadRequestf("limit must be between 1 and 1000")
 	}
-	page := store.Page{Limit: limit}
+	page := kernel.Page{Limit: limit}
 	if raw := httpkit.Deref(req.Params.Cursor); raw != "" {
-		parts, err := (store.Page{After: raw}).Key(4)
+		parts, err := (kernel.Page{After: raw}).Key(4)
 		if err != nil || len(parts) != 4 || parts[0] != "v1" || parts[1] != user ||
 			parts[2] != p.Name {
 			return nil, httpkit.BadRequestf(
@@ -258,7 +258,7 @@ func (s SecurityAPI) GetAPIRestrictionAudit(
 		page.After = parts[3]
 	}
 	rows, next, err := s.deps.Store.APIRestrictions().History(ctx, user, page)
-	if errors.Is(err, store.ErrInvalidCursor) {
+	if errors.Is(err, kernel.ErrInvalidCursor) {
 		return nil, httpkit.BadRequestf("Invalid audit cursor")
 	}
 	if err != nil {
@@ -269,7 +269,7 @@ func (s SecurityAPI) GetAPIRestrictionAudit(
 		out.Changes = append(out.Changes, restrictionDocument(r))
 	}
 	if next != "" {
-		c := store.Cursor("v1", user, p.Name, next)
+		c := kernel.Cursor("v1", user, p.Name, next)
 		out.Cursor = &c
 	}
 	return artgen.GetAPIRestrictionAudit200JSONResponse(out), nil

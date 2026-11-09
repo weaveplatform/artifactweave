@@ -4192,10 +4192,10 @@
       "fmt.Errorf",
       "httpkit.BadRequestf",
       "httpkit.Deref",
+      "kernel.Cursor",
       "kernel.RequireAdmin",
       "s.deps.Store.APIRestrictions",
-      "s.deps.Store.APIRestrictions().History",
-      "store.Cursor"
+      "s.deps.Store.APIRestrictions().History"
     ],
     "review_family": "restriction",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",

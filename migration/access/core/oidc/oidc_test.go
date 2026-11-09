@@ -11,7 +11,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/core/idtoken/idtokentest"
 	"github.com/weaveplatform/artifactweave/migration/access/core/oidc"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -24,10 +25,10 @@ type faulty struct {
 	fail string
 }
 
-func (f *faulty) Configs() store.ConfigStore { return faultyConfigs{f.Store.Configs(), f} }
+func (f *faulty) Configs() configdoc.ConfigStore { return faultyConfigs{f.Store.Configs(), f} }
 
 type faultyConfigs struct {
-	store.ConfigStore
+	configdoc.ConfigStore
 	f *faulty
 }
 
@@ -235,7 +236,7 @@ func TestUnitProviders(t *testing.T) {
 	if _, err := w.db.Store.Configs().
 		Get(ctx, types.ConfigOIDCMapping, "gh2/m"); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Errorf("mapping outlived its provider: %v", err)
 	}

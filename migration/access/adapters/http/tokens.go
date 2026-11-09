@@ -12,13 +12,13 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -256,7 +256,7 @@ var errNeverExpires = apierror.New(
 func (t tokenAPI) identityOf(ctx context.Context, username string) (types.TokenIdentity, error) {
 	_, err := t.deps.Store.Users().Get(ctx, username)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return types.IdentityTransient, nil
 	case err != nil:
 		return "", t.internalError(ctx, "token user", err)
@@ -373,13 +373,13 @@ func (t tokenAPI) visible(ctx context.Context) ([]types.Token, *token.Service, e
 	if err != nil {
 		return nil, nil, fmt.Errorf("tokens: %w", err)
 	}
-	var filter store.TokenFilter
+	var filter port.TokenFilter
 	if !p.Admin {
 		filter.Subject = subjectOf(svc, p.Name)
 	}
 	now := time.Now()
 	var out []types.Token
-	page := store.Page{Limit: 500}
+	page := kernel.Page{Limit: 500}
 	for {
 		recs, next, err := t.deps.Store.Tokens().List(ctx, filter, page)
 		if err != nil {
@@ -416,7 +416,7 @@ func (t tokenAPI) own(ctx context.Context, id string) (types.Token, *token.Servi
 		return types.Token{}, nil, tokenNotFound()
 	}
 	rec, err := t.deps.Store.Tokens().Get(ctx, id)
-	if errors.Is(err, store.ErrNotFound) || (err == nil && rec.Expired(time.Now())) {
+	if errors.Is(err, kernel.ErrNotFound) || (err == nil && rec.Expired(time.Now())) {
 		return types.Token{}, nil, tokenNotFound()
 	}
 	if err != nil {
@@ -549,7 +549,7 @@ func (s AccessService) RevokeTokenById(
 	switch err := svc.Revoke(ctx, rec.ID); {
 	case errors.Is(err, accessapi.ErrNotRevocable):
 		return nil, httpkit.BadRequestf("Token is not revocable")
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return nil, tokenNotFound()
 	case err != nil:
 		return nil, t.internalError(ctx, "revoke token", err)
@@ -586,7 +586,7 @@ func (s AccessService) RevokeTokenByValue(
 		return nil, t.internalError(ctx, "verify token", err)
 	}
 	switch err := svc.Revoke(ctx, rec.ID); {
-	case errors.Is(err, accessapi.ErrNotRevocable), errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, accessapi.ErrNotRevocable), errors.Is(err, kernel.ErrNotFound):
 		return nil, errNotRevocable
 	case err != nil:
 		return nil, t.internalError(ctx, "revoke token", err)
@@ -609,7 +609,7 @@ func (s AccessService) GetTokenDefaultExpiry(
 	}
 	secs := int64(types.DefaultTokenExpiry / time.Second)
 	if err := st.Settings().Get(ctx, types.SettingDefaultTokenExpiry, &secs); err != nil &&
-		!errors.Is(err, store.ErrNotFound) {
+		!errors.Is(err, kernel.ErrNotFound) {
 		return nil, t.internalError(ctx, "default token expiry", err)
 	}
 	v := int(secs)
@@ -783,7 +783,7 @@ func (s SecurityAPI) revokeLegacyToken(w http.ResponseWriter, r *http.Request) {
 	switch err := svc.Revoke(ctx, rec.ID); {
 	case errors.Is(err, accessapi.ErrNotRevocable):
 		httpkit.WriteErr(w, r, httpkit.BadRequestf("Token is not revocable"))
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		writeText(w, "Token not found or already revoked")
 	case err != nil:
 		httpkit.WriteErr(w, r, t.internalError(ctx, "revoke token", err))

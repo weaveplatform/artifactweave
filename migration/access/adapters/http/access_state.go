@@ -13,7 +13,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -93,7 +92,7 @@ func (s accessState) identityErr(ctx context.Context, op, notFound string, err e
 			msg = after
 		}
 		return httpkit.BadRequestf("%s", msg)
-	case errors.Is(err, store.ErrNotFound) && notFound != "":
+	case errors.Is(err, kernel.ErrNotFound) && notFound != "":
 		return apierror.New(http.StatusNotFound, notFound)
 	default:
 		return s.internalError(ctx, op, err)

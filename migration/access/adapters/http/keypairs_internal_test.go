@@ -7,10 +7,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support"
@@ -65,7 +66,7 @@ func TestAccPublicKeyFile(t *testing.T) {
 // vanishingKeys is a key store whose pair someone else deletes between the
 // create that finds it and the update that would replace it.
 type vanishingKeys struct {
-	store.KeyStore
+	port.KeyStore
 	creates   int
 	updateErr error
 }
@@ -73,7 +74,7 @@ type vanishingKeys struct {
 func (v *vanishingKeys) CreateKeypair(context.Context, types.Keypair) error {
 	v.creates++
 	if v.creates == 1 {
-		return store.ErrConflict
+		return kernel.ErrConflict
 	}
 	return nil
 }
@@ -84,7 +85,7 @@ func (v *vanishingKeys) UpdateKeypair(context.Context, types.Keypair) error {
 
 func TestAccPutKeypairRaces(t *testing.T) {
 	ctx := context.Background()
-	gone := &vanishingKeys{updateErr: store.ErrNotFound}
+	gone := &vanishingKeys{updateErr: kernel.ErrNotFound}
 	if err := putKeypair(ctx, gone, types.Keypair{Name: "kp"}); err != nil || gone.creates != 2 {
 		t.Fatalf("a pair deleted before its update: %v after %d creates", err, gone.creates)
 	}
@@ -95,10 +96,10 @@ func TestAccPutKeypairRaces(t *testing.T) {
 	}
 }
 
-// faultyRepos fails the repository reads and writes named in fail with
-// errBoom.
+// faultyRepos is the artifacts module's Repositories with the reads and
+// writes named in fail failing with errBoom.
 type faultyRepos struct {
-	store.RepoStore
+	artifactsapi.Repositories
 	fail map[string]bool
 }
 
@@ -107,7 +108,7 @@ func (f faultyRepos) Get(ctx context.Context, key string) (repo.Config, error) {
 	if f.fail["get"] {
 		return repo.Config{}, errBoom
 	}
-	return f.RepoStore.Get(ctx, key) //nolint:wrapcheck // test double
+	return f.Repositories.Get(ctx, key) //nolint:wrapcheck // test double
 }
 
 // Update fails under "update".
@@ -115,7 +116,7 @@ func (f faultyRepos) Update(ctx context.Context, c repo.Config) error {
 	if f.fail["update"] {
 		return errBoom
 	}
-	return f.RepoStore.Update(ctx, c) //nolint:wrapcheck // test double
+	return f.Repositories.Update(ctx, c) //nolint:wrapcheck // test double
 }
 
 // UsingKeypair fails under "usingKeypair".
@@ -123,27 +124,7 @@ func (f faultyRepos) UsingKeypair(ctx context.Context, name string) ([]string, e
 	if f.fail["usingKeypair"] {
 		return nil, errBoom
 	}
-	return f.RepoStore.UsingKeypair(ctx, name) //nolint:wrapcheck // test double
-}
-
-// repoStoreRepositories serves the Repositories methods that the key pair
-// code calls from a repository store, so that a test can fail any one of
-// them. The other methods are the nil interface's, which panic if called.
-type repoStoreRepositories struct {
-	artifactsapi.Repositories
-	repos store.RepoStore
-}
-
-func (r repoStoreRepositories) Get(ctx context.Context, key string) (repo.Config, error) {
-	return r.repos.Get(ctx, key) //nolint:wrapcheck // test double
-}
-
-func (r repoStoreRepositories) UsingKeypair(ctx context.Context, name string) ([]string, error) {
-	return r.repos.UsingKeypair(ctx, name) //nolint:wrapcheck // test double
-}
-
-func (r repoStoreRepositories) Update(ctx context.Context, c repo.Config) error {
-	return r.repos.Update(ctx, c) //nolint:wrapcheck // test double
+	return f.Repositories.UsingKeypair(ctx, name) //nolint:wrapcheck // test double
 }
 
 // TestAccDropKeypairRefs clears a pair from the primary and the secondary
@@ -161,18 +142,17 @@ func TestAccDropKeypairRefs(t *testing.T) {
 		}
 	}
 	for _, fail := range []string{"usingKeypair", "get", "update"} {
-		broken := faultyRepos{RepoStore: db.Repos(), fail: map[string]bool{fail: true}}
-		if err := dropKeypairRefs(
-			ctx,
-			repoStoreRepositories{repos: broken},
-			"kp",
-		); !errors.Is(err, errBoom) {
+		broken := faultyRepos{
+			Repositories: support.Repositories(db),
+			fail:         map[string]bool{fail: true},
+		}
+		if err := dropKeypairRefs(ctx, broken, "kp"); !errors.Is(err, errBoom) {
 			t.Errorf("%s fails: %v", fail, err)
 		}
 	}
 	used := usedKeypair(t)
-	s := New(Deps{Store: used, Repositories: repoStoreRepositories{
-		repos: faultyRepos{RepoStore: used.Repos(), fail: map[string]bool{"update": true}},
+	s := New(Deps{Store: used, Repositories: faultyRepos{
+		Repositories: support.Repositories(used), fail: map[string]bool{"update": true},
 	}}).Security
 	admin := asAdmin(ctx)
 	_, err := s.DeleteKeyPair(admin, artgen.DeleteKeyPairRequestObject{KeyPairName: "kp-used"})
@@ -185,7 +165,7 @@ func TestAccDropKeypairRefs(t *testing.T) {
 	); err != nil {
 		t.Fatalf("the pair after the failed delete: status %d, want 200: %v", errStatus(err), err)
 	}
-	if err := dropKeypairRefs(ctx, repoStoreRepositories{repos: db.Repos()}, "kp"); err != nil {
+	if err := dropKeypairRefs(ctx, support.Repositories(db), "kp"); err != nil {
 		t.Fatal(err)
 	}
 	for key, want := range map[string][2]string{"both": {"", ""}, "second": {"other", ""}} {
@@ -219,9 +199,9 @@ func usedKeypair(t *testing.T) *inmem.Store {
 // keyDeleteFails is a store whose key pair delete fails with errBoom.
 type keyDeleteFails struct{ *inmem.Store }
 
-func (s keyDeleteFails) Keys() store.KeyStore { return failingKeyDelete{s.Store.Keys()} }
+func (s keyDeleteFails) Keys() port.KeyStore { return failingKeyDelete{s.Store.Keys()} }
 
-type failingKeyDelete struct{ store.KeyStore }
+type failingKeyDelete struct{ port.KeyStore }
 
 func (failingKeyDelete) DeleteKeypair(context.Context, string) error { return errBoom }
 

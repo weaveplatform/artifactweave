@@ -8,7 +8,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/identity"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -38,7 +38,7 @@ func TestUnitCreateOnly(t *testing.T) {
 		[]string{"nobody"},
 	); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatalf("a group with an unknown member: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestUnitMemberships(t *testing.T) {
 	) {
 		t.Fatalf("an unknown group: %v", err)
 	}
-	if _, err := s.UpdateUserGroups(ctx, "nobody", nil, nil); !errors.Is(err, store.ErrNotFound) {
+	if _, err := s.UpdateUserGroups(ctx, "nobody", nil, nil); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("an unknown user: %v", err)
 	}
 	got, err = s.UpdateGroupMembers(ctx, "a", []string{"anonymous"}, []string{"admin"})
@@ -107,11 +107,11 @@ func TestUnitMemberships(t *testing.T) {
 		nil,
 	); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatalf("an unknown member: %v", err)
 	}
-	if _, err := s.UpdateGroupMembers(ctx, "nope", nil, nil); !errors.Is(err, store.ErrNotFound) {
+	if _, err := s.UpdateGroupMembers(ctx, "nope", nil, nil); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("an unknown group: %v", err)
 	}
 }
@@ -162,7 +162,7 @@ func TestUnitPasswordPolicyRules(t *testing.T) {
 	}
 	wantInvalid(t, "the current password", s.SetPassword(ctx, "admin", "Ääää1!x"))
 	wantInvalid(t, "an empty password", s.SetPassword(ctx, "admin", ""))
-	if err := s.SetPassword(ctx, "nobody", "Bbbb2?"); !errors.Is(err, store.ErrNotFound) {
+	if err := s.SetPassword(ctx, "nobody", "Bbbb2?"); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("an unknown user: %v", err)
 	}
 	// A stored hash in a format the comparison cannot read is no match.
@@ -244,7 +244,7 @@ func TestUnitBulkExpiryRevokesEncryptedPasswords(t *testing.T) {
 	if err := s.UnexpireAllPasswords(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Tokens().Get(ctx, "ep-admin"); !errors.Is(err, store.ErrNotFound) {
+	if _, err := db.Tokens().Get(ctx, "ep-admin"); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("admin's encrypted password after expiring every password: %v", err)
 	}
 	if _, err := db.Tokens().Get(ctx, "ep-sso"); err != nil {

@@ -15,8 +15,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	auth "github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/platform/instance"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -96,11 +97,11 @@ func fatalOf(t *testing.T, fn func(tb testing.TB)) string {
 // evaluation does.
 type noPermissions struct{ accesstest.Store }
 
-func (s noPermissions) Permissions() store.PermissionStore {
+func (s noPermissions) Permissions() port.PermissionStore {
 	return failingPermissions{s.Store.Permissions()}
 }
 
-type failingPermissions struct{ store.PermissionStore }
+type failingPermissions struct{ port.PermissionStore }
 
 func (failingPermissions) ForPrincipal(
 	context.Context,
@@ -113,9 +114,9 @@ func (failingPermissions) ForPrincipal(
 // noIdentity is a store whose instance identity cannot be read.
 type noIdentity struct{ accesstest.Store }
 
-func (s noIdentity) Instance() store.InstanceStore { return failingInstance{s.Store.Instance()} }
+func (s noIdentity) Instance() instance.InstanceStore { return failingInstance{s.Store.Instance()} }
 
-type failingInstance struct{ store.InstanceStore }
+type failingInstance struct{ instance.InstanceStore }
 
 func (failingInstance) Get(context.Context) (types.InstanceIdentity, error) {
 	return types.InstanceIdentity{}, errBoom
@@ -124,9 +125,9 @@ func (failingInstance) Get(context.Context) (types.InstanceIdentity, error) {
 // noKeys is a store whose signing keys cannot be read.
 type noKeys struct{ accesstest.Store }
 
-func (s noKeys) Keys() store.KeyStore { return failingKeys{s.Store.Keys()} }
+func (s noKeys) Keys() port.KeyStore { return failingKeys{s.Store.Keys()} }
 
-type failingKeys struct{ store.KeyStore }
+type failingKeys struct{ port.KeyStore }
 
 func (failingKeys) SigningKeys(context.Context) ([]types.SigningKey, error) {
 	return nil, errBoom
@@ -458,7 +459,7 @@ func TestUnitHashPassword(t *testing.T) {
 	if _, err := authn.Basic(ctx, "ann", "wrong"); !errors.Is(err, kernel.ErrBadCredentials) {
 		t.Errorf("Basic(ann, wrong) = %v; want ErrBadCredentials", err)
 	}
-	_, err := k.Store().APIRestrictions().Put(ctx, store.APIRestriction{
+	_, err := k.Store().APIRestrictions().Put(ctx, port.APIRestriction{
 		User: "bob", Actor: "admin", Reason: "audit", Changed: now, Until: now.Add(time.Hour),
 	})
 	must(t, err)

@@ -5,8 +5,8 @@ import (
 
 	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
+	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
 // repositories stands in for the artifacts module's API with the two calls
@@ -28,7 +28,7 @@ func (r repositories) List(ctx context.Context, f artifactsapi.RepoFilter) ([]re
 	if r.failing("Repos.List") {
 		return nil, errBoom
 	}
-	return r.db.Repos().List(ctx, store.RepoFilter(f)) //nolint:wrapcheck // test double
+	return support.Repositories(r.db).List(ctx, f) //nolint:wrapcheck // test double
 }
 
 func (r repositories) Update(ctx context.Context, c repo.Config) error {

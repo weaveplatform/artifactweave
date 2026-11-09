@@ -6,9 +6,9 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/access/core/roles"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -23,14 +23,14 @@ type failing struct {
 	fail string
 }
 
-func (f failing) Projects() store.ProjectStore { return failingProjects{f.Store.Projects(), f.fail} }
+func (f failing) Projects() port.ProjectStore { return failingProjects{f.Store.Projects(), f.fail} }
 
 func (f failing) Tx(ctx context.Context, fn func(context.Context) error) error {
 	return f.Store.Tx(ctx, fn) //nolint:wrapcheck // test double
 }
 
 type failingProjects struct {
-	store.ProjectStore
+	port.ProjectStore
 	fail string
 }
 

@@ -7,7 +7,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/identity"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -20,14 +22,14 @@ type faulty struct {
 	fail string
 }
 
-func (f *faulty) Users() store.UserStore        { return faultyUsers{f.Store.Users(), f} }
-func (f *faulty) Groups() store.GroupStore      { return faultyGroups{f.Store.Groups(), f} }
-func (f *faulty) Tokens() store.TokenStore      { return faultyTokens{f.Store.Tokens(), f} }
-func (f *faulty) Settings() store.SettingsStore { return faultySettings{f.Store.Settings(), f} }
-func (f *faulty) failing(op string) bool        { return f.fail == op }
+func (f *faulty) Users() port.UserStore            { return faultyUsers{f.Store.Users(), f} }
+func (f *faulty) Groups() port.GroupStore          { return faultyGroups{f.Store.Groups(), f} }
+func (f *faulty) Tokens() port.TokenStore          { return faultyTokens{f.Store.Tokens(), f} }
+func (f *faulty) Settings() settings.SettingsStore { return faultySettings{f.Store.Settings(), f} }
+func (f *faulty) failing(op string) bool           { return f.fail == op }
 
 type faultyUsers struct {
-	store.UserStore
+	port.UserStore
 	f *faulty
 }
 
@@ -38,7 +40,7 @@ func (u faultyUsers) Get(ctx context.Context, name string) (types.User, error) {
 	return u.UserStore.Get(ctx, name) //nolint:wrapcheck // test double
 }
 
-func (u faultyUsers) List(ctx context.Context, p store.Page) ([]types.User, string, error) {
+func (u faultyUsers) List(ctx context.Context, p kernel.Page) ([]types.User, string, error) {
 	if u.f.failing("users.list") {
 		return nil, "", errBoom
 	}
@@ -60,7 +62,7 @@ func (u faultyUsers) Unlock(ctx context.Context, names ...string) error {
 }
 
 type faultyGroups struct {
-	store.GroupStore
+	port.GroupStore
 	f *faulty
 }
 
@@ -79,14 +81,14 @@ func (g faultyGroups) AutoJoin(ctx context.Context) ([]string, error) {
 }
 
 type faultyTokens struct {
-	store.TokenStore
+	port.TokenStore
 	f *faulty
 }
 
 func (t faultyTokens) List(
 	ctx context.Context,
-	f store.TokenFilter,
-	p store.Page,
+	f port.TokenFilter,
+	p kernel.Page,
 ) ([]types.Token, string, error) {
 	if t.f.failing("tokens.list") {
 		return nil, "", errBoom
@@ -102,7 +104,7 @@ func (t faultyTokens) Delete(ctx context.Context, id string) error {
 }
 
 type faultySettings struct {
-	store.SettingsStore
+	settings.SettingsStore
 	f *faulty
 }
 

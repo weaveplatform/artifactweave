@@ -9,13 +9,14 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/keymaterial"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -133,11 +134,11 @@ func (s SecurityAPI) CreateKeyPair(
 // putKeypair creates k or replaces the pair of its name. A pair deleted
 // between the refused create and the update is created after all, so a
 // concurrent delete cannot fail the request with a 500.
-func putKeypair(ctx context.Context, keys store.KeyStore, k types.Keypair) error {
+func putKeypair(ctx context.Context, keys port.KeyStore, k types.Keypair) error {
 	err := keys.CreateKeypair(ctx, k)
-	if errors.Is(err, store.ErrConflict) {
+	if errors.Is(err, kernel.ErrConflict) {
 		err = keys.UpdateKeypair(ctx, k)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			err = keys.CreateKeypair(ctx, k)
 		}
 	}
@@ -162,7 +163,7 @@ func (s SecurityAPI) UpdateKeyPair(
 		return nil, err
 	}
 	switch err := st.Keys().UpdateKeypair(ctx, k); {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return nil, keypairNotFound(k.Name)
 	case err != nil:
 		return nil, s.internalError(ctx, "update key pair", err)
@@ -199,7 +200,7 @@ func (s SecurityAPI) GetKeyPair(
 		return nil, err
 	}
 	switch k, err := st.Keys().Keypair(ctx, req.KeyPairName); {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return nil, keypairNotFound(req.KeyPairName)
 	case err != nil:
 		return nil, s.internalError(ctx, "get key pair", err)
@@ -233,7 +234,7 @@ func (s SecurityAPI) DeleteKeyPair(
 		return st.Keys().DeleteKeypair(ctx, name) //nolint:wrapcheck // wrapped below
 	})
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return nil, keypairNotFound(name)
 	case err != nil:
 		return nil, s.internalError(ctx, "delete key pair", err)
@@ -292,7 +293,7 @@ func (s SecurityAPI) GetKeyPairPublicKeyPerRepository(
 	}
 	cfg, err := s.deps.Repositories.Get(ctx, req.RepoKey)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return nil, repoNotFound(req.RepoKey)
 	case err != nil:
 		return nil, s.internalError(ctx, "get repository", err)
@@ -308,7 +309,7 @@ func (s SecurityAPI) GetKeyPairPublicKeyPerRepository(
 			fmt.Sprintf("Repository '%s' has no key pair assigned", req.RepoKey))
 	}
 	switch k, err := st.Keys().Keypair(ctx, ref); {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return nil, keypairNotFound(ref)
 	case err != nil:
 		return nil, s.internalError(ctx, "get key pair", err)
@@ -423,7 +424,7 @@ func (s SecurityAPI) DeleteCertificate(
 		)
 	}
 	switch err := st.Keys().DeleteCertificate(ctx, alias); {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return nil, certificateNotFound(alias)
 	case err != nil:
 		return nil, s.internalError(ctx, "delete certificate", err)

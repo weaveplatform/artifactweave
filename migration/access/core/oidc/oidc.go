@@ -14,8 +14,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/core/idtoken"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -332,7 +332,7 @@ func (s Service) Providers(ctx context.Context) ([]Provider, error) {
 // Provider returns one provider.
 func (s Service) Provider(ctx context.Context, name string) (Provider, error) {
 	d, err := s.configs().Get(ctx, types.ConfigOIDC, name)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return Provider{}, notFoundf("OIDC provider '%s' does not exist", name)
 	}
 	if err != nil {
@@ -457,7 +457,7 @@ func (s Service) storedMapping(ctx context.Context, provider, name string) (stor
 		return stored{}, err
 	}
 	d, err := s.configs().Get(ctx, types.ConfigOIDCMapping, mappingKey(provider, name))
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return stored{}, notFoundf(
 			"OIDC provider '%s' has no identity mapping '%s'",
 			provider,
@@ -507,7 +507,7 @@ func (s Service) CreateMapping(ctx context.Context, provider string, m Mapping) 
 	switch {
 	case err == nil:
 		return Mapping{}, invalidf("an identity mapping named '%s' already exists", str(m.Name))
-	case !errors.Is(err, store.ErrNotFound):
+	case !errors.Is(err, kernel.ErrNotFound):
 		return Mapping{}, fmt.Errorf("oidc: mapping %s: %w", str(m.Name), err)
 	}
 	return m, s.putMapping(ctx, provider, stored{Mapping: m, Created: s.now().UnixNano()})

@@ -13,12 +13,12 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/identity"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -148,8 +148,8 @@ func (s AccessService) GetUserList(
 	if err != nil {
 		return nil, err
 	}
-	pageItems, next, err := svc.Store.Users().ListSummaries(ctx, store.UserFilter{
-		IdentityFilter: store.IdentityFilter{
+	pageItems, next, err := svc.Store.Users().ListSummaries(ctx, port.UserFilter{
+		IdentityFilter: port.IdentityFilter{
 			NameContains: httpkit.Deref(
 				p.Username,
 			),
@@ -157,8 +157,8 @@ func (s AccessService) GetUserList(
 			Resource:   resource,
 		},
 		Status: types.UserStatus(httpkit.Deref(p.Status)), OnlyAdmins: httpkit.Deref(p.OnlyAdmins),
-	}, store.Page{After: httpkit.Deref(p.Cursor), Limit: limit})
-	if errors.Is(err, store.ErrInvalidCursor) {
+	}, kernel.Page{After: httpkit.Deref(p.Cursor), Limit: limit})
+	if errors.Is(err, kernel.ErrInvalidCursor) {
 		return nil, httpkit.BadRequestf("cursor is not valid")
 	}
 	if err != nil {
@@ -525,14 +525,14 @@ func (s AccessService) GetGroupList(
 	if err != nil {
 		return nil, err
 	}
-	pageItems, next, err := svc.Store.Groups().ListNames(ctx, store.IdentityFilter{
+	pageItems, next, err := svc.Store.Groups().ListNames(ctx, port.IdentityFilter{
 		NameContains: httpkit.Deref(
 			p.GroupName,
 		),
 		Descending: httpkit.Deref(p.DescendingOrder),
 		Resource:   resource,
-	}, store.Page{After: httpkit.Deref(p.Cursor), Limit: limit})
-	if errors.Is(err, store.ErrInvalidCursor) {
+	}, kernel.Page{After: httpkit.Deref(p.Cursor), Limit: limit})
+	if errors.Is(err, kernel.ErrInvalidCursor) {
 		return nil, httpkit.BadRequestf("cursor is not valid")
 	}
 	if err != nil {
@@ -595,7 +595,7 @@ func (s AccessService) CreateGroup(
 		},
 	}
 	if err := svc.CreateGroup(ctx, g, httpkit.DerefSlice(b.Members)); err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			return nil, apierror.New(
 				http.StatusNotFound,
 				"One or more users in members were not found",
@@ -733,7 +733,7 @@ func (s AccessService) UpdateGroupMembers(
 		add, remove = httpkit.DerefSlice(req.Body.Add), httpkit.DerefSlice(req.Body.Remove)
 	}
 	members, err := svc.UpdateGroupMembers(ctx, name, add, remove)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		// The group was found first, so a miss names an unknown user.
 		if _, gerr := svc.Group(ctx, name); gerr == nil {
 			return nil, apierror.New(http.StatusNotFound, "A user to add does not exist")
@@ -955,7 +955,7 @@ func (s AccessService) forgetPolicies() {
 // --- Helpers -------------------------------------------------------------------
 
 // The existing API ignores an incomplete resource selector.
-func identityResource(resourceType, resourceName *string) (*store.IdentityResource, error) {
+func identityResource(resourceType, resourceName *string) (*port.IdentityResource, error) {
 	if resourceType == nil || resourceName == nil {
 		return nil, nil //nolint:nilnil // no filter
 	}
@@ -963,7 +963,7 @@ func identityResource(resourceType, resourceName *string) (*store.IdentityResour
 	switch rt {
 	case types.ResourceArtifact, types.ResourceBuild, types.ResourceReleaseBundle,
 		types.ResourceDestination, types.ResourcePipelineSource:
-		return &store.IdentityResource{Type: rt, Name: *resourceName}, nil
+		return &port.IdentityResource{Type: rt, Name: *resourceName}, nil
 	default:
 		return nil, httpkit.BadRequestf(
 			"resourceType %q is not a permission resource type",
@@ -994,8 +994,8 @@ func listLimit(limit *int) (int, error) {
 	if limit == nil {
 		return defaultListLimit, nil
 	}
-	if *limit < 1 || *limit > store.MaxLimit {
-		return 0, httpkit.BadRequestf("limit must be between 1 and %d", store.MaxLimit)
+	if *limit < 1 || *limit > kernel.MaxLimit {
+		return 0, httpkit.BadRequestf("limit must be between 1 and %d", kernel.MaxLimit)
 	}
 	return *limit, nil
 }

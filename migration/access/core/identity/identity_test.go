@@ -10,8 +10,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/identity"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -132,7 +132,14 @@ func TestUnitPatchUser(t *testing.T) {
 	wantInvalid(t, "empty password", s.PatchUser(ctx, "ben", identity.UserPatch{Password: &empty}))
 	nope := []string{"nope"}
 	wantInvalid(t, "unknown group", s.PatchUser(ctx, "ben", identity.UserPatch{Groups: &nope}))
-	if err := s.PatchUser(ctx, "nobody", identity.UserPatch{}); !errors.Is(err, store.ErrNotFound) {
+	if err := s.PatchUser(
+		ctx,
+		"nobody",
+		identity.UserPatch{},
+	); !errors.Is(
+		err,
+		kernel.ErrNotFound,
+	) {
 		t.Fatalf("unknown user: %v", err)
 	}
 }
@@ -176,13 +183,13 @@ func TestUnitLastAdminAndDeletion(t *testing.T) {
 	if err := s.DeleteUser(ctx, "boss"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Tokens().Get(ctx, "t1"); !errors.Is(err, store.ErrNotFound) {
+	if _, err := db.Tokens().Get(ctx, "t1"); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("boss's token survived: %v", err)
 	}
 	if _, err := db.Tokens().Get(ctx, "t2"); err != nil {
 		t.Fatalf("admin's token was revoked: %v", err)
 	}
-	if err := s.DeleteUser(ctx, "boss"); !errors.Is(err, store.ErrNotFound) {
+	if err := s.DeleteUser(ctx, "boss"); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("deleting twice: %v", err)
 	}
 	users, err := s.Users(ctx)
@@ -243,7 +250,7 @@ func TestUnitGroups(t *testing.T) {
 		identity.GroupPatch{},
 	); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatalf("unknown group: %v", err)
 	}
@@ -262,7 +269,7 @@ func TestUnitGroups(t *testing.T) {
 	if err != nil || len(anything.Resources[types.ResourceArtifact].Actions.Groups) != 0 {
 		t.Fatalf("Anything after deleting readers: %+v %v", anything, err)
 	}
-	if err := s.DeleteGroup(ctx, "devs"); !errors.Is(err, store.ErrNotFound) {
+	if err := s.DeleteGroup(ctx, "devs"); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("delete an unknown group: %v", err)
 	}
 }
@@ -286,7 +293,7 @@ func TestUnitLocksAndExpiry(t *testing.T) {
 	if dan, _ := s.User(ctx, "dan"); dan.PasswordExpired || !dan.PasswordChanged.Equal(clock) {
 		t.Fatalf("unexpired: %+v", dan)
 	}
-	if err := s.UnexpirePassword(ctx, "ghost"); !errors.Is(err, store.ErrNotFound) {
+	if err := s.UnexpirePassword(ctx, "ghost"); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("unexpire an unknown user: %v", err)
 	}
 
@@ -435,7 +442,7 @@ func TestUnitEncryptedPasswordFollowsThePassword(t *testing.T) {
 	}
 	// More than a page of other users' encrypted passwords, so the
 	// revocation reads every page.
-	for i := range store.DefaultLimit {
+	for i := range kernel.DefaultLimit {
 		encrypted(fmt.Sprintf("ep-other-%03d", i), fmt.Sprintf("jfac@svc/users/other%03d", i))
 	}
 	encrypted("ep-bad", "nonsense")
@@ -479,7 +486,7 @@ func TestUnitEncryptedPasswordFollowsThePassword(t *testing.T) {
 				t.Errorf("%s: %s was revoked", what, id)
 			}
 		}
-		if _, err := db.Tokens().Get(ctx, "ep-dan"); !errors.Is(err, store.ErrNotFound) {
+		if _, err := db.Tokens().Get(ctx, "ep-dan"); !errors.Is(err, kernel.ErrNotFound) {
 			t.Fatalf("%s: %v", what, err)
 		}
 	}
@@ -498,7 +505,7 @@ func TestUnitChangePassword(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := s.ChangePassword(ctx, "ghost", "x", "Ghost-1", "Ghost-1"); !errors.Is(
-		err, store.ErrNotFound,
+		err, kernel.ErrNotFound,
 	) {
 		t.Fatalf("an unknown user: %v", err)
 	}
@@ -577,7 +584,7 @@ func TestUnitChangePasswordRaces(t *testing.T) {
 	}
 	if err := s.ChangePassword(
 		ctx, "dan", "Elsewhere-1", "Dan-pass2", "Dan-pass2",
-	); !errors.Is(err, store.ErrNotFound) {
+	); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("a user deleted meanwhile: %v", err)
 	}
 }
@@ -588,10 +595,10 @@ type racing struct {
 	after func()
 }
 
-func (r *racing) Users() store.UserStore { return racingUsers{r.Store.Users(), r} }
+func (r *racing) Users() port.UserStore { return racingUsers{r.Store.Users(), r} }
 
 type racingUsers struct {
-	store.UserStore
+	port.UserStore
 	r *racing
 }
 
