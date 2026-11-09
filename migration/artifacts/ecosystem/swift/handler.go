@@ -26,6 +26,11 @@ type inspection struct {
 	path, sha string
 }
 
+// Inspect validates the stored archive of a write to a release archive
+// path (ParseArchivePath) before the write's transaction, so Admit need not
+// read it again. A checksum deploy and any other path inspect nothing. An
+// invalid archive is refused with 422; one that cannot be opened fails the
+// write.
 func (Handler) Inspect(
 	ctx context.Context,
 	env format.Env,
@@ -50,6 +55,12 @@ func (Handler) Inspect(
 	return inspection{path: w.Path, sha: w.Checksums.SHA256}, nil
 }
 
+// Admit applies the generic deploy policy, returning its refusal as it is,
+// then passes a checksum deploy. Any other write must be at a canonical
+// release path, <scope>/<name>/<name>-<version>.zip (400), with a valid
+// archive (422), which it inspects itself unless Inspect covered the same
+// path and content. A write of other content over a stored release is
+// refused (409); the same content, or a folder at the path, passes.
 func (h Handler) Admit(
 	ctx context.Context,
 	env format.Env,
@@ -95,6 +106,10 @@ func (h Handler) Admit(
 	}
 }
 
+// Deployed links a stored release archive to its version in the package
+// index, creating the package and version when they are new. Folders,
+// files at other paths and items outside the tree the index reads (a
+// remote repository's cache, or a local one's own items) change nothing.
 func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
 	if it.Folder || it.Cached != pkgindex.Stored(c).Cached {
 		return nil
@@ -111,9 +126,16 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 	return nil
 }
 
-func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error  { return nil }
+// Deleting does nothing: the item service drops a removed archive's
+// version link with it.
+func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error { return nil }
+
+// Deleted does nothing: a version is one archive, so the item service's
+// pruning of versions left without files is all a delete needs.
 func (Handler) Deleted(context.Context, format.Env, repo.Config, []types.Item) error { return nil }
 
+// Classify classes every path as unique content, as the generic hooks do:
+// a release archive is content only its publisher can supply again.
 func (Handler) Classify(_ repo.Config, _ string) format.Class { return format.ClassUnique }
 
 // Reindex restores the version index from current archives after delete,

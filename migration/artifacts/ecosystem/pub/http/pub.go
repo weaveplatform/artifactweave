@@ -1,5 +1,3 @@
-// Package pubhttp serves the hosted Dart pub protocol through Artifactory's
-// /artifactory/api/pub/{repo} URL.
 package pubhttp
 
 import (
@@ -28,6 +26,12 @@ import (
 
 const mediaType = "application/vnd.pub.v2+json"
 
+// Options configures the pub protocol. Blobs opens a remote's cached
+// version document when the remote source answers from its cache; without
+// it such an answer fails as invalid upstream metadata (502).
+// RemoteSources serves remote repositories and fetches through them; nil
+// leaves the remote class without a source, so a remote repository answers
+// 501.
 type Options struct {
 	Blobs         blob.Store
 	RemoteSources *source.Service
@@ -49,6 +53,20 @@ func (virtualSource) Item(
 	return pkgroute.Found{}, source.ErrUnsupported
 }
 
+// Protocol returns the hosted pub protocol for the router kit, under
+// /artifactory/api/pub/{repoKey}: the publish steps (GET of
+// api/packages/versions/new for the upload URL, POST of the multipart
+// upload there, and GET of api/packages/versions/new/complete to
+// finalize), GET and HEAD of a package's versions (api/packages/{package}),
+// GET of one version (api/packages/{package}/versions/{version}), and GET
+// and HEAD of an archive (packages/{package}/versions/{version}.tar.gz).
+// Local and federated repositories are served from their package index,
+// virtual ones from their members in order, and remote ones through
+// o.RemoteSources when it is set; a class without a source answers 501.
+// The virtual class's source supports no single-item lookup, because the
+// protocol reads a virtual repository's members itself. {repoKey}/reindex
+// is reserved for JFrog's reindex operation, which the server serves
+// beside the protocol.
 func Protocol(o Options) pkgroute.Protocol {
 	sources := map[repo.Class]pkgroute.Source{
 		repo.Local: pkgroute.Local{}, repo.Federated: pkgroute.Local{},

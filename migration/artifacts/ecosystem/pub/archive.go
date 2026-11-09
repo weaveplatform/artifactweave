@@ -1,4 +1,3 @@
-// Package pub validates Dart pub archives and maintains their native index.
 package pub
 
 import (
@@ -17,17 +16,31 @@ import (
 )
 
 const (
-	MaxArchiveBytes  = 64 << 20
+	// MaxArchiveBytes bounds an archive, uploaded or fetched, at 64 MiB
+	// compressed.
+	MaxArchiveBytes = 64 << 20
+	// MaxUnpackedBytes bounds an archive's decompressed TAR stream at
+	// 128 MiB, so a small archive cannot expand without limit.
 	MaxUnpackedBytes = 128 << 20
+	// MaxManifestBytes bounds an archive's pubspec.yaml at 1 MiB.
 	MaxManifestBytes = 1 << 20
-	MaxFiles         = 4096
+	// MaxFiles bounds an archive at 4,096 TAR entries, folders included.
+	MaxFiles = 4096
 )
 
 var (
+	// ErrArchive is what ReadArchive returns for every archive it refuses;
+	// the hooks wrap it, and wrap it too when a stored archive no longer
+	// matches its path.
 	ErrArchive  = errors.New("pub: invalid dart pub archive")
 	namePattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,127}$`)
 )
 
+// Metadata is what the package index keeps for a version, as JSON, and what
+// the protocol answers from: the package's name and version, its pubspec,
+// and the archive's item path and SHA-256. ReadArchive fills the name,
+// version and pubspec, and Deployed and Reindex add the path and SHA-256
+// of the stored item; a remote's come from its upstream version document.
 type Metadata struct {
 	Name    string         `json:"name"`
 	Version string         `json:"version"`
@@ -36,8 +49,14 @@ type Metadata struct {
 	SHA256  string         `json:"sha256"`
 }
 
+// ValidName reports whether name is a pub package name the registry
+// accepts: a lowercase letter followed by up to 127 lowercase letters,
+// digits and underscores.
 func ValidName(name string) bool { return namePattern.MatchString(name) }
 
+// ValidVersion reports whether version is a full semantic version of at
+// most 128 bytes, major.minor.patch with an optional pre-release and build,
+// written without a leading v.
 func ValidVersion(version string) bool {
 	core, _, _ := strings.Cut(version, "-")
 	core, _, _ = strings.Cut(core, "+")
@@ -45,10 +64,15 @@ func ValidVersion(version string) bool {
 		semver.IsValid("v"+version) && !strings.HasPrefix(version, "v")
 }
 
+// Path is the item path of the archive of package name at version:
+// <name>/<name>-<version>.tar.gz.
 func Path(name, version string) string {
 	return name + "/" + name + "-" + version + ".tar.gz"
 }
 
+// ParsePath splits an item path into the package name and version whose
+// archive it holds, and reports ok only when p is exactly Path(name,
+// version) with a valid name and version.
 func ParsePath(p string) (name, version string, ok bool) {
 	name, file, found := strings.Cut(p, "/")
 	if !found || !ValidName(name) || !strings.HasPrefix(file, name+"-") ||

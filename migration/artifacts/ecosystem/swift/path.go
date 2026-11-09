@@ -1,4 +1,3 @@
-// Package swift implements the Swift package registry's stored archive format.
 package swift
 
 import (
@@ -15,22 +14,33 @@ type Package struct {
 	Scope, Name, Version string
 }
 
+// Serves reports whether t is the Swift package type.
 func Serves(t repo.PackageType) bool { return t == repo.Swift }
 
+// ID is the package's registry identifier, <scope>.<name>, under which the
+// package index keeps it.
 func (p Package) ID() string { return p.Scope + "." + p.Name }
 
+// ArchivePath is the item path of the release's source archive:
+// <scope>/<name>/<name>-<version>.zip.
 func (p Package) ArchivePath() string {
 	return p.Scope + "/" + p.Name + "/" + p.Name + "-" + p.Version + ".zip"
 }
 
+// IsValid reports whether the scope, name and version are all valid.
 func (p Package) IsValid() bool {
 	return ValidScope(p.Scope) && ValidName(p.Name) && ValidVersion(p.Version)
 }
 
-// ValidScope and ValidName implement the registry specification's grammar,
-// including the different maximum lengths and separator rules.
+// ValidScope reports whether s is a scope the registry specification's
+// grammar allows: 1 to 39 ASCII letters, digits and hyphens, with no hyphen
+// first, last or next to another.
 func ValidScope(s string) bool { return validComponent(s, 39, false) }
-func ValidName(s string) bool  { return validComponent(s, 100, true) }
+
+// ValidName reports whether s is a package name the registry
+// specification's grammar allows: 1 to 100 ASCII letters, digits, hyphens
+// and underscores, with no separator first, last or next to another.
+func ValidName(s string) bool { return validComponent(s, 100, true) }
 
 func validComponent(s string, limit int, underscore bool) bool {
 	if len(s) == 0 || len(s) > limit {
@@ -49,6 +59,8 @@ func validComponent(s string, limit int, underscore bool) bool {
 	return true
 }
 
+// ValidVersion reports whether v is a full semantic version of at most 128
+// bytes: major.minor.patch with an optional pre-release and build.
 func ValidVersion(v string) bool {
 	core, _, _ := strings.Cut(v, "-")
 	core, _, _ = strings.Cut(core, "+")

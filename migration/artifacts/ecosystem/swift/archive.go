@@ -13,6 +13,8 @@ import (
 )
 
 const (
+	// MaxArchiveBytes bounds a source archive at 512 MiB compressed, however
+	// it arrives: a publish, an item write or a remote's fetch.
 	MaxArchiveBytes = 512 << 20
 	maxFiles        = 100_000
 	maxExpanded     = 1 << 30
@@ -35,6 +37,16 @@ type Archive struct {
 	Tools     map[string]string
 }
 
+// InspectArchive reads a whole source ZIP of size bytes from body, or of
+// any size up to MaxArchiveBytes when size is 0, and returns its
+// manifests. It spools the archive to a temporary file and requires 1 to
+// 100,000 entries, at most 1 GiB expanded, exactly one package root
+// holding Package.swift, at the top or in one folder, and unique members
+// under that root that are regular files or folders, unencrypted and at
+// safe paths. Every member is read to its end, and every manifest,
+// Package.swift or Package@swift-<version>.swift, of at most 1 MiB, must
+// import PackageDescription and declare its swift-tools-version. A refusal
+// names its fault; when ctx ends, the error wraps ctx's.
 func InspectArchive(ctx context.Context, body io.Reader, size int64) (Archive, error) {
 	if size < 0 || size > MaxArchiveBytes {
 		return Archive{}, fmt.Errorf("%w: compressed size limit", errArchive)

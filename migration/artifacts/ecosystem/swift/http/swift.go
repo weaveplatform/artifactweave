@@ -1,5 +1,3 @@
-// Package swifthttp serves the Swift Package Registry API on Artifactory's
-// /artifactory/api/swift/{repo} prefix.
 package swifthttp
 
 import (
@@ -19,8 +17,24 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// Options configures the Swift protocol. RemoteSources serves remote
+// repositories and fetches through them; nil leaves the remote class
+// without a source, so a remote repository answers 501.
 type Options struct{ RemoteSources *source.Service }
 
+// Protocol returns the Swift Package Registry API for the router kit, under
+// /artifactory/api/swift/{repoKey}: GET and HEAD of the identifier lookup
+// (identifiers?url=), a package's release list ({scope}/{name}), a
+// release's metadata ({scope}/{name}/{version}, with or without .json),
+// its manifest ({scope}/{name}/{version}/Package.swift, optionally with
+// swift-version) and its source archive ({scope}/{name}/{version}.zip),
+// and PUT of a release ({scope}/{name}/{version}). Local and federated
+// repositories are served from their items and package index, virtual ones
+// from their members in order, and remote ones through o.RemoteSources
+// when it is set; a class without a source answers 501. The virtual class's
+// source supports no single-item lookup, because the protocol reads a
+// virtual repository's members itself. {repoKey}/reindex is reserved for
+// JFrog's reindex operation, which the server serves beside the protocol.
 func Protocol(o Options) pkgroute.Protocol {
 	sources := map[repo.Class]pkgroute.Source{
 		repo.Local:     pkgroute.Local{},

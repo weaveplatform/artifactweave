@@ -16,14 +16,25 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// The item properties Deployed and Reindex keep on every stored archive:
+// its pubspec's name and version and its SHA-256. The items keep these
+// names, so they never change.
 const (
-	PropName    = "pub.name"
+	// PropName is the property that holds an archive's package name.
+	PropName = "pub.name"
+	// PropVersion is the property that holds an archive's package version.
 	PropVersion = "pub.version"
-	PropSHA256  = "pub.sha256"
+	// PropSHA256 is the property that holds an archive's SHA-256.
+	PropSHA256 = "pub.sha256"
 )
 
+// Serves reports whether t is the pub package type.
 func Serves(t repo.PackageType) bool { return t == repo.Pub }
 
+// Handler is the pub format's hooks: it admits an archive only when its
+// pubspec matches its path, refuses a second write of a published version,
+// and indexes each stored archive as a version of its package. It embeds
+// the generic hooks, so every path is classed as generic content is.
 type Handler struct{ generic.Handler }
 
 type inspection struct {
@@ -31,6 +42,11 @@ type inspection struct {
 	meta Metadata
 }
 
+// Inspect reads and validates the stored archive of a write to a .tar.gz
+// path before the write's transaction, and returns its metadata for Admit
+// and Deployed, so an archive is read once per write. A checksum deploy
+// and any other file inspect nothing. An archive that cannot be opened
+// fails the write, and an invalid one fails it with ErrArchive.
 func (Handler) Inspect(
 	ctx context.Context, env format.Env, _ repo.Config, w format.Write,
 ) (any, error) {
@@ -44,6 +60,13 @@ func (Handler) Inspect(
 	return inspection{sha: w.Checksums.SHA256, meta: meta}, nil
 }
 
+// Admit applies the generic deploy policy, wrapping its refusal, then
+// passes a checksum deploy and a remote's cached version document
+// (api/packages/<name>). Any other write must be at an archive path,
+// <name>/<name>-<version>.tar.gz (400), and the archive's pubspec must name
+// the package and version its path does (409). It reuses Inspect's reading
+// when it covers the same content, and reads the stored archive itself
+// otherwise; an invalid archive fails with ErrArchive.
 func (Handler) Admit(
 	ctx context.Context, env format.Env, c repo.Config, w format.Write,
 ) (format.Write, error) {
@@ -77,8 +100,10 @@ func (Handler) Admit(
 	return w, nil
 }
 
-// A published version is immutable through both pub publish and the generic
-// item route. Deletes and restores still use their normal lifecycle paths.
+// GuardWrite refuses a write to the path of a stored version (409), so a
+// published version is immutable through both pub publish and the generic
+// item route; a checksum deploy and a remote's cached content pass. Deletes
+// and restores still use their normal lifecycle paths.
 func (Handler) GuardWrite(
 	ctx context.Context, env format.Env, c repo.Config, w format.Write,
 ) error {
@@ -96,6 +121,11 @@ func (Handler) GuardWrite(
 	}
 }
 
+// Deployed indexes a stored archive: it sets the archive's pub.*
+// properties, creates the package when it is new, and makes the version,
+// linked to the archive, carry its Metadata. Folders and files at other
+// paths change nothing. An archive whose pubspec no longer matches its path
+// fails with ErrArchive.
 func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
 	if it.Folder {
 		return nil
@@ -131,7 +161,12 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 	return err //nolint:wrapcheck // pkgindex names the version
 }
 
-func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error  { return nil }
+// Deleting does nothing: the item service drops a removed archive's
+// version link with it.
+func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error { return nil }
+
+// Deleted does nothing: a version is one archive, so the item service's
+// pruning of versions left without files is all a delete needs.
 func (Handler) Deleted(context.Context, format.Env, repo.Config, []types.Item) error { return nil }
 
 func cachedMetadataPath(p string) bool {
