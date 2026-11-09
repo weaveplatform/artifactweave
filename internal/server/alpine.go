@@ -58,7 +58,7 @@ func (s artifactoryService) tryAlpineItem(
 	}
 	if strings.HasSuffix(req.path, ".apk") {
 		if _, _, _, _, ok := alpine.ParsePath(req.path); !ok {
-			writeErr(w, r, itemNotFound())
+			WriteErr(w, r, itemNotFound())
 			return true
 		}
 		if c.Class == repo.Virtual {
@@ -76,17 +76,17 @@ func (s artifactoryService) serveAlpineIndex(
 	ctx := r.Context()
 	if _, _, _, ok := alpine.ParseIndexPath(req.path); !ok || len(req.props) != 0 ||
 		r.URL.RawQuery != "" {
-		writeErr(w, r, itemNotFound())
+		WriteErr(w, r, itemNotFound())
 		return
 	}
 	if !acc.folder(c, req.path, types.ActionRead) ||
 		!acc.file(c, req.path, types.ActionRead) ||
 		generic.CheckDownload(c, req.path, false) != nil {
-		writeErr(w, r, denied(p))
+		WriteErr(w, r, denied(p))
 		return
 	}
 	if cached && c.Class != repo.Remote {
-		writeErr(w, r, itemNotFound())
+		WriteErr(w, r, itemNotFound())
 		return
 	}
 	var body []byte
@@ -95,7 +95,7 @@ func (s artifactoryService) serveAlpineIndex(
 		candidates, err := s.alpineCandidates(ctx, st, c, req.path, p, acc,
 			map[string]bool{})
 		if err != nil {
-			writeErr(w, r, s.itemError(ctx, "Alpine virtual index", err))
+			WriteErr(w, r, s.itemError(ctx, "Alpine virtual index", err))
 			return
 		}
 		packages := make([]alpine.Package, 0, len(candidates))
@@ -104,34 +104,34 @@ func (s artifactoryService) serveAlpineIndex(
 		}
 		keyName, key, err := alpine.SigningKey(ctx, s.cfg.Access.Keys, c)
 		if err != nil {
-			writeErr(w, r, s.internalError(ctx, "Alpine virtual signing key", err))
+			WriteErr(w, r, s.internalError(ctx, "Alpine virtual signing key", err))
 			return
 		}
 		body, err = alpine.EncodeIndex(packages, "alpine "+c.Key, keyName, key)
 		if err != nil {
-			writeErr(w, r, s.internalError(ctx, "Alpine virtual index", err))
+			WriteErr(w, r, s.internalError(ctx, "Alpine virtual index", err))
 			return
 		}
 	} else {
 		view, err := s.alpineMemberIndex(ctx, st, c, cached, req.path, p, acc)
 		if err != nil {
-			writeErr(w, r, s.itemError(ctx, "Alpine index", err))
+			WriteErr(w, r, s.itemError(ctx, "Alpine index", err))
 			return
 		}
 		if view.revalidate != nil {
 			if err := view.revalidate(ctx); err != nil {
-				writeErr(w, r, pkgroute.SourceError(err, p.Anonymous))
+				WriteErr(w, r, pkgroute.SourceError(err, p.Anonymous))
 				return
 			}
 		}
 		for _, pkg := range view.packages {
 			allowed, err := alpinePackageReadable(ctx, c, pkg.Path, acc, view.checkRead)
 			if err != nil {
-				writeErr(w, r, s.itemError(ctx, "Alpine index permission", err))
+				WriteErr(w, r, s.itemError(ctx, "Alpine index permission", err))
 				return
 			}
 			if !allowed {
-				writeErr(w, r, denied(p))
+				WriteErr(w, r, denied(p))
 				return
 			}
 		}
@@ -322,19 +322,19 @@ func (s artifactoryService) serveVirtualAlpinePackage(
 ) {
 	if _, _, _, _, ok := alpine.ParsePath(req.path); !ok || len(req.props) != 0 ||
 		r.URL.RawQuery != "" {
-		writeErr(w, r, itemNotFound())
+		WriteErr(w, r, itemNotFound())
 		return
 	}
 	if !acc.file(c, req.path, types.ActionRead) ||
 		generic.CheckDownload(c, req.path, false) != nil {
-		writeErr(w, r, denied(p))
+		WriteErr(w, r, denied(p))
 		return
 	}
 	indexPath := req.path[:strings.LastIndexByte(req.path, '/')+1] + alpine.IndexName
 	candidates, err := s.alpineCandidates(r.Context(), st, c, indexPath, p, acc,
 		map[string]bool{})
 	if err != nil {
-		writeErr(w, r, s.itemError(r.Context(), "Alpine virtual package", err))
+		WriteErr(w, r, s.itemError(r.Context(), "Alpine virtual package", err))
 		return
 	}
 	for _, candidate := range candidates {
@@ -347,17 +347,17 @@ func (s artifactoryService) serveVirtualAlpinePackage(
 		}
 		it, err := st.Items().Get(r.Context(), candidate.repo.Key, false, req.path)
 		if err != nil {
-			writeErr(w, r, s.itemError(r.Context(), "Alpine virtual member", err))
+			WriteErr(w, r, s.itemError(r.Context(), "Alpine virtual member", err))
 			return
 		}
 		if it.Folder {
-			writeErr(w, r, itemNotFound())
+			WriteErr(w, r, itemNotFound())
 			return
 		}
 		s.serveFile(w, r, st, found{repo: candidate.repo, item: it}, p)
 		return
 	}
-	writeErr(w, r, itemNotFound())
+	WriteErr(w, r, itemNotFound())
 }
 
 func (s artifactoryService) serveRemoteAlpinePackage(
@@ -377,12 +377,12 @@ func (s artifactoryService) serveRemoteAlpinePackage(
 	}
 	query, err := alpineSourceRequest(query)
 	if err != nil {
-		writeErr(w, r, s.itemError(r.Context(), "Alpine source", err))
+		WriteErr(w, r, s.itemError(r.Context(), "Alpine source", err))
 		return
 	}
 	result, err := s.cfg.RemoteSources.Read(r.Context(), query)
 	if err != nil {
-		writeErr(
+		WriteErr(
 			w,
 			r,
 			s.itemError(r.Context(), "Alpine source", pkgroute.SourceError(err, p.Anonymous)),
@@ -397,7 +397,7 @@ func (s artifactoryService) serveRemoteAlpinePackage(
 		return
 	}
 	if result.Item == nil {
-		writeErr(w, r, s.internalError(r.Context(), "Alpine source", source.ErrInvalidResult))
+		WriteErr(w, r, s.internalError(r.Context(), "Alpine source", source.ErrInvalidResult))
 		return
 	}
 	s.serveFile(w, r, s.cfg.Store,

@@ -226,7 +226,7 @@ func sinkHandler(w http.ResponseWriter, r *http.Request) {
 	_, err := io.Copy(io.Discard, r.Body)
 	var tooLarge *http.MaxBytesError
 	if errors.As(err, &tooLarge) {
-		apierror.Write(w, errorProfileFor(r.URL.Path), bodyTooLarge(tooLarge.Limit))
+		apierror.Write(w, errorProfileFor(r.URL.Path), BodyTooLarge(tooLarge.Limit))
 		return
 	}
 	w.WriteHeader(http.StatusOK)
@@ -325,7 +325,7 @@ func (e *probeError) Unwrap() error { return e.cause }
 // probeFailed leaves err's cause for the access log and returns the 500 a
 // caller gets, which carries the reason alone.
 func (artifactoryService) probeFailed(ctx context.Context, err *probeError) *apierror.Error {
-	noteCause(ctx, err)
+	NoteCause(ctx, err)
 	return apierror.New(http.StatusInternalServerError, err.reason)
 }
 

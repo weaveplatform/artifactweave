@@ -151,11 +151,11 @@ func promotionArgs(b *artgen.PromoteDockerImageJSONRequestBody) (promotion, erro
 	}
 	a := promotion{
 		targetRepo: b.TargetRepo,
-		name:       b.DockerRepository, tag: deref(b.Tag),
+		name:       b.DockerRepository, tag: Deref(b.Tag),
 		shouldCopy: b.Copy != nil && *b.Copy,
 	}
-	a.toName = orDefault(deref(b.TargetDockerRepository), a.name)
-	a.toTag = orDefault(deref(b.TargetTag), a.tag)
+	a.toName = orDefault(Deref(b.TargetDockerRepository), a.name)
+	a.toTag = orDefault(Deref(b.TargetTag), a.tag)
 	switch {
 	case !dockerhttp.ValidName(a.name):
 		return a, badRequestf("invalid image name '%s'", a.name)

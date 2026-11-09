@@ -17,86 +17,96 @@ const (
 	ctxUser
 )
 
-func withRequestID(ctx context.Context, id string) context.Context {
+// WithRequestID returns ctx carrying the request's correlation id, which
+// RequestIDFrom reads back for log lines.
+func WithRequestID(ctx context.Context, id string) context.Context {
 	return context.WithValue(ctx, ctxRequestID, id)
 }
 
-func requestIDFrom(ctx context.Context) string {
+// RequestIDFrom returns the correlation id WithRequestID stored, or "" for a
+// context that never passed the request ID middleware.
+func RequestIDFrom(ctx context.Context) string {
 	v, _ := ctx.Value(ctxRequestID).(string)
 	return v
 }
 
-func withOriginalContentType(ctx context.Context, mt string) context.Context {
+// WithOriginalContentType returns ctx carrying the vendor media type a client
+// sent before the content-type middleware rewrote it to application/json.
+func WithOriginalContentType(ctx context.Context, mt string) context.Context {
 	return context.WithValue(ctx, ctxOriginalContentType, mt)
 }
 
 // OriginalContentType returns the vendor media type a client sent before
-// normalizeContentType rewrote it, or "" when the client sent a plain type.
+// the content-type middleware rewrote it, or "" when the client sent a plain
+// type.
 func OriginalContentType(ctx context.Context) string {
 	v, _ := ctx.Value(ctxOriginalContentType).(string)
 	return v
 }
 
-// withAccept keeps the Accept header for strict handlers, which see only
+// WithAccept keeps the Accept header for strict handlers, which see only
 // their decoded request: several operations answer with a vendor media type
 // when the client asks for one, and their specs do not declare Accept.
-func withAccept(ctx context.Context, accept string) context.Context {
+func WithAccept(ctx context.Context, accept string) context.Context {
 	return context.WithValue(ctx, ctxAccept, accept)
 }
 
-// accepts reports whether the request's Accept header names mediaType.
-func accepts(ctx context.Context, mediaType string) bool {
+// Accepts reports whether the Accept header WithAccept kept names mediaType.
+func Accepts(ctx context.Context, mediaType string) bool {
 	v, _ := ctx.Value(ctxAccept).(string)
 	return v != "" && strings.Contains(v, mediaType)
 }
 
-func withRawBody(ctx context.Context, b []byte) context.Context {
+// WithRawBody returns ctx carrying a request body as read before the
+// generated binding decoded it, for a handler that needs the bytes as sent.
+func WithRawBody(ctx context.Context, b []byte) context.Context {
 	return context.WithValue(ctx, ctxRawBody, b)
 }
 
-// rawBody returns the request body keepRepositoryBody saved, or nil.
-func rawBody(ctx context.Context) []byte {
+// RawBody returns the request body WithRawBody kept, or nil.
+func RawBody(ctx context.Context) []byte {
 	v, _ := ctx.Value(ctxRawBody).([]byte)
 	return v
 }
 
-// withCause gives accessLog's handlers a slot for the error behind a 500
-// that the client sees only as "internal error".
-func withCause(ctx context.Context, slot *error) context.Context {
+// WithCause gives the access log's handlers a slot for the error behind a
+// 500 that the client sees only as "internal error".
+func WithCause(ctx context.Context, slot *error) context.Context {
 	return context.WithValue(ctx, ctxCause, slot)
 }
 
-// noteCause leaves err for accessLog to log with the request. Without it an
-// untyped error that apierror.Write hides reaches no log at all.
-func noteCause(ctx context.Context, err error) {
+// NoteCause leaves err for the access log to log with the request. Without
+// it an untyped error that apierror.Write hides reaches no log at all.
+func NoteCause(ctx context.Context, err error) {
 	if slot, ok := ctx.Value(ctxCause).(*error); ok {
 		*slot = err
 	}
 }
 
-// withUser gives accessLog's handlers a slot for the name of the user the
-// request authenticated as.
-func withUser(ctx context.Context, slot *string) context.Context {
+// WithUser gives the access log's handlers a slot for the name of the user
+// the request authenticated as.
+func WithUser(ctx context.Context, slot *string) context.Context {
 	return context.WithValue(ctx, ctxUser, slot)
 }
 
-// noteUser leaves the user the middleware authenticated for accessLog,
+// NoteUser leaves the user the middleware authenticated for the access log,
 // which runs outside it and so never sees the principal. It records the
 // user that any credential named, an X-NuGet-ApiKey's included, and never
 // the credential.
-func noteUser(ctx context.Context, name string) {
+func NoteUser(ctx context.Context, name string) {
 	if slot, ok := ctx.Value(ctxUser).(*string); ok {
 		*slot = name
 	}
 }
 
-func withSearchQuery(ctx context.Context, raw string) context.Context {
+// WithSearchQuery returns ctx carrying a request's raw query string.
+func WithSearchQuery(ctx context.Context, raw string) context.Context {
 	return context.WithValue(ctx, ctxSearchQuery, raw)
 }
 
-// rawSearchQuery returns the raw query requestDetails kept for the property
+// RawSearchQuery returns the raw query WithSearchQuery kept, for the property
 // search, whose parameters are property keys the generated binding drops.
-func rawSearchQuery(ctx context.Context) string {
+func RawSearchQuery(ctx context.Context) string {
 	v, _ := ctx.Value(ctxSearchQuery).(string)
 	return v
 }

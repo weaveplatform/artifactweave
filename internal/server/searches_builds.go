@@ -99,7 +99,7 @@ func (s artifactoryService) SearchBuildArtifacts(
 	if body == nil {
 		body = &artgen.SearchBuildArtifactsJSONRequestBody{}
 	}
-	number, status := blank(deref(body.BuildNumber)), blank(deref(body.BuildStatus))
+	number, status := blank(Deref(body.BuildNumber)), blank(Deref(body.BuildStatus))
 	switch {
 	case blank(body.BuildName) == "":
 		return nil, badRequestf("Cannot search without build name.")
@@ -117,8 +117,8 @@ func (s artifactoryService) SearchBuildArtifacts(
 		return nil, err
 	}
 	var mappings []*regexp.Regexp
-	for _, m := range deref(body.Mappings) {
-		if deref(m.Input) == "" {
+	for _, m := range Deref(body.Mappings) {
+		if Deref(m.Input) == "" {
 			continue
 		}
 		re, err := regexp.Compile(`^(?:` + *m.Input + `)$`)
@@ -128,7 +128,7 @@ func (s artifactoryService) SearchBuildArtifacts(
 		mappings = append(mappings, re)
 	}
 	var in func(types.Item) bool
-	if refs := r.refsOf(deref(body.Repos)); refs != nil {
+	if refs := r.refsOf(Deref(body.Repos)); refs != nil {
 		in = func(it types.Item) bool { return refs[aql.RepoRef{Key: it.RepoKey, Cached: it.Cached}] }
 	}
 	missing := noBuildArtifacts(body.BuildName, number, status)

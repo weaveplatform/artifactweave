@@ -28,7 +28,7 @@ func (s artifactoryService) getRemoteFolder(w http.ResponseWriter, r *http.Reque
 		Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.d, Project: c.ProjectKey,
 	}, req.path, &remote.ListingBudget{})
 	if err != nil {
-		writeErr(w, r, pkgroute.SourceError(err, p.Anonymous))
+		WriteErr(w, r, pkgroute.SourceError(err, p.Anonymous))
 		return true
 	}
 	title := html.EscapeString(path.Join(c.Key, req.path))
@@ -57,7 +57,7 @@ func (s artifactoryService) getRemoteFolder(w http.ResponseWriter, r *http.Reque
 	}
 	body.WriteString("</pre></body></html>\n")
 	if err = listing.Revalidate(r.Context()); err != nil {
-		writeErr(w, r, pkgroute.SourceError(err, p.Anonymous))
+		WriteErr(w, r, pkgroute.SourceError(err, p.Anonymous))
 		return true
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

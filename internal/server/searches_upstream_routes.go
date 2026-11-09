@@ -29,7 +29,7 @@ type searchDisclosure struct {
 func (u *upstreamSearch) prepareRoutes(requested *string) {
 	u.routes = map[string][]searchRoute{}
 	u.virtuals = map[string]repo.Config{}
-	keys := strings.Split(deref(requested), ",")
+	keys := strings.Split(Deref(requested), ",")
 	if requested == nil || strings.TrimSpace(*requested) == "" {
 		keys = nil
 		for key, c := range u.r.configs {

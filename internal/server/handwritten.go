@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strings"
 	"sync"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -25,7 +24,7 @@ import (
 func registerHandwrittenStubs(r chi.Router, logger *slog.Logger) {
 	existing := registeredRoutes(r)
 	for _, op := range handwrittenOps() {
-		for _, pattern := range chiPatterns(op.path) {
+		for _, pattern := range ChiPatterns(op.path) {
 			key := op.method + " " + pattern
 			if existing[key] {
 				continue
@@ -84,35 +83,6 @@ var handwrittenOps = sync.OnceValue(func() []handwrittenOp {
 	}
 	return ops
 })
-
-// chiPatterns converts an OpenAPI path template to chi patterns. A trailing
-// parameter is registered twice, once as a single segment and once as a
-// wildcard, because Artifactory item paths ({itemPath}, {repoPath}) span
-// segments and OpenAPI cannot say so.
-func chiPatterns(template string) []string {
-	// Artifactory reserves "api" as a repository key, so an item route such as
-	// /artifactory/{repoKey}/{filePath} must never match /artifactory/api/...;
-	// otherwise chi backtracks into it for every unknown API path and answers
-	// 501 where the client should see 404 or 405. Go's regexp has no
-	// lookahead, so "anything but api" is spelled out.
-	template = strings.Replace(
-		template,
-		"/artifactory/{repoKey}/",
-		"/artifactory/{repoKey:"+notAPI+"}/",
-		1,
-	)
-	patterns := []string{template}
-	segments := strings.Split(template, "/")
-	last := segments[len(segments)-1]
-	if strings.HasPrefix(last, "{") && strings.HasSuffix(last, "}") {
-		segments[len(segments)-1] = "*"
-		patterns = append(patterns, strings.Join(segments, "/"))
-	}
-	return patterns
-}
-
-// notAPI matches one path segment other than the literal "api".
-const notAPI = `(?:[^a/][^/]*|a(?:[^p/][^/]*)?|ap(?:[^i/][^/]*)?|api[^/]+)`
 
 // registeredRoutes lists "METHOD pattern" for everything already on the router.
 func registeredRoutes(r chi.Router) map[string]bool {

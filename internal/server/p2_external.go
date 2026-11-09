@@ -460,7 +460,7 @@ func (s artifactoryService) serveP2CompositeChild(w http.ResponseWriter, r *http
 	c repo.Config, cached bool, req itemRequest, p kernel.Principal, acc access,
 ) {
 	if !acc.file(c, req.path, types.ActionRead) {
-		writeErr(w, r, denied(p))
+		WriteErr(w, r, denied(p))
 		return
 	}
 	var target *url.URL
@@ -469,7 +469,7 @@ func (s artifactoryService) serveP2CompositeChild(w http.ResponseWriter, r *http
 	if strings.HasPrefix(name, p2ExternalPrefix+"/") {
 		target, err = s.p2ResolveExternal(r, c, cached, name, p, acc)
 		if err != nil {
-			writeErr(w, r, pkgroute.SourceError(err, p.Anonymous))
+			WriteErr(w, r, pkgroute.SourceError(err, p.Anonymous))
 			return
 		}
 	}
@@ -477,7 +477,7 @@ func (s artifactoryService) serveP2CompositeChild(w http.ResponseWriter, r *http
 	if target != nil {
 		_, filename, err = p2ExternalParts(name)
 		if err != nil {
-			writeErr(w, r, itemNotFound())
+			WriteErr(w, r, itemNotFound())
 			return
 		}
 	}
@@ -487,7 +487,7 @@ func (s artifactoryService) serveP2CompositeChild(w http.ResponseWriter, r *http
 		var err error
 		external, archiveEntry, err = p2ChildResourceURL(target, filename)
 		if err != nil {
-			writeErr(w, r, itemNotFound())
+			WriteErr(w, r, itemNotFound())
 			return
 		}
 	}
@@ -495,13 +495,13 @@ func (s artifactoryService) serveP2CompositeChild(w http.ResponseWriter, r *http
 	if target != nil && p2.Classify(filename) == p2.KindArtifact {
 		expected, err = s.p2ArtifactChecksums(r, c, cached, name, target, filename, p, acc)
 		if err != nil {
-			writeErr(w, r, pkgroute.SourceError(err, p.Anonymous))
+			WriteErr(w, r, pkgroute.SourceError(err, p.Anonymous))
 			return
 		}
 	}
 	result, err := s.p2Read(r, c, cached, name, external, archiveEntry, p, acc, expected)
 	if err != nil {
-		writeErr(w, r, pkgroute.SourceError(err, p.Anonymous))
+		WriteErr(w, r, pkgroute.SourceError(err, p.Anonymous))
 		return
 	}
 	body := result.body
@@ -538,7 +538,7 @@ func (s artifactoryService) serveP2CompositeChild(w http.ResponseWriter, r *http
 			return p2ExternalPrefix + "/" + digest, nil
 		})
 		if err != nil {
-			writeErr(w, r, pkgroute.SourceError(source.ErrInvalidResult, p.Anonymous))
+			WriteErr(w, r, pkgroute.SourceError(source.ErrInvalidResult, p.Anonymous))
 			return
 		}
 	}

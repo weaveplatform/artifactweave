@@ -20,7 +20,7 @@ func (artifactoryService) tryChefItem(
 	if !chefMetadataItem(c, req.path) {
 		return false
 	}
-	writeErr(w, r, itemNotFound())
+	WriteErr(w, r, itemNotFound())
 	return true
 }
 

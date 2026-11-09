@@ -583,7 +583,7 @@ func (s artifactoryService) helmPartialReindex(next http.Handler) http.Handler {
 		}
 		msg, err := s.reindex(r.Context(), repo.Helm, key, p, false)
 		if err != nil {
-			writeErr(w, r, err)
+			WriteErr(w, r, err)
 			return
 		}
 		// The generated reindex operations answer the same way.

@@ -171,8 +171,8 @@ func (s accessService) CreateGlobalRole(
 	b := req.Body
 	r := types.Role{
 		Name: b.Name, Type: types.RoleType(b.Type),
-		Description: deref(b.Description), Actions: deref(b.Actions),
-		Environments: deref(b.Environments),
+		Description: Deref(b.Description), Actions: Deref(b.Actions),
+		Environments: Deref(b.Environments),
 	}
 	if err := svc.CreateRole(ctx, r); err != nil {
 		return nil, s.roleError(ctx, "create role", err, http.StatusConflict)
@@ -196,8 +196,8 @@ func (s accessService) UpdateGlobalRole(
 	b := req.Body
 	r := types.Role{
 		Name: b.Name, Type: types.RoleType(b.Type),
-		Description: deref(b.Description), Actions: deref(b.Actions),
-		Environments: deref(b.Environments),
+		Description: Deref(b.Description), Actions: Deref(b.Actions),
+		Environments: Deref(b.Environments),
 	}
 	if err := svc.UpdateRole(ctx, string(req.Role), r); err != nil {
 		return nil, s.roleError(ctx, "update role", err, http.StatusConflict)
@@ -231,13 +231,4 @@ func globalRoleWire(r types.Role) accessgen.GlobalRole {
 		out.Description = &r.Description
 	}
 	return out
-}
-
-// deref returns *p, or the zero value when p is nil.
-func deref[T any](p *T) T {
-	var zero T
-	if p == nil {
-		return zero
-	}
-	return *p
 }

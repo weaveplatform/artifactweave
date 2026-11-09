@@ -27,13 +27,13 @@ const (
 )
 
 func (s artifactoryService) registerMultipartRoutes(r chi.Router) {
-	r.With(bodyLimit(managementBodyLimit)).Post(uploadsCreate, s.createMultipart)
-	r.With(bodyLimit(managementBodyLimit)).Post(uploadsURLPart, s.multipartPartURL)
+	r.With(BodyLimit(managementBodyLimit)).Post(uploadsCreate, s.createMultipart)
+	r.With(BodyLimit(managementBodyLimit)).Post(uploadsURLPart, s.multipartPartURL)
 	// A part is up to 5 GiB: no management body limit.
 	r.Put(uploadsPart, s.putMultipartPart)
-	r.With(bodyLimit(managementBodyLimit)).Post(uploadsComplete, s.completeMultipart)
-	r.With(bodyLimit(managementBodyLimit)).Post(uploadsStatus, s.multipartStatus)
-	r.With(bodyLimit(managementBodyLimit)).Post(uploadsAbort, s.abortMultipart)
+	r.With(BodyLimit(managementBodyLimit)).Post(uploadsComplete, s.completeMultipart)
+	r.With(BodyLimit(managementBodyLimit)).Post(uploadsStatus, s.multipartStatus)
+	r.With(BodyLimit(managementBodyLimit)).Post(uploadsAbort, s.abortMultipart)
 }
 
 func (s artifactoryService) multipartService() (*multipart.Service, error) {
@@ -76,28 +76,28 @@ func (s artifactoryService) createMultipart(w http.ResponseWriter, r *http.Reque
 	ctx := r.Context()
 	mp, err := s.multipartService()
 	if err != nil {
-		writeErr(w, r, err)
+		WriteErr(w, r, err)
 		return
 	}
 	st, err := s.content()
 	if err != nil {
-		writeErr(w, r, err)
+		WriteErr(w, r, err)
 		return
 	}
 	p, acc, err := s.itemCaller(ctx, st)
 	if err != nil {
-		writeErr(w, r, err)
+		WriteErr(w, r, err)
 		return
 	}
 	q := r.URL.Query()
 	partSizeMB, perr := strconv.ParseInt(q.Get("partSizeMB"), 10, 64)
 	repoPath := strings.Trim(q.Get("repoPath"), "/")
 	if perr != nil || q.Get("repoKey") == "" || repoPath == "" {
-		writeErr(w, r, badRequestf("repoKey, repoPath and partSizeMB are required"))
+		WriteErr(w, r, badRequestf("repoKey, repoPath and partSizeMB are required"))
 		return
 	}
 	if _, _, _, err := types.SplitItemPath(repoPath); err != nil {
-		writeErr(w, r, badRequestf("malformed path %q", repoPath))
+		WriteErr(w, r, badRequestf("malformed path %q", repoPath))
 		return
 	}
 	c, cached, err := resolveRepo(ctx, st, q.Get("repoKey"))
@@ -105,50 +105,50 @@ func (s artifactoryService) createMultipart(w http.ResponseWriter, r *http.Reque
 		c, err = deployTarget(ctx, st, c, cached)
 	}
 	if err != nil {
-		writeErr(w, r, s.itemError(ctx, "resolve deploy target", err))
+		WriteErr(w, r, s.itemError(ctx, "resolve deploy target", err))
 		return
 	}
 	if !acc.file(c, repoPath, types.ActionWrite) {
-		writeErr(w, r, denied(p))
+		WriteErr(w, r, denied(p))
 		return
 	}
 	token, err := mp.Create(ctx, c.Key, repoPath, partSizeMB, p.Name)
 	if err != nil {
-		writeErr(w, r, s.multipartError(r, "create multipart upload", err))
+		WriteErr(w, r, s.multipartError(r, "create multipart upload", err))
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"token": token})
+	WriteJSON(w, http.StatusOK, map[string]string{"token": token})
 }
 
 func (s artifactoryService) multipartPartURL(w http.ResponseWriter, r *http.Request) {
 	mp, err := s.multipartService()
 	if err != nil {
-		writeErr(w, r, err)
+		WriteErr(w, r, err)
 		return
 	}
 	part, err := strconv.Atoi(r.URL.Query().Get("partNumber"))
 	if err != nil {
-		writeErr(w, r, badRequestf("partNumber is required"))
+		WriteErr(w, r, badRequestf("partNumber is required"))
 		return
 	}
 	ref, err := mp.PartURL(r.Context(), bearer(r), part)
 	if err != nil {
-		writeErr(w, r, s.multipartError(r, "multipart part URL", err))
+		WriteErr(w, r, s.multipartError(r, "multipart part URL", err))
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"url": baseurl.From(r.Context()) + ref})
+	WriteJSON(w, http.StatusOK, map[string]string{"url": baseurl.From(r.Context()) + ref})
 }
 
 func (s artifactoryService) putMultipartPart(w http.ResponseWriter, r *http.Request) {
 	mp, err := s.multipartService()
 	if err != nil {
-		writeErr(w, r, err)
+		WriteErr(w, r, err)
 		return
 	}
 	q := r.URL.Query()
 	part, err := strconv.Atoi(q.Get("partNumber"))
 	if err != nil {
-		writeErr(w, r, kernel.ErrBadCredentials)
+		WriteErr(w, r, kernel.ErrBadCredentials)
 		return
 	}
 	if err := mp.PutPart(
@@ -158,7 +158,7 @@ func (s artifactoryService) putMultipartPart(w http.ResponseWriter, r *http.Requ
 		q.Get("signature"),
 		r.Body,
 	); err != nil {
-		writeErr(w, r, s.multipartError(r, "multipart part", err))
+		WriteErr(w, r, s.multipartError(r, "multipart part", err))
 		return
 	}
 	w.WriteHeader(http.StatusOK)
@@ -167,11 +167,11 @@ func (s artifactoryService) putMultipartPart(w http.ResponseWriter, r *http.Requ
 func (s artifactoryService) completeMultipart(w http.ResponseWriter, r *http.Request) {
 	mp, err := s.multipartService()
 	if err != nil {
-		writeErr(w, r, err)
+		WriteErr(w, r, err)
 		return
 	}
 	if err := mp.Complete(r.Context(), bearer(r), r.URL.Query().Get("sha1")); err != nil {
-		writeErr(w, r, s.multipartError(r, "complete multipart upload", err))
+		WriteErr(w, r, s.multipartError(r, "complete multipart upload", err))
 		return
 	}
 	w.WriteHeader(http.StatusAccepted)
@@ -180,25 +180,25 @@ func (s artifactoryService) completeMultipart(w http.ResponseWriter, r *http.Req
 func (s artifactoryService) multipartStatus(w http.ResponseWriter, r *http.Request) {
 	mp, err := s.multipartService()
 	if err != nil {
-		writeErr(w, r, err)
+		WriteErr(w, r, err)
 		return
 	}
 	st, err := mp.Status(r.Context(), bearer(r))
 	if err != nil {
-		writeErr(w, r, s.multipartError(r, "multipart upload status", err))
+		WriteErr(w, r, s.multipartError(r, "multipart upload status", err))
 		return
 	}
-	writeJSON(w, http.StatusOK, st)
+	WriteJSON(w, http.StatusOK, st)
 }
 
 func (s artifactoryService) abortMultipart(w http.ResponseWriter, r *http.Request) {
 	mp, err := s.multipartService()
 	if err != nil {
-		writeErr(w, r, err)
+		WriteErr(w, r, err)
 		return
 	}
 	if err := mp.Abort(r.Context(), bearer(r)); err != nil {
-		writeErr(w, r, s.multipartError(r, "abort multipart upload", err))
+		WriteErr(w, r, s.multipartError(r, "abort multipart upload", err))
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

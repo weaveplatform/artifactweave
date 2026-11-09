@@ -41,7 +41,7 @@ func (s artifactoryService) tryDebianItem(
 			debian.PackagesIndexPath(req.path) || byHash {
 			s.serveVirtualDebianMetadata(w, r, st, c, req, p, acc)
 		} else {
-			writeErr(w, r, itemNotFound())
+			WriteErr(w, r, itemNotFound())
 		}
 		return true
 	}
@@ -63,17 +63,17 @@ func (s artifactoryService) serveDebianIndex(
 ) {
 	ctx := r.Context()
 	if len(req.props) != 0 || r.URL.RawQuery != "" {
-		writeErr(w, r, itemNotFound())
+		WriteErr(w, r, itemNotFound())
 		return
 	}
 	if !acc.folder(c, req.path, types.ActionRead) ||
 		!acc.file(c, req.path, types.ActionRead) ||
 		generic.CheckDownload(c, req.path, false) != nil {
-		writeErr(w, r, denied(p))
+		WriteErr(w, r, denied(p))
 		return
 	}
 	if cached && c.Class != repo.Remote {
-		writeErr(w, r, itemNotFound())
+		WriteErr(w, r, itemNotFound())
 		return
 	}
 	var body []byte
@@ -124,11 +124,11 @@ func (s artifactoryService) serveDebianIndex(
 		err = store.ErrNotFound
 	}
 	if err != nil {
-		writeErr(w, r, s.itemError(ctx, "Debian Packages index", err))
+		WriteErr(w, r, s.itemError(ctx, "Debian Packages index", err))
 		return
 	}
 	if len(body) > debianIndexLimit {
-		writeErr(
+		WriteErr(
 			w,
 			r,
 			s.internalError(ctx, "Debian Packages index", errDebianIndexTooLarge),
@@ -137,21 +137,21 @@ func (s artifactoryService) serveDebianIndex(
 	}
 	paths, err := debianIndexPaths(req.path, body)
 	if err != nil {
-		writeErr(w, r, s.internalError(ctx, "Debian index", err))
+		WriteErr(w, r, s.internalError(ctx, "Debian index", err))
 		return
 	}
 	for _, path := range paths {
 		if !acc.file(c, path, types.ActionRead) ||
 			generic.CheckDownload(c, path, false) != nil {
-			writeErr(w, r, denied(p))
+			WriteErr(w, r, denied(p))
 			return
 		}
 		if checkRead != nil {
 			if err := checkRead(ctx, path); err != nil {
 				if errors.Is(err, source.ErrDenied) {
-					writeErr(w, r, denied(p))
+					WriteErr(w, r, denied(p))
 				} else {
-					writeErr(w, r, s.itemError(ctx, "Debian package read authority", err))
+					WriteErr(w, r, s.itemError(ctx, "Debian package read authority", err))
 				}
 				return
 			}

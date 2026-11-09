@@ -29,6 +29,6 @@ func (artifactoryService) tryMachineLearningItem(
 	if !machineLearningPrivate(c, req.path) {
 		return false
 	}
-	writeErr(w, r, itemNotFound())
+	WriteErr(w, r, itemNotFound())
 	return true
 }

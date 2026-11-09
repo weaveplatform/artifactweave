@@ -52,7 +52,7 @@ func (s accessService) oidcError(ctx context.Context, op string, err error) erro
 	case errors.Is(err, oidc.ErrUnverified):
 		if errors.Is(err, idtoken.ErrKeys) {
 			artifactoryService{cfg: s.cfg}.log().WarnContext(ctx, op,
-				"request_id", requestIDFrom(ctx), "error", err)
+				"request_id", RequestIDFrom(ctx), "error", err)
 		}
 		return apierror.New(http.StatusUnauthorized, err.Error())
 	default:
@@ -198,7 +198,7 @@ func (s accessService) GetOidcIdentityMappings(
 	if err != nil {
 		return nil, err
 	}
-	all, err := svc.Mappings(ctx, req.ProviderName, deref(req.Params.ProjectKey))
+	all, err := svc.Mappings(ctx, req.ProviderName, Deref(req.Params.ProjectKey))
 	if err != nil {
 		return nil, s.oidcError(ctx, "list identity mappings", err)
 	}
@@ -308,12 +308,12 @@ func (s accessService) OidcTokenExchange(
 		return nil, badRequestf("a body with the token exchange is required")
 	}
 	got, err := svc.Exchange(ctx, oidc.ExchangeRequest{
-		GrantType: deref(b.GrantType), SubjectTokenType: deref(b.SubjectTokenType),
-		SubjectToken: deref(b.SubjectToken), ProviderName: deref(b.ProviderName),
-		ProjectKey: deref(b.ProjectKey), MappingName: deref(b.IdentityMappingName),
-		IncludeReference: deref(b.IncludeReferenceToken),
-		JobID:            deref(b.JobId), RunID: deref(b.RunId), Repo: deref(b.Repo),
-		Revision: deref(b.Revision), Branch: deref(b.Branch),
+		GrantType: Deref(b.GrantType), SubjectTokenType: Deref(b.SubjectTokenType),
+		SubjectToken: Deref(b.SubjectToken), ProviderName: Deref(b.ProviderName),
+		ProjectKey: Deref(b.ProjectKey), MappingName: Deref(b.IdentityMappingName),
+		IncludeReference: Deref(b.IncludeReferenceToken),
+		JobID:            Deref(b.JobId), RunID: Deref(b.RunId), Repo: Deref(b.Repo),
+		Revision: Deref(b.Revision), Branch: Deref(b.Branch),
 	})
 	if err != nil {
 		return nil, s.oidcError(ctx, "OIDC token exchange", err)
@@ -321,11 +321,11 @@ func (s accessService) OidcTokenExchange(
 	expires := int(got.ExpiresIn)
 	out := accessgen.OidcTokenExchange200JSONResponse{
 		AccessToken:     &got.AccessToken,
-		TokenType:       ptrTo("Bearer"),
+		TokenType:       PtrTo("Bearer"),
 		ExpiresIn:       &expires,
-		IssuedTokenType: ptrTo(oidc.IssuedAccessToken),
+		IssuedTokenType: PtrTo(oidc.IssuedAccessToken),
 		Username:        &got.Username,
-		Scope:           ptrTo(got.Record.Scope.String()),
+		Scope:           PtrTo(got.Record.Scope.String()),
 	}
 	if got.ReferenceToken != "" {
 		out.ReferenceToken = &got.ReferenceToken

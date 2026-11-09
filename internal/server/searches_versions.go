@@ -23,7 +23,7 @@ const anyTarget = "_any"
 const versionProperty = "version"
 
 func (s artifactoryService) registerSearchRoutes(r chi.Router) {
-	for _, p := range chiPatterns(versionsPrefix + "{repo}/{path}") {
+	for _, p := range ChiPatterns(versionsPrefix + "{repo}/{path}") {
 		r.Get(p, s.latestVersionByProperties)
 	}
 }
@@ -38,7 +38,7 @@ func (s artifactoryService) latestVersionByProperties(w http.ResponseWriter, req
 	ctx := req.Context()
 	r, err := s.newSearch(ctx, true)
 	if err != nil {
-		writeErr(w, req, err)
+		WriteErr(w, req, err)
 		return
 	}
 	// A repository key has no slash, so the first one ends it.
@@ -46,18 +46,18 @@ func (s artifactoryService) latestVersionByProperties(w http.ResponseWriter, req
 	folder = strings.Trim(folder, "/")
 	q, err := rawQuery(req.URL.RawQuery)
 	if err != nil {
-		writeErr(w, req, err)
+		WriteErr(w, req, err)
 		return
 	}
 	listFiles := q.Get("listFiles")
 	if listFiles != "" && listFiles != "0" && listFiles != "1" {
-		writeErr(w, req, badRequestf("listFiles must be 0 or 1"))
+		WriteErr(w, req, badRequestf("listFiles must be 0 or 1"))
 		return
 	}
 	delete(q, "listFiles")
 	filters, err := propertyFilters(q, false)
 	if err != nil {
-		writeErr(w, req, err)
+		WriteErr(w, req, err)
 		return
 	}
 	var scope aql.Node
@@ -81,7 +81,7 @@ func (s artifactoryService) latestVersionByProperties(w http.ResponseWriter, req
 				strings.HasPrefix(h.Item.Path, folder+"/")
 		})
 	if err != nil {
-		writeErr(w, req, err)
+		WriteErr(w, req, err)
 		return
 	}
 	best := ""
@@ -93,7 +93,7 @@ func (s artifactoryService) latestVersionByProperties(w http.ResponseWriter, req
 		}
 	}
 	if best == "" {
-		writeErr(w, req, apierror.New(http.StatusNotFound,
+		WriteErr(w, req, apierror.New(http.StatusNotFound,
 			"Unable to find artifacts with a version property"))
 		return
 	}
@@ -107,5 +107,5 @@ func (s artifactoryService) latestVersionByProperties(w http.ResponseWriter, req
 			}
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"version": best, "artifacts": artifacts})
+	WriteJSON(w, http.StatusOK, map[string]any{"version": best, "artifacts": artifacts})
 }

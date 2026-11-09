@@ -13,8 +13,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/go-chi/chi/v5"
-
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -77,20 +75,6 @@ var slashCollections = map[string]string{
 	"/artifactory/api/security/keypair/": "/artifactory/api/security/keypair",
 }
 
-// collectionSlash routes each of slashCollections as its path without the
-// trailing slash.
-func collectionSlash(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if bare, ok := slashCollections[r.URL.Path]; ok {
-			r.URL.Path, r.URL.RawPath = bare, ""
-			if rctx := chi.RouteContext(r.Context()); rctx != nil {
-				rctx.RoutePath = r.URL.Path
-			}
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
 // requestDetails keeps what the strict handlers need beyond their decoded
 // request: the Accept header for media-type negotiation, the raw query of a
 // property search, and the raw body of a repository or Access v2 group
@@ -101,13 +85,13 @@ func collectionSlash(next http.Handler) http.Handler {
 // so the copy is bounded.
 func requestDetails(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := withAccept(r.Context(), r.Header.Get("Accept"))
+		ctx := WithAccept(r.Context(), r.Header.Get("Accept"))
 		if r.URL.Path == propertySearchPath || r.URL.Path == "/artifactory/api/search/gavc" {
-			ctx = withSearchQuery(ctx, r.URL.RawQuery)
+			ctx = WithSearchQuery(ctx, r.URL.RawQuery)
 		}
 		if r.Method == http.MethodPut && policyPaths[r.URL.Path] {
 			if err := normalizePolicyBody(r); err != nil {
-				bindingError(http.StatusBadRequest)(w, r, err)
+				BindingError(http.StatusBadRequest)(w, r, err)
 				return
 			}
 		}
@@ -120,11 +104,11 @@ func requestDetails(next http.Handler) http.Handler {
 			(r.Method == http.MethodPatch && isGroupUpdate(r.URL.Path)) {
 			b, err := io.ReadAll(r.Body)
 			if err != nil {
-				bindingError(http.StatusBadRequest)(w, r, err)
+				BindingError(http.StatusBadRequest)(w, r, err)
 				return
 			}
 			r.Body = io.NopCloser(bytes.NewReader(b))
-			ctx = withRawBody(ctx, b)
+			ctx = WithRawBody(ctx, b)
 		}
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -156,7 +140,7 @@ func (s artifactoryService) content() (store.Store, error) {
 
 // internalError logs err and returns a 500 that names nothing internal.
 func (s artifactoryService) internalError(ctx context.Context, op string, err error) error {
-	s.log().ErrorContext(ctx, op, "request_id", requestIDFrom(ctx), "error", err)
+	s.log().ErrorContext(ctx, op, "request_id", RequestIDFrom(ctx), "error", err)
 	return apierror.New(http.StatusInternalServerError, "internal error")
 }
 
@@ -282,7 +266,7 @@ func (s artifactoryService) GetRepositoriesByTypeAndProject(
 			e.Description = &d
 		}
 	}
-	if accepts(ctx, mediaDetails) {
+	if Accepts(ctx, mediaDetails) {
 		return artgen.GetRepositoriesByTypeAndProject200ApplicationVndOrgJfrogArtifactoryRepositoriesRepositoryDetailsListPlusJSONResponse(
 			out,
 		), nil
@@ -331,7 +315,7 @@ func (s artifactoryService) GetAllRepositoryConfigurations(
 			out.FEDERATED = append(out.FEDERATED, c)
 		}
 	}
-	if accepts(ctx, mediaConfigs) {
+	if Accepts(ctx, mediaConfigs) {
 		return artgen.GetAllRepositoryConfigurations200ApplicationVndOrgJfrogArtifactoryRepositoriesRepositoryConfigurationsListPlusJSONResponse(
 			out,
 		), nil
@@ -453,19 +437,19 @@ func (s artifactoryService) GetRepositoryConfigurationV2(
 	}
 	c = repo.Relevant(c)
 	switch {
-	case c.Class == repo.Local && accepts(ctx, mediaLocal):
+	case c.Class == repo.Local && Accepts(ctx, mediaLocal):
 		return artgen.GetRepositoryConfigurationV2200ApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONResponse(
 			c,
 		), nil
-	case c.Class == repo.Remote && accepts(ctx, mediaRemote):
+	case c.Class == repo.Remote && Accepts(ctx, mediaRemote):
 		return artgen.GetRepositoryConfigurationV2200ApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONResponse(
 			c,
 		), nil
-	case c.Class == repo.Virtual && accepts(ctx, mediaVirtual):
+	case c.Class == repo.Virtual && Accepts(ctx, mediaVirtual):
 		return artgen.GetRepositoryConfigurationV2200ApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONResponse(
 			c,
 		), nil
-	case c.Class == repo.Federated && accepts(ctx, mediaFederated):
+	case c.Class == repo.Federated && Accepts(ctx, mediaFederated):
 		return artgen.GetRepositoryConfigurationV2200ApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONResponse(
 			c,
 		), nil
@@ -480,19 +464,19 @@ func configResponse(
 	c repo.Config,
 ) artgen.GetRepositoryConfigurationResponseObject {
 	switch {
-	case c.Class == repo.Local && accepts(ctx, mediaLocal):
+	case c.Class == repo.Local && Accepts(ctx, mediaLocal):
 		return artgen.GetRepositoryConfiguration200ApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONResponse(
 			c,
 		)
-	case c.Class == repo.Remote && accepts(ctx, mediaRemote):
+	case c.Class == repo.Remote && Accepts(ctx, mediaRemote):
 		return artgen.GetRepositoryConfiguration200ApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONResponse(
 			c,
 		)
-	case c.Class == repo.Virtual && accepts(ctx, mediaVirtual):
+	case c.Class == repo.Virtual && Accepts(ctx, mediaVirtual):
 		return artgen.GetRepositoryConfiguration200ApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONResponse(
 			c,
 		)
-	case c.Class == repo.Federated && accepts(ctx, mediaFederated):
+	case c.Class == repo.Federated && Accepts(ctx, mediaFederated):
 		return artgen.GetRepositoryConfiguration200ApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONResponse(
 			c,
 		)
@@ -549,7 +533,7 @@ func (s artifactoryService) GetRemoteRepositoryConfiguration(
 		)
 	}
 	media := "application/json"
-	if accepts(ctx, mediaShared) {
+	if Accepts(ctx, mediaShared) {
 		media = mediaShared
 	}
 	return sharedRemoteResponse{media: media, fields: fields}, nil
@@ -779,7 +763,7 @@ func batchSize(n int) error {
 // express null resets, and it always carries description and notes, so it
 // overwrites both; only the router supplies a body that leaves them out.
 func updateBody(ctx context.Context, decoded any) ([]byte, error) {
-	if b := rawBody(ctx); b != nil {
+	if b := RawBody(ctx); b != nil {
 		return b, nil
 	}
 	b, err := json.Marshal(decoded)

@@ -66,16 +66,16 @@ func (s artifactoryService) reverseProxy(
 	}
 	method := artgen.REPOPATHPREFIX
 	body := artgen.GetReverseProxyConfiguration200JSONResponse{
-		Key:                      ptrTo("nginx"),
-		WebServerType:            ptrTo(artgen.NGINX),
-		ArtifactoryAppContext:    ptrTo("artifactory"),
-		PublicAppContext:         ptrTo("artifactory"),
-		ServerName:               ptrTo(host),
+		Key:                      PtrTo("nginx"),
+		WebServerType:            PtrTo(artgen.NGINX),
+		ArtifactoryAppContext:    PtrTo("artifactory"),
+		PublicAppContext:         PtrTo("artifactory"),
+		ServerName:               PtrTo(host),
 		DockerReverseProxyMethod: &method,
 	}
 	if s.cfg.DockerSubdomainMatch {
 		method = artgen.SUBDOMAIN
-		body.ServerNameExpression = ptrTo("*." + host)
+		body.ServerNameExpression = PtrTo("*." + host)
 	}
 	return body
 }

@@ -780,7 +780,7 @@ func pageAfter(ps []types.Permission, cursor *string, limit int) ([]types.Permis
 // pipeline_source sections.
 func readAccess(ctx context.Context, body any) (wire.AccessPermission, error) {
 	var w wire.AccessPermission
-	if raw := rawBody(ctx); raw != nil {
+	if raw := RawBody(ctx); raw != nil {
 		if err := json.Unmarshal(raw, &w); err != nil {
 			return w, badRequestf("the permission is not valid JSON: %v", err)
 		}

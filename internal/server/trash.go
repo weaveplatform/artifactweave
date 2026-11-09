@@ -41,7 +41,7 @@ func (s artifactoryService) registerTrashRoutes(r chi.Router) {
 	r.Post("/artifactory/api/trash/restore/*", s.restoreTrashPath)
 	r.Get(storagePrefix+trash.Repository, s.trashStorage)
 	r.Get(storagePrefix+trash.Repository+"/*", s.trashStorage)
-	for _, p := range chiPatterns("/artifactory/api/zap/{repoPath}") {
+	for _, p := range ChiPatterns("/artifactory/api/zap/{repoPath}") {
 		r.Post(p, s.zapCache)
 	}
 }
@@ -97,7 +97,7 @@ func (s artifactoryService) DeleteItemFromTrashCan(
 func (s artifactoryService) cleanTrashPath(w http.ResponseWriter, r *http.Request) {
 	rp := strings.TrimPrefix(r.URL.Path, "/artifactory/api/trash/clean/")
 	if err := s.cleanTrash(r.Context(), rp); err != nil {
-		writeErr(w, r, err)
+		WriteErr(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -160,13 +160,13 @@ func (s artifactoryService) restoreTrashPath(w http.ResponseWriter, r *http.Requ
 	if v := q.Get("transaction-size"); v != "" {
 		var n int
 		if _, err := fmt.Sscan(v, &n); err != nil || n < 1 {
-			writeErr(w, r, badRequestf("transaction-size must be a positive integer"))
+			WriteErr(w, r, badRequestf("transaction-size must be a positive integer"))
 			return
 		}
 		size = &n
 	}
 	if err := s.restoreTrash(r.Context(), from, q.Get("to"), size); err != nil {
-		writeErr(w, r, err)
+		WriteErr(w, r, err)
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain")
@@ -323,29 +323,29 @@ func (s artifactoryService) trashStorage(w http.ResponseWriter, r *http.Request)
 	ctx := r.Context()
 	st, err := s.content()
 	if err != nil {
-		writeErr(w, r, err)
+		WriteErr(w, r, err)
 		return
 	}
 	q, err := rawQuery(r.URL.RawQuery)
 	if err != nil {
-		writeErr(w, r, err)
+		WriteErr(w, r, err)
 		return
 	}
 	if _, err := principal(ctx); err != nil {
-		writeErr(w, r, err)
+		WriteErr(w, r, err)
 		return
 	}
 	switch cfg, err := trash.Settings(ctx, st); {
 	case err != nil:
-		writeErr(w, r, s.internalError(ctx, "trash can settings", err))
+		WriteErr(w, r, s.internalError(ctx, "trash can settings", err))
 		return
 	case !cfg.Enabled:
-		writeErr(w, r, itemNotFound())
+		WriteErr(w, r, itemNotFound())
 		return
 	}
 	mode, err := storageMode(q)
 	if err != nil {
-		writeErr(w, r, err)
+		WriteErr(w, r, err)
 		return
 	}
 	dir := strings.Trim(strings.TrimPrefix(
@@ -353,11 +353,11 @@ func (s artifactoryService) trashStorage(w http.ResponseWriter, r *http.Request)
 	key, rest := cutRepoPath(dir)
 	p, sees, err := s.trashSight(ctx, st, key, rest)
 	if err != nil {
-		writeErr(w, r, err)
+		WriteErr(w, r, err)
 		return
 	}
 	if mode == "permissions" && !p.Admin {
-		writeErr(w, r, denied(p))
+		WriteErr(w, r, denied(p))
 		return
 	}
 	v := trashView{
@@ -367,21 +367,21 @@ func (s artifactoryService) trashStorage(w http.ResponseWriter, r *http.Request)
 	n, children, err := v.target(ctx)
 	switch {
 	case errors.Is(err, store.ErrNotFound):
-		writeErr(w, r, itemNotFound())
+		WriteErr(w, r, itemNotFound())
 		return
 	case err != nil:
-		writeErr(w, r, s.internalError(ctx, "find trash", err))
+		WriteErr(w, r, s.internalError(ctx, "find trash", err))
 		return
 	}
 	// The folder check let the path through; an item needs the exact right,
 	// as the storage API asks once it has found the item.
 	if n.Entry != nil && sees != nil && !sees(n.Entry.Record.Item) {
-		writeErr(w, r, denied(p))
+		WriteErr(w, r, denied(p))
 		return
 	}
 	media, body, err := v.view(ctx, mode, n, children, q)
 	if err != nil {
-		writeErr(w, r, s.itemError(ctx, "trash "+mode, err))
+		WriteErr(w, r, s.itemError(ctx, "trash "+mode, err))
 		return
 	}
 	w.Header().Set("Content-Type", media)
@@ -403,7 +403,7 @@ func (v trashView) uri(p string) string {
 	if p == "" {
 		return v.base
 	}
-	return v.base + "/" + escapePath(p)
+	return v.base + "/" + EscapePath(p)
 }
 
 // target finds what the trash can holds at the path, with what it holds
@@ -567,7 +567,7 @@ func (v trashView) lastModified(ctx context.Context, n trash.Node) (string, any,
 		}
 	}
 	return mediaLastModified, map[string]any{
-		"uri": v.uri(at), "lastModified": formatTime(newest.Modified),
+		"uri": v.uri(at), "lastModified": FormatTime(newest.Modified),
 	}, nil
 }
 
@@ -636,9 +636,9 @@ func trashFileInfo(uri, dir string, e types.TrashEntry) map[string]any {
 	it := e.Record.Item
 	return map[string]any{
 		"repo": trash.Repository, "path": "/" + dir,
-		"created": formatTime(it.Created), "createdBy": it.CreatedBy,
-		"lastModified": formatTime(it.Modified), "modifiedBy": it.ModifiedBy,
-		"lastUpdated": formatTime(it.Updated), "mimeType": it.MimeType,
+		"created": FormatTime(it.Created), "createdBy": it.CreatedBy,
+		"lastModified": FormatTime(it.Modified), "modifiedBy": it.ModifiedBy,
+		"lastUpdated": FormatTime(it.Updated), "mimeType": it.MimeType,
 		"size": fmt.Sprint(it.Size), "checksums": checksumsJSON(it.Actual),
 		"originalChecksums": checksumsJSON(it.Original),
 		"properties":        trashProperties(e),
@@ -708,34 +708,34 @@ func (s artifactoryService) zapCache(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	st, err := s.content()
 	if err != nil {
-		writeErr(w, r, err)
+		WriteErr(w, r, err)
 		return
 	}
 	rp := strings.Trim(strings.TrimPrefix(r.URL.Path, "/artifactory/api/zap/"), "/")
 	key, rest := cutRepoPath(rp)
 	p, acc, err := s.itemCaller(ctx, st)
 	if err != nil {
-		writeErr(w, r, err)
+		WriteErr(w, r, err)
 		return
 	}
 	c, cached, err := resolveRepo(ctx, st, key)
 	switch {
 	case err != nil:
-		writeErr(w, r, s.itemError(ctx, "resolve zap target", err))
+		WriteErr(w, r, s.itemError(ctx, "resolve zap target", err))
 		return
 	case !cached:
-		writeErr(w, r, badRequestf("Zap applies to a remote repository's cache: use '%s'",
+		WriteErr(w, r, badRequestf("Zap applies to a remote repository's cache: use '%s'",
 			key+types.CacheSuffix))
 		return
 	case !acc.file(c, rest, types.ActionDelete) && !acc.file(c, rest, types.ActionManage):
-		writeErr(w, r, denied(p))
+		WriteErr(w, r, denied(p))
 		return
 	}
 	if _, err := s.items(st).Zap(ctx, item.Target{Repo: c, Cached: true, Path: rest}); err != nil {
-		writeErr(w, r, s.itemError(ctx, "zap", err))
+		WriteErr(w, r, s.itemError(ctx, "zap", err))
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{
+	WriteJSON(w, http.StatusOK, map[string]string{
 		"Message": "Completed zapping cache in path " + rp,
 	})
 }

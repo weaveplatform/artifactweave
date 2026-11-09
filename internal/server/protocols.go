@@ -27,8 +27,8 @@ func (s artifactoryService) protocolOptions() pkgroute.Options {
 		},
 		ItemError: s.itemError,
 		Created: func(w http.ResponseWriter, r *http.Request, it types.Item) {
-			writeJSON(w, http.StatusCreated, itemCreated(r.Context(), it))
+			WriteJSON(w, http.StatusCreated, itemCreated(r.Context(), it))
 		},
-		Fault: func(r *http.Request, err error) { noteCause(r.Context(), err) },
+		Fault: func(r *http.Request, err error) { NoteCause(r.Context(), err) },
 	}
 }

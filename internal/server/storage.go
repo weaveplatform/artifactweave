@@ -54,13 +54,13 @@ func noProperties() error {
 // form adds the repository root, which the spec addresses with an empty
 // item path.
 func (s artifactoryService) registerStorageRoutes(r chi.Router) {
-	for _, p := range append(chiPatterns(storagePrefix+"{repoKey}/{itemPath}"), storagePrefix+"{repoKey}") {
+	for _, p := range append(ChiPatterns(storagePrefix+"{repoKey}/{itemPath}"), storagePrefix+"{repoKey}") {
 		r.Get(p, s.getStorage)
 		r.Put(p, s.setProperties)
 		r.Delete(p, s.deleteProperties)
 	}
-	for _, p := range append(chiPatterns(metadataPrefix+"{repoKey}/{itemPath}"), metadataPrefix+"{repoKey}") {
-		r.With(bodyLimit(managementBodyLimit)).Patch(p, s.patchMetadata)
+	for _, p := range append(ChiPatterns(metadataPrefix+"{repoKey}/{itemPath}"), metadataPrefix+"{repoKey}") {
+		r.With(BodyLimit(managementBodyLimit)).Patch(p, s.patchMetadata)
 	}
 }
 
@@ -146,13 +146,13 @@ type storageView struct {
 func (v storageView) uri(ctx context.Context, p string) string {
 	u := baseurl.From(ctx) + storagePrefix + v.key
 	if p != "" {
-		u += "/" + escapePath(p)
+		u += "/" + EscapePath(p)
 	}
 	return u
 }
 
 func (v storageView) downloadURI(ctx context.Context, p string) string {
-	return baseurl.From(ctx) + "/artifactory/" + v.key + "/" + escapePath(p)
+	return baseurl.From(ctx) + "/artifactory/" + v.key + "/" + EscapePath(p)
 }
 
 // target finds the item the request names, through a virtual repository's
@@ -261,25 +261,25 @@ func (s artifactoryService) getStorage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	v, p, q, err := s.storageRequest(r, storagePrefix)
 	if err != nil {
-		writeErr(w, r, err)
+		WriteErr(w, r, err)
 		return
 	}
 	mode, err := storageMode(q)
 	if err != nil {
-		writeErr(w, r, err)
+		WriteErr(w, r, err)
 		return
 	}
 	// A folder check first, as for a download; the exact right once the
 	// item is found.
 	if !v.acc.folder(v.repo, v.path, types.ActionRead) {
-		writeErr(w, r, denied(p))
+		WriteErr(w, r, denied(p))
 		return
 	}
 	switch {
 	case mode == "list" && p.Anonymous,
 		mode == "lastModified" && !v.acc.folder(v.repo, v.path, types.ActionWrite),
 		mode == "permissions" && !p.Admin:
-		writeErr(w, r, denied(p))
+		WriteErr(w, r, denied(p))
 		return
 	}
 	// The file list of a blacked-out repository answers 404 with
@@ -288,17 +288,17 @@ func (s artifactoryService) getStorage(w http.ResponseWriter, r *http.Request) {
 	// info checks read permission alone (prepareStorageInfoResponse).
 	if mode == "list" && v.repo.Class != repo.Virtual {
 		if err := generic.CheckBlackedOut(v.repo, v.path); err != nil {
-			writeErr(w, r, s.itemError(ctx, "storage list", err))
+			WriteErr(w, r, s.itemError(ctx, "storage list", err))
 			return
 		}
 	}
 	f, err := v.target(ctx)
 	if err != nil {
-		writeErr(w, r, s.itemError(ctx, "storage item", err))
+		WriteErr(w, r, s.itemError(ctx, "storage item", err))
 		return
 	}
 	if !v.acc.item(f.repo, f.item.FullPath(), f.item.Folder, types.ActionRead) {
-		writeErr(w, r, denied(p))
+		WriteErr(w, r, denied(p))
 		return
 	}
 	var (
@@ -320,7 +320,7 @@ func (s artifactoryService) getStorage(w http.ResponseWriter, r *http.Request) {
 		media, body, err = v.permissions(ctx, f)
 	}
 	if err != nil {
-		writeErr(w, r, s.itemError(ctx, "storage "+mode, err))
+		WriteErr(w, r, s.itemError(ctx, "storage "+mode, err))
 		return
 	}
 	w.Header().Set("Content-Type", media)
@@ -365,7 +365,7 @@ func (s artifactoryService) storageRequest(
 // unknown (the repository root has no stored item).
 func putTime(body map[string]any, key string, t time.Time) {
 	if !t.IsZero() {
-		body[key] = formatTime(t)
+		body[key] = FormatTime(t)
 	}
 }
 
@@ -495,7 +495,7 @@ func (l listing) render(uri, folder string, self types.Item, items []listed) map
 			b["uri"].(string),
 		) //nolint:forcetypeassert // set above
 	})
-	return map[string]any{"uri": uri, "created": formatTime(time.Now()), "files": files}
+	return map[string]any{"uri": uri, "created": FormatTime(time.Now()), "files": files}
 }
 
 // listEntry is one entry of a FileList. size is a JSON number, -1 for a
@@ -512,7 +512,7 @@ func listEntry(it types.Item, uri string, mdTimestamps bool) map[string]any {
 		entry["sha2"] = it.Actual.SHA256
 	}
 	if mdTimestamps && !it.PropertiesModified.IsZero() {
-		entry["mdTimestamps"] = map[string]string{"properties": formatTime(it.PropertiesModified)}
+		entry["mdTimestamps"] = map[string]string{"properties": FormatTime(it.PropertiesModified)}
 	}
 	return entry
 }
@@ -596,7 +596,7 @@ func (v storageView) lastModified(ctx context.Context, f found) (string, any, er
 	}
 	return mediaLastModified, map[string]any{
 		"uri":          v.uri(ctx, newest.FullPath()),
-		"lastModified": formatTime(newest.Modified),
+		"lastModified": FormatTime(newest.Modified),
 	}, nil
 }
 
@@ -709,20 +709,20 @@ func (s artifactoryService) editProperties(
 	ctx := r.Context()
 	v, p, q, err := s.storageRequest(r, prefix)
 	if err != nil {
-		writeErr(w, r, err)
+		WriteErr(w, r, err)
 		return
 	}
 	if !v.acc.file(v.repo, v.path, types.ActionAnnotate) {
-		writeErr(w, r, denied(p))
+		WriteErr(w, r, denied(p))
 		return
 	}
 	switch {
 	case v.repo.Class == repo.Virtual:
-		writeErr(w, r, badRequestf("properties of virtual repository '%s' cannot be changed; "+
+		WriteErr(w, r, badRequestf("properties of virtual repository '%s' cannot be changed; "+
 			"address the member that holds the item", v.key))
 		return
 	case v.repo.Class == repo.Remote && !v.isCached:
-		writeErr(
+		WriteErr(
 			w,
 			r,
 			badRequestf("properties of remote repository '%s' are set on its cache, '%s'",
@@ -732,12 +732,12 @@ func (s artifactoryService) editProperties(
 	}
 	recursive, err := flag(q, recursiveParam, true)
 	if err != nil {
-		writeErr(w, r, err)
+		WriteErr(w, r, err)
 		return
 	}
 	edit, err := parse(q)
 	if err != nil {
-		writeErr(w, r, err)
+		WriteErr(w, r, err)
 		return
 	}
 	cached := v.isCached || v.repo.Class == repo.Remote
@@ -785,7 +785,7 @@ func (s artifactoryService) editProperties(
 		}
 	})
 	if err != nil {
-		writeErr(w, r, s.itemError(ctx, "edit properties", err))
+		WriteErr(w, r, s.itemError(ctx, "edit properties", err))
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

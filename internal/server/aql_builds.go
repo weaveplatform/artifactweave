@@ -40,11 +40,11 @@ func (s artifactoryService) searchBuildsAQL(
 	run := q
 	if !p.Admin {
 		if !buildScoped(p.Scope) {
-			writeErr(w, r, apierror.New(http.StatusBadRequest, aqlBuildsRestricted))
+			WriteErr(w, r, apierror.New(http.StatusBadRequest, aqlBuildsRestricted))
 			return
 		}
 		if err := q.CheckRestricted(); err != nil {
-			writeErr(w, r, apierror.New(http.StatusBadRequest, err.Error()))
+			WriteErr(w, r, apierror.New(http.StatusBadRequest, err.Error()))
 			return
 		}
 		if f := scanFactor(r, s.cfg.AQL.ScanFactor); f > 1 && q.HasLimit {
@@ -72,7 +72,7 @@ func (s artifactoryService) searchBuildsAQL(
 	}
 	hits, err := st.Builds().Search(dbctx, run, o)
 	if err != nil {
-		writeErr(w, r, s.aqlFailure(ctx, dbctx.Err(), timeout, "aql build search", err))
+		WriteErr(w, r, s.aqlFailure(ctx, dbctx.Err(), timeout, "aql build search", err))
 		return
 	}
 	trimmed := limit > 0 && len(hits) > limit
@@ -83,7 +83,7 @@ func (s artifactoryService) searchBuildsAQL(
 		d, _ := accessapi.DeciderFrom(ctx)
 		acc, err := accessFor(ctx, s.cfg.Access.Authorizer, p, d)
 		if err != nil {
-			writeErr(w, r, s.internalError(ctx, "aql permissions", err))
+			WriteErr(w, r, s.internalError(ctx, "aql permissions", err))
 			return
 		}
 		hits = slices.DeleteFunc(hits, func(h aql.BuildHit) bool { return !acc.readsRun(h.Build) })
@@ -95,7 +95,7 @@ func (s artifactoryService) searchBuildsAQL(
 	if q.Relates() {
 		related, err = s.nestBuilds(dbctx, st, p, q, o.Now, hits)
 		if err != nil {
-			writeErr(w, r, s.aqlFailure(ctx, dbctx.Err(), timeout, "aql related rows", err))
+			WriteErr(w, r, s.aqlFailure(ctx, dbctx.Err(), timeout, "aql related rows", err))
 			return
 		}
 	}

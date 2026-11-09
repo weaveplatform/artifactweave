@@ -54,7 +54,7 @@ func (s artifactoryService) searchTransitiveAQL(
 	}
 	found, err := s.transitiveAQL(ctx, r, st, p, q)
 	if err != nil {
-		writeErr(w, r, transitiveError(err))
+		WriteErr(w, r, transitiveError(err))
 		return
 	}
 	response := q.Response(found.hits)
@@ -64,7 +64,7 @@ func (s artifactoryService) searchTransitiveAQL(
 	body := renderAQL(r, response)
 	if found.revalidate != nil {
 		if err = found.revalidate(ctx); err != nil {
-			writeErr(w, r, transitiveError(err))
+			WriteErr(w, r, transitiveError(err))
 			return
 		}
 	}

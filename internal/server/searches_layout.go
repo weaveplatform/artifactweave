@@ -75,10 +75,10 @@ func (r *searchRun) layoutScope(
 		}
 	}
 	values := layout.Values{}
-	if deref(g) != "" {
+	if Deref(g) != "" {
 		values[layout.TokenOrg] = *g
 	}
-	if deref(a) != "" {
+	if Deref(a) != "" {
 		values[layout.TokenModule] = *a
 	}
 	items := &item.Service{Store: r.st}
@@ -193,7 +193,7 @@ func (ls layoutScope) find(
 // wildcard compiles a search parameter in which * is any text and ? one
 // character; nil, for a parameter not given or empty, matches anything.
 func wildcard(p *string) *regexp.Regexp {
-	if deref(p) == "" {
+	if Deref(p) == "" {
 		return nil
 	}
 	var sb strings.Builder
@@ -216,7 +216,7 @@ func matches(re *regexp.Regexp, s string) bool { return re == nil || re.MatchStr
 
 // downloadURI is the URL an item downloads from under the key key.
 func downloadURI(ctx context.Context, key, fullPath string) string {
-	return baseurl.From(ctx) + "/artifactory/" + key + "/" + escapePath(fullPath)
+	return baseurl.From(ctx) + "/artifactory/" + key + "/" + EscapePath(fullPath)
 }
 
 // SearchGavc answers the GAVC search: the files whose layout coordinates
@@ -232,10 +232,10 @@ func (s artifactoryService) SearchGavc(
 		return nil, err
 	}
 	p := req.Params
-	if deref(p.G) == "" && deref(p.A) == "" && deref(p.V) == "" && deref(p.C) == "" {
+	if Deref(p.G) == "" && Deref(p.A) == "" && Deref(p.V) == "" && Deref(p.C) == "" {
 		return nil, badRequestf("name at least one of g, a, v and c")
 	}
-	specific := deref(p.Specific)
+	specific := Deref(p.Specific)
 	remote, err := gavcRemote(ctx, specific, p.G, p.A)
 	if err != nil {
 		return nil, err
@@ -338,7 +338,7 @@ func (r *searchRun) namedKeys(scope aql.Node) map[aql.RepoRef]string {
 // moduleSearch checks a versions or latest version search's parameters: a
 // group or a module, and remote 0 or 1.
 func moduleSearch[R ~int](g, a *string, remote *R) error {
-	if deref(g) == "" && deref(a) == "" {
+	if Deref(g) == "" && Deref(a) == "" {
 		return badRequestf("name the group (g), the module (a) or both")
 	}
 	if remote != nil && *remote != 0 && *remote != 1 {
@@ -462,8 +462,8 @@ func (s artifactoryService) SearchVersions(
 	if err != nil {
 		return nil, err
 	}
-	v := deref(p.V)
-	upstream := r.upstreamSearch(ls, p.Repos, p.G, p.A, deref(p.Remote) == 1)
+	v := Deref(p.V)
+	upstream := r.upstreamSearch(ls, p.Repos, p.G, p.A, Deref(p.Remote) == 1)
 	versions, err := moduleVersions(ctx, r, ls, p.G, p.A, v, false, upstream)
 	if err != nil {
 		return nil, err
@@ -507,8 +507,8 @@ func (s artifactoryService) SearchLatestVersion(
 	if err != nil {
 		return nil, err
 	}
-	v := deref(p.V)
-	upstream := r.upstreamSearch(ls, p.Repos, p.G, p.A, deref(p.Remote) == 1)
+	v := Deref(p.V)
+	upstream := r.upstreamSearch(ls, p.Repos, p.G, p.A, Deref(p.Remote) == 1)
 	versions, err := moduleVersions(ctx, r, ls, p.G, p.A, v, true, upstream)
 	if err != nil {
 		return nil, err

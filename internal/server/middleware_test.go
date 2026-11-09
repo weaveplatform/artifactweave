@@ -11,30 +11,32 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
 func TestAccRequestIDReusedOrMinted(t *testing.T) {
 	var seen string
-	h := requestID(
+	h := RequestID(
 		http.HandlerFunc(
-			func(_ http.ResponseWriter, r *http.Request) { seen = requestIDFrom(r.Context()) },
+			func(_ http.ResponseWriter, r *http.Request) { seen = RequestIDFrom(r.Context()) },
 		),
 	)
 
 	rec := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
-	r.Header.Set(requestIDHeader, "client-id")
+	r.Header.Set(RequestIDHeader, "client-id")
 	h.ServeHTTP(rec, r)
-	if seen != "client-id" || rec.Header().Get(requestIDHeader) != "client-id" {
-		t.Fatalf("client id not reused: ctx %q header %q", seen, rec.Header().Get(requestIDHeader))
+	if seen != "client-id" || rec.Header().Get(RequestIDHeader) != "client-id" {
+		t.Fatalf("client id not reused: ctx %q header %q", seen, rec.Header().Get(RequestIDHeader))
 	}
 
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
-	if seen == "" || seen == "client-id" || rec.Header().Get(requestIDHeader) != seen {
-		t.Fatalf("minted id wrong: ctx %q header %q", seen, rec.Header().Get(requestIDHeader))
+	if seen == "" || seen == "client-id" || rec.Header().Get(RequestIDHeader) != seen {
+		t.Fatalf("minted id wrong: ctx %q header %q", seen, rec.Header().Get(RequestIDHeader))
 	}
-	if requestIDFrom(context.Background()) != "" {
+	if RequestIDFrom(context.Background()) != "" {
 		t.Fatal("bare context should have no id")
 	}
 	if newRequestID() == newRequestID() {
@@ -45,12 +47,14 @@ func TestAccRequestIDReusedOrMinted(t *testing.T) {
 func TestAccAccessLogFields(t *testing.T) {
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&buf, nil))
-	h := requestID(accessLog(logger)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusCreated)
-		_, _ = w.Write([]byte("hello"))
-	})))
+	h := RequestID(
+		AccessLog(logger, plainPath)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte("hello"))
+		})),
+	)
 	r := httptest.NewRequest(http.MethodPut, "/artifactory/repo/a.txt", nil)
-	r.Header.Set(requestIDHeader, "rid-1")
+	r.Header.Set(RequestIDHeader, "rid-1")
 	h.ServeHTTP(httptest.NewRecorder(), r)
 	for _, want := range []string{`"method":"PUT"`, `"path":"/artifactory/repo/a.txt"`, `"status":201`, `"bytes":5`, `"duration"`, `"request_id":"rid-1"`} {
 		if !strings.Contains(buf.String(), want) {
@@ -68,31 +72,33 @@ func TestAccAccessLogLogsTheCauseOfAnUntypedError(t *testing.T) {
 	}{{
 		name: "untyped error",
 		handler: func(w http.ResponseWriter, r *http.Request) {
-			writeErr(w, r, errors.New("sqlite: disk I/O error"))
+			WriteErr(w, r, errors.New("sqlite: disk I/O error"))
 		},
 		level: "ERROR",
 		cause: true,
 	}, {
 		name: "untyped error the binder renders as a 500",
 		handler: func(w http.ResponseWriter, r *http.Request) {
-			bindingError(http.StatusInternalServerError)(w, r, errors.New("sqlite: disk I/O error"))
+			BindingError(http.StatusInternalServerError)(w, r, errors.New("sqlite: disk I/O error"))
 		},
 		level: "ERROR",
 		cause: true,
 	}, {
 		name:    "typed error",
-		handler: func(w http.ResponseWriter, r *http.Request) { writeErr(w, r, itemNotFound()) },
+		handler: func(w http.ResponseWriter, r *http.Request) { WriteErr(w, r, itemNotFound()) },
 		level:   "INFO",
 	}, {
 		name: "untyped binding error",
 		handler: func(w http.ResponseWriter, r *http.Request) {
-			bindingError(http.StatusBadRequest)(w, r, errors.New("bad header"))
+			BindingError(http.StatusBadRequest)(w, r, errors.New("bad header"))
 		},
 		level: "INFO",
 	}} {
 		t.Run(tc.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			h := requestID(accessLog(slog.New(slog.NewJSONHandler(&buf, nil)))(tc.handler))
+			h := RequestID(
+				AccessLog(slog.New(slog.NewJSONHandler(&buf, nil)), plainPath)(tc.handler),
+			)
 			h.ServeHTTP(
 				httptest.NewRecorder(),
 				httptest.NewRequest(http.MethodGet, "/artifactory/api/x", nil),
@@ -106,10 +112,10 @@ func TestAccAccessLogLogsTheCauseOfAnUntypedError(t *testing.T) {
 			}
 		})
 	}
-	// Without accessLog above it, a handler's error has nowhere to go and
+	// Without AccessLog above it, a handler's error has nowhere to go and
 	// must not panic.
 	rec := httptest.NewRecorder()
-	writeErr(
+	WriteErr(
 		rec,
 		httptest.NewRequest(http.MethodGet, "/artifactory/api/x", nil),
 		errors.New("lost"),
@@ -122,11 +128,12 @@ func TestAccAccessLogLogsTheCauseOfAnUntypedError(t *testing.T) {
 func TestAccRecoverPanicUsesEnvelope(t *testing.T) {
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&buf, nil))
-	h := recoverPanic(
+	h := ErrorProfiles(accessProfile)(RecoverPanic(
 		logger,
+		plainPath,
 	)(
 		http.HandlerFunc(func(http.ResponseWriter, *http.Request) { panic("boom") }),
-	)
+	))
 	for path, want := range map[string]string{
 		"/artifactory/api/x": `{"errors":[{"status":500,"message":"internal error"}]}`,
 		"/access/api/x":      `{"errors":[{"code":"INTERNAL_ERROR","message":"internal error"}]}`,
@@ -157,7 +164,7 @@ func TestAccBodyLimit(t *testing.T) {
 		}
 		w.WriteHeader(http.StatusOK)
 	})
-	h := bodyLimit(8)(next)
+	h := BodyLimit(8)(next)
 
 	rec := httptest.NewRecorder()
 	r := httptest.NewRequest(
@@ -205,10 +212,14 @@ func TestAccBodyLimit(t *testing.T) {
 
 func TestAccNormalizeContentType(t *testing.T) {
 	var gotHeader, gotOriginal string
-	h := normalizeContentType(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-		gotHeader = r.Header.Get("Content-Type")
-		gotOriginal = OriginalContentType(r.Context())
-	}))
+	h := NormalizeContentType(
+		keepLFS,
+	)(
+		http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+			gotHeader = r.Header.Get("Content-Type")
+			gotOriginal = OriginalContentType(r.Context())
+		}),
+	)
 	cases := []struct{ in, header, original, path string }{
 		{
 			"application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json; charset=utf-8",
@@ -245,7 +256,7 @@ func TestAccNormalizeContentType(t *testing.T) {
 
 func TestAccBindingError(t *testing.T) {
 	rec := httptest.NewRecorder()
-	bindingError(
+	BindingError(
 		http.StatusBadRequest,
 	)(
 		rec,
@@ -256,11 +267,13 @@ func TestAccBindingError(t *testing.T) {
 		t.Fatalf("binding error: %d %s", rec.Code, rec.Body.String())
 	}
 	rec = httptest.NewRecorder()
-	bindingError(
+	BindingError(
 		http.StatusBadRequest,
 	)(
 		rec,
-		httptest.NewRequest(http.MethodGet, "/access/api/x", nil),
+		httptest.NewRequest(http.MethodGet, "/access/api/x", nil).WithContext(
+			WithProfileRules(context.Background(), accessProfile),
+		),
 		&http.MaxBytesError{Limit: 8},
 	)
 	if rec.Code != http.StatusRequestEntityTooLarge ||
@@ -270,16 +283,18 @@ func TestAccBindingError(t *testing.T) {
 	}
 }
 
-func TestAccStrictBindingErrorThroughRouter(t *testing.T) {
-	// A generated strict handler fails response rendering if the writer breaks;
-	// the request-binding path is exercised by an invalid header value that the
-	// generated binder rejects. Accept is a plain string, so the only binding
-	// failure reachable today is a malformed path, which chi answers itself;
-	// this test pins the error handler wiring instead.
-	h := testHandler()
-	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/artifactory/api/system/version", nil))
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status %d", rec.Code)
-	}
+// plainPath logs paths as they are: these tests name no credential.
+func plainPath(path string) string { return path }
+
+// accessProfile gives /access/ paths the Access profile, as the server's
+// rules do, so the tests can tell the two envelopes apart.
+var accessProfile = []ProfileRule{{
+	Match:   func(path string) bool { return strings.HasPrefix(path, "/access/") },
+	Profile: apierror.ProfileAccess,
+}}
+
+// keepLFS keeps the media type of Git LFS protocol requests, as the
+// server's predicate does.
+func keepLFS(r *http.Request) bool {
+	return strings.HasPrefix(r.URL.Path, "/artifactory/api/lfs/")
 }

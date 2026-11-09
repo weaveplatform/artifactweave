@@ -457,11 +457,11 @@ func (s accessService) CreateToken(
 		return nil, badRequestf("a token request body is required")
 	}
 	m := mintRequest{
-		username: deref(body.Username), scope: deref(body.Scope), expiresIn: body.ExpiresIn,
-		isRefreshable: deref(body.Refreshable), shouldForceRevocable: deref(body.ForceRevocable),
-		shouldIncludeReference: deref(body.IncludeReferenceToken), audience: deref(body.Audience),
-		description: deref(body.Description), projectKey: deref(body.ProjectKey),
-		refreshToken: deref(body.RefreshToken),
+		username: Deref(body.Username), scope: Deref(body.Scope), expiresIn: body.ExpiresIn,
+		isRefreshable: Deref(body.Refreshable), shouldForceRevocable: Deref(body.ForceRevocable),
+		shouldIncludeReference: Deref(body.IncludeReferenceToken), audience: Deref(body.Audience),
+		description: Deref(body.Description), projectKey: Deref(body.ProjectKey),
+		refreshToken: Deref(body.RefreshToken),
 	}
 	if body.GrantType != nil {
 		m.grant = string(*body.GrantType)
@@ -566,7 +566,7 @@ func (s accessService) RevokeTokenByValue(
 	if err := adminOnly(ctx); err != nil {
 		return nil, err
 	}
-	if req.Body == nil || deref(req.Body.Token) == "" {
+	if req.Body == nil || Deref(req.Body.Token) == "" {
 		return nil, badRequestf("token is required")
 	}
 	// Verify resolves either form and refuses expired and revoked tokens,
@@ -642,22 +642,20 @@ func tokenDetails(svc *token.Service, r types.Token) accessgen.TokenDetails {
 		d.Description = &r.Description
 	}
 	if !r.ExpiresAt.IsZero() {
-		d.Expiry = ptrTo(int(r.ExpiresAt.Unix()))
+		d.Expiry = PtrTo(int(r.ExpiresAt.Unix()))
 	}
 	if !r.LastUsed.IsZero() {
-		d.LastUsed = ptrTo(int(r.LastUsed.Unix()))
+		d.LastUsed = PtrTo(int(r.LastUsed.Unix()))
 	}
 	return d
 }
-
-func ptrTo[T any](v T) *T { return &v }
 
 // Legacy endpoints: /api/security/token. The create and revoke bodies are
 // form-encoded, so those two routes are hand-written.
 
 func (s artifactoryService) registerTokenRoutes(r chi.Router) {
-	r.With(bodyLimit(managementBodyLimit)).Post(legacyTokenPath, s.createLegacyToken)
-	r.With(bodyLimit(managementBodyLimit)).Post(legacyTokenRevokePath, s.revokeLegacyToken)
+	r.With(BodyLimit(managementBodyLimit)).Post(legacyTokenPath, s.createLegacyToken)
+	r.With(BodyLimit(managementBodyLimit)).Post(legacyTokenRevokePath, s.revokeLegacyToken)
 }
 
 // GetLegacyTokens lists every token in the legacy shape. Unlike
@@ -690,7 +688,7 @@ func (s artifactoryService) GetLegacyTokens(
 // refreshed as access_token, which must pair with refresh_token (refresh).
 func (s artifactoryService) createLegacyToken(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		writeErr(w, r, badRequestf("malformed form: %v", err))
+		WriteErr(w, r, badRequestf("malformed form: %v", err))
 		return
 	}
 	f := r.PostForm
@@ -702,33 +700,33 @@ func (s artifactoryService) createLegacyToken(w http.ResponseWriter, r *http.Req
 	var err error
 	if v := f.Get("refreshable"); v != "" {
 		if m.isRefreshable, err = strconv.ParseBool(v); err != nil {
-			writeErr(w, r, badRequestf("refreshable must be true or false"))
+			WriteErr(w, r, badRequestf("refreshable must be true or false"))
 			return
 		}
 	}
 	if v := f.Get("expires_in"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil {
-			writeErr(w, r, badRequestf("expires_in must be a number of seconds"))
+			WriteErr(w, r, badRequestf("expires_in must be a number of seconds"))
 			return
 		}
 		m.expiresIn = &n
 	}
 	issued, err := tokenAPI{cfg: s.cfg}.mint(r.Context(), m)
 	if err != nil {
-		writeErr(w, r, err)
+		WriteErr(w, r, err)
 		return
 	}
 	expires := int(issued.ExpiresIn)
 	scope := issued.Record.Scope.String()
 	out := artgen.LegacyTokenResponse{
 		AccessToken: &issued.AccessToken, ExpiresIn: &expires, Scope: &scope,
-		TokenType: ptrTo("Bearer"),
+		TokenType: PtrTo("Bearer"),
 	}
 	if issued.RefreshToken != "" {
 		out.RefreshToken = &issued.RefreshToken
 	}
-	writeJSON(w, http.StatusOK, out)
+	WriteJSON(w, http.StatusOK, out)
 }
 
 // revokeLegacyToken is POST /api/security/token/revoke, by value or by id.
@@ -750,12 +748,12 @@ func (s artifactoryService) revokeLegacyToken(w http.ResponseWriter, r *http.Req
 		}
 	}
 	if err != nil {
-		writeErr(w, r, err)
+		WriteErr(w, r, err)
 		return
 	}
 	value, id := r.PostForm.Get("token"), r.PostForm.Get("token_id")
 	if (value == "") == (id == "") {
-		writeErr(w, r, badRequestf("exactly one of token and token_id is required"))
+		WriteErr(w, r, badRequestf("exactly one of token and token_id is required"))
 		return
 	}
 	if value != "" {
@@ -765,7 +763,7 @@ func (s artifactoryService) revokeLegacyToken(w http.ResponseWriter, r *http.Req
 			return
 		}
 		if err != nil {
-			writeErr(w, r, t.internalError(ctx, "verify token", err))
+			WriteErr(w, r, t.internalError(ctx, "verify token", err))
 			return
 		}
 		id = rec.ID
@@ -777,16 +775,16 @@ func (s artifactoryService) revokeLegacyToken(w http.ResponseWriter, r *http.Req
 		return
 	}
 	if err != nil {
-		writeErr(w, r, err)
+		WriteErr(w, r, err)
 		return
 	}
 	switch err := svc.Revoke(ctx, rec.ID); {
 	case errors.Is(err, accessapi.ErrNotRevocable):
-		writeErr(w, r, badRequestf("Token is not revocable"))
+		WriteErr(w, r, badRequestf("Token is not revocable"))
 	case errors.Is(err, store.ErrNotFound):
 		writeText(w, "Token not found or already revoked")
 	case err != nil:
-		writeErr(w, r, t.internalError(ctx, "revoke token", err))
+		WriteErr(w, r, t.internalError(ctx, "revoke token", err))
 	default:
 		writeText(w, "Token revoked")
 	}

@@ -147,14 +147,14 @@ func (s accessService) GetUserList(
 	}
 	pageItems, next, err := svc.Store.Users().ListSummaries(ctx, store.UserFilter{
 		IdentityFilter: store.IdentityFilter{
-			NameContains: deref(
+			NameContains: Deref(
 				p.Username,
 			),
-			Descending: deref(p.DescendingOrder),
+			Descending: Deref(p.DescendingOrder),
 			Resource:   resource,
 		},
-		Status: types.UserStatus(deref(p.Status)), OnlyAdmins: deref(p.OnlyAdmins),
-	}, store.Page{After: deref(p.Cursor), Limit: limit})
+		Status: types.UserStatus(Deref(p.Status)), OnlyAdmins: Deref(p.OnlyAdmins),
+	}, store.Page{After: Deref(p.Cursor), Limit: limit})
 	if errors.Is(err, store.ErrInvalidCursor) {
 		return nil, badRequestf("cursor is not valid")
 	}
@@ -203,21 +203,21 @@ func (s accessService) CreateUser(
 	u := types.User{
 		Name:             name,
 		Email:            string(b.Email),
-		Admin:            deref(b.Admin),
+		Admin:            Deref(b.Admin),
 		ProfileUpdatable: derefOr(b.ProfileUpdatable, true),
-		DisableUIAccess: deref(
+		DisableUIAccess: Deref(
 			b.DisableUiAccess,
 		),
-		InternalPasswordDisabled: deref(b.InternalPasswordDisabled),
-		Groups:                   derefSlice(b.Groups),
+		InternalPasswordDisabled: Deref(b.InternalPasswordDisabled),
+		Groups:                   DerefSlice(b.Groups),
 		Roles: types.RoleFlags{
-			WatchManager: deref(b.WatchManager), PolicyViewer: deref(b.PolicyViewer),
-			PolicyManager: deref(b.PolicyManager), ReportsManager: deref(b.ReportsManager),
-			ResourcesManager: deref(b.ResourcesManager), ManageWebhook: deref(b.ManageWebhook),
-			PlatformAuditor: deref(b.PlatformAuditor),
+			WatchManager: Deref(b.WatchManager), PolicyViewer: Deref(b.PolicyViewer),
+			PolicyManager: Deref(b.PolicyManager), ReportsManager: Deref(b.ReportsManager),
+			ResourcesManager: Deref(b.ResourcesManager), ManageWebhook: Deref(b.ManageWebhook),
+			PlatformAuditor: Deref(b.PlatformAuditor),
 		},
 	}
-	if err := svc.CreateUser(ctx, u, deref(b.Password)); err != nil {
+	if err := svc.CreateUser(ctx, u, Deref(b.Password)); err != nil {
 		return nil, s.identityErr(ctx, "create user", userExists(name), err)
 	}
 	d, err := s.userDetails(ctx, svc, name)
@@ -314,7 +314,7 @@ func (s accessService) UpdateUserGroups(
 	name := string(req.Username)
 	var add, remove []string
 	if req.Body != nil {
-		add, remove = derefSlice(req.Body.Add), derefSlice(req.Body.Remove)
+		add, remove = DerefSlice(req.Body.Add), DerefSlice(req.Body.Remove)
 	}
 	groups, err := svc.UpdateUserGroups(ctx, name, add, remove)
 	if err != nil {
@@ -485,8 +485,8 @@ func (s accessService) GetGroupList(
 		return nil, err
 	}
 	pageItems, next, err := svc.Store.Groups().ListNames(ctx, store.IdentityFilter{
-		NameContains: deref(p.GroupName), Descending: deref(p.DescendingOrder), Resource: resource,
-	}, store.Page{After: deref(p.Cursor), Limit: limit})
+		NameContains: Deref(p.GroupName), Descending: Deref(p.DescendingOrder), Resource: resource,
+	}, store.Page{After: Deref(p.Cursor), Limit: limit})
 	if errors.Is(err, store.ErrInvalidCursor) {
 		return nil, badRequestf("cursor is not valid")
 	}
@@ -527,15 +527,15 @@ func (s accessService) CreateGroup(
 		return nil, badRequestf("LDAP group import is not available in artifactweave")
 	}
 	g := types.Group{
-		Name: b.Name, Description: deref(b.Description), AutoJoin: deref(b.AutoJoin),
-		AdminPrivileges: deref(b.AdminPrivileges), ExternalID: deref(b.ExternalId),
+		Name: b.Name, Description: Deref(b.Description), AutoJoin: Deref(b.AutoJoin),
+		AdminPrivileges: Deref(b.AdminPrivileges), ExternalID: Deref(b.ExternalId),
 		Roles: types.RoleFlags{
-			WatchManager: deref(b.WatchManager), PolicyViewer: deref(b.PolicyViewer),
-			PolicyManager: deref(b.PolicyManager), ReportsManager: deref(b.ReportsManager),
-			ResourcesManager: deref(b.ManageResources), ManageWebhook: deref(b.ManageWebhook),
+			WatchManager: Deref(b.WatchManager), PolicyViewer: Deref(b.PolicyViewer),
+			PolicyManager: Deref(b.PolicyManager), ReportsManager: Deref(b.ReportsManager),
+			ResourcesManager: Deref(b.ManageResources), ManageWebhook: Deref(b.ManageWebhook),
 		},
 	}
-	if err := svc.CreateGroup(ctx, g, derefSlice(b.Members)); err != nil {
+	if err := svc.CreateGroup(ctx, g, DerefSlice(b.Members)); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			return nil, apierror.New(
 				http.StatusNotFound,
@@ -579,7 +579,7 @@ func (s accessService) UpdateGroup(
 	if err != nil {
 		return nil, s.identityErr(ctx, "update group", groupNotFound(name), err)
 	}
-	if err := fixedGroupFields(rawBody(ctx), g); err != nil {
+	if err := fixedGroupFields(RawBody(ctx), g); err != nil {
 		return nil, err
 	}
 	b := req.Body
@@ -662,7 +662,7 @@ func (s accessService) UpdateGroupMembers(
 	name := string(req.Name)
 	var add, remove []string
 	if req.Body != nil {
-		add, remove = derefSlice(req.Body.Add), derefSlice(req.Body.Remove)
+		add, remove = DerefSlice(req.Body.Add), DerefSlice(req.Body.Remove)
 	}
 	members, err := svc.UpdateGroupMembers(ctx, name, add, remove)
 	if errors.Is(err, store.ErrNotFound) {
@@ -970,13 +970,6 @@ func nonNil(s []string) []string {
 func derefOr[T any](p *T, def T) T {
 	if p == nil {
 		return def
-	}
-	return *p
-}
-
-func derefSlice(p *[]string) []string {
-	if p == nil {
-		return nil
 	}
 	return *p
 }

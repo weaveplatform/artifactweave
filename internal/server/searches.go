@@ -72,7 +72,7 @@ type searchResponse struct {
 
 func answer(ctx context.Context, vendor string, body any) searchResponse {
 	media := "application/json"
-	if accepts(ctx, vendor) {
+	if Accepts(ctx, vendor) {
 		media = vendor
 	}
 	return searchResponse{media: media, body: body}
@@ -312,7 +312,7 @@ func within(f aql.Field, from, to time.Time) aql.Node {
 func (r *searchRun) uri(ctx context.Context, it types.Item) string {
 	u := baseurl.From(ctx) + storagePrefix + it.ReportedRepoKey()
 	if p := it.FullPath(); p != "" {
-		u += "/" + escapePath(p)
+		u += "/" + EscapePath(p)
 	}
 	return u
 }
@@ -428,7 +428,7 @@ func (s artifactoryService) SearchProperty(
 	if err != nil {
 		return nil, err
 	}
-	criteria, err := propertyCriteria(rawSearchQuery(ctx))
+	criteria, err := propertyCriteria(RawSearchQuery(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -579,7 +579,7 @@ func (r *searchRun) window(from time.Time, to *time.Time) (time.Time, time.Time,
 		end = *to
 	}
 	if from.After(end) {
-		return from, end, badRequestf("from %s is after to %s", formatTime(from), formatTime(end))
+		return from, end, badRequestf("from %s is after to %s", FormatTime(from), FormatTime(end))
 	}
 	return from, end, nil
 }
@@ -620,7 +620,7 @@ func (s artifactoryService) SearchCreation(
 	entries := make([]map[string]any, 0, len(hits))
 	for _, h := range hits {
 		entries = append(entries, map[string]any{
-			"uri": r.uri(ctx, h.Item), "created": formatTime(h.Item.Created),
+			"uri": r.uri(ctx, h.Item), "created": FormatTime(h.Item.Created),
 		})
 	}
 	return answer(ctx, mediaCreationSearch, results(entries)), nil

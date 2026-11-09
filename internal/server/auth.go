@@ -113,10 +113,10 @@ func authenticate(
 					return
 				}
 				if err != nil {
-					writeErr(w, r, err)
+					WriteErr(w, r, err)
 					return
 				}
-				noteUser(ctx, p.Name)
+				NoteUser(ctx, p.Name)
 				next.ServeHTTP(
 					w,
 					r.WithContext(authn.WithAuthorized(keepNPMCredential(ctx, r, p), p, d)),
@@ -133,17 +133,17 @@ func authenticate(
 			}
 			anonymous, err := a.AnonymousAllowed(ctx)
 			if err != nil {
-				writeErr(w, r, err)
+				WriteErr(w, r, err)
 				return
 			}
 			switch {
 			case anonymous:
 				p, d, err := authorize(ctx, st, kernel.Anonymous, true)
 				if err != nil {
-					writeErr(w, r, err)
+					WriteErr(w, r, err)
 					return
 				}
-				noteUser(ctx, p.Name)
+				NoteUser(ctx, p.Name)
 				next.ServeHTTP(w, r.WithContext(authn.WithAuthorized(ctx, p, d)))
 			case publicRoutes[r.Method+" "+r.URL.Path]:
 				next.ServeHTTP(w, r)

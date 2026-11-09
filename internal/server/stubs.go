@@ -8,53 +8,79 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
-// errorProfileFor selects the error response contract from the request path.
-// Terraform providers join errors[] entries, Docker reads errors[].code, npm
-// prints error, and jfrog-client-go prints the body. Unclaimed routes must keep
-// the same profile as handled requests so clients can read their 404 responses.
-func errorProfileFor(path string) apierror.Profile {
-	switch {
-	case strings.HasPrefix(path, "/xray/"):
-		return apierror.ProfileXray
-	case npmOperation(path), isNPMReindex(path), isTerraformReindex(path):
-		return apierror.ProfileArtifactory
-	case strings.HasPrefix(path, "/artifactory/api/npm/"):
-		return apierror.ProfileNPM
-	case path == "/artifactory/api/terraform/remote/v2" || strings.HasPrefix(path, "/artifactory/api/terraform/remote/v2/"):
-		return apierror.ProfileTerraformBackend
-	case strings.HasPrefix(path, "/artifactory/api/terraform/"):
-		return apierror.ProfileTerraformRegistry
-	case strings.HasPrefix(path, "/artifactory/api/go/"):
-		return apierror.ProfileText
-	case strings.HasPrefix(path, "/artifactory/api/pypi/"),
-		strings.HasPrefix(path, "/artifactory/api/nuget/"),
-		strings.HasPrefix(path, "/artifactory/api/helm/"):
+// errorProfileRules select the error response contract from the request
+// path. Terraform providers join errors[] entries, Docker reads
+// errors[].code, npm prints error, and jfrog-client-go prints the body.
+// Order matters: the JFrog operations beside the npm and Terraform
+// registries must match before the registries' own prefixes, and the first
+// matching rule wins.
+var errorProfileRules = []ProfileRule{
+	{Match: pathPrefix("/xray/"), Profile: apierror.ProfileXray},
+	{
+		Match: func(path string) bool {
+			return npmOperation(path) || isNPMReindex(path) || isTerraformReindex(path)
+		},
+		Profile: apierror.ProfileArtifactory,
+	},
+	{Match: pathPrefix("/artifactory/api/npm/"), Profile: apierror.ProfileNPM},
+	{
+		Match: func(path string) bool {
+			return path == "/artifactory/api/terraform/remote/v2" ||
+				strings.HasPrefix(path, "/artifactory/api/terraform/remote/v2/")
+		},
+		Profile: apierror.ProfileTerraformBackend,
+	},
+	{Match: pathPrefix("/artifactory/api/terraform/"), Profile: apierror.ProfileTerraformRegistry},
+	{Match: pathPrefix("/artifactory/api/go/"), Profile: apierror.ProfileText},
+	{
 		// Named, though the default gives the same, because research 10
 		// once gave PyPI and Helm plain text. 7.x answers Artifactory's
 		// envelope under all three (decisions 0037, 0038 and 0039), and
 		// pip, twine, NuGet.Protocol and helm read only the status.
-		return apierror.ProfileArtifactory
-	case dockerhttp.IsRegistryPath(path):
+		Match: pathPrefix(
+			"/artifactory/api/pypi/",
+			"/artifactory/api/nuget/",
+			"/artifactory/api/helm/",
+		),
+		Profile: apierror.ProfileArtifactory,
+	},
+	{
 		// The JFrog operations beside the registry (promote,
 		// parentManifests) keep the Artifactory envelope (decision 0031).
-		return apierror.ProfileOCI
-	case strings.HasPrefix(path, "/access/"), strings.HasPrefix(path, "/event/"),
-		strings.HasPrefix(path, "/worker/"):
-		return apierror.ProfileAccess
-	case strings.HasPrefix(path, "/artifactory/api/retention/"):
-		return apierror.ProfileArtifactoryLegacy
-	case strings.HasPrefix(path, "/artifactory/api/import/"),
-		strings.HasPrefix(path, "/artifactory/api/export/"),
-		strings.HasPrefix(path, "/artifactory/api/artifactexport/"):
-		return apierror.ProfileImportExport
-	case strings.HasPrefix(path, "/distribution/"):
-		return apierror.ProfileJFrogDistribution
-	case strings.HasPrefix(path, "/pfed/"):
-		return apierror.ProfilePlatformFederation
-	case strings.HasPrefix(path, "/grid/"):
-		return apierror.ProfileGrid
-	default:
-		return apierror.ProfileArtifactory
+		Match:   dockerhttp.IsRegistryPath,
+		Profile: apierror.ProfileOCI,
+	},
+	{Match: pathPrefix("/access/", "/event/", "/worker/"), Profile: apierror.ProfileAccess},
+	{Match: pathPrefix("/artifactory/api/retention/"), Profile: apierror.ProfileArtifactoryLegacy},
+	{
+		Match: pathPrefix(
+			"/artifactory/api/import/",
+			"/artifactory/api/export/",
+			"/artifactory/api/artifactexport/",
+		),
+		Profile: apierror.ProfileImportExport,
+	},
+	{Match: pathPrefix("/distribution/"), Profile: apierror.ProfileJFrogDistribution},
+	{Match: pathPrefix("/pfed/"), Profile: apierror.ProfilePlatformFederation},
+	{Match: pathPrefix("/grid/"), Profile: apierror.ProfileGrid},
+}
+
+// errorProfileFor is the profile errorProfileRules give path. Unclaimed
+// routes keep the same profile as handled requests so clients can read
+// their 404 responses.
+func errorProfileFor(path string) apierror.Profile {
+	return ProfileFor(errorProfileRules, path)
+}
+
+// pathPrefix matches a path that starts with any of prefixes.
+func pathPrefix(prefixes ...string) func(path string) bool {
+	return func(path string) bool {
+		for _, p := range prefixes {
+			if strings.HasPrefix(path, p) {
+				return true
+			}
+		}
+		return false
 	}
 }
 

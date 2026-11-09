@@ -16,7 +16,7 @@ import (
 // which the generated strict servers do not decode.
 func (s artifactoryService) patchConfiguration(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	fail := func(err error) { writeErr(w, r, err) }
+	fail := func(err error) { WriteErr(w, r, err) }
 	if err := adminOnly(ctx); err != nil {
 		fail(err)
 		return

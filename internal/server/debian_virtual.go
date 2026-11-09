@@ -46,22 +46,22 @@ func (s artifactoryService) serveVirtualDebianMetadata(
 		!acc.folder(c, req.path, types.ActionRead) ||
 		!acc.file(c, req.path, types.ActionRead) ||
 		generic.CheckDownload(c, req.path, false) != nil {
-		writeErr(w, r, denied(p))
+		WriteErr(w, r, denied(p))
 		return
 	}
 	parts := strings.Split(req.path, "/")
 	if len(parts) < 3 {
-		writeErr(w, r, itemNotFound())
+		WriteErr(w, r, itemNotFound())
 		return
 	}
 	view, err := s.buildVirtualDebianView(r.Context(), st, c, parts[1], p, acc)
 	if err != nil {
-		writeErr(w, r, s.itemError(r.Context(), "Debian virtual index", err))
+		WriteErr(w, r, s.itemError(r.Context(), "Debian virtual index", err))
 		return
 	}
 	body, ok := view.files[req.path]
 	if !ok {
-		writeErr(w, r, itemNotFound())
+		WriteErr(w, r, itemNotFound())
 		return
 	}
 	w.Header().Set("Content-Type", "application/octet-stream")
@@ -237,7 +237,7 @@ func (s artifactoryService) serveVirtualDebianPackage(
 	if len(req.props) != 0 || r.URL.RawQuery != "" ||
 		!acc.file(c, req.path, types.ActionRead) ||
 		generic.CheckDownload(c, req.path, false) != nil {
-		writeErr(w, r, denied(p))
+		WriteErr(w, r, denied(p))
 		return
 	}
 	for _, key := range c.Repositories {
@@ -246,12 +246,12 @@ func (s artifactoryService) serveVirtualDebianPackage(
 			continue
 		}
 		if err != nil {
-			writeErr(w, r, s.itemError(ctx, "Debian virtual member", err))
+			WriteErr(w, r, s.itemError(ctx, "Debian virtual member", err))
 			return
 		}
 		if member.PackageType != repo.Debian || member.Class == repo.Virtual ||
 			member.DebianTrivialLayout != nil && *member.DebianTrivialLayout {
-			writeErr(w, r, s.itemError(ctx, "Debian virtual member", errDebianVirtualMemberType))
+			WriteErr(w, r, s.itemError(ctx, "Debian virtual member", errDebianVirtualMemberType))
 			return
 		}
 		if !acc.file(member, req.path, types.ActionRead) ||
@@ -269,7 +269,7 @@ func (s artifactoryService) serveVirtualDebianPackage(
 			continue
 		}
 		if err != nil {
-			writeErr(w, r, s.itemError(ctx, "Debian virtual package", err))
+			WriteErr(w, r, s.itemError(ctx, "Debian virtual package", err))
 			return
 		}
 		if !it.Folder {
@@ -277,7 +277,7 @@ func (s artifactoryService) serveVirtualDebianPackage(
 			return
 		}
 	}
-	writeErr(w, r, itemNotFound())
+	WriteErr(w, r, itemNotFound())
 }
 
 // serveRemoteVirtualDebianPackage returns false only when a member lacks the
@@ -288,7 +288,7 @@ func (s artifactoryService) serveRemoteVirtualDebianPackage(
 	p kernel.Principal, acc access,
 ) bool {
 	if s.cfg.RemoteSources == nil {
-		writeErr(w, r, s.itemError(r.Context(), "Debian virtual source",
+		WriteErr(w, r, s.itemError(r.Context(), "Debian virtual source",
 			pkgroute.SourceError(source.ErrUnavailable, p.Anonymous)))
 		return true
 	}
@@ -298,7 +298,7 @@ func (s artifactoryService) serveRemoteVirtualDebianPackage(
 	}
 	q, err := debianSourceRequest(q)
 	if err != nil {
-		writeErr(w, r, s.itemError(r.Context(), "Debian virtual package", err))
+		WriteErr(w, r, s.itemError(r.Context(), "Debian virtual package", err))
 		return true
 	}
 	result, err := s.cfg.RemoteSources.Read(r.Context(), q)
@@ -306,7 +306,7 @@ func (s artifactoryService) serveRemoteVirtualDebianPackage(
 		return false
 	}
 	if err != nil {
-		writeErr(w, r, s.itemError(r.Context(), "Debian virtual source",
+		WriteErr(w, r, s.itemError(r.Context(), "Debian virtual source",
 			pkgroute.SourceError(err, p.Anonymous)))
 		return true
 	}
@@ -318,7 +318,7 @@ func (s artifactoryService) serveRemoteVirtualDebianPackage(
 		return true
 	}
 	if result.Item == nil {
-		writeErr(
+		WriteErr(
 			w,
 			r,
 			s.internalError(r.Context(), "Debian virtual source", source.ErrInvalidResult),
@@ -349,7 +349,7 @@ func (s artifactoryService) debianMemberBytes(
 			Repo: member, Subject: accessapi.SubjectOf(p), Access: acc.d,
 			Project: member.ProjectKey,
 			Resource: source.Resource{
-				Path: path, EscapedPath: escapePath(path), Method: http.MethodGet,
+				Path: path, EscapedPath: EscapePath(path), Method: http.MethodGet,
 			},
 		}
 		q, err := debianSourceRequest(q)

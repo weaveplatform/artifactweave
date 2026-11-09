@@ -31,7 +31,7 @@ func (s artifactoryService) uploadCranBinary(w http.ResponseWriter, r *http.Requ
 	version := q.Get("rVersion")
 	if len(q["distribution"]) != 1 || len(q["rVersion"]) != 1 ||
 		strings.Contains(version, "/") {
-		writeErr(w, r, badRequestf("distribution and rVersion are required"))
+		WriteErr(w, r, badRequestf("distribution and rVersion are required"))
 		return
 	}
 	var feed, suffix string
@@ -44,7 +44,7 @@ func (s artifactoryService) uploadCranBinary(w http.ResponseWriter, r *http.Requ
 		feed, suffix = "bin/linux/contrib/"+version, ".tar.gz"
 	}
 	if _, ok := cran.Feed(feed); !ok {
-		writeErr(w, r, badRequestf("invalid CRAN distribution or R version"))
+		WriteErr(w, r, badRequestf("invalid CRAN distribution or R version"))
 		return
 	}
 	s.uploadCran(w, r, feed, suffix)
@@ -58,12 +58,12 @@ func (s artifactoryService) uploadCran(
 	ctx := r.Context()
 	st, err := s.content()
 	if err != nil {
-		writeErr(w, r, err)
+		WriteErr(w, r, err)
 		return
 	}
 	p, acc, err := s.itemCaller(ctx, st)
 	if err != nil {
-		writeErr(w, r, err)
+		WriteErr(w, r, err)
 		return
 	}
 	c, cached, err := resolveRepo(ctx, st, chi.URLParam(r, "repoKey"))
@@ -71,47 +71,47 @@ func (s artifactoryService) uploadCran(
 		c, err = deployTarget(ctx, st, c, cached)
 	}
 	if err != nil {
-		writeErr(w, r, s.itemError(ctx, "resolve CRAN upload repository", err))
+		WriteErr(w, r, s.itemError(ctx, "resolve CRAN upload repository", err))
 		return
 	}
 	if c.PackageType != repo.Cran {
-		writeErr(w, r, badRequestf("repository is not a CRAN repository"))
+		WriteErr(w, r, badRequestf("repository is not a CRAN repository"))
 		return
 	}
 	if !acc.folder(c, feed, types.ActionWrite) {
-		writeErr(w, r, denied(p))
+		WriteErr(w, r, denied(p))
 		return
 	}
 	tmp, err := os.CreateTemp("", "artifactweave-cran-upload-*")
 	if err != nil {
-		writeErr(w, r, s.internalError(ctx, "spool CRAN upload", err))
+		WriteErr(w, r, s.internalError(ctx, "spool CRAN upload", err))
 		return
 	}
 	defer func() { _ = os.Remove(tmp.Name()); _ = tmp.Close() }()
 	size, err := io.Copy(tmp, io.LimitReader(r.Body, cranUploadLimit+1))
 	if err != nil {
-		writeErr(w, r, badRequestf("cannot read CRAN package upload"))
+		WriteErr(w, r, badRequestf("cannot read CRAN package upload"))
 		return
 	}
 	if size > cranUploadLimit {
-		writeErr(w, r, badRequestf("CRAN package exceeds upload limit"))
+		WriteErr(w, r, badRequestf("CRAN package exceeds upload limit"))
 		return
 	}
 	if _, err := tmp.Seek(0, io.SeekStart); err != nil {
-		writeErr(w, r, s.internalError(ctx, "rewind CRAN upload", err))
+		WriteErr(w, r, s.internalError(ctx, "rewind CRAN upload", err))
 		return
 	}
 	pkg, err := cran.ReadUploaded(ctx, tmp, size, feed, suffix)
 	if err != nil {
-		writeErr(w, r, badRequestf("invalid CRAN package archive"))
+		WriteErr(w, r, badRequestf("invalid CRAN package archive"))
 		return
 	}
 	if !acc.file(c, pkg.Path, types.ActionWrite) {
-		writeErr(w, r, denied(p))
+		WriteErr(w, r, denied(p))
 		return
 	}
 	if _, err := tmp.Seek(0, io.SeekStart); err != nil {
-		writeErr(w, r, s.internalError(ctx, "rewind CRAN package", err))
+		WriteErr(w, r, s.internalError(ctx, "rewind CRAN package", err))
 		return
 	}
 	svc := s.items(st)
@@ -122,13 +122,13 @@ func (s artifactoryService) uploadCran(
 		OverwriteIdentical: s.mayBeIdentical(false),
 	})
 	if errors.Is(err, cran.ErrPackage) {
-		writeErr(w, r, badRequestf("invalid CRAN package archive"))
+		WriteErr(w, r, badRequestf("invalid CRAN package archive"))
 		return
 	}
 	if err != nil {
-		writeErr(w, r, s.itemError(ctx, "deploy CRAN package", err))
+		WriteErr(w, r, s.itemError(ctx, "deploy CRAN package", err))
 		return
 	}
 	w.Header().Set("Location", downloadURI(ctx, it.ReportedRepoKey(), it.FullPath()))
-	writeJSON(w, http.StatusCreated, itemCreated(ctx, it))
+	WriteJSON(w, http.StatusCreated, itemCreated(ctx, it))
 }

@@ -17,7 +17,7 @@ func (artifactoryService) tryCondaItem(
 	if !protocolPrivateItem(c, req.path) {
 		return false
 	}
-	writeErr(w, r, itemNotFound())
+	WriteErr(w, r, itemNotFound())
 	return true
 }
 

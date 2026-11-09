@@ -36,10 +36,10 @@ const calculateMetadataActions = types.ActionManage | types.ActionDelete | types
 // the spec, under the patterns chiPatterns derives so they replace the 501
 // stubs (decision 0036).
 func (s artifactoryService) registerMavenRoutes(r chi.Router) {
-	for _, p := range chiPatterns(mavenCalculatePrefix + "{repoKey}/{folderPath}") {
+	for _, p := range ChiPatterns(mavenCalculatePrefix + "{repoKey}/{folderPath}") {
 		r.Post(p, s.calculateMavenMetadata)
 	}
-	for _, p := range chiPatterns(mavenGeneratePrefix + "{repoKey}/{jarFilePath}") {
+	for _, p := range ChiPatterns(mavenGeneratePrefix + "{repoKey}/{jarFilePath}") {
 		r.Post(p, s.generateMavenPom)
 	}
 }
@@ -115,14 +115,14 @@ func (s artifactoryService) calculateMavenMetadata(w http.ResponseWriter, r *htt
 	if v := r.URL.Query().Get("noneRecursive"); v != "" {
 		none, err := strconv.ParseBool(v)
 		if err != nil {
-			writeErr(w, r, badRequestf("noneRecursive must be true or false"))
+			WriteErr(w, r, badRequestf("noneRecursive must be true or false"))
 			return
 		}
 		recursive = !none
 	}
 	t, err := s.mavenTargetOf(r, mavenCalculatePrefix, calculateMetadataActions)
 	if err != nil {
-		writeErr(w, r, err)
+		WriteErr(w, r, err)
 		return
 	}
 	ctx := r.Context()
@@ -133,7 +133,7 @@ func (s artifactoryService) calculateMavenMetadata(w http.ResponseWriter, r *htt
 		t.path,
 		recursive,
 	); err != nil {
-		writeErr(w, r, s.itemError(ctx, "calculate Maven metadata", err))
+		WriteErr(w, r, s.itemError(ctx, "calculate Maven metadata", err))
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain")
@@ -153,17 +153,17 @@ func (s artifactoryService) generateMavenPom(w http.ResponseWriter, r *http.Requ
 		err = badRequestf("'%s/%s' is not a file", t.c.Key, t.path)
 	}
 	if err != nil {
-		writeErr(w, r, err)
+		WriteErr(w, r, err)
 		return
 	}
 	svc := s.items(t.st)
 	at, body, err := maven.GeneratePOM(ctx, svc.Env(), t.c, t.it)
 	if err != nil {
-		writeErr(w, r, s.itemError(ctx, "generate POM", err))
+		WriteErr(w, r, s.itemError(ctx, "generate POM", err))
 		return
 	}
 	if err := s.writePom(ctx, svc, t, at, body); err != nil {
-		writeErr(w, r, err)
+		WriteErr(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusOK)

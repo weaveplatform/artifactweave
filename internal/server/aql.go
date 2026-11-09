@@ -57,33 +57,33 @@ func (s artifactoryService) searchAQL(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	st, err := s.content()
 	if err != nil {
-		writeErr(w, r, err)
+		WriteErr(w, r, err)
 		return
 	}
 	if p, ok := kernel.FromContext(ctx); ok && p.Anonymous {
 		// Artifactory refuses anonymous queries with 403, even with anonymous
 		// access on (research 22 §1.3); with it off the request never gets
 		// here, and the middleware's 401 asks for credentials.
-		writeErr(w, r, apierror.New(http.StatusForbidden, "AQL queries need an authenticated user"))
+		WriteErr(w, r, apierror.New(http.StatusForbidden, "AQL queries need an authenticated user"))
 		return
 	}
 	p, err := kernel.RequireAuthenticated(ctx)
 	if err != nil {
-		writeErr(w, r, err)
+		WriteErr(w, r, err)
 		return
 	}
 	body, err := io.ReadAll(io.LimitReader(r.Body, aqlBodyLimit))
 	if err != nil {
-		writeErr(w, r, badRequestf("reading the query: %v", err))
+		WriteErr(w, r, badRequestf("reading the query: %v", err))
 		return
 	}
 	// At debug level the queries clients send are kept: the acceptance
 	// suite captures the JFrog CLI's from here as
 	// migration/artifacts/core/aql fixtures.
-	s.log().DebugContext(ctx, "aql query", "request_id", requestIDFrom(ctx), "query", string(body))
+	s.log().DebugContext(ctx, "aql query", "request_id", RequestIDFrom(ctx), "query", string(body))
 	q, err := aql.Parse(string(body))
 	if err != nil {
-		writeErr(w, r, apierror.New(http.StatusBadRequest, aqlMessage(err)))
+		WriteErr(w, r, apierror.New(http.StatusBadRequest, aqlMessage(err)))
 		return
 	}
 	if s.dispatchAlternateAQL(w, r, st, p, q) {
@@ -91,14 +91,14 @@ func (s artifactoryService) searchAQL(w http.ResponseWriter, r *http.Request) {
 	}
 	configs, err := repoConfigs(ctx, st)
 	if err != nil {
-		writeErr(w, r, s.internalError(ctx, "aql repositories", err))
+		WriteErr(w, r, s.internalError(ctx, "aql repositories", err))
 		return
 	}
 	q.Resolve(aqlRepositories(configs))
 	run, scaled := q.ForNesting(), false
 	if !p.Admin {
 		if err := q.CheckRestricted(); err != nil {
-			writeErr(w, r, apierror.New(http.StatusBadRequest, err.Error()))
+			WriteErr(w, r, apierror.New(http.StatusBadRequest, err.Error()))
 			return
 		}
 		if f := scanFactor(r, s.cfg.AQL.ScanFactor); f > 1 && q.HasLimit {
@@ -126,7 +126,7 @@ func (s artifactoryService) searchAQL(w http.ResponseWriter, r *http.Request) {
 	}
 	hits, err := st.Items().Search(dbctx, run, o)
 	if err != nil {
-		writeErr(w, r, s.aqlFailure(ctx, dbctx.Err(), timeout, "aql search", err))
+		WriteErr(w, r, s.aqlFailure(ctx, dbctx.Err(), timeout, "aql search", err))
 		return
 	}
 	trimmed := limit > 0 && len(hits) > limit
@@ -136,12 +136,12 @@ func (s artifactoryService) searchAQL(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case q.Action != aql.Find:
 		if hits, err = s.aqlAction(ctx, st, p, q, configs, hits); err != nil {
-			writeErr(w, r, s.internalError(ctx, q.Action.String(), err))
+			WriteErr(w, r, s.internalError(ctx, q.Action.String(), err))
 			return
 		}
 	case !p.Admin:
 		if hits, err = readable(ctx, s.cfg.Access.Authorizer, p, configs, hits); err != nil {
-			writeErr(w, r, s.internalError(ctx, "aql permissions", err))
+			WriteErr(w, r, s.internalError(ctx, "aql permissions", err))
 			return
 		}
 		if scaled && len(hits) > q.Limit {
@@ -158,7 +158,7 @@ func (s artifactoryService) searchAQL(w http.ResponseWriter, r *http.Request) {
 			related, err = q.Nest(dbctx, aql.AQLSource(st.Builds(), st.Items()), n, hits)
 		}
 		if err != nil {
-			writeErr(w, r, s.aqlFailure(ctx, dbctx.Err(), timeout, "aql related rows", err))
+			WriteErr(w, r, s.aqlFailure(ctx, dbctx.Err(), timeout, "aql related rows", err))
 			return
 		}
 	}
