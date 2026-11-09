@@ -8,8 +8,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/blobtest"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/mirror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitStatus(t *testing.T) {
@@ -26,9 +24,9 @@ func TestUnitStatus(t *testing.T) {
 	// Two members taken out of the configuration still have records: "gone"
 	// holds the only copy of another blob, "old" a failed attempt at this one.
 	other := strings.Repeat("ab", 32)
-	for _, rec := range []types.BlobReplica{
-		{SHA256: other, Member: "gone", State: types.ReplicaPresent, Size: 10},
-		{SHA256: sha, Member: "old", State: types.ReplicaFailed, Size: 100},
+	for _, rec := range []mirror.BlobReplica{
+		{SHA256: other, Member: "gone", State: mirror.ReplicaPresent, Size: 10},
+		{SHA256: sha, Member: "old", State: mirror.ReplicaFailed, Size: 100},
 	} {
 		if err := r.Put(ctx, rec); err != nil {
 			t.Fatal(err)
@@ -47,11 +45,11 @@ func TestUnitStatus(t *testing.T) {
 	m0, m1, m2 := st.Members[0], st.Members[1], st.Members[2]
 	if m0.Name != "m0" || m0.Zone != "home" || m0.Kind != "fs" || !m0.Available ||
 		!m0.WriteEnabled || m0.Latency < 0 || len(m0.Replicas) != 1 ||
-		m0.Replicas[0].State != types.ReplicaPresent || m0.Replicas[0].Count != 1 ||
+		m0.Replicas[0].State != mirror.ReplicaPresent || m0.Replicas[0].Count != 1 ||
 		m0.SoleCopies != 1 {
 		t.Fatalf("m0 %+v", m0)
 	}
-	if m1.Available || len(m1.Replicas) != 1 || m1.Replicas[0].State != types.ReplicaPending {
+	if m1.Available || len(m1.Replicas) != 1 || m1.Replicas[0].State != mirror.ReplicaPending {
 		t.Fatalf("m1 %+v", m1)
 	}
 	if m2.WriteEnabled || len(m2.Replicas) != 0 || m2.SoleCopies != 0 {
@@ -62,18 +60,18 @@ func TestUnitStatus(t *testing.T) {
 	}
 	gone, old := st.Removed[0], st.Removed[1]
 	if gone.Name != "gone" || gone.SoleCopies != 1 || len(gone.Replicas) != 1 ||
-		gone.Replicas[0].State != types.ReplicaPresent || gone.Replicas[0].Bytes != 10 {
+		gone.Replicas[0].State != mirror.ReplicaPresent || gone.Replicas[0].Bytes != 10 {
 		t.Fatalf("gone %+v", gone)
 	}
 	if old.Name != "old" || old.SoleCopies != 0 || len(old.Replicas) != 1 ||
-		old.Replicas[0].State != types.ReplicaFailed {
+		old.Replicas[0].State != mirror.ReplicaFailed {
 		t.Fatalf("old %+v", old)
 	}
 }
 
 // summaryFailures fails the summary queries.
 type summaryFailures struct {
-	store.ReplicaIndex
+	mirror.ReplicaIndex
 	counts, under, sole bool
 }
 
@@ -84,7 +82,7 @@ func (f summaryFailures) SoleCopies(ctx context.Context) (map[string]int64, erro
 	return f.ReplicaIndex.SoleCopies(ctx)
 }
 
-func (f summaryFailures) Counts(ctx context.Context) ([]store.ReplicaCount, error) {
+func (f summaryFailures) Counts(ctx context.Context) ([]mirror.ReplicaCount, error) {
 	if f.counts {
 		return nil, errInjected
 	}

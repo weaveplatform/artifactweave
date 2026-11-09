@@ -80,5 +80,5 @@ These are the pinned client definitions and executable evidence from which this 
 - Client pin: [test/acceptance/clients/dotnet-11.Dockerfile](../../test/acceptance/clients/dotnet-11.Dockerfile).
 - Evidence: [test/acceptance/features/nuget_publish.feature](../../test/acceptance/features/nuget_publish.feature).
 - Evidence: [test/acceptance/features/nuget_v3.feature](../../test/acceptance/features/nuget_v3.feature).
-- Evidence: [internal/auth/token.go](../../internal/auth/token.go).
+- Evidence: [migration/access/core/authn/token.go](../../migration/access/core/authn/token.go).
 - Evidence: [test/acceptance/features/nuget_remote.feature](../../test/acceptance/features/nuget_remote.feature).

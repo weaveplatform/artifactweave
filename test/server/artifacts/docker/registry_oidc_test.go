@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/auth/token"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -37,7 +37,7 @@ func TestAccRegistryTokenForOIDCUsers(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-		a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{
+		a, err := authn.NewAuthenticator(db.Users(), db.Settings(), authn.Options{
 			Hash: testHash, Tokens: c.Tokens, Groups: db.Groups(),
 		})
 		if err != nil {

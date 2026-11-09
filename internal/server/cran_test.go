@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -157,7 +157,7 @@ func TestUnitCRANVirtualRejectsCyclesAndWrongMembers(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	p := auth.Principal{Name: "admin", Admin: true}
+	p := kernel.Principal{Name: "admin", Admin: true}
 	acc, err := accessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)

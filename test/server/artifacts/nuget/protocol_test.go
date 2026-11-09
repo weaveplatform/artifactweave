@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/auth/token"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -55,7 +55,7 @@ func nugetServer(t *testing.T, tune ...harness.Tune) (http.Handler, *inmem.Store
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{
+	a, err := authn.NewAuthenticator(db.Users(), db.Settings(), authn.Options{
 		Hash: testHash, Tokens: tokens,
 	})
 	if err != nil {

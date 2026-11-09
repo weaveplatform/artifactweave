@@ -163,7 +163,7 @@
 //     what fake-gcs-server does not (preconditions on writes and compose
 //     destinations, compose of at most 32 sources pinned by generation,
 //     DeleteSourceObjects, the server's CRC32C check), the second with its
-//     sessions kept in the uploads table of the in-memory metadata store.
+//     sessions kept in the uploads table of the platform's in-memory store.
 //   - TestAccContractOnEmulator: the contract through the SDK adapter on
 //     fake-gcs-server, which checks the wiring: requests, write
 //     preconditions, compose, ranged JSON reads and listings. The emulator

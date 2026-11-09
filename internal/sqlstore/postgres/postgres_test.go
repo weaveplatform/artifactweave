@@ -184,34 +184,37 @@ func TestAccRemoteCachePersistence(t *testing.T) {
 		t.Cleanup(func() { _ = s.Close() })
 		return s
 	}
-	sqltest.RemoteCachePersistence(t, open(), open)
+	sqltest.RemoteLayoutPersistence(t, open(), open)
 }
 
 func TestAccRepositoryHeaderSecrets(t *testing.T) {
 	dsn := sqltest.PostgresDSN(t)
 	first := true
-	sqltest.RepositoryHeaders(t, func(t *testing.T, k *crypt.Keyring) *sqlcommon.Store {
-		s, err := postgres.Open(
-			t.Context(),
-			dsn,
-			postgres.Options{Options: sqlcommon.Options{Keyring: k}},
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if first {
-			sqltest.Reset(t, s.DB(), postgres.Dialect)
-			first = false
-		}
-		t.Cleanup(func() { _ = s.Close() })
-		return s
-	})
+	sqltest.RepositoryHeaderEnvironmentRename(
+		t,
+		func(t *testing.T, k *crypt.Keyring) *sqlcommon.Store {
+			s, err := postgres.Open(
+				t.Context(),
+				dsn,
+				postgres.Options{Options: sqlcommon.Options{Keyring: k}},
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if first {
+				sqltest.Reset(t, s.DB(), postgres.Dialect)
+				first = false
+			}
+			t.Cleanup(func() { _ = s.Close() })
+			return s
+		},
+	)
 }
 
 func TestAccRepositoryHeaderMigration(t *testing.T) {
 	dsn := sqltest.PostgresDSN(t)
 	first := true
-	sqltest.RepositoryHeadersMigration(t, func(t *testing.T, k *crypt.Keyring) *sqlcommon.Store {
+	sqltest.RepositoryHeadersOpen(t, func(t *testing.T, k *crypt.Keyring) *sqlcommon.Store {
 		s, err := postgres.Open(
 			t.Context(),
 			dsn,

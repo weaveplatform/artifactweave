@@ -15,9 +15,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	ml "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/machinelearning"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -139,7 +139,7 @@ func (h handler) publish(
 ) error {
 	ctx := r.Context()
 	c := pkgroute.RequestFrom(r).Repo
-	p, _ := auth.FromContext(ctx)
+	p, _ := kernel.FromContext(ctx)
 	by := p.Name
 	if p.Anonymous {
 		by = ""

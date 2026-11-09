@@ -2,18 +2,16 @@ package sqlcommon
 
 import (
 	"context"
-	"strconv"
 
-	accmigrations "github.com/weaveplatform/artifactweave/migration/access/adapters/sql/migrations"
-	artmigrations "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/sql/migrations"
-	fedmigrations "github.com/weaveplatform/artifactweave/migration/federation/adapters/sql/migrations"
-	ntfmigrations "github.com/weaveplatform/artifactweave/migration/notifications/adapters/sql/migrations"
+	accsql "github.com/weaveplatform/artifactweave/migration/access/adapters/sql"
+	artsql "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/sql"
+	fedsql "github.com/weaveplatform/artifactweave/migration/federation/adapters/sql"
+	ntfsql "github.com/weaveplatform/artifactweave/migration/notifications/adapters/sql"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
-	platmigrations "github.com/weaveplatform/artifactweave/migration/platform/store/sql/migrations"
-	relmigrations "github.com/weaveplatform/artifactweave/migration/releases/adapters/sql/migrations"
-	retmigrations "github.com/weaveplatform/artifactweave/migration/retention/adapters/sql/migrations"
-	wrkmigrations "github.com/weaveplatform/artifactweave/migration/workers/adapters/sql/migrations"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	platsql "github.com/weaveplatform/artifactweave/migration/platform/store/sql"
+	relsql "github.com/weaveplatform/artifactweave/migration/releases/adapters/sql"
+	retsql "github.com/weaveplatform/artifactweave/migration/retention/adapters/sql"
+	wrksql "github.com/weaveplatform/artifactweave/migration/workers/adapters/sql"
 )
 
 // Modules returns every module's registration with the SQL layer, in the
@@ -29,109 +27,14 @@ import (
 // cycle.
 func Modules() []dialect.Module {
 	return []dialect.Module{
-		{Name: "platform", Migrations: platmigrations.FS, Sealed: []dialect.SealedColumn{
-			{
-				Table: "config_secrets", Column: "value", Purpose: purposeConfigSecret,
-				Keys: []string{"kind", "key", "name"},
-				RowID: func(k []string) string {
-					return configSecretID(types.ConfigKind(k[0]), k[1], k[2])
-				},
-			},
-			{
-				Table: "instance", Column: "private_key", Purpose: purposeInstanceKey,
-				Keys: []string{"instance_id"}, RowID: dialect.FirstKey,
-			},
-		}},
-		{
-			Name:       "artifacts",
-			Migrations: artmigrations.FS,
-			// The backfill moves the sensitive headers still held in legacy
-			// repository documents into sealed rows, and counts them, before
-			// the module's columns are re-sealed.
-			BeforeReseal: func(ctx context.Context, s *dialect.Store) (int, error) {
-				return (&Store{Store: s}).backfillRepositoryHeaders(ctx)
-			},
-			// The same backfill runs at every open, with the configured
-			// keyring, because DDL never sees key material (decision 0017).
-			AfterMigrate: func(ctx context.Context, s *dialect.Store) error {
-				_, err := (&Store{Store: s}).backfillRepositoryHeaders(ctx)
-				return err
-			},
-			Sealed: []dialect.SealedColumn{
-				{
-					Table: "repository_secrets", Column: "password", Purpose: purposeRepoPassword,
-					Keys: []string{"repo_key"}, RowID: dialect.FirstKey,
-				},
-				{
-					Table: "repository_header_secrets", Column: "value", Purpose: purposeRepoHeader,
-					Keys: []string{"repo_key", "position", "name"},
-					RowID: func(k []string) string {
-						index, _ := strconv.Atoi(k[1])
-						return repositoryHeaderID(k[0], index, k[2])
-					},
-				},
-			},
-		},
-		{
-			Name:       "access",
-			Migrations: accmigrations.FS,
-			// Go fills the lowercase search names that a row lacks, because
-			// the engines fold case by their own rules (decision 0043).
-			AfterMigrate: func(ctx context.Context, s *dialect.Store) error {
-				return (&Store{Store: s}).backfillIdentitySearch(ctx)
-			},
-			Sealed: []dialect.SealedColumn{
-				{
-					Table: "keypairs", Column: "private_key", Purpose: purposeKeypairPrivate,
-					Keys: []string{"name"}, RowID: dialect.FirstKey,
-				},
-				{
-					Table: "keypairs", Column: "passphrase", Purpose: purposeKeypairPassphrase,
-					Keys: []string{"name"}, RowID: dialect.FirstKey,
-				},
-				{
-					Table: "signing_keys", Column: "private_key", Purpose: purposeSigningPrivate,
-					Keys: []string{"alias"}, RowID: dialect.FirstKey,
-				},
-				{
-					Table: "signing_keys", Column: "passphrase", Purpose: purposeSigningPassphrase,
-					Keys: []string{"alias"}, RowID: dialect.FirstKey,
-				},
-				{
-					Table: "certificates", Column: "private_key", Purpose: purposeCertificateKey,
-					Keys: []string{"alias"}, RowID: dialect.FirstKey,
-				},
-				{
-					Table: "tokens", Column: "secret", Purpose: purposeTokenSecret,
-					Keys: []string{"id"}, RowID: dialect.FirstKey,
-				},
-			},
-		},
-		{Name: "notifications", Migrations: ntfmigrations.FS, Sealed: []dialect.SealedColumn{
-			{
-				Table: "webhook_secrets", Column: "value", Purpose: purposeWebhookSecret,
-				Keys: []string{"webhook_key", "handler_index", "name"},
-				RowID: func(k []string) string {
-					i, _ := strconv.Atoi(k[1]) // an INTEGER column always reads back as digits
-					return secretID(k[0], i, k[2])
-				},
-			},
-		}},
-		{Name: "retention", Migrations: retmigrations.FS},
-		{Name: "federation", Migrations: fedmigrations.FS, Sealed: []dialect.SealedColumn{
-			{
-				Table: "replications", Column: "password", Purpose: purposeReplicationPassword,
-				Keys: []string{"replication_key"}, RowID: dialect.FirstKey,
-			},
-		}},
-		{Name: "releases", Migrations: relmigrations.FS},
-		{Name: "workers", Migrations: wrkmigrations.FS, Sealed: []dialect.SealedColumn{
-			{
-				Table: "worker_secrets", Column: "value", Purpose: purposeWorkerSecret,
-				Keys:  []string{"worker_key", "name"},
-				RowID: func(k []string) string { return k[0] + "/" + k[1] },
-			},
-		}},
+		platsql.Module,
+		artsql.Module,
+		accsql.Module,
+		ntfsql.Module,
+		retsql.Module,
+		fedsql.Module,
+		relsql.Module,
+		wrksql.Module,
 	}
 }
 

@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -699,7 +699,7 @@ func TestAccStoragePermissions(t *testing.T) {
 		t.Fatalf("seeded principals on a remote %v", p)
 	}
 	// A grant through Any Remote shows on the cache of every remote.
-	anyRemote, err := w.db.Permissions().Get(context.Background(), auth.AnyRemotePermission)
+	anyRemote, err := w.db.Permissions().Get(context.Background(), authn.AnyRemotePermission)
 	if err != nil {
 		t.Fatal(err)
 	}

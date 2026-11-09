@@ -362,7 +362,7 @@ func apiReviewPolicy(e *apiReviewOperation) {
 		e.Evidence = append(
 			e.Evidence,
 			"migration/artifacts/ecosystem/bower/http/register.go",
-			"pkg/store/storetest/bower.go",
+			"migration/artifacts/adapters/storetest/bower.go",
 		)
 	}
 	e.Evidence = append(
@@ -383,15 +383,15 @@ func apiReviewPersistence(path string) (string, string, []string) {
 	if strings.HasPrefix(path, apiRestrictionPath) || path == apiRestrictionAuditPath {
 		return "restriction", "audit: default100/max1000, sequence DESC strict id<cursor; filter+administrator-bound cursor; other operations singular", []string{
 			"internal/server/api_restrictions.go",
-			"internal/sqlstore/sqlcommon/api_restriction.go",
-			"pkg/store/storetest/api_restriction.go",
+			"migration/access/adapters/sql/api_restriction.go",
+			"migration/access/adapters/storetest/api_restriction.go",
 		}
 	}
 	if path == "/access/api/v2/users" || path == "/access/api/v2/groups" {
 		return "identity-pages", "GET: default/max1000, indexed name keyset both directions, SQL filters and LIMIT+1; other methods singular mutations; existing name cursor retained", []string{
 			"internal/server/access_identity.go",
-			"internal/sqlstore/sqlcommon/identity_query.go",
-			"pkg/store/storetest/identity_query.go",
+			"migration/access/adapters/sql/identity_query.go",
+			"migration/access/adapters/storetest/identity_query.go",
 		}
 	}
 	if strings.HasPrefix(path, "/access/") ||
@@ -400,16 +400,16 @@ func apiReviewPersistence(path string) (string, string, []string) {
 			"internal/server/access_identity.go",
 			"internal/server/tokens.go",
 			"internal/service/identity/identity.go",
-			"internal/auth/token/token.go",
-			"internal/sqlstore/sqlcommon/identity.go",
-			"internal/sqlstore/sqlcommon/operations.go",
+			"migration/access/core/token/token.go",
+			"migration/access/adapters/sql/identity.go",
+			"migration/access/adapters/sql/projects.go",
 		}
 	}
 	if strings.HasPrefix(path, "/artifactory/api/build") {
 		return "build", "build names/numbers/runs retain complete legacy collections; store keysets may be collected; append/replay and run detail are singular", []string{
 			"internal/server/builds.go",
 			"migration/artifacts/core/build/build.go",
-			"internal/sqlstore/sqlcommon/builds.go",
+			"migration/artifacts/adapters/sql/builds.go",
 			"internal/server/builds_status_test.go",
 		}
 	}
@@ -418,7 +418,7 @@ func apiReviewPersistence(path string) (string, string, []string) {
 		return "repository", "legacy arrays remain complete; store keysets are collected and filtered; not bounded by client page size", []string{
 			"internal/server/repositories.go",
 			"migration/artifacts/core/repos/repos.go",
-			"internal/sqlstore/sqlcommon/content.go",
+			"migration/artifacts/adapters/sql/content.go",
 		}
 	}
 	if strings.HasPrefix(path, "/artifactory/api/search/") ||
@@ -426,7 +426,7 @@ func apiReviewPersistence(path string) (string, string, []string) {
 		return "search", "AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches collect authorized results from batches; no new keyset promise", []string{
 			"internal/server/searches.go",
 			"internal/server/aql.go",
-			"internal/sqlstore/sqlcommon/content_items.go",
+			"migration/artifacts/adapters/sql/content_items.go",
 			"docs/research/decisions/0012-search-and-aql.md",
 		}
 	}
@@ -438,7 +438,7 @@ func apiReviewPersistence(path string) (string, string, []string) {
 				"internal/server/server.go",
 				"internal/server/pkgroute/pkgroute.go",
 				"migration/artifacts/core/item/item.go",
-				"internal/sqlstore/sqlcommon/content_items.go",
+				"migration/artifacts/adapters/sql/content_items.go",
 			}
 		}
 	}
@@ -446,7 +446,7 @@ func apiReviewPersistence(path string) (string, string, []string) {
 		"internal/server/server.go",
 		"internal/server/items.go",
 		"internal/server/storage.go",
-		"internal/sqlstore/sqlcommon/content_items.go",
-		"internal/sqlstore/sqlcommon/operations.go",
+		"migration/artifacts/adapters/sql/content_items.go",
+		"migration/access/adapters/sql/projects.go",
 	}
 }

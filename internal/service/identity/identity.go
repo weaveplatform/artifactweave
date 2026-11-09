@@ -14,7 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -36,7 +37,7 @@ var ErrExists = errors.New("identity: already exists")
 type Service struct {
 	Store store.Store
 	// Hash is the password hash cost; the zero value is production's.
-	Hash auth.HashParams
+	Hash authn.HashParams
 	// Now supplies the time; nil means time.Now.
 	Now func() time.Time
 }
@@ -250,14 +251,14 @@ func (s *Service) setPassword(
 		return nil
 	}
 	if keepSame && len(u.PasswordHash) > 0 {
-		if same, err := auth.CheckPassword(u.PasswordHash, password); err == nil && same {
+		if same, err := authn.CheckPassword(u.PasswordHash, password); err == nil && same {
 			return nil
 		}
 	}
 	if err := s.checkPolicy(ctx, *u, password); err != nil {
 		return err
 	}
-	hash, err := auth.HashPasswordWith(s.Hash, password)
+	hash, err := authn.HashPasswordWith(s.Hash, password)
 	if err != nil {
 		return fmt.Errorf("identity: hash password: %w", err)
 	}
@@ -298,7 +299,7 @@ func (s *Service) admins(ctx context.Context) ([]string, error) {
 // DeleteUser removes a user, its group memberships and its tokens. The
 // seeded admin and anonymous users and the last administrator stay.
 func (s *Service) DeleteUser(ctx context.Context, name string) error {
-	if name == auth.AdminUser || name == auth.AnonymousUser {
+	if name == authn.AdminUser || name == kernel.AnonymousUser {
 		return fmt.Errorf(
 			"%w: %w: the built-in user %q cannot be deleted",
 			ErrInvalid,
@@ -617,7 +618,7 @@ func passwordMatches(u types.User, password string) bool {
 		(u.Status != "" && u.Status != types.UserEnabled) {
 		return false
 	}
-	same, err := auth.CheckPassword(u.PasswordHash, password)
+	same, err := authn.CheckPassword(u.PasswordHash, password)
 	return err == nil && same
 }
 
@@ -653,14 +654,14 @@ func (s *Service) UnlockAll(ctx context.Context) error {
 
 // LockPolicy returns the user lock policy.
 func (s *Service) LockPolicy(ctx context.Context) (types.UserLockPolicy, error) {
-	return auth.LockPolicy(ctx, s.Store.Settings()) //nolint:wrapcheck // already wrapped
+	return authn.LockPolicy(ctx, s.Store.Settings()) //nolint:wrapcheck // already wrapped
 }
 
 // SetLockPolicy stores p. Disabling the policy also clears every lock, as
 // Artifactory does, so turning it off is never a way to strand users.
 func (s *Service) SetLockPolicy(ctx context.Context, p types.UserLockPolicy) error {
 	if p.LoginAttempts == 0 {
-		p.LoginAttempts = auth.DefaultLoginAttempts
+		p.LoginAttempts = authn.DefaultLoginAttempts
 	}
 	if p.LoginAttempts < 1 {
 		return invalidf("loginAttempts must be at least 1")
@@ -678,7 +679,7 @@ func (s *Service) SetLockPolicy(ctx context.Context, p types.UserLockPolicy) err
 
 // ExpirationPolicy returns the password expiration policy.
 func (s *Service) ExpirationPolicy(ctx context.Context) (types.PasswordExpirationPolicy, error) {
-	return auth.ExpirationPolicy(ctx, s.Store.Settings()) //nolint:wrapcheck // already wrapped
+	return authn.ExpirationPolicy(ctx, s.Store.Settings()) //nolint:wrapcheck // already wrapped
 }
 
 // SetExpirationPolicy stores p and returns what was stored.
@@ -711,15 +712,15 @@ type AccessLockPolicy struct {
 // documents: enabled with loginAttempts is attempts, disabled is 0.
 func (s *Service) AccessLockPolicy(ctx context.Context) (AccessLockPolicy, error) {
 	settings := s.Store.Settings()
-	lock, err := auth.LockPolicy(ctx, settings)
+	lock, err := authn.LockPolicy(ctx, settings)
 	if err != nil {
 		return AccessLockPolicy{}, err //nolint:wrapcheck // already wrapped
 	}
-	expiry, err := auth.ExpirationPolicy(ctx, settings)
+	expiry, err := authn.ExpirationPolicy(ctx, settings)
 	if err != nil {
 		return AccessLockPolicy{}, err //nolint:wrapcheck // already wrapped
 	}
-	access, err := auth.AccessLockSettings(ctx, settings)
+	access, err := authn.AccessLockSettings(ctx, settings)
 	if err != nil {
 		return AccessLockPolicy{}, err //nolint:wrapcheck // already wrapped
 	}
@@ -751,11 +752,11 @@ func (s *Service) SetAccessLockPolicy(
 	}
 	return p, s.tx(ctx, func(ctx context.Context) error {
 		settings := s.Store.Settings()
-		lock, err := auth.LockPolicy(ctx, settings)
+		lock, err := authn.LockPolicy(ctx, settings)
 		if err != nil {
 			return err //nolint:wrapcheck // already wrapped
 		}
-		expiry, err := auth.ExpirationPolicy(ctx, settings)
+		expiry, err := authn.ExpirationPolicy(ctx, settings)
 		if err != nil {
 			return err //nolint:wrapcheck // already wrapped
 		}

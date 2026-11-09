@@ -23,7 +23,7 @@ const withPrincipal = "WithPrincipal"
 
 // withPrincipalSites are the production files that may name WithPrincipal.
 // Everywhere else an authorised principal is stored together with its decider,
-// through accessapi.WithCaller or auth.WithAuthorized, which forwards to it. A
+// through accessapi.WithCaller or authn.WithAuthorized, which forwards to it. A
 // principal stored alone still compiles and reads back, but it has no decider:
 // the Docker registry refuses it, pkgroute and terraformbackend deny it, and
 // accessFor quietly evaluates its permissions again for every question.
@@ -40,7 +40,7 @@ var withPrincipalSites = []string{
 
 // withPrincipalRule ends every problem: what to use instead.
 const withPrincipalRule = "a principal stored without its decider has no permissions; " +
-	"store an authorised one with accessapi.WithCaller or auth.WithAuthorized"
+	"store an authorised one with accessapi.WithCaller or authn.WithAuthorized"
 
 func TestUnitWithPrincipalCallers(t *testing.T) {
 	for _, p := range checkWithPrincipalCallers(repopath.Root(t)) {

@@ -17,26 +17,18 @@ import (
 )
 
 // accessInternals are the legacy packages of access that no test outside
-// access may import: the evaluator and the authenticator, which ACC-11 and
-// ACC-12 split into access core, and the token service, which ACC-12 moves
-// there. Staged access core is judged by its path instead (accessInternal).
-var accessInternals = []string{"internal/authz", "internal/auth", "internal/auth/token"}
-
-// accessSplits are the legacy access packages whose ledger entries split
-// them, so ledger.Translate names no target that places their tests in
-// access.
-var accessSplits = []string{"internal/auth", "internal/authz"}
+// access may import. ACC-12 moved the authenticator and the token service
+// out of them, leaving only the bridges to the kernel and access/api until
+// PRO-02; a test that imports a bridge would compile against a path that
+// is about to go, so it names the kernel or access/api itself. Staged
+// access core is judged by its path instead (accessInternal).
+var accessInternals = []string{"internal/auth", "internal/auth/token"}
 
 // allowlistedInternals are the access internals that an allowlisted file may
 // import: the authenticator and the token service, which the server root,
-// the composition root and the server harnesses wire themselves, and the
-// access core packages ACC-12 moves them to. The evaluator is never one.
-var allowlistedInternals = []string{
-	"internal/auth",
-	"internal/auth/token",
-	root + "/access/core/authn",
-	root + "/access/core/token",
-}
+// the composition root and the server harnesses wire themselves. The
+// evaluator is never one, and neither is a legacy path of them.
+var allowlistedInternals = []string{root + "/access/core/authn", root + "/access/core/token"}
 
 // accessAllowance names files that may still import allowlistedInternals,
 // and the tickets whose work removes the entry.
@@ -133,10 +125,10 @@ func checkAccessInternals(dir string, l *ledger.Ledger, allow []accessAllowance)
 }
 
 // insideAccess reports whether dir, a directory relative to the repository
-// root, belongs to access: it is staged under access, it lies in a legacy
-// package that access splits, or its ledger entry moves it into access.
+// root, belongs to access: it is staged under access, or its ledger entry
+// moves it into access.
 func insideAccess(l *ledger.Ledger, dir string) bool {
-	if under(dir, root+"/access") || underAny(dir, accessSplits...) {
+	if under(dir, root+"/access") {
 		return true
 	}
 	if !ledger.IsLegacy(dir) {
@@ -191,8 +183,7 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 				Action: ledger.ActionMove,
 				To:     "artifacts/ecosystem/npm/http",
 			},
-			{From: "internal/auth", Action: ledger.ActionSplit},
-			{From: "internal/authz", Action: ledger.ActionSplit},
+			{From: "internal/auth", Action: ledger.ActionMove, To: "access/core/authn"},
 		},
 	}
 	allow := []accessAllowance{
@@ -200,21 +191,21 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 		{"internal/app/*_test.go", "TST-07"},
 		{"test/server/**", "WEB-22"},
 	}
-	evaluator, authenticator, tokens := accessInternals[0], accessInternals[1], accessInternals[2]
+	evaluator := root + "/access/core/authz"
+	authenticator, tokens := allowlistedInternals[0], allowlistedInternals[1]
+	legacy := accessInternals[0]
 	conforming := map[string]string{
 		"go.mod": "module " + modulePath + "\n",
-		// Each allowlisted root uses its entry, with the legacy paths and
-		// the access core paths ACC-12 gives them.
+		// Each allowlisted root uses its entry; a file under test/ is a
+		// test even without the _test.go suffix.
 		"internal/server/server_test.go":  file(authenticator, tokens),
-		"internal/server/handler_test.go": file(root + "/access/core/authn"),
 		"internal/app/app_test.go":        file(tokens),
 		"test/server/access/auth_test.go": file(authenticator),
-		"test/server/support/assemble.go": file(root + "/access/core/token"),
-		// Access's own tests: staged, in a split legacy package, and in a
-		// legacy package whose entry moves it into access.
-		root + "/access/core/authn/authn_test.go":    file(evaluator, root+"/access/core/authz"),
-		"internal/auth/auth_test.go":                 file(evaluator),
-		"internal/authz/authz_test.go":               file(authenticator),
+		"test/server/support/assemble.go": file(tokens),
+		// Access's own tests: staged, and in legacy packages whose entries
+		// move them into access, the bridges' among them.
+		root + "/access/core/authn/authn_test.go":    file(evaluator, authenticator),
+		"internal/auth/bridge_kernel_test.go":        file(evaluator, authenticator, legacy),
 		"internal/service/identity/identity_test.go": file(evaluator, tokens),
 		// The published contracts and access test support, staged and legacy.
 		"internal/server/xyz/npm_test.go": file(
@@ -257,6 +248,17 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 			name: "protocol test importing the token service",
 			src:  file(tokens),
 			want: protocol + " imports " + tokens,
+		},
+		{
+			name: "protocol test importing a legacy access package",
+			src:  file(legacy),
+			want: protocol + " imports " + legacy,
+		},
+		{
+			name: "root test importing a legacy access package",
+			file: "internal/server/x_test.go",
+			src:  file(accessInternals[1]),
+			want: "internal/server/x_test.go imports " + accessInternals[1],
 		},
 		{
 			name: "staged artifacts test importing access core",

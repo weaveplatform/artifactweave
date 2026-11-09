@@ -10,8 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/auth/token"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/token"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -40,10 +41,10 @@ func newIdentityWorld(t *testing.T) identityWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, err := auth.NewAuthenticator(
+	a, err := authn.NewAuthenticator(
 		db.Users(),
 		db.Settings(),
-		auth.Options{Hash: testHash, Tokens: tokens},
+		authn.Options{Hash: testHash, Tokens: tokens},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -721,7 +722,7 @@ func TestAccDeleteGroupDropsGrants(t *testing.T) {
 		http.StatusCreated,
 		nil,
 	)
-	anything, err := w.db.Permissions().Get(ctx, auth.AnythingPermission)
+	anything, err := w.db.Permissions().Get(ctx, authn.AnythingPermission)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -739,7 +740,7 @@ func TestAccDeleteGroupDropsGrants(t *testing.T) {
 		nil,
 	)
 	w.call(t, http.MethodDelete, "/access/api/v2/groups/team", admin, "", http.StatusNoContent, nil)
-	got, err := w.db.Permissions().Get(ctx, auth.AnythingPermission)
+	got, err := w.db.Permissions().Get(ctx, authn.AnythingPermission)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -838,7 +839,7 @@ func TestAccGroupListPagesAndFilters(t *testing.T) {
 }
 
 func TestAccAccessIdentityWithoutStore(t *testing.T) {
-	ctx := auth.WithPrincipal(context.Background(), auth.Principal{Name: "admin", Admin: true})
+	ctx := kernel.WithPrincipal(context.Background(), kernel.Principal{Name: "admin", Admin: true})
 	svc := accessService{}
 	if _, err := svc.GetUserList(
 		ctx,

@@ -14,7 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -22,11 +24,11 @@ import (
 
 func adminPasswordIs(t *testing.T, st store.Store, password string) bool {
 	t.Helper()
-	u, err := st.Users().Get(context.Background(), auth.AdminUser)
+	u, err := st.Users().Get(context.Background(), authn.AdminUser)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ok, err := auth.CheckPassword(u.PasswordHash, password)
+	ok, err := authn.CheckPassword(u.PasswordHash, password)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,6 +84,12 @@ func TestAccSeedUsesConfiguredPassword(t *testing.T) {
 	if !adminPasswordIs(t, db, "configured") {
 		t.Fatal("admin does not have the configured password")
 	}
+	// The seed creates the build-info repository through the artifacts
+	// module's binding, so it lands in the store app passes.
+	bi, err := db.Repos().Get(context.Background(), types.BuildInfoRepository)
+	if err != nil || bi.Key != types.BuildInfoRepository {
+		t.Fatalf("build-info repository = %+v, %v", bi, err)
+	}
 	if _, err := os.Stat(filepath.Join(cfg.DataDir, InitialPasswordFile)); !os.IsNotExist(err) {
 		t.Fatalf("a configured password was also written to a file: %v", err)
 	}
@@ -111,11 +119,12 @@ func (s hiddenSettings) Get(ctx context.Context, key string, into any) error {
 func TestAccSeedLostRaceRemovesPasswordFile(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
-	hash, err := auth.HashPasswordWith(authHash, "winner")
+	hash, err := authn.HashPasswordWith(authHash, "winner")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := auth.SeedHashed(ctx, db, hash, time.Now()); err != nil {
+	repositories := repos.NewRepositories(db, access.KeysOf(db), access.ProjectsOf(db))
+	if _, err := authn.SeedHashed(ctx, db, repositories, hash, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	h := &hidden{Store: db}
@@ -155,7 +164,7 @@ func TestAccSeedErrors(t *testing.T) {
 	}
 
 	db := inmem.New()
-	if err := db.Groups().Create(ctx, types.Group{Name: auth.ReadersGroup}); err != nil {
+	if err := db.Groups().Create(ctx, types.Group{Name: authn.ReadersGroup}); err != nil {
 		t.Fatal(err)
 	}
 	cfg = testConfig(t)

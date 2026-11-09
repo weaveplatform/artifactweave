@@ -3,8 +3,8 @@ package access
 import (
 	"context"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
@@ -16,7 +16,7 @@ var _ accessapi.Authenticator = authenticator{}
 // pass through as the authenticator gave them: it wraps its own, and callers
 // test its sentinels with errors.Is.
 type authenticator struct {
-	a  *auth.Authenticator
+	a  *authn.Authenticator
 	st store.Store
 }
 

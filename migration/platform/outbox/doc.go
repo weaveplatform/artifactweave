@@ -11,9 +11,9 @@
 // that a module appends its events in its own transaction and a module's api
 // package may import it. OutboxStore takes and returns the clock and the
 // values, so they are declared beside it and the package imports no module.
-// The metadata store's SQL and in-memory stores implement OutboxStore, and
-// its Outbox returns it; no service appends yet. The package imports only the
-// standard library.
+// The platform's store adapters (platform/store/sql and platform/store/inmem)
+// implement OutboxStore, and the metadata store's Outbox returns theirs; no
+// service appends yet. The package imports only the standard library.
 //
 // # Inputs
 //
@@ -91,14 +91,15 @@
 //     values with ErrInvalidHLC) and TestUnitCursorsAndMarkers (Behind and
 //     Expect).
 //
-// The metadata store's outbox contract (the Outbox, OutboxConcurrent,
-// PeerCursors, AppliedMarkers and FailedFetches subtests: sequences per
-// origin and stream, reads after a sequence and up to a limit, pruning that
-// keeps the numbering, a rolled-back append, concurrent appends, cursor
-// replacement and deletion, applied positions per origin, failed fetch
-// counting and clearing, and cancelled contexts) runs on its in-memory,
-// SQLite and PostgreSQL stores. The shared types' TestUnitStamp orders
-// stamps through Compare, and the tests beside the shared types' and the
-// metadata store's bridges fail if an alias of the clock, a value, the
-// parser, its sentinel or the port becomes a declared copy.
+// The platform's outbox contract (the Outbox, OutboxConcurrent, PeerCursors,
+// AppliedMarkers and FailedFetches subtests of platform/store/storetest:
+// sequences per origin and stream, reads after a sequence and up to a limit,
+// pruning that keeps the numbering, a rolled-back append, concurrent appends,
+// cursor replacement and deletion, applied positions per origin, failed fetch
+// counting and clearing, and cancelled contexts) runs on the platform's
+// in-memory and SQLite stores and on the metadata store's in-memory, SQLite
+// and PostgreSQL stores. The shared types' TestUnitStamp orders stamps
+// through Compare, and the tests beside the shared types' and the metadata
+// store's bridges fail if an alias of the clock, a value, the parser, its
+// sentinel or the port becomes a declared copy.
 package outbox

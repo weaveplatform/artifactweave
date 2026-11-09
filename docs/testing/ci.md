@@ -29,7 +29,7 @@ prints the complete inventory. `make test`, `make accept-go` and `make accept`
 run the guard. The `Select CI tests` job runs it before planning any profile.
 
 Go reserves `TestMain` for a package hook. Its four reviewed owners are
-`internal/auth` and `migration/devtools/pkgmove` (three-OS Go matrix; the
+`migration/access/core/authn` and `migration/devtools/pkgmove` (three-OS Go matrix; the
 pkgmove hook runs the test binary as a failing `git` for its fixture scripts),
 `test/acceptance` (Linux native acceptance), and `test/platform` (real-cloud
 platform scenarios). The four

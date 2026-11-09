@@ -7,9 +7,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/token"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -24,13 +25,13 @@ func TestAccAuthenticatePrincipal(t *testing.T) {
 	db := inmem.New()
 	ctx := context.Background()
 	cheapSeed(t, db)
-	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{Hash: testHash})
+	a, err := authn.NewAuthenticator(db.Users(), db.Settings(), authn.Options{Hash: testHash})
 	if err != nil {
 		t.Fatal(err)
 	}
-	var got *auth.Principal
+	var got *kernel.Principal
 	h := authenticate(a, nil, nil)(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-		if p, ok := auth.FromContext(r.Context()); ok {
+		if p, ok := kernel.FromContext(r.Context()); ok {
 			got = &p
 		}
 	}))
@@ -50,13 +51,13 @@ func TestAccAuthenticatePrincipal(t *testing.T) {
 		t.Fatal(err)
 	}
 	serve(nil)
-	if got == nil || !got.Anonymous || got.Name != auth.AnonymousUser {
+	if got == nil || !got.Anonymous || got.Name != kernel.AnonymousUser {
 		t.Fatalf("anonymous principal %+v", got)
 	}
 }
 
 // The middleware stores every principal it authorises with the decider that
-// authorised it, which handlers reach through auth.DeciderFrom; a request it
+// authorised it, which handlers reach through authn.DeciderFrom; a request it
 // lets through without authorising a principal carries no decider.
 func TestAccAuthenticateAttachesDecider(t *testing.T) {
 	ctx := t.Context()
@@ -71,7 +72,7 @@ func TestAccAuthenticateAttachesDecider(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{
+	a, err := authn.NewAuthenticator(db.Users(), db.Settings(), authn.Options{
 		Hash: testHash, Tokens: tokens,
 	})
 	if err != nil {
@@ -85,18 +86,18 @@ func TestAccAuthenticateAttachesDecider(t *testing.T) {
 	skip := func(r *http.Request) bool { return r.URL.Path == skipped }
 	var (
 		reached bool
-		p       auth.Principal
+		p       kernel.Principal
 		stored  bool
 		d       accessapi.Decider
 	)
 	h := authenticate(a, db, skip)(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		reached = true
-		p, stored = auth.FromContext(r.Context())
+		p, stored = kernel.FromContext(r.Context())
 		d, _ = accessapi.DeciderFrom(r.Context())
 	}))
 	check := func(name, path string, headers map[string]string, authorised bool) {
 		t.Helper()
-		reached, p, stored, d = false, auth.Principal{}, false, nil
+		reached, p, stored, d = false, kernel.Principal{}, false, nil
 		do(t, h, http.MethodGet, path, headers, "")
 		switch {
 		case !reached:
@@ -138,10 +139,10 @@ func (brokenSettings) Get(context.Context, string, any) error { return errors.Ne
 
 func TestAccAuthenticateStoreFailures(t *testing.T) {
 	db := inmem.New()
-	a, err := auth.NewAuthenticator(
+	a, err := authn.NewAuthenticator(
 		brokenUsers{db.Users()},
 		brokenSettings{db.Settings()},
-		auth.Options{Hash: testHash},
+		authn.Options{Hash: testHash},
 	)
 	if err != nil {
 		t.Fatal(err)

@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	auth "github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -223,7 +223,7 @@ func TestUnitAnonymousAccessOffGrantsNothing(t *testing.T) {
 
 // The middleware authorises the principal the test maps each request to and
 // stores it with its decider, which kernel.FromContext, accessapi.DeciderFrom
-// and auth.DeciderFrom read back. A failed authorisation is reported on the
+// and authn.DeciderFrom read back. A failed authorisation is reported on the
 // test the middleware was given, and answers 500 without serving the
 // handler.
 func TestUnitMiddleware(t *testing.T) {

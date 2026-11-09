@@ -19,11 +19,11 @@ import (
 	"github.com/go-chi/chi/v5"
 	"golang.org/x/mod/semver"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	ansiblefmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/ansible"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -76,7 +76,7 @@ func writeJSON(w http.ResponseWriter, r *http.Request, status int, v any) {
 }
 
 func (h handler) fail(w http.ResponseWriter, r *http.Request, err error) {
-	p, _ := auth.FromContext(r.Context())
+	p, _ := kernel.FromContext(r.Context())
 	h.k.Error(w, r, pkgroute.SourceError(err, p.Anonymous || p.Name == ""))
 }
 

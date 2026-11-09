@@ -12,10 +12,10 @@ import (
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	platinmem "github.com/weaveplatform/artifactweave/migration/platform/store/inmem"
+	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const kind = "test.derive"
@@ -23,14 +23,14 @@ const kind = "test.derive"
 // world is a queue over an in-memory store with a metric reader.
 type world struct {
 	t      *testing.T
-	st     store.Store
+	st     *platinmem.Store
 	q      *work.Queue
 	reader *sdkmetric.ManualReader
 }
 
 func newWorld(t *testing.T, o work.Options) *world {
 	t.Helper()
-	st := inmem.New()
+	st := platinmem.New(memtx.New())
 	reader := sdkmetric.NewManualReader()
 	o.Meters = sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
 	if o.Poll == 0 {
@@ -67,7 +67,7 @@ func (w *world) enqueue(key string) {
 	}
 }
 
-func (w *world) item(key string) (types.WorkItem, error) {
+func (w *world) item(key string) (work.WorkItem, error) {
 	return w.st.WorkQueue().Get(context.Background(), kind, key)
 }
 
@@ -136,23 +136,23 @@ func TestUnitBackoff(t *testing.T) {
 
 func TestUnitNew(t *testing.T) {
 	for _, o := range []work.Options{{Workers: -1}, {Lease: -1}, {MaxAttempts: -1}, {Poll: -1}} {
-		if _, err := work.New(inmem.New(), o); !errors.Is(err, work.ErrOptions) {
+		if _, err := work.New(platinmem.New(memtx.New()), o); !errors.Is(err, work.ErrOptions) {
 			t.Errorf("New(%+v): %v, want ErrOptions", o, err)
 		}
 	}
-	q, err := work.New(inmem.New(), work.Options{})
+	q, err := work.New(platinmem.New(memtx.New()), work.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := q.Handle(
 		kind,
-		func(context.Context, types.WorkItem) error { return nil },
+		func(context.Context, work.WorkItem) error { return nil },
 	); err != nil {
 		t.Fatal(err)
 	}
 	if err := q.Handle(
 		kind,
-		func(context.Context, types.WorkItem) error { return nil },
+		func(context.Context, work.WorkItem) error { return nil },
 	); !errors.Is(err, work.ErrDuplicateHandler) {
 		t.Fatalf("a second handler for one kind: %v", err)
 	}
@@ -166,7 +166,7 @@ func TestUnitRunCompletes(t *testing.T) {
 		mu   sync.Mutex
 		seen []string
 	)
-	if err := w.q.Handle(kind, func(_ context.Context, it types.WorkItem) error {
+	if err := w.q.Handle(kind, func(_ context.Context, it work.WorkItem) error {
 		mu.Lock()
 		defer mu.Unlock()
 		seen = append(seen, it.Key+" "+string(it.Payload))
@@ -191,7 +191,7 @@ func TestUnitRunCompletes(t *testing.T) {
 		t.Fatalf("handled %q", got)
 	}
 	for _, k := range []string{"a", "b"} {
-		if _, err := w.item(k); !errors.Is(err, store.ErrNotFound) {
+		if _, err := w.item(k); !errors.Is(err, kernel.ErrNotFound) {
 			t.Errorf("%s left in the queue: %v", k, err)
 		}
 	}
@@ -210,10 +210,10 @@ func TestUnitRunCompletes(t *testing.T) {
 	if !errors.Is(err, boom) {
 		t.Fatal(err)
 	}
-	if _, err := w.item("rolled-back"); !errors.Is(err, store.ErrNotFound) {
+	if _, err := w.item("rolled-back"); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("a rolled-back enqueue left %v", err)
 	}
-	if err := w.q.Enqueue(context.Background(), kind, "", nil); !errors.Is(err, store.ErrInvalid) {
+	if err := w.q.Enqueue(context.Background(), kind, "", nil); !errors.Is(err, kernel.ErrInvalid) {
 		t.Fatalf("an empty key: %v", err)
 	}
 }
@@ -226,7 +226,7 @@ func TestUnitRetryAndPark(t *testing.T) {
 		Backoff: func(int) time.Duration { return time.Millisecond },
 	})
 	var calls atomic.Int64
-	if err := w.q.Handle(kind, func(context.Context, types.WorkItem) error {
+	if err := w.q.Handle(kind, func(context.Context, work.WorkItem) error {
 		if calls.Add(1) == 2 {
 			panic("kaboom")
 		}
@@ -238,7 +238,7 @@ func TestUnitRetryAndPark(t *testing.T) {
 	w.run()
 	eventually(t, "the item to park", func() bool {
 		it, err := w.item("k")
-		return err == nil && it.State == types.WorkParked
+		return err == nil && it.State == work.WorkParked
 	})
 	it, _ := w.item("k")
 	if it.Attempts != 3 || it.LastError != "still broken" || calls.Load() != 3 {
@@ -258,7 +258,7 @@ func TestUnitPanicIsAFailure(t *testing.T) {
 	)
 	if err := w.q.Handle(
 		kind,
-		func(context.Context, types.WorkItem) error { panic("kaboom") },
+		func(context.Context, work.WorkItem) error { panic("kaboom") },
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -266,7 +266,7 @@ func TestUnitPanicIsAFailure(t *testing.T) {
 	w.run()
 	eventually(t, "the panic to be recorded", func() bool {
 		it, err := w.item("k")
-		return err == nil && it.State == types.WorkPending &&
+		return err == nil && it.State == work.WorkPending &&
 			strings.Contains(it.LastError, "kaboom") &&
 			strings.Contains(it.LastError, work.ErrPanic.Error())
 	})
@@ -276,7 +276,7 @@ func TestUnitPanicIsAFailure(t *testing.T) {
 func TestUnitStopReleases(t *testing.T) {
 	w := newWorld(t, work.Options{Workers: 1})
 	started := make(chan struct{})
-	if err := w.q.Handle(kind, func(ctx context.Context, _ types.WorkItem) error {
+	if err := w.q.Handle(kind, func(ctx context.Context, _ work.WorkItem) error {
 		close(started)
 		<-ctx.Done()
 		return ctx.Err()
@@ -294,7 +294,7 @@ func TestUnitStopReleases(t *testing.T) {
 	cancel()
 	<-done
 	it, err := w.item("k")
-	if err != nil || it.State != types.WorkPending || it.Attempts != 0 || it.LeasedBy != "" {
+	if err != nil || it.State != work.WorkPending || it.Attempts != 0 || it.LeasedBy != "" {
 		t.Fatalf("after stopping: %+v %v", it, err)
 	}
 	if runs, _, _ := w.metrics(); runs["released"] != 1 {
@@ -308,7 +308,7 @@ func TestUnitHeartbeat(t *testing.T) {
 	w := newWorld(t, work.Options{Workers: 1, Lease: 40 * time.Millisecond})
 	release := make(chan struct{})
 	var lost atomic.Bool
-	if err := w.q.Handle(kind, func(ctx context.Context, it types.WorkItem) error {
+	if err := w.q.Handle(kind, func(ctx context.Context, it work.WorkItem) error {
 		if it.Key == "slow" {
 			time.Sleep(150 * time.Millisecond)
 			return nil
@@ -327,18 +327,18 @@ func TestUnitHeartbeat(t *testing.T) {
 	w.run()
 	eventually(t, "the slow run to complete", func() bool {
 		_, err := w.item("slow")
-		return errors.Is(err, store.ErrNotFound)
+		return errors.Is(err, kernel.ErrNotFound)
 	})
-	if it, _, err := w.st.WorkQueue().LeaseKey(context.Background(), kind, "slow", store.WorkLease{
+	if it, _, err := w.st.WorkQueue().LeaseKey(context.Background(), kind, "slow", work.WorkLease{
 		Holder: "x", Until: time.Now().Add(time.Hour), Now: time.Now(),
-	}); !errors.Is(err, store.ErrNotFound) {
+	}); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("the slow item was run twice: %+v %v", it, err)
 	}
 
 	w.enqueue("stolen")
 	eventually(t, "the run to start", func() bool {
 		it, err := w.item("stolen")
-		return err == nil && it.State == types.WorkLeased
+		return err == nil && it.State == work.WorkLeased
 	})
 	it, _ := w.item("stolen")
 	// Another node completes the item, as one would after taking it over.
@@ -360,7 +360,7 @@ func TestUnitEnsureFresh(t *testing.T) {
 		calls atomic.Int64
 		fail  atomic.Bool
 	)
-	if err := w.q.Handle(kind, func(context.Context, types.WorkItem) error {
+	if err := w.q.Handle(kind, func(context.Context, work.WorkItem) error {
 		calls.Add(1)
 		if fail.Load() {
 			return errors.New("broken")
@@ -381,7 +381,7 @@ func TestUnitEnsureFresh(t *testing.T) {
 	if err := w.q.EnsureFresh(ctx, kind, "k"); err != nil || calls.Load() != 1 {
 		t.Fatalf("owed work: %v, %d calls", err, calls.Load())
 	}
-	if _, err := w.item("k"); !errors.Is(err, store.ErrNotFound) {
+	if _, err := w.item("k"); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("after EnsureFresh: %v", err)
 	}
 	// A failing run returns its error and leaves the item to retry.
@@ -397,7 +397,7 @@ func TestUnitEnsureFresh(t *testing.T) {
 	}
 	// A run held elsewhere is waited for.
 	fail.Store(false)
-	held, took, err := w.st.WorkQueue().LeaseKey(ctx, kind, "k", store.WorkLease{
+	held, took, err := w.st.WorkQueue().LeaseKey(ctx, kind, "k", work.WorkLease{
 		Holder: "elsewhere", Until: time.Now().Add(time.Hour), Now: time.Now(),
 	})
 	if err != nil || !took {
@@ -414,7 +414,7 @@ func TestUnitEnsureFresh(t *testing.T) {
 	}
 	// A parked item is reported, and a cancelled wait ends.
 	w.enqueue("p")
-	parked, _, _ := w.st.WorkQueue().LeaseKey(ctx, kind, "p", store.WorkLease{
+	parked, _, _ := w.st.WorkQueue().LeaseKey(ctx, kind, "p", work.WorkLease{
 		Holder: "elsewhere", Until: time.Now().Add(time.Hour), Now: time.Now(),
 	})
 	cctx, cancel := context.WithTimeout(ctx, 30*time.Millisecond)
@@ -422,7 +422,7 @@ func TestUnitEnsureFresh(t *testing.T) {
 	if err := w.q.EnsureFresh(cctx, kind, "p"); !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("waiting past the deadline: %v", err)
 	}
-	if err := w.st.WorkQueue().Fail(ctx, kind, "p", parked.Generation, store.WorkFailure{
+	if err := w.st.WorkQueue().Fail(ctx, kind, "p", parked.Generation, work.WorkFailure{
 		Error: "gave up", Park: true, Now: time.Now(),
 	}); err != nil {
 		t.Fatal(err)
@@ -437,7 +437,7 @@ func TestUnitWaitIdleDeadline(t *testing.T) {
 	w := newWorld(t, work.Options{})
 	if err := w.q.Handle(
 		kind,
-		func(context.Context, types.WorkItem) error { return nil },
+		func(context.Context, work.WorkItem) error { return nil },
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -451,7 +451,7 @@ func TestUnitWaitIdleDeadline(t *testing.T) {
 
 // With no handlers there is nothing to lease; Run waits for its context.
 func TestUnitRunWithoutHandlers(t *testing.T) {
-	q, err := work.New(inmem.New(), work.Options{})
+	q, err := work.New(platinmem.New(memtx.New()), work.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -463,22 +463,22 @@ func TestUnitRunWithoutHandlers(t *testing.T) {
 }
 
 // failingQueue fails every lease and every Stats call.
-type failingQueue struct{ store.WorkQueue }
+type failingQueue struct{ work.WorkQueue }
 
 var errStore = errors.New("store down")
 
-func (failingQueue) Lease(context.Context, store.WorkLease) ([]types.WorkItem, error) {
+func (failingQueue) Lease(context.Context, work.WorkLease) ([]work.WorkItem, error) {
 	return nil, errStore
 }
 
-func (failingQueue) Stats(context.Context) ([]types.WorkStats, error) { return nil, errStore }
+func (failingQueue) Stats(context.Context) ([]work.WorkStats, error) { return nil, errStore }
 
-type failingStore struct{ store.Store }
+type failingStore struct{ *platinmem.Store }
 
-func (f failingStore) WorkQueue() store.WorkQueue { return failingQueue{f.Store.WorkQueue()} }
+func (f failingStore) WorkQueue() work.WorkQueue { return failingQueue{f.Store.WorkQueue()} }
 
 func TestUnitStoreFailures(t *testing.T) {
-	st := failingStore{inmem.New()}
+	st := failingStore{platinmem.New(memtx.New())}
 	reader := sdkmetric.NewManualReader()
 	q, err := work.New(st, work.Options{
 		Poll: time.Millisecond, Meters: sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader)),
@@ -488,7 +488,7 @@ func TestUnitStoreFailures(t *testing.T) {
 	}
 	if err := q.Handle(
 		kind,
-		func(context.Context, types.WorkItem) error { return nil },
+		func(context.Context, work.WorkItem) error { return nil },
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -508,7 +508,7 @@ func TestUnitStoreFailures(t *testing.T) {
 
 func TestUnitPermanentRefusalParksWithoutRetry(t *testing.T) {
 	w := newWorld(t, work.Options{})
-	if err := w.q.Handle(kind, func(context.Context, types.WorkItem) error {
+	if err := w.q.Handle(kind, func(context.Context, work.WorkItem) error {
 		return errors.Join(work.ErrPermanent, errors.New("authority revoked"))
 	}); err != nil {
 		t.Fatal(err)
@@ -518,7 +518,7 @@ func TestUnitPermanentRefusalParksWithoutRetry(t *testing.T) {
 		t.Fatal(err)
 	}
 	record, err := w.item("revoked")
-	if err != nil || record.State != types.WorkParked || record.Attempts != 1 ||
+	if err != nil || record.State != work.WorkParked || record.Attempts != 1 ||
 		!strings.Contains(record.LastError, "authority revoked") {
 		t.Fatal(record, err)
 	}

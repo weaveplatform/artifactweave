@@ -136,11 +136,13 @@
 //     Azurite. It needs Docker and skips without it; CI runs it in the Linux
 //     unit job.
 //
-// The tests are external (package mirror_test), because the metadata store
-// and the shared types they build mirrors with alias this package's
-// declarations, and export_test.go opens the internals they reach. The
-// metadata store's replica and blob index contracts run on its in-memory,
-// SQLite and PostgreSQL stores, and the tests beside the metadata store's
-// and the shared types' bridges fail if an alias of the replica rows becomes
-// a declared copy.
+// The tests are external (package mirror_test), and export_test.go opens
+// the internals they reach. They build mirrors over testDB
+// (testdb_test.go): the platform's in-memory upload and lease stores, and a
+// blob and replica index that answers as the artifacts module's in-memory
+// indexes do, since platform code, tests included, never imports a module.
+// The artifacts contract runs the real indexes on the in-memory, SQLite and
+// PostgreSQL stores, and the tests beside the metadata store's and the
+// shared types' bridges fail if an alias of the replica rows becomes a
+// declared copy.
 package mirror

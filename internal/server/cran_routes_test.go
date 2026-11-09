@@ -13,9 +13,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -348,11 +348,11 @@ func TestUnitCRANReadAuthorityCallbacks(t *testing.T) {
 	w := newItemWorld(t, false)
 	c := repo.Config{Key: "cran-rights", Class: repo.Local, PackageType: repo.Cran}
 	cranRepo(t, w, c)
-	admin := auth.Principal{Name: "admin", Admin: true}
-	user := auth.Principal{Name: "user"}
+	admin := kernel.Principal{Name: "admin", Admin: true}
+	user := kernel.Principal{Name: "user"}
 	for _, tc := range []struct {
 		name        string
-		who         auth.Principal
+		who         kernel.Principal
 		checkErr    error
 		expectedOK  bool
 		expectedErr bool

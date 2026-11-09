@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -32,7 +32,11 @@ func seededHandler(t *testing.T) (http.Handler, *inmem.Store) {
 	t.Helper()
 	db := inmem.New()
 	support.Seed(t, db)
-	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{Hash: support.TestHash})
+	a, err := authn.NewAuthenticator(
+		db.Users(),
+		db.Settings(),
+		authn.Options{Hash: support.TestHash},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

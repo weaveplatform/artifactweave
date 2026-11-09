@@ -7,9 +7,11 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authz"
 	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -69,10 +71,10 @@ const refreshRoute = "POST /access/api/v1/tokens"
 // (expiredRefresh). Without credentials the request acts as anonymous when
 // anonymous access is on, except on the registry (decision 0031); otherwise
 // only public routes answer. Every
-// principal is then authorised once (auth.Authorize): its permissions are
+// principal is then authorised once (authn.Authorize): its permissions are
 // evaluated for the request, and the principal is stored with that
-// evaluator (auth.WithAuthorized), which handlers ask every question
-// through auth.DeciderFrom. The principal's name goes to the access log
+// evaluator (authn.WithAuthorized), which handlers ask every question
+// through authn.DeciderFrom. The principal's name goes to the access log
 // (noteUser). A request skip reports passes untouched, credentials or not: a
 // protocol's absent path, such as Go's checksum database, which its router
 // answers 404 whoever asks, a host route served to anyone, such as
@@ -82,7 +84,7 @@ const refreshRoute = "POST /access/api/v1/tokens"
 // which check the password and the token they carry themselves
 // (npmUserPath).
 func authenticate(
-	a *auth.Authenticator,
+	a *authn.Authenticator,
 	st store.Store,
 	skip func(r *http.Request) bool,
 ) func(http.Handler) http.Handler {
@@ -95,19 +97,19 @@ func authenticate(
 				return
 			}
 			if p, presented, err := credentials(ctx, a, r); presented {
-				if errors.Is(err, auth.ErrPasswordExpired) && ownPasswordChange(r, p.Name) {
+				if errors.Is(err, kernel.ErrPasswordExpired) && ownPasswordChange(r, p.Name) {
 					err = nil
 				}
 				if err == nil && p.Registry != nil && !dockerhttp.IsRegistryPath(r.URL.Path) {
 					// A registry token is good for the registry alone
 					// (decision 0005).
-					err = auth.ErrBadCredentials
+					err = kernel.ErrBadCredentials
 				}
 				var d *authz.Decider
 				if err == nil {
 					p, d, err = authorize(ctx, st, p, p.Anonymous)
 				} else if who, ok := expiredRefresh(ctx, a, r, err); ok {
-					next.ServeHTTP(w, r.WithContext(auth.WithExpiredToken(ctx, who)))
+					next.ServeHTTP(w, r.WithContext(authn.WithExpiredToken(ctx, who)))
 					return
 				}
 				if err != nil {
@@ -117,7 +119,7 @@ func authenticate(
 				noteUser(ctx, p.Name)
 				next.ServeHTTP(
 					w,
-					r.WithContext(auth.WithAuthorized(keepNPMCredential(ctx, r, p), p, d)),
+					r.WithContext(authn.WithAuthorized(keepNPMCredential(ctx, r, p), p, d)),
 				)
 				return
 			}
@@ -126,7 +128,7 @@ func authenticate(
 				// while anonymous access is on: an anonymous client then
 				// fetches an anonymous token and pulls with it, and one with
 				// credentials learns at once to send them (decision 0031).
-				apierror.Write(w, apierror.ProfileOCI, auth.ErrUnauthenticated)
+				apierror.Write(w, apierror.ProfileOCI, kernel.ErrUnauthenticated)
 				return
 			}
 			anonymous, err := a.AnonymousAllowed(ctx)
@@ -136,17 +138,17 @@ func authenticate(
 			}
 			switch {
 			case anonymous:
-				p, d, err := authorize(ctx, st, auth.Anonymous, true)
+				p, d, err := authorize(ctx, st, kernel.Anonymous, true)
 				if err != nil {
 					writeErr(w, r, err)
 					return
 				}
 				noteUser(ctx, p.Name)
-				next.ServeHTTP(w, r.WithContext(auth.WithAuthorized(ctx, p, d)))
+				next.ServeHTTP(w, r.WithContext(authn.WithAuthorized(ctx, p, d)))
 			case publicRoutes[r.Method+" "+r.URL.Path]:
 				next.ServeHTTP(w, r)
 			default:
-				apierror.Write(w, errorProfileFor(r.URL.Path), auth.ErrUnauthenticated)
+				apierror.Write(w, errorProfileFor(r.URL.Path), kernel.ErrUnauthenticated)
 			}
 		})
 	}
@@ -180,9 +182,9 @@ func ownPasswordChange(r *http.Request, user string) bool {
 // than quietly becoming anonymous.
 func credentials(
 	ctx context.Context,
-	a *auth.Authenticator,
+	a *authn.Authenticator,
 	r *http.Request,
-) (p auth.Principal, presented bool, err error) {
+) (p kernel.Principal, presented bool, err error) {
 	if user, password, ok := r.BasicAuth(); ok {
 		p, err = basicCredentials(ctx, a, user, password)
 		return p, true, err
@@ -199,42 +201,42 @@ func credentials(
 			return p, true, nil
 		}
 		if strings.HasPrefix(r.URL.Path, "/artifactory/api/gems/") && !strings.Contains(h, " ") &&
-			auth.LooksLikeToken(h) {
+			accessapi.LooksLikeToken(h) {
 			p, err = a.Token(ctx, h, "")
 			return p, true, err //nolint:wrapcheck // Authentication errors are rendered by status.
 		}
 		scheme, raw, _ := strings.Cut(h, " ")
 		if !strings.EqualFold(scheme, "Bearer") || raw == "" {
-			return auth.Principal{}, true, auth.ErrBadCredentials
+			return kernel.Principal{}, true, kernel.ErrBadCredentials
 		}
 		p, err = a.Token(ctx, strings.TrimSpace(raw), "")
 		return p, true, err //nolint:wrapcheck // apierror values, rendered by status
 	}
 	if k := r.Header.Get("X-JFrog-Art-Api"); k != "" {
 		if !types.IsReferenceToken(k) {
-			return auth.Principal{}, true, auth.ErrBadCredentials
+			return kernel.Principal{}, true, kernel.ErrBadCredentials
 		}
 		p, err = a.Token(ctx, k, "")
 		return p, true, err //nolint:wrapcheck // apierror values, rendered by status
 	}
 	if user, secret, ok := nugetAPIKey(r); ok {
 		if user == "" || secret == "" {
-			return auth.Principal{}, true, auth.ErrBadCredentials
+			return kernel.Principal{}, true, kernel.ErrBadCredentials
 		}
 		p, err = basicCredentials(ctx, a, user, secret)
 		return p, true, err
 	}
-	return auth.Principal{}, false, nil
+	return kernel.Principal{}, false, nil
 }
 
 // basicCredentials verifies a user and the secret Basic carries with it: a
 // password, or an access or reference token whose subject is the user.
 func basicCredentials(
 	ctx context.Context,
-	a *auth.Authenticator,
+	a *authn.Authenticator,
 	user, secret string,
-) (auth.Principal, error) {
-	if auth.LooksLikeToken(secret) {
+) (kernel.Principal, error) {
+	if accessapi.LooksLikeToken(secret) {
 		return a.Token(ctx, secret, user) //nolint:wrapcheck // apierror values, rendered by status
 	}
 	return a.Basic(ctx, user, secret) //nolint:wrapcheck // apierror values, rendered by status
@@ -271,34 +273,34 @@ func nugetAPIKey(r *http.Request) (string, string, bool) {
 // revoked and forged tokens still answer 401.
 func expiredRefresh(
 	ctx context.Context,
-	a *auth.Authenticator,
+	a *authn.Authenticator,
 	r *http.Request,
 	err error,
-) (auth.Refresher, bool) {
-	if !errors.Is(err, auth.ErrBadCredentials) || r.Method+" "+r.URL.Path != refreshRoute {
-		return auth.Refresher{}, false
+) (authn.Refresher, bool) {
+	if !errors.Is(err, kernel.ErrBadCredentials) || r.Method+" "+r.URL.Path != refreshRoute {
+		return authn.Refresher{}, false
 	}
 	scheme, raw, _ := strings.Cut(r.Header.Get("Authorization"), " ")
 	if !strings.EqualFold(scheme, "Bearer") {
-		return auth.Refresher{}, false
+		return authn.Refresher{}, false
 	}
 	return a.ExpiredToken(ctx, strings.TrimSpace(raw))
 }
 
 // authorize evaluates p's permissions for the request, returning p and its
-// decider as auth.Authorize does. A handler built without a store (tests of
+// decider as authn.Authorize does. A handler built without a store (tests of
 // the system endpoints) has nothing to evaluate, and p passes through
 // without a decider.
 func authorize(
 	ctx context.Context,
 	st store.Store,
-	p auth.Principal,
+	p kernel.Principal,
 	anonymous bool,
-) (auth.Principal, *authz.Decider, error) {
+) (kernel.Principal, *authz.Decider, error) {
 	if st == nil {
 		return p, nil, nil
 	}
-	return auth.Authorize(ctx, authz.Sources{ //nolint:wrapcheck // auth wraps its own errors
+	return authn.Authorize(ctx, authz.Sources{ //nolint:wrapcheck // auth wraps its own errors
 		Permissions: st.Permissions(), Groups: st.Groups(), AnonymousEnabled: anonymous,
 	}, p)
 }

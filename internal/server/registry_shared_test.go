@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -74,12 +74,12 @@ func TestAccRegistryRefusesWithoutDeciderBehindAuthentication(t *testing.T) {
 	if err := db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
 		t.Fatal(err)
 	}
-	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{Hash: testHash})
+	a, err := authn.NewAuthenticator(db.Users(), db.Settings(), authn.Options{Hash: testHash})
 	if err != nil {
 		t.Fatal(err)
 	}
 	for name, tc := range map[string]struct {
-		auth   *auth.Authenticator
+		auth   *authn.Authenticator
 		status int
 	}{
 		"with an authenticator": {a, http.StatusUnauthorized},

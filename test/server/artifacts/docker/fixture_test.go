@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/auth/token"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -143,7 +143,7 @@ func newStatusFixture(
 		secrets["forged-access"] = strings.Join(parts, ".")
 		c.Tokens = tokens
 		c.PasswordHash = testHash
-		c.Auth, err = auth.NewAuthenticator(c.Store.Users(), c.Store.Settings(), auth.Options{
+		c.Auth, err = authn.NewAuthenticator(c.Store.Users(), c.Store.Settings(), authn.Options{
 			Hash: testHash, Tokens: tokens,
 		})
 		if err != nil {

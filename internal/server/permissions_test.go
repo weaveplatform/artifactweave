@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func adminJSON() map[string]string {
@@ -130,7 +130,7 @@ func TestAccSeededPermissionsInEveryFormat(t *testing.T) {
 		for _, path := range []string{permV1, permV2, permAcc} {
 			rec := do(t, h, http.MethodGet, path+"/"+name, basic("admin", "pw"), "")
 			mustStatus(t, rec, 200, path+"/"+name)
-			if strings.Contains(rec.Body.String(), auth.AnonymousUser) {
+			if strings.Contains(rec.Body.String(), kernel.AnonymousUser) {
 				t.Errorf("%s/%s grants anonymous: %s", path, name, rec.Body)
 			}
 		}

@@ -16,13 +16,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	baseformat "github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	format "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/gitlfs"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -193,10 +193,10 @@ func statusOf(err error) int {
 	if errors.As(err, &rejected) {
 		return rejected.Status
 	}
-	if errors.Is(err, auth.ErrForbidden) || errors.Is(err, source.ErrDenied) {
+	if errors.Is(err, kernel.ErrForbidden) || errors.Is(err, source.ErrDenied) {
 		return http.StatusForbidden
 	}
-	if errors.Is(err, auth.ErrUnauthenticated) {
+	if errors.Is(err, kernel.ErrUnauthenticated) {
 		return http.StatusUnauthorized
 	}
 	if errors.Is(err, store.ErrNotFound) {

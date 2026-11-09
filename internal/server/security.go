@@ -12,8 +12,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/service/identity"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -489,7 +490,7 @@ func (s artifactoryService) ConfigureUserLockPolicy(
 	}
 	p := types.UserLockPolicy{
 		Enabled:       req.Body.Enabled != nil && *req.Body.Enabled,
-		LoginAttempts: auth.DefaultLoginAttempts,
+		LoginAttempts: authn.DefaultLoginAttempts,
 	}
 	if req.Body.LoginAttempts != nil {
 		if p.LoginAttempts = *req.Body.LoginAttempts; p.LoginAttempts < 1 {
@@ -539,7 +540,7 @@ func (s artifactoryService) SetPasswordExpirationPolicy(
 		return nil, badRequestf("a password expiration policy is required")
 	}
 	p := types.PasswordExpirationPolicy{
-		MaxAgeDays:    auth.DefaultPasswordMaxAgeDays,
+		MaxAgeDays:    authn.DefaultPasswordMaxAgeDays,
 		NotifyByEmail: true,
 	}
 	if req.Body.Enabled != nil {
@@ -657,7 +658,7 @@ func (s artifactoryService) ChangePassword(
 	ctx context.Context,
 	req artgen.ChangePasswordRequestObject,
 ) (artgen.ChangePasswordResponseObject, error) {
-	p, err := auth.RequireAuthenticated(ctx)
+	p, err := kernel.RequireAuthenticated(ctx)
 	if err != nil {
 		return nil, err //nolint:wrapcheck // typed for the response
 	}
@@ -667,7 +668,7 @@ func (s artifactoryService) ChangePassword(
 	b := req.Body
 	self := p.Name == b.UserName && !narrowedToken(p)
 	if !self && (!p.Admin || p.PasswordExpired) {
-		return nil, auth.ErrForbidden
+		return nil, kernel.ErrForbidden
 	}
 	st, err := s.content()
 	if err != nil {
@@ -688,7 +689,7 @@ func (s artifactoryService) CreateApiKey(
 	ctx context.Context,
 	_ artgen.CreateApiKeyRequestObject,
 ) (artgen.CreateApiKeyResponseObject, error) {
-	if _, err := auth.RequireAuthenticated(ctx); err != nil {
+	if _, err := kernel.RequireAuthenticated(ctx); err != nil {
 		return nil, err //nolint:wrapcheck // typed for the response
 	}
 	return nil, badRequestf(errAPIKeysRetired)
@@ -699,7 +700,7 @@ func (s artifactoryService) RegenerateApiKey(
 	ctx context.Context,
 	_ artgen.RegenerateApiKeyRequestObject,
 ) (artgen.RegenerateApiKeyResponseObject, error) {
-	if _, err := auth.RequireAuthenticated(ctx); err != nil {
+	if _, err := kernel.RequireAuthenticated(ctx); err != nil {
 		return nil, err //nolint:wrapcheck // typed for the response
 	}
 	return nil, badRequestf(errAPIKeysRetired)
@@ -711,7 +712,7 @@ func (s artifactoryService) GetApiKey(
 	ctx context.Context,
 	_ artgen.GetApiKeyRequestObject,
 ) (artgen.GetApiKeyResponseObject, error) {
-	if _, err := auth.RequireAuthenticated(ctx); err != nil {
+	if _, err := kernel.RequireAuthenticated(ctx); err != nil {
 		return nil, err //nolint:wrapcheck // typed for the response
 	}
 	return nil, apierror.New(http.StatusNotFound, "No API key exists: API keys are retired")
@@ -728,7 +729,7 @@ func (s artifactoryService) RevokeApiKey(
 		if err := adminOnly(ctx); err != nil {
 			return nil, err
 		}
-	} else if _, err := auth.RequireAuthenticated(
+	} else if _, err := kernel.RequireAuthenticated(
 		ctx,
 	); err != nil {
 		return nil, err //nolint:wrapcheck // typed for the response

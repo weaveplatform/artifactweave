@@ -10,9 +10,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/service/identity"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
@@ -61,7 +62,7 @@ func (s accessService) readerIdentity(ctx context.Context) (*identity.Service, e
 // groups, or self's record: administrators, and tokens whose system scope
 // covers identities:r, as the permission evaluator decides (decision 0006).
 func (s accessService) identityFor(ctx context.Context, self string) (*identity.Service, error) {
-	p, err := auth.RequireAuthenticated(ctx)
+	p, err := kernel.RequireAuthenticated(ctx)
 	if err != nil {
 		return nil, err //nolint:wrapcheck // an apierror value
 	}
@@ -78,7 +79,7 @@ func (s accessService) identityFor(ctx context.Context, self string) (*identity.
 		return nil, s.identityErr(ctx, "evaluate permissions", "", err)
 	}
 	if !a.d.System("identities", types.ScopeRead) {
-		return nil, auth.ErrForbidden
+		return nil, kernel.ErrForbidden
 	}
 	return svc, nil
 }
@@ -326,7 +327,7 @@ func (s accessService) ChangeUserPassword(
 	ctx context.Context,
 	req accessgen.ChangeUserPasswordRequestObject,
 ) (accessgen.ChangeUserPasswordResponseObject, error) {
-	p, err := auth.RequireAuthenticated(ctx)
+	p, err := kernel.RequireAuthenticated(ctx)
 	if err != nil {
 		return nil, err //nolint:wrapcheck // an apierror value
 	}
@@ -335,7 +336,7 @@ func (s accessService) ChangeUserPassword(
 	// with an expired password (the middleware lets that one request through),
 	// but not through a narrowed token (narrowedToken).
 	if !p.Admin && (p.Name != name || narrowedToken(p)) {
-		return nil, auth.ErrForbidden
+		return nil, kernel.ErrForbidden
 	}
 	if req.Body == nil || req.Body.Password == nil || *req.Body.Password == "" {
 		return nil, badRequestf("a body with the new password is required")
@@ -722,7 +723,7 @@ func (s accessService) GetBasicAuthenticationStatus(
 	if err != nil {
 		return nil, err
 	}
-	on, err := auth.BasicAuthEnabled(ctx, svc.Store.Settings())
+	on, err := authn.BasicAuthEnabled(ctx, svc.Store.Settings())
 	if err != nil {
 		return nil, s.identityErr(ctx, "read basic authentication switch", "", err)
 	}

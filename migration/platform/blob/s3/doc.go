@@ -142,8 +142,8 @@
 //
 //   - TestAccContractOnFake and TestAccContractWithDurableSessions: the
 //     blobtest contract on an in-memory fake of S3 with 256 KiB parts, the
-//     second with its sessions kept in the uploads table of the in-memory
-//     metadata store.
+//     second with its sessions kept in the uploads table of the platform's
+//     in-memory store.
 //   - TestAccContractOnMinIO: the contract on MinIO with S3's 5 MiB part
 //     floor, so multipart uploads, the copy into place and presigned GETs run
 //     end to end. TestAccConcurrentCommitsOnMinIO: sessions commit one blob

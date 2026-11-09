@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -19,6 +18,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	npmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
@@ -590,13 +590,13 @@ func TestAccReindexFaults(t *testing.T) {
 		http.StatusUnauthorized {
 		t.Errorf("no caller: %v", err)
 	}
-	admin := auth.WithPrincipal(ctx, auth.Principal{Name: "admin", Admin: true})
+	admin := kernel.WithPrincipal(ctx, kernel.Principal{Name: "admin", Admin: true})
 	for _, c := range []struct {
 		fail string
 		call func(artifactoryService) error
 	}{
 		{"settings", func(s artifactoryService) error {
-			_, err := s.reindex(auth.WithPrincipal(ctx, auth.Principal{Name: "deployer"}),
+			_, err := s.reindex(kernel.WithPrincipal(ctx, kernel.Principal{Name: "deployer"}),
 				repo.NuGet, "nuget-local", "", false)
 			return err
 		}},

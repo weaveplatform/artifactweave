@@ -8,8 +8,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/auth/token"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -134,10 +134,10 @@ func terraformServer(
 		t.Fatal(err)
 	}
 	tokens, _ := seedTokens(t, db)
-	a, err := auth.NewAuthenticator(
+	a, err := authn.NewAuthenticator(
 		db.Users(),
 		db.Settings(),
-		auth.Options{Hash: testHash, Tokens: tokens},
+		authn.Options{Hash: testHash, Tokens: tokens},
 	)
 	if err != nil {
 		t.Fatal(err)

@@ -9,13 +9,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	"github.com/weaveplatform/artifactweave/internal/config"
 	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/migration/access"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -54,7 +54,7 @@ var registerDebianSnapshotWork = server.RegisterDebianSnapshotWork
 type runtime struct {
 	keys   *crypt.Keyring
 	store  store.Store
-	auth   *auth.Authenticator
+	auth   *authn.Authenticator
 	tokens *token.Service // issues and verifies access tokens
 	// access is the access module over store, auth and tokens; the server
 	// is given its API beside them.
@@ -278,8 +278,8 @@ func openAccess(
 	st store.Store,
 	tokens *token.Service,
 	log *slog.Logger,
-) (*auth.Authenticator, *access.Module, error) {
-	authn, authErr := auth.NewAuthenticator(st.Users(), st.Settings(), auth.Options{
+) (*authn.Authenticator, *access.Module, error) {
+	authn, authErr := authn.NewAuthenticator(st.Users(), st.Settings(), authn.Options{
 		Hash: authHash, Tokens: tokens, Groups: st.Groups(),
 		APIRestrictions: st.APIRestrictions(),
 	})

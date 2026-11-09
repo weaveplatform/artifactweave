@@ -10,15 +10,17 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/config"
+	"github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // authHash is the password hashing cost: the zero value, the production
 // parameters, everywhere but this package's tests, which lower it in an init
 // (hash_test.go). No configuration reaches it.
-var authHash auth.HashParams
+var authHash authn.HashParams
 
 // InitialPasswordFile is where the first start writes a generated admin
 // password, under the data directory. A file with mode 0600 rather than a
@@ -34,7 +36,7 @@ func seedPrincipals(
 	st store.Store,
 	log *slog.Logger,
 ) error {
-	seeded, err := auth.Seeded(ctx, st)
+	seeded, err := authn.Seeded(ctx, st)
 	if err != nil {
 		return fmt.Errorf("seed: %w", err)
 	}
@@ -56,11 +58,15 @@ func seedPrincipals(
 			return fmt.Errorf("seed: %w", err)
 		}
 	}
-	hash, err := auth.HashPasswordWith(authHash, password)
+	hash, err := authn.HashPasswordWith(authHash, password)
 	if err != nil {
 		return fmt.Errorf("seed: %w", err)
 	}
-	seededNow, err := auth.SeedHashed(ctx, st, hash, time.Now())
+	// The build-info repository is the artifacts module's, so the seed
+	// creates it through the module's binding over the same store, which
+	// joins the seed's transaction.
+	repositories := repos.NewRepositories(st, access.KeysOf(st), access.ProjectsOf(st))
+	seededNow, err := authn.SeedHashed(ctx, st, repositories, hash, time.Now())
 	if err != nil {
 		return err //nolint:wrapcheck // auth wraps its own errors
 	}

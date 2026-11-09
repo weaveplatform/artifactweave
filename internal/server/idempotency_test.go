@@ -10,10 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -31,14 +32,14 @@ func TestUnitIdempotencyKey(t *testing.T) {
 			t.Fatalf("invalid key %q accepted", raw)
 		}
 	}
-	for _, p := range []auth.Principal{{}, auth.Anonymous, {Name: "registry", Registry: &types.RegistryAccess{}}} {
+	for _, p := range []kernel.Principal{{}, kernel.Anonymous, {Name: "registry", Registry: &types.RegistryAccess{}}} {
 		if _, err := appendReplayRequest(`"key"`, p, build.Append{}); err == nil {
 			t.Fatalf("unsupported principal accepted: %+v", p)
 		}
 	}
 	if _, err := appendReplayRequest(
 		`"key"`,
-		auth.Principal{Name: "user", Password: true},
+		kernel.Principal{Name: "user", Password: true},
 		build.Append{Started: time.Date(10000, 1, 1, 0, 0, 0, 0, time.UTC)},
 	); err == nil {
 		t.Fatal("unencodable scope accepted")
@@ -78,7 +79,7 @@ func (u replayDeadlineUsers) Get(context.Context, string) (types.User, error) {
 func TestAccAppendIdempotencyRecheckDeadline(t *testing.T) {
 	w := newItemWorld(t, false)
 	w.publish(artifactDoc("app", "1", testStarted, "artifact"))
-	a, err := auth.NewAuthenticator(w.db.Users(), w.db.Settings(), auth.Options{Hash: testHash})
+	a, err := authn.NewAuthenticator(w.db.Users(), w.db.Settings(), authn.Options{Hash: testHash})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,10 +87,10 @@ func TestAccAppendIdempotencyRecheckDeadline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	badAuth, err := auth.NewAuthenticator(
+	badAuth, err := authn.NewAuthenticator(
 		replayDeadlineUsers{w.db.Users()},
 		w.db.Settings(),
-		auth.Options{Hash: testHash},
+		authn.Options{Hash: testHash},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -117,7 +118,7 @@ func TestAccAppendIdempotencyRecheckDeadline(t *testing.T) {
 func TestAccAppendIdempotencyReplayEvaluatesCurrentPermissions(t *testing.T) {
 	w := newItemWorld(t, false)
 	w.publish(artifactDoc("app", "1", testStarted, "artifact"))
-	a, err := auth.NewAuthenticator(w.db.Users(), w.db.Settings(), auth.Options{Hash: testHash})
+	a, err := authn.NewAuthenticator(w.db.Users(), w.db.Settings(), authn.Options{Hash: testHash})
 	if err != nil {
 		t.Fatal(err)
 	}

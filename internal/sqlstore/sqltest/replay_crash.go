@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
+	platstoretest "github.com/weaveplatform/artifactweave/migration/platform/store/storetest"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
@@ -28,8 +28,9 @@ func crashReplayRequest() store.ReplayRequest {
 }
 
 // ReplayCrash kills a separate process after its transactional mutation but
-// before its receipt commits. Both the effect and receipt must roll back.
-func ReplayCrash(t *testing.T, s *sqlcommon.Store, env []string) {
+// before its receipt commits. Both the effect and receipt must roll back. It
+// uses only s's settings and replay stores, so it takes the platform's Store.
+func ReplayCrash(t *testing.T, s platstoretest.Store, env []string) {
 	t.Helper()
 	executable, err := os.Executable()
 	if err != nil {
@@ -82,7 +83,7 @@ func ReplayCrash(t *testing.T, s *sqlcommon.Store, env []string) {
 }
 
 // ReplayCrashChild is called only by each backend's subprocess test helper.
-func ReplayCrashChild(t *testing.T, s *sqlcommon.Store) {
+func ReplayCrashChild(t *testing.T, s platstoretest.Store) {
 	t.Helper()
 	_, err := s.Replays().
 		Do(t.Context(), crashReplayRequest(), func(ctx context.Context) (int64, error) {

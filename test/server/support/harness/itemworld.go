@@ -8,8 +8,9 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -87,7 +88,7 @@ func NewItemWorld(t *testing.T, anonymous bool, tune ...Tune) *ItemWorld {
 	support.Seed(t, db)
 	hash := support.CheapHash
 	for _, u := range []types.User{
-		{Name: "reader", PasswordHash: hash, Groups: []string{auth.ReadersGroup}},
+		{Name: "reader", PasswordHash: hash, Groups: []string{authn.ReadersGroup}},
 		{Name: "deployer", PasswordHash: hash},
 		{Name: "user", PasswordHash: hash},
 	} {
@@ -116,7 +117,7 @@ func NewItemWorld(t *testing.T, anonymous bool, tune ...Tune) *ItemWorld {
 			Name: AnonymousRemotes,
 			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
 				Actions: types.Grants{Users: map[string]types.Actions{
-					auth.AnonymousUser: types.ActionRead,
+					kernel.AnonymousUser: types.ActionRead,
 				}},
 				Targets: map[string]types.Target{types.TargetAnyRemote: {Include: []string{"**"}}},
 			}},
@@ -145,7 +146,11 @@ func NewItemWorld(t *testing.T, anonymous bool, tune ...Tune) *ItemWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{Hash: support.TestHash})
+	a, err := authn.NewAuthenticator(
+		db.Users(),
+		db.Settings(),
+		authn.Options{Hash: support.TestHash},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -33,7 +33,7 @@ func TestUnitAffectedPlanChoosesOnlyOwnedChanges(t *testing.T) {
 		{"deployment guide and code", []change{{status: "M", path: "deploy/platform/terraform/aws/cdn/README.md"}, {status: "M", path: "deploy/check.sh"}}, "deployment", ""},
 		{"deployment template", []change{{status: "M", path: "deploy/platform/SCENARIO-TEMPLATE.md"}}, "deployment", ""},
 		{"fixture readme", []change{{status: "M", path: "test/acceptance/testdata/upstreams/README.md"}}, "full", ""},
-		{"shared auth", []change{{status: "M", path: "internal/auth/auth.go"}}, "full", ""},
+		{"shared auth", []change{{status: "M", path: "migration/access/core/authn/auth.go"}}, "full", ""},
 		{"shared server", []change{{status: "M", path: "internal/server/server.go"}}, "full", ""},
 		{"shared fixture", []change{{status: "M", path: "test/server/support/support.go"}}, "full", ""},
 		{"new server test", []change{{status: "A", path: "test/server/artifacts/npm/new_test.go"}}, "full", ""},

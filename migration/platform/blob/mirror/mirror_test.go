@@ -16,9 +16,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/mirror"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const testChunk = 16 << 10
@@ -44,11 +41,11 @@ func newMirror(
 	t *testing.T,
 	ms []mirror.Member,
 	tune func(*mirror.Options),
-) (*mirror.Store, store.ReplicaIndex) {
+) (*mirror.Store, replicaIndex) {
 	t.Helper()
 	o := mirror.Options{
 		Members: ms, ChunkSize: testChunk,
-		Sessions: session.NewMemory(), Replicas: inmem.New().Replicas(),
+		Sessions: session.NewMemory(), Replicas: newTestDB().Replicas(),
 	}
 	if tune != nil {
 		tune(&o)
@@ -58,7 +55,7 @@ func newMirror(
 		t.Fatal(err)
 	}
 	// The mirror's port leaves out Get, which the tests read records with.
-	return s, o.Replicas.(store.ReplicaIndex)
+	return s, o.Replicas.(replicaIndex)
 }
 
 var contractOptions = blobtest.Options{LargeSize: 3*testChunk + 1234}
@@ -114,7 +111,7 @@ func TestUnitContractWithDurableSessions(t *testing.T) {
 	blobtest.Run(t, func(t *testing.T) blob.Store {
 		_, ms := fakes(3, true)
 		s, _ := newMirror(t, ms, func(o *mirror.Options) {
-			o.Sessions = session.InUploads(inmem.New().Uploads(), "mirror:test")
+			o.Sessions = session.InUploads(newTestDB().Uploads(), "mirror:test")
 		})
 		return s
 	}, contractOptions)
@@ -127,13 +124,13 @@ func put(t *testing.T, s *mirror.Store, body []byte) blob.Info {
 }
 
 // states returns each member's replica state for sha.
-func states(t *testing.T, r store.ReplicaIndex, sha string) map[string]types.ReplicaState {
+func states(t *testing.T, r replicaIndex, sha string) map[string]mirror.ReplicaState {
 	t.Helper()
 	recs, err := r.ForBlob(context.Background(), sha)
 	if err != nil {
 		t.Fatal(err)
 	}
-	out := map[string]types.ReplicaState{}
+	out := map[string]mirror.ReplicaState{}
 	for _, rec := range recs {
 		out[rec.Member] = rec.State
 	}
@@ -142,9 +139,9 @@ func states(t *testing.T, r store.ReplicaIndex, sha string) map[string]types.Rep
 
 func wantStates(
 	t *testing.T,
-	r store.ReplicaIndex,
+	r replicaIndex,
 	sha string,
-	want map[string]types.ReplicaState,
+	want map[string]mirror.ReplicaState,
 ) {
 	t.Helper()
 	got := states(t, r, sha)
@@ -164,8 +161,8 @@ func TestUnitMemberDownAtAppend(t *testing.T) {
 	f[2].failOn("append", 0, errInjected)
 	body := blobtest.Content(1, 2*testChunk+5)
 	info := put(t, s, body)
-	wantStates(t, r, info.Digests.SHA256, map[string]types.ReplicaState{
-		"m0": types.ReplicaPresent, "m1": types.ReplicaPresent, "m2": types.ReplicaPending,
+	wantStates(t, r, info.Digests.SHA256, map[string]mirror.ReplicaState{
+		"m0": mirror.ReplicaPresent, "m1": mirror.ReplicaPresent, "m2": mirror.ReplicaPending,
 	})
 	if f[2].has(info.Digests.SHA256) {
 		t.Fatal("the ejected member stored the blob")
@@ -181,8 +178,8 @@ func TestUnitMemberFailsAtCommit(t *testing.T) {
 	s, r := newMirror(t, ms, nil)
 	f[1].failOn("commit", 0, errInjected)
 	info := put(t, s, blobtest.Content(2, 100))
-	wantStates(t, r, info.Digests.SHA256, map[string]types.ReplicaState{
-		"m0": types.ReplicaPresent, "m1": types.ReplicaPending, "m2": types.ReplicaPresent,
+	wantStates(t, r, info.Digests.SHA256, map[string]mirror.ReplicaState{
+		"m0": mirror.ReplicaPresent, "m1": mirror.ReplicaPending, "m2": mirror.ReplicaPresent,
 	})
 }
 
@@ -252,8 +249,8 @@ func retryAfterPartialCommit(t *testing.T, resume bool) {
 			t.Fatal(err)
 		}
 		sha := blobtest.Digest(body).SHA256
-		wantStates(t, r, sha, map[string]types.ReplicaState{
-			"m0": types.ReplicaPresent, "m1": types.ReplicaPending, "m2": types.ReplicaPending,
+		wantStates(t, r, sha, map[string]mirror.ReplicaState{
+			"m0": mirror.ReplicaPresent, "m1": mirror.ReplicaPending, "m2": mirror.ReplicaPending,
 		})
 		// m1's commit went through after all but the answer was lost: its
 		// session is gone and it holds the blob.
@@ -281,12 +278,12 @@ func retryAfterPartialCommit(t *testing.T, resume bool) {
 
 // synctestWaitStragglers waits (outside a bubble) until n members are
 // present for sha.
-func synctestWaitStragglers(t *testing.T, r store.ReplicaIndex, sha string, n int) {
+func synctestWaitStragglers(t *testing.T, r replicaIndex, sha string, n int) {
 	t.Helper()
 	for range 200 {
 		present := 0
 		for _, st := range states(t, r, sha) {
-			if st == types.ReplicaPresent {
+			if st == mirror.ReplicaPresent {
 				present++
 			}
 		}
@@ -305,12 +302,12 @@ func TestUnitStragglers(t *testing.T) {
 		f[2].slow("commit", 10*time.Second)
 		info := put(t, s, blobtest.Content(4, 64))
 		sha := info.Digests.SHA256
-		if states(t, r, sha)["m2"] != types.ReplicaPending {
+		if states(t, r, sha)["m2"] != mirror.ReplicaPending {
 			t.Fatalf("a member still committing must be pending: %v", states(t, r, sha))
 		}
 		time.Sleep(11 * time.Second)
 		synctest.Wait()
-		if states(t, r, sha)["m2"] != types.ReplicaPresent {
+		if states(t, r, sha)["m2"] != mirror.ReplicaPresent {
 			t.Fatalf("the straggler finished: %v", states(t, r, sha))
 		}
 
@@ -319,7 +316,7 @@ func TestUnitStragglers(t *testing.T) {
 		time.Sleep(31 * time.Second)
 		synctest.Wait()
 		rec, err := r.Get(context.Background(), info.Digests.SHA256, "m2")
-		if err != nil || rec.State != types.ReplicaPending ||
+		if err != nil || rec.State != mirror.ReplicaPending ||
 			!bytes.Contains([]byte(rec.LastError), []byte("canceled")) {
 			t.Fatalf("a straggler past the timeout stays pending: %+v %v", rec, err)
 		}
@@ -369,7 +366,7 @@ func TestUnitWaitIdle(t *testing.T) {
 		if err := s.WaitIdle(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if got := states(t, r, sha)["m2"]; got != types.ReplicaPresent {
+		if got := states(t, r, sha)["m2"]; got != mirror.ReplicaPresent {
 			t.Fatalf("WaitIdle returned before the straggler was recorded: %v", got)
 		}
 	})
@@ -491,8 +488,8 @@ func TestUnitBreaker(t *testing.T) {
 		}
 		// While open it gets no new copies; its copy is deferred.
 		info2 := put(t, s, blobtest.Content(9, 100))
-		wantStates(t, r, info2.Digests.SHA256, map[string]types.ReplicaState{
-			"m0": types.ReplicaPending, "m1": types.ReplicaPresent, "m2": types.ReplicaPresent,
+		wantStates(t, r, info2.Digests.SHA256, map[string]mirror.ReplicaState{
+			"m0": mirror.ReplicaPending, "m1": mirror.ReplicaPresent, "m2": mirror.ReplicaPresent,
 		})
 		time.Sleep(16 * time.Second)
 		if _, err := s.Stat(ctx, sha); err != nil || f[0].calls["stat"] != calls+1 {
@@ -519,7 +516,7 @@ func TestUnitDeleteWithMemberDown(t *testing.T) {
 	if err := s.Delete(ctx, sha); err != nil {
 		t.Fatal(err)
 	}
-	wantStates(t, r, sha, map[string]types.ReplicaState{"m1": types.ReplicaDeleting})
+	wantStates(t, r, sha, map[string]mirror.ReplicaState{"m1": mirror.ReplicaDeleting})
 	if ok, err := s.Exists(ctx, sha); err != nil || ok {
 		t.Fatalf("a tombstoned blob exists: %v %v", ok, err)
 	}
@@ -698,7 +695,7 @@ func TestUnitSignFailureKeepsHealth(t *testing.T) {
 func TestUnitNewValidates(t *testing.T) {
 	st := newFake()
 	m := func(name string) mirror.Member { return mirror.Member{Name: name, Store: st, WriteEnabled: true} }
-	base := mirror.Options{Sessions: session.NewMemory(), Replicas: inmem.New().Replicas()}
+	base := mirror.Options{Sessions: session.NewMemory(), Replicas: newTestDB().Replicas()}
 	cases := map[string]mirror.Options{
 		"no members":      {},
 		"bad name":        {Members: []mirror.Member{m("Bad-Name")}},
@@ -970,39 +967,39 @@ func TestUnitReadErrors(t *testing.T) {
 
 // failingReplicas is a replica index whose operations fail on demand.
 type failingReplicas struct {
-	store.ReplicaIndex
+	replicaIndex
 	put, forBlob, deleteBlob error
 }
 
-func (f failingReplicas) Put(ctx context.Context, r types.BlobReplica) error {
+func (f failingReplicas) Put(ctx context.Context, r mirror.BlobReplica) error {
 	if f.put != nil {
 		return f.put
 	}
-	return f.ReplicaIndex.Put(ctx, r) //nolint:wrapcheck // test wrapper
+	return f.replicaIndex.Put(ctx, r) //nolint:wrapcheck // test wrapper
 }
 
-func (f failingReplicas) ForBlob(ctx context.Context, sha string) ([]types.BlobReplica, error) {
+func (f failingReplicas) ForBlob(ctx context.Context, sha string) ([]mirror.BlobReplica, error) {
 	if f.forBlob != nil {
 		return nil, f.forBlob
 	}
-	return f.ReplicaIndex.ForBlob(ctx, sha) //nolint:wrapcheck // test wrapper
+	return f.replicaIndex.ForBlob(ctx, sha) //nolint:wrapcheck // test wrapper
 }
 
 func (f failingReplicas) DeleteBlob(ctx context.Context, sha string) (int64, error) {
 	if f.deleteBlob != nil {
 		return 0, f.deleteBlob
 	}
-	return f.ReplicaIndex.DeleteBlob(ctx, sha) //nolint:wrapcheck // test wrapper
+	return f.replicaIndex.DeleteBlob(ctx, sha) //nolint:wrapcheck // test wrapper
 }
 
 func TestUnitReplicaIndexFailures(t *testing.T) {
 	ctx := context.Background()
 	_, ms := fakes(3, true)
-	base := inmem.New().Replicas()
+	base := newTestDB().Replicas()
 	s, _ := newMirror(
 		t,
 		ms,
-		func(o *mirror.Options) { o.Replicas = failingReplicas{ReplicaIndex: base, put: errInjected} },
+		func(o *mirror.Options) { o.Replicas = failingReplicas{replicaIndex: base, put: errInjected} },
 	)
 	u, err := s.BeginUpload(ctx)
 	if err != nil {
@@ -1019,7 +1016,7 @@ func TestUnitReplicaIndexFailures(t *testing.T) {
 	s, _ = newMirror(
 		t,
 		ms,
-		func(o *mirror.Options) { o.Replicas = failingReplicas{ReplicaIndex: base, forBlob: errInjected} },
+		func(o *mirror.Options) { o.Replicas = failingReplicas{replicaIndex: base, forBlob: errInjected} },
 	)
 	if _, err := s.Stat(ctx, sha); !errors.Is(err, errInjected) {
 		t.Fatal(err)
@@ -1034,7 +1031,7 @@ func TestUnitReplicaIndexFailures(t *testing.T) {
 	s, _ = newMirror(
 		t,
 		ms,
-		func(o *mirror.Options) { o.Replicas = failingReplicas{ReplicaIndex: base, deleteBlob: errInjected} },
+		func(o *mirror.Options) { o.Replicas = failingReplicas{replicaIndex: base, deleteBlob: errInjected} },
 	)
 	if err := s.Delete(ctx, sha); !errors.Is(err, errInjected) {
 		t.Fatal(err)
@@ -1042,7 +1039,7 @@ func TestUnitReplicaIndexFailures(t *testing.T) {
 	f, ms2 := fakes(2, false)
 	s, _ = newMirror(t, ms2, func(o *mirror.Options) {
 		o.WriteQuorum = 1
-		o.Replicas = failingReplicas{ReplicaIndex: base, put: errInjected}
+		o.Replicas = failingReplicas{replicaIndex: base, put: errInjected}
 	})
 	f[0].failOn("delete", 0, errInjected)
 	if err := s.Delete(ctx, sha); !errors.Is(err, errInjected) {

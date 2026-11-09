@@ -20,10 +20,10 @@
 //     and the caller, checks permissions, stores a published bundle through
 //     the item service, where the format's hooks admit and index it, reads
 //     the package index, items and blobs, serves items and writes errors;
-//     the caller's principal (internal/auth, through its kernel bridge),
-//     which every route but discovery requires to be authenticated; and
-//     the format package, whose rules check every slug, version and path
-//     and whose Metadata the reads decode from the index.
+//     the caller's principal (the kernel), which every route but discovery
+//     requires to be authenticated; and the format package, whose rules
+//     check every slug, version and path and whose Metadata the reads decode
+//     from the index.
 //
 // # Outputs
 //

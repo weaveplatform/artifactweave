@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 )
@@ -25,7 +25,7 @@ func newTokenFixture(t *testing.T, tune ...func(*Config)) (http.Handler, statusS
 	options := []func(*Config){func(c *Config) {
 		c.Tokens, secrets = seedTokens(t, c.Store)
 		var err error
-		c.Auth, err = auth.NewAuthenticator(c.Store.Users(), c.Store.Settings(), auth.Options{
+		c.Auth, err = authn.NewAuthenticator(c.Store.Users(), c.Store.Settings(), authn.Options{
 			Hash: testHash, Tokens: c.Tokens, APIRestrictions: c.Store.APIRestrictions(),
 		})
 		if err != nil {

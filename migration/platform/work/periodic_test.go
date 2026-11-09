@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	platinmem "github.com/weaveplatform/artifactweave/migration/platform/store/inmem"
+	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const periodicKind = "test.periodic"
@@ -32,7 +32,7 @@ type recorder struct {
 	w    *world
 }
 
-func (r *recorder) handle(ctx context.Context, it types.WorkItem) error {
+func (r *recorder) handle(ctx context.Context, it work.WorkItem) error {
 	r.mu.Lock()
 	r.runs[it.Key]++
 	n := r.runs[it.Key]
@@ -89,7 +89,7 @@ func TestUnitRunDue(t *testing.T) {
 	if r.count("a") != 1 || r.count("again") != 1 || r.count("bad") != 1 {
 		t.Fatalf("first pass ran %v", r.runs)
 	}
-	if _, err := w.st.WorkQueue().Get(ctx, periodicKind, "a"); !errors.Is(err, store.ErrNotFound) {
+	if _, err := w.st.WorkQueue().Get(ctx, periodicKind, "a"); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("a is done: %v", err)
 	}
 	// "again" is due again; "bad" waits out its backoff.
@@ -98,7 +98,7 @@ func TestUnitRunDue(t *testing.T) {
 		t.Fatalf("second pass: %d runs, %v, %v", n, err, r.runs)
 	}
 	bad, err := w.st.WorkQueue().Get(ctx, periodicKind, "bad")
-	if err != nil || bad.State != types.WorkPending || bad.LastError != "bad item" {
+	if err != nil || bad.State != work.WorkPending || bad.LastError != "bad item" {
 		t.Fatalf("the failed item: %+v %v", bad, err)
 	}
 	if _, err := w.q.RunDue(ctx, "test.unknown"); !errors.Is(err, work.ErrNoHandler) {
@@ -131,7 +131,7 @@ func (c *clock) add(d time.Duration) {
 // its first run; a run of the key "last" calls last instead.
 func requeueOnce(q *work.Queue, last func(context.Context) error) work.Handler {
 	runs := map[string]int{}
-	return func(ctx context.Context, it types.WorkItem) error {
+	return func(ctx context.Context, it work.WorkItem) error {
 		// RunDue runs one item at a time, so runs needs no lock.
 		runs[it.Key]++
 		if it.Key == "last" {
@@ -164,7 +164,7 @@ func TestUnitRunDueTies(t *testing.T) {
 		t.Fatalf("first pass: %d runs, %v, %v", n, err, r.runs)
 	}
 	again, err := w.st.WorkQueue().Get(ctx, periodicKind, "again")
-	if err != nil || again.State != types.WorkPending || again.Attempts != 0 ||
+	if err != nil || again.State != work.WorkPending || again.Attempts != 0 ||
 		again.LeasedBy != "" {
 		t.Fatalf("the re-queued item after the pass: %+v %v", again, err)
 	}
@@ -195,7 +195,7 @@ func TestUnitRunDueStopped(t *testing.T) {
 	}
 	for _, key := range []string{"again", "last"} {
 		it, err := w.st.WorkQueue().Get(context.Background(), periodicKind, key)
-		if err != nil || it.State != types.WorkPending || it.Attempts != 0 {
+		if err != nil || it.State != work.WorkPending || it.Attempts != 0 {
 			t.Fatalf("%s after the pass stopped: %+v %v", key, it, err)
 		}
 	}
@@ -211,7 +211,7 @@ func TestUnitRunDueHeldLeaseRunsOut(t *testing.T) {
 		func(ctx context.Context) error {
 			c.add(2 * time.Minute)
 			now := c.now()
-			_, took, err := w.st.WorkQueue().LeaseKey(ctx, periodicKind, "a1", store.WorkLease{
+			_, took, err := w.st.WorkQueue().LeaseKey(ctx, periodicKind, "a1", work.WorkLease{
 				Holder: "elsewhere", Until: now.Add(time.Hour), Now: now,
 			})
 			if err != nil || !took {
@@ -233,28 +233,31 @@ func TestUnitRunDueHeldLeaseRunsOut(t *testing.T) {
 		t.Fatalf("the item taken over: %+v %v", it, err)
 	}
 	if it, err := w.st.WorkQueue().Get(ctx, periodicKind, "a2"); err != nil ||
-		it.State != types.WorkPending {
+		it.State != work.WorkPending {
 		t.Fatalf("the item held anew: %+v %v", it, err)
 	}
 }
 
 // releaseFailing fails every Release.
-type releaseFailing struct{ store.WorkQueue }
+type releaseFailing struct{ work.WorkQueue }
 
 func (releaseFailing) Release(context.Context, string, string, int64, time.Time) error {
 	return errStore
 }
 
-type releaseFailingStore struct{ store.Store }
+type releaseFailingStore struct{ *platinmem.Store }
 
-func (f releaseFailingStore) WorkQueue() store.WorkQueue {
+func (f releaseFailingStore) WorkQueue() work.WorkQueue {
 	return releaseFailing{f.Store.WorkQueue()}
 }
 
 // A pass that cannot hand back the item it holds reports it, with the runs
 // it made.
 func TestUnitRunDueHandBackFailure(t *testing.T) {
-	q, err := work.New(releaseFailingStore{inmem.New()}, work.Options{Now: newClock().now})
+	q, err := work.New(
+		releaseFailingStore{platinmem.New(memtx.New())},
+		work.Options{Now: newClock().now},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -275,7 +278,7 @@ func TestUnitHandleEveryTicks(t *testing.T) {
 	w := newWorld(t, work.Options{})
 	ran := make(chan string, 1)
 	if err := w.q.HandleEvery(periodicKind, 10*time.Millisecond,
-		func(_ context.Context, it types.WorkItem) error {
+		func(_ context.Context, it work.WorkItem) error {
 			ran <- it.Key
 			return nil
 		}); err != nil {
@@ -301,7 +304,7 @@ func TestUnitRunDueStoreFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := q.HandleEvery(periodicKind, time.Millisecond,
-		func(context.Context, types.WorkItem) error { return nil }); err != nil {
+		func(context.Context, work.WorkItem) error { return nil }); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := q.RunDue(context.Background(), periodicKind); !errors.Is(err, errStore) {

@@ -9,15 +9,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	"github.com/weaveplatform/artifactweave/internal/service/oidc"
 	"github.com/weaveplatform/artifactweave/internal/service/roles"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -139,8 +140,8 @@ var matrixPrincipals = []matrixPrincipal{
 	}, formatGrants("", rawd))},
 	// Anonymous with anonymous access on holds nothing: since 7.84.3
 	// neither seeded permission grants it, Any Remote included (#383).
-	{name: "anon-on", user: auth.AnonymousUser, anonymous: true, anonymousOn: true},
-	{name: "anon-off", user: auth.AnonymousUser, anonymous: true},
+	{name: "anon-on", user: kernel.AnonymousUser, anonymous: true, anonymousOn: true},
+	{name: "anon-off", user: kernel.AnonymousUser, anonymous: true},
 	// member's token scoped to A: what member holds in A, nothing in B.
 	{
 		name: "tok-repo", user: "member", token: true, scope: "artifact:libs-local:*",
@@ -1642,7 +1643,7 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 	}
 
 	tokens, secrets := seedMatrixTokens(t, db)
-	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{
+	a, err := authn.NewAuthenticator(db.Users(), db.Settings(), authn.Options{
 		Hash: testHash, Tokens: tokens,
 	})
 	must(err)

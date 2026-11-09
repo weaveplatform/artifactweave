@@ -12,11 +12,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	ml "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/machinelearning"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -95,7 +95,7 @@ func (h handler) start(w http.ResponseWriter, r *http.Request) {
 		h.fail(w, r, err)
 		return
 	}
-	p, ok := auth.FromContext(r.Context())
+	p, ok := kernel.FromContext(r.Context())
 	if !ok || p.Anonymous {
 		h.fail(w, r, apierror.New(http.StatusUnauthorized, "authentication required"))
 		return

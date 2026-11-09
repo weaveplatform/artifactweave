@@ -64,13 +64,12 @@
 //   - TestUnitFixtureReadsAreRootRelative,
 //     TestUnitFixtureReadRuleDetectsViolations: tests read repository
 //     fixtures through repopath.
-//   - TestUnitPrincipalInternals: outside internal/auth and the staged
-//     kernel and access trees, no Go file selects IsTokenAuthenticated,
-//     TokenSubject or PasswordRevision, the Principal fields that access
-//     trusts when it rechecks a credential, or sets one in a composite
-//     literal (PasswordRevision only in a Principal literal, since the
-//     credential references declare it too); its cases prove each rule can
-//     fail.
+//   - TestUnitPrincipalInternals: outside the staged kernel and access
+//     trees, no Go file selects IsTokenAuthenticated, TokenSubject or
+//     PasswordRevision, the Principal fields that access trusts when it
+//     rechecks a credential, or sets one in a composite literal
+//     (PasswordRevision only in a Principal literal, since the credential
+//     references declare it too); its cases prove each rule can fail.
 //   - TestUnitWithPrincipalCallers: no production file names WithPrincipal,
 //     which stores a principal without its decider, except the bridge that
 //     aliases it, access/api's WithCaller, which binds the decider next, and
@@ -79,10 +78,11 @@
 //     naming it is caught.
 //   - TestUnitTestsAvoidAccessInternals,
 //     TestUnitAccessInternalsRuleDetectsViolations: outside access, no test
-//     imports internal/authz, internal/auth, internal/auth/token or a package
-//     of access core other than test support. Only the server root,
-//     internal/app and the test/server harnesses may import the
-//     authenticator and the token service, until TST-04 to TST-07 and WEB-22
-//     remove the reason, and an allowlist entry that no file uses fails; the
-//     second proves each rule can fail.
+//     imports a package of access core, such as the evaluator, other than
+//     test support, or the legacy internal/auth and internal/auth/token,
+//     which hold only bridges. Only the server root, internal/app and the
+//     test/server harnesses may import the authenticator and the token
+//     service, until TST-04 to TST-07 and WEB-22 remove the reason, and an
+//     allowlist entry that no file uses fails; the second proves each rule
+//     can fail.
 package layout

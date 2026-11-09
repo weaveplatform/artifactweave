@@ -13,8 +13,9 @@ per-disclosed-path checks. Operational behavior is documented in
 ## Contracts and ownership
 
 `migration/artifacts/core/remote/source` imports no server package and does not
-receive a transaction or format write-hook environment. `pkg/types/source.go` defines
-durable, secret-free `RepositoryIncarnation`, `SourceGeneration` and tagged
+receive a transaction or format write-hook environment.
+`migration/artifacts/core/model/source.go` defines durable, secret-free
+`RepositoryIncarnation`, `SourceGeneration` and tagged
 `SourceIdentity` records; [#619](https://github.com/weaveplatform/artifactweave/issues/619)
 owns allocation, persistence and atomic publication fences. Reusing a repository key or
 changing a configuration away and back must not revive old source work.

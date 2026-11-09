@@ -13,9 +13,9 @@
 // access switch; and the composition root marks the bootstrap descriptor
 // applied. A port in one module would make the others depend on it, so the
 // keys and the port sit in the platform (decision 0044, "Shared stores in
-// the platform"). The metadata store's SQL and in-memory stores implement
-// SettingsStore over the settings table. The package imports only the
-// standard library.
+// the platform"). The platform's store adapters (platform/store/sql and
+// platform/store/inmem) implement SettingsStore over the settings table. The
+// package imports only the standard library.
 //
 // # Inputs
 //
@@ -84,12 +84,14 @@
 //
 // # Testing
 //
-// The package declares only keys and a port, so it has no tests of its
-// own. The metadata store's settings contract (the Settings subtest: Get
-// and Delete of a key with no stored value are kernel.ErrNotFound, Put
-// replaces a value, a value that cannot be encoded and a decode into the
-// wrong type fail, and Keys lists the stored keys in order) runs on its
-// in-memory, SQLite and PostgreSQL stores. The tests beside the shared
-// types' and the metadata store's bridges fail if a key's alias changes its
-// type or string, or if the port's alias becomes a declared copy.
+// The package declares only keys and a port, so it has no tests of its own.
+// The platform's settings contract (the Settings subtest of
+// platform/store/storetest: Get and Delete of a key with no stored value are
+// kernel.ErrNotFound, Put replaces a value, a value that cannot be encoded
+// and a decode into the wrong type fail, and Keys lists the stored keys in
+// order) runs on the platform's in-memory and SQLite stores and on the
+// metadata store's in-memory, SQLite and PostgreSQL stores. The tests beside
+// the shared types' and the metadata store's bridges fail if a key's alias
+// changes its type or string, or if the port's alias becomes a declared
+// copy.
 package settings

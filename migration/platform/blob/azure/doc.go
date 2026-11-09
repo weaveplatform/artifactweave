@@ -188,7 +188,7 @@
 //     rules, uncommitted blocks discarded by a commit that does not name
 //     them, If-None-Match on committed blobs, an authorised copy source with
 //     the expected ETag, the block limit), the second with its sessions kept
-//     in the uploads table of the in-memory metadata store.
+//     in the uploads table of the platform's in-memory store.
 //     TestUnitFakeModelsAzure checks the fake's own rules.
 //   - TestAccContractOnAzurite: the contract through the SDK adapter on
 //     Azurite, with small parts and copy ranges so blocks, the temporary

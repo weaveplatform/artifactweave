@@ -16,18 +16,19 @@
 // # Role
 //
 // platform layer: the upload session of the object-store blob backends, and
-// the port of the uploads table it is persisted through. Blob storage
-// belongs to no module, so the sessions sit in the platform beside
-// platform/blob, whose hasher, upload options and sentinels they use. The
-// s3, gcs and azure stores keep their sessions through it, and so does the
-// mirror for the uploads it spreads over its members. Upload and UploadStore
-// are declared here, by the package that persists through them, so that it
-// imports no store (decision 0044, "Narrowing"). The uploads table's SQL and
-// in-memory adapters implement the port. Through the metadata store, the
-// Docker registry and the JFrog CLI multipart service keep their own
-// sessions in the same table, and the stale-upload reaper of garbage
-// collection lists the idle ones with Stale. The package imports
-// platform/blob, the kernel and the standard library.
+// the port of the uploads table it is persisted through. Blob storage belongs
+// to no module, so the sessions sit in the platform beside platform/blob,
+// whose hasher, upload options and sentinels they use. The s3, gcs and azure
+// stores keep their sessions through it, and so does the mirror for the
+// uploads it spreads over its members. Upload and UploadStore are declared
+// here, by the package that persists through them, so that it imports no
+// store (decision 0044, "Narrowing"). The platform's store adapters
+// (platform/store/sql and platform/store/inmem) implement the port over the
+// uploads table. Through the metadata store, the Docker registry and the
+// JFrog CLI multipart service keep their own sessions in the same table, and
+// the stale-upload reaper of garbage collection lists the idle ones with
+// Stale. The package imports platform/blob, the kernel and the standard
+// library.
 //
 // # Inputs
 //
@@ -48,7 +49,8 @@
 //   - Store, what a session is persisted through (Put, Get, Delete), with
 //     Memory (NewMemory) and InUploads.
 //   - Upload, one row of the uploads table, and UploadStore, the port the
-//     metadata store implements: Put, Get, Delete, and Stale for the reaper.
+//     platform's stores implement: Put, Get, Delete, and Stale for the
+//     reaper.
 //
 // # Invariants
 //
@@ -124,7 +126,10 @@
 //   - TestUnitInUploadsErrors: the upload store's errors are wrapped and not
 //     taken for an unknown session, and a missing row lets Put start one.
 //
-// The metadata store's upload contract runs on its in-memory, SQLite and
-// PostgreSQL stores, and the s3, gcs, azure and mirror stores run the blob
-// contract with sessions kept through InUploads.
+// The InUploads tests keep their sessions in the platform's in-memory store.
+// The platform's upload contract (the Uploads subtest of
+// platform/store/storetest) runs on the platform's in-memory and SQLite
+// stores and on the metadata store's in-memory, SQLite and PostgreSQL stores,
+// and the s3, gcs, azure and mirror stores run the blob contract with
+// sessions kept through InUploads.
 package session

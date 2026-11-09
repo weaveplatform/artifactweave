@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/auth/token"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
@@ -85,9 +85,13 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 		must(err)
 		cfg.Tokens = tokens
 		cfg.PasswordHash = testHash
-		cfg.Auth, err = auth.NewAuthenticator(cfg.Store.Users(), cfg.Store.Settings(), auth.Options{
-			Hash: testHash, Tokens: tokens,
-		})
+		cfg.Auth, err = authn.NewAuthenticator(
+			cfg.Store.Users(),
+			cfg.Store.Settings(),
+			authn.Options{
+				Hash: testHash, Tokens: tokens,
+			},
+		)
 		must(err)
 		f.secrets = seedDockerMatrixTokens(t, cfg.Store, tokens)
 	}

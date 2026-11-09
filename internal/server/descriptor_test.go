@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -150,7 +150,10 @@ func TestUnitPatchConfigurationAnonymousAccess(t *testing.T) {
 func TestAccPatchConfigurationBody(t *testing.T) {
 	w := newRepoWorld(t)
 	svc := artifactoryService{cfg: Config{Store: w.db}}
-	admin := auth.WithPrincipal(context.Background(), auth.Principal{Name: "admin", Admin: true})
+	admin := kernel.WithPrincipal(
+		context.Background(),
+		kernel.Principal{Name: "admin", Admin: true},
+	)
 	for name, c := range map[string]struct {
 		svc      artifactoryService
 		body     func(http.ResponseWriter) io.ReadCloser

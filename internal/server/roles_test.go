@@ -9,8 +9,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/service/roles"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
@@ -119,7 +119,7 @@ func TestAccGlobalRolesAndEnvironmentsBodies(t *testing.T) {
 }
 
 func TestAccGlobalRolesWithoutStore(t *testing.T) {
-	ctx := auth.WithPrincipal(context.Background(), auth.Principal{Name: "admin", Admin: true})
+	ctx := kernel.WithPrincipal(context.Background(), kernel.Principal{Name: "admin", Admin: true})
 	if _, err := (accessService{}).GetAllGlobalRoles(
 		ctx,
 		accessgen.GetAllGlobalRolesRequestObject{},
@@ -134,7 +134,7 @@ func TestAccGlobalRolesWithoutStore(t *testing.T) {
 		accessgen.GetAllGlobalRolesRequestObject{},
 	); !errors.Is(
 		err,
-		auth.ErrUnauthenticated,
+		kernel.ErrUnauthenticated,
 	) {
 		t.Fatalf("no principal: %v", err)
 	}

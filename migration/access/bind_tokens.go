@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 

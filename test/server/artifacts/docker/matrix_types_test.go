@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	registryroute "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
@@ -125,8 +125,8 @@ var matrixPrincipals = []matrixPrincipal{
 	}, formatGrants("", rawd))},
 	// Anonymous with anonymous access on holds nothing: since 7.84.3
 	// neither seeded permission grants it, Any Remote included (#383).
-	{name: "anon-on", user: auth.AnonymousUser, anonymous: true, anonymousOn: true},
-	{name: "anon-off", user: auth.AnonymousUser, anonymous: true},
+	{name: "anon-on", user: kernel.AnonymousUser, anonymous: true, anonymousOn: true},
+	{name: "anon-off", user: kernel.AnonymousUser, anonymous: true},
 	// member's token scoped to A: what member holds in A, nothing in B.
 	{
 		name: "tok-repo", user: "member", token: true, scope: "artifact:libs-local:*",

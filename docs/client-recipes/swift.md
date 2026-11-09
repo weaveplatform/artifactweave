@@ -74,4 +74,4 @@ These are the pinned client definitions and executable evidence from which this 
 - Client pin: [test/acceptance/clients/swift.Dockerfile](../../test/acceptance/clients/swift.Dockerfile).
 - Evidence: [migration/artifacts/ecosystem/swift/http/swift_test.go](../../migration/artifacts/ecosystem/swift/http/swift_test.go).
 - Evidence: [migration/artifacts/ecosystem/swift/http/remote_test.go](../../migration/artifacts/ecosystem/swift/http/remote_test.go).
-- Evidence: [internal/auth/token_test.go](../../internal/auth/token_test.go).
+- Evidence: [migration/access/core/authn/token_test.go](../../migration/access/core/authn/token_test.go).

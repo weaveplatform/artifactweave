@@ -3,6 +3,7 @@ package inmem_test
 import (
 	"testing"
 
+	artport "github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	fedport "github.com/weaveplatform/artifactweave/migration/federation/core/port"
 	ntfport "github.com/weaveplatform/artifactweave/migration/notifications/core/port"
 	relport "github.com/weaveplatform/artifactweave/migration/releases/core/port"
@@ -19,10 +20,11 @@ func TestUnitContract(t *testing.T) {
 
 // The in-memory store must satisfy each module's port Store, which declares
 // only the part of the metadata store that module uses, so a module can take
-// this store as its own until its adapters move (STO-14, STO-15). The
-// aggregate's accessors return the bridged port interfaces, which are the same
-// types.
+// this store as its own until its adapters move (STO-14, STO-15, STO-17,
+// STO-18). The aggregate's accessors return the bridged port interfaces, which
+// are the same types.
 var (
+	_ artport.Store = (*inmem.Store)(nil)
 	_ ntfport.Store = (*inmem.Store)(nil)
 	_ retport.Store = (*inmem.Store)(nil)
 	_ fedport.Store = (*inmem.Store)(nil)

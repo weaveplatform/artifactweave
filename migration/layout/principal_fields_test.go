@@ -9,7 +9,6 @@ import (
 	"go/token"
 	"io/fs"
 	"os"
-	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -65,7 +64,6 @@ func v(p auth.Principal, ref kernel.CredentialReference, r [32]byte) {
 	_ = auth.Principal{IsTokenAuthenticated: true, TokenSubject: "s", PasswordRevision: r}`)
 	conforming := map[string]string{
 		"go.mod":                           "module github.com/weaveplatform/artifactweave\n",
-		"internal/auth/principal.go":       uses,
 		"migration/kernel/principal.go":    uses,
 		"migration/kernel/sub/sub_test.go": uses,
 		"migration/access/core/authn/a.go": uses,
@@ -153,6 +151,12 @@ func v(p auth.Principal, ref kernel.CredentialReference, r [32]byte) {
 			want: v + ":12: sets PasswordRevision in a Principal literal",
 		},
 		{
+			name: "file in internal/auth, which holds only bridges",
+			file: "internal/auth/principal.go",
+			src:  file(`	_ = p.TokenSubject`),
+			want: "internal/auth/principal.go:11: selects TokenSubject",
+		},
+		{
 			name: "subpackage of internal/auth",
 			file: "internal/auth/token/token.go",
 			src:  file(`	_ = p.TokenSubject`),
@@ -221,13 +225,11 @@ func checkPrincipalInternals(dir string) []string {
 }
 
 // ownsPrincipalInternals reports whether the Go file at rel, a path relative
-// to the repository root, belongs to access or the kernel: a file directly in
-// internal/auth, whose subdirectories are other packages, or any file under
-// the staged kernel and access trees.
+// to the repository root, belongs to access or the kernel: any file under
+// the staged kernel and access trees. The legacy internal/auth holds only
+// bridges, which name none of the fields.
 func ownsPrincipalInternals(rel string) bool {
-	return path.Dir(rel) == "internal/auth" ||
-		strings.HasPrefix(rel, root+"/kernel/") ||
-		strings.HasPrefix(rel, root+"/access/")
+	return strings.HasPrefix(rel, root+"/kernel/") || strings.HasPrefix(rel, root+"/access/")
 }
 
 // principalInternalUses returns each use of a principal internal in the Go

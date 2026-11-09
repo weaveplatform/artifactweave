@@ -8,7 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -36,7 +37,7 @@ func apiRecoveryContext(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if apiRecoveryRequest(r) {
 			// Bound recovery too, including password verification and database waits.
-			ctx, cancel := context.WithTimeout(auth.WithAPIRecovery(r.Context()), 5*time.Second)
+			ctx, cancel := context.WithTimeout(authn.WithAPIRecovery(r.Context()), 5*time.Second)
 			defer cancel()
 			r = r.WithContext(ctx)
 		}
@@ -49,13 +50,13 @@ func apiRecoveryContext(next http.Handler) http.Handler {
 // and subsequent Current credential checks.
 func (s artifactoryService) checkAPIRestriction(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		p, ok := auth.FromContext(r.Context())
+		p, ok := kernel.FromContext(r.Context())
 		if ok && !p.Anonymous && !healthRequest(r) && !apiRecoveryRequest(r) {
 			ctx, cancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
-			err := auth.CheckAPIRestriction(ctx, s.cfg.Store.APIRestrictions(), p.Name, time.Now())
+			err := authn.CheckAPIRestriction(ctx, s.cfg.Store.APIRestrictions(), p.Name, time.Now())
 			cancel()
 			if err != nil {
-				if errors.Is(err, auth.ErrAPIRestricted) {
+				if errors.Is(err, kernel.ErrAPIRestricted) {
 					writeErr(w, r, err)
 				} else {
 					writeLimitError(w, r, err)
@@ -70,8 +71,8 @@ func (s artifactoryService) checkAPIRestriction(next http.Handler) http.Handler 
 func (s artifactoryService) restrictionCaller(
 	ctx context.Context,
 	user string,
-) (auth.Principal, error) {
-	p, err := auth.RequireAdmin(ctx)
+) (kernel.Principal, error) {
+	p, err := kernel.RequireAdmin(ctx)
 	if err != nil {
 		return p, fmt.Errorf("API restriction administrator: %w", err)
 	}
@@ -188,7 +189,7 @@ func (s artifactoryService) GetAPIRestrictionAudit(
 	ctx context.Context,
 	req artgen.GetAPIRestrictionAuditRequestObject,
 ) (artgen.GetAPIRestrictionAuditResponseObject, error) {
-	p, err := auth.RequireAdmin(ctx)
+	p, err := kernel.RequireAdmin(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("API restriction audit administrator: %w", err)
 	}

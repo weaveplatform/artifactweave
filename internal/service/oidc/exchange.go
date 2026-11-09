@@ -13,7 +13,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/weaveplatform/artifactweave/internal/auth/idtoken"
-	"github.com/weaveplatform/artifactweave/internal/auth/token"
+	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 

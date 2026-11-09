@@ -1,12 +1,15 @@
 // Package sqltest holds the suites that the SQLite and PostgreSQL store
 // packages run against the whole composite store: key rotation (Rotation,
-// with its Opener), repository headers and their migration, remote cache
-// persistence, identity paging, the replay of a crashed write, the refusal
-// of a legacy migration history, and the schema description that the golden
+// with its Opener); the parts of the repository header and remote cache
+// suites that need more than the artifacts module's stores, whose tests run
+// the rest (an environment rename through the roles service, the header
+// conversion at the composite's open with its reseal, and a layout edit
+// through the config store); the replay of a crashed write, the refusal of
+// a legacy migration history, and the schema description that the golden
 // files and the stream checks compare (Schema, SchemaGolden). Reset empties
 // a composite store's database for the next test by rolling back, and
-// migrating again, every stream that sqlcommon.Modules lists. They stay here
-// until STO-19 moves the composite store's suites.
+// migrating again, every stream that sqlcommon.Modules lists. They stay
+// here until STO-19 moves the composite store's suites.
 //
 // PostgresDSN is a bridge to the module SQL harness in
 // migration/platform/sql/sqltest, which starts the one PostgreSQL container

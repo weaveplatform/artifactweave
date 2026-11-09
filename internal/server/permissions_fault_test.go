@@ -8,8 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -136,7 +137,7 @@ func newPermFaultWorld(t *testing.T) (http.Handler, *permFault) {
 			t.Fatal(err)
 		}
 	}
-	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{Hash: testHash})
+	a, err := authn.NewAuthenticator(db.Users(), db.Settings(), authn.Options{Hash: testHash})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -287,7 +288,7 @@ func TestAccPermissionHandlerEdges(t *testing.T) {
 
 	db := inmem.New()
 	cheapSeed(t, db)
-	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{Hash: testHash})
+	a, err := authn.NewAuthenticator(db.Users(), db.Settings(), authn.Options{Hash: testHash})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -328,7 +329,7 @@ func TestAccPermissionCallerWithoutMiddleware(t *testing.T) {
 	cheapSeed(t, db)
 	f := &permFault{op: "forprincipal"}
 	cfg := withAccess(Config{Store: permFaultStore{Store: db, f: f}})
-	ctx := auth.WithPrincipal(context.Background(), auth.Principal{Name: "admin", Admin: true})
+	ctx := kernel.WithPrincipal(context.Background(), kernel.Principal{Name: "admin", Admin: true})
 	_, err := permissionCaller(ctx, cfg)
 	var ae *apierror.Error
 	if !errors.As(err, &ae) || ae.Status != http.StatusInternalServerError {

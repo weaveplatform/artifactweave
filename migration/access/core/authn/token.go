@@ -1,0 +1,227 @@
+package authn
+
+import (
+	"context"
+	"crypto/sha256"
+	"errors"
+	"fmt"
+	"slices"
+
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+)
+
+// ErrInvalidToken reports a token that does not verify: malformed, badly
+// signed, expired, revoked, or of a subject that is not a user. Verifiers
+// wrap it; the request answers kernel.ErrBadCredentials.
+var ErrInvalidToken = errors.New("auth: invalid token")
+
+// TokenVerifier resolves an access token (a JWT) or a reference token to its
+// stored record. migration/access/core/token implements it.
+type TokenVerifier interface {
+	// Verify returns the stored record of the access or reference token
+	// raw. An error wrapping ErrInvalidToken means raw does not verify; any
+	// other means it could not be checked.
+	Verify(ctx context.Context, raw string) (model.Token, error)
+}
+
+// ExpiredVerifier is a TokenVerifier that also verifies an access token
+// whose only fault is its expiry. migration/access/core/token implements it.
+type ExpiredVerifier interface {
+	// VerifyExpired is Verify for an access token, accepting one whose
+	// expiry has passed.
+	VerifyExpired(ctx context.Context, raw string) (model.Token, error)
+}
+
+// Token verifies a token presented as Bearer, as X-JFrog-Art-Api, or as the
+// password of a Basic credential whose user name is user ("" for the first
+// two). A Basic user name must name the token's subject (decision 0005). The
+// subject must still be an enabled user: disabling a user disables their
+// tokens.
+func (a *Authenticator) Token(ctx context.Context, raw, user string) (kernel.Principal, error) {
+	if a.tokens == nil {
+		return kernel.Principal{}, kernel.ErrBadCredentials
+	}
+	t, err := a.tokens.Verify(ctx, raw)
+	if errors.Is(err, ErrInvalidToken) {
+		return kernel.Principal{}, kernel.ErrBadCredentials
+	}
+	if err != nil {
+		return kernel.Principal{}, fmt.Errorf("auth: token: %w", err)
+	}
+	u, err := a.tokenUser(ctx, t, user)
+	if err != nil {
+		return kernel.Principal{}, err
+	}
+	if t.Purpose == model.TokenPurposeEncryptedPassword {
+		if err := a.passwordUsable(ctx, u); err != nil {
+			return kernel.Principal{}, err
+		}
+	}
+	p := tokenPrincipal(u, t.Scope)
+	p.TokenID, p.TokenExpires, p.Identity = t.ID, t.ExpiresAt, t.Identity
+	p.TokenSubject = t.Subject
+	if t.Registry != nil {
+		p.Registry, p.TokenParent = t.Registry, t.Parent
+		p.PasswordRevision = sha256.Sum256(u.PasswordHash)
+		if u.Name == kernel.AnonymousUser {
+			// An anonymous registry token works only while anonymous
+			// access does: turning it off ends the pulls at once.
+			on, err := a.AnonymousAllowed(ctx)
+			if err != nil {
+				return kernel.Principal{}, err
+			}
+			if !on {
+				return kernel.Principal{}, kernel.ErrBadCredentials
+			}
+			p.Anonymous = true
+		}
+	}
+	return p, nil
+}
+
+// Refresher is the access token a refresh presents for the token it
+// replaces, and that token's user.
+type Refresher struct {
+	// User is the name of the token's user.
+	User string
+	// TokenID is the id of the token the refresh replaces.
+	TokenID string
+}
+
+// ExpiredToken verifies raw as an access token whatever its expiry, and
+// whose user is still enabled. Only the refresh grant asks: the JFrog CLI
+// refreshes with the access token it is replacing, by then often expired,
+// as the Bearer credential (Access) or the access_token form field
+// (legacy). This verifies identity only; the refresh transaction checks API
+// restrictions before rotation, preserving a policy denial as 403.
+func (a *Authenticator) ExpiredToken(ctx context.Context, raw string) (Refresher, bool) {
+	v, ok := a.tokens.(ExpiredVerifier)
+	if !ok {
+		return Refresher{}, false
+	}
+	t, err := v.VerifyExpired(ctx, raw)
+	if err != nil {
+		return Refresher{}, false
+	}
+	u, err := a.lookupTokenUser(ctx, t, "")
+	if err != nil {
+		return Refresher{}, false
+	}
+	return Refresher{User: u.Name, TokenID: t.ID}, true
+}
+
+// tokenUser returns the enabled user t's subject names, which must be user
+// when user is set. A token from an OIDC exchange, or one an administrator
+// minted for a name that is no stored user, may name a user who is not
+// stored (kernel.TokenIdentity): a synthetic subject is never a stored user,
+// and a transient one stands in for a missing user.
+func (a *Authenticator) tokenUser(
+	ctx context.Context,
+	t model.Token,
+	user string,
+) (model.User, error) {
+	u, err := a.lookupTokenUser(ctx, t, user)
+	if err != nil {
+		return u, err
+	}
+	if err := a.apiAllowed(ctx, u.Name); err != nil {
+		return model.User{}, err
+	}
+	return u, nil
+}
+
+func (a *Authenticator) lookupTokenUser(
+	ctx context.Context,
+	t model.Token,
+	user string,
+) (model.User, error) {
+	sub, err := model.ParseSubject(t.Subject)
+	if err != nil || sub.Kind != "users" || (user != "" && user != sub.Name) {
+		return model.User{}, kernel.ErrBadCredentials
+	}
+	if t.Identity == kernel.IdentitySynthetic {
+		return model.User{Name: sub.Name}, nil
+	}
+	u, err := a.users.Get(ctx, sub.Name)
+	if errors.Is(err, kernel.ErrNotFound) && t.Identity == kernel.IdentityTransient {
+		return a.transientUser(ctx, sub.Name)
+	}
+	if errors.Is(err, kernel.ErrNotFound) {
+		return model.User{}, kernel.ErrBadCredentials
+	}
+	if err != nil {
+		return model.User{}, fmt.Errorf("auth: user %s: %w", sub.Name, err)
+	}
+	if u.Status != "" && u.Status != model.UserEnabled {
+		return model.User{}, kernel.ErrBadCredentials
+	}
+	return u, nil
+}
+
+// transientUser is a user a transient token names who is not stored. It
+// exists for the request alone, and belongs to the groups new users join
+// automatically, as Access treats such a user ("Transient Users and Auto
+// Join Groups" in JFrog's access-tokens page; research 21). The token's
+// scope then decides what applies: applied-permissions/user keeps those
+// groups and grants to the name, a groups scope only the groups it names.
+func (a *Authenticator) transientUser(ctx context.Context, name string) (model.User, error) {
+	u := model.User{Name: name}
+	if a.groups == nil {
+		return u, nil
+	}
+	groups, err := a.groups.AutoJoin(ctx)
+	if err != nil {
+		return model.User{}, fmt.Errorf("auth: auto-join groups: %w", err)
+	}
+	u.Groups = groups
+	return u, nil
+}
+
+// passwordUsable applies to an encrypted password what Basic applies to the
+// password it stands for. Setting or expiring the password revokes it
+// (internal/service/identity), but the age policy expires a password with
+// no write to revoke on, so expiry is checked here as well.
+func (a *Authenticator) passwordUsable(ctx context.Context, u model.User) error {
+	if len(u.PasswordHash) == 0 || u.InternalPasswordDisabled {
+		return kernel.ErrBadCredentials
+	}
+	_, expiry, err := a.policies(ctx)
+	if err != nil {
+		return err
+	}
+	if PasswordExpired(u, expiry, a.now()) {
+		return kernel.ErrPasswordExpired
+	}
+	return nil
+}
+
+type expiredTokenKey struct{}
+
+// WithExpiredToken returns ctx carrying the expired access token a refresh
+// request presented as its credential (Authenticator.ExpiredToken).
+func WithExpiredToken(ctx context.Context, r Refresher) context.Context {
+	return context.WithValue(ctx, expiredTokenKey{}, r)
+}
+
+// ExpiredTokenFrom returns what WithExpiredToken stored.
+func ExpiredTokenFrom(ctx context.Context) (Refresher, bool) {
+	r, ok := ctx.Value(expiredTokenKey{}).(Refresher)
+	return r, ok
+}
+
+// tokenPrincipal is the token's user with the token's scope. Authorize
+// applies the scope (decision 0006): applied-permissions/user acts as the
+// user, /admin is an administrator whatever its user, /groups
+// acts through the named groups the user belongs to, and resource and
+// system entries only narrow. The user's own flag and groups are kept here
+// because a resource-only scope narrows them rather than replacing them.
+func tokenPrincipal(u model.User, scope kernel.Scope) kernel.Principal {
+	return kernel.Principal{
+		Name:                 u.Name,
+		Admin:                u.Admin,
+		Groups:               slices.Clone(u.Groups),
+		Scope:                scope,
+		IsTokenAuthenticated: true,
+	}
+}

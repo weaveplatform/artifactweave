@@ -5,12 +5,10 @@
 // # Role
 //
 // access module, module root. Only app imports a module root; other modules
-// reach access through access/api (decision 0044, dependency rules). Until
-// access core holds the authenticator, the evaluator and the token service
-// (https://github.com/weaveplatform/artifactweave/issues/1063 and
-// https://github.com/weaveplatform/artifactweave/issues/1064), the bindings
-// wrap the legacy internal/auth, internal/authz and internal/auth/token, so
-// consumers can move onto access/api first.
+// reach access through access/api (decision 0044, dependency rules). The
+// bindings wrap access core: the evaluator in access/core/authz, the
+// authenticator in access/core/authn and the token service in
+// access/core/token.
 //
 // # Inputs
 //
@@ -96,9 +94,9 @@
 // # Status
 //
 // Implemented P9d: New, Module and the store-only bindings, binding every
-// access/api contract over the legacy authenticator, evaluator, token service
-// and store. The module's routes and background work (target layout, line
-// 533) stay in the server and app for now.
+// access/api contract over access core's authenticator, evaluator and token
+// service and the store. The module's routes and background work (target
+// layout, line 533) stay in the server and app for now.
 //
 // # Testing
 //
@@ -106,8 +104,8 @@
 //     without the services their fields are nil interfaces and every other
 //     contract is bound, and Settings is published.
 //   - TestUnitAuthenticatorBinding, TestUnitAuthorizerBinding,
-//     TestUnitTokensBinding: each method over the in-memory store and the
-//     legacy services, the rechecks reading the module's token records, and
+//     TestUnitTokensBinding: each method over the in-memory store and access
+//     core's services, the rechecks reading the module's token records, and
 //     a call inside a transaction taking part in it.
 //   - TestUnitAuthorizerErrors: Authorize's, For's and Decide's error
 //     texts, each with a nil Decider.

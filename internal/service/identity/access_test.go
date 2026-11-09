@@ -6,8 +6,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/service/identity"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -212,7 +212,7 @@ func TestUnitBulkPasswordExpiry(t *testing.T) {
 	if err != nil || u.PasswordExpired || !u.PasswordChanged.Equal(clock) {
 		t.Fatalf("unexpired %+v %v", u, err)
 	}
-	if _, err := auth.CheckPassword(u.PasswordHash, "pw"); err != nil {
+	if _, err := authn.CheckPassword(u.PasswordHash, "pw"); err != nil {
 		t.Fatalf("the password survives: %v", err)
 	}
 }

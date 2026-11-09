@@ -19,8 +19,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -74,7 +75,7 @@ func newItemWorld(t *testing.T, anonymous bool, tune ...func(*Config)) *itemWorl
 	cheapSeed(t, db)
 	hash := cheapHash
 	for _, u := range []types.User{
-		{Name: "reader", PasswordHash: hash, Groups: []string{auth.ReadersGroup}},
+		{Name: "reader", PasswordHash: hash, Groups: []string{authn.ReadersGroup}},
 		{Name: "deployer", PasswordHash: hash},
 		{Name: "user", PasswordHash: hash},
 	} {
@@ -103,7 +104,7 @@ func newItemWorld(t *testing.T, anonymous bool, tune ...func(*Config)) *itemWorl
 			Name: anonymousRemotes,
 			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
 				Actions: types.Grants{Users: map[string]types.Actions{
-					auth.AnonymousUser: types.ActionRead,
+					kernel.AnonymousUser: types.ActionRead,
 				}},
 				Targets: map[string]types.Target{types.TargetAnyRemote: {Include: []string{"**"}}},
 			}},
@@ -132,7 +133,7 @@ func newItemWorld(t *testing.T, anonymous bool, tune ...func(*Config)) *itemWorl
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{Hash: testHash})
+	a, err := authn.NewAuthenticator(db.Users(), db.Settings(), authn.Options{Hash: testHash})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -282,7 +283,7 @@ func TestAccServeFilePreservesProtocolDisposition(t *testing.T) {
 	r := httptest.NewRequest(http.MethodGet, "/native/download", nil)
 	rec := httptest.NewRecorder()
 	rec.Header().Set("Content-Disposition", `attachment; filename="plugin-com-weave-fixture.jar"`)
-	s.serveFile(rec, r, w.db, f, auth.Principal{Name: "reader"})
+	s.serveFile(rec, r, w.db, f, kernel.Principal{Name: "reader"})
 	wantStatus(t, rec, http.StatusOK)
 	got := rec.Header().Get("Content-Disposition")
 	if got != `attachment; filename="plugin-com-weave-fixture.jar"` {
@@ -292,7 +293,7 @@ func TestAccServeFilePreservesProtocolDisposition(t *testing.T) {
 		t.Fatalf("body %q", got)
 	}
 	ordinary := httptest.NewRecorder()
-	s.serveFile(ordinary, r, w.db, f, auth.Principal{Name: "reader"})
+	s.serveFile(ordinary, r, w.db, f, kernel.Principal{Name: "reader"})
 	wantStatus(t, ordinary, http.StatusOK)
 	if got := ordinary.Header().Get("Content-Disposition"); got != blob.Disposition(it.Name) {
 		t.Fatalf("default disposition %q, want %q", got, blob.Disposition(it.Name))
@@ -575,7 +576,12 @@ func TestAccReadsContent(t *testing.T) {
 	for n := range store.MaxLimit {
 		put("gone", fmt.Sprintf("f%d.bin", n))
 	}
-	acc, err := accessFor(ctx, authorizerOver(db), auth.Principal{Name: "admin", Admin: true}, nil)
+	acc, err := accessFor(
+		ctx,
+		authorizerOver(db),
+		kernel.Principal{Name: "admin", Admin: true},
+		nil,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

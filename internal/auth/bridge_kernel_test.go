@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -18,7 +19,8 @@ import (
 // but the two names would stop matching, so the test checks that each auth
 // name is the kernel's value, also through a wrap and on an error that the
 // authenticator returns, and that the status and message JFrog clients see
-// are unchanged.
+// are unchanged. The authenticator lives in access/core/authn, so the test
+// builds one through that package's exported API, with a cheap hash.
 func TestUnitBridgeKernelAuthSentinels(t *testing.T) {
 	const unauthorized, forbidden = http.StatusUnauthorized, http.StatusForbidden
 	cases := []struct {
@@ -57,10 +59,21 @@ func TestUnitBridgeKernelAuthSentinels(t *testing.T) {
 		})
 	}
 
+	cheap := authn.HashParams{MemoryKiB: 64, Time: 1, Threads: 1}
+	hash, err := authn.HashPasswordWith(cheap, "password")
+	if err != nil {
+		t.Fatal(err)
+	}
 	db := inmem.New()
-	a, _ := newAuth(t, db, Options{})
-	addUser(t, db, types.User{Name: "ann"}, "password")
-	_, err := a.Basic(t.Context(), "ann", "wrong")
+	if err := db.Users().
+		Create(t.Context(), types.User{Name: "ann", PasswordHash: hash}); err != nil {
+		t.Fatal(err)
+	}
+	a, err := authn.NewAuthenticator(db.Users(), db.Settings(), authn.Options{Hash: cheap})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = a.Basic(t.Context(), "ann", "wrong")
 	if !errors.Is(err, ErrBadCredentials) || !errors.Is(err, kernel.ErrBadCredentials) {
 		t.Errorf("a wrong password: %v does not match ErrBadCredentials under both names", err)
 	}

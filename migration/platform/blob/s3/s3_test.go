@@ -16,7 +16,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/blobtest"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
 	"github.com/weaveplatform/artifactweave/migration/platform/cdn"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
+	platinmem "github.com/weaveplatform/artifactweave/migration/platform/store/inmem"
+	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
 )
 
 var errInjected = errors.New("injected")
@@ -376,7 +377,11 @@ func TestUnitResumeWithDamagedState(t *testing.T) {
 func TestAccContractWithDurableSessions(t *testing.T) {
 	small(t)
 	blobtest.Run(t, func(t *testing.T) blob.Store {
-		return newFakeStore(t, newFake(), session.InUploads(inmem.New().Uploads(), "s3:test"))
+		return newFakeStore(
+			t,
+			newFake(),
+			session.InUploads(platinmem.New(memtx.New()).Uploads(), "s3:test"),
+		)
 	}, blobtest.Options{LargeSize: 2*testPart + 7})
 }
 

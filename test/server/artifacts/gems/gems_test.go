@@ -15,8 +15,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/auth/token"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -76,7 +76,11 @@ func newWorldWith(t *testing.T, configure harness.Tune) *world {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{Hash: support.TestHash})
+	a, err := authn.NewAuthenticator(
+		db.Users(),
+		db.Settings(),
+		authn.Options{Hash: support.TestHash},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -408,10 +412,10 @@ func TestAccNativeRawRubyGemsTokenAuth(t *testing.T) {
 			t.Fatal(err)
 		}
 		cfg.Tokens = tokens
-		cfg.Auth, err = auth.NewAuthenticator(
+		cfg.Auth, err = authn.NewAuthenticator(
 			cfg.Store.Users(),
 			cfg.Store.Settings(),
-			auth.Options{Hash: support.TestHash, Tokens: tokens},
+			authn.Options{Hash: support.TestHash, Tokens: tokens},
 		)
 		if err != nil {
 			t.Fatal(err)

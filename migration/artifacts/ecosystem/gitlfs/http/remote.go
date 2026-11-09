@@ -12,12 +12,12 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	baseformat "github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	format "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/gitlfs"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -53,14 +53,14 @@ func (h handler) readSource(
 		return source.Result{}, source.ErrUnsupported
 	}
 	c := pkgroute.RequestFrom(r).Repo
-	p, ok := auth.FromContext(r.Context())
+	p, ok := kernel.FromContext(r.Context())
 	if !ok {
 		return source.Result{}, source.ErrDenied
 	}
 	d, _ := accessapi.DeciderFrom(r.Context())
 	result, err := h.o.RemoteSources.Read(r.Context(), source.Request{
 		Repo:      c,
-		Subject:   auth.SubjectOf(p),
+		Subject:   accessapi.SubjectOf(p),
 		Access:    d,
 		Resource:  resource,
 		CacheOnly: cacheOnly,

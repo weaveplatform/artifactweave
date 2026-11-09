@@ -15,7 +15,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/blobtest"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
+	platinmem "github.com/weaveplatform/artifactweave/migration/platform/store/inmem"
+	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
 )
 
 var errInjected = errors.New("injected")
@@ -60,7 +61,11 @@ func TestAccContractOnFake(t *testing.T) {
 // metadata store's uploads table, as the server configures it.
 func TestAccContractWithDurableSessions(t *testing.T) {
 	blobtest.Run(t, func(t *testing.T) blob.Store {
-		return newFakeStore(t, newFake(), session.InUploads(inmem.New().Uploads(), "azure:test"))
+		return newFakeStore(
+			t,
+			newFake(),
+			session.InUploads(platinmem.New(memtx.New()).Uploads(), "azure:test"),
+		)
 	}, blobtest.Options{LargeSize: 2*testPart + 7})
 }
 

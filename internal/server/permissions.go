@@ -11,10 +11,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/service/permission"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authz"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
@@ -52,7 +52,7 @@ type permCaller struct {
 }
 
 func permissionCaller(ctx context.Context, cfg Config) (permCaller, error) {
-	p, err := auth.RequireAuthenticated(ctx)
+	p, err := kernel.RequireAuthenticated(ctx)
 	if err != nil {
 		return permCaller{}, fmt.Errorf("permissions: %w", err)
 	}
@@ -108,7 +108,7 @@ func (c permCaller) managesAll() bool { return c.dec.IsAdmin() || c.canManageRes
 // admin-only route still asks for an administrator.
 func (c permCaller) admin() error {
 	if !c.managesAll() {
-		return auth.ErrForbidden
+		return kernel.ErrForbidden
 	}
 	return nil
 }
@@ -148,11 +148,11 @@ func (c permCaller) lookup(
 	p, err := c.svc.Get(ctx, name)
 	switch {
 	case errors.Is(err, permission.ErrNotFound) && !c.reader():
-		return types.Permission{}, auth.ErrForbidden
+		return types.Permission{}, kernel.ErrForbidden
 	case err != nil:
 		return types.Permission{}, fmt.Errorf("permissions: %w", err)
 	case !may(p):
-		return types.Permission{}, auth.ErrForbidden
+		return types.Permission{}, kernel.ErrForbidden
 	}
 	return p, nil
 }
@@ -585,7 +585,7 @@ func (s artifactoryService) CreateOrReplacePermissionTargetV2(
 			case !exists:
 				return p, c.admin()
 			case !c.manages(old):
-				return types.Permission{}, auth.ErrForbidden
+				return types.Permission{}, kernel.ErrForbidden
 			case !c.managesAll():
 				if err := permission.CheckManagerEdit(old, p, v2Sections, c.dec); err != nil {
 					return types.Permission{}, fmt.Errorf("permissions: %w", err)
@@ -680,7 +680,7 @@ func (s accessService) GetPermissions(
 		return nil, err
 	}
 	if !c.reader() {
-		return nil, auth.ErrForbidden
+		return nil, kernel.ErrForbidden
 	}
 	q := req.Params
 	limit := permPageDefault

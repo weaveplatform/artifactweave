@@ -16,16 +16,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // TestHash keeps server-route authentication tests fast under the race detector.
-var TestHash = auth.HashParams{MemoryKiB: 64, Time: 1, Threads: 1}
+var TestHash = authn.HashParams{MemoryKiB: 64, Time: 1, Threads: 1}
 
 // CheapHash is the hash of the test principals' shared password, "pw".
 var CheapHash = func() []byte {
-	h, err := auth.HashPasswordWith(TestHash, "pw")
+	h, err := authn.HashPasswordWith(TestHash, "pw")
 	if err != nil {
 		panic(err)
 	}
@@ -39,7 +41,14 @@ var CheapHash = func() []byte {
 // seeded is left as it is.
 func Seed(t *testing.T, db store.Store) {
 	t.Helper()
-	if _, err := auth.SeedHashed(context.Background(), db, CheapHash, time.Now()); err != nil {
+	repositories := repos.NewRepositories(db, access.KeysOf(db), access.ProjectsOf(db))
+	if _, err := authn.SeedHashed(
+		context.Background(),
+		db,
+		repositories,
+		CheapHash,
+		time.Now(),
+	); err != nil {
 		t.Fatal(err)
 	}
 }

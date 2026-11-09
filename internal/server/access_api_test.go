@@ -4,10 +4,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
-	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -62,7 +62,7 @@ func TestUnitWithAccess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, err := auth.NewAuthenticator(st.Users(), st.Settings(), auth.Options{
+	a, err := authn.NewAuthenticator(st.Users(), st.Settings(), authn.Options{
 		Hash: testHash, Tokens: tokens,
 	})
 	if err != nil {

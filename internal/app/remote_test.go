@@ -17,8 +17,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/server"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -53,7 +53,7 @@ func newRemoteWorld(t *testing.T) *remoteWorld {
 	if err = rt.store.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
-	hash, err := auth.HashPasswordWith(authHash, "pw")
+	hash, err := authn.HashPasswordWith(authHash, "pw")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
+	artport "github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	fedport "github.com/weaveplatform/artifactweave/migration/federation/core/port"
 	ntfport "github.com/weaveplatform/artifactweave/migration/notifications/core/port"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
@@ -93,9 +94,10 @@ func declaredStoreMethods(t *testing.T) []string {
 // The SQL store, the composite the SQLite and PostgreSQL stores embed, must
 // satisfy each module's port Store, which declares only the part of the
 // metadata store that module uses, so a module can take this store as its own
-// until its adapters move (STO-14, STO-15). The aggregate's accessors return
-// the bridged port interfaces, which are the same types.
+// until its adapters move (STO-14, STO-15, STO-17, STO-18). The aggregate's
+// accessors return the bridged port interfaces, which are the same types.
 var (
+	_ artport.Store = (*sqlcommon.Store)(nil)
 	_ ntfport.Store = (*sqlcommon.Store)(nil)
 	_ retport.Store = (*sqlcommon.Store)(nil)
 	_ fedport.Store = (*sqlcommon.Store)(nil)

@@ -87,25 +87,25 @@
 // (the Docker token and npm login tests move with their slices, issues 1022
 // and 1031, and the other modules' tests with issue 1008):
 //
-//   - auth.Authorize(ctx, authz.Sources{Permissions: st.Permissions(),
+//   - authn.Authorize(ctx, authz.Sources{Permissions: st.Permissions(),
 //     Groups: st.Groups(), AnonymousEnabled: x}, p), then
-//     auth.WithAuthorized: accesstest.Over(t, st).Authorize(ctx, p, x).
+//     authn.WithAuthorized: accesstest.Over(t, st).Authorize(ctx, p, x).
 //   - A test middleware that reads a header, authorises and calls
 //     WithPrincipal: router.Use(kit.Middleware(t, x, principalOf)), keeping
 //     the test's own mapping from header to principal.
 //   - authz.New(ctx, authz.Sources{...}, authz.Subject{...}):
 //     kit.Decide(ctx, accessapi.Subject{...}, x).
-//   - auth.NewAuthenticator(st.Users(), st.Settings(), auth.Options{...}):
+//   - authn.NewAuthenticator(st.Users(), st.Settings(), authn.Options{...}):
 //     kit.API().Authenticator, with WithTokens, WithTokenVerifier or WithNow
 //     as the options had.
 //   - token.New(ctx, st, token.Options{KeyBits: 1024}):
 //     accesstest.Over(t, st, accesstest.WithTokens()).API().Tokens.
 //   - tokens.Verify(ctx, raw), and a field of an Issued.Record:
 //     kit.Verify(ctx, raw), and kit.Verify(ctx, issued.AccessToken).
-//   - auth.HashPasswordWith(cheap, pw): accesstest.HashPassword(t, pw).
-//   - auth.ErrLoginSuspended: accesstest.ErrLoginSuspended.
-//   - auth.Principal, auth.Anonymous, auth.WithPrincipal, auth.FromContext
-//     and the six sentinels: their kernel names.
+//   - authn.HashPasswordWith(cheap, pw): accesstest.HashPassword(t, pw).
+//   - authn.ErrLoginSuspended: accesstest.ErrLoginSuspended.
+//   - The internal/auth bridges Principal, Anonymous, WithPrincipal,
+//     FromContext and the six sentinels: their kernel names.
 //   - authz.Subject, authz.Repo, token.Request, token.RegistryRequest and
 //     token.Issued: accessapi.Subject, accessapi.Repo,
 //     accessapi.TokenRequest, accessapi.RegistryTokenRequest and
@@ -120,7 +120,7 @@
 //   - TestUnitAnonymousAccessOffGrantsNothing: with anonymous access off,
 //     the anonymous principal gets nothing.
 //   - TestUnitMiddleware: the principal and decider the middleware stores
-//     read back through the kernel, access/api and the legacy accessor; a
+//     read back through the kernel, access/api and authn.DeciderFrom; a
 //     failed authorisation is reported on the test and answers 500.
 //   - TestUnitWithTokens: the instance identity is created when missing and
 //     kept when present, the signing key exists once the kit is built, an
