@@ -1,4 +1,4 @@
-package types
+package model
 
 import (
 	"crypto/ed25519"

@@ -1,4 +1,4 @@
-package types
+package api
 
 // RunStatus is the status of a cleanup or smart-archiving run.
 type RunStatus string

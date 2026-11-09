@@ -1,4 +1,4 @@
-package types_test
+package model_test
 
 import (
 	"crypto/ed25519"
