@@ -1,4 +1,3 @@
-// Package skillshttp serves the local ClawHub-compatible Skills publish API.
 package skillshttp
 
 import (
@@ -25,6 +24,12 @@ import (
 
 const maxPayloadBytes = 64 << 10
 
+// Protocol returns the ClawHub-compatible Skills protocol for skills
+// repositories, which are local only: the anonymous discovery document
+// (.well-known/clawhub.json), the list, detail, versions, version,
+// single-file, search, resolve, download and scan-status (xrayStatus)
+// reads, and the multipart publish (POST api/v1/skills), with the
+// Artifactory error profile. Only the local class has a source.
 func Protocol() pkgroute.Protocol {
 	return pkgroute.Protocol{
 		Name: "skills", Types: []repo.PackageType{repo.Skills},

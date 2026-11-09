@@ -16,8 +16,14 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// Serves reports whether t is the Ansible package type.
 func Serves(t repo.PackageType) bool { return t == repo.Ansible }
 
+// Handler is the Ansible format's hooks: it admits only a valid collection
+// archive at the path its MANIFEST.json identity gives, records a stored
+// archive's identity and SHA-256 as ansible.* properties, and indexes it
+// as a version of <namespace>.<name>. Admit applies the generic deploy
+// policy first.
 type Handler struct{ generic.Handler }
 
 type inspection struct {
@@ -26,6 +32,12 @@ type inspection struct {
 	err  error
 }
 
+// Inspect reads and validates the stored archive of a write to a .tar.gz
+// path (ReadArchive) before the write's transaction, and returns the result
+// for Admit and Deployed, so an archive is read once per write. A checksum
+// deploy and any other path inspect nothing. An invalid archive does not
+// fail Inspect, because Admit refuses it; one that cannot be opened fails
+// the write.
 func (Handler) Inspect(
 	ctx context.Context,
 	env format.Env,
@@ -44,6 +56,11 @@ func (Handler) Inspect(
 	return &inspection{sha: w.Checksums.SHA256, meta: meta, err: err}, nil
 }
 
+// Admit applies the generic deploy policy, wrapping its refusal, then
+// passes a checksum deploy and a write to a remote's cache. Any other write
+// must be of a .tar.gz (400) at a collection archive path (400), with
+// content Inspect read as a valid archive whose MANIFEST.json names the
+// namespace, name and version the path gives (400).
 func (Handler) Admit(
 	ctx context.Context,
 	env format.Env,
@@ -78,6 +95,13 @@ func (Handler) Admit(
 	return w, nil
 }
 
+// Deployed records the ansible.* properties of an archive stored at a
+// collection archive path, writing only those that changed, and syncs its
+// version in the package index under <namespace>.<name>, with the
+// archive's Metadata and the archive as its only file. It reuses Inspect's
+// reading when it covers the same content and reads the stored archive
+// otherwise; an archive that does not validate fails the write. Folders, a
+// remote's cached files and other paths change nothing.
 func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
 	if it.Folder || it.Cached {
 		return nil
@@ -95,7 +119,12 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 	return index(ctx, env.Store, c, it, meta)
 }
 
-func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error  { return nil }
+// Deleting does nothing: an archive is its version's only file, and the
+// item service prunes a version a delete leaves without files.
+func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error { return nil }
+
+// Deleted does nothing: the item service has already pruned the versions
+// the delete left without files, and no other file belongs to a version.
 func (Handler) Deleted(context.Context, format.Env, repo.Config, []types.Item) error { return nil }
 
 func metadataOf(ctx context.Context, env format.Env, it types.Item) (Metadata, error) {
@@ -155,6 +184,12 @@ func index(ctx context.Context, st store.Store, c repo.Config, it types.Item, me
 	return err //nolint:wrapcheck // pkgindex names the failed version
 }
 
+// Reindex rebuilds the package index from every archive stored at a
+// collection archive path: it reads each archive again, records its
+// properties unless the reindex operation keeps item properties
+// (SkipProperties), groups the versions by <namespace>.<name> and
+// reconciles the index. An archive that no longer validates, or whose
+// identity no longer matches its path, fails the reindex with ErrArchive.
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	var all []pkgindex.Indexed
 	byName := map[string]int{}

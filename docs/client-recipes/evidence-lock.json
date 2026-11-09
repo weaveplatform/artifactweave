@@ -23,7 +23,7 @@
   "migration/artifacts/ecosystem/vcs/http/archive_git_test.go": "fc4ef97591c049be131d6eee187450609d2a55fc7530295e259ebe0334e2d278",
   "migration/artifacts/ecosystem/vcs/http/testdata/git-archives.json": "df28a545d0dbf8cac25008d086ccc71bdb0fc4bba01141128d93588abb219fa1",
   "test/acceptance/alpine_steps_test.go": "efb8cc382c5ba967be09d183953225f10c5689162d6a949e67dae9f5cc82f7e1",
-  "test/acceptance/ansible_steps_test.go": "1eda0c7bbf66e63ca291ad52326cd73d10415baf845e267544cac3cabca18a77",
+  "test/acceptance/ansible_steps_test.go": "f0c35eaaabf261434d67fe806b0f8f00e5ce3af4bb42a5663c1bd7c9a5c30b6c",
   "test/acceptance/bower_private_steps_test.go": "ab39b57dff38bc25d668dc359a54afee676fb1235598921d68d248d1b79c5e3a",
   "test/acceptance/bower_steps_test.go": "987f6ac16b0eccf648c57acea3e41b692f986d1ff053f78d25f91cac28862340",
   "test/acceptance/cargo_steps_test.go": "8737691a3fc114ae7c30ef98ecada87bed5f9e59aa8320f773ddd0af2ec08b1e",

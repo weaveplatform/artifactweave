@@ -17,6 +17,9 @@ import (
 )
 
 const (
+	// MaxArchiveBytes is the largest compressed collection archive
+	// ReadArchive accepts, the 128 MiB limit docs/operations/ansible.md
+	// documents; the protocol reads no larger file from a publish.
 	MaxArchiveBytes  = 128 << 20
 	maxExpandedBytes = 512 << 20
 	maxFiles         = 4096
@@ -24,6 +27,9 @@ const (
 )
 
 var (
+	// ErrArchive is the error ReadArchive returns for every archive it
+	// refuses. Reindex and the protocol wrap it for a stored collection
+	// whose archive or index entry no longer agrees with its path.
 	ErrArchive = errors.New("invalid Ansible collection archive")
 	nameRE     = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
 )
@@ -38,8 +44,14 @@ type Metadata struct {
 	SHA256       string            `json:"sha256"`
 }
 
+// ValidName reports whether v is a valid Galaxy namespace or collection
+// name: a lower-case ASCII letter followed by at most 63 lower-case
+// letters, digits and underscores.
 func ValidName(v string) bool { return nameRE.MatchString(v) }
 
+// ValidVersion reports whether v is a valid collection version: a semantic
+// version of at most 128 bytes with exactly three numeric parts and no "v"
+// prefix, optionally followed by a pre-release and build metadata.
 func ValidVersion(v string) bool {
 	core, _, _ := strings.Cut(v, "-")
 	core, _, _ = strings.Cut(core, "+")
@@ -47,11 +59,19 @@ func ValidVersion(v string) bool {
 		semver.IsValid("v"+v)
 }
 
+// Path returns where a repository stores the archive of
+// <namespace>.<name> at version:
+// collections/<namespace>/<name>/<version>/<namespace>-<name>-<version>.tar.gz.
+// It does not check its arguments; ParsePath accepts only a path Path
+// builds from a valid identity and version.
 func Path(namespace, name, version string) string {
 	return "collections/" + namespace + "/" + name + "/" + version + "/" +
 		namespace + "-" + name + "-" + version + ".tar.gz"
 }
 
+// ParsePath returns the namespace, name and version of a collection archive
+// path, and ok false unless p is exactly the Path of a valid namespace,
+// name and version.
 func ParsePath(p string) (namespace, name, version string, ok bool) {
 	parts := strings.Split(p, "/")
 	if len(parts) != 5 || parts[0] != "collections" ||

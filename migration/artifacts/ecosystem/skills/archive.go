@@ -13,12 +13,24 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// The bundle limits are those docs/testing/skills.md documents. They are
+// artifactweave's admission limits, not measured Artifactory limits.
 const (
+	// MaxArchiveBytes bounds a bundle, 32 MiB: its stored ZIP, each entry's
+	// expanded size and all its entries' together. The protocol bounds a
+	// publish's files and the ZIP it builds from them by it too.
 	MaxArchiveBytes = 32 << 20
-	MaxSkillBytes   = 5 << 20
-	MaxFiles        = 256
+	// MaxSkillBytes bounds a bundle's SKILL.md, 5 MiB.
+	MaxSkillBytes = 5 << 20
+	// MaxFiles bounds a bundle's entries, folders included, 256; the
+	// protocol bounds the parts of a publish by it too.
+	MaxFiles = 256
 )
 
+// ErrArchive is the error ReadArchive returns for a bundle it refuses: one
+// over a bound, a corrupt or empty ZIP, an unsafe, duplicate or special
+// entry, or SKILL.md front matter that does not parse or exceeds its field
+// bounds.
 var ErrArchive = errors.New("skills: invalid skills bundle")
 
 // Metadata is the package record derived from the canonical path and

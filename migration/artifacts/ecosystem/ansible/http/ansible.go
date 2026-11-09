@@ -1,5 +1,3 @@
-// Package ansiblehttp serves Galaxy v3 collection requests through the shared
-// package protocol, source and item boundaries.
 package ansiblehttp
 
 import (
@@ -34,6 +32,15 @@ import (
 
 const maxPageBytes = 2 << 20
 
+// Protocol returns the Galaxy v3 protocol for ansible repositories: the API
+// root's version list, the collection, version list, version and import
+// task reads and the archive downloads (GET and HEAD), and the collection
+// publish (POST api/v3/artifacts/collections/), with the Artifactory error
+// profile. Local and federated repositories read their own items; a
+// virtual repository takes the local source too, because the handlers pick
+// its concrete members before any source read. remote is the remote source
+// service; nil leaves the remote class without a source, so a remote
+// repository answers 501.
 func Protocol(remote *source.Service) pkgroute.Protocol {
 	sources := map[repo.Class]pkgroute.Source{
 		repo.Local: pkgroute.Local{}, repo.Federated: pkgroute.Local{},
