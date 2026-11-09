@@ -21,15 +21,23 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
+	platsql "github.com/weaveplatform/artifactweave/migration/platform/store/sql"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // Store implements store.Store over database/sql for one Dialect. The
 // embedded dialect store holds the pool, the dialect and the keyring and
-// runs the unit of work; Store adds the aggregate's accessors.
-type Store struct{ *dialect.Store }
+// runs the unit of work; Store adds the aggregate's accessors. The
+// platform's stores are a field over the same dialect store rather than
+// embedded, so none of their methods is promoted onto Store, where it could
+// shadow an accessor without a compile error.
+type Store struct {
+	*dialect.Store
+	platform *platsql.Store
+}
 
 var _ store.Store = (*Store)(nil)
 
@@ -73,7 +81,33 @@ func Open(ctx context.Context, db *sql.DB, d Dialect, o Options) (*Store, error)
 	return s, nil
 }
 
-// New wraps an open, migrated pool.
+// New wraps an open, migrated pool. It registers the layout fence with the
+// platform's config store: a layout document that is created, changed or
+// deleted fences the remote repositories that use it, in the same
+// transaction (decision 0007).
 func New(db *sql.DB, d Dialect, keys *crypt.Keyring) *Store {
-	return &Store{Store: dialect.New(db, d, keys)}
+	s := &Store{Store: dialect.New(db, d, keys)}
+	s.platform = platsql.New(s.Store, configdoc.Watch{
+		Kind: configdoc.ConfigLayout,
+		Changed: func(ctx context.Context, key string) error {
+			return store.FenceLayoutSources(ctx, s, remoteRecords{s}, key)
+		},
+	})
+	return s
 }
+
+// Settings implements store.Store with the platform's settings store.
+func (s *Store) Settings() store.SettingsStore { return s.platform.Settings() }
+
+// Leases implements store.Store with the platform's lease store.
+func (s *Store) Leases() store.LeaseStore { return s.platform.Leases() }
+
+// WorkQueue implements store.Store with the platform's work queue.
+func (s *Store) WorkQueue() store.WorkQueue { return s.platform.WorkQueue() }
+
+// Configs implements store.Store with the platform's config document store,
+// which fences layouts as New registered.
+func (s *Store) Configs() store.ConfigStore { return s.platform.Configs() }
+
+// Instance implements store.Store with the platform's instance store.
+func (s *Store) Instance() store.InstanceStore { return s.platform.Instance() }
