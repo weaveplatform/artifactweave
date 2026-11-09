@@ -61,7 +61,7 @@ func entErr3[V any](_ V, _ string, err error) error { return err }
 
 // entSeed stores one record of every enterprise kind and returns the IDs
 // the store assigned.
-func entSeed(t *testing.T, s store.Store) (tracker, execution, archived int64) {
+func entSeed(t *testing.T, s store.Store) (tracker, archived int64) {
 	t.Helper()
 	ctx := context.Background()
 	now := time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)
@@ -85,21 +85,11 @@ func entSeed(t *testing.T, s store.Store) (tracker, execution, archived int64) {
 		CreateTracker(ctx, types.DistributionTracker{BundleName: "app", BundleVersion: "1"},
 			[]types.DistributionJob{{PeerInstanceID: "edge"}})
 	must(err)
-	must(s.Archive().CreatePolicy(ctx, types.ArchivePolicy{Key: "p", Family: types.ArchiveSmartV2}))
-	ex, err := s.Archive().
-		CreateExecution(ctx, types.ArchiveExecution{Kind: types.ExecutionArchive})
-	must(err)
 	it, err := s.ArchivedItems().AddItem(ctx, types.ArchivedItem{
 		Item: types.Item{RepoKey: "libs", Path: ".", Name: "a.jar"}, ExpiresAt: now,
 	})
 	must(err)
-	must(s.Workers().Create(ctx, types.Worker{Key: "w", Action: "AFTER_CREATE"}))
-	must(s.Workers().PutSecret(ctx, "w", "token", "s3cret"))
-	must(
-		s.Workers().
-			AddExecution(ctx, types.WorkerExecution{ID: "e1", WorkerKey: "w", Started: now}),
-	)
-	return tr.ID, ex.ID, it.ID
+	return tr.ID, it.ID
 }
 
 func TestAccEnterpriseClosedDatabase(t *testing.T) {
@@ -108,11 +98,10 @@ func TestAccEnterpriseClosedDatabase(t *testing.T) {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	b, d, a, w := s.Bundles(), s.Distribution(), s.Archive(), s.Workers()
+	b, d := s.Bundles(), s.Distribution()
 	ai := s.ArchivedItems()
 	rb := types.ReleaseBundle{Name: "app", Version: "1"}
 	tr := types.DistributionTracker{ID: 1}
-	ex := types.ArchiveExecution{ID: 1}
 	item := types.ArchivedItem{Item: types.Item{RepoKey: "r", Path: ".", Name: "n"}}
 	entFails(t, map[string]error{
 		"Bundles.Create":           b.Create(ctx, rb, nil),
@@ -138,53 +127,21 @@ func TestAccEnterpriseClosedDatabase(t *testing.T) {
 		"Distribution.JobsForPeer": entErr(
 			d.JobsForPeer(ctx, "edge", []types.JobStatus{types.JobFailed}),
 		),
-		"Archive.CreatePolicy":    a.CreatePolicy(ctx, types.ArchivePolicy{Key: "p"}),
-		"Archive.Policy":          entErr(a.Policy(ctx, "p")),
-		"Archive.UpdatePolicy":    a.UpdatePolicy(ctx, types.ArchivePolicy{Key: "p"}),
-		"Archive.DeletePolicy":    a.DeletePolicy(ctx, "p"),
-		"Archive.Policies":        entErr(a.Policies(ctx, types.ArchiveSmartV2)),
-		"Archive.CreateExecution": entErr(a.CreateExecution(ctx, ex)),
-		"Archive.Execution":       entErr(a.Execution(ctx, 1)),
-		"Archive.UpdateExecution": a.UpdateExecution(ctx, ex),
-		"Archive.Executions": entErr3(
-			a.Executions(ctx, store.ExecutionFilter{}, store.Page{}),
-		),
 		"Archive.AddItem":      entErr(ai.AddItem(ctx, item)),
 		"Archive.Item":         entErr(ai.Item(ctx, 1)),
 		"Archive.FindItems":    entErr(ai.FindItems(ctx, "r", "n")),
 		"Archive.Items":        entErr3(ai.Items(ctx, store.ArchivedFilter{}, store.Page{})),
 		"Archive.DeleteItem":   ai.DeleteItem(ctx, 1),
 		"Archive.ExpiredItems": entErr(ai.ExpiredItems(ctx, time.Now(), 0)),
-		"Workers.Create":       w.Create(ctx, types.Worker{Key: "w"}),
-		"Workers.Get":          entErr(w.Get(ctx, "w")),
-		"Workers.Update":       w.Update(ctx, types.Worker{Key: "w"}),
-		"Workers.Delete":       w.Delete(ctx, "w"),
-		"Workers.List":         entErr(w.List(ctx, store.WorkerFilter{})),
-		"Workers.State":        entErr(w.State(ctx, "w")),
-		"Workers.SetState":     w.SetState(ctx, "w", "k", "v"),
-		"Workers.DeleteState":  w.DeleteState(ctx, "w", "k"),
-		"Workers.PutSecret":    w.PutSecret(ctx, "w", "k", "v"),
-		"Workers.Secrets":      entErr(w.Secrets(ctx, "w")),
-		"Workers.DeleteSecret": w.DeleteSecret(ctx, "w", "k"),
-		"Workers.AddExecution": w.AddExecution(
-			ctx,
-			types.WorkerExecution{ID: "e", WorkerKey: "w"},
-		),
-		"Workers.Execution":       entErr(w.Execution(ctx, "e")),
-		"Workers.Executions":      entErr3(w.Executions(ctx, "", store.Page{})),
-		"Workers.PruneExecutions": entErr(w.PruneExecutions(ctx, time.Now())),
 	})
 }
 
 func TestAccEnterpriseCorruptRows(t *testing.T) {
 	s := entOpen(t)
 	ctx := context.Background()
-	tracker, execution, archived := entSeed(t, s)
-	b, d, a, w := s.Bundles(), s.Distribution(), s.Archive(), s.Workers()
+	tracker, archived := entSeed(t, s)
+	b, d := s.Bundles(), s.Distribution()
 	ai := s.ArchivedItems()
-	if err := w.PutSecret(ctx, "w", "other", "x"); err != nil {
-		t.Fatal(err)
-	}
 	// Text where a number, boolean or JSON document belongs.
 	entExec(t, s,
 		"UPDATE release_bundles SET notes = '{'",
@@ -192,14 +149,7 @@ func TestAccEnterpriseCorruptRows(t *testing.T) {
 		"UPDATE bundle_audits SET created_at = 'x'",
 		"UPDATE distribution_trackers SET rules = '{'",
 		"UPDATE distribution_jobs SET started_at = 'x'",
-		"UPDATE archive_policies SET enabled = 'x'",
-		"UPDATE archive_executions SET total = 'x'",
 		"UPDATE archived_items SET item = '{'",
-		"UPDATE workers SET filter_doc = '{'",
-		"UPDATE worker_executions SET duration_ms = 'x'",
-		// A value sealed for another row fails to open.
-		"UPDATE worker_secrets SET value = (SELECT value FROM worker_secrets WHERE name = 'other')"+
-			" WHERE name = 'token'",
 	)
 	later := time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC)
 	entFails(t, map[string]error{
@@ -210,18 +160,9 @@ func TestAccEnterpriseCorruptRows(t *testing.T) {
 		"Distribution.Tracker":  entErr(d.Tracker(ctx, tracker)),
 		"Distribution.Trackers": entErr(d.Trackers(ctx, "", "")),
 		"Distribution.Jobs":     entErr(d.Jobs(ctx, tracker)),
-		"Archive.Policy":        entErr(a.Policy(ctx, "p")),
-		"Archive.Policies":      entErr(a.Policies(ctx, "")),
-		"Archive.Execution":     entErr(a.Execution(ctx, execution)),
-		"Archive.Executions":    entErr3(a.Executions(ctx, store.ExecutionFilter{}, store.Page{})),
 		"Archive.Item":          entErr(ai.Item(ctx, archived)),
 		"Archive.Items":         entErr3(ai.Items(ctx, store.ArchivedFilter{}, store.Page{})),
 		"Archive.ExpiredItems":  entErr(ai.ExpiredItems(ctx, later, 0)),
-		"Workers.Get":           entErr(w.Get(ctx, "w")),
-		"Workers.List":          entErr(w.List(ctx, store.WorkerFilter{})),
-		"Workers.Secrets":       entErr(w.Secrets(ctx, "w")),
-		"Workers.Execution":     entErr(w.Execution(ctx, "e1")),
-		"Workers.Executions":    entErr3(w.Executions(ctx, "", store.Page{})),
 	})
 	// A second round reaches the checks the first round's failures stop
 	// short of.
@@ -238,11 +179,10 @@ func TestAccEnterpriseCorruptRows(t *testing.T) {
 func TestAccEnterpriseFailingStatements(t *testing.T) {
 	s := entOpen(t)
 	ctx := context.Background()
-	tracker, _, _ := entSeed(t, s)
-	b, d, w := s.Bundles(), s.Distribution(), s.Workers()
+	tracker, _ := entSeed(t, s)
+	b, d := s.Bundles(), s.Distribution()
 	for _, table := range []string{
-		"bundle_keeps", "bundle_exports", "distribution_trackers",
-		"distribution_jobs", "worker_state", "worker_secrets", "worker_executions",
+		"bundle_keeps", "bundle_exports", "distribution_trackers", "distribution_jobs",
 	} {
 		entExec(t, s, "CREATE TRIGGER fail_"+table+" BEFORE INSERT ON "+table+
 			" BEGIN SELECT RAISE(ABORT, 'injected'); END")
@@ -261,12 +201,6 @@ func TestAccEnterpriseFailingStatements(t *testing.T) {
 			types.DistributionJob{TrackerID: tracker, PeerInstanceID: "x"},
 		),
 		"Distribution.Create": entErr(d.CreateTracker(ctx, types.DistributionTracker{}, nil)),
-		"Workers.SetState":    w.SetState(ctx, "w", "k", "v"),
-		"Workers.PutSecret":   w.PutSecret(ctx, "w", "k", "v"),
-		"Workers.AddExecution": w.AddExecution(
-			ctx,
-			types.WorkerExecution{ID: "e2", WorkerKey: "w"},
-		),
 	})
 	// The failed replace left the artifact list as it was.
 	got, err := b.Artifacts(ctx, "app", "1")

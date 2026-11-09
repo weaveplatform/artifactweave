@@ -41,10 +41,6 @@ func opsStore(t *testing.T) (*sqlcommon.Store, string) {
 	}
 	t.Cleanup(func() { _ = s.Close() })
 	ps := s.Projects()
-	_, err = s.Webhooks().AddDelivery(ctx, types.WebhookDelivery{WebhookKey: "missing"})
-	if !errors.Is(err, store.ErrNotFound) {
-		t.Fatalf("delivery to a missing webhook: %v", err)
-	}
 	for _, err := range []error{
 		ps.Create(ctx, types.Project{Key: "p1"}),
 		ps.Create(ctx, types.Project{Key: "p2"}),
@@ -54,12 +50,6 @@ func opsStore(t *testing.T) (*sqlcommon.Store, string) {
 		ps.PutAssignment(ctx, types.RepositoryAssignment{
 			RepoKey: "repo-a", ProjectKey: "p1", Environments: []string{"p1-E"}, SharedWith: []string{"p2"},
 		}),
-		s.Webhooks().Create(ctx, types.WebhookSubscription{Key: "w", Handlers: []types.WebhookHandler{
-			{Type: types.HandlerWebhook, Secret: "s"},
-		}}),
-		s.Webhooks().Create(ctx, types.WebhookSubscription{Key: "named", Handlers: []types.WebhookHandler{
-			{Type: types.HandlerCustomWebhook, Secrets: []types.NamedSecret{{Name: "token", Value: "t"}}},
-		}}),
 		s.Replications().Put(ctx, types.Replication{Key: "k1", RepoKey: "repo-a", Password: "pw"}),
 		s.Replications().PutRun(ctx, types.ReplicationRun{ReplicationKey: "k1", Started: time.Unix(1, 0)}),
 	} {
@@ -185,81 +175,6 @@ func TestAccOperationsFaults(t *testing.T) {
 			func(ctx context.Context, s store.Store) error { return ps(s).DeleteAssignment(ctx, "repo-a") },
 		},
 		{
-			"create webhook secrets",
-			[]string{opsFail("INSERT", "webhook_secrets")},
-			func(ctx context.Context, s store.Store) error {
-				return s.Webhooks().
-					Create(ctx, types.WebhookSubscription{Key: "x", Handlers: []types.WebhookHandler{
-						{Type: types.HandlerWebhook, Secret: "s"},
-					}})
-			},
-		},
-		{
-			"create webhook named secret",
-			[]string{opsFail("INSERT", "webhook_secrets")},
-			func(ctx context.Context, s store.Store) error {
-				return s.Webhooks().
-					Create(ctx, types.WebhookSubscription{Key: "x", Handlers: []types.WebhookHandler{
-						{
-							Type:    types.HandlerCustomWebhook,
-							Secrets: []types.NamedSecret{{Name: "n", Value: "v"}},
-						},
-					}})
-			},
-		},
-		{
-			"create webhook clear secrets",
-			[]string{opsDrop("webhook_secrets")},
-			func(ctx context.Context, s store.Store) error {
-				return s.Webhooks().Create(ctx, types.WebhookSubscription{Key: "x"})
-			},
-		},
-		{
-			"update webhook secrets",
-			[]string{opsDrop("webhook_secrets")},
-			func(ctx context.Context, s store.Store) error {
-				return s.Webhooks().Update(ctx, types.WebhookSubscription{Key: "w"})
-			},
-		},
-		{
-			"get webhook secrets",
-			[]string{opsDrop("webhook_secrets")},
-			func(ctx context.Context, s store.Store) error {
-				_, err := s.Webhooks().Get(ctx, "w")
-				return err
-			},
-		},
-		{
-			"list webhook secrets",
-			[]string{opsDrop("webhook_secrets")},
-			func(ctx context.Context, s store.Store) error {
-				_, err := s.Webhooks().List(ctx, store.WebhookFilter{})
-				return err
-			},
-		},
-		{
-			"delete webhook",
-			[]string{opsFail("DELETE", "webhooks")},
-			func(ctx context.Context, s store.Store) error {
-				return s.Webhooks().Delete(ctx, "w")
-			},
-		},
-		{
-			"delete webhook secrets",
-			[]string{opsDrop("webhook_secrets")},
-			func(ctx context.Context, s store.Store) error {
-				return s.Webhooks().Delete(ctx, "w")
-			},
-		},
-		{
-			"add delivery",
-			[]string{opsFail("INSERT", "webhook_deliveries")},
-			func(ctx context.Context, s store.Store) error {
-				_, err := s.Webhooks().AddDelivery(ctx, types.WebhookDelivery{WebhookKey: "w"})
-				return err
-			},
-		},
-		{
 			"delete replication runs",
 			[]string{opsDrop("replication_runs")},
 			func(ctx context.Context, s store.Store) error { return s.Replications().Delete(ctx, "k1") },
@@ -323,10 +238,7 @@ func TestAccOperationsSealed(t *testing.T) {
 	}
 	defer func() { _ = s.Close() }()
 	for name, op := range map[string]func() error{
-		"webhook secret": func() error { _, err := s.Webhooks().Get(ctx, "w"); return err },
-		"named secret":   func() error { _, err := s.Webhooks().Get(ctx, "named"); return err },
-		"webhook list":   func() error { _, err := s.Webhooks().List(ctx, store.WebhookFilter{}); return err },
-		"replication":    func() error { _, err := s.Replications().Get(ctx, "k1"); return err },
+		"replication": func() error { _, err := s.Replications().Get(ctx, "k1"); return err },
 	} {
 		if err := op(); !errors.Is(err, sqlcommon.ErrNoKeyring) {
 			t.Errorf("%s: want ErrNoKeyring, got %v", name, err)
@@ -353,7 +265,7 @@ func TestAccOperationsUnmigrated(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = s.Close() }()
-	ps, ws, cs, rs := s.Projects(), s.Webhooks(), s.Cleanup(), s.Replications()
+	ps, rs := s.Projects(), s.Replications()
 	now := time.Unix(100, 0)
 	errOf := func(_ any, err error) error { return err }
 	ops := map[string]error{
@@ -379,29 +291,6 @@ func TestAccOperationsUnmigrated(t *testing.T) {
 		"assignment":         errOf(ps.Assignment(ctx, "r")),
 		"assignments":        errOf(ps.Assignments(ctx, "p")),
 		"delete assignment":  ps.DeleteAssignment(ctx, "r"),
-		"webhook create":     ws.Create(ctx, types.WebhookSubscription{Key: "w"}),
-		"webhook get":        errOf(ws.Get(ctx, "w")),
-		"webhook update":     ws.Update(ctx, types.WebhookSubscription{Key: "w"}),
-		"webhook delete":     ws.Delete(ctx, "w"),
-		"webhook list": errOf(
-			ws.List(ctx, store.WebhookFilter{Domain: "d", ProjectKey: "p", EnabledOnly: true}),
-		),
-		"add delivery": errOf(ws.AddDelivery(ctx, types.WebhookDelivery{WebhookKey: "w"})),
-		"deliveries": errOf(
-			ws.Deliveries(ctx, store.DeliveryFilter{WebhookKey: "w", From: now, To: now}),
-		),
-		"prune deliveries": errOf(ws.PruneDeliveries(ctx, now)),
-		"create policy":    cs.CreatePolicy(ctx, types.CleanupPolicy{Key: "k"}),
-		"policy":           errOf(cs.Policy(ctx, "k")),
-		"update policy":    cs.UpdatePolicy(ctx, types.CleanupPolicy{Key: "k"}),
-		"delete policy":    cs.DeletePolicy(ctx, "k"),
-		"policies": errOf(
-			cs.Policies(ctx, store.PolicyFilter{ItemType: "package", ProjectKey: "p"}),
-		),
-		"create run":         errOf(cs.CreateRun(ctx, types.CleanupRun{PolicyKey: "k"})),
-		"run":                errOf(cs.Run(ctx, 1)),
-		"update run":         cs.UpdateRun(ctx, types.CleanupRun{ID: 1}),
-		"last run":           errOf(cs.LastRun(ctx, "k")),
 		"put replication":    rs.Put(ctx, types.Replication{Key: "k"}),
 		"get replication":    errOf(rs.Get(ctx, "k")),
 		"repo replications":  errOf(rs.ForRepo(ctx, "r")),
@@ -414,11 +303,6 @@ func TestAccOperationsUnmigrated(t *testing.T) {
 		),
 		"last replication": errOf(rs.LastRun(ctx, "k")),
 	}
-	_, _, err = cs.Runs(ctx, store.RunFilter{
-		PolicyKey: "k", ItemType: "package",
-		Statuses: []types.RunStatus{types.RunCompleted},
-	}, store.Page{})
-	ops["runs"] = err
 	for name, err := range ops {
 		if err == nil || errors.Is(err, store.ErrNotFound) {
 			t.Errorf("%s: want a driver error, got %v", name, err)
