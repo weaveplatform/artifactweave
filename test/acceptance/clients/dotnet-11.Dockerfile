@@ -4,4 +4,4 @@
 # candidate; Dependabot moves the digest as the tag moves, and holds the next
 # major as it does for every image here. The job builds it as
 # artifactweave-accept-dotnet11.
-FROM mcr.microsoft.com/dotnet/sdk:11.0@sha256:b55f191e80c1828476d2b080d05d33e1183068f5bcaeee684f28a1d4e31a10ad
+FROM mcr.microsoft.com/dotnet/sdk:11.0@sha256:59d092a889fbad09c1a0b0c5dd072c6315125b0294a5cddfa48ec892f63b2ab3
