@@ -30,6 +30,30 @@ func TestUnitReverseClosureIncludesTransitiveProductionConsumers(t *testing.T) {
 	}
 }
 
+// A format's settings reach app through the composition root's
+// configuration package, which app imports, so app's tests are selected
+// although app imports no package of the format.
+func TestUnitReverseClosureCarriesFormatChangesThroughAppConfig(t *testing.T) {
+	migration := modulePath + "/migration/"
+	staged := migration + "artifacts/ecosystem/"
+	graph := map[string][]string{
+		staged + "npm":           nil,
+		staged + "maven":         nil,
+		migration + "app/config": {staged + "npm"},
+		migration + "app":        {migration + "app/config"},
+		migration + "artifacts":  {staged + "maven"},
+	}
+	got := reverseClosure(graph, []string{staged + "npm"}, "npm")
+	want := []string{
+		"./migration/app",
+		"./migration/app/config",
+		"./migration/artifacts/ecosystem/npm",
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("reverse closure = %v, want %v", got, want)
+	}
+}
+
 func TestUnitSourceImportGraphFailsOnMissingInternalPackage(t *testing.T) {
 	root := t.TempDir()
 	dir := filepath.Join(root, "internal", "example")
