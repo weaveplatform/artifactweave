@@ -12,6 +12,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -455,7 +456,7 @@ func (forgetful) Reindex(ctx context.Context, env format.Env, c repo.Config) err
 // escaped is a store whose work queue is another store's, so queued work
 // escapes the transaction of the write that asked for it.
 type escaped struct {
-	store.Store
+	item.Store
 	queue store.WorkQueue
 }
 
@@ -466,7 +467,7 @@ func TestUnitTheSuiteCatchesBrokenFormats(t *testing.T) {
 	for _, c := range []struct {
 		name     string
 		f        Format
-		st       func() store.Store
+		st       func() item.Store
 		scenario func(*world) error
 		expected string
 	}{
@@ -480,7 +481,7 @@ func TestUnitTheSuiteCatchesBrokenFormats(t *testing.T) {
 			f.Work = nil
 			return f
 		}(), nil, workScenario, "queued work"},
-		{"escaped work", taggedFormat(tagged{}), func() store.Store {
+		{"escaped work", taggedFormat(tagged{}), func() item.Store {
 			return escaped{inmem.New(), inmem.New().WorkQueue()}
 		}, rollbackScenario, "left queued work"},
 		{"fixture", func() Format {
@@ -546,7 +547,7 @@ func TestUnitTheSuiteCatchesBrokenFormats(t *testing.T) {
 		},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			st := store.Store(inmem.New())
+			st := item.Store(inmem.New())
 			if c.st != nil {
 				st = c.st()
 			}

@@ -11,7 +11,7 @@ import (
 )
 
 type transferRaceStore struct {
-	store.Store
+	Store
 	before func()
 }
 

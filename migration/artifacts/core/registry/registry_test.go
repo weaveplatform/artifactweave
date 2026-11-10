@@ -37,7 +37,7 @@ func sum(s string) string {
 // a restarted process would.
 type backend struct {
 	name string
-	open func(t *testing.T) (st store.Store, reopen func() store.Store)
+	open func(t *testing.T) (st registry.Store, reopen func() registry.Store)
 }
 
 // backends are the stores sessions are kept in: the in-memory reference,
@@ -45,13 +45,13 @@ type backend struct {
 // containers.
 func backends() []backend {
 	return []backend{
-		{"inmem", func(*testing.T) (store.Store, func() store.Store) {
+		{"inmem", func(*testing.T) (registry.Store, func() registry.Store) {
 			db := inmem.New()
-			return db, func() store.Store { return db }
+			return db, func() registry.Store { return db }
 		}},
-		{"sqlite", func(t *testing.T) (store.Store, func() store.Store) {
+		{"sqlite", func(t *testing.T) (registry.Store, func() registry.Store) {
 			path := filepath.Join(t.TempDir(), "aw.db")
-			open := func() store.Store {
+			open := func() registry.Store {
 				st, err := sqlite.Open(context.Background(), path, sqlite.Options{})
 				if err != nil {
 					t.Fatal(err)
@@ -61,7 +61,7 @@ func backends() []backend {
 			}
 			return open(), open
 		}},
-		{"postgres", func(t *testing.T) (store.Store, func() store.Store) {
+		{"postgres", func(t *testing.T) (registry.Store, func() registry.Store) {
 			dsn := sqltest.PostgresDSN(t)
 			open := func() *sqlcommon.Store {
 				st, err := postgres.Open(context.Background(), dsn, postgres.Options{})
@@ -74,7 +74,7 @@ func backends() []backend {
 			// The test binary shares one server, so each test starts empty.
 			first := open()
 			sqltest.Reset(t, first.DB(), first.Dialect())
-			return first, func() store.Store { return open() }
+			return first, func() registry.Store { return open() }
 		}},
 	}
 }
@@ -83,7 +83,7 @@ func backends() []backend {
 // generic one, a blob store and the service over them.
 type world struct {
 	t      *testing.T
-	db     store.Store
+	db     registry.Store
 	blobs  blob.Store
 	svc    *registry.Service
 	docker repo.Config
@@ -91,7 +91,7 @@ type world struct {
 	plain  repo.Config
 }
 
-func newWorld(t *testing.T, db store.Store) *world {
+func newWorld(t *testing.T, db registry.Store) *world {
 	t.Helper()
 	ctx := context.Background()
 	blobs, err := fs.New(t.TempDir())
@@ -122,7 +122,7 @@ func (w *world) repo(key string) repo.Config {
 	return c
 }
 
-func (w *world) service(db store.Store) *registry.Service {
+func (w *world) service(db registry.Store) *registry.Service {
 	return &registry.Service{
 		Store: db, Blobs: w.blobs, Now: func() time.Time { return start }, Formats: ecosystem.For,
 	}
@@ -152,7 +152,7 @@ func (w *world) item(c repo.Config, path string) (types.Item, error) {
 }
 
 // each runs fn against a fresh world on every backend.
-func each(t *testing.T, fn func(t *testing.T, w *world, reopen func() store.Store)) {
+func each(t *testing.T, fn func(t *testing.T, w *world, reopen func() registry.Store)) {
 	for _, b := range backends() {
 		t.Run(b.name, func(t *testing.T) {
 			db, reopen := b.open(t)
@@ -162,7 +162,7 @@ func each(t *testing.T, fn func(t *testing.T, w *world, reopen func() store.Stor
 }
 
 func TestAccChunkedUploadSurvivesARestart(t *testing.T) {
-	each(t, func(t *testing.T, w *world, reopen func() store.Store) {
+	each(t, func(t *testing.T, w *world, reopen func() registry.Store) {
 		ctx := context.Background()
 		o := w.owner("team/app")
 		id, err := w.svc.Begin(ctx, o)
@@ -212,7 +212,7 @@ func TestAccChunkedUploadSurvivesARestart(t *testing.T) {
 }
 
 func TestAccSessionsBelongToTheirOwner(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		ctx := context.Background()
 		o := w.owner("app")
 		id, err := w.svc.Begin(ctx, o)
@@ -259,7 +259,7 @@ func TestAccSessionsBelongToTheirOwner(t *testing.T) {
 }
 
 func TestAccFinishVerifiesTheDigest(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		ctx := context.Background()
 		o := w.owner("app")
 		id, err := w.svc.Begin(ctx, o)
@@ -292,7 +292,7 @@ func TestAccFinishVerifiesTheDigest(t *testing.T) {
 }
 
 func TestAccCancel(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		ctx := context.Background()
 		o := w.owner("app")
 		id, err := w.svc.Begin(ctx, o)
@@ -327,7 +327,7 @@ func blobUpload(t *testing.T, w *world, id string) string {
 }
 
 func TestAccASessionEndsWithItsBlobUpload(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		ctx := context.Background()
 		o := w.owner("app")
 		id, err := w.svc.Begin(ctx, o)
@@ -353,7 +353,7 @@ func TestAccASessionEndsWithItsBlobUpload(t *testing.T) {
 }
 
 func TestAccMonolithicUpload(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		ctx := context.Background()
 		o := w.owner("app")
 		it, err := w.svc.Upload(ctx, o, strings.NewReader("whole"), sum("whole"))
@@ -374,7 +374,7 @@ func TestAccMonolithicUpload(t *testing.T) {
 }
 
 func TestAccMount(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		ctx := context.Background()
 		layer := sum("shared layer")
 		w.deploy(w.oci, "base/v1/sha256__"+layer, "shared layer", start)
@@ -412,7 +412,7 @@ func TestAccMount(t *testing.T) {
 }
 
 func TestAccReap(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		ctx := context.Background()
 		id, err := w.svc.Begin(ctx, w.owner("app"))
 		if err != nil {
@@ -454,7 +454,7 @@ func TestAccReap(t *testing.T) {
 }
 
 func TestAccExpireUploads(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		ctx := context.Background()
 		old, recent := start.Add(-48*time.Hour), start.Add(-time.Hour)
 		gone := []string{

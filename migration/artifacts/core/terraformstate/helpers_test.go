@@ -38,7 +38,7 @@ var start = time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC)
 type world struct {
 	t     *testing.T
 	ctx   context.Context
-	st    store.Store
+	st    item.Store
 	blobs blob.Store
 	keys  *crypt.Keyring
 	items *item.Service
@@ -62,7 +62,7 @@ func keyring(t *testing.T, keys ...crypt.MasterKey) *crypt.Keyring {
 	return k
 }
 
-func newWorld(t *testing.T, st store.Store) *world {
+func newWorld(t *testing.T, st item.Store) *world {
 	t.Helper()
 	blobs, err := fs.New(t.TempDir())
 	if err != nil {
@@ -80,7 +80,7 @@ func newWorld(t *testing.T, st store.Store) *world {
 
 // newWorldOver is prev's world over st, the same database opened again:
 // a restart.
-func newWorldOver(t *testing.T, st store.Store, prev *world) *world {
+func newWorldOver(t *testing.T, st item.Store, prev *world) *world {
 	t.Helper()
 	w := &world{t: t, ctx: context.Background(), st: st, blobs: prev.blobs, now: prev.now}
 	w.useKeys(prev.keys)
@@ -93,7 +93,7 @@ func newWorldOver(t *testing.T, st store.Store, prev *world) *world {
 }
 
 // memStore is a fresh in-memory store.
-func memStore() store.Store { return inmem.New() }
+func memStore() item.Store { return inmem.New() }
 
 // sqliteFile is a SQLite database a test opens and closes, as a restart
 // does.
@@ -107,7 +107,7 @@ func sqliteBackend(t *testing.T) *sqliteFile {
 	return &sqliteFile{path: filepath.Join(t.TempDir(), "aw.db")}
 }
 
-func (f *sqliteFile) open(t *testing.T) store.Store {
+func (f *sqliteFile) open(t *testing.T) item.Store {
 	t.Helper()
 	st, err := sqlite.Open(context.Background(), f.path, sqlite.Options{})
 	if err != nil {

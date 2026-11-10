@@ -71,7 +71,7 @@ func symbols(id, version string) []byte {
 type world struct {
 	t     *testing.T
 	ctx   context.Context
-	st    store.Store
+	st    item.Store
 	items *item.Service
 	trash *trash.Service
 	q     *work.Queue
@@ -84,7 +84,7 @@ func newWorld(t *testing.T, tune func(*repo.Config)) *world {
 	return newWorldOn(t, inmem.New(), tune)
 }
 
-func newWorldOn(t *testing.T, st store.Store, tune func(*repo.Config)) *world {
+func newWorldOn(t *testing.T, st item.Store, tune func(*repo.Config)) *world {
 	t.Helper()
 	blobs, err := fs.New(t.TempDir())
 	if err != nil {

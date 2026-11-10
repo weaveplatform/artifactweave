@@ -161,7 +161,7 @@ func files(name, folder string, blobs ...string) []string {
 // the tag folder's, dated by the push; a push by digest keeps an image a
 // package without adding a version; finished uploads are no files of any.
 func TestAccPushIndexesTheTag(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		c := &clock{}
 		w.svc.Now = c.now
 		w.at(c, 1)
@@ -197,7 +197,7 @@ func TestAccPushIndexesTheTag(t *testing.T) {
 // gives it the new manifest's files; pushing the same manifest again
 // changes nothing.
 func TestAccOverwriteMovesTheTagToTheNewestPlace(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		c := &clock{}
 		w.svc.Now = c.now
 		first, firstDigest := w.image(w.docker, "app", layerA)
@@ -230,7 +230,7 @@ func TestAccOverwriteMovesTheTagToTheNewestPlace(t *testing.T) {
 // A tag is a version while its folder holds a manifest, and an image a
 // package while it holds any manifest, whatever is deleted around them.
 func TestAccDeletesKeepTheIndex(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		c := &clock{}
 		w.svc.Now = c.now
 		body, digest := w.image(w.docker, "app", layerA)
@@ -267,7 +267,7 @@ func TestAccDeletesKeepTheIndex(t *testing.T) {
 // Copies, moves and restores land files one at a time, the manifest
 // before or after its blobs; each leaves the index as a push would.
 func TestAccCopiesMovesAndRestoresKeepTheIndex(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		ctx := context.Background()
 		c := &clock{}
 		w.svc.Now = c.now
@@ -322,7 +322,7 @@ func TestAccCopiesMovesAndRestoresKeepTheIndex(t *testing.T) {
 
 // A reindex rebuilds from the item tree the index the hooks kept.
 func TestAccReindexRebuildsTheSameIndex(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		ctx := context.Background()
 		c := &clock{}
 		w.svc.Now = c.now

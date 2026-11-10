@@ -46,7 +46,7 @@ func (f *faults) hit(op string) error {
 }
 
 type faultStore struct {
-	store.Store
+	multipart.Store
 	f *faults
 }
 

@@ -21,8 +21,10 @@ import (
 	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	blobsession "github.com/weaveplatform/artifactweave/migration/platform/blob/session"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -92,10 +94,18 @@ type session struct {
 	SHA256 string `json:"sha256,omitempty"`
 }
 
+// Store is what multipart uploads keep in the metadata store: the upload
+// sessions, and the blob index that takes the assembled content's
+// reference. The metadata store's aggregate (pkg/store) is a Store.
+type Store interface {
+	Uploads() blobsession.UploadStore
+	Blobs() port.BlobIndex
+}
+
 // Service runs multipart uploads over a metadata store and a blob store.
 // Dir holds the staged parts, a directory per upload.
 type Service struct {
-	Store store.Store
+	Store Store
 	Blobs blob.Store
 	Dir   string
 	// Restrictions is asked about the session's user, at Now, on every

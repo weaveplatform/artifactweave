@@ -48,7 +48,7 @@ func (f worker) Owed(c repo.Config, cached bool, p string) []format.WorkRef {
 // otherWorker is a second format type, which may not claim worker's kinds.
 type otherWorker struct{ worker }
 
-func newQueue(t *testing.T, st store.Store, o work.Options) *work.Queue {
+func newQueue(t *testing.T, st Store, o work.Options) *work.Queue {
 	t.Helper()
 	q, err := work.New(st, o)
 	if err != nil {

@@ -21,7 +21,7 @@ var errBoom = errors.New("boom")
 
 // faultyStore fails what its fields name and delegates the rest.
 type faultyStore struct {
-	store.Store
+	registry.Store
 	uploads *faultyUploads
 	items   *faultyItems
 	repos   *faultyRepos

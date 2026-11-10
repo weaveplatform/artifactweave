@@ -57,7 +57,10 @@ func newFixture(t *testing.T) *fixture {
 	return newFixtureWith(t, nil)
 }
 
-func newFixtureWith(t *testing.T, makeRemote func(*item.Service) *source.Service) *fixture {
+func newFixtureWith(
+	t *testing.T,
+	makeRemote func(*inmem.Store, *item.Service) *source.Service,
+) *fixture {
 	t.Helper()
 	db := inmem.New()
 	blobs, err := fs.New(t.TempDir())
@@ -80,7 +83,7 @@ func newFixtureWith(t *testing.T, makeRemote func(*item.Service) *source.Service
 	}))
 	var remote *source.Service
 	if makeRemote != nil {
-		remote = makeRemote(items)
+		remote = makeRemote(db, items)
 	}
 	pkgroute.Mount(r, pkgroute.Options{
 		Store: db, Items: func() *item.Service { return items },
@@ -487,7 +490,9 @@ func TestAccBazelClient(t *testing.T) {
 	up := fakeupstream.New(t, fakeupstream.Options{})
 	f := newFixtureWith(
 		t,
-		func(items *item.Service) *source.Service { return remoteService(t, items) },
+		func(db *inmem.Store, items *item.Service) *source.Service {
+			return remoteService(t, db, items)
+		},
 	)
 	f.publish(
 		f.local,

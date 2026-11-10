@@ -477,16 +477,29 @@ func TestUnitRemoteReindexStoreFaults(t *testing.T) {
 	}
 }
 
+// accessStore is w's store as the access module reads it. Every store the
+// remote reindex tests run on, each formattest backend's among them, is a
+// metadata store that holds the users and permissions as well.
+func accessStore(t *testing.T, w *world) accesstest.Store {
+	t.Helper()
+	st, ok := w.st.(accesstest.Store)
+	if !ok {
+		t.Fatalf("%T holds no access stores", w.st)
+	}
+	return st
+}
+
 func reindexCredential(t *testing.T, w *world) json.RawMessage {
 	t.Helper()
-	if _, err := w.st.Users().Get(w.ctx, "tester"); errors.Is(err, store.ErrNotFound) {
+	acc := accessStore(t, w)
+	if _, err := acc.Users().Get(w.ctx, "tester"); errors.Is(err, store.ErrNotFound) {
 		hash := accesstest.HashPassword(t, "pw")
-		if err = w.st.Users().
+		if err = acc.Users().
 			Create(w.ctx, types.User{Name: "tester", PasswordHash: hash, Admin: true}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	api := accesstest.Over(t, w.st, accesstest.WithNow(func() time.Time { return w.now })).API()
+	api := accesstest.Over(t, acc, accesstest.WithNow(func() time.Time { return w.now })).API()
 	p, err := api.Authenticator.Basic(w.ctx, "tester", "pw")
 	if err != nil {
 		t.Fatal(err)
@@ -507,15 +520,16 @@ func TestUnitRemoteReindexWorkerRevocation(t *testing.T) {
 				w.c = w.repo("remote", repo.Remote, nil)
 				it := cacheReindexPackage(t, w, "Foo.1.0.0.nupkg", pkg("Foo", "1.0.0", ""))
 				reindexCredential(t, w)
-				user, err := w.st.Users().Get(w.ctx, "tester")
+				acc := accessStore(t, w)
+				user, err := acc.Users().Get(w.ctx, "tester")
 				if err != nil {
 					t.Fatal(err)
 				}
 				user.Admin = false
-				if err = w.st.Users().Update(w.ctx, user); err != nil {
+				if err = acc.Users().Update(w.ctx, user); err != nil {
 					t.Fatal(err)
 				}
-				if err = w.st.Permissions().
+				if err = acc.Permissions().
 					Create(w.ctx, types.Permission{Name: "manager", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{"tester": types.ActionManage}}, Targets: map[string]types.Target{w.c.Key: {Include: []string{"**"}}}}}}); err != nil {
 					t.Fatal(err)
 				}
@@ -539,11 +553,11 @@ func TestUnitRemoteReindexWorkerRevocation(t *testing.T) {
 				change := func() {
 					switch revoke {
 					case "manage":
-						if err := w.st.Permissions().Delete(w.ctx, "manager"); err != nil {
+						if err := acc.Permissions().Delete(w.ctx, "manager"); err != nil {
 							t.Fatal(err)
 						}
 					case "password", "disabled":
-						u, err := w.st.Users().Get(w.ctx, "tester")
+						u, err := acc.Users().Get(w.ctx, "tester")
 						if err != nil {
 							t.Fatal(err)
 						}
@@ -552,7 +566,7 @@ func TestUnitRemoteReindexWorkerRevocation(t *testing.T) {
 						} else {
 							u.PasswordHash = []byte("changed revision")
 						}
-						if err = w.st.Users().Update(w.ctx, u); err != nil {
+						if err = acc.Users().Update(w.ctx, u); err != nil {
 							t.Fatal(err)
 						}
 					}

@@ -42,7 +42,7 @@ type fixture struct {
 func newFixture(
 	t *testing.T,
 	class repo.Class,
-	configure ...func(*item.Service) *source.Service,
+	configure ...func(*inmem.Store, *item.Service) *source.Service,
 ) *fixture {
 	t.Helper()
 	ctx := context.Background()
@@ -58,7 +58,7 @@ func newFixture(
 	items := &item.Service{Store: db, Blobs: blobs, Formats: ecosystem.For}
 	var remoteSources *source.Service
 	if len(configure) > 0 {
-		remoteSources = configure[0](items)
+		remoteSources = configure[0](db, items)
 	}
 	r := chi.NewRouter()
 	r.Use(baseurl.Middleware("http://registry.test"))
@@ -259,7 +259,7 @@ func TestAccProtocolValidationAndReadOnlyClasses(t *testing.T) {
 	remote := newFixture(
 		t,
 		repo.Remote,
-		func(*item.Service) *source.Service { return &source.Service{} },
+		func(*inmem.Store, *item.Service) *source.Service { return &source.Service{} },
 	)
 	for _, tc := range []struct{ method, path string }{
 		{http.MethodPut, "api/v1/crates/new"},

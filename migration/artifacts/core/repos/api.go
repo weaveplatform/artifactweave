@@ -9,10 +9,25 @@ import (
 	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 var _ artifactsapi.Repositories = repositories{}
+
+// Store is what the repositories read and write: the repository
+// configurations, the work queue a reindex request goes to, and what Remove
+// deletes with a repository, its items and package index, and the trash can
+// its content moves to (trash.Store). Every call joins the transaction ctx
+// carries. The metadata store's aggregate (pkg/store) is a Store.
+type Store interface {
+	trash.Store
+	Repos() port.RepoStore
+	Packages() port.PackageStore
+	WorkQueue() work.WorkQueue
+}
 
 // NewRepositories returns the artifacts module's Repositories over st, which
 // reads key pairs through keys and environments through projects for
@@ -24,7 +39,7 @@ var _ artifactsapi.Repositories = repositories{}
 // must take part in that transaction too, as the access module's bindings
 // over st do. Nothing is read or checked until a method is called.
 func NewRepositories(
-	st store.Store,
+	st Store,
 	keys accessapi.Keys,
 	projects accessapi.Projects,
 ) artifactsapi.Repositories {
@@ -32,7 +47,7 @@ func NewRepositories(
 }
 
 type repositories struct {
-	st       store.Store
+	st       Store
 	keys     accessapi.Keys
 	projects accessapi.Projects
 }

@@ -39,7 +39,7 @@ func (f *faults) fail(method string) bool {
 // faulty fails the package and item store methods its faults arm and
 // delegates the rest, transactions included.
 type faulty struct {
-	store.Store
+	item.Store
 	f *faults
 }
 
@@ -360,7 +360,7 @@ func TestUnitCorruptMetadata(t *testing.T) {
 // reindex's transaction reads them again, as a deploy in between leaves
 // them.
 type changing struct {
-	store.Store
+	item.Store
 	searches *int
 }
 

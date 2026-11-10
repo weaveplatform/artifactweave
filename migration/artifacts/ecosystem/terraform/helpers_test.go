@@ -27,7 +27,7 @@ import (
 type world struct {
 	t     *testing.T
 	ctx   context.Context
-	st    store.Store
+	st    item.Store
 	blobs *counting
 	items *item.Service
 	trash *trash.Service
@@ -39,7 +39,7 @@ func newWorld(t *testing.T) *world {
 	return newWorldOn(t, inmem.New())
 }
 
-func newWorldOn(t *testing.T, st store.Store) *world {
+func newWorldOn(t *testing.T, st item.Store) *world {
 	t.Helper()
 	b, err := fs.New(t.TempDir())
 	if err != nil {

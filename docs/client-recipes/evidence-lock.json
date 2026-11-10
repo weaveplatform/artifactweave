@@ -11,7 +11,7 @@
   "migration/access/adapters/http/authn_middleware.go": "96fc9bec3b46e94aba09b495135852cba900dcfa6dff1086bd8a55fa4ad19571",
   "migration/access/core/authn/token.go": "babe0157048fb63ffe7758df90769a88538e07364c54783f57c3f25559aab4a3",
   "migration/access/core/authn/token_test.go": "2d7c3c2cb63e8b2a9a0e89ec474d1f86c88c86318973be7f835659f28cb8820e",
-  "migration/artifacts/ecosystem/bazelmodules/http/bazelmodules_test.go": "66679968fd196a728c87cbb40b9fbe6f977aca65f3fe66338305bffded7a4a1d",
+  "migration/artifacts/ecosystem/bazelmodules/http/bazelmodules_test.go": "f8b6a0d4da148bdaa8b40a74545b7b859d5321f10feddde003dce62d82099c0f",
   "migration/artifacts/ecosystem/huggingface/http/migration_scope_test.go": "0af99d371718de7593e0876ec738144812ef8dc184977cfefe0b1be4b24f4ff7",
   "migration/artifacts/ecosystem/huggingface/http/migration_test.go": "882fc9b96ca1eb02f8cb2c59207ad34ab39602f4d55de108cf3d26c9600b1ab6",
   "migration/artifacts/ecosystem/swift/http/remote_test.go": "79c1ed273e57a0e9e64c61e2cea4eefbf81c897f19e6a096d3630ddd27610a9a",

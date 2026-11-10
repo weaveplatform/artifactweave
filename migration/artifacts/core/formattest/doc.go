@@ -56,7 +56,8 @@
 //     broken fails its subtest with what differs; a fixture that contradicts
 //     itself fails Run before any scenario runs.
 //   - Backends: the in-memory reference store, SQLite on disk and
-//     PostgreSQL. PostgreSQL skips in -short runs and where Docker cannot
+//     PostgreSQL, each opened as the item service's store (item.Store),
+//     which the world's item and trash services run over. PostgreSQL skips in -short runs and where Docker cannot
 //     run Linux containers, unless ARTIFACTWEAVE_TEST_POSTGRES_DSN names a
 //     server; the test binary shares one server, which each scenario
 //     resets. NuGet's remote reindex test and the Terraform state service's
@@ -109,8 +110,9 @@
 //     #p9d-modular-monolith-migration, epic ART
 //     (https://github.com/weaveplatform/artifactweave/issues/941).
 //   - https://github.com/weaveplatform/artifactweave/issues/268,
-//     https://github.com/weaveplatform/artifactweave/issues/533 and
-//     https://github.com/weaveplatform/artifactweave/issues/972
+//     https://github.com/weaveplatform/artifactweave/issues/533,
+//     https://github.com/weaveplatform/artifactweave/issues/972 and
+//     https://github.com/weaveplatform/artifactweave/issues/1088
 //
 // # Status
 //
@@ -121,10 +123,10 @@
 // (https://github.com/weaveplatform/artifactweave/issues/361). P8 added
 // Format.RepoWork and File.SidecarOf
 // (https://github.com/weaveplatform/artifactweave/issues/533), and
-// Format.Local for Terraform's terraformType. Staged in P9d. Roadmap: the
-// world takes the item service's narrow store in place of the whole store
-// (https://github.com/weaveplatform/artifactweave/issues/1088), and Run
-// takes its backends from its caller instead of opening them, so that
+// Format.Local for Terraform's terraformType. Staged in P9d, which narrowed
+// the backends and the world to the item service's store
+// (https://github.com/weaveplatform/artifactweave/issues/1088). Roadmap:
+// Run takes its backends from its caller instead of opening them, so that
 // artifacts core never imports app
 // (https://github.com/weaveplatform/artifactweave/issues/1098).
 //

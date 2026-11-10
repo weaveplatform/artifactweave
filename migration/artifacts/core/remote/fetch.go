@@ -450,7 +450,7 @@ func (p *Policy) upload(
 		By:           q.Subject.Name,
 		NoStore:      noStore,
 		MaxBytes:     limit,
-		CheckCurrent: func(ctx context.Context, _ store.Store) error { return p.Check(ctx, q, permit, revision) },
+		CheckCurrent: func(ctx context.Context, _ item.Store) error { return p.Check(ctx, q, permit, revision) },
 	}
 }
 

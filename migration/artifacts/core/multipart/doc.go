@@ -26,8 +26,8 @@
 //     checksum token lets it through; the garbage collector, which hands
 //     stale sessions under Backend to Reap; and the composition root, which
 //     runs Sweep at startup.
-//   - Driven: the metadata store (the uploads table, and the blob index a
-//     completion records the content in), the blob store
+//   - Driven: the metadata store, through Store (the uploads table, and
+//     the blob index a completion records the content in), the blob store
 //     (platform/blob.Store) whose upload the parts are appended to, the
 //     staging directory Dir on local disk, and accessapi.Restrictions.
 //
@@ -72,7 +72,8 @@
 //     (the JFrog CLI multipart protocol, #91) and
 //     #p9d-modular-monolith-migration, epic ART
 //     (https://github.com/weaveplatform/artifactweave/issues/941).
-//   - https://github.com/weaveplatform/artifactweave/issues/1012
+//   - https://github.com/weaveplatform/artifactweave/issues/1012 and
+//     https://github.com/weaveplatform/artifactweave/issues/1088
 //
 // # Status
 //

@@ -12,6 +12,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
+	"github.com/weaveplatform/artifactweave/migration/platform/tx"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -35,7 +38,10 @@ var ErrNotPermitted = errors.New("trash: restoring an item is not permitted")
 // Settings returns the trash can settings. Unset means on with Artifactory's
 // 14 days, and a stored retention below one day means the default too: the
 // settings document may carry only "enabled".
-func Settings(ctx context.Context, st store.Store) (types.TrashcanSettings, error) {
+func Settings(
+	ctx context.Context,
+	st interface{ Settings() settings.SettingsStore },
+) (types.TrashcanSettings, error) {
 	t := types.TrashcanSettings{Enabled: true, RetentionDays: DefaultRetentionDays}
 	err := st.Settings().Get(ctx, types.SettingTrashcan, &t)
 	switch {
@@ -50,9 +56,23 @@ func Settings(ctx context.Context, st store.Store) (types.TrashcanSettings, erro
 	return t, nil
 }
 
+// Store is what the trash can reads and writes: its entries, the items
+// they were taken from, the trash can settings and the blob references an
+// entry holds. Every call joins the transaction ctx carries; the service
+// runs its own transactions through Tx, a batch of entries at a time. The
+// metadata store's aggregate (pkg/store) is a Store, and so is the item
+// service's store.
+type Store interface {
+	tx.Runner
+	Trash() port.TrashStore
+	Items() port.ItemStore
+	Settings() settings.SettingsStore
+	Blobs() port.BlobIndex
+}
+
 // Service works on the trash can of one store.
 type Service struct {
-	Store store.Store
+	Store Store
 	// Items recreates restored items; only Restore needs it.
 	Items *item.Service
 	// Now supplies the time; nil means time.Now.

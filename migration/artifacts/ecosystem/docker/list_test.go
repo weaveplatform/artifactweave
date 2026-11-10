@@ -15,7 +15,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
@@ -31,9 +30,9 @@ func TestUnitCompare(t *testing.T) {
 // The listings are AQL queries, so they run on the reference evaluator and
 // on SQL, where a name's _ and . must not act as wildcards.
 func TestAccListings(t *testing.T) {
-	for name, open := range map[string]func(t *testing.T) store.Store{
-		"inmem": func(*testing.T) store.Store { return inmem.New() },
-		"sqlite": func(t *testing.T) store.Store {
+	for name, open := range map[string]func(t *testing.T) item.Store{
+		"inmem": func(*testing.T) item.Store { return inmem.New() },
+		"sqlite": func(t *testing.T) item.Store {
 			st, err := sqlite.Open(context.Background(), filepath.Join(t.TempDir(), "aw.db"),
 				sqlite.Options{})
 			if err != nil {
@@ -47,7 +46,7 @@ func TestAccListings(t *testing.T) {
 	}
 }
 
-func listings(t *testing.T, db store.Store) {
+func listings(t *testing.T, db item.Store) {
 	ctx := context.Background()
 	blobs, err := fs.New(t.TempDir())
 	if err != nil {

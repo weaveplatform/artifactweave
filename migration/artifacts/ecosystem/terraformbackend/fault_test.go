@@ -43,7 +43,7 @@ func (f *fault) fail(method string) error {
 }
 
 type faultyStore struct {
-	store.Store
+	item.Store
 	f *fault
 }
 

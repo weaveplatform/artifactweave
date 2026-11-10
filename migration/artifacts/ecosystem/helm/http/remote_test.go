@@ -58,14 +58,14 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 		t.Fatal(err)
 	}
 	for user, pattern := range map[string]string{"reader": "**", "partial": "visible/**"} {
-		err = f.items.Store.Permissions().
+		err = f.db.Permissions().
 			Create(t.Context(), types.Permission{Name: "remote-" + user, Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{user: types.ActionRead}}, Targets: map[string]types.Target{"remote": {Include: []string{pattern}}}}}})
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 	resolver, err := upstream.NewResolver(
-		f.items.Store,
+		f.db,
 		nil,
 		upstream.ResolverOptions{RevisionKey: []byte(strings.Repeat("k", 32))},
 	)
@@ -75,7 +75,7 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 	clock := fakeupstream.NewClock(time.Date(2026, 10, 22, 0, 0, 0, 0, time.UTC))
 	pool := new(upstream.Pool)
 	policy := &remote.Policy{
-		Store:   f.items.Store,
+		Store:   f.db,
 		Blobs:   f.items.Blobs,
 		Items:   f.items,
 		Pool:    pool,
@@ -105,13 +105,13 @@ func (f *remoteFixture) mount(t *testing.T, public string, relative bool) {
 		}
 		return kernel.Principal{Name: name, Admin: name == "admin"}
 	}
-	authorize := accesstest.Over(t, f.items.Store).Middleware(t, true, principalOf)
+	authorize := accesstest.Over(t, f.db).Middleware(t, true, principalOf)
 	r := chi.NewRouter()
 	r.Use(baseurl.Middleware(public), authorize)
 	pkgroute.Mount(
 		r,
 		pkgroute.Options{
-			Store: f.items.Store,
+			Store: f.db,
 			Items: func() *item.Service { return f.items },
 			ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it types.Item) {
 				body, _, err := f.items.Blobs.Open(r.Context(), it.Actual.SHA256)
@@ -500,7 +500,7 @@ func TestAccRemoteOriginCredentialsAndProxy(t *testing.T) {
 func (f *remoteFixture) allowPrivate(t *testing.T, origins ...string) {
 	t.Helper()
 	resolver, err := upstream.NewResolver(
-		f.items.Store,
+		f.db,
 		nil,
 		upstream.ResolverOptions{
 			RevisionKey:           []byte(strings.Repeat("k", 32)),

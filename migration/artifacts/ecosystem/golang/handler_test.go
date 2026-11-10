@@ -32,7 +32,7 @@ const dir = "example.com/m/@v/v1.0.0"
 type world struct {
 	t     *testing.T
 	ctx   context.Context
-	st    store.Store
+	st    item.Store
 	items *item.Service
 	now   time.Time
 }

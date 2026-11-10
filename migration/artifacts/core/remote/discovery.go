@@ -26,7 +26,7 @@ import (
 // traversal inputs only; consumers receive canonical paths after lossless
 // translation and current authorization.
 type Discovery struct {
-	store       store.Store
+	store       item.Store
 	repository  repo.Config
 	identity    types.SourceIdentity
 	canonical   *layout.Layout

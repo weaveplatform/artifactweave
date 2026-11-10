@@ -20,8 +20,9 @@
 //     here (Keep); the garbage collector (migration/artifacts/core/gc),
 //     which expires entries (PurgeExpired); and the format contract suite
 //     (artifacts/core/formattest), which restores.
-//   - Driven: the metadata store, for trash entries, items and their
-//     properties, blob references, the trash can settings and transactions;
+//   - Driven: the metadata store, through Store, for trash entries, items
+//     and their properties, blob references, the trash can settings and
+//     transactions (Settings takes the settings store alone);
 //     and the item service (migration/artifacts/core/item), which recreates
 //     restored items and names the sidecars a file's format keeps with it
 //     (format.SidecarKeeper).
@@ -83,7 +84,8 @@
 //     (task 2 and tracking item 7), #p8-pypi-nuget-helm-terraform-locals and
 //     #p9d-modular-monolith-migration, epic ART
 //     (https://github.com/weaveplatform/artifactweave/issues/941).
-//   - https://github.com/weaveplatform/artifactweave/issues/973
+//   - https://github.com/weaveplatform/artifactweave/issues/973 and
+//     https://github.com/weaveplatform/artifactweave/issues/1088
 //
 // # Status
 //
@@ -101,7 +103,7 @@
 // (https://github.com/weaveplatform/artifactweave/issues/504). P8 restores
 // the sidecars a format keeps with a file
 // (https://github.com/weaveplatform/artifactweave/issues/533). Staged in
-// P9d. Roadmap: the service takes a narrow store in place of the whole store
+// P9d, which narrowed the service's store to Store
 // (https://github.com/weaveplatform/artifactweave/issues/1088).
 //
 // # Testing

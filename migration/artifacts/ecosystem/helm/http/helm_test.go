@@ -38,6 +38,7 @@ type fixture struct {
 	t     *testing.T
 	h     http.Handler
 	items *item.Service
+	db    *inmem.Store
 	c     repo.Config
 }
 
@@ -100,7 +101,7 @@ func newFixture(t *testing.T, relative bool) *fixture {
 		},
 		helmhttp.Protocol(helmhttp.Options{Format: helmfmt.Settings{RelativeURLs: &relative}}),
 	)
-	return &fixture{t: t, h: router, items: items, c: c}
+	return &fixture{t: t, h: router, items: items, db: db, c: c}
 }
 
 func (f *fixture) do(method, path, user string) *httptest.ResponseRecorder {

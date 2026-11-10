@@ -17,6 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -24,7 +25,7 @@ func TestAccRemoteSparseCacheOfflineRedirectAndIntegrity(t *testing.T) {
 	up := fakeupstream.New(t, fakeupstream.Options{})
 	clock := fakeupstream.NewClock(time.Date(2026, 10, 24, 0, 0, 0, 0, time.UTC))
 	denyAtDelivery := false
-	f := newFixture(t, repo.Remote, func(items *item.Service) *source.Service {
+	f := newFixture(t, repo.Remote, func(db *inmem.Store, items *item.Service) *source.Service {
 		c, err := items.Store.Repos().Get(t.Context(), "cargo-test")
 		if err != nil {
 			t.Fatal(err)
@@ -37,7 +38,7 @@ func TestAccRemoteSparseCacheOfflineRedirectAndIntegrity(t *testing.T) {
 		}
 		key := []byte(strings.Repeat("k", 32))
 		resolver, err := upstream.NewResolver(
-			items.Store,
+			db,
 			nil,
 			upstream.ResolverOptions{RevisionKey: key},
 		)
@@ -46,7 +47,7 @@ func TestAccRemoteSparseCacheOfflineRedirectAndIntegrity(t *testing.T) {
 		}
 		pool := new(upstream.Pool)
 		policy := &remote.Policy{
-			Store:   items.Store,
+			Store:   db,
 			Blobs:   items.Blobs,
 			Items:   items,
 			Pool:    pool,
@@ -221,7 +222,7 @@ func TestAccRemoteSparseCacheOfflineRedirectAndIntegrity(t *testing.T) {
 
 func TestAccRemoteRejectsCorruptIndexAndCrate(t *testing.T) {
 	up := fakeupstream.New(t, fakeupstream.Options{})
-	f := newFixture(t, repo.Remote, func(items *item.Service) *source.Service {
+	f := newFixture(t, repo.Remote, func(db *inmem.Store, items *item.Service) *source.Service {
 		c, err := items.Store.Repos().Get(t.Context(), "cargo-test")
 		if err != nil {
 			t.Fatal(err)
@@ -232,7 +233,7 @@ func TestAccRemoteRejectsCorruptIndexAndCrate(t *testing.T) {
 		}
 		key := []byte(strings.Repeat("k", 32))
 		resolver, err := upstream.NewResolver(
-			items.Store,
+			db,
 			nil,
 			upstream.ResolverOptions{RevisionKey: key},
 		)
@@ -241,7 +242,7 @@ func TestAccRemoteRejectsCorruptIndexAndCrate(t *testing.T) {
 		}
 		pool := new(upstream.Pool)
 		policy := &remote.Policy{
-			Store:   items.Store,
+			Store:   db,
 			Blobs:   items.Blobs,
 			Items:   items,
 			Pool:    pool,
@@ -317,7 +318,7 @@ func TestAccRemoteRejectsCorruptIndexAndCrate(t *testing.T) {
 
 func TestAccRemoteTemplateAndSparseValidation(t *testing.T) {
 	up := fakeupstream.New(t, fakeupstream.Options{})
-	f := newFixture(t, repo.Remote, func(items *item.Service) *source.Service {
+	f := newFixture(t, repo.Remote, func(db *inmem.Store, items *item.Service) *source.Service {
 		c, err := items.Store.Repos().Get(t.Context(), "cargo-test")
 		if err != nil {
 			t.Fatal(err)
@@ -328,7 +329,7 @@ func TestAccRemoteTemplateAndSparseValidation(t *testing.T) {
 		}
 		key := []byte(strings.Repeat("k", 32))
 		resolver, err := upstream.NewResolver(
-			items.Store,
+			db,
 			nil,
 			upstream.ResolverOptions{RevisionKey: key},
 		)
@@ -337,7 +338,7 @@ func TestAccRemoteTemplateAndSparseValidation(t *testing.T) {
 		}
 		pool := new(upstream.Pool)
 		policy := &remote.Policy{
-			Store:   items.Store,
+			Store:   db,
 			Blobs:   items.Blobs,
 			Items:   items,
 			Pool:    pool,

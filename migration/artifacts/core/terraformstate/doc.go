@@ -18,8 +18,9 @@
 //   - Driving: the Terraform backend API (workspaces, state versions,
 //     locks and uploads), and keys rotate, which re-seals stored states
 //     through the composition root (Reseal).
-//   - Driven: the item service (Items), whose formats give the Terraform
-//     backend's the same Keys; the package index; and the master keyring
+//   - Driven: the item service (Items), whose store (item.Store) holds the
+//     states and whose formats give the Terraform backend's the same Keys;
+//     the package index; and the master keyring
 //     (platform/crypt.Keyring), which seals a state while the repository's
 //     encryptStates is on and opens it again.
 //
@@ -57,7 +58,8 @@
 //     (the Terraform backend, #557 and #558) and
 //     #p9d-modular-monolith-migration, epic ART
 //     (https://github.com/weaveplatform/artifactweave/issues/941).
-//   - https://github.com/weaveplatform/artifactweave/issues/1011
+//   - https://github.com/weaveplatform/artifactweave/issues/1011 and
+//     https://github.com/weaveplatform/artifactweave/issues/1088
 //
 // # Status
 //

@@ -14,7 +14,11 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -44,9 +48,26 @@ var (
 	ErrExists = errors.New("item: the path already holds an item")
 )
 
+// Store is what the item service reads and writes: what its formats see
+// (format.Store), with the blob index, the trash can, the settings and
+// configuration documents, the work queue and the lease table. Every call
+// joins the transaction ctx carries, and the service runs each operation as
+// one transaction through Tx, so the blob references, the trash entries and
+// the work a write queues commit or roll back with the item. The metadata
+// store's aggregate (pkg/store) is a Store.
+type Store interface {
+	format.Store
+	Blobs() port.BlobIndex
+	Trash() port.TrashStore
+	Settings() settings.SettingsStore
+	Configs() configdoc.ConfigStore
+	WorkQueue() work.WorkQueue
+	Leases() work.LeaseStore
+}
+
 // Service writes items into a store and its blob store.
 type Service struct {
-	Store store.Store
+	Store Store
 	Blobs blob.Store
 	// Keys is the format.Env.Keys of every operation, which the formats'
 	// derived work signs Alpine, Debian, Opkg and RPM metadata with. Nil
@@ -855,7 +876,10 @@ func (s *Service) RecordSidecar(
 
 // TrashEnabled reads the trash can setting; unset means on, as in
 // Artifactory.
-func TrashEnabled(ctx context.Context, st store.Store) (bool, error) {
+func TrashEnabled(
+	ctx context.Context,
+	st interface{ Settings() settings.SettingsStore },
+) (bool, error) {
 	var t types.TrashcanSettings
 	err := st.Settings().Get(ctx, types.SettingTrashcan, &t)
 	if errors.Is(err, store.ErrNotFound) {

@@ -106,7 +106,7 @@ func TestUnitTransferWorkOrderingAndRollback(t *testing.T) {
 }
 
 type transferQueueRecorder struct {
-	store store.Store
+	store Store
 	keys  []string
 	fail  bool
 }

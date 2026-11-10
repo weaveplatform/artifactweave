@@ -37,7 +37,7 @@ var update = flag.Bool("update", false, "rewrite the golden metadata files")
 type metaWorld struct {
 	t     *testing.T
 	ctx   context.Context
-	db    store.Store
+	db    item.Store
 	blobs blob.Store
 	c     repo.Config
 	items *item.Service
@@ -50,7 +50,7 @@ func newMetaWorld(t *testing.T, tune func(*repo.Config)) *metaWorld {
 	return newMetaWorldOn(t, inmem.New(), tune)
 }
 
-func newMetaWorldOn(t *testing.T, db store.Store, tune func(*repo.Config)) *metaWorld {
+func newMetaWorldOn(t *testing.T, db item.Store, tune func(*repo.Config)) *metaWorld {
 	t.Helper()
 	blobs, err := fs.New(t.TempDir())
 	if err != nil {

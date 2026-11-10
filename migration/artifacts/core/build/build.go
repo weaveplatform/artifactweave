@@ -12,7 +12,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/idempotency"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -41,9 +43,21 @@ type Access interface {
 	Item(c repo.Config, path string, want types.Actions) bool
 }
 
+// Store is what the build service reads and writes: the item service's
+// store, through which build-info documents and promotions write items
+// (item.Store), with the build records and the replay records that let a
+// retried request append once (decision 0014). Every call joins the
+// transaction ctx carries. The metadata store's aggregate (pkg/store) is a
+// Store.
+type Store interface {
+	item.Store
+	Builds() port.BuildStore
+	Replays() idempotency.ReplayStore
+}
+
 // Service works on the builds of one store.
 type Service struct {
-	Store store.Store
+	Store Store
 	Blobs blob.Store
 	// Now supplies the time; nil means time.Now.
 	Now func() time.Time

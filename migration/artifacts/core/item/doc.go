@@ -23,12 +23,15 @@
 //     registry and Terraform state services; and the composition root, which
 //     registers the formats' derived work and the remote cache cleanup with
 //     the work queue (RegisterWork, RegisterCacheMaintenance).
-//   - Driven: the metadata store (items, blob references, repositories,
-//     the package index, the trash can, settings and the work queue, through
-//     the whole store), the blob store (platform/blob.Store), the format
-//     registry (core/format.Registry; nil means the generic handler for
-//     every type), the access module's Keys, which derived work signs
-//     metadata with, and the work queue that takes derived work (Enqueuer).
+//   - Driven: the metadata store, through Store: what the formats see
+//     (format.Store: repositories, items, the package index, the remote
+//     cache and transactions), with the blob references, the trash can, the
+//     settings and configuration documents, the work queue and the lease
+//     table, which the registry and build services' stores embed; the blob
+//     store (platform/blob.Store); the format registry (core/format.Registry;
+//     nil means the generic handler for every type); the access module's
+//     Keys, which derived work signs metadata with; and the work queue that
+//     takes derived work (Enqueuer).
 //
 // # Outputs
 //
@@ -77,7 +80,8 @@
 //   - Plan: docs/implementation/plan.md#p3-repositories-generic-artifacts-cli-aql-shape
 //     to #p9-remote-repositories, and #p9d-modular-monolith-migration, epic
 //     ART (https://github.com/weaveplatform/artifactweave/issues/941).
-//   - https://github.com/weaveplatform/artifactweave/issues/1010
+//   - https://github.com/weaveplatform/artifactweave/issues/1010 and
+//     https://github.com/weaveplatform/artifactweave/issues/1088
 //
 // # Status
 //

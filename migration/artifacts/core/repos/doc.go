@@ -19,7 +19,8 @@
 //     NewRepositories returns.
 //   - Driven: the metadata store (repository configurations, items and
 //     their properties, blob references, the package index, trash entries
-//     and the work queue, through the whole store), the trash service
+//     and the work queue, through Store, which embeds the trash can's
+//     store), the trash service
 //     (artifacts/core/trash), which keeps a deleted repository's content,
 //     and accessapi.Keys and accessapi.Projects, for the key pair and
 //     environment checks.
@@ -64,7 +65,8 @@
 //     (the descriptor PATCH and config apply) and
 //     #p9d-modular-monolith-migration, epic ART
 //     (https://github.com/weaveplatform/artifactweave/issues/941).
-//   - https://github.com/weaveplatform/artifactweave/issues/1013
+//   - https://github.com/weaveplatform/artifactweave/issues/1013 and
+//     https://github.com/weaveplatform/artifactweave/issues/1088
 //
 // # Status
 //

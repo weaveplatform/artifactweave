@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -41,7 +42,7 @@ func TestUnitWriteLockFailuresRollback(t *testing.T) {
 }
 
 type guardStore struct {
-	store.Store
+	item.Store
 	failure string
 }
 

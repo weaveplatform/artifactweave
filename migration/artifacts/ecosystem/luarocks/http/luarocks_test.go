@@ -53,7 +53,7 @@ func newFixture(
 func newFixtureWithProtocol(
 	t *testing.T,
 	class repo.Class,
-	protocol func(*item.Service) luarockshttp.Options,
+	protocol func(*inmem.Store, *item.Service) luarockshttp.Options,
 	tune ...func(*pkgroute.Options, *item.Service),
 ) *fixture {
 	t.Helper()
@@ -106,7 +106,7 @@ func newFixtureWithProtocol(
 	}
 	var configured luarockshttp.Options
 	if protocol != nil {
-		configured = protocol(items)
+		configured = protocol(db, items)
 	}
 	pkgroute.Mount(r, options, luarockshttp.Protocol(configured))
 	return &fixture{t, r, items, db, c}
