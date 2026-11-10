@@ -241,7 +241,7 @@ func (s *Kit) OperationRepo(
 	t repo.PackageType,
 	op ReindexOp,
 	key string,
-) (store.Store, repo.Config, string, error) {
+) (Store, repo.Config, string, error) {
 	st, err := s.Content()
 	if err != nil {
 		return nil, repo.Config{}, "", err
@@ -286,7 +286,7 @@ func (s *Kit) OperationRepo(
 // the item in the store for whichever queue polls it.
 func (s *Kit) Enqueue(
 	ctx context.Context,
-	st store.Store,
+	st Store,
 	kind, key, by string,
 ) error {
 	if err := s.Queue(ctx, st, kind, key, by); err != nil {
@@ -297,13 +297,13 @@ func (s *Kit) Enqueue(
 
 // Queue is enqueue's queueing, which joins ctx's transaction, for a caller
 // that reports the failure itself.
-func (s *Kit) Queue(ctx context.Context, st store.Store, kind, key, by string) error {
+func (s *Kit) Queue(ctx context.Context, st Store, kind, key, by string) error {
 	return s.queueRequest(ctx, st, kind, key, format.WorkRequest{By: by})
 }
 
 func (s *Kit) queueRequest(
 	ctx context.Context,
-	st store.Store,
+	st Store,
 	kind, key string,
 	req format.WorkRequest,
 ) error {
@@ -327,7 +327,7 @@ func (s *Kit) queueRequest(
 // checking Manage again. The accepted payload and its source are one commit.
 func (s *Kit) queueRemoteReindex(
 	ctx context.Context,
-	st store.Store,
+	st Store,
 	c repo.Config,
 	requested string,
 ) error {
@@ -389,7 +389,7 @@ func (s *Kit) queueRemoteReindex(
 // or waits for the worker already running it, as a read of derived work
 // does. A server without the runtime's queue, in tests, runs it through a
 // queue of its own.
-func (s *Kit) Await(ctx context.Context, st store.Store, kind, key string) error {
+func (s *Kit) Await(ctx context.Context, st Store, kind, key string) error {
 	q := s.Work
 	if q == nil {
 		var err error

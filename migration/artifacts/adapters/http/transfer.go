@@ -76,7 +76,7 @@ func (s ArtifactoryAPI) moveItem(w http.ResponseWriter, r *http.Request) {
 // messages, even when items failed.
 func (s ArtifactoryAPI) transfer(w http.ResponseWriter, r *http.Request, move bool) {
 	ctx := r.Context()
-	st, err := s.Content()
+	st, err := s.content()
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
 		return
@@ -215,7 +215,7 @@ type landing struct {
 // refused, as for the file.
 func (s ArtifactoryAPI) overwriteRight(
 	ctx context.Context,
-	st store.Store,
+	st Store,
 	acc itemkit.Access,
 	p kernel.Principal,
 	l landing,
@@ -288,7 +288,7 @@ const defaultFolderSlots = 10
 // other check as 6.20's FolderDownloadServiceImpl orders them.
 func (s ArtifactoryAPI) downloadFolderArchive(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	st, err := s.Content()
+	st, err := s.content()
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
 		return

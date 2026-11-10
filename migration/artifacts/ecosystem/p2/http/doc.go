@@ -17,18 +17,20 @@
 //   - Driving: the router, which lists TryP2Item tenth and last among the
 //     item kit's overlays (itemkit.Deps.Overlays), so that an item GET or
 //     HEAD in a P2 repository reaches it before the generic lookup.
-//   - Driven: the item kit (artifacts/adapters/http/itemkit), which resolves
-//     the request and the caller's access, reads blobs, serves a virtual
-//     member's file through its item GET, and writes errors; the kit's
-//     remote source service, which fetches and caches a remote's metadata,
-//     artifacts and site archives and its external children, under the
-//     kit's P2 source request (itemkit.P2SourceRequest) or the archive and
-//     external requests built here; the generic download policy
-//     (artifacts/ecosystem/generic); the maven format, which says which
-//     local repositories hold a Maven update site; pkgroute, for the source
-//     errors; and the format package (artifacts/ecosystem/p2), which classes
-//     paths, checks child locations, extracts archive entries, reads the
-//     declared checksums and rewrites composites.
+//   - Driven: the item kit (artifacts/adapters/http/itemkit), whose store
+//     (itemkit.Store) the overlay is handed and a virtual repository's
+//     members are read from, and which resolves the request and the caller's
+//     access, reads blobs, serves a virtual member's file through its item
+//     GET, and writes errors; the kit's remote source service, which fetches
+//     and caches a remote's metadata, artifacts and site archives and its
+//     external children, under the kit's P2 source request
+//     (itemkit.P2SourceRequest) or the archive and external requests built
+//     here; the generic download policy (artifacts/ecosystem/generic); the
+//     maven format, which says which local repositories hold a Maven update
+//     site; pkgroute, for the source errors; and the format package
+//     (artifacts/ecosystem/p2), which classes paths, checks child locations,
+//     extracts archive entries, reads the declared checksums and rewrites
+//     composites.
 //   - Settings: none. A remote's url (an update-site directory or a
 //     site.zip!/ archive) and its p2ChildOrigins, the other origins its
 //     composite children may name, are repository configuration.
@@ -90,8 +92,9 @@
 //   - Plan: docs/implementation/plan.md#p31-native-build-and-plugin-repositories
 //     and #p9d-modular-monolith-migration, epic WEB
 //     (https://github.com/weaveplatform/artifactweave/issues/944).
-//   - https://github.com/weaveplatform/artifactweave/issues/773 and
-//     https://github.com/weaveplatform/artifactweave/issues/1084
+//   - https://github.com/weaveplatform/artifactweave/issues/773,
+//     https://github.com/weaveplatform/artifactweave/issues/1084 and
+//     https://github.com/weaveplatform/artifactweave/issues/1090
 //
 // # Status
 //

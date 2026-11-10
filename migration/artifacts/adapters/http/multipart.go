@@ -109,7 +109,7 @@ func (s ArtifactoryAPI) createMultipart(w http.ResponseWriter, r *http.Request) 
 		httpkit.WriteErr(w, r, err)
 		return
 	}
-	st, err := s.Content()
+	st, err := s.content()
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
 		return

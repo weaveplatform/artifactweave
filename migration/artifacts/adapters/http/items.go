@@ -53,7 +53,7 @@ func PrivateItem(c repo.Config, p string) bool {
 
 // builds returns the service that writes items on behalf of builds, with
 // the same format hooks, and settings, as items.
-func (s ArtifactoryAPI) builds(st store.Store) *build.Service {
+func (s ArtifactoryAPI) builds(st Store) *build.Service {
 	svc := &build.Service{
 		Store: st, Blobs: s.cfg.Blobs, Formats: s.Format,
 		AllowDuplicateEntries: s.cfg.AllowDuplicateBuildEntries,
@@ -78,7 +78,7 @@ func (s ArtifactoryAPI) deployEscapedItem(
 	escaped string,
 ) {
 	ctx := r.Context()
-	st, err := s.Content()
+	st, err := s.content()
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
 		return
@@ -228,7 +228,7 @@ func (s ArtifactoryAPI) fileDeploy(
 // exception is token, the checksum token of the caller's own finished
 // multipart upload of the content, which no item holds until this deploy.
 func (s ArtifactoryAPI) reusable(
-	st store.Store,
+	st Store,
 	p kernel.Principal,
 	acc itemkit.Access,
 	token string,
@@ -251,7 +251,7 @@ func (s ArtifactoryAPI) reusable(
 // (private, Deps.Private).
 func readsContent(
 	ctx context.Context,
-	st store.Store,
+	st Store,
 	acc itemkit.Access,
 	sum string,
 	private func(repo.Config, string) bool,
@@ -290,7 +290,7 @@ func readsContent(
 
 func (ArtifactoryAPI) isFile(
 	ctx context.Context,
-	st store.Store,
+	st Store,
 	c repo.Config,
 	p string,
 ) bool {
@@ -335,7 +335,7 @@ func (s ArtifactoryAPI) recordChecksum(
 // it, into the trash can for local repositories.
 func (s ArtifactoryAPI) deleteItem(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	st, err := s.Content()
+	st, err := s.content()
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
 		return

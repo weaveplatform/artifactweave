@@ -97,10 +97,12 @@ func TestAccSearchAQLTimeout(t *testing.T) {
 // when its deadline has already passed as it is made; Windows' clock is too
 // coarse for a one-nanosecond deadline to have passed, and a fast in-memory
 // search then finishes before the timer fires.
-type deadlineStore struct{ store.Store }
+type deadlineStore struct{ serverStore }
 
-func (s deadlineStore) Items() store.ItemStore   { return deadlineItems{s.Store.Items()} }
-func (s deadlineStore) Builds() store.BuildStore { return deadlineBuilds{s.Store.Builds()} }
+func (s deadlineStore) Items() store.ItemStore { return deadlineItems{s.serverStore.Items()} }
+func (s deadlineStore) Builds() store.BuildStore {
+	return deadlineBuilds{s.serverStore.Builds()}
+}
 
 type deadlineItems struct{ store.ItemStore }
 

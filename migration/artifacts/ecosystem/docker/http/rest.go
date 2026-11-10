@@ -276,7 +276,7 @@ func (s DockerAPI) FindParentManifestLists(
 // promotionRepo resolves a repository a promotion names: a missing key is
 // not found, and anything but a local or federated Docker, OCI or Helm OCI
 // repository cannot take part (decision 0031).
-func promotionRepo(ctx context.Context, st store.Store, key string) (repo.Config, error) {
+func promotionRepo(ctx context.Context, st itemkit.Store, key string) (repo.Config, error) {
 	c, served, err := Lookup(ctx, st, key)
 	switch {
 	case err != nil:
@@ -308,7 +308,7 @@ func orDefault(v, def string) string {
 // Docker operation names, as the registry resolves it (decision 0003): a
 // missing key or another package type is not found, and a remote or
 // virtual repository is refused until the registry serves those.
-func dockerRepo(ctx context.Context, st store.Store, key string) (repo.Config, error) {
+func dockerRepo(ctx context.Context, st itemkit.Store, key string) (repo.Config, error) {
 	c, found, err := Lookup(ctx, st, key)
 	switch {
 	case err != nil:
@@ -325,7 +325,7 @@ func dockerRepo(ctx context.Context, st store.Store, key string) (repo.Config, e
 
 // registry returns the service that writes items on behalf of Docker
 // promotion, with the same format hooks, and settings, as items.
-func (s DockerAPI) registry(st store.Store) *registry.Service {
+func (s DockerAPI) registry(st itemkit.Store) *registry.Service {
 	svc := &registry.Service{Store: st, Blobs: s.Blobs, Formats: s.Format}
 	if s.Work != nil {
 		svc.Work = s.Work

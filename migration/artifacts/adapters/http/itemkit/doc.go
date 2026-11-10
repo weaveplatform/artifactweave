@@ -19,15 +19,21 @@
 //
 // # Inputs
 //
-//   - Deps: the metadata and blob stores, the remote sources, the work
-//     queue, the formats and their settings, the access module's API, the
-//     redirect policy and the descriptor's minimum size, the logger, the
-//     overlays and the private-path predicate.
+//   - Deps: the metadata store, through Store: the item service's store
+//     (item.Store), in which the kit resolves repositories, reads items and
+//     the remote cache and queues work, and over which it builds the item
+//     service, with the upload sessions that the Docker REST operations'
+//     registry service keeps. Then the blob store, the remote sources, the
+//     work queue, the formats and their settings, the access module's API,
+//     the redirect policy and the descriptor's minimum size, the logger,
+//     the overlays and the private-path predicate.
 //   - The request's principal and decider in its context, which the
 //     authentication middleware put there.
 //
 // # Outputs
 //
+//   - Store, the store Deps.Store holds, which Content returns and each
+//     Overlay is handed. It names no access or configuration-module store.
 //   - Kit and its methods: GetItem (an item GET or HEAD), ServeFile,
 //     RedirectManifest, Items (the item service), Format, ItemCaller,
 //     ItemError, MayBeIdentical, Content, InternalError, Log, Reindex,
@@ -75,12 +81,14 @@
 //     ("Dependency rules": a module reaches another only through its api).
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     lines 238 to 246 (artifacts/adapters/http).
-//   - https://github.com/weaveplatform/artifactweave/issues/1075
+//   - https://github.com/weaveplatform/artifactweave/issues/1075 and
+//     https://github.com/weaveplatform/artifactweave/issues/1090
 //
 // # Status
 //
 // Implemented P1 to P9c as the server root's item routes and helpers;
-// split out as the item kit in P9d (WEB-06).
+// split out as the item kit in P9d (WEB-06), which also narrowed its store
+// to Store (ART-22).
 //
 // # Testing
 //

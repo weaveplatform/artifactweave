@@ -38,9 +38,10 @@
 //     (access/api); and the remote source service (Options.RemoteSources),
 //     which fetches upstream metadata and tarballs into the remote cache.
 //     NPMAPI's operations run over the item kit
-//     (artifacts/adapters/http/itemkit), which resolves the repository,
-//     checks Manage and queues the reindex every format shares, and over
-//     access/api's Tokens, whose encrypted password stands in for a
+//     (artifacts/adapters/http/itemkit), whose store (itemkit.Store) holds
+//     the parked conversion that a resume reads, and which resolves the
+//     repository, checks Manage and queues the reindex every format shares,
+//     and over access/api's Tokens, whose encrypted password stands in for a
 //     password caller's own in the .npmrc lines (DV-004).
 //
 // # Outputs
@@ -106,8 +107,9 @@
 //     (https://github.com/weaveplatform/artifactweave/issues/944).
 //   - https://github.com/weaveplatform/artifactweave/issues/626 (the remote
 //     registry adapter),
-//     https://github.com/weaveplatform/artifactweave/issues/1031 and
-//     https://github.com/weaveplatform/artifactweave/issues/1086
+//     https://github.com/weaveplatform/artifactweave/issues/1031,
+//     https://github.com/weaveplatform/artifactweave/issues/1086 and
+//     https://github.com/weaveplatform/artifactweave/issues/1090
 //
 // # Status
 //

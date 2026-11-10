@@ -10,7 +10,6 @@ import (
 	cheffmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/chef"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // TryChefItem is the item overlay (itemkit.Overlay) that answers 404 for a
@@ -19,7 +18,7 @@ import (
 // permission patterns, and only the native API filters and rewrites those
 // documents. It writes nothing and returns false for every other path.
 func TryChefItem(
-	_ *itemkit.Kit, w http.ResponseWriter, r *http.Request, _ store.Store, c repo.Config,
+	_ *itemkit.Kit, w http.ResponseWriter, r *http.Request, _ itemkit.Store, c repo.Config,
 	_ bool, req itemkit.ItemRequest, _ kernel.Principal, _ itemkit.Access,
 ) bool {
 	if !chefMetadataItem(c, req.Path) {

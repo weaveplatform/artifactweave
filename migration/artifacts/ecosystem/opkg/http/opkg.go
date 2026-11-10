@@ -54,7 +54,7 @@ type opkgItems struct{ *itemkit.Kit }
 // answered; every other request, a folder among them, it leaves to the
 // overlays after it and the generic lookup.
 func TryOpkgItem(
-	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
+	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) bool {
 	s := opkgItems{k}
@@ -83,7 +83,7 @@ func TryOpkgItem(
 }
 
 func (s opkgItems) serveOpkgIndex(
-	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
+	w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
 	ctx := r.Context()
@@ -178,7 +178,7 @@ func opkgPackageReadable(
 }
 
 func (s opkgItems) opkgMemberIndex(
-	ctx context.Context, st store.Store, c repo.Config, cached bool, indexPath string,
+	ctx context.Context, st itemkit.Store, c repo.Config, cached bool, indexPath string,
 	p kernel.Principal, acc itemkit.Access,
 ) (opkgIndexView, error) {
 	view := opkgIndexView{repo: c}
@@ -257,7 +257,7 @@ func (s opkgItems) readOpkgBlob(ctx context.Context, sha string) ([]byte, error)
 }
 
 func (s opkgItems) opkgCandidates(
-	ctx context.Context, st store.Store, c repo.Config, indexPath string,
+	ctx context.Context, st itemkit.Store, c repo.Config, indexPath string,
 	p kernel.Principal, acc itemkit.Access, seen map[string]bool,
 ) ([]opkgCandidate, error) {
 	if seen[c.Key] || len(seen) >= 8 {
@@ -326,7 +326,7 @@ func (s opkgItems) opkgCandidates(
 }
 
 func (s opkgItems) serveOpkgPackage(
-	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
+	w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
 	if len(req.Props) != 0 || r.URL.RawQuery != "" || cached && c.Class != repo.Remote {

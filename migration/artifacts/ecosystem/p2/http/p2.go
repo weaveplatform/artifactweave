@@ -44,7 +44,7 @@ type p2Items struct{ *itemkit.Kit }
 // boundary. It reports whether it answered; a repository of another type,
 // and a remote's own update-site files, it leaves to the generic lookup.
 func TryP2Item(
-	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
+	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) bool {
 	s := p2Items{k}
@@ -172,8 +172,14 @@ func (s p2Items) serveP2Archive(w http.ResponseWriter, r *http.Request,
 	}
 }
 
-func (s p2Items) serveP2Virtual(w http.ResponseWriter, r *http.Request,
-	st store.Store, c repo.Config, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
+func (s p2Items) serveP2Virtual(
+	w http.ResponseWriter,
+	r *http.Request,
+	st itemkit.Store,
+	c repo.Config,
+	req itemkit.ItemRequest,
+	p kernel.Principal,
+	acc itemkit.Access,
 ) {
 	if !acc.Folder(c, req.Path, types.ActionRead) ||
 		!acc.File(c, req.Path, types.ActionRead) ||
@@ -240,7 +246,7 @@ func (s p2Items) serveP2Virtual(w http.ResponseWriter, r *http.Request,
 // p2Members keeps the virtual order and removes members a caller cannot
 // traverse. Only a P2 remote or a local Maven/Generic update site can supply
 // native metadata. A nested P2 virtual is permitted if its graph is acyclic.
-func p2Members(ctx context.Context, st store.Store, c repo.Config, acc itemkit.Access,
+func p2Members(ctx context.Context, st itemkit.Store, c repo.Config, acc itemkit.Access,
 	visited map[string]bool,
 ) ([]repo.Config, error) {
 	if visited[c.Key] {

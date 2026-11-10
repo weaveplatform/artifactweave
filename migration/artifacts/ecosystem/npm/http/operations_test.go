@@ -78,7 +78,7 @@ func TestAccReindexFaults(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	on := func(st store.Store) NPMAPI {
+	on := func(st serverStore) NPMAPI {
 		cfg := Config{Formats: recording(f)}
 		if st != nil {
 			cfg.Store = st
@@ -141,7 +141,7 @@ func TestAccReindexFaults(t *testing.T) {
 
 // park queues kind for key on st's work queue and parks it, as the queue
 // parks work whose retries have run out.
-func park(t *testing.T, st store.Store, kind, key string) {
+func park(t *testing.T, st *inmem.Store, kind, key string) {
 	t.Helper()
 	ctx := context.Background()
 	now := time.Now()

@@ -9,16 +9,29 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
+
+// Store is what the item kit reads and writes, and what it hands on to its
+// overlays and to the handlers built on it (Content): the item service's
+// store (item.Store), over which the kit builds the item service and queues
+// and awaits derived work, with the upload sessions, which the Docker REST
+// operations' registry service keeps (registry.Store). It names no access
+// or configuration-module store: the kit reaches the access module through
+// Deps.Access. The metadata store's aggregate (pkg/store) is a Store.
+type Store interface {
+	item.Store
+	Uploads() session.UploadStore
+}
 
 // Deps is what the item kit reads: the stores and services an item request
 // reaches, and the hooks the composition supplies. The kit never reads the
@@ -27,7 +40,7 @@ import (
 type Deps struct {
 	// Store is the metadata store; nil answers every item route like an
 	// unimplemented operation (Content).
-	Store store.Store
+	Store Store
 	// Blobs is the blob store files are served from and written to.
 	Blobs blob.Store
 	// Keys derives the key for short-lived download URLs.
@@ -79,7 +92,7 @@ type Overlay func(
 	k *Kit,
 	w http.ResponseWriter,
 	r *http.Request,
-	st store.Store,
+	st Store,
 	c repo.Config,
 	cached bool,
 	req ItemRequest,
@@ -107,7 +120,7 @@ func New(d Deps) *Kit {
 
 // Content returns the store. A router built without one (tests of the
 // routing alone) answers like an unimplemented operation.
-func (s *Kit) Content() (store.Store, error) {
+func (s *Kit) Content() (Store, error) {
 	if s.Store == nil {
 		return nil, apierror.ErrNotImplemented
 	}

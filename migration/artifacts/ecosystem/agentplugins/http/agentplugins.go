@@ -11,7 +11,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -59,7 +58,7 @@ type AgentPluginItems struct{ *itemkit.Kit }
 // that is no marketplace answers 404. It answers false, leaving the request
 // to the overlays after it and the generic lookup, for anything else.
 func TryAgentMarketplaceItem(
-	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
+	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) bool {
 	s := AgentPluginItems{k}
@@ -76,7 +75,7 @@ func TryAgentMarketplaceItem(
 }
 
 func (s AgentPluginItems) serveAgentMarketplace(
-	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
+	w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	name string, p kernel.Principal, acc itemkit.Access,
 ) {
 	if err := generic.CheckDownload(c, name, false); err != nil {

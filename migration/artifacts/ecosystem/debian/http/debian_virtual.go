@@ -41,7 +41,7 @@ type debianVirtualView struct {
 // Packages files. Its Release is signed with the virtual repository's key,
 // and every advertised Filename resolves through the same member order.
 func (s DebianAPI) serveVirtualDebianMetadata(
-	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
+	w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
 	if len(req.Props) != 0 || r.URL.RawQuery != "" ||
@@ -72,7 +72,7 @@ func (s DebianAPI) serveVirtualDebianMetadata(
 }
 
 func (s DebianAPI) buildVirtualDebianView(
-	ctx context.Context, st store.Store, c repo.Config, distribution string,
+	ctx context.Context, st itemkit.Store, c repo.Config, distribution string,
 	p kernel.Principal, acc itemkit.Access,
 ) (debianVirtualView, error) {
 	if len(c.Repositories) == 0 || len(c.Repositories) > 128 {
@@ -173,7 +173,7 @@ func mapKeys(set map[string]bool) []string {
 }
 
 func (s DebianAPI) addDebianMemberIndexes(
-	ctx context.Context, st store.Store, virtual, member repo.Config, distribution string,
+	ctx context.Context, st itemkit.Store, virtual, member repo.Config, distribution string,
 	p kernel.Principal, acc itemkit.Access,
 	indexes map[string][]debian.PackageRecord, selected map[string]map[string]bool,
 ) error {
@@ -232,7 +232,7 @@ func (s DebianAPI) addDebianMemberIndexes(
 }
 
 func (s DebianAPI) serveVirtualDebianPackage(
-	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
+	w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
 	ctx := r.Context()
@@ -340,7 +340,7 @@ func (s DebianAPI) serveRemoteVirtualDebianPackage(
 // Remote metadata uses source.Policy so the selected cache variant retains
 // upstream freshness and redirect constraints.
 func (s DebianAPI) debianMemberBytes(
-	ctx context.Context, st store.Store, member repo.Config, path string,
+	ctx context.Context, st itemkit.Store, member repo.Config, path string,
 	p kernel.Principal, acc itemkit.Access,
 ) ([]byte, func(context.Context, string) error, error) {
 	if !acc.File(member, path, types.ActionRead) ||

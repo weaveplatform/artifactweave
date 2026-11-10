@@ -112,7 +112,7 @@ func (s DebianAPI) CreateDebianSnapshot(
 func snapshotRoot(job debianSnapshotRequest) string { return "snapshots/" + job.Tag }
 
 func claimDebianSnapshot(
-	ctx context.Context, st store.Store, job debianSnapshotRequest, p kernel.Principal,
+	ctx context.Context, st itemkit.Store, job debianSnapshotRequest, p kernel.Principal,
 ) error {
 	if err := st.Tx(ctx, func(ctx context.Context) error {
 		marker, err := st.Items().Get(ctx, job.Target, false, snapshotRoot(job))
@@ -154,7 +154,7 @@ func claimDebianSnapshot(
 }
 
 func snapshotRepos(
-	ctx context.Context, st store.Store, job debianSnapshotRequest,
+	ctx context.Context, st itemkit.Store, job debianSnapshotRequest,
 	p kernel.Principal, acc itemkit.Access,
 ) (repo.Config, repo.Config, error) {
 	sourceRepo, err := st.Repos().Get(ctx, job.Source)
@@ -234,7 +234,7 @@ func RegisterDebianSnapshotWork(q *work.Queue, k *itemkit.Kit) error {
 }
 
 func (s DebianAPI) createDebianSnapshot(
-	ctx context.Context, st store.Store, job debianSnapshotRequest,
+	ctx context.Context, st itemkit.Store, job debianSnapshotRequest,
 	p kernel.Principal, acc itemkit.Access,
 ) error {
 	sourceRepo, targetRepo, err := snapshotRepos(ctx, st, job, p, acc)
@@ -304,7 +304,7 @@ func (s DebianAPI) createDebianSnapshot(
 }
 
 func (s DebianAPI) debianSnapshotFiles(
-	ctx context.Context, st store.Store, c repo.Config, distribution string,
+	ctx context.Context, st itemkit.Store, c repo.Config, distribution string,
 	p kernel.Principal, acc itemkit.Access,
 ) (map[string][]byte, error) {
 	if c.Class == repo.Virtual {

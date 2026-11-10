@@ -94,7 +94,7 @@ func isRepositoryUpdate(path string) bool {
 // readerFor returns the principal of a read and what it may read.
 func (s ArtifactoryAPI) readerFor(
 	ctx context.Context,
-	st store.Store,
+	st Store,
 ) (kernel.Principal, func(repo.Config) bool, error) {
 	p, err := httpkit.Principal(ctx)
 	if err != nil {
@@ -116,7 +116,7 @@ func (s ArtifactoryAPI) GetRepositoriesByTypeAndProject(
 	ctx context.Context,
 	req artgen.GetRepositoriesByTypeAndProjectRequestObject,
 ) (artgen.GetRepositoriesByTypeAndProjectResponseObject, error) {
-	st, err := s.Content()
+	st, err := s.content()
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +180,7 @@ func (s ArtifactoryAPI) GetAllRepositoryConfigurations(
 	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}
-	st, err := s.Content()
+	st, err := s.content()
 	if err != nil {
 		return nil, err
 	}
@@ -250,7 +250,7 @@ func (s ArtifactoryAPI) CheckIfRepositoryExists(
 	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}
-	st, err := s.Content()
+	st, err := s.content()
 	if err != nil {
 		return nil, err
 	}
@@ -298,7 +298,7 @@ func (s ArtifactoryAPI) readOne(
 	ctx context.Context,
 	key string,
 ) (kernel.Principal, repo.Config, error) {
-	st, err := s.Content()
+	st, err := s.content()
 	if err != nil {
 		return kernel.Principal{}, repo.Config{}, err
 	}
@@ -410,7 +410,7 @@ func (s ArtifactoryAPI) GetRemoteRepositoryConfiguration(
 	ctx context.Context,
 	req artgen.GetRemoteRepositoryConfigurationRequestObject,
 ) (artgen.GetRemoteRepositoryConfigurationResponseObject, error) {
-	st, err := s.Content()
+	st, err := s.content()
 	if err != nil {
 		return nil, err
 	}
@@ -478,7 +478,7 @@ func (s ArtifactoryAPI) GetBatchOfRepositoriesByName(
 	ctx context.Context,
 	req artgen.GetBatchOfRepositoriesByNameRequestObject,
 ) (artgen.GetBatchOfRepositoriesByNameResponseObject, error) {
-	st, err := s.Content()
+	st, err := s.content()
 	if err != nil {
 		return nil, err
 	}
@@ -551,7 +551,7 @@ func (s ArtifactoryAPI) CreateRepository(
 	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}
-	st, err := s.Content()
+	st, err := s.content()
 	if err != nil {
 		return nil, err
 	}
@@ -605,7 +605,7 @@ func (s ArtifactoryAPI) CreateMultipleRepositories(
 	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}
-	st, err := s.Content()
+	st, err := s.content()
 	if err != nil {
 		return nil, err
 	}
@@ -713,7 +713,7 @@ func (s ArtifactoryAPI) UpdateRepositoryConfiguration(
 	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}
-	st, err := s.Content()
+	st, err := s.content()
 	if err != nil {
 		return nil, err
 	}
@@ -760,7 +760,7 @@ func (s ArtifactoryAPI) UpdateRepositoryConfiguration(
 // update commits.
 func (s ArtifactoryAPI) writeUpdates(
 	ctx context.Context,
-	st store.Store,
+	st Store,
 	stored, updated []repo.Config,
 ) error {
 	var by string
@@ -791,7 +791,7 @@ func (s ArtifactoryAPI) writeUpdates(
 // and rewrites its environments to their stored spelling.
 func (s ArtifactoryAPI) checkReferences(
 	ctx context.Context,
-	st store.Store,
+	st Store,
 	c *repo.Config,
 ) error {
 	if err := repos.CheckKeypairs(ctx, s.cfg.Access.Keys, *c); err != nil {
@@ -824,7 +824,7 @@ func (s ArtifactoryAPI) UpdateMultipleRepositories(
 	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}
-	st, err := s.Content()
+	st, err := s.content()
 	if err != nil {
 		return nil, err
 	}
@@ -947,7 +947,7 @@ func (s ArtifactoryAPI) DeleteRepository(
 		}
 		return nil, fmt.Errorf("repositories: %w", err)
 	}
-	st, err := s.Content()
+	st, err := s.content()
 	if err != nil {
 		return nil, err
 	}
@@ -989,7 +989,7 @@ func (s ArtifactoryAPI) DeleteRepositories(
 		}
 		return nil, fmt.Errorf("repositories: %w", err)
 	}
-	st, err := s.Content()
+	st, err := s.content()
 	if err != nil {
 		return nil, err
 	}

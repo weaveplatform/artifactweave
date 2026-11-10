@@ -51,7 +51,7 @@ type RPMAPI struct{ *itemkit.Kit }
 // answered; every other request it leaves to the overlays after it and the
 // generic lookup.
 func TryRPMItem(
-	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
+	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) bool {
 	s := RPMAPI{k}
@@ -70,7 +70,7 @@ func TryRPMItem(
 }
 
 func (s RPMAPI) serveVirtualRPMMetadata(
-	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
+	w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
 	root, name, ok := strings.Cut(req.Path, "repodata/")
@@ -138,7 +138,7 @@ func signVirtualRPM(
 }
 
 func (s RPMAPI) serveVirtualRPMPackage(
-	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
+	w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
 	if len(req.Props) != 0 || r.URL.RawQuery != "" {
@@ -251,7 +251,7 @@ func (s RPMAPI) serveVirtualRemoteRPMPackage(
 }
 
 func (s RPMAPI) rpmCandidates(
-	ctx context.Context, st store.Store, c repo.Config, root string,
+	ctx context.Context, st itemkit.Store, c repo.Config, root string,
 	p kernel.Principal, acc itemkit.Access, seen map[string]bool,
 ) ([]rpmCandidate, error) {
 	if seen[c.Key] || len(seen) >= 8 {
@@ -309,7 +309,7 @@ func (s RPMAPI) rpmCandidates(
 }
 
 func (s RPMAPI) rpmMemberPackages(
-	ctx context.Context, st store.Store, c repo.Config, root string,
+	ctx context.Context, st itemkit.Store, c repo.Config, root string,
 	p kernel.Principal, acc itemkit.Access,
 ) ([]rpm.Package, error) {
 	manifest, err := s.rpmMemberBytes(ctx, st, c, root+"repodata/repomd.xml", p, acc)
@@ -336,7 +336,7 @@ func (s RPMAPI) rpmMemberPackages(
 }
 
 func (s RPMAPI) rpmMemberBytes(
-	ctx context.Context, st store.Store, c repo.Config, path string,
+	ctx context.Context, st itemkit.Store, c repo.Config, path string,
 	p kernel.Principal, acc itemkit.Access,
 ) ([]byte, error) {
 	if c.Class == repo.Remote {

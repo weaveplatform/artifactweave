@@ -18,16 +18,17 @@
 //   - Driving: the router, which lists TryOpkgItem ninth among the item
 //     kit's overlays (itemkit.Deps.Overlays), so that an item GET or HEAD in
 //     an Opkg repository reaches it before the generic lookup.
-//   - Driven: the item kit (artifacts/adapters/http/itemkit), which resolves
-//     the request and the caller's access, reads items and blobs, serves
-//     stored files and remote streams and writes errors; the kit's remote
-//     source service, which fetches a remote's feed and IPKs under the kit's
-//     Opkg source request (itemkit.OpkgSourceRequest); access/api's Keys,
-//     through which the format's SignFeed reads a virtual repository's GPG
-//     key pair; the generic download policy (artifacts/ecosystem/generic);
-//     and the format package (artifacts/ecosystem/opkg), whose rules parse
-//     every feed path, decode member feeds and encode and sign the virtual
-//     feed.
+//   - Driven: the item kit (artifacts/adapters/http/itemkit), whose store
+//     (itemkit.Store) the overlay is handed and reads repositories and items
+//     from, and which resolves the request and the caller's access, reads
+//     items and blobs, serves stored files and remote streams and writes
+//     errors; the kit's remote source service, which fetches a remote's feed
+//     and IPKs under the kit's Opkg source request
+//     (itemkit.OpkgSourceRequest); access/api's Keys, through which the
+//     format's SignFeed reads a virtual repository's GPG key pair; the
+//     generic download policy (artifacts/ecosystem/generic); and the format
+//     package (artifacts/ecosystem/opkg), whose rules parse every feed path,
+//     decode member feeds and encode and sign the virtual feed.
 //
 // # Outputs
 //
@@ -73,8 +74,9 @@
 //   - Plan: docs/implementation/plan.md#p29-linux-package-repositories
 //     and #p9d-modular-monolith-migration, epic WEB
 //     (https://github.com/weaveplatform/artifactweave/issues/944).
-//   - https://github.com/weaveplatform/artifactweave/issues/760 and
-//     https://github.com/weaveplatform/artifactweave/issues/1082
+//   - https://github.com/weaveplatform/artifactweave/issues/760,
+//     https://github.com/weaveplatform/artifactweave/issues/1082 and
+//     https://github.com/weaveplatform/artifactweave/issues/1090
 //
 // # Status
 //

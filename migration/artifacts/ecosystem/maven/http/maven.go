@@ -54,7 +54,7 @@ func (s MavenAPI) RegisterMavenRoutes(r chi.Router) {
 type mavenTarget struct {
 	p    kernel.Principal
 	acc  itemkit.Access
-	st   store.Store
+	st   itemkit.Store
 	c    repo.Config
 	path string
 	it   types.Item

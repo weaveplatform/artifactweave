@@ -41,7 +41,7 @@ type DebianAPI struct{ *itemkit.Kit }
 // other request, a folder among them, it leaves to the overlays after it
 // and the generic lookup.
 func TryDebianItem(
-	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
+	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) bool {
 	s := DebianAPI{k}
@@ -71,7 +71,7 @@ func TryDebianItem(
 }
 
 func (s DebianAPI) serveDebianIndex(
-	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
+	w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
 	ctx := r.Context()

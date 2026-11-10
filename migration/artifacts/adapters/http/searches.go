@@ -23,7 +23,6 @@ import (
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -129,7 +128,7 @@ func results(entries []map[string]any) map[string]any {
 type searchRun struct {
 	*search.SearchRun
 	s   ArtifactoryAPI
-	st  store.Store
+	st  Store
 	acc itemkit.Access
 }
 
@@ -158,7 +157,7 @@ func (a searchAccess) Readable(
 // newSearch starts a search. named refuses anonymous callers with 401, for
 // the searches JFrog documents as needing a non-anonymous user.
 func (s ArtifactoryAPI) newSearch(ctx context.Context, named bool) (*searchRun, error) {
-	st, err := s.Content()
+	st, err := s.content()
 	if err != nil {
 		return nil, err
 	}

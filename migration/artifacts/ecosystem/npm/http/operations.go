@@ -35,7 +35,7 @@ type NPMAPI struct{ *itemkit.Kit }
 func (s NPMAPI) npmOperation(
 	ctx context.Context,
 	key string,
-) (store.Store, repo.Config, string, error) {
+) (itemkit.Store, repo.Config, string, error) {
 	return s.OperationRepo(ctx, repo.NPM, itemkit.ReindexOps[repo.NPM], key)
 }
 

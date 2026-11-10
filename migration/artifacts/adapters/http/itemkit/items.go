@@ -78,7 +78,7 @@ func ParseEscapedItemPath(escaped string) (ItemRequest, error) {
 // ItemCaller returns the caller and its permissions for an item request.
 func (s *Kit) ItemCaller(
 	ctx context.Context,
-	st store.Store,
+	st Store,
 ) (kernel.Principal, Access, error) {
 	p, err := httpkit.Principal(ctx)
 	if err != nil {
@@ -94,7 +94,7 @@ func (s *Kit) ItemCaller(
 
 // ResolveRepo returns the repository a key names and whether the key is a
 // remote repository's cache alias.
-func ResolveRepo(ctx context.Context, st store.Store, key string) (repo.Config, bool, error) {
+func ResolveRepo(ctx context.Context, st Store, key string) (repo.Config, bool, error) {
 	stored, cached := types.ResolveRepoKey(key)
 	c, err := st.Repos().Get(ctx, stored)
 	if err == nil && (!cached || c.Class == repo.Remote) {
@@ -169,7 +169,7 @@ func ItemNotFound() error { return apierror.New(http.StatusNotFound, "Could not 
 
 // Items returns the item service over st, with the kit's blobs, formats,
 // work queue and access keys, which every item write goes through.
-func (s *Kit) Items(st store.Store) *item.Service {
+func (s *Kit) Items(st Store) *item.Service {
 	svc := &item.Service{
 		Store:            st,
 		Blobs:            s.Blobs,
@@ -197,7 +197,7 @@ func (s *Kit) Format(t repo.PackageType) format.Handler {
 // repository. Remote repositories and their caches take no deploys.
 func DeployTarget(
 	ctx context.Context,
-	st store.Store,
+	st Store,
 	c repo.Config,
 	cached bool,
 ) (repo.Config, error) {
@@ -330,7 +330,7 @@ func newDownload(p string, folder bool, m types.Matrix, resolve resolver) *Downl
 // resolves it before looking there; the storage API passes nil.
 func Lookup(
 	ctx context.Context,
-	st store.Store,
+	st Store,
 	c repo.Config,
 	cached bool,
 	p string,
@@ -517,7 +517,7 @@ func (s *Kit) GetItem(w http.ResponseWriter, r *http.Request) {
 // matchesMatrix applies download matrix parameters (types.Matrix.Matches).
 func matchesMatrix(
 	ctx context.Context,
-	st store.Store,
+	st Store,
 	it types.Item,
 	req ItemRequest,
 ) (bool, error) {
@@ -539,7 +539,7 @@ func matchesMatrix(
 func (s *Kit) getSidecar(
 	w http.ResponseWriter,
 	r *http.Request,
-	st store.Store,
+	st Store,
 	c repo.Config,
 	cached bool,
 	p string,
@@ -579,7 +579,7 @@ func (s *Kit) getSidecar(
 func (s *Kit) ServeFile(
 	w http.ResponseWriter,
 	r *http.Request,
-	st store.Store,
+	st Store,
 	f Found,
 	p kernel.Principal,
 ) {
@@ -680,7 +680,7 @@ func startsAtZero(rng string) bool { return strings.HasPrefix(strings.TrimSpace(
 func (s *Kit) listFolder(
 	w http.ResponseWriter,
 	r *http.Request,
-	st store.Store,
+	st Store,
 	named repo.Config,
 	f Found,
 	acc Access,
@@ -790,7 +790,7 @@ func SplitRepoPath(escaped string) (key, p string, folder bool, err error) {
 func (s *Kit) getArchiveEntry(
 	w http.ResponseWriter,
 	r *http.Request,
-	st store.Store,
+	st Store,
 	f Found,
 	entry string,
 ) {

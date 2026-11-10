@@ -26,7 +26,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/middleware"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )
@@ -34,9 +34,16 @@ import (
 // Config is the part of the router's configuration that the tests here
 // set, which newKit passes on to the item kit as the router does.
 type Config struct {
-	Store  store.Store
+	Store  serverStore
 	Blobs  blob.Store
 	Access accessapi.API
+}
+
+// serverStore is the store the router's worlds hold: the item kit's, and
+// the access module's, which the router binds over the same store.
+type serverStore interface {
+	itemkit.Store
+	accesstest.Store
 }
 
 // newKit returns the item kit over c. The router's overlays are left out:
@@ -57,7 +64,7 @@ func withAccess(t *testing.T, c Config) Config {
 }
 
 // authorizerOver is the access module's Authorizer over st.
-func authorizerOver(t *testing.T, st store.Store) accessapi.Authorizer {
+func authorizerOver(t *testing.T, st accesstest.Store) accessapi.Authorizer {
 	t.Helper()
 	return accesstest.Over(t, st).API().Authorizer
 }
@@ -66,7 +73,7 @@ func authorizerOver(t *testing.T, st store.Store) accessapi.Authorizer {
 var cheapHash = support.CheapHash
 
 // cheapSeed seeds db with the built-in principals, admin's password "pw".
-func cheapSeed(t *testing.T, db store.Store) {
+func cheapSeed(t *testing.T, db *inmem.Store) {
 	t.Helper()
 	support.Seed(t, db)
 }
@@ -87,7 +94,7 @@ type debianStubs struct{ artgen.UnimplementedStrict }
 // their operations as the router would.
 type itemWorld struct {
 	t     *testing.T
-	db    store.Store
+	db    *inmem.Store
 	blobs blob.Store
 	h     http.Handler
 }

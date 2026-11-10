@@ -49,7 +49,7 @@ func (s ArtifactoryAPI) RegisterTrashRoutes(r chi.Router) {
 	}
 }
 
-func (s ArtifactoryAPI) trashService(st store.Store) *trash.Service {
+func (s ArtifactoryAPI) trashService(st Store) *trash.Service {
 	return &trash.Service{Store: st, Items: s.Items(st)}
 }
 
@@ -69,7 +69,7 @@ func (s ArtifactoryAPI) EmptyTrashCan(
 	ctx context.Context,
 	_ artgen.EmptyTrashCanRequestObject,
 ) (artgen.EmptyTrashCanResponseObject, error) {
-	st, err := s.Content()
+	st, err := s.content()
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +111,7 @@ func (s ArtifactoryAPI) cleanTrashPath(w http.ResponseWriter, r *http.Request) {
 // admin can. Cleaning a path with nothing trashed succeeds: what the caller
 // wanted gone is gone.
 func (s ArtifactoryAPI) cleanTrash(ctx context.Context, repoPath string) error {
-	st, err := s.Content()
+	st, err := s.content()
 	if err != nil {
 		return err
 	}
@@ -195,7 +195,7 @@ func (s ArtifactoryAPI) restoreTrash(
 	from, to string,
 	size *int,
 ) error {
-	st, err := s.Content()
+	st, err := s.content()
 	if err != nil {
 		return err
 	}
@@ -328,7 +328,7 @@ func cutRepoPath(rp string) (key, rest string) {
 // them. What the trash can holds is kept, for restore, clean and empty.
 func (s ArtifactoryAPI) trashStorage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	st, err := s.Content()
+	st, err := s.content()
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
 		return
@@ -594,7 +594,7 @@ func (v trashView) lastModified(ctx context.Context, n trash.Node) (string, any,
 // inferred choice: the listing names who deleted each item.
 func (s ArtifactoryAPI) trashSight(
 	ctx context.Context,
-	st store.Store,
+	st Store,
 	key, rest string,
 ) (kernel.Principal, func(types.Item) bool, error) {
 	p, acc, err := s.ItemCaller(ctx, st)
@@ -699,7 +699,7 @@ func (s ArtifactoryAPI) collector() (*gc.Collector, error) {
 	if s.cfg.GC != nil {
 		return s.cfg.GC, nil
 	}
-	st, err := s.Content()
+	st, err := s.content()
 	if err != nil {
 		return nil, err
 	}
@@ -715,7 +715,7 @@ func (s ArtifactoryAPI) collector() (*gc.Collector, error) {
 // repository.
 func (s ArtifactoryAPI) zapCache(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	st, err := s.Content()
+	st, err := s.content()
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
 		return

@@ -16,7 +16,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -35,7 +34,7 @@ var Admin = kernel.Principal{Name: "admin", Admin: true}
 // World is a seeded in-memory world for unit tests of the item kit.
 type World struct {
 	// Store is the in-memory metadata store.
-	Store store.Store
+	Store *inmem.Store
 	// Blobs is a file-system blob store in the test's temporary directory.
 	Blobs blob.Store
 	// Local, Remote, Federated and Virtual are the seeded generic

@@ -19,7 +19,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // errBoom is the failure the fault stores inject.
@@ -32,9 +31,16 @@ var p8Types = []repo.PackageType{repo.PyPI, repo.NuGet, repo.Helm, repo.Terrafor
 // Config is the part of the router's configuration that the tests here
 // set, which newKit passes on to the item kit as the router does.
 type Config struct {
-	Store   store.Store
+	Store   serverStore
 	Formats func(repo.PackageType) format.Handler
 	Access  accessapi.API
+}
+
+// serverStore is the store the router's worlds hold: the item kit's, and
+// the access module's, which the router binds over the same store.
+type serverStore interface {
+	itemkit.Store
+	accesstest.Store
 }
 
 // newKit returns the item kit over c. The router's overlays and private

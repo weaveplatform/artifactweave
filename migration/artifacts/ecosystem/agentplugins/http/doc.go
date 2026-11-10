@@ -20,9 +20,11 @@
 //     or HEAD of a marketplace file reaches it before the generic lookup,
 //     and calls AgentPluginItems' RegisterAgentMarketplaceRoutes right
 //     after the item routes.
-//   - Driven: the item kit (artifacts/adapters/http/itemkit), which resolves
-//     the repository and the caller's access and writes errors; the generic
-//     download policy (artifacts/ecosystem/generic); and the format package
+//   - Driven: the item kit (artifacts/adapters/http/itemkit), whose store
+//     (itemkit.Store) the overlay is handed and the marketplace's files are
+//     read from, and which resolves the repository and the caller's access
+//     and writes errors; the generic download policy
+//     (artifacts/ecosystem/generic); and the format package
 //     (artifacts/ecosystem/agentplugins), whose IsMarketplace,
 //     IsReservedMarketplace and Marketplace name and render the files.
 //
@@ -63,8 +65,9 @@
 //   - Plan: docs/implementation/plan.md#p9b-newly-identified-artifactory-formats
 //     and #p9d-modular-monolith-migration, epic WEB
 //     (https://github.com/weaveplatform/artifactweave/issues/944).
-//   - https://github.com/weaveplatform/artifactweave/issues/690 and
-//     https://github.com/weaveplatform/artifactweave/issues/1086
+//   - https://github.com/weaveplatform/artifactweave/issues/690,
+//     https://github.com/weaveplatform/artifactweave/issues/1086 and
+//     https://github.com/weaveplatform/artifactweave/issues/1090
 //
 // # Status
 //

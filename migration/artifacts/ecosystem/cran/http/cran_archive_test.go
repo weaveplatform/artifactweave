@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
@@ -40,7 +41,7 @@ func TestAccCRANArchiveDeletedAfterEnumeration(t *testing.T) {
 
 type (
 	cranMigrationFailure struct {
-		store.Store
+		itemkit.Store
 		fail   bool
 		mode   string
 		cancel context.CancelFunc

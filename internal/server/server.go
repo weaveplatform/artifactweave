@@ -358,6 +358,7 @@ func newKit(cfg Config) *itemkit.Kit { return itemkit.New(kitDeps(cfg)) }
 func artifactsDeps(cfg Config) artifactshttp.Deps {
 	return artifactshttp.Deps{
 		Deps:                        kitDeps(cfg),
+		Store:                       cfg.Store,
 		RemoteHTTP:                  cfg.RemoteHTTP,
 		RemoteStatus:                cfg.RemoteStatus,
 		GC:                          cfg.GC,

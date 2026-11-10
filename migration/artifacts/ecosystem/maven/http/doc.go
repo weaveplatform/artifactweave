@@ -20,13 +20,15 @@
 //     it stubs the spec's hand-written operations, so that the two
 //     operations claim the patterns the spec derives and no 501 stub is
 //     registered under them (decision 0036).
-//   - Driven: the item kit (artifacts/adapters/http/itemkit), which resolves
-//     the repository and the caller's access, reads items, builds the item
-//     service and writes errors; the item service (artifacts/core/item),
-//     which deploys a generated POM with its checks, index and metadata
-//     queue; and the format package (artifacts/ecosystem/maven), whose
-//     Serves, CalculateMetadata and GeneratePOM decide the Maven group,
-//     queue the metadata and build the POM.
+//   - Driven: the item kit (artifacts/adapters/http/itemkit), whose store
+//     (itemkit.Store) the POM generation reads the repository's items from,
+//     and which resolves the repository and the caller's access, reads
+//     items, builds the item service and writes errors; the item service
+//     (artifacts/core/item), which deploys a generated POM with its checks,
+//     index and metadata queue; and the format package
+//     (artifacts/ecosystem/maven), whose Serves, CalculateMetadata and
+//     GeneratePOM decide the Maven group, queue the metadata and build the
+//     POM.
 //
 // # Outputs
 //
@@ -67,8 +69,9 @@
 //   - Plan: docs/implementation/plan.md#p7-npm-go-maven-locals and
 //     #p9d-modular-monolith-migration, epic WEB
 //     (https://github.com/weaveplatform/artifactweave/issues/944).
-//   - https://github.com/weaveplatform/artifactweave/issues/282 and
-//     https://github.com/weaveplatform/artifactweave/issues/1086
+//   - https://github.com/weaveplatform/artifactweave/issues/282,
+//     https://github.com/weaveplatform/artifactweave/issues/1086 and
+//     https://github.com/weaveplatform/artifactweave/issues/1090
 //
 // # Status
 //

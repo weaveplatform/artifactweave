@@ -50,7 +50,7 @@ func (b buildAccess) Item(c repo.Config, path string, want types.Actions) bool {
 func (s ArtifactoryAPI) buildCaller(
 	ctx context.Context,
 ) (*build.Service, kernel.Principal, buildAccess, error) {
-	st, err := s.Content()
+	st, err := s.content()
 	if err != nil {
 		return nil, kernel.Principal{}, buildAccess{}, err
 	}

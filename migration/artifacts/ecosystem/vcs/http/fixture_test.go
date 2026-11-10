@@ -11,13 +11,13 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit/kittest"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
 // Config is the part of the router's configuration that the tests here
 // set, which newKit passes on to the item kit as the router does.
 type Config struct {
-	Store store.Store
+	Store itemkit.Store
 }
 
 // newKit returns the item kit over c. The router's overlays are left out:
@@ -30,7 +30,7 @@ func newKit(c Config) *itemkit.Kit {
 // itemWorld is the store and blob store of the router's item world, for
 // the tests that call the partial's code over them.
 type itemWorld struct {
-	db    store.Store
+	db    *inmem.Store
 	blobs blob.Store
 }
 

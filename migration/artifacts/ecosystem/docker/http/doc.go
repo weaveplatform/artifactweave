@@ -35,24 +35,25 @@
 //     DockerAPI in the artifactory spec's strict server; its operations
 //     (rest.go) check image names with ValidName and find repositories with
 //     Lookup.
-//   - Driven: the registry's store (Options.Store, a
+//   - Driven: the registry's store (Options.Store, an
 //     artifacts/core/registry Store), which resolves repositories and reads
 //     items, and over which the registry's writes (artifacts/core/registry)
 //     keep upload sessions and store blobs, mounts, manifests and deletes
 //     through the item service; Lookup reads only repositories, from any
-//     format.Store; the format package
-//     (artifacts/ecosystem/docker, imported as layout), which names paths,
-//     parses manifests and finds blobs, manifests, tags, images and
-//     referrers; the access module's API (access/api), whose decider each
-//     request carries, whose Tokens sign registry tokens (TokenIssuer) and
-//     whose Identity reads a user's email; the registry's remote source
-//     service (Options.Sources), through which a remote repository's
-//     manifests, blobs, tags and referrers are read; and the server's
-//     download (Options.ServeBlob, Options.RedirectManifest), which applies
-//     the download redirect policy (decision 0029) and counts downloads.
-//     DockerAPI runs over the item kit (artifacts/adapters/http/itemkit),
-//     which resolves the caller's access, builds the registry service its
-//     deletes and promotions go through, and writes errors.
+//     format.Store; the format package (artifacts/ecosystem/docker, imported
+//     as layout), which names paths, parses manifests and finds blobs,
+//     manifests, tags, images and referrers; the access module's API
+//     (access/api), whose decider each request carries, whose Tokens sign
+//     registry tokens (TokenIssuer) and whose Identity reads a user's email;
+//     the registry's remote source service (Options.Sources), through which
+//     a remote repository's manifests, blobs, tags and referrers are read;
+//     and the server's download (Options.ServeBlob,
+//     Options.RedirectManifest), which applies the download redirect policy
+//     (decision 0029) and counts downloads. DockerAPI runs over the item kit
+//     (artifacts/adapters/http/itemkit), which resolves the caller's access
+//     and writes errors, and over its store (itemkit.Store), in which it
+//     finds repositories and over which it builds the registry service its
+//     deletes and promotions go through.
 //
 // # Outputs
 //
@@ -134,8 +135,9 @@
 //     https://github.com/weaveplatform/artifactweave/issues/226 (listings and
 //     deletes), https://github.com/weaveplatform/artifactweave/issues/624
 //     (remote reads), https://github.com/weaveplatform/artifactweave/issues/1022,
-//     https://github.com/weaveplatform/artifactweave/issues/1086 and
-//     https://github.com/weaveplatform/artifactweave/issues/1089
+//     https://github.com/weaveplatform/artifactweave/issues/1086,
+//     https://github.com/weaveplatform/artifactweave/issues/1089 and
+//     https://github.com/weaveplatform/artifactweave/issues/1090
 //
 // # Status
 //

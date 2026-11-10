@@ -28,17 +28,25 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/middleware"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Config is the part of the router's configuration that the tests here
 // set, which newKit and newItemWorld pass on as the router does.
 type Config struct {
-	Store                   store.Store
+	Store                   serverStore
 	Blobs                   blob.Store
 	Access                  accessapi.API
 	CranArchiveMoverEnabled bool
+}
+
+// serverStore is the store the router's worlds hold: the artifacts
+// partial's, which holds the item kit's, and the access module's, which the
+// router binds over the same store.
+type serverStore interface {
+	artifactshttp.Store
+	accesstest.Store
 }
 
 // newKit returns the item kit over c. The router's overlays and private
@@ -56,7 +64,7 @@ func withAccess(t *testing.T, c Config) Config {
 }
 
 // authorizerOver is the access module's Authorizer over st.
-func authorizerOver(t *testing.T, st store.Store) accessapi.Authorizer {
+func authorizerOver(t *testing.T, st accesstest.Store) accessapi.Authorizer {
 	t.Helper()
 	return accesstest.Over(t, st).API().Authorizer
 }
@@ -92,7 +100,7 @@ type cranStubs struct{ artgen.UnimplementedStrict }
 // requests as the router would.
 type itemWorld struct {
 	t     *testing.T
-	db    store.Store
+	db    *inmem.Store
 	blobs blob.Store
 	h     http.Handler
 }
@@ -112,7 +120,8 @@ func newItemWorld(t *testing.T, tune ...func(*Config)) *itemWorld {
 	}
 	c = withAccess(t, c)
 	art := artifactshttp.New(artifactshttp.Deps{
-		Deps: itemkit.Deps{Store: c.Store, Blobs: c.Blobs, Access: c.Access},
+		Store: c.Store,
+		Deps:  itemkit.Deps{Blobs: c.Blobs, Access: c.Access},
 	})
 	ops := CranAPI{Kit: art.Kit, ArchiveMoverEnabled: c.CranArchiveMoverEnabled}
 	r := chi.NewRouter()
