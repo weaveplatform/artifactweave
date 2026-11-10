@@ -159,7 +159,6 @@
       "tokens_fixture_test.go",
       "tokens_status_test.go",
       "trash_handlers_internal_test.go",
-      "trash_views_internal_test.go",
       "vcs_routes_internal_test.go",
       "vcs_tables_test.go"
     ],
@@ -196,6 +195,8 @@
     "test/server/artifacts": [
       "aql_actions_test.go",
       "aql_builds_test.go",
+      "aql_related_test.go",
+      "aql_transitive_test.go",
       "builds_diff_test.go",
       "builds_promote_test.go",
       "builds_routes_test.go",
