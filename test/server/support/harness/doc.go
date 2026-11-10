@@ -1,6 +1,6 @@
 // Package harness builds the production router for the server-assembly
-// suites under test/server, and a seeded world of users, permissions and
-// repositories behind it.
+// suites under test/server, a seeded world of users, permissions and
+// repositories behind it, and the application runtime that serve opens.
 //
 // # Role
 //
@@ -16,6 +16,9 @@
 //   - The router and its configuration from internal/server; the seeding,
 //     password hashes and request helpers of test/server/support; an
 //     in-memory store and a file-system blob store.
+//   - The application runtime from migration/app (app.OpenRuntime) with the
+//     default configuration of migration/app/config, and a fake upstream
+//     from the artifacts module's fakeupstream.
 //   - Root-relative fixture paths, which RepoFile resolves through
 //     platform/testkit/repopath.
 //
@@ -32,12 +35,22 @@
 //     signs storage URLs (StorageSigner, SigningBlobs). Do, Item and
 //     WantStatus send requests to it and check what they left behind.
 //   - RepoFile: the absolute path of a root-relative fixture.
+//   - App: the application runtime opened as serve opens it, over AppConfig
+//     (the default configuration with a temporary data directory) with
+//     AppOptions (a cheap password hash and a small signing key), closed
+//     when the test ends.
+//   - RemoteWorld, from NewRemoteWorld: the router over an App runtime with
+//     the generic remote repository remote in front of a fake upstream, the
+//     users reader and denied and the remote-read permission. Request sends
+//     requests to it and Update saves a changed remote.
 //
 // # Invariants
 //
 //   - test/server/support never imports this package. The in-package tests
 //     of internal/server import support, and this package imports
 //     internal/server, so the import would close a cycle.
+//   - migration/app's in-package tests never import this package: it imports
+//     migration/app, so the import would close a cycle.
 //   - NewItemWorld builds the same world as newItemWorld, the in-package
 //     fixture of the internal/server tests, which keep their own copy because
 //     they cannot import this package. A change to one is made to the other.
@@ -54,10 +67,12 @@
 //   - Plan: docs/implementation/plan.md#p9d-modular-monolith-migration, epic
 //     TST (https://github.com/weaveplatform/artifactweave/issues/945).
 //   - https://github.com/weaveplatform/artifactweave/issues/997
+//   - https://github.com/weaveplatform/artifactweave/issues/1096 (App and
+//     RemoteWorld, for the suites that left migration/app).
 //
 // # Status
 //
-// Implemented P9d (issue 997).
+// Implemented P9d (issues 997 and 1096).
 //
 // # Testing
 //
