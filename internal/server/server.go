@@ -13,7 +13,6 @@ import (
 	"net/http"
 	"slices"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -386,7 +385,16 @@ func New(cfg Config) http.Handler {
 	debianOps := debianAPI{kit}
 	cranOps := cranAPI{Kit: kit, archiveMoverEnabled: cfg.CranArchiveMoverEnabled}
 	rpmOps := rpmAPI{kit}
-	sysAPI := systemAPI{cfg: cfg, instanceID: new(atomic.Pointer[string])}
+	sysAPI := NewSystemAPI(Deps{
+		Store:         cfg.Store,
+		Blobs:         cfg.Blobs,
+		CompatVersion: cfg.CompatVersion,
+		Revision:      cfg.Revision,
+		BaseURL:       cfg.BaseURL,
+		Settings:      configapi.Settings{DockerSubdomainMatch: cfg.DockerSubdomainMatch},
+		Configuration: cfg.Configuration,
+		Logger:        cfg.Logger,
+	})
 	accessHTTP := accesshttp.New(accesshttp.Deps{
 		API:           cfg.Access,
 		Store:         cfg.Store,
@@ -444,7 +452,7 @@ func New(cfg Config) http.Handler {
 	// After authentication, which it needs, and ahead of routing, which
 	// cannot match it (HelmPartialReindex).
 	if cfg.Store != nil {
-		r.Use(accessHTTP.CheckAPIRestriction(healthRequest, writeLimitError))
+		r.Use(accessHTTP.CheckAPIRestriction(HealthRequest, writeLimitError))
 	}
 	if cfg.RequestLimits != nil {
 		r.Use(limiter.limitPrincipal(limits))
@@ -455,22 +463,22 @@ func New(cfg Config) http.Handler {
 
 	// Hand-written routes go first so they win over anything a generated mux
 	// might later claim for the same prefix.
-	r.Get("/artifactory/api/system/ping", sysAPI.ping(systemAPI.probeArtifactory))
-	r.With(middleware.BodyLimit(sinkBodyLimit)).Post("/artifactory/api/system/usage", sinkHandler)
-	r.With(middleware.BodyLimit(sinkBodyLimit)).
-		Post("/jfconnect/api/v1/backoffice/metrics/log", sinkHandler)
-	r.Get("/access/api/v1/system/ping", sysAPI.ping(systemAPI.probeAccess))
+	r.Get("/artifactory/api/system/ping", sysAPI.ArtifactoryPing())
+	r.With(middleware.BodyLimit(SinkBodyLimit)).Post("/artifactory/api/system/usage", SinkHandler)
+	r.With(middleware.BodyLimit(SinkBodyLimit)).
+		Post("/jfconnect/api/v1/backoffice/metrics/log", SinkHandler)
+	r.Get("/access/api/v1/system/ping", sysAPI.AccessPing())
 	// Access's and the router's own probes, which JFrog's Helm charts and
 	// secret rotator poll through the public URL. The router is ready when
 	// the services behind it are.
-	r.Get("/access/api/v1/system/readiness", sysAPI.readiness(systemAPI.probeAccess))
-	r.Get("/access/api/v1/system/liveness", liveness)
-	r.Get("/router/api/v1/system/readiness", sysAPI.readiness(systemAPI.probeArtifactory))
-	r.Get("/router/api/v1/system/liveness", liveness)
-	r.Get("/router/api/v1/system/health", sysAPI.routerHealth)
+	r.Get("/access/api/v1/system/readiness", sysAPI.AccessReadiness())
+	r.Get("/access/api/v1/system/liveness", Liveness)
+	r.Get("/router/api/v1/system/readiness", sysAPI.RouterReadiness())
+	r.Get("/router/api/v1/system/liveness", Liveness)
+	r.Get("/router/api/v1/system/health", sysAPI.RouterHealth)
 	r.Get("/artifactory/api/artifactweave/remote-status/{repoKey}", artAPI.SmartStatus)
 	r.With(middleware.BodyLimit(middleware.ManagementBodyLimit)).
-		Patch("/artifactory/api/system/configuration", sysAPI.patchConfiguration)
+		Patch("/artifactory/api/system/configuration", sysAPI.PatchConfiguration)
 	// The item routes and the handwritten routes beside them keep their
 	// original order (item paths, AQL, agent marketplace, CRAN uploads,
 	// transfer, Debian snapshots), and all run before
@@ -532,7 +540,7 @@ func New(cfg Config) http.Handler {
 		artgen.HandlerWithOptions(
 			artgen.NewStrictHandlerWithOptions(artifactoryServer{
 				SecurityAPI:    accessHTTP.Security,
-				systemAPI:      &sysAPI,
+				SystemAPI:      sysAPI,
 				ArtifactoryAPI: &artAPI,
 				vcsAPI:         &vcsOps,
 				npmAPI:         &npmOps,
@@ -667,7 +675,7 @@ func newAuthnOptions(
 	skip ...func(*http.Request) bool,
 ) accesshttp.AuthnOptions {
 	public := accesshttp.PublicRoutes()
-	maps.Copy(public, systemPublicRoutes)
+	maps.Copy(public, PublicRoutes())
 	return accesshttp.AuthnOptions{
 		Auth:               a,
 		Store:              st,
@@ -683,11 +691,11 @@ func newAuthnOptions(
 }
 
 // newLimitOptions returns the request-limit middleware's options as the
-// router composes them: the probes (healthRequest) and the recovery API
+// router composes them: the probes (HealthRequest) and the recovery API
 // (APIRecoveryRequest) pass the shared limits.
 func newLimitOptions(limits *apilimit.Service) limitOptions {
 	return limitOptions{
-		Health:   healthRequest,
+		Health:   HealthRequest,
 		Recovery: accesshttp.APIRecoveryRequest,
 		Limits:   limits,
 	}

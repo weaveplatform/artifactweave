@@ -265,7 +265,7 @@ func TestAccProbeWithoutMemory(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	s := systemAPI{cfg: Config{Store: db}}
+	s := SystemAPI{deps: Deps{Store: db}}
 	id, err := s.probeDatabase(context.Background())
 	if err != nil || id != healthInstanceID {
 		t.Fatalf("probe: %q %v", id, err)

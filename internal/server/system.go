@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"maps"
 	"net/http"
 	"os"
 	"strings"
@@ -13,62 +14,102 @@ import (
 	"sync/atomic"
 	"time"
 
+	configapi "github.com/weaveplatform/artifactweave/migration/configuration/api"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/middleware"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/platform/instance"
 )
 
 // versionMediaType is the vendor type Artifactory advertises for the version
 // document; clients that send it in Accept get it back.
 const versionMediaType = "application/vnd.org.jfrog.artifactory.system.Version+json"
 
-// systemAPI implements the artifactory spec's system operations (version,
+// Deps is what the system handlers need, which the composition root
+// supplies.
+type Deps struct {
+	// Store holds the instance identity, which the probes read to show the
+	// database answers and the service id reports. Nil leaves the probes
+	// nothing to probe and answers the descriptor PATCH 501, as a router
+	// built to test routing alone answers. A nil store aggregate converts to
+	// a nil Store; a typed nil pointer would not.
+	Store instance.Store
+	// Blobs is the hot binary store, which Artifactory's probes ask for one
+	// blob; nil skips that probe.
+	Blobs blob.Store
+	// CompatVersion is the Artifactory version GetSystemVersion reports
+	// (decision 0005).
+	CompatVersion string
+	// Revision is the build revision GetSystemVersion reports.
+	Revision string
+	// BaseURL is the configured base URL, whose host the reverse proxy
+	// configuration names; empty means the base URL of each request.
+	BaseURL string
+	// Settings holds docker.subdomain_match, which picks the Docker access
+	// method the reverse proxy configuration names.
+	Settings configapi.Settings
+	// Configuration parses and applies the YAML descriptor the PATCH sends.
+	Configuration configapi.API
+	// Logger receives the handlers' internal errors; nil means slog.Default.
+	Logger *slog.Logger
+}
+
+// SystemAPI implements the artifactory spec's system operations (version,
 // license, service id, readiness and liveness) and the reverse proxy
-// configuration, and serves the probes the router mounts beside them. The
-// compatibility version drives client behaviour (decision 0005), so it is
-// configuration, not the build version.
-type systemAPI struct {
-	cfg Config
+// configuration, and serves the probes, the telemetry sinks and the
+// descriptor PATCH the router mounts beside them. The compatibility version
+// drives client behaviour (decision 0005), so it is configuration, not the
+// build version.
+type SystemAPI struct {
+	deps Deps
 	// instanceID holds the instance id the database last gave the health
 	// probes; nil, in values built only to reach the store, keeps none.
 	instanceID *atomic.Pointer[string]
 }
 
+// NewSystemAPI returns the system handlers over d. They remember the
+// instance id the probes last read, so router health still names the
+// services by it while the database is down.
+func NewSystemAPI(d Deps) *SystemAPI {
+	return &SystemAPI{deps: d, instanceID: new(atomic.Pointer[string])}
+}
+
 // internalError logs err and returns a 500 that names nothing internal.
-func (s systemAPI) internalError(ctx context.Context, op string, err error) error {
+func (s SystemAPI) internalError(ctx context.Context, op string, err error) error {
 	s.log().ErrorContext(ctx, op, "request_id", httpkit.RequestIDFrom(ctx), "error", err)
 	return apierror.New(http.StatusInternalServerError, "internal error")
 }
 
 // log is the configured logger, or slog's default for values built
 // without one in tests.
-func (s systemAPI) log() *slog.Logger {
-	if s.cfg.Logger == nil {
+func (s SystemAPI) log() *slog.Logger {
+	if s.deps.Logger == nil {
 		return slog.Default()
 	}
-	return s.cfg.Logger
+	return s.deps.Logger
 }
 
 // content returns the store. A router built without one (tests of the
 // routing alone) answers like an unimplemented operation, as the item
 // kit's Content does for the artifacts routes.
-func (s systemAPI) content() (store.Store, error) {
-	if s.cfg.Store == nil {
+func (s SystemAPI) content() (instance.Store, error) {
+	if s.deps.Store == nil {
 		return nil, apierror.ErrNotImplemented
 	}
-	return s.cfg.Store, nil
+	return s.deps.Store, nil
 }
 
-func (s systemAPI) GetSystemVersion(
+func (s SystemAPI) GetSystemVersion(
 	_ context.Context,
 	req artgen.GetSystemVersionRequestObject,
 ) (artgen.GetSystemVersionResponseObject, error) {
 	license := "artifactweave"
 	body := artgen.SystemVersion{
-		Version:  s.cfg.CompatVersion,
-		Revision: s.cfg.Revision,
+		Version:  s.deps.CompatVersion,
+		Revision: s.deps.Revision,
 		Addons:   []string{},
 		License:  &license,
 	}
@@ -82,7 +123,7 @@ func (s systemAPI) GetSystemVersion(
 
 // GetSystemLicense answers administrators only, as documented
 // (getlicenseinfo.json).
-func (systemAPI) GetSystemLicense(
+func (SystemAPI) GetSystemLicense(
 	ctx context.Context,
 	_ artgen.GetSystemLicenseRequestObject,
 ) (artgen.GetSystemLicenseResponseObject, error) {
@@ -100,14 +141,14 @@ func (systemAPI) GetSystemLicense(
 // (getserviceid-1.md), with the stored instance id. The token service
 // derives its jfac@ issuer from the same record, so the jfrt@<id>:admin
 // scope jf rt atc --grant-admin builds from this body names this instance.
-func (s systemAPI) GetServiceId(
+func (s SystemAPI) GetServiceId(
 	ctx context.Context,
 	_ artgen.GetServiceIdRequestObject,
 ) (artgen.GetServiceIdResponseObject, error) {
 	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}
-	id, err := s.cfg.Store.Instance().Get(ctx)
+	id, err := s.deps.Store.Instance().Get(ctx)
 	if err != nil {
 		return nil, s.internalError(ctx, "instance identity", err)
 	}
@@ -119,7 +160,7 @@ func (s systemAPI) GetServiceId(
 // GetSystemReadiness answers OK while the database and the binary store
 // answer, and 500 with the reason otherwise (getreadinessprobe.md:
 // "Returns HTTP error code with reason if not working properly").
-func (s systemAPI) GetSystemReadiness(
+func (s SystemAPI) GetSystemReadiness(
 	ctx context.Context,
 	_ artgen.GetSystemReadinessRequestObject,
 ) (artgen.GetSystemReadinessResponseObject, error) {
@@ -132,7 +173,7 @@ func (s systemAPI) GetSystemReadiness(
 // GetSystemLiveness answers OK while the process serves requests. It
 // probes neither store: an orchestrator restarts a container whose
 // liveness fails, and a restart brings back no database or bucket.
-func (systemAPI) GetSystemLiveness(
+func (SystemAPI) GetSystemLiveness(
 	context.Context,
 	artgen.GetSystemLivenessRequestObject,
 ) (artgen.GetSystemLivenessResponseObject, error) {
@@ -143,13 +184,13 @@ func (systemAPI) GetSystemLiveness(
 // JSON server cannot express well, and the spec marks them x-handwritten.
 
 // probeFunc probes the stores one service needs.
-type probeFunc func(systemAPI, context.Context) *probeError
+type probeFunc func(SystemAPI, context.Context) *probeError
 
 // ping answers the plain text OK while probe passes, and 500 with the
 // reason as plain text otherwise, as the 6.20 PingResource answers a failed
 // storage or Access check. Artifactory's ping probes the database and the
 // binary store, Access's the database alone.
-func (s systemAPI) ping(probe probeFunc) http.HandlerFunc {
+func (s SystemAPI) ping(probe probeFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		if err := probe(s, r.Context()); err != nil {
@@ -164,42 +205,65 @@ func (s systemAPI) ping(probe probeFunc) http.HandlerFunc {
 // readiness answers the router's and Access's readiness probes as
 // Artifactory's readiness answers: {"code":"OK"} while probe passes, and 500
 // with the reason in the path's error envelope otherwise.
-func (s systemAPI) readiness(probe probeFunc) http.HandlerFunc {
+func (s SystemAPI) readiness(probe probeFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := probe(s, r.Context()); err != nil {
-			apierror.Write(w, errorProfileFor(r.URL.Path), s.probeFailed(r.Context(), err))
+			apierror.Write(w, httpkit.ErrorProfile(r), s.probeFailed(r.Context(), err))
 			return
 		}
-		liveness(w, r)
+		Liveness(w, r)
 	}
 }
 
-// liveness answers the router's and Access's liveness probes. They probe no
+// ArtifactoryPing returns the handler of GET /artifactory/api/system/ping,
+// which probes the database and the binary store.
+func (s SystemAPI) ArtifactoryPing() http.HandlerFunc {
+	return s.ping(SystemAPI.probeArtifactory)
+}
+
+// AccessPing returns the handler of GET /access/api/v1/system/ping, which
+// probes the database alone.
+func (s SystemAPI) AccessPing() http.HandlerFunc { return s.ping(SystemAPI.probeAccess) }
+
+// AccessReadiness returns the handler of GET /access/api/v1/system/readiness,
+// which probes the database alone.
+func (s SystemAPI) AccessReadiness() http.HandlerFunc {
+	return s.readiness(SystemAPI.probeAccess)
+}
+
+// RouterReadiness returns the handler of GET /router/api/v1/system/readiness.
+// The router is ready when the services behind it are, so it probes what
+// Artifactory needs, which covers what Access needs.
+func (s SystemAPI) RouterReadiness() http.HandlerFunc {
+	return s.readiness(SystemAPI.probeArtifactory)
+}
+
+// Liveness answers the router's and Access's liveness probes. They probe no
 // store, for the reason GetSystemLiveness gives.
-func liveness(w http.ResponseWriter, _ *http.Request) {
+func Liveness(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = io.WriteString(w, `{"code":"OK"}`+"\n")
 }
 
-// sinkBodyLimit bounds the telemetry sinks' bodies. The sinks answer
+// SinkBodyLimit bounds the telemetry sinks' bodies. The sinks answer
 // without credentials, so without a bound anyone could hold a connection
 // open for as long as they kept sending (#431). The reports the JFrog CLI
 // and the Terraform providers post are well under a kilobyte; 1 MiB leaves
 // ample room for a larger one without letting the read run on.
-const sinkBodyLimit = 1 << 20
+const SinkBodyLimit = 1 << 20
 
-// sinkHandler drains and discards telemetry posted by the JFrog CLI and the
+// SinkHandler drains and discards telemetry posted by the JFrog CLI and the
 // Terraform providers (usage reports, jfconnect metrics). It runs behind
-// middleware.BodyLimit(sinkBodyLimit). Reading a body within the limit to EOF lets the
+// middleware.BodyLimit(SinkBodyLimit). Reading a body within the limit to EOF lets the
 // connection be reused; a body without a declared length that runs past the
 // limit stops the read there and answers 413, as middleware.BodyLimit answers a
 // declared one, and the server then closes the connection rather than
 // drain the rest.
-func sinkHandler(w http.ResponseWriter, r *http.Request) {
+func SinkHandler(w http.ResponseWriter, r *http.Request) {
 	_, err := io.Copy(io.Discard, r.Body)
 	var tooLarge *http.MaxBytesError
 	if errors.As(err, &tooLarge) {
-		apierror.Write(w, errorProfileFor(r.URL.Path), middleware.BodyTooLarge(tooLarge.Limit))
+		apierror.Write(w, httpkit.ErrorProfile(r), middleware.BodyTooLarge(tooLarge.Limit))
 		return
 	}
 	w.WriteHeader(http.StatusOK)
@@ -227,6 +291,35 @@ var systemPublicRoutes = map[string]bool{
 	"POST /jfconnect/api/v1/backoffice/metrics/log": true,
 }
 
+// PublicRoutes returns "METHOD path" of the system routes that answer
+// without credentials while anonymous access is off (systemPublicRoutes),
+// in a new map, which the router merges with the other modules' public
+// routes.
+func PublicRoutes() map[string]bool { return maps.Clone(systemPublicRoutes) }
+
+// HealthRequest reports whether r is a GET of one of Artifactory's,
+// Access's or the router's probes. The router lets those pass every request
+// limit and the API restriction check, so that a busy or restricted server
+// still answers its health checks.
+func HealthRequest(r *http.Request) bool {
+	if r.Method != http.MethodGet {
+		return false
+	}
+	switch r.URL.EscapedPath() {
+	case "/artifactory/api/system/ping",
+		"/artifactory/api/v1/system/readiness",
+		"/artifactory/api/v1/system/liveness",
+		"/access/api/v1/system/ping",
+		"/access/api/v1/system/readiness",
+		"/access/api/v1/system/liveness",
+		"/router/api/v1/system/health",
+		"/router/api/v1/system/readiness",
+		"/router/api/v1/system/liveness":
+		return true
+	}
+	return false
+}
+
 // Router health states. A service whose probe fails is UNHEALTHY, and the
 // router, which works itself, is UNHEALTHY_PEER while any of its services
 // is not healthy.
@@ -246,11 +339,11 @@ type healthEntry struct {
 	Message   string `json:"message"`
 }
 
-// routerHealth answers the JFrog router's aggregate health document: 200
+// RouterHealth answers the JFrog router's aggregate health document: 200
 // while both services are healthy, 503 otherwise. One process is the
 // router and both services, so all three share a node. Access (jfac) needs
 // the database; Artifactory (jfrt) needs the database and the binary store.
-func (s systemAPI) routerHealth(w http.ResponseWriter, r *http.Request) {
+func (s SystemAPI) RouterHealth(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	node := nodeID()
 	router := healthEntry{NodeID: node, State: stateHealthy, Message: healthyMessage}
@@ -319,14 +412,14 @@ func (e *probeError) Unwrap() error { return e.cause }
 
 // probeFailed leaves err's cause for the access log and returns the 500 a
 // caller gets, which carries the reason alone.
-func (systemAPI) probeFailed(ctx context.Context, err *probeError) *apierror.Error {
+func (SystemAPI) probeFailed(ctx context.Context, err *probeError) *apierror.Error {
 	httpkit.NoteCause(ctx, err)
 	return apierror.New(http.StatusInternalServerError, err.reason)
 }
 
 // probeArtifactory probes what Artifactory needs: the database, then the
 // binary store.
-func (s systemAPI) probeArtifactory(ctx context.Context) *probeError {
+func (s SystemAPI) probeArtifactory(ctx context.Context) *probeError {
 	if _, err := s.probeDatabase(ctx); err != nil {
 		return err
 	}
@@ -334,7 +427,7 @@ func (s systemAPI) probeArtifactory(ctx context.Context) *probeError {
 }
 
 // probeAccess probes what Access needs: the database.
-func (s systemAPI) probeAccess(ctx context.Context) *probeError {
+func (s SystemAPI) probeAccess(ctx context.Context) *probeError {
 	_, err := s.probeDatabase(ctx)
 	return err
 }
@@ -343,15 +436,15 @@ func (s systemAPI) probeAccess(ctx context.Context) *probeError {
 // call relies on, and returns its id. A store without one has still
 // answered. A handler built without a store, as only tests build one, has
 // nothing to probe.
-func (s systemAPI) probeDatabase(ctx context.Context) (string, *probeError) {
-	if s.cfg.Store == nil {
+func (s SystemAPI) probeDatabase(ctx context.Context) (string, *probeError) {
+	if s.deps.Store == nil {
 		return "", nil
 	}
 	ctx, cancel := context.WithTimeout(ctx, probeTimeout)
 	defer cancel()
-	id, err := s.cfg.Store.Instance().Get(ctx)
+	id, err := s.deps.Store.Instance().Get(ctx)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return "", nil
 	case err != nil:
 		return "", &probeError{reason: reasonDatabase, cause: err}
@@ -363,13 +456,13 @@ func (s systemAPI) probeDatabase(ctx context.Context) (string, *probeError) {
 }
 
 // probeBinaries asks the hot binary store for one blob.
-func (s systemAPI) probeBinaries(ctx context.Context) *probeError {
-	if s.cfg.Blobs == nil {
+func (s SystemAPI) probeBinaries(ctx context.Context) *probeError {
+	if s.deps.Blobs == nil {
 		return nil
 	}
 	ctx, cancel := context.WithTimeout(ctx, probeTimeout)
 	defer cancel()
-	if _, err := s.cfg.Blobs.Exists(ctx, probeDigest); err != nil {
+	if _, err := s.deps.Blobs.Exists(ctx, probeDigest); err != nil {
 		return &probeError{reason: reasonBinaryStore, cause: err}
 	}
 	return nil
@@ -378,7 +471,7 @@ func (s systemAPI) probeBinaries(ctx context.Context) *probeError {
 // lastInstanceID is the id the database last gave a probe, or "" before it
 // has given one. The id never changes once created, so router health
 // names the services by it while the database is down.
-func (s systemAPI) lastInstanceID() string {
+func (s SystemAPI) lastInstanceID() string {
 	if s.instanceID == nil {
 		return ""
 	}

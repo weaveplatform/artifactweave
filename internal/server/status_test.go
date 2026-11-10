@@ -239,10 +239,10 @@ func systemStatusRows() []statusCase {
 }
 
 // sinkStatusRows are the telemetry sinks: public, and limited to
-// sinkBodyLimit bytes of body (#431).
+// SinkBodyLimit bytes of body (#431).
 func sinkStatusRows() []statusCase {
 	const report = `{"productId":"jfrog-cli-go/2.60.0","features":[]}`
-	oversized := strings.Repeat("x", sinkBodyLimit+1)
+	oversized := strings.Repeat("x", SinkBodyLimit+1)
 	var rows []statusCase
 	for _, route := range []string{
 		"POST /artifactory/api/system/usage",

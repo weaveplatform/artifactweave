@@ -242,7 +242,7 @@ func (b *endlessBody) Read(p []byte) (int, error) {
 	return n, nil
 }
 
-// TestAccTelemetrySinkBodyLimit holds both sinks to sinkBodyLimit: a body at
+// TestAccTelemetrySinkBodyLimit holds both sinks to SinkBodyLimit: a body at
 // the limit is drained and answered 200, and a longer one answers 413
 // without being read to the end, whether its length is declared or not.
 func TestAccTelemetrySinkBodyLimit(t *testing.T) {
@@ -262,11 +262,11 @@ func TestAccTelemetrySinkBodyLimit(t *testing.T) {
 	} {
 		t.Run(path, func(t *testing.T) {
 			// At the limit, declared and undeclared: read to the end.
-			atLimit := strings.Repeat("x", sinkBodyLimit)
+			atLimit := strings.Repeat("x", SinkBodyLimit)
 			if rec := post(
 				path,
 				strings.NewReader(atLimit),
-				sinkBodyLimit,
+				SinkBodyLimit,
 			); rec.Code != http.StatusOK {
 				t.Errorf("declared, at the limit: status %d: %s", rec.Code, rec.Body)
 			}
@@ -280,20 +280,20 @@ func TestAccTelemetrySinkBodyLimit(t *testing.T) {
 
 			// A declared length over the limit is refused before any read.
 			declared := &endlessBody{t: t}
-			rec := post(path, declared, sinkBodyLimit+1)
+			rec := post(path, declared, SinkBodyLimit+1)
 			assertTooLarge(t, "declared", rec, tooLarge)
 
 			// An undeclared body is read one byte past the limit, which is
 			// how MaxBytesReader detects the overrun, and no further. The
 			// margin only keeps a regression from looping forever.
-			undeclared := &endlessBody{t: t, budget: sinkBodyLimit + 64<<10}
+			undeclared := &endlessBody{t: t, budget: SinkBodyLimit + 64<<10}
 			rec = post(path, undeclared, -1)
 			assertTooLarge(t, "undeclared", rec, tooLarge)
-			if undeclared.read > sinkBodyLimit+1 {
+			if undeclared.read > SinkBodyLimit+1 {
 				t.Errorf(
 					"undeclared: read %d bytes, want at most %d",
 					undeclared.read,
-					sinkBodyLimit+1,
+					SinkBodyLimit+1,
 				)
 			}
 		})

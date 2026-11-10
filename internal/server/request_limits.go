@@ -20,25 +20,6 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func healthRequest(r *http.Request) bool {
-	if r.Method != http.MethodGet {
-		return false
-	}
-	switch r.URL.EscapedPath() {
-	case "/artifactory/api/system/ping",
-		"/artifactory/api/v1/system/readiness",
-		"/artifactory/api/v1/system/liveness",
-		"/access/api/v1/system/ping",
-		"/access/api/v1/system/readiness",
-		"/access/api/v1/system/liveness",
-		"/router/api/v1/system/health",
-		"/router/api/v1/system/readiness",
-		"/router/api/v1/system/liveness":
-		return true
-	}
-	return false
-}
-
 // limitOptions are the values the request-limit middleware takes from the
 // router, which builds them from the code that owns each request kind.
 type limitOptions struct {

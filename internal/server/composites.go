@@ -34,7 +34,7 @@ type artifactoryStubs struct{ artgen.UnimplementedStrict }
 // and are named after no operation.
 type artifactoryServer struct {
 	*accesshttp.SecurityAPI
-	*systemAPI
+	*SystemAPI
 	*artifactshttp.ArtifactoryAPI
 	*vcsAPI
 	*npmAPI

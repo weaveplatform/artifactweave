@@ -245,7 +245,7 @@ func apiReviewHandlers(t *testing.T) map[string]apiReviewHandler {
 		"cranAPI":        "artifactory",
 		"rpmAPI":         "artifactory",
 		"SecurityAPI":    "artifactory",
-		"systemAPI":      "artifactory",
+		"SystemAPI":      "artifactory",
 		"AccessService":  "access",
 	}
 	out := map[string]apiReviewHandler{}
@@ -339,7 +339,7 @@ func apiReviewPolicy(e *apiReviewOperation) {
 	if strings.Contains(path, "/api/storage/") {
 		e.Admission += "; ?list additionally selects expensive policy"
 	}
-	if healthRequest(r) {
+	if HealthRequest(r) {
 		e.Admission = "health exemption"
 	}
 	if accesshttp.APIRecoveryRequest(r) {

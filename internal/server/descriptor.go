@@ -12,10 +12,10 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
-// patchConfiguration is PATCH /api/system/configuration: the YAML descriptor
+// PatchConfiguration is PATCH /api/system/configuration: the YAML descriptor
 // as a patch (decision 0009). It is hand-written because the body is YAML,
 // which the generated strict servers do not decode.
-func (s systemAPI) patchConfiguration(w http.ResponseWriter, r *http.Request) {
+func (s SystemAPI) PatchConfiguration(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	fail := func(err error) { httpkit.WriteErr(w, r, err) }
 	if err := httpkit.AdminOnly(ctx); err != nil {
@@ -39,7 +39,7 @@ func (s systemAPI) patchConfiguration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// ${NAME} references resolve from the server's own environment.
-	conf := s.cfg.Configuration.Descriptor
+	conf := s.deps.Configuration.Descriptor
 	p, err := conf.Parse(body, os.LookupEnv)
 	if err != nil {
 		fail(httpkit.BadRequestf("%s", err.Error()))

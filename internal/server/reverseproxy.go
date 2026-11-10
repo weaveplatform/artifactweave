@@ -20,7 +20,7 @@ import (
 // needs (decision 0003): SUBDOMAIN when docker.subdomain_match is on and
 // REPOPATHPREFIX otherwise, with serverName the base URL's host and, for
 // subdomains, its wildcard.
-func (s systemAPI) GetReverseProxyConfiguration(
+func (s SystemAPI) GetReverseProxyConfiguration(
 	ctx context.Context,
 	_ artgen.GetReverseProxyConfigurationRequestObject,
 ) (artgen.GetReverseProxyConfigurationResponseObject, error) {
@@ -54,10 +54,10 @@ func methodAndPorts(
 }
 
 // reverseProxy describes this server as the reverse proxy settings.
-func (s systemAPI) reverseProxy(
+func (s SystemAPI) reverseProxy(
 	ctx context.Context,
 ) artgen.GetReverseProxyConfiguration200JSONResponse {
-	base := s.cfg.BaseURL
+	base := s.deps.BaseURL
 	if base == "" {
 		base = baseurl.From(ctx)
 	}
@@ -74,7 +74,7 @@ func (s systemAPI) reverseProxy(
 		ServerName:               httpkit.PtrTo(host),
 		DockerReverseProxyMethod: &method,
 	}
-	if s.cfg.DockerSubdomainMatch {
+	if s.deps.Settings.DockerSubdomainMatch {
 		method = artgen.SUBDOMAIN
 		body.ServerNameExpression = httpkit.PtrTo("*." + host)
 	}

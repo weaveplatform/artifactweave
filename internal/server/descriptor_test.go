@@ -149,13 +149,13 @@ func TestUnitPatchConfigurationAnonymousAccess(t *testing.T) {
 // built without a store.
 func TestAccPatchConfigurationBody(t *testing.T) {
 	w := newRepoWorld(t)
-	svc := systemAPI{cfg: Config{Store: w.db}}
+	svc := SystemAPI{deps: Deps{Store: w.db}}
 	admin := kernel.WithPrincipal(
 		context.Background(),
 		kernel.Principal{Name: "admin", Admin: true},
 	)
 	for name, c := range map[string]struct {
-		svc      systemAPI
+		svc      SystemAPI
 		body     func(http.ResponseWriter) io.ReadCloser
 		expected int
 	}{
@@ -165,14 +165,14 @@ func TestAccPatchConfigurationBody(t *testing.T) {
 		"unreadable": {svc, func(http.ResponseWriter) io.ReadCloser {
 			return io.NopCloser(failingReader{})
 		}, http.StatusBadRequest},
-		"no store": {systemAPI{cfg: Config{}}, func(http.ResponseWriter) io.ReadCloser {
+		"no store": {SystemAPI{deps: Deps{}}, func(http.ResponseWriter) io.ReadCloser {
 			return io.NopCloser(strings.NewReader("a: b"))
 		}, http.StatusNotImplemented},
 	} {
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequestWithContext(admin, http.MethodPatch, configPath, nil)
 		req.Body = c.body(rec)
-		c.svc.patchConfiguration(rec, req)
+		c.svc.PatchConfiguration(rec, req)
 		if rec.Code != c.expected {
 			t.Errorf("%s: %d %s", name, rec.Code, rec.Body)
 		}
