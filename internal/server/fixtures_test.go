@@ -392,14 +392,6 @@ func bearerAuth(token string) map[string]string {
 	return support.Bearer(token)
 }
 
-func formAs(headers map[string]string) map[string]string {
-	out := map[string]string{"Content-Type": "application/x-www-form-urlencoded"}
-	for k, v := range headers {
-		out[k] = v
-	}
-	return out
-}
-
 func jsonAs(headers map[string]string) map[string]string {
 	out := map[string]string{"Content-Type": "application/json"}
 	for k, v := range headers {

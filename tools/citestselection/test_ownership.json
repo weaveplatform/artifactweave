@@ -247,8 +247,11 @@
       "virtual_members_test.go"
     ],
     "test/server/configuration": [
+      "descriptor_test.go",
       "fixture_test.go",
-      "forwarded_test.go"
+      "forwarded_test.go",
+      "service_id_test.go",
+      "system_health_test.go"
     ]
   },
   "format_dependencies": {
