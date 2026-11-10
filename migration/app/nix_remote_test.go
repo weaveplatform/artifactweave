@@ -58,7 +58,7 @@ func TestAccNixRawRoutesCannotBypassNativeValidation(t *testing.T) {
 			}
 			native := base + "nar/" + path[:32] + "/" + strings.TrimPrefix(info.URL, "nar/")
 			remoteStatus(t, w.request("GET", native, "reader", ""), 502)
-			if _, err = w.rt.store.Items().
+			if _, err = w.rt.Store.Items().
 				Get(t.Context(), "remote", true, info.URL); !errors.Is(
 				err,
 				store.ErrNotFound,
@@ -92,7 +92,7 @@ func TestAccNixRawRoutesCannotBypassNativeValidation(t *testing.T) {
 				)
 			}
 			before := w.up.Count("", "")
-			service := item.Service{Store: w.rt.store, Blobs: w.rt.blobs, Formats: ecosystem.For}
+			service := item.Service{Store: w.rt.Store, Blobs: w.rt.Blobs, Formats: ecosystem.For}
 			_, err = service.Zap(t.Context(), item.Target{Repo: w.c, Cached: true, Path: path})
 			if cache && err != nil {
 				t.Fatal(err)
@@ -111,7 +111,7 @@ func TestAccNixRawRoutesCannotBypassNativeValidation(t *testing.T) {
 				!strings.Contains(fresh.Body.String(), "Deriver: unknown-deriver") {
 				t.Fatal("zap did not refresh narinfo")
 			}
-			_, err = w.rt.store.Items().Get(t.Context(), "remote", true, info.URL)
+			_, err = w.rt.Store.Items().Get(t.Context(), "remote", true, info.URL)
 			if cache && err != nil {
 				t.Fatal(err)
 			}

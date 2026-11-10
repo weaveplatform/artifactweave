@@ -26,11 +26,11 @@ func registryWorld(t *testing.T) *remoteWorld {
 	w.update()
 	w.h = server.New(
 		server.Config{
-			Store:           w.rt.store,
-			Blobs:           w.rt.blobs,
-			Auth:            w.rt.auth,
-			Tokens:          w.rt.tokens,
-			Keys:            w.rt.keys,
+			Store:           w.rt.Store,
+			Blobs:           w.rt.Blobs,
+			Auth:            w.rt.Auth,
+			Tokens:          w.rt.Tokens,
+			Keys:            w.rt.Keys,
 			RegistrySources: w.rt.modules.artifacts.RegistrySources(),
 			Logger:          slog.New(slog.NewTextHandler(io.Discard, nil)),
 		},
@@ -126,7 +126,7 @@ func TestAccRegistryRemotePullRefreshAndOffline(t *testing.T) {
 	if got := w.request("GET", path, "reader", ""); got.Body.String() != string(manifest) {
 		t.Fatal("fresh tag unexpectedly changed")
 	}
-	service := item.Service{Store: w.rt.store, Blobs: w.rt.blobs, Formats: ecosystem.For}
+	service := item.Service{Store: w.rt.Store, Blobs: w.rt.Blobs, Formats: ecosystem.For}
 	if _, err := service.Zap(
 		t.Context(),
 		item.Target{Repo: w.c, Cached: true, Path: "team/image"},
@@ -181,11 +181,11 @@ func TestAccRegistryRemoteIndexAndReferrers(t *testing.T) {
 	if response.Body.String() != string(index) {
 		t.Fatal("index rewritten")
 	}
-	it, err := w.rt.store.Items().Get(t.Context(), "remote", true, "team/image/multi/manifest.json")
+	it, err := w.rt.Store.Items().Get(t.Context(), "remote", true, "team/image/multi/manifest.json")
 	if err != nil {
 		t.Fatal("remote index native item missing", err)
 	}
-	props, err := w.rt.store.Items().Properties(t.Context(), it.ID)
+	props, err := w.rt.Store.Items().Properties(t.Context(), it.ID)
 	if err != nil || len(props[layout.ManifestTypeProperty]) != 1 ||
 		props[layout.ManifestTypeProperty][0] != layout.MediaTypeOCIIndex {
 		t.Fatal("index media properties missing", props, err)
@@ -273,7 +273,7 @@ func TestAccRegistryRemoteNoStoreAndNativeRoutes(t *testing.T) {
 	if got.Body.String() != string(layer[1:5]) {
 		t.Fatal("transient range changed")
 	}
-	entries, _, err := w.rt.store.RemoteCache().List(t.Context(), "remote", "", store.Page{})
+	entries, _, err := w.rt.Store.RemoteCache().List(t.Context(), "remote", "", store.Page{})
 	if err != nil || len(entries) != 0 {
 		t.Fatal("no-store populated cache", entries, err)
 	}
@@ -339,7 +339,7 @@ func TestAccRegistryRemoteRejectsInvalidIndexChildren(t *testing.T) {
 			if got.Code == 200 {
 				t.Fatal("invalid index published")
 			}
-			if _, err := w.rt.store.Items().
+			if _, err := w.rt.Store.Items().
 				Get(t.Context(), "remote", true, "team/image/bad/manifest.json"); err == nil {
 				t.Fatal("invalid index item published")
 			}

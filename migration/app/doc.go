@@ -37,7 +37,7 @@
 //
 // # Invariants
 //
-//   - openRuntime opens the store, which applies pending migrations, seeds
+//   - OpenRuntime opens the store, which applies pending migrations, seeds
 //     the built-in principals and applies the bootstrap, then opens the
 //     token service, the authenticator, both blob tiers, the garbage
 //     collector and the work queue, builds the modules, registers the
@@ -61,7 +61,7 @@
 //   - Decision 0016: docs/research/decisions/0016-observability-and-health.md
 //     (the structured log, which the HTTP server's error log joins).
 //   - Decision 0033: docs/research/decisions/0033-persistent-work-queue.md
-//     (the work queue that openRuntime starts).
+//     (the work queue that OpenRuntime starts).
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md
 //     (app is the composition root and may import any package).
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
@@ -83,7 +83,7 @@
 //
 // The tests start the runtime from a configuration as serve would, each
 // beside the file it tests: run_test.go covers Run; runtime_test.go
-// openRuntime, its loops and close; platform_test.go Keyring, OpenStore,
+// OpenRuntime, its loops and Close; platform_test.go Keyring, OpenStore,
 // Migrate, RotateKeys, the blob tiers and their mirrors; modules_test.go
 // buildModules and the token service; seed_test.go and bootstrap_test.go
 // the first start and config apply; serverlog_test.go the HTTP server's

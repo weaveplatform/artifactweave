@@ -44,7 +44,7 @@
 //   - New does no I/O: it binds and builds, and the store, the network and
 //     the file system are reached only by the methods app calls after it.
 //     It refuses only Deps without a store.
-//   - app calls RegisterWork, OpenRemoteSources and Start in openRuntime's
+//   - app calls RegisterWork, OpenRemoteSources and Start in OpenRuntime's
 //     order, after the work queue opens and before it runs: a work kind with
 //     no handler waits (decision 0033), and the loops must start last so a
 //     failed start closes everything it opened.
@@ -116,6 +116,6 @@
 //     path's error, a failed start that opens nothing and leaves the policy
 //     key and its lease as they were, and the remote reads' fences refusing
 //     a read that no longer stands.
-//   - app's tests start the module through openRuntime, and its remote
+//   - app's tests start the module through OpenRuntime, and its remote
 //     suites read remote content through it.
 package artifacts

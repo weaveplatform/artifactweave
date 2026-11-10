@@ -17,9 +17,10 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
-// authHash is the password hashing cost: the zero value, the production
-// parameters, everywhere but this package's tests, which lower it in an init
-// (hash_test.go). No configuration reaches it.
+// authHash is the password hashing cost OpenRuntime uses when its options
+// set none: the zero value, the production parameters, everywhere but this
+// package's tests, which lower it in an init (hash_test.go). No
+// configuration reaches it.
 var authHash authn.HashParams
 
 // InitialPasswordFile is where the first start writes a generated admin
@@ -29,11 +30,12 @@ const InitialPasswordFile = "initial-admin-password"
 
 // seedPrincipals creates the built-in principals on first start (decision
 // 0005). The admin password is bootstrap.admin_password, or a generated one
-// written to InitialPasswordFile.
+// written to InitialPasswordFile, hashed at cost.
 func seedPrincipals(
 	ctx context.Context,
 	cfg config.Config,
 	st store.Store,
+	cost authn.HashParams,
 	log *slog.Logger,
 ) error {
 	seeded, err := authn.Seeded(ctx, st)
@@ -58,7 +60,7 @@ func seedPrincipals(
 			return fmt.Errorf("seed: %w", err)
 		}
 	}
-	hash, err := authn.HashPasswordWith(authHash, password)
+	hash, err := authn.HashPasswordWith(cost, password)
 	if err != nil {
 		return fmt.Errorf("seed: %w", err)
 	}

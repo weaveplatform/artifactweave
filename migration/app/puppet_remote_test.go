@@ -88,7 +88,7 @@ func TestAccPuppetRemoteCacheRefreshOfflineAndIntegrity(t *testing.T) {
 	w.c.RetrievalCachePeriodSecs = new(1)
 	w.c.AssumedOfflinePeriodSecs = new(0)
 	w.update()
-	service := item.Service{Store: w.rt.store, Blobs: w.rt.blobs, Formats: ecosystem.For}
+	service := item.Service{Store: w.rt.Store, Blobs: w.rt.Blobs, Formats: ecosystem.For}
 	if _, err := service.Zap(
 		t.Context(),
 		item.Target{Repo: w.c, Cached: true, Path: "v3/releases"},
@@ -118,7 +118,7 @@ func TestAccPuppetRegisteredRoutesAndReindex(t *testing.T) {
 	w := newRemoteWorld(t)
 	data := repopath.Read(t, "test/acceptance/fixtures/puppet/acme-widget-1.0.0.tar.gz")
 	c := *repo.Defaults(&repo.Config{Key: "puppet", Class: repo.Local, PackageType: repo.Puppet})
-	if err := w.rt.store.Repos().Create(t.Context(), c); err != nil {
+	if err := w.rt.Store.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
 	path := "/artifactory/puppet/acme-widget/acme-widget-1.0.0.tar.gz"

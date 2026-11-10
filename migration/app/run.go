@@ -51,7 +51,7 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 func run(ctx context.Context, cfg config.Config, log *slog.Logger, ready chan<- string) error {
 	// The store opens first, so migrations finish before the port accepts
 	// a request.
-	rt, err := openRuntime(ctx, cfg, log)
+	rt, err := OpenRuntime(ctx, cfg, log, RuntimeOptions{})
 	if err != nil {
 		return fmt.Errorf("start: %w", err)
 	}
@@ -60,17 +60,17 @@ func run(ctx context.Context, cfg config.Config, log *slog.Logger, ready chan<- 
 	// recorded.
 	closeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), drain)
 	defer cancel()
-	return errors.Join(err, rt.close(closeCtx))
+	return errors.Join(err, rt.Close(closeCtx))
 }
 
 func serve(
 	ctx context.Context,
 	cfg config.Config,
 	log *slog.Logger,
-	rt *runtime,
+	rt *Runtime,
 	ready chan<- string,
 ) error {
-	limits, err := apilimit.New(rt.store, cfg.API, nil)
+	limits, err := apilimit.New(rt.Store, cfg.API, nil)
 	if err != nil {
 		return fmt.Errorf("configure API limits: %w", err)
 	}
@@ -91,20 +91,20 @@ func serve(
 	srv := &http.Server{
 		Handler: newHandler(server.Config{
 			RequestLimits: limits,
-			Keys:          rt.keys,
+			Keys:          rt.Keys,
 			BaseURL:       cfg.BaseURL,
 			CompatVersion: cfg.Compat.ArtifactoryVersion,
 			Revision:      buildinfo.Version(),
 			Logger:        log,
-			Store:         rt.store,
-			Blobs:         rt.blobs,
+			Store:         rt.Store,
+			Blobs:         rt.Blobs,
 			ColdBlobs:     rt.coldBlobs,
-			Auth:          rt.auth,
+			Auth:          rt.Auth,
 			GC:            art.GC(),
 			BlobLocation:  rt.location,
 			Mirrors:       rt.mirrorsAdmin(),
 			Multipart:     rt.multipart,
-			Tokens:        rt.tokens,
+			Tokens:        rt.Tokens,
 			Access:        accessAPI,
 			Configuration: rt.modules.configuration.API(),
 			Redirect: itemkit.Redirect{
@@ -132,7 +132,7 @@ func serve(
 			CranArchiveMoverEnabled:        artifactsSettings.CranArchiveMoverEnabled,
 			HuggingFaceXetEnabled:          artifactsSettings.HuggingFaceXetEnabled,
 			GlobalEnvironmentLimit:         accessAPI.Settings.GlobalEnvironmentLimit,
-			Work:                           rt.work,
+			Work:                           rt.Work,
 			RemoteHTTP:                     art.RemoteHTTP(),
 			RemoteSources:                  art.RemoteSources(),
 			RegistrySources:                art.RegistrySources(),
@@ -142,7 +142,7 @@ func serve(
 		BaseContext:       func(net.Listener) context.Context { return reqCtx },
 		ErrorLog:          stdlog.New(serverLog{log}, "", 0),
 	}
-	logSigning(ctx, log, rt.store, rt.blobs)
+	logSigning(ctx, log, rt.Store, rt.Blobs)
 	log.Info("artifactweave listening",
 		"addr", ln.Addr().String(),
 		"version", buildinfo.Version(),

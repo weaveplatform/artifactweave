@@ -58,7 +58,7 @@ func TestAccMappedMavenDescriptorDownloadAndAliasDenial(t *testing.T) {
 				"",
 			)
 			remoteStatus(t, got, http.StatusBadGateway)
-			if _, err := w.rt.store.Items().
+			if _, err := w.rt.Store.Items().
 				Get(t.Context(), w.c.Key, true, "org.acme/app/ivy-2.0.xml"); !errors.Is(
 				err,
 				store.ErrNotFound,
@@ -74,17 +74,17 @@ func mappedRuntimeRequest(
 	w *remoteWorld,
 ) (context.Context, source.Request, *remote.Discovery) {
 	t.Helper()
-	p, err := w.rt.auth.Basic(t.Context(), "reader", "pw")
+	p, err := w.rt.Auth.Basic(t.Context(), "reader", "pw")
 	if err != nil {
 		t.Fatal(err)
 	}
-	authorizer := accesstest.Over(t, w.rt.store).API().Authorizer
+	authorizer := accesstest.Over(t, w.rt.Store).API().Authorizer
 	p, decider, err := authorizer.Authorize(t.Context(), p, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	d, err := remote.NewDiscovery(t.Context(), &item.Service{
-		Store: w.rt.store, Formats: ecosystem.For,
+		Store: w.rt.Store, Formats: ecosystem.For,
 	}, w.c)
 	if err != nil {
 		t.Fatal(err)
@@ -106,7 +106,7 @@ func TestAccMappedRootRuntimePublicationAndDeliveryFences(t *testing.T) {
 			t.Run(fmt.Sprint(noStore, "/fetch=", duringFetch), func(t *testing.T) {
 				w := newMavenRemoteWorld(t)
 				const custom = "filename-discovery"
-				if err := w.rt.store.Configs().
+				if err := w.rt.Store.Configs().
 					Put(t.Context(), types.ConfigDocument{Kind: types.ConfigLayout, Key: custom, Document: json.RawMessage(`{"artifactPathPattern":"[org]/[module]-[baseRev].[ext]"}`)}); err != nil {
 					t.Fatal(err)
 				}
@@ -152,14 +152,14 @@ func TestAccMappedRootRuntimePublicationAndDeliveryFences(t *testing.T) {
 				} else if err := <-done; err != nil {
 					t.Fatal(err)
 				}
-				permission, err := w.rt.store.Permissions().Get(t.Context(), "remote-read")
+				permission, err := w.rt.Store.Permissions().Get(t.Context(), "remote-read")
 				if err != nil {
 					t.Fatal(err)
 				}
 				r := permission.Resources[types.ResourceArtifact]
 				r.Targets[w.c.Key] = types.Target{Include: []string{"org.acme/app-1.0.jar"}}
 				permission.Resources[types.ResourceArtifact] = r
-				if err = w.rt.store.Permissions().Update(t.Context(), permission); err != nil {
+				if err = w.rt.Store.Permissions().Update(t.Context(), permission); err != nil {
 					t.Fatal(err)
 				}
 				gate.Release()

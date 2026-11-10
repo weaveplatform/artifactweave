@@ -43,7 +43,7 @@ func conanRemoteArchive(t *testing.T, entries map[string]string) []byte {
 func TestAccConanRemoteCacheIntegrityAndOffline(t *testing.T) {
 	w := newRemoteWorld(t)
 	c := *repo.Defaults(&repo.Config{Key: "conan-up", Class: repo.Remote, PackageType: repo.Conan, URL: w.up.URL})
-	if err := w.rt.store.Repos().Create(t.Context(), c); err != nil {
+	if err := w.rt.Store.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
 	base := "/v2/conans/hello/1.0/_/_/revisions/abc"
@@ -91,7 +91,7 @@ func TestAccConanRemoteCacheIntegrityAndOffline(t *testing.T) {
 		t.Fatalf("cached read changed: %d %s", got.Code, got.Body)
 	}
 	c.Offline = new(true)
-	if err := w.rt.store.Repos().Update(t.Context(), c); err != nil {
+	if err := w.rt.Store.Repos().Update(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
 	w.up.Delete(base + "/files/conanfile.py")
@@ -105,7 +105,7 @@ func TestAccConanRemoteCacheIntegrityAndOffline(t *testing.T) {
 		t.Fatalf("offline cached revision metadata: %d %s", got.Code, got.Body)
 	}
 	c.Offline = new(false)
-	if err := w.rt.store.Repos().Update(t.Context(), c); err != nil {
+	if err := w.rt.Store.Repos().Update(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
 	bad := "/v2/conans/hello/1.0/_/_/revisions/bad"
@@ -141,7 +141,7 @@ func TestAccConanRemoteCacheIntegrityAndOffline(t *testing.T) {
 func TestAccConanRemoteArchiveIntegrity(t *testing.T) {
 	w := newRemoteWorld(t)
 	c := *repo.Defaults(&repo.Config{Key: "conan-archive", Class: repo.Remote, PackageType: repo.Conan, URL: w.up.URL})
-	if err := w.rt.store.Repos().Create(t.Context(), c); err != nil {
+	if err := w.rt.Store.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
 	sum := func(data string) string {

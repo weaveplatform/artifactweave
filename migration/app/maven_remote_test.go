@@ -90,11 +90,11 @@ func TestAccMavenRemoteMetadataArtifactsAndOutage(t *testing.T) {
 		w.request("GET", "/artifactory/remote/org/acme/app/1.0/app-1.0.jar.sha1", "reader", ""),
 		200,
 	)
-	items := &item.Service{Store: w.rt.store, Blobs: w.rt.blobs, Formats: ecosystem.For}
+	items := &item.Service{Store: w.rt.Store, Blobs: w.rt.Blobs, Formats: ecosystem.For}
 	if err := items.Reindex(t.Context(), w.c); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := w.rt.store.Items().
+	if _, err := w.rt.Store.Items().
 		Get(t.Context(), w.c.Key, true, "org/acme/app/maven-metadata.xml"); !errors.Is(
 		err,
 		store.ErrNotFound,
@@ -174,7 +174,7 @@ func TestAccMavenRemoteSnapshotAndReleaseResolution(t *testing.T) {
 	nonunique := "org/acme/old/1.0-SNAPSHOT/old-1.0-SNAPSHOT.jar"
 	mavenSource(w, nonunique, sourceJAR(t, "nonunique"), "application/java-archive")
 	remoteStatus(t, w.request("GET", "/artifactory/remote/"+nonunique, "reader", ""), 200)
-	if _, err := w.rt.store.Items().Get(t.Context(), w.c.Key, true, nonunique); err != nil {
+	if _, err := w.rt.Store.Items().Get(t.Context(), w.c.Key, true, nonunique); err != nil {
 		t.Fatal("mutable binary not stored as item", err)
 	}
 	mavenSource(
@@ -228,7 +228,7 @@ func TestAccMavenRemoteDenialsAndAdmission(t *testing.T) {
 					},
 				)
 				remoteStatus(t, w.request("GET", "/artifactory/remote/"+p, "reader", ""), 502)
-				if _, err := w.rt.store.Items().
+				if _, err := w.rt.Store.Items().
 					Get(t.Context(), w.c.Key, true, p); !errors.Is(
 					err,
 					store.ErrNotFound,
@@ -333,7 +333,7 @@ func TestAccMavenRemoteEagerCompanionsAndRetention(t *testing.T) {
 		mavenSource(w, p, sourceJAR(t, fmt.Sprint(i)), "application/java-archive")
 		remoteStatus(t, w.request("GET", "/artifactory/remote/"+p, "reader", ""), 200)
 	}
-	items := &item.Service{Store: w.rt.store, Blobs: w.rt.blobs, Formats: ecosystem.For}
+	items := &item.Service{Store: w.rt.Store, Blobs: w.rt.Blobs, Formats: ecosystem.For}
 	if err := (maven.Handler{}).Work(
 		t.Context(),
 		items.Env(),
@@ -341,7 +341,7 @@ func TestAccMavenRemoteEagerCompanionsAndRetention(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := w.rt.store.Items().
+	if _, err := w.rt.Store.Items().
 		Get(t.Context(), w.c.Key, true, "org/acme/snap/1.0-SNAPSHOT/snap-1.0-20261021.120001-1.jar"); !errors.Is(
 		err,
 		store.ErrNotFound,
@@ -386,15 +386,15 @@ func TestAccMavenFamilyLayoutRequests(t *testing.T) {
 			if !bytes.Equal(res.Body.Bytes(), jar) || w.up.Count("GET", "/"+tc.origin) != 1 {
 				t.Fatal("layout resolution", w.up.Requests())
 			}
-			if _, err := w.rt.store.Items().
+			if _, err := w.rt.Store.Items().
 				Get(t.Context(), w.c.Key, true, tc.request); err != nil {
 				t.Fatal("canonical cache path lost", err)
 			}
-			items := &item.Service{Store: w.rt.store, Blobs: w.rt.blobs, Formats: ecosystem.For}
+			items := &item.Service{Store: w.rt.Store, Blobs: w.rt.Blobs, Formats: ecosystem.For}
 			if err := items.Reindex(t.Context(), w.c); err != nil {
 				t.Fatal(err)
 			}
-			pkg, err := w.rt.store.Packages().Find(t.Context(), w.c.Key, "org.acme:app")
+			pkg, err := w.rt.Store.Packages().Find(t.Context(), w.c.Key, "org.acme:app")
 			if err != nil || pkg.ID == 0 {
 				t.Fatal("fetched content not indexed", err)
 			}
@@ -417,18 +417,18 @@ func TestAccMavenCompanionSurvivesRuntimeRestart(t *testing.T) {
 	cfg := testConfig(t)
 	cfg.Bootstrap.AdminPassword = "pw"
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	rt, err := openRuntime(t.Context(), cfg, log)
+	rt, err := OpenRuntime(t.Context(), cfg, log, RuntimeOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
-		if err := rt.close(context.Background()); err != nil {
+		if err := rt.Close(context.Background()); err != nil {
 			t.Error(err)
 		}
 	}()
 	up := fakeupstream.New(t, fakeupstream.Options{})
 	c := *repo.Defaults(&repo.Config{Key: "maven", Class: repo.Remote, PackageType: repo.Maven, URL: up.URL, FetchJarsEagerly: new(true)})
-	if err = rt.store.Repos().Create(t.Context(), c); err != nil {
+	if err = rt.Store.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
 	p := "org/acme/app/1.0/app-1.0"
@@ -443,9 +443,9 @@ func TestAccMavenCompanionSurvivesRuntimeRestart(t *testing.T) {
 	rt.modules.artifacts.MavenEager().Close()
 	h := server.New(
 		server.Config{
-			Store:         rt.store,
-			Blobs:         rt.blobs,
-			Auth:          rt.auth,
+			Store:         rt.Store,
+			Blobs:         rt.Blobs,
+			Auth:          rt.Auth,
 			RemoteSources: rt.modules.artifacts.RemoteSources(),
 			Logger:        log,
 		},
@@ -455,7 +455,7 @@ func TestAccMavenCompanionSurvivesRuntimeRestart(t *testing.T) {
 	response := httptest.NewRecorder()
 	h.ServeHTTP(response, r)
 	remoteStatus(t, response, 200)
-	stats, err := rt.store.WorkQueue().Stats(t.Context())
+	stats, err := rt.Store.WorkQueue().Stats(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -468,10 +468,10 @@ func TestAccMavenCompanionSurvivesRuntimeRestart(t *testing.T) {
 	if !found || up.Count("GET", "/"+p+".jar") != 0 {
 		t.Fatal("companion not durably pending", stats)
 	}
-	if err = rt.close(t.Context()); err != nil {
+	if err = rt.Close(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	rt, err = openRuntime(t.Context(), cfg, log)
+	rt, err = OpenRuntime(t.Context(), cfg, log, RuntimeOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -480,7 +480,7 @@ func TestAccMavenCompanionSurvivesRuntimeRestart(t *testing.T) {
 	tick := time.NewTicker(5 * time.Millisecond)
 	defer tick.Stop()
 	for {
-		if _, err = rt.store.Items().Get(deadline, "maven", true, p+".jar"); err == nil {
+		if _, err = rt.Store.Items().Get(deadline, "maven", true, p+".jar"); err == nil {
 			break
 		}
 		select {
@@ -563,7 +563,7 @@ func TestAccMavenColdChecksumHeadDoesNotAdmitOwner(t *testing.T) {
 	if w.up.Count("GET", "") != 0 {
 		t.Fatal("HEAD fetched body", w.up.Requests())
 	}
-	if _, err := w.rt.store.Items().
+	if _, err := w.rt.Store.Items().
 		Get(t.Context(), w.c.Key, true, p); !errors.Is(
 		err,
 		store.ErrNotFound,
@@ -586,7 +586,7 @@ func TestAccMavenUpstreamNoStoreDoesNotScheduleCompanion(t *testing.T) {
 	)
 	w.up.Set("/"+p+".jar", fakeupstream.Resource{Body: sourceJAR(t, "must not fetch")})
 	remoteStatus(t, w.request("GET", "/artifactory/remote/"+p+".pom", "reader", ""), 200)
-	stats, err := w.rt.store.WorkQueue().Stats(t.Context())
+	stats, err := w.rt.Store.WorkQueue().Stats(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}

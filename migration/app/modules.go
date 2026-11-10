@@ -28,7 +28,7 @@ type modules struct {
 	configuration *configuration.Module
 }
 
-// moduleDeps is what openRuntime opens before the modules and buildModules
+// moduleDeps is what OpenRuntime opens before the modules and buildModules
 // builds them over.
 type moduleDeps struct {
 	store store.Store
@@ -36,7 +36,7 @@ type moduleDeps struct {
 	keys *crypt.Keyring
 	// auth and tokens are the authenticator and the token service that the
 	// access module binds. Opening them reads the store and crypto/rand, so
-	// openRuntime opens them at their places in the start-up order, before
+	// OpenRuntime opens them at their places in the start-up order, before
 	// the blob tiers.
 	auth   *authn.Authenticator
 	tokens *token.Service
@@ -52,7 +52,7 @@ type moduleDeps struct {
 // buildModules builds the access, artifacts and configuration modules over
 // d with cfg's settings, in that order, each over the APIs of the ones
 // before it. The constructors do no I/O, so building them once the work
-// queue is open moves none of openRuntime's I/O; a constructor's refusal is
+// queue is open moves none of OpenRuntime's I/O; a constructor's refusal is
 // returned wrapped with its module's name.
 func buildModules(cfg config.Config, d moduleDeps) (modules, error) {
 	acc, err := access.New(access.Deps{
@@ -89,17 +89,18 @@ func buildModules(cfg config.Config, d moduleDeps) (modules, error) {
 	return modules{access: acc, artifacts: art, configuration: conf}, nil
 }
 
-// tokenKeyBits is the access-token RSA key size; zero means the production
-// size. Tests set a small one so every runtime they open stays cheap.
+// tokenKeyBits is the access-token RSA key size OpenRuntime uses when its
+// options set none; zero means the production size. Tests set a small one
+// so every runtime they open stays cheap.
 var tokenKeyBits int
 
 // openTokens creates the instance identity when missing and the token
-// service over it, which creates the first signing key.
-func openTokens(ctx context.Context, st store.Store) (*token.Service, error) {
+// service over it, which creates the first signing key of keyBits bits.
+func openTokens(ctx context.Context, st store.Store, keyBits int) (*token.Service, error) {
 	if err := instance.EnsureInstance(ctx, st); err != nil {
 		return nil, err //nolint:wrapcheck // EnsureInstance's errors start "instance identity:"
 	}
-	tokens, err := token.New(ctx, st, token.Options{KeyBits: tokenKeyBits})
+	tokens, err := token.New(ctx, st, token.Options{KeyBits: keyBits})
 	if err != nil {
 		return nil, fmt.Errorf("access tokens: %w", err)
 	}

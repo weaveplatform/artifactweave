@@ -143,37 +143,37 @@ func TestAccBootstrapDescriptorAppliesOnce(t *testing.T) {
 	)
 	var logs bytes.Buffer
 	log := slog.New(slog.NewTextHandler(&logs, nil))
-	rt, err := openRuntime(ctx, cfg, log)
+	rt, err := OpenRuntime(ctx, cfg, log, RuntimeOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := rt.store.Repos().Get(ctx, "boot-local"); err != nil {
+	if _, err := rt.Store.Repos().Get(ctx, "boot-local"); err != nil {
 		t.Fatalf("bootstrap repository: %v", err)
 	}
 	var marker bootstrapMarker
-	if err := rt.store.Settings().Get(ctx, types.SettingBootstrapDescriptor, &marker); err != nil ||
+	if err := rt.Store.Settings().Get(ctx, types.SettingBootstrapDescriptor, &marker); err != nil ||
 		marker.File != cfg.Bootstrap.Descriptor || len(marker.SHA256) != 64 {
 		t.Fatalf("marker %+v %v", marker, err)
 	}
 	// An operator deletes the repository; a later start must not bring it
 	// back, even with a changed file.
-	if err := rt.store.Repos().Delete(ctx, "boot-local"); err != nil {
+	if err := rt.Store.Repos().Delete(ctx, "boot-local"); err != nil {
 		t.Fatal(err)
 	}
-	if err := rt.close(ctx); err != nil {
+	if err := rt.Close(ctx); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(cfg.Bootstrap.Descriptor,
 		[]byte("localRepositories:\n  later-local:\n    type: generic\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	rt, err = openRuntime(ctx, cfg, log)
+	rt, err = OpenRuntime(ctx, cfg, log, RuntimeOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = rt.close(ctx) }()
+	defer func() { _ = rt.Close(ctx) }()
 	for _, key := range []string{"boot-local", "later-local"} {
-		if _, err := rt.store.Repos().Get(ctx, key); !errors.Is(err, store.ErrNotFound) {
+		if _, err := rt.Store.Repos().Get(ctx, key); !errors.Is(err, store.ErrNotFound) {
 			t.Fatalf("the bootstrap descriptor was applied again: %s: %v", key, err)
 		}
 	}
@@ -196,10 +196,11 @@ func TestAccBootstrapDescriptorFailureStopsStart(t *testing.T) {
 		if body != "" {
 			cfg.Bootstrap.Descriptor = writeFile(t, body)
 		}
-		if _, err := openRuntime(
+		if _, err := OpenRuntime(
 			ctx,
 			cfg,
 			slog.New(slog.NewTextHandler(io.Discard, nil)),
+			RuntimeOptions{},
 		); err == nil ||
 			!strings.Contains(err.Error(), "bootstrap descriptor") {
 			t.Errorf("%s: %v", name, err)
@@ -208,7 +209,7 @@ func TestAccBootstrapDescriptorFailureStopsStart(t *testing.T) {
 	// The descriptor package's own error survives the wrapping.
 	cfg := testConfig(t)
 	cfg.Bootstrap.Descriptor = writeFile(t, "proxies: 3\n")
-	if _, err := openRuntime(ctx, cfg, slog.Default()); err == nil ||
+	if _, err := OpenRuntime(ctx, cfg, slog.Default(), RuntimeOptions{}); err == nil ||
 		!strings.Contains(err.Error(), descriptor.ErrInvalid.Error()) {
 		t.Fatalf("invalid descriptor: %v", err)
 	}

@@ -28,11 +28,11 @@ func newCondaRemoteWorld(t *testing.T) (*remoteWorld, map[string][]byte, string)
 	w.update()
 	w.h = server.New(
 		server.Config{
-			Store:          w.rt.store,
-			Blobs:          w.rt.blobs,
-			Auth:           w.rt.auth,
-			Tokens:         w.rt.tokens,
-			Keys:           w.rt.keys,
+			Store:          w.rt.Store,
+			Blobs:          w.rt.Blobs,
+			Auth:           w.rt.Auth,
+			Tokens:         w.rt.Tokens,
+			Keys:           w.rt.Keys,
 			RemoteSources:  w.rt.modules.artifacts.RemoteSources(),
 			RemoteHTTP:     w.rt.modules.artifacts.RemoteHTTP(),
 			Logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
@@ -79,7 +79,7 @@ func TestAccCondaShardRemoteCacheRefreshAndOffline(t *testing.T) {
 	if w.up.Count("GET", "/noarch/"+shard) != 1 {
 		t.Fatal("shard was not reused from cache")
 	}
-	entries, _, err := w.rt.store.RemoteCache().
+	entries, _, err := w.rt.Store.RemoteCache().
 		List(t.Context(), "remote", "noarch/"+shard, store.Page{Limit: 100})
 	if err != nil || len(entries) != 1 || entries[0].Blob.Checksums.SHA256 == "" {
 		t.Fatalf("validated shard not cached: %+v %v", entries, err)
@@ -184,7 +184,7 @@ func TestAccCondaInvalidShardNeverPublishesCacheOrFallsBack(t *testing.T) {
 			if response.Code == 200 {
 				t.Fatal("invalid shard returned success")
 			}
-			entries, _, err := w.rt.store.RemoteCache().
+			entries, _, err := w.rt.Store.RemoteCache().
 				List(t.Context(), "remote", "noarch/"+shard, store.Page{Limit: 100})
 			if err != nil {
 				t.Fatal(err)
@@ -226,7 +226,7 @@ func TestAccCondaShardFetchRechecksPermissionAndRepositoryRevision(t *testing.T)
 			}
 			switch mutation {
 			case "permission":
-				if err := w.rt.store.Permissions().Delete(t.Context(), "remote-read"); err != nil {
+				if err := w.rt.Store.Permissions().Delete(t.Context(), "remote-read"); err != nil {
 					t.Fatal(err)
 				}
 			case "source":
@@ -245,7 +245,7 @@ func TestAccCondaShardFetchRechecksPermissionAndRepositoryRevision(t *testing.T)
 			case <-time.After(10 * time.Second):
 				t.Fatal("request did not stop")
 			}
-			entries, _, err := w.rt.store.RemoteCache().
+			entries, _, err := w.rt.Store.RemoteCache().
 				List(t.Context(), "remote", "noarch/"+shard, store.Page{Limit: 100})
 			if err != nil {
 				t.Fatal(err)

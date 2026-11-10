@@ -115,7 +115,7 @@ func TestAccRegistryRemoteRevocationDuringFetch(t *testing.T) {
 			w := registryWorld(t)
 			var parent string
 			if strings.HasPrefix(mutation, "parent") {
-				issued, err := w.rt.tokens.Issue(
+				issued, err := w.rt.Tokens.Issue(
 					t.Context(),
 					token.Request{
 						Username:  "reader",
@@ -128,7 +128,7 @@ func TestAccRegistryRemoteRevocationDuringFetch(t *testing.T) {
 				}
 				parent = issued.Record.ID
 			}
-			issued, err := w.rt.tokens.IssueRegistry(
+			issued, err := w.rt.Tokens.IssueRegistry(
 				t.Context(),
 				token.RegistryRequest{
 					Username:  "reader",
@@ -169,9 +169,9 @@ func TestAccRegistryRemoteRevocationDuringFetch(t *testing.T) {
 			}
 			switch mutation {
 			case "permission":
-				err = w.rt.store.Permissions().Delete(t.Context(), "remote-read")
+				err = w.rt.Store.Permissions().Delete(t.Context(), "remote-read")
 			case "user", "password":
-				u, e := w.rt.store.Users().Get(t.Context(), "reader")
+				u, e := w.rt.Store.Users().Get(t.Context(), "reader")
 				if e != nil {
 					t.Fatal(e)
 				}
@@ -180,16 +180,16 @@ func TestAccRegistryRemoteRevocationDuringFetch(t *testing.T) {
 				} else {
 					u.PasswordHash = []byte("changed")
 				}
-				err = w.rt.store.Users().Update(t.Context(), u)
+				err = w.rt.Store.Users().Update(t.Context(), u)
 			case "parent revoked", "parent expired":
-				p, e := w.rt.store.Tokens().Get(t.Context(), parent)
+				p, e := w.rt.Store.Tokens().Get(t.Context(), parent)
 				if e != nil {
 					t.Fatal(e)
 				}
-				err = w.rt.store.Tokens().Delete(t.Context(), parent)
+				err = w.rt.Store.Tokens().Delete(t.Context(), parent)
 				if err == nil && mutation == "parent expired" {
 					p.ExpiresAt = time.Now().Add(-time.Hour)
-					err = w.rt.store.Tokens().Create(t.Context(), p)
+					err = w.rt.Store.Tokens().Create(t.Context(), p)
 				}
 			case "source":
 				w.c.URL = w.up.URL + "/changed"
@@ -208,7 +208,7 @@ func TestAccRegistryRemoteRevocationDuringFetch(t *testing.T) {
 				t.Fatal("fetch did not finish")
 			}
 			h := strings.TrimPrefix(registryDigest(body), "sha256:")
-			if _, err = w.rt.store.Items().
+			if _, err = w.rt.Store.Items().
 				Get(t.Context(), "remote", true, layout.UploadPath("team/image", h)); !errors.Is(
 				err,
 				store.ErrNotFound,

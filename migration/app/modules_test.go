@@ -16,7 +16,7 @@ import (
 
 // buildModules over a store whose every call panics, because its embedded
 // store.Store is nil, succeeds: no constructor reads or writes anything, so
-// building the modules after the work queue moves none of openRuntime's I/O.
+// building the modules after the work queue moves none of OpenRuntime's I/O.
 // Without a store, the first constructor's refusal names its module.
 func TestUnitBuildModulesDoesNoIO(t *testing.T) {
 	mods, err := buildModules(config.Default(), moduleDeps{store: struct{ store.Store }{}})
@@ -39,38 +39,38 @@ func TestAccRuntimeTokens(t *testing.T) {
 	ctx := context.Background()
 	cfg := testConfig(t)
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	rt, err := openRuntime(ctx, cfg, log)
+	rt, err := OpenRuntime(ctx, cfg, log, RuntimeOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	id, err := rt.store.Instance().Get(ctx)
+	id, err := rt.Store.Instance().Get(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if types.ValidateInstanceID(id.InstanceID) != nil || rt.tokens.Issuer() == "" {
-		t.Fatalf("identity %q, issuer %q", id.InstanceID, rt.tokens.Issuer())
+	if types.ValidateInstanceID(id.InstanceID) != nil || rt.Tokens.Issuer() == "" {
+		t.Fatalf("identity %q, issuer %q", id.InstanceID, rt.Tokens.Issuer())
 	}
-	issued, err := rt.tokens.Issue(ctx, token.Request{Username: "admin"})
+	issued, err := rt.Tokens.Issue(ctx, token.Request{Username: "admin"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := rt.close(ctx); err != nil {
+	if err := rt.Close(ctx); err != nil {
 		t.Fatal(err)
 	}
-	rt, err = openRuntime(ctx, cfg, log)
+	rt, err = OpenRuntime(ctx, cfg, log, RuntimeOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = rt.close(ctx) }()
-	again, err := rt.store.Instance().Get(ctx)
+	defer func() { _ = rt.Close(ctx) }()
+	again, err := rt.Store.Instance().Get(ctx)
 	if err != nil || again.InstanceID != id.InstanceID {
 		t.Fatalf("identity changed: %q, %v", again.InstanceID, err)
 	}
-	keys, err := rt.store.Keys().SigningKeys(ctx)
+	keys, err := rt.Store.Keys().SigningKeys(ctx)
 	if err != nil || len(keys) != 1 {
 		t.Fatalf("signing keys %d, %v", len(keys), err)
 	}
-	if _, err := rt.tokens.Verify(ctx, issued.AccessToken); err != nil {
+	if _, err := rt.Tokens.Verify(ctx, issued.AccessToken); err != nil {
 		t.Fatalf("a token issued before the restart: %v", err)
 	}
 }
@@ -101,6 +101,7 @@ func TestAccOpenTokensWithoutIdentity(t *testing.T) {
 	if _, err := openTokens(
 		ctx,
 		instanceOf{inmem.New(), fakeInstance{getErr: store.ErrNotFound}},
+		tokenKeyBits,
 	); err == nil {
 		t.Fatal("tokens without an identity")
 	}

@@ -80,7 +80,7 @@ type Deps struct {
 
 // Module is the artifacts module as app holds it: its API, the item service
 // that runs the formats' derived work, and the remote runtimes that
-// OpenRemoteSources opens. app calls its methods in openRuntime's order
+// OpenRemoteSources opens. app calls its methods in OpenRuntime's order
 // from one goroutine; the services they open are safe for concurrent use.
 type Module struct {
 	store                 store.Store

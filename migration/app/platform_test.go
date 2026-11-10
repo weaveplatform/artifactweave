@@ -758,7 +758,7 @@ func TestAccOptimizeRunsRepairNow(t *testing.T) {
 	cfg := testConfig(t)
 	cfg.Blob = mirrorConfig()
 	ctx := context.Background()
-	rt, err := openRuntime(ctx, cfg, log)
+	rt, err := OpenRuntime(ctx, cfg, log, RuntimeOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -781,7 +781,7 @@ func TestAccOptimizeRunsRepairNow(t *testing.T) {
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	if err := rt.close(ctx); err != nil {
+	if err := rt.Close(ctx); err != nil {
 		t.Fatal(err)
 	}
 	// The store is closed, so the status queries fail.
@@ -792,11 +792,11 @@ func TestAccOptimizeRunsRepairNow(t *testing.T) {
 
 func TestAccNoMirrorNoAdmin(t *testing.T) {
 	ctx := context.Background()
-	rt, err := openRuntime(ctx, testConfig(t), slog.New(slog.DiscardHandler))
+	rt, err := OpenRuntime(ctx, testConfig(t), slog.New(slog.DiscardHandler), RuntimeOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = rt.close(ctx) })
+	t.Cleanup(func() { _ = rt.Close(ctx) })
 	if rt.mirrorsAdmin() != nil {
 		t.Fatal("an fs-only runtime reports mirrors")
 	}

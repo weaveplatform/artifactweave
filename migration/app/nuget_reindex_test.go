@@ -44,7 +44,7 @@ func TestAccNuGetRemoteReindexAPI(t *testing.T) {
 		}
 	}
 	assertReindexFeeds(t, w, "remote")
-	st := w.rt.store
+	st := w.rt.Store
 	it, err := st.Items().Get(t.Context(), w.c.Key, true, packagePath)
 	if err != nil {
 		t.Fatal(err)
@@ -99,7 +99,7 @@ func TestAccNuGetRemoteReindexAPI(t *testing.T) {
 	) {
 		t.Fatal("cache alias created independent work", err)
 	}
-	if err = w.rt.work.EnsureFresh(t.Context(), format.KindReindex, w.c.Key); err != nil {
+	if err = w.rt.Work.EnsureFresh(t.Context(), format.KindReindex, w.c.Key); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = st.WorkQueue().

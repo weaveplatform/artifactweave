@@ -49,7 +49,7 @@ func TestAccRuntimeRunsRepair(t *testing.T) {
 	cfg.Blob = mirrorConfig()
 	cfg.ColdBlob = config.Blob{BlobBackend: config.BlobBackend{Backend: "fs"}}
 	ctx := context.Background()
-	rt, err := openRuntime(ctx, cfg, log)
+	rt, err := OpenRuntime(ctx, cfg, log, RuntimeOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +64,7 @@ func TestAccRuntimeRunsRepair(t *testing.T) {
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	if err := rt.close(ctx); err != nil {
+	if err := rt.Close(ctx); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -83,7 +83,7 @@ func TestAccOpenRuntimeErrors(t *testing.T) {
 	} {
 		cfg := testConfig(t)
 		tune(&cfg)
-		if _, err := openRuntime(ctx, cfg, log); err == nil {
+		if _, err := OpenRuntime(ctx, cfg, log, RuntimeOptions{}); err == nil {
 			t.Errorf("%s: opened", name)
 		}
 	}
@@ -99,8 +99,8 @@ func TestAccOpenRuntimeErrors(t *testing.T) {
 
 func TestAccRuntimeCloseReportsStoreError(t *testing.T) {
 	boom := errors.New("boom")
-	rt := &runtime{stopLoops: func() {}, closeStore: func() error { return boom }}
-	if err := rt.close(context.Background()); !errors.Is(err, boom) ||
+	rt := &Runtime{stopLoops: func() {}, closeStore: func() error { return boom }}
+	if err := rt.Close(context.Background()); !errors.Is(err, boom) ||
 		!strings.HasPrefix(err.Error(), "close:") {
 		t.Fatalf("close = %v", err)
 	}
@@ -136,18 +136,23 @@ func TestAccRuntimeOnPostgresAndMinIO(t *testing.T) {
 			Bucket: "artifacts", Endpoint: minio.URL, Region: "us-east-1", PathStyle: true,
 		},
 	}}
-	rt, err := openRuntime(ctx, cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	rt, err := OpenRuntime(
+		ctx,
+		cfg,
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+		RuntimeOptions{},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		if err := rt.close(ctx); err != nil {
+		if err := rt.Close(ctx); err != nil {
 			t.Error(err)
 		}
 	})
 	body := blobtest.Content(42, 9<<20)
-	info := blobtest.Put(ctx, t, rt.blobs, body)
-	r, _, err := rt.blobs.Open(ctx, info.Digests.SHA256)
+	info := blobtest.Put(ctx, t, rt.Blobs, body)
+	r, _, err := rt.Blobs.Open(ctx, info.Digests.SHA256)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,7 +169,7 @@ func TestAccRuntimeRunsGC(t *testing.T) {
 	cfg := testConfig(t)
 	cfg.GC.Interval = 10 * time.Millisecond
 	ctx := context.Background()
-	rt, err := openRuntime(ctx, cfg, log)
+	rt, err := OpenRuntime(ctx, cfg, log, RuntimeOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,7 +183,7 @@ func TestAccRuntimeRunsGC(t *testing.T) {
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	if err := rt.close(ctx); err != nil {
+	if err := rt.Close(ctx); err != nil {
 		t.Fatal(err)
 	}
 }

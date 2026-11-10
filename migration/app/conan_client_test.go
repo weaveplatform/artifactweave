@@ -32,7 +32,7 @@ func TestAccConanRemoteClient(t *testing.T) {
 			origin := *repo.Defaults(&repo.Config{Key: "conan-origin", Class: repo.Local, PackageType: repo.Conan})
 			proxy := *repo.Defaults(&repo.Config{Key: "conan-proxy", Class: repo.Remote, PackageType: repo.Conan, URL: srv.URL + "/artifactory/api/conan/conan-origin", Username: "admin", Password: "pw"})
 			for _, c := range []repo.Config{origin, proxy} {
-				if err := w.rt.store.Repos().Create(t.Context(), c); err != nil {
+				if err := w.rt.Store.Repos().Create(t.Context(), c); err != nil {
 					t.Fatal(err)
 				}
 			}

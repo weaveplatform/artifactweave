@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/app/config"
+	"github.com/weaveplatform/artifactweave/migration/artifacts"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
@@ -37,34 +38,79 @@ var repairEvery = mirror.DefaultRepairInterval
 // work queue. It is a variable so tests can see the kit it is given.
 var registerDebianSnapshotWork = debianhttp.RegisterDebianSnapshotWork
 
-// runtime is what serve holds open: the metadata store, the blob tiers, the
+// Runtime is what serve holds open: the metadata store, the blob tiers, the
 // work queue, the modules, and the background loops (mirror repair, GC and
-// the work queue's workers).
-type runtime struct {
-	keys   *crypt.Keyring
-	store  store.Store
-	auth   *authn.Authenticator
-	tokens *token.Service // issues and verifies access tokens
+// the work queue's workers). OpenRuntime opens it and Close releases it.
+// Test support reads its exported fields to build a router over the stores
+// and modules serve would use.
+type Runtime struct {
+	// Keys is the master key's keyring, nil without a master key.
+	Keys *crypt.Keyring
+	// Store is the metadata store, with its pending migrations applied.
+	Store store.Store
+	// Auth authenticates requests against Store's users and Tokens.
+	Auth *authn.Authenticator
+	// Tokens issues and verifies access tokens.
+	Tokens *token.Service
+	// Artifacts is the artifacts module, whose remote sources, remote
+	// HTTP pool and registry sources serve hands the server.
+	Artifacts *artifacts.Module
 	// modules are the access, artifacts and configuration modules over
-	// store, auth and tokens; the server is given their APIs and the
+	// Store, Auth and Tokens; the server is given their APIs and the
 	// artifacts module's remote sources beside them.
-	modules          modules
-	closeStore       func() error
-	blobs, coldBlobs blob.Store
-	location         usage.Location
-	multipart        *multipart.Service
-	// work runs derived work after the changes that need it (decision 0033).
-	work      *work.Queue
+	modules    modules
+	closeStore func() error
+	// Blobs is the hot tier's blob store; coldBlobs is the cold tier's,
+	// nil when cold_blob configures none.
+	Blobs     blob.Store
+	coldBlobs blob.Store
+	location  usage.Location
+	multipart *multipart.Service
+	// Work runs derived work after the changes that need it (decision 0033).
+	Work      *work.Queue
 	mirrors   []*mirror.Store
 	admin     *mirrorAdmin
 	stopLoops context.CancelFunc
 	loops     sync.WaitGroup
 }
 
-// openRuntime opens the store (applying pending migrations), builds both
-// blob tiers and starts a repair loop for each mirror. On failure everything
-// opened so far is closed again.
-func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*runtime, error) {
+// RuntimeOptions tune what OpenRuntime builds; the zero value is
+// production. A zero field keeps the package default, which is
+// production's everywhere but app's own tests (hash_test.go).
+type RuntimeOptions struct {
+	// PasswordHash is the Argon2id cost of the seeded admin password and
+	// of the passwords the authenticator hashes. A lower cost than
+	// production's is safe in tests: verification reads the cost from
+	// each stored hash, so every password still checks, only sooner.
+	PasswordHash authn.HashParams
+	// TokenKeyBits is the RSA size of the access-token signing key the
+	// first start creates.
+	TokenKeyBits int
+}
+
+// withDefaults returns o with each zero field set to the package default.
+func (o RuntimeOptions) withDefaults() RuntimeOptions {
+	if o.PasswordHash == (authn.HashParams{}) {
+		o.PasswordHash = authHash
+	}
+	if o.TokenKeyBits == 0 {
+		o.TokenKeyBits = tokenKeyBits
+	}
+	return o
+}
+
+// OpenRuntime opens the store (applying pending migrations), builds both
+// blob tiers and the modules, and starts a repair loop for each mirror, the
+// garbage collector and the work queue's workers, with the costs opts sets.
+// On failure everything opened so far is closed again. The caller closes
+// the runtime with Close.
+func OpenRuntime(
+	ctx context.Context,
+	cfg config.Config,
+	log *slog.Logger,
+	opts RuntimeOptions,
+) (*Runtime, error) {
+	opts = opts.withDefaults()
 	settings := cfg.Artifacts()
 	keys, err := Keyring(cfg)
 	if err != nil {
@@ -74,18 +120,18 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	if err != nil {
 		return nil, err
 	}
-	if err := seedPrincipals(ctx, cfg, st, log); err != nil {
+	if err := seedPrincipals(ctx, cfg, st, opts.PasswordHash, log); err != nil {
 		return nil, errors.Join(err, st.Close())
 	}
 	if err := applyBootstrap(ctx, cfg, st, log); err != nil {
 		return nil, errors.Join(err, st.Close())
 	}
-	tokens, err := openTokens(ctx, st)
+	tokens, err := openTokens(ctx, st, opts.TokenKeyBits)
 	if err != nil {
 		return nil, errors.Join(err, st.Close())
 	}
 	authenticator, err := authn.NewAuthenticator(st.Users(), st.Settings(), authn.Options{
-		Hash: authHash, Tokens: tokens, Groups: st.Groups(),
+		Hash: opts.PasswordHash, Tokens: tokens, Groups: st.Groups(),
 		APIRestrictions: st.APIRestrictions(),
 	})
 	if err != nil {
@@ -158,18 +204,19 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	// The loops outlive startup's context and stop only through close, after
 	// the HTTP server has drained.
 	lctx, stop := context.WithCancel(context.WithoutCancel(ctx))
-	rt := &runtime{
-		keys:       keys,
-		store:      st,
-		auth:       authenticator,
-		tokens:     tokens,
+	rt := &Runtime{
+		Keys:       keys,
+		Store:      st,
+		Auth:       authenticator,
+		Tokens:     tokens,
+		Artifacts:  mods.artifacts,
 		modules:    mods,
 		closeStore: st.Close,
-		blobs:      hot.store,
+		Blobs:      hot.store,
 		coldBlobs:  cold.store,
 		location:   hotTier.location(),
 		multipart:  parts,
-		work:       queue,
+		Work:       queue,
 		stopLoops:  stop,
 	}
 	if err := art.OpenRemoteSources(ctx); err != nil {
@@ -216,10 +263,12 @@ func formatSettings(cfg config.Config, keys *crypt.Keyring) ecosystem.Settings {
 	return formats
 }
 
-// close stops the background loops, waits until ctx ends for mirror commits still
-// running after their quorum (so they are recorded rather than left pending
-// for the repair worker), and closes the store.
-func (rt *runtime) close(ctx context.Context) error {
+// Close stops the background loops, waits until ctx ends for mirror
+// commits still running after their quorum (so they are recorded rather
+// than left pending for the repair worker), and closes the store. It is
+// called once, after the HTTP server over the runtime has drained; the
+// error joins the mirrors' and the store's.
+func (rt *Runtime) Close(ctx context.Context) error {
 	rt.modules.artifacts.Close()
 	rt.stopLoops()
 	rt.loops.Wait()

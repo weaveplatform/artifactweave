@@ -43,7 +43,7 @@ func TestAccSeedGeneratesAdminPassword(t *testing.T) {
 	// JSON, so the test compares the logged path exactly on every OS.
 	log := slog.New(slog.NewJSONHandler(&logs, nil))
 	db := inmem.New()
-	if err := seedPrincipals(ctx, cfg, db, log); err != nil {
+	if err := seedPrincipals(ctx, cfg, db, authHash, log); err != nil {
 		t.Fatal(err)
 	}
 	path := filepath.Join(cfg.DataDir, InitialPasswordFile)
@@ -66,7 +66,7 @@ func TestAccSeedGeneratesAdminPassword(t *testing.T) {
 	if err := os.Remove(path); err != nil {
 		t.Fatal(err)
 	}
-	if err := seedPrincipals(ctx, cfg, db, log); err != nil {
+	if err := seedPrincipals(ctx, cfg, db, authHash, log); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
@@ -78,7 +78,7 @@ func TestAccSeedUsesConfiguredPassword(t *testing.T) {
 	cfg := testConfig(t)
 	cfg.Bootstrap.AdminPassword = "configured"
 	db := inmem.New()
-	if err := seedPrincipals(context.Background(), cfg, db, slog.Default()); err != nil {
+	if err := seedPrincipals(context.Background(), cfg, db, authHash, slog.Default()); err != nil {
 		t.Fatal(err)
 	}
 	if !adminPasswordIs(t, db, "configured") {
@@ -130,7 +130,7 @@ func TestAccSeedLostRaceRemovesPasswordFile(t *testing.T) {
 	h := &hidden{Store: db}
 	h.hide.Store(2) // our check and Seed's own check outside its transaction
 	cfg := testConfig(t)
-	if err := seedPrincipals(ctx, cfg, h, slog.Default()); err != nil {
+	if err := seedPrincipals(ctx, cfg, h, authHash, slog.Default()); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(cfg.DataDir, InitialPasswordFile)); !os.IsNotExist(err) {
@@ -151,7 +151,7 @@ func TestAccSeedErrors(t *testing.T) {
 
 	cfg := testConfig(t)
 	cfg.DataDir = filepath.Join(file, "data")
-	if err := seedPrincipals(ctx, cfg, inmem.New(), log); err == nil {
+	if err := seedPrincipals(ctx, cfg, inmem.New(), authHash, log); err == nil {
 		t.Error("an uncreatable data directory was not reported")
 	}
 
@@ -159,7 +159,7 @@ func TestAccSeedErrors(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(cfg.DataDir, InitialPasswordFile), 0o750); err != nil {
 		t.Fatal(err)
 	}
-	if err := seedPrincipals(ctx, cfg, inmem.New(), log); err == nil {
+	if err := seedPrincipals(ctx, cfg, inmem.New(), authHash, log); err == nil {
 		t.Error("an unwritable password file was not reported")
 	}
 
@@ -169,16 +169,16 @@ func TestAccSeedErrors(t *testing.T) {
 	}
 	cfg = testConfig(t)
 	cfg.Bootstrap.AdminPassword = "pw"
-	if err := seedPrincipals(ctx, cfg, db, log); err == nil {
+	if err := seedPrincipals(ctx, cfg, db, authHash, log); err == nil {
 		t.Error("a failed seed was not reported")
 	}
 
-	// openRuntime closes the store it opened when seeding fails.
+	// OpenRuntime closes the store it opened when seeding fails.
 	cfg = testConfig(t)
 	cfg.Database.DSN = filepath.Join(t.TempDir(), "aw.db")
 	cfg.DataDir = filepath.Join(file, "data")
-	if _, err := openRuntime(ctx, cfg, log); err == nil {
-		t.Error("openRuntime ignored a failed seed")
+	if _, err := OpenRuntime(ctx, cfg, log, RuntimeOptions{}); err == nil {
+		t.Error("OpenRuntime ignored a failed seed")
 	}
 }
 

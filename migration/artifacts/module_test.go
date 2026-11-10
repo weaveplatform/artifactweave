@@ -21,7 +21,7 @@ import (
 )
 
 // newModule builds the module over a fresh in-memory store and the real
-// access module, then opens its remote sources, as openRuntime does.
+// access module, then opens its remote sources, as OpenRuntime does.
 func newModule(t *testing.T) *Module {
 	t.Helper()
 	st := inmem.New()

@@ -70,7 +70,7 @@ func ApplyDescriptor(
 // configurationOver binds the configuration API over st alone, with the
 // artifacts and access contracts it applies through: config apply never
 // builds the modules, and the bootstrap descriptor is applied before
-// openRuntime builds them. Every contract is bound over st, the store whose
+// OpenRuntime builds them. Every contract is bound over st, the store whose
 // unit of work Apply writes in, so the anonymous access setting and the
 // repositories are written in Apply's transaction.
 func configurationOver(st store.Store) configapi.API {

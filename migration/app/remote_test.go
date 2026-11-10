@@ -32,7 +32,7 @@ const remotePolicyKeySetting = "remote.internal_policy_key"
 
 type remoteWorld struct {
 	t  *testing.T
-	rt *runtime
+	rt *Runtime
 	h  http.Handler
 	up *fakeupstream.Server
 	c  repo.Config
@@ -42,18 +42,23 @@ func newRemoteWorld(t *testing.T) *remoteWorld {
 	t.Helper()
 	cfg := testConfig(t)
 	cfg.Bootstrap.AdminPassword = "pw"
-	rt, err := openRuntime(t.Context(), cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	rt, err := OpenRuntime(
+		t.Context(),
+		cfg,
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+		RuntimeOptions{},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		if err := rt.close(context.Background()); err != nil {
+		if err := rt.Close(context.Background()); err != nil {
 			t.Error(err)
 		}
 	})
 	up := fakeupstream.New(t, fakeupstream.Options{})
 	c := *repo.Defaults(&repo.Config{Key: "remote", Class: repo.Remote, PackageType: repo.Generic, URL: up.URL})
-	if err = rt.store.Repos().Create(t.Context(), c); err != nil {
+	if err = rt.Store.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
 	hash, err := authn.HashPasswordWith(authHash, "pw")
@@ -61,12 +66,12 @@ func newRemoteWorld(t *testing.T) *remoteWorld {
 		t.Fatal(err)
 	}
 	for _, name := range []string{"reader", "denied"} {
-		if err = rt.store.Users().
+		if err = rt.Store.Users().
 			Create(t.Context(), types.User{Name: name, PasswordHash: hash}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err = rt.store.Permissions().
+	if err = rt.Store.Permissions().
 		Create(t.Context(), types.Permission{Name: "remote-read", Resources: map[types.ResourceType]types.Resource{
 			types.ResourceArtifact: {
 				Actions: types.Grants{Users: map[string]types.Actions{"reader": types.ActionRead}},
@@ -77,11 +82,11 @@ func newRemoteWorld(t *testing.T) *remoteWorld {
 	}
 	h := server.New(
 		server.Config{
-			Store:         rt.store,
-			Blobs:         rt.blobs,
-			Auth:          rt.auth,
-			Tokens:        rt.tokens,
-			Keys:          rt.keys,
+			Store:         rt.Store,
+			Blobs:         rt.Blobs,
+			Auth:          rt.Auth,
+			Tokens:        rt.Tokens,
+			Keys:          rt.Keys,
 			RemoteSources: rt.modules.artifacts.RemoteSources(),
 			RemoteHTTP:    rt.modules.artifacts.RemoteHTTP(),
 			Logger:        slog.New(slog.NewTextHandler(io.Discard, nil)),
@@ -116,7 +121,7 @@ func remoteStatus(t *testing.T, r *httptest.ResponseRecorder, code int) {
 
 func (w *remoteWorld) update() {
 	w.t.Helper()
-	if err := w.rt.store.Repos().Update(w.t.Context(), w.c); err != nil {
+	if err := w.rt.Store.Repos().Update(w.t.Context(), w.c); err != nil {
 		w.t.Fatal(err)
 	}
 }
@@ -153,7 +158,7 @@ func TestAccGenericRemoteDownloadLifecycle(t *testing.T) {
 		head.Header().Get("X-Checksum-Sha256") != digest {
 		t.Fatal(head.Header(), head.Body)
 	}
-	if _, err := w.rt.store.Items().
+	if _, err := w.rt.Store.Items().
 		Get(t.Context(), "remote", true, "a/file.bin"); !errors.Is(
 		err,
 		store.ErrNotFound,
@@ -165,7 +170,7 @@ func TestAccGenericRemoteDownloadLifecycle(t *testing.T) {
 	if part.Body.String() != body[3:9] {
 		t.Fatal(part.Body)
 	}
-	it, err := w.rt.store.Items().Get(t.Context(), "remote", true, "a/file.bin")
+	it, err := w.rt.Store.Items().Get(t.Context(), "remote", true, "a/file.bin")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -202,7 +207,7 @@ func TestAccGenericRemoteDownloadLifecycle(t *testing.T) {
 	if len(w.up.Requests()) != count {
 		t.Fatal("warm request fetched")
 	}
-	stats, err := w.rt.store.Items().Stats(t.Context(), it.ID)
+	stats, err := w.rt.Store.Items().Stats(t.Context(), it.ID)
 	if err != nil || stats.DownloadCount != 3 {
 		t.Fatalf("stats %+v %v", stats, err)
 	}
@@ -227,7 +232,7 @@ func TestAccGenericRemoteDownloadLifecycle(t *testing.T) {
 		t.Fatal(got.Body)
 	}
 	remoteStatus(t, w.request("DELETE", "/artifactory/api/repositories/remote", "admin", ""), 200)
-	if _, err = w.rt.store.RemoteCache().
+	if _, err = w.rt.Store.RemoteCache().
 		Source(t.Context(), "remote"); !errors.Is(
 		err,
 		store.ErrNotFound,
@@ -253,7 +258,7 @@ func TestAccGenericRemoteTransientSidecarsAndFailures(t *testing.T) {
 		304,
 	)
 	remoteStatus(t, w.request("GET", "/artifactory/remote-cache/file.bin", "reader", ""), 404)
-	if entries, _, err := w.rt.store.RemoteCache().
+	if entries, _, err := w.rt.Store.RemoteCache().
 		List(t.Context(), "remote", "", store.Page{}); err != nil ||
 		len(entries) != 0 {
 		t.Fatalf("transient entries %v %v", entries, err)
@@ -323,9 +328,9 @@ func TestAccGenericRemoteAuthorizationAndRevocation(t *testing.T) {
 			var err error
 			switch mutation {
 			case "permission":
-				err = w.rt.store.Permissions().Delete(t.Context(), "remote-read")
+				err = w.rt.Store.Permissions().Delete(t.Context(), "remote-read")
 			case "user", "password":
-				u, e := w.rt.store.Users().Get(t.Context(), "reader")
+				u, e := w.rt.Store.Users().Get(t.Context(), "reader")
 				if e != nil {
 					t.Fatal(e)
 				}
@@ -334,7 +339,7 @@ func TestAccGenericRemoteAuthorizationAndRevocation(t *testing.T) {
 				} else {
 					u.PasswordHash = []byte("replacement")
 				}
-				err = w.rt.store.Users().Update(t.Context(), u)
+				err = w.rt.Store.Users().Update(t.Context(), u)
 			case "source":
 				w.c.URL = w.up.URL + "/changed"
 				w.update()
@@ -355,7 +360,7 @@ func TestAccGenericRemoteAuthorizationAndRevocation(t *testing.T) {
 			if got.Code == 200 {
 				t.Fatal("revoked read succeeded")
 			}
-			if _, err = w.rt.store.Items().
+			if _, err = w.rt.Store.Items().
 				Get(t.Context(), "remote", true, "held.bin"); !errors.Is(
 				err,
 				store.ErrNotFound,
@@ -391,11 +396,11 @@ func TestAccGenericRemoteTraceFetchesWithoutDownload(t *testing.T) {
 		!strings.Contains(got.Body.String(), "Request succeeded") {
 		t.Fatal(got.Body)
 	}
-	it, err := w.rt.store.Items().Get(t.Context(), "remote", true, "trace.bin")
+	it, err := w.rt.Store.Items().Get(t.Context(), "remote", true, "trace.bin")
 	if err != nil {
 		t.Fatal(err)
 	}
-	stats, err := w.rt.store.Items().Stats(t.Context(), it.ID)
+	stats, err := w.rt.Store.Items().Stats(t.Context(), it.ID)
 	if err != nil || stats.DownloadCount != 0 {
 		t.Fatalf("trace counted %v %v", stats, err)
 	}
@@ -408,27 +413,27 @@ func TestAccGenericRemoteDefaultRestartKeepsCacheIdentity(t *testing.T) {
 	cfg := testConfig(t)
 	cfg.Bootstrap.AdminPassword = "pw"
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	rt, err := openRuntime(t.Context(), cfg, log)
+	rt, err := OpenRuntime(t.Context(), cfg, log, RuntimeOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
-		if err := rt.close(context.Background()); err != nil {
+		if err := rt.Close(context.Background()); err != nil {
 			t.Error(err)
 		}
 	}()
 	up := fakeupstream.New(t, fakeupstream.Options{})
 	up.Set("/restart.bin", fakeupstream.Resource{Body: []byte("survives restart")})
 	c := *repo.Defaults(&repo.Config{Key: "restart", Class: repo.Remote, PackageType: repo.Generic, URL: up.URL})
-	if err = rt.store.Repos().Create(t.Context(), c); err != nil {
+	if err = rt.Store.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
 	get := func() *httptest.ResponseRecorder {
 		h := server.New(
 			server.Config{
-				Store:         rt.store,
-				Blobs:         rt.blobs,
-				Auth:          rt.auth,
+				Store:         rt.Store,
+				Blobs:         rt.Blobs,
+				Auth:          rt.Auth,
 				RemoteSources: rt.modules.artifacts.RemoteSources(),
 				Logger:        log,
 			},
@@ -440,18 +445,18 @@ func TestAccGenericRemoteDefaultRestartKeepsCacheIdentity(t *testing.T) {
 		return out
 	}
 	remoteStatus(t, get(), 200)
-	before, err := rt.store.RemoteCache().Source(t.Context(), c.Key)
+	before, err := rt.Store.RemoteCache().Source(t.Context(), c.Key)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = rt.close(t.Context()); err != nil {
+	if err = rt.Close(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	rt, err = openRuntime(t.Context(), cfg, log)
+	rt, err = OpenRuntime(t.Context(), cfg, log, RuntimeOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	after, err := rt.store.RemoteCache().Source(t.Context(), c.Key)
+	after, err := rt.Store.RemoteCache().Source(t.Context(), c.Key)
 	if err != nil || after != before {
 		t.Fatalf("identity %v %v %v", before, after, err)
 	}
@@ -464,7 +469,7 @@ func TestAccGenericRemoteDefaultRestartKeepsCacheIdentity(t *testing.T) {
 	// No public configuration descriptor exposes the private internal setting.
 	r := httptest.NewRequest("GET", "/artifactory/api/system/configuration", nil)
 	r.SetBasicAuth("admin", "pw")
-	h := server.New(server.Config{Store: rt.store, Auth: rt.auth, Logger: log})
+	h := server.New(server.Config{Store: rt.Store, Auth: rt.Auth, Logger: log})
 	out := httptest.NewRecorder()
 	h.ServeHTTP(out, r)
 	if strings.Contains(out.Body.String(), remotePolicyKeySetting) {
@@ -494,7 +499,7 @@ func TestAccGenericRemoteColdAndWarmSignedDelivery(t *testing.T) {
 	w.update()
 	router := chi.NewRouter()
 	router.Get("/{sha}", func(out http.ResponseWriter, r *http.Request) {
-		body, _, err := w.rt.blobs.Open(r.Context(), chi.URLParam(r, "sha"))
+		body, _, err := w.rt.Blobs.Open(r.Context(), chi.URLParam(r, "sha"))
 		if err != nil {
 			http.Error(out, "missing", 404)
 			return
@@ -506,9 +511,9 @@ func TestAccGenericRemoteColdAndWarmSignedDelivery(t *testing.T) {
 	defer edge.Close()
 	w.h = server.New(
 		server.Config{
-			Store:         w.rt.store,
-			Blobs:         remoteSignedBlobs{Store: w.rt.blobs, edge: edge.URL},
-			Auth:          w.rt.auth,
+			Store:         w.rt.Store,
+			Blobs:         remoteSignedBlobs{Store: w.rt.Blobs, edge: edge.URL},
+			Auth:          w.rt.Auth,
 			RemoteSources: w.rt.modules.artifacts.RemoteSources(),
 			Logger:        slog.New(slog.NewTextHandler(io.Discard, nil)),
 		},
@@ -538,11 +543,11 @@ func TestAccGenericRemoteColdAndWarmSignedDelivery(t *testing.T) {
 	if w.up.Count("GET", "/signed.bin") != 1 {
 		t.Fatal(w.up.Requests())
 	}
-	it, err := w.rt.store.Items().Get(t.Context(), "remote", true, "signed.bin")
+	it, err := w.rt.Store.Items().Get(t.Context(), "remote", true, "signed.bin")
 	if err != nil {
 		t.Fatal(err)
 	}
-	stats, err := w.rt.store.Items().Stats(t.Context(), it.ID)
+	stats, err := w.rt.Store.Items().Stats(t.Context(), it.ID)
 	if err != nil || stats.DownloadCount != 2 {
 		t.Fatalf("signed stats %+v %v", stats, err)
 	}
@@ -560,7 +565,7 @@ func TestAccGenericRemoteOriginOmitsSignedQuery(t *testing.T) {
 		"",
 	)
 	remoteStatus(t, got, 200)
-	it, err := w.rt.store.Items().Get(t.Context(), "remote", true, "signed-query.bin")
+	it, err := w.rt.Store.Items().Get(t.Context(), "remote", true, "signed-query.bin")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -581,7 +586,7 @@ func TestAccGenericRemoteRejectsMalformedColdChecksum(t *testing.T) {
 				w.request("GET", "/artifactory/remote/invalid.bin.sha256", "reader", ""),
 				502,
 			)
-			if _, err := w.rt.store.Items().
+			if _, err := w.rt.Store.Items().
 				Get(t.Context(), "remote", true, "invalid.bin.sha256"); !errors.Is(
 				err,
 				store.ErrNotFound,
