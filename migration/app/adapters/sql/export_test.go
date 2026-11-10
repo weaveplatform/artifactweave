@@ -1,4 +1,4 @@
-package sqlcommon
+package sql
 
 // SealedPurposes exposes the purpose of every sealed column the modules
 // register, which Reseal covers, to the external tests, in registration

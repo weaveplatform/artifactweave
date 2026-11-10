@@ -11,8 +11,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
 	"github.com/weaveplatform/artifactweave/migration/app/config"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
@@ -54,7 +54,7 @@ func ApplyDescriptor(
 	if err != nil {
 		return fmt.Errorf("config apply: %w", err)
 	}
-	st, err := OpenStore(ctx, cfg, sqlcommon.Options{Keyring: keys})
+	st, err := OpenStore(ctx, cfg, sql.Options{Keyring: keys})
 	if err != nil {
 		return fmt.Errorf("config apply: %w", err)
 	}

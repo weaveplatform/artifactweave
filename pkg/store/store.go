@@ -29,7 +29,7 @@
 // stores seal them with the configured keyring and keep them out of every
 // JSON document column, so no listing or document read can leak one.
 //
-// pkg/store/inmem is the reference implementation, internal/sqlstore
+// migration/app/adapters/inmem is the reference implementation, internal/sqlstore
 // implements the same contract for SQLite and PostgreSQL, and storetest is
 // the contract suite every backend runs.
 //

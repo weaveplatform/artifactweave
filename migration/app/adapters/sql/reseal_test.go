@@ -1,4 +1,4 @@
-package sqlcommon_test
+package sql_test
 
 import (
 	"context"
@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql/sqlite"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
@@ -35,7 +35,7 @@ func TestAccSealedColumnsComplete(t *testing.T) {
 	if len(scan.purposes) == 0 {
 		t.Fatal("found no Seal calls; the scan is broken")
 	}
-	for _, problem := range checkSealedPurposes(scan, sqlcommon.SealedPurposes(), sealExempt) {
+	for _, problem := range checkSealedPurposes(scan, sql.SealedPurposes(), sealExempt) {
 		t.Error(problem)
 	}
 }
@@ -48,11 +48,11 @@ func TestUnitModulesRegisterInTheCanonicalOrder(t *testing.T) {
 		"platform", "artifacts", "access", "notifications",
 		"retention", "federation", "releases", "workers",
 	}
-	if got := sqlcommon.ModuleNames(); !slices.Equal(got, want) {
+	if got := sql.ModuleNames(); !slices.Equal(got, want) {
 		t.Errorf("modules = %q; want %q", got, want)
 	}
 	seen := map[string]bool{}
-	for _, p := range sqlcommon.SealedPurposes() {
+	for _, p := range sql.SealedPurposes() {
 		if seen[p] {
 			t.Errorf("purpose %q is registered more than once", p)
 		}
@@ -131,12 +131,12 @@ func contentKeys(t *testing.T) *crypt.Keyring {
 }
 
 // openContent opens a migrated SQLite store at path.
-func openContent(t *testing.T, path string, k *crypt.Keyring) *sqlcommon.Store {
+func openContent(t *testing.T, path string, k *crypt.Keyring) *sql.Store {
 	t.Helper()
 	s, err := sqlite.Open(
 		context.Background(),
 		path,
-		sqlite.Options{Options: sqlcommon.Options{Keyring: k}},
+		sqlite.Options{Options: sql.Options{Keyring: k}},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -145,7 +145,7 @@ func openContent(t *testing.T, path string, k *crypt.Keyring) *sqlcommon.Store {
 	return s
 }
 
-func execSQL(t *testing.T, s *sqlcommon.Store, q string) {
+func execSQL(t *testing.T, s *sql.Store, q string) {
 	t.Helper()
 	if _, err := s.DB().ExecContext(context.Background(), q); err != nil {
 		t.Fatalf("%s: %v", q, err)

@@ -250,7 +250,7 @@ it is documented; a PUT of the checksum file fixes a missing checksum here. Six 
 
 ## Verification
 
-- `pkg/store/storetest` and `migration/platform/blob/blobtest` contract suites run against
+- `migration/app/storetest` and `migration/platform/blob/blobtest` contract suites run against
   the in-memory store, SQLite, PostgreSQL (testcontainers) and MinIO (testcontainers) on
   Linux CI and skip cleanly where Docker is absent.
 - Upload-session tests resume across simulated process boundaries on both blob backends.

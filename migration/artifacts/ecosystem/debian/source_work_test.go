@@ -13,11 +13,11 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/terraformtest"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 

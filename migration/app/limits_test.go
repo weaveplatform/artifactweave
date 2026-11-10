@@ -10,10 +10,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
 	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
 func TestAccAPIRequestRates(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql/sqlite"
 	sqlitedrv "github.com/weaveplatform/artifactweave/migration/platform/sql/sqlite"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
 )

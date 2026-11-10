@@ -21,6 +21,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
@@ -34,7 +35,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 

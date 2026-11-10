@@ -109,8 +109,8 @@
 // compile time that their stores satisfy Store (adapters/inmem/store.go and
 // adapters/sql/store.go), and the metadata store's in-memory and SQL stores
 // are checked against it beside the other modules' ports
-// (pkg/store/inmem/inmem_test.go and
-// internal/sqlstore/sqlcommon/store_test.go). The module's contract suite,
+// (migration/app/adapters/inmem/inmem_test.go and
+// migration/app/adapters/sql/store_test.go). The module's contract suite,
 // adapters/storetest, runs every port on the module's adapters
 // (adapters/inmem's TestUnitContract, and adapters/sql's TestAccContract on
 // SQLite in memory and in a file) and on the metadata store's in-memory,

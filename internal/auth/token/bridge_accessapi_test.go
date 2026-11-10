@@ -8,8 +8,8 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	coretoken "github.com/weaveplatform/artifactweave/migration/access/core/token"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/platform/instance"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
 // The token API and npm logout answer a short-lived token's revocation by

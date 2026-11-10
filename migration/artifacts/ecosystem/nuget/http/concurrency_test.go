@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
+	"github.com/weaveplatform/artifactweave/migration/app/storetest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	pgdrv "github.com/weaveplatform/artifactweave/migration/platform/sql/postgres"
@@ -25,9 +25,9 @@ import (
 // blocked by PostgreSQL itself, not by a mutex or lease polling in this process.
 func TestAccNuGetWriteTransactionsOnPostgres(t *testing.T) {
 	dsn := platsqltest.PostgresDSN(t)
-	open := func() *sqltest.SQLStore {
+	open := func() *storetest.SQLStore {
 		t.Helper()
-		db, err := sqltest.OpenPostgres(context.Background(), dsn, sqltest.PostgresOptions{})
+		db, err := storetest.OpenPostgres(context.Background(), dsn, storetest.PostgresOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -37,7 +37,7 @@ func TestAccNuGetWriteTransactionsOnPostgres(t *testing.T) {
 	db, other := open(), open()
 	for _, mode := range []string{"commit", "rollback", "cancel owner", "cancel waiter", "copy", "move"} {
 		t.Run(mode, func(t *testing.T) {
-			sqltest.Reset(t, db.DB(), pgdrv.Dialect)
+			storetest.Reset(t, db.DB(), pgdrv.Dialect)
 			f := newFixtureOn(t, db)
 			f.items.Store = other
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -191,7 +191,7 @@ func existsAt(ctx context.Context, db pkgroute.Store, repo, path string) bool {
 	return err == nil
 }
 
-func waitForBlocked(t *testing.T, ctx context.Context, db *sqltest.SQLStore, done <-chan error) {
+func waitForBlocked(t *testing.T, ctx context.Context, db *storetest.SQLStore, done <-chan error) {
 	t.Helper()
 	tick := time.NewTicker(10 * time.Millisecond)
 	defer tick.Stop()

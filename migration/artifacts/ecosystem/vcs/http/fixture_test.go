@@ -7,10 +7,10 @@ package vcshttp
 import (
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit/kittest"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
 // Config is the part of the router's configuration that the tests here

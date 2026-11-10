@@ -19,10 +19,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 

@@ -24,6 +24,7 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit/kittest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -32,7 +33,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
 // The keys of the repositories every world holds, beside kittest's generic

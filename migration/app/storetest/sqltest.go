@@ -1,4 +1,4 @@
-// Package sqltest holds the suites that the SQLite and PostgreSQL store
+// Package storetest holds the suites that the SQLite and PostgreSQL store
 // packages run against the whole composite store: key rotation (Rotation,
 // with its Opener); the parts of the repository header and remote cache
 // suites that need more than the artifacts module's stores, whose tests run
@@ -10,13 +10,13 @@
 // a composite store's database for the next test by rolling back, and
 // migrating again, every stream that sqlcommon.Modules lists. They stay
 // here until STO-19 moves the composite store's suites.
-package sqltest
+package storetest
 
 import (
 	"database/sql"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
+	sqlcommon "github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	platsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
 )

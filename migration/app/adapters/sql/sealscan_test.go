@@ -1,4 +1,4 @@
-package sqlcommon_test
+package sql_test
 
 import (
 	"bytes"

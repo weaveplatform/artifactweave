@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql/sqlite"
+	"github.com/weaveplatform/artifactweave/migration/app/storetest"
 )
 
 func TestAccReplayProcessCrash(t *testing.T) {
@@ -17,7 +17,7 @@ func TestAccReplayProcessCrash(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = s.Close() })
-	sqltest.ReplayCrash(t, s, []string{"ARTIFACTWEAVE_REPLAY_CRASH_SQLITE=" + path})
+	storetest.ReplayCrash(t, s, []string{"ARTIFACTWEAVE_REPLAY_CRASH_SQLITE=" + path})
 }
 
 func TestAccReplayCrashHelper(t *testing.T) {
@@ -28,11 +28,11 @@ func TestAccReplayCrashHelper(t *testing.T) {
 	s, err := sqlite.Open(
 		t.Context(),
 		path,
-		sqlite.Options{Options: sqlcommon.Options{SkipMigrate: true}},
+		sqlite.Options{Options: sql.Options{SkipMigrate: true}},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = s.Close() }()
-	sqltest.ReplayCrashChild(t, s)
+	storetest.ReplayCrashChild(t, s)
 }

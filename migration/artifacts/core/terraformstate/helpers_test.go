@@ -9,8 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/app/apptest"
+	"github.com/weaveplatform/artifactweave/migration/app/storetest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/terraformstate"
@@ -21,7 +22,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -98,7 +98,7 @@ func memStore() item.Store { return inmem.New() }
 // does.
 type sqliteFile struct {
 	path string
-	st   *sqltest.SQLStore
+	st   *storetest.SQLStore
 }
 
 func sqliteBackend(t *testing.T) *sqliteFile {
@@ -108,7 +108,7 @@ func sqliteBackend(t *testing.T) *sqliteFile {
 
 func (f *sqliteFile) open(t *testing.T) item.Store {
 	t.Helper()
-	st, err := sqltest.OpenSQLite(context.Background(), f.path, sqltest.SQLiteOptions{})
+	st, err := storetest.OpenSQLite(context.Background(), f.path, storetest.SQLiteOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

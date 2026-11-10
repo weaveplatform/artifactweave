@@ -12,9 +12,9 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/postgres"
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql/postgres"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql/sqlite"
 	"github.com/weaveplatform/artifactweave/migration/app/config"
 	artifactshttp "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -411,8 +411,8 @@ func Keyring(cfg config.Config) (*crypt.Keyring, error) {
 func OpenStore(
 	ctx context.Context,
 	cfg config.Config,
-	o sqlcommon.Options,
-) (*sqlcommon.Store, error) {
+	o sql.Options,
+) (*sql.Store, error) {
 	if cfg.Database.Driver == "postgres" {
 		s, err := postgres.Open(ctx, cfg.Database.DSN, postgres.Options{Options: o})
 		if err != nil {
@@ -451,12 +451,12 @@ func Migrate(
 	if action != "up" && action != "down" && action != "version" {
 		return fmt.Errorf("%w: %q", ErrUnknownMigration, action)
 	}
-	s, err := OpenStore(ctx, cfg, sqlcommon.Options{SkipMigrate: true})
+	s, err := OpenStore(ctx, cfg, sql.Options{SkipMigrate: true})
 	if err != nil {
 		return err
 	}
 	defer func() { _ = s.Close() }()
-	db, d, mods := s.DB(), s.Dialect(), sqlcommon.Modules()
+	db, d, mods := s.DB(), s.Dialect(), sql.Modules()
 	switch action {
 	case "up":
 		done, err := dialect.Migrate(ctx, db, d, mods, module)
@@ -501,7 +501,7 @@ func Migrate(
 // returned as it is, for Rollback to refuse.
 func oneStep(
 	ctx context.Context,
-	s *sqlcommon.Store,
+	s *sql.Store,
 	mods []dialect.Module,
 	module string,
 ) (string, int, error) {
@@ -531,7 +531,7 @@ func RotateKeys(ctx context.Context, cfg config.Config, w io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("keys rotate: %w", err)
 	}
-	s, err := OpenStore(ctx, cfg, sqlcommon.Options{Keyring: keys})
+	s, err := OpenStore(ctx, cfg, sql.Options{Keyring: keys})
 	if err != nil {
 		return fmt.Errorf("keys rotate: %w", err)
 	}
@@ -570,7 +570,7 @@ func RotateKeys(ctx context.Context, cfg config.Config, w io.Writer) error {
 func resealStates(
 	ctx context.Context,
 	cfg config.Config,
-	st *sqlcommon.Store,
+	st *sql.Store,
 	keys *crypt.Keyring,
 ) (terraformstate.ResealReport, error) {
 	hot, _ := tiers(cfg, st)

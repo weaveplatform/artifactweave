@@ -3,9 +3,9 @@ package artifactshttp
 import (
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
 func TestAccConfiguredCollector(t *testing.T) {

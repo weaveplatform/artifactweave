@@ -11,11 +11,11 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	configapi "github.com/weaveplatform/artifactweave/migration/configuration/api"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )

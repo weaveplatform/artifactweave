@@ -7,9 +7,9 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/settings"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
 func TestUnitDownloadCredentialRestoration(t *testing.T) {

@@ -9,15 +9,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/migration/app/storetest"
 	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	platsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
 var seedTime = time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)
@@ -120,7 +120,11 @@ func TestUnitSeedInMemory(t *testing.T) { seedTwice(t, inmem.New()) }
 
 func TestAccSeedSQLite(t *testing.T) {
 	ctx := context.Background()
-	st, err := sqltest.OpenSQLite(ctx, filepath.Join(t.TempDir(), "aw.db"), sqltest.SQLiteOptions{})
+	st, err := storetest.OpenSQLite(
+		ctx,
+		filepath.Join(t.TempDir(), "aw.db"),
+		storetest.SQLiteOptions{},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,12 +136,12 @@ func TestAccSeedSQLite(t *testing.T) {
 func TestAccSeedPostgres(t *testing.T) {
 	dsn := platsqltest.PostgresDSN(t)
 	ctx := context.Background()
-	st, err := sqltest.OpenPostgres(ctx, dsn, sqltest.PostgresOptions{})
+	st, err := storetest.OpenPostgres(ctx, dsn, storetest.PostgresOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = st.Close() })
-	sqltest.Reset(t, st.DB(), st.Dialect())
+	storetest.Reset(t, st.DB(), st.Dialect())
 	seedTwice(t, st)
 }
 

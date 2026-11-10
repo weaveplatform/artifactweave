@@ -12,13 +12,13 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	configurationhttp "github.com/weaveplatform/artifactweave/migration/configuration/adapters/http"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )

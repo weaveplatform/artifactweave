@@ -7,14 +7,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
 	sqlitedrv "github.com/weaveplatform/artifactweave/migration/platform/sql/sqlite"
 )
 
 // Options configures Open: the store's options, and the driver's, which Open
 // passes on.
 type Options struct {
-	sqlcommon.Options
+	sql.Options
 	// BusyTimeout bounds lock waits; 10s when zero.
 	BusyTimeout time.Duration
 }
@@ -25,12 +25,12 @@ type Options struct {
 // failure. The path Memory opens a private in-memory database. The driver's
 // errors, ErrPathRequired among them, are returned as they are, and
 // sqlcommon.Open's behind "sqlite: ".
-func Open(ctx context.Context, path string, o Options) (*sqlcommon.Store, error) {
+func Open(ctx context.Context, path string, o Options) (*sql.Store, error) {
 	db, err := sqlitedrv.OpenDB(path, sqlitedrv.Options{BusyTimeout: o.BusyTimeout})
 	if err != nil {
 		return nil, err
 	}
-	s, err := sqlcommon.Open(ctx, db, sqlitedrv.Dialect, o.Options)
+	s, err := sql.Open(ctx, db, sqlitedrv.Dialect, o.Options)
 	if err != nil {
 		return nil, fmt.Errorf("sqlite: %w", err)
 	}

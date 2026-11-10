@@ -13,12 +13,12 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	artifactshttp "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	configurationhttp "github.com/weaveplatform/artifactweave/migration/configuration/adapters/http"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/middleware"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
 // versionMediaType is the vendor type of the version document, which the

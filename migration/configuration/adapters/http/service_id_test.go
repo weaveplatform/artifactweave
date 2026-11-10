@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
 // TestAccServiceIDWithoutIdentity: a store with no instance identity is a

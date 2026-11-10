@@ -3,6 +3,8 @@ package inmem_test
 import (
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/migration/app/storetest"
 	artport "github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	fedport "github.com/weaveplatform/artifactweave/migration/federation/core/port"
 	ntfport "github.com/weaveplatform/artifactweave/migration/notifications/core/port"
@@ -10,8 +12,6 @@ import (
 	retport "github.com/weaveplatform/artifactweave/migration/retention/core/port"
 	wrkport "github.com/weaveplatform/artifactweave/migration/workers/core/port"
 	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/store/storetest"
 )
 
 func TestUnitContract(t *testing.T) {

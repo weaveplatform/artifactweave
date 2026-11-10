@@ -11,14 +11,14 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/migration/app/storetest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -248,8 +248,8 @@ func TestAccFindManifest(t *testing.T) {
 	for name, open := range map[string]func(t *testing.T) item.Store{
 		"inmem": func(*testing.T) item.Store { return inmem.New() },
 		"sqlite": func(t *testing.T) item.Store {
-			st, err := sqltest.OpenSQLite(context.Background(), filepath.Join(t.TempDir(), "aw.db"),
-				sqltest.SQLiteOptions{})
+			st, err := storetest.OpenSQLite(context.Background(), filepath.Join(t.TempDir(), "aw.db"),
+				storetest.SQLiteOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}

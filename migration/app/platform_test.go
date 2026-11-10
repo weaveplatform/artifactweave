@@ -19,7 +19,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
 	"github.com/weaveplatform/artifactweave/migration/app/config"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -35,7 +36,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -661,7 +661,7 @@ func TestAccOpenStoreErrors(t *testing.T) {
 	ctx := context.Background()
 	cfg := config.Default()
 	cfg.Database.Driver, cfg.Database.DSN = "postgres", "postgres://%zz"
-	if _, err := OpenStore(ctx, cfg, sqlcommon.Options{}); err == nil {
+	if _, err := OpenStore(ctx, cfg, sql.Options{}); err == nil {
 		t.Fatal("a malformed PostgreSQL DSN opened")
 	}
 	if err := Migrate(ctx, cfg, "up", 0, "", &bytes.Buffer{}); err == nil {
@@ -674,11 +674,11 @@ func TestAccOpenStoreErrors(t *testing.T) {
 	}
 	cfg = config.Default()
 	cfg.DataDir = filepath.Join(file, "data")
-	if _, err := OpenStore(ctx, cfg, sqlcommon.Options{}); err == nil {
+	if _, err := OpenStore(ctx, cfg, sql.Options{}); err == nil {
 		t.Fatal("a data directory under a file opened")
 	}
 	cfg.DataDir = file
-	if _, err := OpenStore(ctx, cfg, sqlcommon.Options{}); err == nil {
+	if _, err := OpenStore(ctx, cfg, sql.Options{}); err == nil {
 		t.Fatal("a database path that is not a file opened")
 	}
 }
@@ -696,7 +696,7 @@ func TestAccRotateKeys(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := OpenStore(ctx, cfg, sqlcommon.Options{Keyring: k})
+	s, err := OpenStore(ctx, cfg, sql.Options{Keyring: k})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -724,7 +724,7 @@ func TestAccRotateKeys(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err = OpenStore(ctx, cfg, sqlcommon.Options{Keyring: k})
+	s, err = OpenStore(ctx, cfg, sql.Options{Keyring: k})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -877,7 +877,7 @@ func TestAccResealStatesWithoutBlobs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := OpenStore(ctx, cfg, sqlcommon.Options{Keyring: k})
+	s, err := OpenStore(ctx, cfg, sql.Options{Keyring: k})
 	if err != nil {
 		t.Fatal(err)
 	}

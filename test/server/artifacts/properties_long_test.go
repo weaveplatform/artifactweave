@@ -13,9 +13,10 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/postgres"
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql/postgres"
+	sqltest "github.com/weaveplatform/artifactweave/migration/app/storetest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/storetest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
@@ -23,7 +24,6 @@ import (
 	pgdrv "github.com/weaveplatform/artifactweave/migration/platform/sql/postgres"
 	platsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
 	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 

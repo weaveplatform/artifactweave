@@ -20,6 +20,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	artifactshttp "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit/kittest"
@@ -27,7 +28,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/middleware"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 

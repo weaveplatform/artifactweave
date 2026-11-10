@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
+	"github.com/weaveplatform/artifactweave/migration/app/storetest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
@@ -22,8 +22,8 @@ import (
 func TestAccCacheCleanupSQLiteRestart(t *testing.T) {
 	ctx := context.Background()
 	dbPath := filepath.Join(t.TempDir(), "cache.db")
-	open := func() *sqltest.SQLStore {
-		s, err := sqltest.OpenSQLite(ctx, dbPath, sqltest.SQLiteOptions{})
+	open := func() *storetest.SQLStore {
+		s, err := storetest.OpenSQLite(ctx, dbPath, storetest.SQLiteOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -110,19 +110,23 @@ func TestAccCacheCleanupConcurrentDownload(t *testing.T) {
 		t.Run(backend, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			var db *sqltest.SQLStore
+			var db *storetest.SQLStore
 			var err error
 			if backend == "postgres" {
 				dsn := os.Getenv("ARTIFACTWEAVE_TEST_POSTGRES_DSN")
 				if dsn == "" {
 					t.Skip("ARTIFACTWEAVE_TEST_POSTGRES_DSN not set")
 				}
-				db, err = sqltest.OpenPostgres(ctx, dsn, sqltest.PostgresOptions{MaxOpenConns: 4})
+				db, err = storetest.OpenPostgres(
+					ctx,
+					dsn,
+					storetest.PostgresOptions{MaxOpenConns: 4},
+				)
 			} else {
-				db, err = sqltest.OpenSQLite(
+				db, err = storetest.OpenSQLite(
 					ctx,
 					filepath.Join(t.TempDir(), "race.db"),
-					sqltest.SQLiteOptions{},
+					storetest.SQLiteOptions{},
 				)
 			}
 			if err != nil {

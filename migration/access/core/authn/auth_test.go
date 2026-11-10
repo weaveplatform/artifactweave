@@ -11,10 +11,10 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/port"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/settings"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
 // TestMain makes hashing cheap: the production parameters cost 64 MiB and

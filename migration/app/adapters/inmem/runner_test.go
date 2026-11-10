@@ -1,8 +1,8 @@
 package inmem_test
 
 import (
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/platform/tx"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
 // The store's Tx and AfterCommit are those of the embedded *memtx.Store.

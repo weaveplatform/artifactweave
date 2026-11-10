@@ -8,8 +8,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/port"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
 func TestUnitAPIRestrictionCredentialsAndRecovery(t *testing.T) {

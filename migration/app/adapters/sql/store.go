@@ -1,4 +1,4 @@
-// Package sqlcommon implements pkg/store over database/sql for any SQL
+// Package sql implements pkg/store over database/sql for any SQL
 // dialect (decision 0004), following hostweave's dialect layer: one store
 // implementation, a Dialect describing what differs between engines, and
 // embedded per-dialect migrations.
@@ -14,7 +14,7 @@
 //   - Text columns that lists sort by are byte-ordered (COLLATE "C" on
 //     PostgreSQL, SQLite's default), so every backend pages in the order
 //     inmem does.
-package sqlcommon
+package sql
 
 import (
 	"context"

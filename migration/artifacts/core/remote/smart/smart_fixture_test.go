@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/upstreamtest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -14,7 +15,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
 // The Smart tests stay in this package, since they reach Smart's unexported

@@ -11,7 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/migration/app/storetest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -19,7 +20,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	platsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
 	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -31,8 +31,8 @@ func backends() []Backend {
 	return []Backend{
 		{"inmem", func(*testing.T) item.Store { return inmem.New() }},
 		{"sqlite", func(t *testing.T) item.Store {
-			st, err := sqltest.OpenSQLite(context.Background(),
-				filepath.Join(t.TempDir(), "aw.db"), sqltest.SQLiteOptions{})
+			st, err := storetest.OpenSQLite(context.Background(),
+				filepath.Join(t.TempDir(), "aw.db"), storetest.SQLiteOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -40,13 +40,13 @@ func backends() []Backend {
 			return st
 		}},
 		{"postgres", func(t *testing.T) item.Store {
-			st, err := sqltest.OpenPostgres(context.Background(),
-				platsqltest.PostgresDSN(t), sqltest.PostgresOptions{})
+			st, err := storetest.OpenPostgres(context.Background(),
+				platsqltest.PostgresDSN(t), storetest.PostgresOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
 			t.Cleanup(func() { _ = st.Close() })
-			sqltest.Reset(t, st.DB(), st.Dialect())
+			storetest.Reset(t, st.DB(), st.Dialect())
 			return st
 		}},
 	}

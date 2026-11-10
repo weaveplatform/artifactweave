@@ -11,8 +11,8 @@ import (
 
 	"github.com/cucumber/godog"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql/sqlite"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
@@ -33,11 +33,11 @@ func (w *world) registerCacheMaintenance(sc *godog.ScenarioContext) {
 	sc.Step(`^I run remote cache cleanup$`, w.runRemoteCacheCleanup)
 }
 
-func (w *world) maintenanceStore() (*sqlcommon.Store, *item.Service, error) {
+func (w *world) maintenanceStore() (*sql.Store, *item.Service, error) {
 	st, err := sqlite.Open(
 		context.Background(),
 		filepath.Join(w.dataDir, "artifactweave.db"),
-		sqlite.Options{Options: sqlcommon.Options{SkipMigrate: true}},
+		sqlite.Options{Options: sql.Options{SkipMigrate: true}},
 	)
 	if err != nil {
 		return nil, nil, err

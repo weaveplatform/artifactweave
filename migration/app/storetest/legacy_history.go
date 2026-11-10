@@ -1,4 +1,4 @@
-package sqltest
+package storetest
 
 import (
 	"database/sql"
@@ -6,7 +6,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
+	sqlcommon "github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	platsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
 )

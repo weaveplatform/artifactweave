@@ -3,9 +3,9 @@ package identity_test
 import (
 	"context"
 
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
 // repositories stands in for the artifacts module's API with the one call

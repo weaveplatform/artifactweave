@@ -8,10 +8,10 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/core/port"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 

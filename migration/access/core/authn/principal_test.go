@@ -7,8 +7,8 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authz"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
 func TestUnitDeciderFrom(t *testing.T) {

@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/postgres"
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql/postgres"
+	"github.com/weaveplatform/artifactweave/migration/app/storetest"
 	pgdrv "github.com/weaveplatform/artifactweave/migration/platform/sql/postgres"
 	platsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
 )
@@ -24,7 +24,7 @@ func TestAccSchemaGolden(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = s.Close() })
 	// Earlier tests of the binary leave rows behind on the shared server.
-	sqltest.Reset(t, s.DB(), pgdrv.Dialect)
+	storetest.Reset(t, s.DB(), pgdrv.Dialect)
 	platsqltest.SchemaGolden(t, s.DB(), pgdrv.Dialect.Name,
 		filepath.Join("testdata", "schema.golden"), *update)
 }

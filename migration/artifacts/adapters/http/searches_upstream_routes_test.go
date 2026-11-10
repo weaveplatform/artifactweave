@@ -4,10 +4,10 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/search"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
 // Without an authenticator the paths a search would disclose cannot be

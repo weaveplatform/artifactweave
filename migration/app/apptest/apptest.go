@@ -5,13 +5,13 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/postgres"
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql/postgres"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql/sqlite"
+	"github.com/weaveplatform/artifactweave/migration/app/storetest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/formattest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	platsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
 // FormatBackends returns the stores the format contract runs on, in this
@@ -43,7 +43,7 @@ func FormatBackends() []formattest.Backend {
 			t.Cleanup(func() { _ = st.Close() })
 			// The test binary shares one server, so each scenario starts
 			// empty.
-			sqltest.Reset(t, st.DB(), st.Dialect())
+			storetest.Reset(t, st.DB(), st.Dialect())
 			return st
 		}},
 	}

@@ -373,8 +373,8 @@ Decisions: [0004](../research/decisions/0004-storage-sql-metadata-and-blobs.md),
    the generated wire models (`migration/platform/gen`) and table-driven round-trip tests
    per wire form (legacy, Access, YAML descriptor). Written and reviewed before task 1
    so the store contracts are expressed in these types.
-1. `pkg/store` contracts (`Repos`, `Items`, `Properties`, `Stats`, `Principals`, `Groups`, `Permissions`, `Tokens`, `Projects`, `Webhooks`, `Policies`, `Runs`, `Packages`) with `Tx`, sentinel errors and keyset cursors; `pkg/store/inmem`.
-2. `internal/sqlstore/sqlcommon` dialect layer; `sqlite` (modernc, WAL, single writer) and `postgres` (pgx stdlib); embedded migrations; `artifactweave migrate up|down|version`.
+1. `pkg/store` contracts (`Repos`, `Items`, `Properties`, `Stats`, `Principals`, `Groups`, `Permissions`, `Tokens`, `Projects`, `Webhooks`, `Policies`, `Runs`, `Packages`) with `Tx`, sentinel errors and keyset cursors; `migration/app/adapters/inmem`.
+2. `migration/app/adapters/sql` dialect layer; `sqlite` (modernc, WAL, single writer) and `postgres` (pgx stdlib); embedded migrations; `artifactweave migrate up|down|version`.
 3. `migration/platform/blob` contract: `BeginUpload / Append / Commit(digest) / Abort`, `Open` returning `io.ReadSeekCloser`, `PresignGet`, `Delete`, `Stat`; `fs` backend (temp dir per upload id, rename on commit) and `s3` backend (multipart upload id persisted through the store, path-style option for MinIO); checksum index by sha256, sha1 and md5.
 4. `migration/platform/crypt`: keyring, sealed columns with purpose and row AAD, `artifactweave keys rotate`.
 5. `storetest` and `blobtest` contract suites.
@@ -389,10 +389,10 @@ Decisions: [0004](../research/decisions/0004-storage-sql-metadata-and-blobs.md),
   enterprise products) over the `pkg/types` domain types, with `Tx`, `AfterCommit`, sentinel
   errors and keyset cursors; `store.Normalise` defines what a stored value reads back as (UTC
   microseconds, millisecond durations).
-- `pkg/store/inmem` (reference), `internal/sqlstore/sqlcommon` with `sqlite` (modernc, WAL,
+- `migration/app/adapters/inmem` (reference), `migration/app/adapters/sql` with `sqlite` (modernc, WAL,
   immediate transactions; file and in-memory) and `postgres` (pgx); 71 tables, identical in both
   dialects. Differences from research 15's table list are recorded in its section 4.1.
-- `pkg/store/storetest`: 62 contract subtests passing on inmem, SQLite file, SQLite memory and
+- `migration/app/storetest`: 62 contract subtests passing on inmem, SQLite file, SQLite memory and
   PostgreSQL 17 (testcontainers, skipped without Docker), plus SQLite fault-injection tests per
   group. Every PostgreSQL contract run rolls all migrations back and applies them again.
 - Sealed columns: one registry drives `Store.Reseal`; `artifactweave keys rotate` re-seals under

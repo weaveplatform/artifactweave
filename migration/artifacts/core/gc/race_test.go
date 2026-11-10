@@ -10,7 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/migration/app/storetest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -19,7 +20,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/blobtest"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -211,8 +211,8 @@ var raceStores = map[string]func(t *testing.T) raceStore{
 	"inmem": func(*testing.T) raceStore { return inmem.New() },
 	"sqlite": func(t *testing.T) raceStore {
 		t.Helper()
-		st, err := sqltest.OpenSQLite(context.Background(), filepath.Join(t.TempDir(), "aw.db"),
-			sqltest.SQLiteOptions{Options: sqltest.Options{}})
+		st, err := storetest.OpenSQLite(context.Background(), filepath.Join(t.TempDir(), "aw.db"),
+			storetest.SQLiteOptions{Options: storetest.Options{}})
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -7,10 +7,10 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
 func transitiveRow(name string) peerAQLRow {

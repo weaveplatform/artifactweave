@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/postgres"
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql/postgres"
+	"github.com/weaveplatform/artifactweave/migration/app/storetest"
 	pgdrv "github.com/weaveplatform/artifactweave/migration/platform/sql/postgres"
 	platsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -24,8 +24,8 @@ func TestAccReplayProcessCrash(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = s.Close() })
-	sqltest.Reset(t, s.DB(), pgdrv.Dialect)
-	sqltest.ReplayCrash(t, s, []string{"ARTIFACTWEAVE_REPLAY_CRASH_POSTGRES=" + dsn})
+	storetest.Reset(t, s.DB(), pgdrv.Dialect)
+	storetest.ReplayCrash(t, s, []string{"ARTIFACTWEAVE_REPLAY_CRASH_POSTGRES=" + dsn})
 }
 
 func TestAccReplayCrashHelper(t *testing.T) {
@@ -36,13 +36,13 @@ func TestAccReplayCrashHelper(t *testing.T) {
 	s, err := postgres.Open(
 		t.Context(),
 		dsn,
-		postgres.Options{Options: sqlcommon.Options{SkipMigrate: true}},
+		postgres.Options{Options: sql.Options{SkipMigrate: true}},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = s.Close() }()
-	sqltest.ReplayCrashChild(t, s)
+	storetest.ReplayCrashChild(t, s)
 }
 
 func TestAccReplayPruneDoesNotDeleteRenewal(t *testing.T) {
@@ -53,7 +53,7 @@ func TestAccReplayPruneDoesNotDeleteRenewal(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = s.Close() })
-	sqltest.Reset(t, s.DB(), pgdrv.Dialect)
+	storetest.Reset(t, s.DB(), pgdrv.Dialect)
 	now := time.Now().UTC()
 	digest := fmt.Sprintf("%x", sha256.Sum256([]byte("prune-race")))
 	r := store.ReplayRequest{

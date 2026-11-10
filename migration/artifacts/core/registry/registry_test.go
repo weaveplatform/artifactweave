@@ -11,7 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/migration/app/storetest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
@@ -20,7 +21,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	platsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
 	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -50,7 +50,11 @@ func backends() []backend {
 		{"sqlite", func(t *testing.T) (registry.Store, func() registry.Store) {
 			path := filepath.Join(t.TempDir(), "aw.db")
 			open := func() registry.Store {
-				st, err := sqltest.OpenSQLite(context.Background(), path, sqltest.SQLiteOptions{})
+				st, err := storetest.OpenSQLite(
+					context.Background(),
+					path,
+					storetest.SQLiteOptions{},
+				)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -61,11 +65,11 @@ func backends() []backend {
 		}},
 		{"postgres", func(t *testing.T) (registry.Store, func() registry.Store) {
 			dsn := platsqltest.PostgresDSN(t)
-			open := func() *sqltest.SQLStore {
-				st, err := sqltest.OpenPostgres(
+			open := func() *storetest.SQLStore {
+				st, err := storetest.OpenPostgres(
 					context.Background(),
 					dsn,
-					sqltest.PostgresOptions{},
+					storetest.PostgresOptions{},
 				)
 				if err != nil {
 					t.Fatal(err)
@@ -75,7 +79,7 @@ func backends() []backend {
 			}
 			// The test binary shares one server, so each test starts empty.
 			first := open()
-			sqltest.Reset(t, first.DB(), first.Dialect())
+			storetest.Reset(t, first.DB(), first.Dialect())
 			return first, func() registry.Store { return open() }
 		}},
 	}

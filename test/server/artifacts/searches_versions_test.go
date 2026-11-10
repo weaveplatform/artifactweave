@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
 func TestAccLatestVersionByProperties(t *testing.T) {

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
 const configPath = "/artifactory/api/system/configuration"

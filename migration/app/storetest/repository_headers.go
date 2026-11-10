@@ -1,4 +1,4 @@
-package sqltest
+package storetest
 
 import (
 	"encoding/json"
@@ -7,8 +7,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/migration/access/core/roles"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
@@ -28,7 +28,7 @@ func RepositoryHeaderEnvironmentRename(t *testing.T, open Opener) {
 	repositoryHeaderEnvironmentRename(t, open(t, keys))
 }
 
-func repositoryHeaderEnvironmentRename(t *testing.T, s *sqlcommon.Store) {
+func repositoryHeaderEnvironmentRename(t *testing.T, s *sql.Store) {
 	t.Helper()
 	ctx := t.Context()
 	// The roles service lists and updates repositories and nothing more, so
@@ -108,7 +108,7 @@ func RepositoryHeadersOpen(t *testing.T, open Opener) {
 	}
 }
 
-func assertHeaderDocument(t *testing.T, s *sqlcommon.Store, key string) {
+func assertHeaderDocument(t *testing.T, s *sql.Store, key string) {
 	t.Helper()
 	var doc string
 	headerMust(

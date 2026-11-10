@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -17,7 +18,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/blobtest"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 

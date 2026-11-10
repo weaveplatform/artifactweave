@@ -8,14 +8,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
 	pgdrv "github.com/weaveplatform/artifactweave/migration/platform/sql/postgres"
 )
 
 // Options configures Open: the store's options, and the driver's, which Open
 // passes on.
 type Options struct {
-	sqlcommon.Options
+	sql.Options
 	// MaxOpenConns bounds the pool; 0 keeps the database/sql default.
 	MaxOpenConns int
 	// ConnMaxLifetime recycles connections; 0 keeps them.
@@ -27,7 +27,7 @@ type Options struct {
 // migrates unless o.SkipMigrate, wraps in the SQL store and closes on
 // failure. The driver's errors, ErrDSNRequired among them, are returned as
 // they are, and sqlcommon.Open's behind "postgres: ".
-func Open(ctx context.Context, dsn string, o Options) (*sqlcommon.Store, error) {
+func Open(ctx context.Context, dsn string, o Options) (*sql.Store, error) {
 	db, err := pgdrv.OpenDB(dsn, pgdrv.Options{
 		MaxOpenConns:    o.MaxOpenConns,
 		ConnMaxLifetime: o.ConnMaxLifetime,
@@ -35,7 +35,7 @@ func Open(ctx context.Context, dsn string, o Options) (*sqlcommon.Store, error) 
 	if err != nil {
 		return nil, err
 	}
-	s, err := sqlcommon.Open(ctx, db, pgdrv.Dialect, o.Options)
+	s, err := sql.Open(ctx, db, pgdrv.Dialect, o.Options)
 	if err != nil {
 		return nil, fmt.Errorf("postgres: %w", err)
 	}

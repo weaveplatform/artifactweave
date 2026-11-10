@@ -9,15 +9,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/postgres"
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql/postgres"
+	"github.com/weaveplatform/artifactweave/migration/app/storetest"
+	sqltest "github.com/weaveplatform/artifactweave/migration/app/storetest"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	pgdrv "github.com/weaveplatform/artifactweave/migration/platform/sql/postgres"
 	platsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
 	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/storetest"
 )
 
 func TestAccContract(t *testing.T) {
@@ -28,7 +28,7 @@ func TestAccContract(t *testing.T) {
 	}
 	storetest.Run(t, func(t *testing.T) store.Store {
 		s, err := postgres.Open(context.Background(), dsn,
-			postgres.Options{Options: sqlcommon.Options{Keyring: k}, MaxOpenConns: 8})
+			postgres.Options{Options: sql.Options{Keyring: k}, MaxOpenConns: 8})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -65,11 +65,11 @@ func TestAccOpenErrors(t *testing.T) {
 func TestAccKeyRotation(t *testing.T) {
 	dsn := platsqltest.PostgresDSN(t)
 	first := true
-	sqltest.Rotation(t, func(t *testing.T, k *crypt.Keyring) *sqlcommon.Store {
+	sqltest.Rotation(t, func(t *testing.T, k *crypt.Keyring) *sql.Store {
 		s, err := postgres.Open(
 			context.Background(),
 			dsn,
-			postgres.Options{Options: sqlcommon.Options{Keyring: k}},
+			postgres.Options{Options: sql.Options{Keyring: k}},
 		)
 		if err != nil {
 			t.Fatal(err)
@@ -104,7 +104,7 @@ func TestAccLegacyHistoryRefused(t *testing.T) {
 // another stream, such as a foreign key across modules, fails here, because
 // that table does not exist (decision 0044, "No cross-module foreign keys").
 func TestAccStreamsMigrateAlone(t *testing.T) {
-	mods := sqlcommon.Modules()
+	mods := sql.Modules()
 	for _, m := range mods {
 		t.Run(m.Name, func(t *testing.T) {
 			ctx := t.Context()
@@ -166,10 +166,10 @@ func scratchSchema(t *testing.T) string {
 
 // openUnmigrated opens a store over dsn without migrating, closed when the
 // test ends.
-func openUnmigrated(t *testing.T, dsn string) *sqlcommon.Store {
+func openUnmigrated(t *testing.T, dsn string) *sql.Store {
 	t.Helper()
 	s, err := postgres.Open(t.Context(), dsn,
-		postgres.Options{Options: sqlcommon.Options{SkipMigrate: true}})
+		postgres.Options{Options: sql.Options{SkipMigrate: true}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,7 +179,7 @@ func openUnmigrated(t *testing.T, dsn string) *sqlcommon.Store {
 
 func TestAccRemoteCachePersistence(t *testing.T) {
 	dsn := platsqltest.PostgresDSN(t)
-	open := func() *sqlcommon.Store {
+	open := func() *sql.Store {
 		s, err := postgres.Open(context.Background(), dsn, postgres.Options{})
 		if err != nil {
 			t.Fatal(err)
@@ -195,11 +195,11 @@ func TestAccRepositoryHeaderSecrets(t *testing.T) {
 	first := true
 	sqltest.RepositoryHeaderEnvironmentRename(
 		t,
-		func(t *testing.T, k *crypt.Keyring) *sqlcommon.Store {
+		func(t *testing.T, k *crypt.Keyring) *sql.Store {
 			s, err := postgres.Open(
 				t.Context(),
 				dsn,
-				postgres.Options{Options: sqlcommon.Options{Keyring: k}},
+				postgres.Options{Options: sql.Options{Keyring: k}},
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -217,11 +217,11 @@ func TestAccRepositoryHeaderSecrets(t *testing.T) {
 func TestAccRepositoryHeaderMigration(t *testing.T) {
 	dsn := platsqltest.PostgresDSN(t)
 	first := true
-	sqltest.RepositoryHeadersOpen(t, func(t *testing.T, k *crypt.Keyring) *sqlcommon.Store {
+	sqltest.RepositoryHeadersOpen(t, func(t *testing.T, k *crypt.Keyring) *sql.Store {
 		s, err := postgres.Open(
 			t.Context(),
 			dsn,
-			postgres.Options{Options: sqlcommon.Options{Keyring: k}},
+			postgres.Options{Options: sql.Options{Keyring: k}},
 		)
 		if err != nil {
 			t.Fatal(err)

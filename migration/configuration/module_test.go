@@ -4,10 +4,10 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	configapi "github.com/weaveplatform/artifactweave/migration/configuration/api"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
 // New refuses Deps without a store and otherwise binds the API without

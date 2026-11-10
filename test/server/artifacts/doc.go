@@ -34,7 +34,7 @@
 //     server (searches_upstream_test.go), reindex with a recording format
 //     (reindex_test.go) and remote sources over stub backends
 //     (source_test.go).
-//   - PostgreSQL through internal/sqlstore/sqltest for the cases that run on
+//   - PostgreSQL through migration/app/storetest for the cases that run on
 //     it too (idempotency_sql_test.go, properties_long_test.go); they skip
 //     without Docker.
 //
