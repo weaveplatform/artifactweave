@@ -31,6 +31,12 @@ claims remain on [#216](https://github.com/weaveplatform/artifactweave/issues/21
 the expanded scope has its own capture work and P41 qualification. P18 reviews the
 remaining decisions for the initial sequence, with later designs reviewed in their phases.
 
+Reports and decision records written before P9d cite code paths from before the
+modular-monolith migration, such as `internal/server` or `pkg/types`.
+[`docs/implementation/p9d-path-map.json`](../implementation/p9d-path-map.json) maps each
+legacy package and file to its final path; a package that was split across modules is
+mapped file by file.
+
 ## Purpose
 
 Teams that want to leave Artifactory need a registry that their existing clients,

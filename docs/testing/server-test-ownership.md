@@ -39,18 +39,16 @@ fails until the inventory and the tree agree.
 
 `ownership.OwnedTestDir`, in `tools/citestselection/ownership`, decides which
 `_test.go` files are server tests that need a reviewed owner: those in one of
-these directories, where `<root>` is `migration` or `internal`. P9d stages the
-target tree under `migration/` and renames it to `internal/` at promotion, so
-both roots are accepted until then.
+these directories.
 
 - `test/server` and everything below it;
-- `<root>/app`;
-- `<root>/<module>/adapters/http` and everything below it;
-- `<root>/artifacts/ecosystem/<type>/http` and everything below it.
+- `internal/app`;
+- `internal/<module>/adapters/http` and everything below it;
+- `internal/artifacts/ecosystem/<type>/http` and everything below it.
 
 Every `packages` key must be one of these directories, written in clean form. A
 test in a format's directory (`test/server/artifacts/<type>` or
-`<root>/artifacts/ecosystem/<type>/http`) counts as that format's code on a
+`internal/artifacts/ecosystem/<type>/http`) counts as that format's code on a
 narrow PR only when its package owner is that format; any other owner, `shared`
 included, selects full CI.
 

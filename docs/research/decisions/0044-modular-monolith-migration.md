@@ -448,7 +448,7 @@ rule can fail. There is no depguard configuration.
   linters would surface about 126 unrelated findings. Revive's `checkPublicInterface`
   stays off.
 - **Guidance.** `CLAUDE.md` is unchanged, since its layout rule stays true.
-  [`migration/README.md`](../../../migration/README.md) and a banner in
+  [`migration/README.md`](https://github.com/weaveplatform/artifactweave/blob/671fb9459b9c1717fc6c485695daa85b07fe0861/migration/README.md) and a banner in
   [`repo-layout.md`](../../implementation/repo-layout.md) carry the migration guidance.
 
 ### Type-alias bridges
@@ -457,7 +457,7 @@ A declaration that leaves a legacy split package, such as `pkg/types`, `pkg/stor
 `internal/auth` or `internal/authz`, leaves an alias at its old path while its users are
 re-pointed: one `bridge_<target>.go` per target, headed by a comment that names the
 declaring package and the change that deletes the bridge (the exact form is in
-[`migration/README.md`](../../../migration/README.md)), and never marked `Deprecated:`.
+[`migration/README.md`](https://github.com/weaveplatform/artifactweave/blob/671fb9459b9c1717fc6c485695daa85b07fe0861/migration/README.md)), and never marked `Deprecated:`.
 Sentinel errors bridge as `var ErrNotFound = kernel.ErrNotFound`, the same pointer, so
 `errors.Is` keeps matching; generic functions bridge as wrappers. A `package X` test that
 would form an import cycle becomes `package X_test` with an `export_test.go`. Every user
@@ -560,7 +560,7 @@ Nothing in this decision departs from Artifactory's behaviour, so it has no entr
   rules, repository root and package mapping), and the other option documents in
   [`docs/research/architecture-options/`](../architecture-options/).
 - [Implementation plan, modular-monolith migration section](../../implementation/plan.md#p9d-modular-monolith-migration),
-  and [`migration/README.md`](../../../migration/README.md).
+  and [`migration/README.md`](https://github.com/weaveplatform/artifactweave/blob/671fb9459b9c1717fc6c485695daa85b07fe0861/migration/README.md).
 - Decisions that stay in force and that the moves preserve:
   [0002](0002-spec-first-flat-crud-handwritten-item-paths.md) (generated strict servers and
   handwritten item paths), [0004](0004-storage-sql-metadata-and-blobs.md) (SQL metadata and

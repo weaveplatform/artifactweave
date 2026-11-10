@@ -14,11 +14,12 @@ metadata across members and caches the merged result for
 
 ## Decision
 
-`internal/service/repo` resolves a virtual repository by walking `repositories` in order
-and returning the first member that has the item; nested virtuals are flattened with cycle
-detection. Writes go to `defaultDeploymentRepo` and fail with Artifactory's error when it
-is unset. `artifactoryRequestsCanRetrieveRemoteArtifacts` controls whether requests that
-originate from another repository on the same instance may reach remote members.
+`internal/artifacts/core/virtual` resolves a virtual repository by walking `repositories`
+in order and returning the first member that has the item; nested virtuals are flattened
+with cycle detection. Writes go to `defaultDeploymentRepo` and fail with Artifactory's
+error when it is unset. `artifactoryRequestsCanRetrieveRemoteArtifacts` controls whether
+requests that originate from another repository on the same instance may reach remote
+members.
 
 Each format handler implements a merge for its non-unique metadata:
 
@@ -74,7 +75,7 @@ The decision stands against 7.161.32 as a plan for P10. The 7.x notes add inputs
 
 P10 owns virtual resolution and permission-filtered metadata merging. P28 adds
 remaining existing-format operations, such as npm audit and private PyPI search;
-P29–P33 add format-specific virtual adapters where the target permits that class.
+P29 to P33 add format-specific virtual adapters where the target permits that class.
 Each must prove member ordering, upstream failure, visibility and native-client
 behavior. A generic file lookup alone does not satisfy a native metadata contract.
 

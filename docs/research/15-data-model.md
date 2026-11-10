@@ -390,8 +390,8 @@ direction (push from a local, pull into a remote) is derived from the repository
 | Metadata server reindex | request/response bodies untyped in the initial inventory | generated 501 today; P28 owns this remaining core/index API, distinct from implemented per-format reindex |
 
 Current system-route availability is checked against the
-[generated stubs](../../internal/server/gen/artifactory/unimplemented.gen.go) and the
-[implemented-route registry](../../internal/server/stub_test.go). The shapes above
+[generated stubs](../../internal/platform/gen/artifactory/unimplemented.gen.go) and the
+[implemented-route registry](../../internal/app/stub_test.go). The shapes above
 record contracts; they do not imply configuration persistence or operational effects.
 
 ### 2.7 Legacy security (`administration-jfrog-artifactory-security-api`)

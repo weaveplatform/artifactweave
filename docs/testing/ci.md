@@ -23,7 +23,7 @@ and native clients. A package or `_test.go` file may contain both kinds.
 Subtests inherit the kind of their top-level test; their display names need no
 prefix. Classifying a test changes its name only, not its assertions or
 fixtures. `make test-names` uses Go's parser to check all tracked application
-test files under `api/`, `internal/`, `migration/`, `pkg/`, `test/` and `tools/`, including
+test files under `api/`, `internal/`, `pkg/`, `test/` and `tools/`, including
 platform-specific and build-tagged sources; `go run ./tools/testnames -json`
 prints the complete inventory. `make test`, `make accept-go` and `make accept`
 run the guard. The `Select CI tests` job runs it before planning any profile.

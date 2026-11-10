@@ -27,16 +27,19 @@ The initial domain model derives from [research 15](../15-data-model.md), sectio
 an entity exists because an operation reads or writes it, and its fields are the union
 of those contracts. This dated inventory is not a closed set. Under
 [0042](0042-capability-scope-and-supersession.md), P20 inventories the expanded surface
-and P21–P40 add the required entities, migrations and converters, including GraphQL
+and P21 to P40 add the required entities, migrations and converters, including GraphQL
 and external integration contracts. Existing tables alone do not prove a service works.
 
 - **One internal representation per entity.** Each entity has one Go type in the
   `core/model` package of the module that owns it (domain) that carries every field any
   wire form needs, in the type the server reasons with (booleans as `bool`, sizes as
-  `int64`, times as `time.Time`). Wire forms live only in `internal/kernel/wire` and are
-  produced and consumed by converters; no handler or store touches a wire struct directly.
-  `internal/artifacts/api/repo` is the existing instance of this rule for repositories
-  and stays the model for that entity.
+  `int64`, times as `time.Time`). Wire forms live only in `internal/kernel/wire`, and
+  converters produce and consume them. The handlers that exchange a wire form decode and
+  encode it themselves: the security and permission handlers
+  (`internal/access/adapters/http/security.go` and `permissions.go`) and the storage
+  summary (`internal/artifacts/adapters/http/storageinfo.go`). No store touches a wire
+  struct. `internal/artifacts/api/repo` is the existing instance of this rule for
+  repositories and stays the model for that entity.
 - **Wire quirks are preserved by the converters, never by the domain.** Booleans
   accepted as strings, `size` as a decimal string, `lastDownloaded` as epoch
   milliseconds in one projection and ISO time in another, kebab-case keys in the legacy
