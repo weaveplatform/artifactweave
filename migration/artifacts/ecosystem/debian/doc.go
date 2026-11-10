@@ -16,10 +16,8 @@
 // service through the format hooks (decision 0032), so every write and
 // delete in a Debian repository reaches it whichever API carried it, and
 // it rebuilds the apt metadata as queued work (decision 0033). The Debian
-// protocol is still the root files migration/artifacts/ecosystem/debian/http/debian.go,
-// debian_operations.go, debian_snapshot.go and debian_virtual.go, which
-// serve remote and virtual metadata, the reindex operation and snapshots
-// with this package.
+// protocol is the http subpackage (debianhttp), which serves remote and
+// virtual metadata, the reindex operation and snapshots with this package.
 //
 // # Inputs
 //
@@ -27,19 +25,20 @@
 //     service's hooks for debian repositories to Handler; the work queue, which
 //     runs the metadata rebuild (KindIndex) and the reindex operation's
 //     writeProps=0 form (KindReindexNoProps) through Handler.Work, and every
-//     format's reindex through Handler.Reindex; and the server's root files:
-//     debian.go, which checks metadata paths and decodes an index to serve it
-//     only to a caller who may read every package it lists; debian_virtual.go,
-//     which composes and signs a virtual repository's metadata
-//     (DecodePackagesIndex, ReleasePackageIndexes, GzipIndex, Release,
-//     SignRelease); debian_snapshot.go, which copies checksum-bound metadata
-//     into a snapshot (ReleaseIndexRefs) under WithSnapshotWrite;
-//     debian_operations.go, which queues KindReindexNoProps; source.go, which
-//     checks upstream metadata or a package before a remote caches it (the
-//     *Path predicates, ValidateReleaseMetadata, DecodePackagesIndex,
-//     DecodeSourcesIndex, ReadBinary, ReadSource); and items.go, which permits
-//     a whole snapshot folder's delete (WithSnapshotDelete) and sends a
-//     remote's downloads through the remote source (Serves).
+//     format's reindex through Handler.Reindex; the protocol (debianhttp),
+//     which checks metadata paths and decodes an index to serve it only to a
+//     caller who may read every package it lists, composes and signs a
+//     virtual repository's metadata (DecodePackagesIndex,
+//     ReleasePackageIndexes, GzipIndex, Release, SignRelease), copies
+//     checksum-bound metadata into a snapshot (ReleaseIndexRefs) under
+//     WithSnapshotWrite, and queues KindReindexNoProps; the item kit
+//     (artifacts/adapters/http/itemkit), whose remote source request checks
+//     upstream metadata or a package before a remote caches it (the *Path
+//     predicates, ValidateReleaseMetadata, DecodePackagesIndex,
+//     DecodeSourcesIndex, ReadBinary, ReadSource), and whose item GET sends a
+//     remote's downloads through the remote source (Serves); and the
+//     artifacts module's item delete (artifacts/adapters/http), which permits
+//     a whole snapshot folder's delete (WithSnapshotDelete).
 //   - Driven: the format hooks' environment (format.Env): its blobs hold
 //     the packages; its store holds the items, their properties and the
 //     package index (artifacts/core/pkgindex), and lists a repository's
@@ -103,8 +102,8 @@
 //     digests, and its signatures bind them.
 //   - A local or federated repository's apt metadata under dists/ is
 //     derived, never uploaded, and never built for a remote from its
-//     partial cache: a remote caches the upstream's after source.go has
-//     checked it.
+//     partial cache: a remote caches the upstream's after the item kit's
+//     remote source request has checked it.
 //   - Nothing under snapshots/ is written except by the server's own
 //     snapshot publication, or deleted except as a whole snapshot folder
 //     (409).
@@ -127,8 +126,8 @@
 //     https://docs.jfrog.com/artifactory/reference/createdebiansnapshot.
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     line 233 (ecosystem/debian), line 379 (the slice row), line 407 (the
-//     protocol's later home, ecosystem/debian/http) and line 997 (the
-//     mapping row).
+//     protocol's home, ecosystem/debian/http) and line 997 (the mapping
+//     row).
 //   - Plan: docs/implementation/plan.md#p29-linux-package-repositories
 //     and #p9d-modular-monolith-migration, epic ECO
 //     (https://github.com/weaveplatform/artifactweave/issues/943).
@@ -163,8 +162,8 @@
 //     with KindIndex as the repository's work.
 //
 // testdata holds the contract packages, the dpkg-source fixture alpha_1.0-1
-// and generate-source.sh, which builds it; the root
-// migration/artifacts/ecosystem/debian/http/debian_source_test.go and the acceptance steps also read
-// them. The protocol's native apt evidence is the @debian acceptance
-// partition (test/acceptance/features/debian.feature).
+// and generate-source.sh, which builds it; the protocol's tests
+// (http/debian_source_test.go) and the acceptance steps also read them. The
+// protocol's native apt evidence is the @debian acceptance partition
+// (test/acceptance/features/debian.feature).
 package debian

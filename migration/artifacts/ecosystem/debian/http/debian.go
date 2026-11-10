@@ -32,9 +32,14 @@ var errDebianIndexTooLarge = errors.New("server: debian Packages index exceeds l
 // serves Debian's indexes and virtual repositories, over the item kit.
 type DebianAPI struct{ *itemkit.Kit }
 
-// TryDebianItem ensures a Packages index is never returned to a caller who
-// cannot read every package it advertises. The ordinary item route cannot
-// make that guarantee for a cached or virtual metadata file.
+// TryDebianItem is the overlay (itemkit.Overlay) that serves a Debian
+// repository's Packages and Sources indexes and their by-hash copies, and a
+// virtual repository's metadata under dists/ and its binary packages. It
+// ensures an index is never returned to a caller who cannot read every
+// package it advertises, which the ordinary item route cannot guarantee for
+// a cached or virtual metadata file. It reports whether it answered; every
+// other request, a folder among them, it leaves to the overlays after it
+// and the generic lookup.
 func TryDebianItem(
 	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,

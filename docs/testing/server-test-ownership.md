@@ -65,7 +65,7 @@ When a test file leaves a shared directory such as `internal/server`:
 | Conan | `migration/artifacts/ecosystem/conan/http`, `test/server/artifacts/conan` |
 | Conda | `migration/artifacts/ecosystem/conda/http`, `test/server/artifacts/conda` |
 | CRAN | `test/server/artifacts/cran` |
-| Debian | `test/server/artifacts/debian` |
+| Debian | `migration/artifacts/ecosystem/debian/http`, `test/server/artifacts/debian` |
 | Docker/OCI | `migration/artifacts/ecosystem/docker/http`, `test/server/artifacts/docker` |
 | Go modules | `migration/artifacts/ecosystem/golang/http`, `test/server/artifacts/golang` |
 | Helm | `migration/artifacts/ecosystem/helm/http`, `test/server/artifacts/helm` |

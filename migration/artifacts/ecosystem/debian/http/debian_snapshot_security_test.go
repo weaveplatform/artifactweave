@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -30,7 +29,7 @@ func TestUnitDebianSnapshotRejectsUnboundMetadata(t *testing.T) {
 		{name: "malformed index", index: "bad!", size: 4, digest: fmt.Sprintf("%x", sha256.Sum256([]byte("bad!"))), expectedError: "Packages index"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			w := newItemWorld(t, false)
+			w := newItemWorld(t)
 			c := *repo.Defaults(&repo.Config{
 				Key: "deb-source", Class: repo.Local, PackageType: repo.Debian,
 			})
@@ -69,11 +68,11 @@ func TestUnitDebianSnapshotRejectsUnboundMetadata(t *testing.T) {
 				put(index, tc.index)
 			}
 			p := kernel.Principal{Name: "admin", Admin: true}
-			acc, err := itemkit.AccessFor(t.Context(), authorizerOver(w.db), p, nil)
+			acc, err := itemkit.AccessFor(t.Context(), authorizerOver(t, w.db), p, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
-			_, err = DebianAPI{newKit(server.Config{Store: w.db, Blobs: w.blobs})}.
+			_, err = DebianAPI{newKit(Config{Store: w.db, Blobs: w.blobs})}.
 				debianSnapshotFiles(t.Context(), w.db, c, "stable", p, acc)
 			if err == nil || !strings.Contains(err.Error(), tc.expectedError) {
 				t.Fatalf("unbound snapshot metadata: %v, want %q", err, tc.expectedError)
@@ -83,7 +82,7 @@ func TestUnitDebianSnapshotRejectsUnboundMetadata(t *testing.T) {
 }
 
 func TestAccDebianSnapshotClaimCannotBeReusedByAnotherSource(t *testing.T) {
-	w := newItemWorld(t, false)
+	w := newItemWorld(t)
 	for _, key := range []string{"deb-source-one", "deb-source-two", "deb-target"} {
 		if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&repo.Config{
 			Key: key, Class: repo.Local, PackageType: repo.Debian,

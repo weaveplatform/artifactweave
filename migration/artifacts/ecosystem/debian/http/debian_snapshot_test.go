@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -91,7 +90,7 @@ func TestUnitDebianSnapshotRequiresValidRepositoriesAndPermissions(t *testing.T)
 			if tc.user != "" {
 				p = kernel.Principal{Name: tc.user}
 			}
-			acc, err := itemkit.AccessFor(ctx, authorizerOver(st), p, nil)
+			acc, err := itemkit.AccessFor(ctx, authorizerOver(t, st), p, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -146,7 +145,7 @@ func TestUnitDebianSnapshotPreservesCompletedAndClaimedTags(t *testing.T) {
 				t.Fatal(err)
 			}
 			p := kernel.Principal{Name: "admin", Admin: true}
-			acc, err := itemkit.AccessFor(ctx, authorizerOver(st), p, nil)
+			acc, err := itemkit.AccessFor(ctx, authorizerOver(t, st), p, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -156,7 +155,7 @@ func TestUnitDebianSnapshotPreservesCompletedAndClaimedTags(t *testing.T) {
 				Tag:          "first",
 				Distribution: tc.distribution,
 			}
-			err = DebianAPI{newKit(server.Config{Store: st})}.createDebianSnapshot(
+			err = DebianAPI{newKit(Config{Store: st})}.createDebianSnapshot(
 				ctx, st, job, p, acc,
 			)
 			if (err != nil) != tc.expectedErr {
@@ -223,7 +222,7 @@ func TestUnitDebianSnapshotWorkUsesCurrentPermissions(t *testing.T) {
 	}
 	if err := RegisterDebianSnapshotWork(
 		q,
-		newKit(server.Config{Store: st, Access: accessAPI}),
+		newKit(Config{Store: st, Access: accessAPI}),
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -265,7 +264,7 @@ func TestUnitDebianSnapshotWorkWithoutAuthenticator(t *testing.T) {
 	}
 	if err := RegisterDebianSnapshotWork(
 		q,
-		newKit(withAccess(server.Config{Store: st})),
+		newKit(withAccess(t, Config{Store: st})),
 	); err != nil {
 		t.Fatal(err)
 	}
