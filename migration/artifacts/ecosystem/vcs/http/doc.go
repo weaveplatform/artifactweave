@@ -16,7 +16,7 @@
 // vcshttp so that it does not shadow net/http. The slice has no format
 // package, so the item service gives VCS repositories the generic hooks
 // (decision 0032). The routes under /artifactory/api/vcs are still the
-// root files internal/server/vcs_routes.go, vcs_download.go, vcs_nested.go
+// root files migration/artifacts/ecosystem/vcs/http/vcs_routes.go, vcs_download.go, vcs_nested.go
 // and vcs_peer_file.go, which serve them with this package. Outside tests,
 // only its own http subtree, the module's http adapters and app may import
 // it (decision 0044, dependency rules); the root files do until they move.

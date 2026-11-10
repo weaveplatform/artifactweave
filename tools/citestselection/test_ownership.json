@@ -140,7 +140,6 @@
       "stub_test.go",
       "tokens_fixture_test.go",
       "tokens_status_test.go",
-      "vcs_routes_internal_test.go",
       "vcs_tables_test.go"
     ],
     "migration/access/adapters/http": [
@@ -329,7 +328,6 @@
       "test/server/artifacts/storage_list_test.go"
     ],
     "vcs": [
-      "internal/server/vcs_routes_internal_test.go",
       "internal/server/vcs_tables_test.go"
     ]
   }

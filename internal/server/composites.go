@@ -6,6 +6,7 @@ import (
 	cranhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cran/http"
 	debianhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian/http"
 	rpmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/rpm/http"
+	vcshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/vcs/http"
 	configurationhttp "github.com/weaveplatform/artifactweave/migration/configuration/adapters/http"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
@@ -40,7 +41,7 @@ type artifactoryServer struct {
 	*accesshttp.SecurityAPI
 	*configurationhttp.SystemAPI
 	*artifactshttp.ArtifactoryAPI
-	*VCSAPI
+	*vcshttp.VCSAPI
 	*npmAPI
 	*dockerAPI
 	*debianhttp.DebianAPI

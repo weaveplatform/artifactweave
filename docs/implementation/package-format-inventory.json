@@ -593,7 +593,7 @@
       "owner_issue": 786,
       "evidence": "test/acceptance/features/vcs_recipes.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/vcs-repositories",
-      "route_file": "internal/server/vcs_routes.go",
+      "route_file": "migration/artifacts/ecosystem/vcs/http/vcs_routes.go",
       "p9c": true
     },
     {

@@ -1,4 +1,4 @@
-package server
+package vcshttp
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	vcshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/vcs/http"
@@ -100,7 +101,7 @@ func TestUnitVCSExactRefsURLDoesNotFollowRedirects(t *testing.T) {
 }
 
 func TestUnitVCSArchiveBadRequestRejectsBeforeSource(t *testing.T) {
-	s := VCSAPI{newKit(Config{})}
+	s := VCSAPI{newKit(server.Config{})}
 	for _, tc := range []struct{ kind, ext string }{{"tags", "exe"}, {"other", "zip"}} {
 		_, _, err := s.vcsArchive(t.Context(), "r", "team", "project", tc.kind, "main", tc.ext, "")
 		var api *apierror.Error
@@ -113,7 +114,7 @@ func TestUnitVCSArchiveBadRequestRejectsBeforeSource(t *testing.T) {
 const vcsTestOID = "0123456789abcdef0123456789abcdef01234567"
 
 func TestUnitVCSResultStreamRevalidationAndUsage(t *testing.T) {
-	s := VCSAPI{newKit(Config{})}
+	s := VCSAPI{newKit(server.Config{})}
 	var used, closed int
 	newBody := func(body string) *source.Stream {
 		return &source.Stream{
@@ -220,7 +221,7 @@ type countingVCSReadCloser struct {
 func (r *countingVCSReadCloser) Close() error { *r.closed++; return nil }
 
 func TestUnitVCSPropertyFilterRequiresCachedItem(t *testing.T) {
-	s := VCSAPI{newKit(Config{})}
+	s := VCSAPI{newKit(server.Config{})}
 	closed := 0
 	result := source.Result{
 		Stream: &source.Stream{
@@ -246,7 +247,7 @@ func TestUnitVCSPropertyFilterMatchesOnlyCachedItemProperties(t *testing.T) {
 		types.Properties{"qa": {"approved"}, "source": {"git"}}, time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	s := VCSAPI{newKit(Config{Store: w.db})}
+	s := VCSAPI{newKit(server.Config{Store: w.db})}
 	result := source.Result{Item: &item}
 	for _, tc := range []struct {
 		name   string
@@ -274,7 +275,7 @@ func TestUnitVCSPropertyFilterMatchesOnlyCachedItemProperties(t *testing.T) {
 
 func TestUnitVCSCachedResultRequiresBlobAndPreservesReadFault(t *testing.T) {
 	result := source.Result{Item: &types.Item{Size: 7}}
-	s := VCSAPI{newKit(Config{})}
+	s := VCSAPI{newKit(server.Config{})}
 	if _, _, err := s.vcsOpenResult(
 		t.Context(),
 		result,
