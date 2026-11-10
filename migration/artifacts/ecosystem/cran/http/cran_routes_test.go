@@ -9,7 +9,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -23,7 +22,7 @@ func cranFixtureBytes(t *testing.T, name string) []byte {
 }
 
 func TestUnitCRANReadAuthorityCallbacks(t *testing.T) {
-	w := newItemWorld(t, false)
+	w := newItemWorld(t)
 	c := repo.Config{Key: "cran-rights", Class: repo.Local, PackageType: repo.Cran}
 	cranRepo(t, w, c)
 	admin := kernel.Principal{Name: "admin", Admin: true}
@@ -41,7 +40,7 @@ func TestUnitCRANReadAuthorityCallbacks(t *testing.T) {
 		{"upstream fault", admin, errors.New("upstream fault"), false, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			acc, err := itemkit.AccessFor(t.Context(), authorizerOver(w.db), tc.who, nil)
+			acc, err := itemkit.AccessFor(t.Context(), authorizerOver(t, w.db), tc.who, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -130,10 +129,10 @@ func TestUnitCRANUploadRequiresStoreAndAuthenticatedCaller(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/artifactory/api/cran/cran-local/sources",
 		bytes.NewReader(body))
 	missingStore := httptest.NewRecorder()
-	CranAPI{Kit: newKit(server.Config{})}.uploadCranSource(missingStore, req)
+	CranAPI{Kit: newKit(Config{})}.uploadCranSource(missingStore, req)
 	wantStatus(t, missingStore, http.StatusNotImplemented)
-	w := newItemWorld(t, false)
+	w := newItemWorld(t)
 	withoutCaller := httptest.NewRecorder()
-	CranAPI{Kit: newKit(server.Config{Store: w.db})}.uploadCranSource(withoutCaller, req)
+	CranAPI{Kit: newKit(Config{Store: w.db})}.uploadCranSource(withoutCaller, req)
 	wantStatus(t, withoutCaller, http.StatusUnauthorized)
 }

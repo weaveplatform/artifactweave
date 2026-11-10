@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -94,7 +93,7 @@ func TestUnitCRANSourceValidatesPublishedBytes(t *testing.T) {
 }
 
 func TestUnitCRANVirtualRejectsCyclesAndWrongMembers(t *testing.T) {
-	w := newItemWorld(t, false)
+	w := newItemWorld(t)
 	for _, c := range []repo.Config{
 		{Key: "cran-wrong", Class: repo.Local, PackageType: repo.Maven},
 		{Key: "cran-local", Class: repo.Local, PackageType: repo.Cran},
@@ -107,11 +106,11 @@ func TestUnitCRANVirtualRejectsCyclesAndWrongMembers(t *testing.T) {
 		}
 	}
 	p := kernel.Principal{Name: "admin", Admin: true}
-	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(w.db), p, nil)
+	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(t, w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := CranAPI{Kit: newKit(server.Config{Store: w.db, Blobs: w.blobs})}
+	svc := CranAPI{Kit: newKit(Config{Store: w.db, Blobs: w.blobs})}
 	for _, tc := range []struct {
 		key      string
 		expected error

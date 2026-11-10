@@ -12,22 +12,21 @@
 // bound rules of the P2 slice. A P2 repository is remote or virtual and is
 // never deployed to, so the slice registers no format Handler and the item
 // service gives P2 repositories the generic hooks (decision 0032). The P2
-// protocol is still the root files migration/artifacts/ecosystem/p2/http/p2.go and
-// p2_external.go, which serve a remote's update site, its site.zip!/
-// archive form and its composite children, and a virtual repository's
-// composite metadata, with this package.
+// protocol is the http subpackage (p2http), which serves a remote's update
+// site, its site.zip!/ archive form and its composite children, and a
+// virtual repository's composite metadata, with this package.
 //
 // # Inputs
 //
-//   - Driving: the server's root files: p2.go, which classes each read
-//     (Classify) and serves a file from a remote's site archive
-//     (ExtractArchive, within MaxArtifact); p2_external.go, which resolves
-//     a composite's children (ValidChildLocation, MaxChildURL, MaxDepth),
-//     rewrites their locations to the repository's own paths
-//     (EditComposite), pins a child artifact to the checksums its site
-//     declares (ArtifactChecksums) and serves entries of a child's site
-//     archive (ExtractArchive); and source.go, which checks upstream p2
-//     content before a remote caches it (Classify, Validate).
+//   - Driving: the protocol (p2http), which classes each read (Classify),
+//     serves a file from a remote's site archive (ExtractArchive, within
+//     MaxArtifact), resolves a composite's children (ValidChildLocation,
+//     MaxChildURL, MaxDepth), rewrites their locations to the repository's
+//     own paths (EditComposite), pins a child artifact to the checksums
+//     its site declares (ArtifactChecksums) and serves entries of a child's
+//     site archive (ExtractArchive); and the item kit
+//     (artifacts/adapters/http/itemkit), whose remote source request checks
+//     upstream p2 content before a remote caches it (Classify, Validate).
 //   - Driven: none. It reads only the bytes or reader it is given, with xz
 //     (github.com/ulikunitz/xz) for the .xml.xz metadata form, and keeps
 //     no state.
@@ -84,8 +83,7 @@
 //     https://docs.jfrog.com/artifactory/docs/p2-repositories.
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     line 234 (ecosystem/p2), line 379 (the slice row), line 408 (the
-//     protocol's later home, ecosystem/p2/http) and line 997 (the mapping
-//     row).
+//     protocol's home, ecosystem/p2/http) and line 997 (the mapping row).
 //   - Plan: docs/implementation/plan.md#p31-native-build-and-plugin-repositories
 //     and #p9d-modular-monolith-migration, epic ECO
 //     (https://github.com/weaveplatform/artifactweave/issues/943).
@@ -112,8 +110,8 @@
 //
 // testdata holds unmodified files of the published Eclipse GLSP 2.7.0 update
 // site (p2.index, the content and artifacts metadata as .jar and .xml.xz,
-// and a source bundle), which the suites in test/server/artifacts/p2,
-// internal/server's p2_internal_test.go and the acceptance steps also read.
+// and a source bundle), which the suites in test/server/artifacts/p2, the
+// protocol's tests (http/p2_test.go) and the acceptance steps also read.
 // The protocol's native evidence is the @p2 acceptance partition
 // (test/acceptance/features/p2.feature), which drives the Eclipse p2
 // director.

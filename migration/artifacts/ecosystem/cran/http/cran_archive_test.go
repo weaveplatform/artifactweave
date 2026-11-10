@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
@@ -16,7 +15,7 @@ import (
 )
 
 func TestAccCRANArchiveDeletedAfterEnumeration(t *testing.T) {
-	w := newItemWorld(t, false)
+	w := newItemWorld(t)
 	c := *repo.Defaults(&repo.Config{Key: "cran-migrate", Class: repo.Local, PackageType: repo.Cran})
 	cranRepo(t, w, c)
 	body := string(cranFixtureBytes(t, "assertthat_0.2.1.tar.gz"))
@@ -98,12 +97,8 @@ func (s cranMigrationItems) Get(
 }
 
 func TestAccCRANArchiveMigrationPaginationAndCancellation(t *testing.T) {
-	var cfg server.Config
-	w := newItemWorld(
-		t,
-		false,
-		func(c *server.Config) { c.CranArchiveMoverEnabled = true; cfg = *c },
-	)
+	var cfg Config
+	w := newItemWorld(t, func(c *Config) { c.CranArchiveMoverEnabled = true; cfg = *c })
 	c := *repo.Defaults(&repo.Config{Key: "cran-migrate", Class: repo.Local, PackageType: repo.Cran})
 	cranRepo(t, w, c)
 	body := string(cranFixtureBytes(t, "assertthat_0.2.1.tar.gz"))

@@ -106,7 +106,7 @@ func TestUnitP2ArchiveURLAcceptsOnlyHTTPZipRoot(t *testing.T) {
 }
 
 func TestUnitP2VirtualFailsClosedWhenMemberStoreFails(t *testing.T) {
-	w := newItemWorld(t, false)
+	w := newItemWorld(t)
 	admin := accessapi.Subject{Name: "admin", Admin: true}
 	d, err := accesstest.Over(t, w.db).Decide(t.Context(), admin, false)
 	if err != nil {
