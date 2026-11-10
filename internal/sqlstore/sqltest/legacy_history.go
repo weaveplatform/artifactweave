@@ -8,6 +8,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
 )
 
 // legacyHistory is a history table that predates the per-module migration
@@ -48,7 +49,7 @@ func LegacyHistoryRefused(t *testing.T, db *sql.DB, d dialect.Dialect, open func
 		}
 	}
 	// Schema leaves out the history table, so any other object shows here.
-	if got, err := Schema(ctx, db, d.Name); err != nil || got != "\n" {
+	if got, err := sqltest.Schema(ctx, db, d.Name); err != nil || got != "\n" {
 		t.Errorf("the refused database holds more than its history (%v):\n%s", err, got)
 	}
 	var columns []string

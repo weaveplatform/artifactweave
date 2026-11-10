@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
 	sqlitedrv "github.com/weaveplatform/artifactweave/migration/platform/sql/sqlite"
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
 )
 
 var update = flag.Bool("update", false, "rewrite the schema golden")

@@ -113,7 +113,7 @@ func TestAccStreamsMigrateAlone(t *testing.T) {
 			if err != nil || len(up) == 0 {
 				t.Fatalf("Migrate %s = %v, %v", m.Name, up, err)
 			}
-			got, err := sqltest.Schema(ctx, db, pgdrv.Dialect.Name)
+			got, err := platsqltest.Schema(ctx, db, pgdrv.Dialect.Name)
 			if err != nil || got == "\n" {
 				t.Fatalf("Migrate %s created no table (%v)", m.Name, err)
 			}
@@ -121,7 +121,7 @@ func TestAccStreamsMigrateAlone(t *testing.T) {
 			if err != nil || len(down) != len(up) {
 				t.Fatalf("Rollback %s = %v, %v; want %v reverted", m.Name, down, err, up)
 			}
-			got, err = sqltest.Schema(ctx, db, pgdrv.Dialect.Name)
+			got, err = platsqltest.Schema(ctx, db, pgdrv.Dialect.Name)
 			if err != nil || got != "\n" {
 				t.Fatalf("Rollback %s left (%v):\n%s", m.Name, err, got)
 			}

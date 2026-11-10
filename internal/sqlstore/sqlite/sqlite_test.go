@@ -12,6 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	sqlitedrv "github.com/weaveplatform/artifactweave/migration/platform/sql/sqlite"
+	sqlsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/storetest"
 )
@@ -93,7 +94,7 @@ func TestAccMigrationsUpDownUp(t *testing.T) {
 	}
 	// The streams applied again build the schema a fresh database has.
 	golden := filepath.Join("testdata", "schema.golden")
-	sqltest.SchemaGolden(t, s.DB(), sqlitedrv.Dialect.Name, golden, false)
+	sqlsqltest.SchemaGolden(t, s.DB(), sqlitedrv.Dialect.Name, golden, false)
 }
 
 // TestAccLegacyHistoryRefused opens a database whose history predates the

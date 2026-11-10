@@ -25,6 +25,6 @@ func TestAccSchemaGolden(t *testing.T) {
 	t.Cleanup(func() { _ = s.Close() })
 	// Earlier tests of the binary leave rows behind on the shared server.
 	sqltest.Reset(t, s.DB(), pgdrv.Dialect)
-	sqltest.SchemaGolden(t, s.DB(), pgdrv.Dialect.Name,
+	platsqltest.SchemaGolden(t, s.DB(), pgdrv.Dialect.Name,
 		filepath.Join("testdata", "schema.golden"), *update)
 }
