@@ -56,7 +56,7 @@
 //     docs/research/decisions/0029-cdn-delivery-and-download-redirect.md
 //     (the minimum redirect size).
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
-//     "Full package tree", lines 302 to 307 (configuration/api's config.go
+//     "Full package tree", lines 302 to 306 (configuration/api's config.go
 //     and events.go), and lines 1111 to 1116 (descriptor apply as the one
 //     sanctioned transaction across modules).
 //   - Research 06: docs/research/06-system-configuration-and-descriptor.md.

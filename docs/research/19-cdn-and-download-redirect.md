@@ -219,7 +219,7 @@ At first written for main at `00888fc`, after #139; updated for #146 (the redire
 | Behaviour | Source |
 |---|---|
 | A GET on a repository with `downloadRedirect` or `cdnRedirect` follows decision 0029's policy: conditional requests that resolve to 304 or 412 are answered locally; a repository with neither flag, a file under the minimum size and `X-JFrog-Download-Redirect-To: None` stream; otherwise the store's CDN unless the header says `S3` or the file is over the CDN's limit, then storage for `downloadRedirect`, then stream | `internal/server/redirect.go` (`route`, `redirect`) |
-| The minimum size is the descriptor's `downloadRedirectConfig.fileMinimumSize` in MB once applied, and `download.redirect.min_size` (1 MiB) until then | `internal/descriptor/redirect.go`, `internal/server/redirect.go` (`minRedirectSize`) |
+| The minimum size is the descriptor's `downloadRedirectConfig.fileMinimumSize` in MB once applied, and `download.redirect.min_size` (1 MiB) until then | `migration/configuration/core/descriptor/redirect.go`, `internal/server/redirect.go` (`minRedirectSize`) |
 | A store with CloudFront, alone or as a mirror member, sends no file over 50,000,000,000 bytes to the CDN | `pkg/cdn` (`CloudFrontMaxSize`), `internal/app/blob.go` (`cdnMaxSize`) |
 | A Docker or OCI manifest GET follows the same policy, its signed URL carrying the manifest's media type; its HEAD is answered locally | `internal/server/docker/manifests.go`, `internal/server/redirect.go` (`redirectManifest`) |
 | HEAD is answered locally, never redirected | `internal/server/redirect.go` |

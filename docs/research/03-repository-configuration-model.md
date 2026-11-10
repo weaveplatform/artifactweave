@@ -773,7 +773,8 @@ The rows from `downloadRedirect` on, except `remoteRepoLayout`, are from the
 [YAML page](https://docs.jfrog.com/installation/docs/repositories-configurations-in-artifactory-yaml.md) [D].
 
 artifactweave reads each YAML key in the table into its JSON field, so the descriptor and
-the repositories API store the same value in the same place (`internal/descriptor/parse.go`):
+the repositories API store the same value in the same place
+(`migration/configuration/core/descriptor/parse.go`):
 
 - `downloadRedirect` takes the `{enabled: <bool>}` block or the flat flag the JSON API
   uses.
