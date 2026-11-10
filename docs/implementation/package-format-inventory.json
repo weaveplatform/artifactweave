@@ -161,7 +161,7 @@
       "owner_issue": 758,
       "evidence": "test/acceptance/features/debian.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/debian-repositories",
-      "route_file": "internal/server/debian.go",
+      "route_file": "migration/artifacts/ecosystem/debian/http/debian.go",
       "p9c": true
     },
     {

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/config"
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/migration/access"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
@@ -28,6 +27,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conda"
+	debianhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian/http"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
@@ -47,7 +47,7 @@ var repairEvery = mirror.DefaultRepairInterval
 
 // registerDebianSnapshotWork registers the Debian snapshot handler with the
 // work queue. It is a variable so tests can see the kit it is given.
-var registerDebianSnapshotWork = server.RegisterDebianSnapshotWork
+var registerDebianSnapshotWork = debianhttp.RegisterDebianSnapshotWork
 
 // runtime is what serve holds open: the metadata store, the blob tiers, the
 // garbage collector, the work queue, and the background loops (mirror

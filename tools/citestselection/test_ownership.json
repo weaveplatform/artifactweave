@@ -17,6 +17,7 @@
     "migration/artifacts/ecosystem/composer/http": "composer",
     "migration/artifacts/ecosystem/conan/http": "conan",
     "migration/artifacts/ecosystem/conda/http": "conda",
+    "migration/artifacts/ecosystem/debian/http": "debian",
     "migration/artifacts/ecosystem/docker/http": "docker",
     "migration/artifacts/ecosystem/gems/http": "gems",
     "migration/artifacts/ecosystem/gitlfs/http": "gitlfs",
@@ -108,9 +109,6 @@
       "cran_archive_internal_test.go",
       "cran_internal_test.go",
       "cran_routes_internal_test.go",
-      "debian_snapshot_security_internal_test.go",
-      "debian_snapshot_test.go",
-      "debian_source_test.go",
       "error_profiles_p8_test.go",
       "fixtures_test.go",
       "format_tables_test.go",
@@ -281,11 +279,6 @@
       "internal/server/cran_internal_test.go",
       "internal/server/cran_routes_internal_test.go",
       "internal/server/status_cran_archive_test.go"
-    ],
-    "debian": [
-      "internal/server/debian_snapshot_security_internal_test.go",
-      "internal/server/debian_snapshot_test.go",
-      "internal/server/debian_source_test.go"
     ],
     "docker": [
       "internal/app/registry_remote_test.go",

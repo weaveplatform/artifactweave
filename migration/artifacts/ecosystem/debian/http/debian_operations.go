@@ -1,4 +1,4 @@
-package server
+package debianhttp
 
 import (
 	"context"

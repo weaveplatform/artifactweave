@@ -3,6 +3,7 @@ package server
 import (
 	accesshttp "github.com/weaveplatform/artifactweave/migration/access/adapters/http"
 	artifactshttp "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http"
+	debianhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian/http"
 	rpmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/rpm/http"
 	configurationhttp "github.com/weaveplatform/artifactweave/migration/configuration/adapters/http"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
@@ -41,7 +42,7 @@ type artifactoryServer struct {
 	*vcsAPI
 	*npmAPI
 	*dockerAPI
-	*DebianAPI
+	*debianhttp.DebianAPI
 	*cranAPI
 	*rpmhttp.RPMAPI
 	artifactoryStubs

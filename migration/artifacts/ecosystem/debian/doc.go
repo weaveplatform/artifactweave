@@ -16,7 +16,7 @@
 // service through the format hooks (decision 0032), so every write and
 // delete in a Debian repository reaches it whichever API carried it, and
 // it rebuilds the apt metadata as queued work (decision 0033). The Debian
-// protocol is still the root files internal/server/debian.go,
+// protocol is still the root files migration/artifacts/ecosystem/debian/http/debian.go,
 // debian_operations.go, debian_snapshot.go and debian_virtual.go, which
 // serve remote and virtual metadata, the reindex operation and snapshots
 // with this package.
@@ -164,7 +164,7 @@
 //
 // testdata holds the contract packages, the dpkg-source fixture alpha_1.0-1
 // and generate-source.sh, which builds it; the root
-// internal/server/debian_source_test.go and the acceptance steps also read
+// migration/artifacts/ecosystem/debian/http/debian_source_test.go and the acceptance steps also read
 // them. The protocol's native apt evidence is the @debian acceptance
 // partition (test/acceptance/features/debian.feature).
 package debian

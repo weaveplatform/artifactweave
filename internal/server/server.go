@@ -36,6 +36,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	alpinehttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/alpine/http"
+	debianhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian/http"
 	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
 	luarockshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/luarocks/http"
 	opkghttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/opkg/http"
@@ -307,7 +308,7 @@ var overlays = []itemkit.Overlay{
 	artifactshttp.TryMachineLearningItem,
 	artifactshttp.TryChefItem,
 	tryCranItem,
-	TryDebianItem,
+	debianhttp.TryDebianItem,
 	rpmhttp.TryRPMItem,
 	opkghttp.TryOpkgItem,
 	tryP2Item,
@@ -385,7 +386,7 @@ func New(cfg Config) http.Handler {
 	vcsOps := vcsAPI{kit}
 	npmOps := npmAPI{kit}
 	dockerOps := dockerAPI{kit}
-	debianOps := DebianAPI{kit}
+	debianOps := debianhttp.DebianAPI{kit}
 	cranOps := cranAPI{Kit: kit, archiveMoverEnabled: cfg.CranArchiveMoverEnabled}
 	rpmOps := rpmhttp.RPMAPI{Kit: kit}
 	sysAPI := configurationhttp.New(configurationhttp.Deps{

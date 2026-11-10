@@ -1,4 +1,4 @@
-package server
+package debianhttp
 
 import (
 	"crypto/sha256"
@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -72,7 +73,7 @@ func TestUnitDebianSnapshotRejectsUnboundMetadata(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			_, err = DebianAPI{newKit(Config{Store: w.db, Blobs: w.blobs})}.
+			_, err = DebianAPI{newKit(server.Config{Store: w.db, Blobs: w.blobs})}.
 				debianSnapshotFiles(t.Context(), w.db, c, "stable", p, acc)
 			if err == nil || !strings.Contains(err.Error(), tc.expectedError) {
 				t.Fatalf("unbound snapshot metadata: %v, want %q", err, tc.expectedError)
