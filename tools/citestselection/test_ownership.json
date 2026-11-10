@@ -119,6 +119,7 @@
       "matrix_test.go",
       "npm_auth_paths_test.go",
       "npm_fixture_test.go",
+      "npm_operations_internal_test.go",
       "oidc_status_test.go",
       "permissions_status_test.go",
       "registry_shared_test.go",
