@@ -15,7 +15,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -99,7 +98,7 @@ func NewUpstreamSearch(
 	d UpstreamDeps,
 ) *UpstreamSearch {
 	return &UpstreamSearch{
-		r: r, ls: ls, g: httpkit.Deref(g), a: httpkit.Deref(a),
+		r: r, ls: ls, g: deref(g), a: deref(a),
 		sources: d.Sources, items: d.Items, routes: d.Routes, fail: d.Fail,
 	}
 }
@@ -224,7 +223,7 @@ func (u *UpstreamSearch) Gavc(ctx context.Context, v, c *string) ([]LayoutHit, e
 }
 
 // Disclose reports whether the search may name full, as Routes.Disclose
-// decides and records it, which makes an UpstreamSearch a Upstream.
+// decides and records it, which makes an UpstreamSearch an Upstream.
 func (u *UpstreamSearch) Disclose(key, full string, folder bool, cached ...bool) bool {
 	return u.routes.Disclose(key, full, folder, cached...)
 }
