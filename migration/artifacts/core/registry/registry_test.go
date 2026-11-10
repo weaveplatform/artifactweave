@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
-	"github.com/weaveplatform/artifactweave/migration/app/storetest"
+	appstoretest "github.com/weaveplatform/artifactweave/migration/app/storetest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
@@ -50,10 +50,10 @@ func backends() []backend {
 		{"sqlite", func(t *testing.T) (registry.Store, func() registry.Store) {
 			path := filepath.Join(t.TempDir(), "aw.db")
 			open := func() registry.Store {
-				st, err := storetest.OpenSQLite(
+				st, err := appstoretest.OpenSQLite(
 					context.Background(),
 					path,
-					storetest.SQLiteOptions{},
+					appstoretest.SQLiteOptions{},
 				)
 				if err != nil {
 					t.Fatal(err)
@@ -65,11 +65,11 @@ func backends() []backend {
 		}},
 		{"postgres", func(t *testing.T) (registry.Store, func() registry.Store) {
 			dsn := platsqltest.PostgresDSN(t)
-			open := func() *storetest.SQLStore {
-				st, err := storetest.OpenPostgres(
+			open := func() *appstoretest.SQLStore {
+				st, err := appstoretest.OpenPostgres(
 					context.Background(),
 					dsn,
-					storetest.PostgresOptions{},
+					appstoretest.PostgresOptions{},
 				)
 				if err != nil {
 					t.Fatal(err)
@@ -79,7 +79,7 @@ func backends() []backend {
 			}
 			// The test binary shares one server, so each test starts empty.
 			first := open()
-			storetest.Reset(t, first.DB(), first.Dialect())
+			appstoretest.Reset(t, first.DB(), first.Dialect())
 			return first, func() registry.Store { return open() }
 		}},
 	}

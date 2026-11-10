@@ -13,7 +13,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/app/storetest"
+	appstoretest "github.com/weaveplatform/artifactweave/migration/app/storetest"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	pgdrv "github.com/weaveplatform/artifactweave/migration/platform/sql/postgres"
@@ -314,16 +314,16 @@ func TestAccConcurrentPushes(t *testing.T) {
 // On PostgreSQL, whose transactions read only what others committed, the
 // format's check alone would let several through.
 func TestAccConcurrentPushesOnPostgres(t *testing.T) {
-	db, err := storetest.OpenPostgres(
+	db, err := appstoretest.OpenPostgres(
 		context.Background(),
 		platsqltest.PostgresDSN(t),
-		storetest.PostgresOptions{},
+		appstoretest.PostgresOptions{},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	storetest.Reset(t, db.DB(), pgdrv.Dialect)
+	appstoretest.Reset(t, db.DB(), pgdrv.Dialect)
 	testConcurrentPushes(t, newFixtureOn(t, db))
 }
 

@@ -30,13 +30,13 @@ func runBuildRowLock(t *testing.T, factory Factory) {
 				t.Errorf("locked run %d, want %d", got.ID, b.ID)
 			}
 			if err != nil {
-				return err
+				return err //nolint:wrapcheck // the transaction returns the store's own error
 			}
 			got, err = s.Builds().ByIDForUpdate(ctx, b.ID)
 			if err == nil && got.ID != b.ID {
 				t.Errorf("locked run by ID %d, want %d", got.ID, b.ID)
 			}
-			return err
+			return err //nolint:wrapcheck // the transaction returns the store's own error
 		}))
 	})
 }

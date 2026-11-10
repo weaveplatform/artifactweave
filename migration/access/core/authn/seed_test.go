@@ -12,7 +12,7 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
-	"github.com/weaveplatform/artifactweave/migration/app/storetest"
+	appstoretest "github.com/weaveplatform/artifactweave/migration/app/storetest"
 	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -120,10 +120,10 @@ func TestUnitSeedInMemory(t *testing.T) { seedTwice(t, inmem.New()) }
 
 func TestAccSeedSQLite(t *testing.T) {
 	ctx := context.Background()
-	st, err := storetest.OpenSQLite(
+	st, err := appstoretest.OpenSQLite(
 		ctx,
 		filepath.Join(t.TempDir(), "aw.db"),
-		storetest.SQLiteOptions{},
+		appstoretest.SQLiteOptions{},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -136,12 +136,12 @@ func TestAccSeedSQLite(t *testing.T) {
 func TestAccSeedPostgres(t *testing.T) {
 	dsn := platsqltest.PostgresDSN(t)
 	ctx := context.Background()
-	st, err := storetest.OpenPostgres(ctx, dsn, storetest.PostgresOptions{})
+	st, err := appstoretest.OpenPostgres(ctx, dsn, appstoretest.PostgresOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = st.Close() })
-	storetest.Reset(t, st.DB(), st.Dialect())
+	appstoretest.Reset(t, st.DB(), st.Dialect())
 	seedTwice(t, st)
 }
 

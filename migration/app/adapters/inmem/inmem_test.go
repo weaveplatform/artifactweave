@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
-	"github.com/weaveplatform/artifactweave/migration/app/storetest"
+	appstoretest "github.com/weaveplatform/artifactweave/migration/app/storetest"
 	artport "github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	fedport "github.com/weaveplatform/artifactweave/migration/federation/core/port"
 	ntfport "github.com/weaveplatform/artifactweave/migration/notifications/core/port"
@@ -15,7 +15,7 @@ import (
 )
 
 func TestUnitContract(t *testing.T) {
-	storetest.Run(t, func(*testing.T) store.Store { return inmem.New() })
+	appstoretest.Run(t, func(*testing.T) store.Store { return inmem.New() })
 }
 
 // The in-memory store must satisfy each module's port Store, which declares

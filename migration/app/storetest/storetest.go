@@ -1,7 +1,3 @@
-// Package storetest is the contract suite for pkg/store implementations
-// (decision 0015). Every backend (inmem, SQLite in memory and on disk,
-// PostgreSQL) runs Run with a factory that returns a fresh, empty store, so
-// one set of expectations defines the behaviour of all of them.
 package storetest
 
 import (

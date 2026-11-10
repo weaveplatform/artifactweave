@@ -18,8 +18,10 @@ exclude:
     # Contract-suite harnesses (decision 0015): their remaining branches are
     # the t.Fatal paths taken only when a backend violates the contract.
     - ^migration/platform/blob/blobtest/
-    - ^pkg/store/storetest/
     - ^migration/artifacts/core/formattest/
+    # The backends that the composition root hands the format contract: the
+    # same t.Fatal paths, of a store that cannot be opened.
+    - ^migration/app/apptest/
     # Assertions the store contract suites share: the same t.Fatal paths.
     - ^migration/platform/testkit/storekit/
     # Per-module store contract suites (decision 0015); their remaining
@@ -28,9 +30,10 @@ exclude:
     # The platform's store contract suite (decision 0015), in platform/store
     # rather than an adapters directory: the same t.Fatal paths.
     - ^migration/platform/store/storetest/
-    # The composite store's SQL contract suites; their remaining branches are
-    # t.Fatal paths taken only when a backend breaks the contract.
-    - ^internal/sqlstore/sqltest/
+    # The composite stores' contract suite (decision 0015) and their SQL
+    # suites; their remaining branches are t.Fatal paths taken only when a
+    # backend breaks the contract.
+    - ^migration/app/storetest/
     # Module SQL harness: its remaining branches are t.Fatal paths of a
     # container or database that fails to start, migrate or clean up, and the
     # ARTIFACTWEAVE_TEST_POSTGRES_DSN branch, which CI does not set.

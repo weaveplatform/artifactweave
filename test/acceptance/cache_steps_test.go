@@ -8,7 +8,7 @@ import (
 
 	"github.com/cucumber/godog"
 
-	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
+	appsql "github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql/sqlite"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
@@ -28,7 +28,7 @@ func (w *world) registerCache(sc *godog.ScenarioContext) {
 func (w *world) cacheFile(remote, file, target string) error {
 	ctx := context.Background()
 	st, err := sqlite.Open(ctx, filepath.Join(w.dataDir, "artifactweave.db"),
-		sqlite.Options{Options: sql.Options{SkipMigrate: true}})
+		sqlite.Options{Options: appsql.Options{SkipMigrate: true}})
 	if err != nil {
 		return err
 	}

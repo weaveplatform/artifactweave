@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
+	appsql "github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
 	artport "github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	fedport "github.com/weaveplatform/artifactweave/migration/federation/core/port"
 	ntfport "github.com/weaveplatform/artifactweave/migration/notifications/core/port"
@@ -97,10 +97,10 @@ func declaredStoreMethods(t *testing.T) []string {
 // until its adapters move (STO-14, STO-15, STO-17, STO-18). The aggregate's
 // accessors return the bridged port interfaces, which are the same types.
 var (
-	_ artport.Store = (*sql.Store)(nil)
-	_ ntfport.Store = (*sql.Store)(nil)
-	_ retport.Store = (*sql.Store)(nil)
-	_ fedport.Store = (*sql.Store)(nil)
-	_ relport.Store = (*sql.Store)(nil)
-	_ wrkport.Store = (*sql.Store)(nil)
+	_ artport.Store = (*appsql.Store)(nil)
+	_ ntfport.Store = (*appsql.Store)(nil)
+	_ retport.Store = (*appsql.Store)(nil)
+	_ fedport.Store = (*appsql.Store)(nil)
+	_ relport.Store = (*appsql.Store)(nil)
+	_ wrkport.Store = (*appsql.Store)(nil)
 )

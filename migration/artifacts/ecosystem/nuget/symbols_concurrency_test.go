@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/app/storetest"
+	appstoretest "github.com/weaveplatform/artifactweave/migration/app/storetest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
@@ -21,12 +21,12 @@ import (
 func TestAccSymbolsOppositeMovesOnPostgres(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
-	db, err := storetest.OpenPostgres(ctx, platsqltest.PostgresDSN(t), storetest.PostgresOptions{})
+	db, err := appstoretest.OpenPostgres(ctx, platsqltest.PostgresDSN(t), appstoretest.PostgresOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = db.Close() }()
-	storetest.Reset(t, db.DB(), pgdrv.Dialect)
+	appstoretest.Reset(t, db.DB(), pgdrv.Dialect)
 	w := newWorldOn(t, db, nil)
 	other := w.repo("nuget-other", repo.Local, nil)
 	w.deploy("A.1.0.0.snupkg", pdbPackage("A", zipFile{"lib/app.pdb", string(portablePDB())}), nil)

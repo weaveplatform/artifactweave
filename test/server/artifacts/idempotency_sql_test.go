@@ -14,10 +14,10 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
+	appsql "github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql/postgres"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql/sqlite"
-	"github.com/weaveplatform/artifactweave/migration/app/storetest"
+	appstoretest "github.com/weaveplatform/artifactweave/migration/app/storetest"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	pgdrv "github.com/weaveplatform/artifactweave/migration/platform/sql/postgres"
 	platsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
@@ -33,9 +33,9 @@ func TestAccAppendReplayDurability(t *testing.T) {
 			if backend == "postgres" {
 				dsn = platsqltest.PostgresDSN(t)
 			}
-			open := func() *sql.Store {
+			open := func() *appsql.Store {
 				t.Helper()
-				var s *sql.Store
+				var s *appsql.Store
 				var err error
 				if backend == "sqlite" {
 					s, err = sqlite.Open(ctx, path, sqlite.Options{})
@@ -50,14 +50,14 @@ func TestAccAppendReplayDurability(t *testing.T) {
 			}
 			first := open()
 			if backend == "postgres" {
-				storetest.Reset(t, first.DB(), pgdrv.Dialect)
+				appstoretest.Reset(t, first.DB(), pgdrv.Dialect)
 			}
 			cheapSeed(t, first)
 			blobs, err := fs.New(t.TempDir())
 			if err != nil {
 				t.Fatal(err)
 			}
-			handler := func(s *sql.Store) http.Handler {
+			handler := func(s *appsql.Store) http.Handler {
 				t.Helper()
 				a, err := authn.NewAuthenticator(
 					s.Users(),

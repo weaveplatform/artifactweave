@@ -23,7 +23,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
-	"github.com/weaveplatform/artifactweave/migration/app/storetest"
+	appstoretest "github.com/weaveplatform/artifactweave/migration/app/storetest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
@@ -142,10 +142,10 @@ func proxyConfig(t *testing.T, raw string) wire.ProxyConfiguration {
 
 func TestAccResolverSealedCredentialsAndRotation(t *testing.T) {
 	key, _ := crypt.New([]byte("0123456789abcdef0123456789abcdef"))
-	st, err := storetest.OpenSQLite(
+	st, err := appstoretest.OpenSQLite(
 		t.Context(),
 		sqlitedrv.Memory,
-		storetest.SQLiteOptions{Options: storetest.Options{Keyring: key}},
+		appstoretest.SQLiteOptions{Options: appstoretest.Options{Keyring: key}},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -447,10 +447,10 @@ func TestAccResolverTLSClientIdentityAndRotation(t *testing.T) {
 	)
 	upstream.Set("/item", fakeupstream.Resource{Body: []byte("mutual")})
 	key, _ := crypt.New([]byte("0123456789abcdef0123456789abcdef"))
-	st, err := storetest.OpenSQLite(
+	st, err := appstoretest.OpenSQLite(
 		t.Context(),
 		sqlitedrv.Memory,
-		storetest.SQLiteOptions{Options: storetest.Options{Keyring: key}},
+		appstoretest.SQLiteOptions{Options: appstoretest.Options{Keyring: key}},
 	)
 	if err != nil {
 		t.Fatal(err)

@@ -42,7 +42,7 @@ func testTxCommit(t *testing.T, s store.Store) {
 	committed := false
 	storekit.Must(t, s.Tx(ctx, func(ctx context.Context) error {
 		if _, err := s.Blobs().Ref(ctx, blob(1), 1); err != nil {
-			return err
+			return err //nolint:wrapcheck // the transaction returns the store's own error
 		}
 		s.AfterCommit(ctx, func() { committed = true })
 		if committed {
@@ -70,10 +70,10 @@ func testTxRollback(t *testing.T, s store.Store) {
 	notified := false
 	err := s.Tx(ctx, func(ctx context.Context) error {
 		if _, err := s.Blobs().Ref(ctx, blob(2), 1); err != nil {
-			return err
+			return err //nolint:wrapcheck // the transaction returns the store's own error
 		}
 		if _, err := s.Blobs().Ref(ctx, blob(1), 5); err != nil {
-			return err
+			return err //nolint:wrapcheck // the transaction returns the store's own error
 		}
 		s.AfterCommit(ctx, func() { notified = true })
 		return errBoom
@@ -103,11 +103,11 @@ func testTxNested(t *testing.T, s store.Store) {
 	// TestUnitTxNestedJoinsOuter in memtx.
 	err := s.Tx(ctx, func(ctx context.Context) error {
 		if _, err := s.Blobs().Ref(ctx, blob(1), 1); err != nil {
-			return err
+			return err //nolint:wrapcheck // the transaction returns the store's own error
 		}
 		return s.Tx(ctx, func(ctx context.Context) error {
 			if _, err := s.Blobs().Ref(ctx, blob(2), 1); err != nil {
-				return err
+				return err //nolint:wrapcheck // the transaction returns the store's own error
 			}
 			return errBoom
 		})
@@ -120,7 +120,7 @@ func testTxNested(t *testing.T, s store.Store) {
 	storekit.Must(t, s.Tx(ctx, func(ctx context.Context) error {
 		return s.Tx(ctx, func(ctx context.Context) error {
 			_, err := s.Blobs().Ref(ctx, blob(3), 1)
-			return err
+			return err //nolint:wrapcheck // the transaction returns the store's own error
 		})
 	}))
 	storekit.Get[types.Blob](t)(s.Blobs().Get(ctx, blob(3).Checksums.SHA256))

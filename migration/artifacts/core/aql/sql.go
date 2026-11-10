@@ -18,11 +18,11 @@ const (
 	PostgreSQL
 )
 
-// Compiled is a query as SQL over the store's tables (internal/sqlstore
-// migrations): the caller selects its columns FROM the domain's table,
-// items, builds or build_promotions, unaliased, then appends " WHERE " +
-// Where and Tail, binding Args in order. Placeholders are "?"; a
-// PostgreSQL caller rebinds them.
+// Compiled is a query as SQL over the artifacts module's tables (the stream
+// in artifacts/adapters/sql/migrations): the caller selects its columns FROM
+// the domain's table, items, builds or build_promotions, unaliased, then
+// appends " WHERE " + Where and Tail, binding Args in order. Placeholders
+// are "?"; a PostgreSQL caller rebinds them.
 type Compiled struct {
 	Where string
 	Tail  string

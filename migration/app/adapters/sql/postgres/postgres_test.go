@@ -9,10 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
+	appsql "github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql/postgres"
-	"github.com/weaveplatform/artifactweave/migration/app/storetest"
-	sqltest "github.com/weaveplatform/artifactweave/migration/app/storetest"
+	appstoretest "github.com/weaveplatform/artifactweave/migration/app/storetest"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	pgdrv "github.com/weaveplatform/artifactweave/migration/platform/sql/postgres"
@@ -26,13 +25,13 @@ func TestAccContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	storetest.Run(t, func(t *testing.T) store.Store {
+	appstoretest.Run(t, func(t *testing.T) store.Store {
 		s, err := postgres.Open(context.Background(), dsn,
-			postgres.Options{Options: sql.Options{Keyring: k}, MaxOpenConns: 8})
+			postgres.Options{Options: appsql.Options{Keyring: k}, MaxOpenConns: 8})
 		if err != nil {
 			t.Fatal(err)
 		}
-		sqltest.Reset(t, s.DB(), pgdrv.Dialect)
+		appstoretest.Reset(t, s.DB(), pgdrv.Dialect)
 		t.Cleanup(func() { _ = s.Close() })
 		return s
 	})
@@ -65,17 +64,17 @@ func TestAccOpenErrors(t *testing.T) {
 func TestAccKeyRotation(t *testing.T) {
 	dsn := platsqltest.PostgresDSN(t)
 	first := true
-	sqltest.Rotation(t, func(t *testing.T, k *crypt.Keyring) *sql.Store {
+	appstoretest.Rotation(t, func(t *testing.T, k *crypt.Keyring) *appsql.Store {
 		s, err := postgres.Open(
 			context.Background(),
 			dsn,
-			postgres.Options{Options: sql.Options{Keyring: k}},
+			postgres.Options{Options: appsql.Options{Keyring: k}},
 		)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if first {
-			sqltest.Reset(t, s.DB(), pgdrv.Dialect)
+			appstoretest.Reset(t, s.DB(), pgdrv.Dialect)
 			first = false
 		}
 		t.Cleanup(func() { _ = s.Close() })
@@ -90,7 +89,7 @@ func TestAccKeyRotation(t *testing.T) {
 func TestAccLegacyHistoryRefused(t *testing.T) {
 	ctx := t.Context()
 	dsn := scratchSchema(t)
-	sqltest.LegacyHistoryRefused(t, openUnmigrated(t, dsn).DB(), pgdrv.Dialect, func() error {
+	appstoretest.LegacyHistoryRefused(t, openUnmigrated(t, dsn).DB(), pgdrv.Dialect, func() error {
 		refused, err := postgres.Open(ctx, dsn, postgres.Options{})
 		if err == nil {
 			_ = refused.Close()
@@ -104,7 +103,7 @@ func TestAccLegacyHistoryRefused(t *testing.T) {
 // another stream, such as a foreign key across modules, fails here, because
 // that table does not exist (decision 0044, "No cross-module foreign keys").
 func TestAccStreamsMigrateAlone(t *testing.T) {
-	mods := sql.Modules()
+	mods := appsql.Modules()
 	for _, m := range mods {
 		t.Run(m.Name, func(t *testing.T) {
 			ctx := t.Context()
@@ -131,11 +130,11 @@ func TestAccStreamsMigrateAlone(t *testing.T) {
 
 // scratchSchema creates an empty schema of its own on the test server and
 // returns a DSN that selects it. pgx passes an unknown DSN parameter such as
-// search_path to the server as a run-time parameter, so every connection of
-// a pool opened with the DSN starts in the schema, and current_schema(),
-// which the migrator's probe and sqltest.Schema read, names it. The schema
-// is dropped when the test ends, because one server serves every test of
-// the binary.
+// search_path to the server as a run-time parameter, so every connection of a
+// pool opened with the DSN starts in the schema, and current_schema(), which
+// the migrator's probe and platsqltest.Schema read, names it. The schema is
+// dropped when the test ends, because one server serves every test of the
+// binary.
 func scratchSchema(t *testing.T) string {
 	t.Helper()
 	dsn := platsqltest.PostgresDSN(t)
@@ -166,10 +165,10 @@ func scratchSchema(t *testing.T) string {
 
 // openUnmigrated opens a store over dsn without migrating, closed when the
 // test ends.
-func openUnmigrated(t *testing.T, dsn string) *sql.Store {
+func openUnmigrated(t *testing.T, dsn string) *appsql.Store {
 	t.Helper()
 	s, err := postgres.Open(t.Context(), dsn,
-		postgres.Options{Options: sql.Options{SkipMigrate: true}})
+		postgres.Options{Options: appsql.Options{SkipMigrate: true}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,7 +178,7 @@ func openUnmigrated(t *testing.T, dsn string) *sql.Store {
 
 func TestAccRemoteCachePersistence(t *testing.T) {
 	dsn := platsqltest.PostgresDSN(t)
-	open := func() *sql.Store {
+	open := func() *appsql.Store {
 		s, err := postgres.Open(context.Background(), dsn, postgres.Options{})
 		if err != nil {
 			t.Fatal(err)
@@ -187,25 +186,25 @@ func TestAccRemoteCachePersistence(t *testing.T) {
 		t.Cleanup(func() { _ = s.Close() })
 		return s
 	}
-	sqltest.RemoteLayoutPersistence(t, open(), open)
+	appstoretest.RemoteLayoutPersistence(t, open(), open)
 }
 
 func TestAccRepositoryHeaderSecrets(t *testing.T) {
 	dsn := platsqltest.PostgresDSN(t)
 	first := true
-	sqltest.RepositoryHeaderEnvironmentRename(
+	appstoretest.RepositoryHeaderEnvironmentRename(
 		t,
-		func(t *testing.T, k *crypt.Keyring) *sql.Store {
+		func(t *testing.T, k *crypt.Keyring) *appsql.Store {
 			s, err := postgres.Open(
 				t.Context(),
 				dsn,
-				postgres.Options{Options: sql.Options{Keyring: k}},
+				postgres.Options{Options: appsql.Options{Keyring: k}},
 			)
 			if err != nil {
 				t.Fatal(err)
 			}
 			if first {
-				sqltest.Reset(t, s.DB(), pgdrv.Dialect)
+				appstoretest.Reset(t, s.DB(), pgdrv.Dialect)
 				first = false
 			}
 			t.Cleanup(func() { _ = s.Close() })
@@ -217,17 +216,17 @@ func TestAccRepositoryHeaderSecrets(t *testing.T) {
 func TestAccRepositoryHeaderMigration(t *testing.T) {
 	dsn := platsqltest.PostgresDSN(t)
 	first := true
-	sqltest.RepositoryHeadersOpen(t, func(t *testing.T, k *crypt.Keyring) *sql.Store {
+	appstoretest.RepositoryHeadersOpen(t, func(t *testing.T, k *crypt.Keyring) *appsql.Store {
 		s, err := postgres.Open(
 			t.Context(),
 			dsn,
-			postgres.Options{Options: sql.Options{Keyring: k}},
+			postgres.Options{Options: appsql.Options{Keyring: k}},
 		)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if first {
-			sqltest.Reset(t, s.DB(), pgdrv.Dialect)
+			appstoretest.Reset(t, s.DB(), pgdrv.Dialect)
 			first = false
 		}
 		t.Cleanup(func() { _ = s.Close() })

@@ -6,10 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
+	appsql "github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql/sqlite"
-	"github.com/weaveplatform/artifactweave/migration/app/storetest"
-	sqltest "github.com/weaveplatform/artifactweave/migration/app/storetest"
+	appstoretest "github.com/weaveplatform/artifactweave/migration/app/storetest"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	sqlitedrv "github.com/weaveplatform/artifactweave/migration/platform/sql/sqlite"
@@ -29,9 +28,9 @@ func keyring(t *testing.T) *crypt.Keyring {
 }
 
 func TestAccContractFile(t *testing.T) {
-	storetest.Run(t, func(t *testing.T) store.Store {
+	appstoretest.Run(t, func(t *testing.T) store.Store {
 		s, err := sqlite.Open(context.Background(), filepath.Join(t.TempDir(), "aw.db"),
-			sqlite.Options{Options: sql.Options{Keyring: keyring(t)}})
+			sqlite.Options{Options: appsql.Options{Keyring: keyring(t)}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -41,9 +40,9 @@ func TestAccContractFile(t *testing.T) {
 }
 
 func TestAccContractMemory(t *testing.T) {
-	storetest.Run(t, func(t *testing.T) store.Store {
+	appstoretest.Run(t, func(t *testing.T) store.Store {
 		s, err := sqlite.Open(context.Background(), sqlitedrv.Memory,
-			sqlite.Options{Options: sql.Options{Keyring: keyring(t)}})
+			sqlite.Options{Options: appsql.Options{Keyring: keyring(t)}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -59,7 +58,7 @@ func TestAccMigrationsUpDownUp(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = s.Close() }()
-	mods := sql.Modules()
+	mods := appsql.Modules()
 	streams, err := dialect.Version(ctx, s.DB(), sqlitedrv.Dialect, mods)
 	if err != nil || len(streams) != len(mods) {
 		t.Fatalf("Version = %v, %v", streams, err)
@@ -103,12 +102,12 @@ func TestAccMigrationsUpDownUp(t *testing.T) {
 func TestAccLegacyHistoryRefused(t *testing.T) {
 	ctx := t.Context()
 	path := filepath.Join(t.TempDir(), "legacy.db")
-	s, err := sqlite.Open(ctx, path, sqlite.Options{Options: sql.Options{SkipMigrate: true}})
+	s, err := sqlite.Open(ctx, path, sqlite.Options{Options: appsql.Options{SkipMigrate: true}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = s.Close() })
-	sqltest.LegacyHistoryRefused(t, s.DB(), sqlitedrv.Dialect, func() error {
+	appstoretest.LegacyHistoryRefused(t, s.DB(), sqlitedrv.Dialect, func() error {
 		refused, err := sqlite.Open(ctx, path, sqlite.Options{})
 		if err == nil {
 			_ = refused.Close()
@@ -137,7 +136,7 @@ func TestAccOpenErrors(t *testing.T) {
 		t.Fatal("a database in a missing directory opened")
 	}
 	s, err := sqlite.Open(ctx, filepath.Join(t.TempDir(), "raw.db"),
-		sqlite.Options{Options: sql.Options{SkipMigrate: true}})
+		sqlite.Options{Options: appsql.Options{SkipMigrate: true}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,11 +148,11 @@ func TestAccOpenErrors(t *testing.T) {
 
 func TestAccKeyRotation(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "aw.db")
-	sqltest.Rotation(t, func(t *testing.T, k *crypt.Keyring) *sql.Store {
+	appstoretest.Rotation(t, func(t *testing.T, k *crypt.Keyring) *appsql.Store {
 		s, err := sqlite.Open(
 			context.Background(),
 			path,
-			sqlite.Options{Options: sql.Options{Keyring: k}},
+			sqlite.Options{Options: appsql.Options{Keyring: k}},
 		)
 		if err != nil {
 			t.Fatal(err)
@@ -165,7 +164,7 @@ func TestAccKeyRotation(t *testing.T) {
 
 func TestAccRemoteCachePersistence(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "remote.db")
-	open := func() *sql.Store {
+	open := func() *appsql.Store {
 		s, err := sqlite.Open(context.Background(), path, sqlite.Options{})
 		if err != nil {
 			t.Fatal(err)
@@ -173,18 +172,18 @@ func TestAccRemoteCachePersistence(t *testing.T) {
 		t.Cleanup(func() { _ = s.Close() })
 		return s
 	}
-	sqltest.RemoteLayoutPersistence(t, open(), open)
+	appstoretest.RemoteLayoutPersistence(t, open(), open)
 }
 
 func TestAccRepositoryHeaderSecrets(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "headers.db")
-	sqltest.RepositoryHeaderEnvironmentRename(
+	appstoretest.RepositoryHeaderEnvironmentRename(
 		t,
-		func(t *testing.T, k *crypt.Keyring) *sql.Store {
+		func(t *testing.T, k *crypt.Keyring) *appsql.Store {
 			s, err := sqlite.Open(
 				t.Context(),
 				path,
-				sqlite.Options{Options: sql.Options{Keyring: k}},
+				sqlite.Options{Options: appsql.Options{Keyring: k}},
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -197,11 +196,11 @@ func TestAccRepositoryHeaderSecrets(t *testing.T) {
 
 func TestAccRepositoryHeaderMigration(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "headers.db")
-	sqltest.RepositoryHeadersOpen(t, func(t *testing.T, k *crypt.Keyring) *sql.Store {
+	appstoretest.RepositoryHeadersOpen(t, func(t *testing.T, k *crypt.Keyring) *appsql.Store {
 		s, err := sqlite.Open(
 			t.Context(),
 			path,
-			sqlite.Options{Options: sql.Options{Keyring: k}},
+			sqlite.Options{Options: appsql.Options{Keyring: k}},
 		)
 		if err != nil {
 			t.Fatal(err)

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
+	appsql "github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
@@ -16,7 +16,7 @@ import (
 
 // Opener opens the same database each call with the given keyring (nil for
 // none).
-type Opener func(t *testing.T, keys *crypt.Keyring) *sql.Store
+type Opener func(t *testing.T, keys *crypt.Keyring) *appsql.Store
 
 // sealedValues is the number of sealed values Rotation writes, one per
 // sealed column.
@@ -71,7 +71,7 @@ func keyring(t *testing.T, keys ...crypt.MasterKey) *crypt.Keyring {
 var instanceKey = ed25519.NewKeyFromSeed([]byte(strings.Repeat("k", ed25519.SeedSize)))
 
 // populate writes one value into every sealed column.
-func populate(t *testing.T, s *sql.Store) {
+func populate(t *testing.T, s *appsql.Store) {
 	t.Helper()
 	ctx := context.Background()
 	check := func(err error) {
@@ -136,7 +136,7 @@ func populate(t *testing.T, s *sql.Store) {
 }
 
 // verify reads every sealed value back.
-func verify(t *testing.T, s *sql.Store) {
+func verify(t *testing.T, s *appsql.Store) {
 	t.Helper()
 	ctx := context.Background()
 	want := func(what, got, value string, err error) {

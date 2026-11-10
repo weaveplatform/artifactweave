@@ -3,7 +3,7 @@ package storetest
 import (
 	"context"
 
-	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
+	appsql "github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql/postgres"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql/sqlite"
 )
@@ -13,11 +13,11 @@ import (
 // test support from app, never the composite's own packages, so they name
 // the composite, and open it with OpenSQLite and OpenPostgres, through this
 // package.
-type SQLStore = sql.Store
+type SQLStore = appsql.Store
 
 // Options configures the composite store's open: whether it migrates, and
 // the keyring that seals secret columns.
-type Options = sql.Options
+type Options = appsql.Options
 
 // SQLiteOptions configures OpenSQLite: the composite store's Options and
 // the SQLite driver's busy timeout.

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
+	appsql "github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
 	"github.com/weaveplatform/artifactweave/migration/app/config"
 	"github.com/weaveplatform/artifactweave/migration/configuration/core/descriptor"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -34,7 +34,7 @@ func repoKeys(t *testing.T, cfg config.Config) []string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	st, err := OpenStore(context.Background(), cfg, sql.Options{Keyring: keys})
+	st, err := OpenStore(context.Background(), cfg, appsql.Options{Keyring: keys})
 	if err != nil {
 		t.Fatal(err)
 	}

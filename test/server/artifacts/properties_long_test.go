@@ -16,7 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql/postgres"
-	sqltest "github.com/weaveplatform/artifactweave/migration/app/storetest"
+	appstoretest "github.com/weaveplatform/artifactweave/migration/app/storetest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/storetest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
@@ -46,7 +46,7 @@ func openPostgres(t *testing.T) store.Store {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	sqltest.Reset(t, db.DB(), pgdrv.Dialect)
+	appstoretest.Reset(t, db.DB(), pgdrv.Dialect)
 	return db
 }
 

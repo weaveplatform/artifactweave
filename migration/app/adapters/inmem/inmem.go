@@ -1,17 +1,3 @@
-// Package inmem is the reference in-memory implementation of pkg/store.
-//
-// # Design
-//
-// Store embeds a *memtx.Store, the in-memory unit of work, so the gate, the
-// transactions with their snapshots, the row copies and the paging are
-// memtx's, and so are Tx, AfterCommit and Close. Store keeps no rows of its
-// own: the platform's stores are migration/platform/store/inmem's, the
-// artifacts module's stores and indexes are
-// migration/artifacts/adapters/inmem's, and the access, notifications,
-// retention, federation, releases and workers stores are those modules'
-// adapters/inmem's, all over the same memtx.Store, each keeping its rows in
-// memtx tables and making every call through Do. It serves unit tests and
-// embedders that need no durability.
 package inmem
 
 import (

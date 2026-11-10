@@ -12,7 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
-	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
+	appsql "github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
 	"github.com/weaveplatform/artifactweave/migration/app/config"
 	"github.com/weaveplatform/artifactweave/migration/artifacts"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
@@ -116,7 +116,7 @@ func OpenRuntime(
 	if err != nil {
 		return nil, err
 	}
-	st, err := OpenStore(ctx, cfg, sql.Options{Keyring: keys})
+	st, err := OpenStore(ctx, cfg, appsql.Options{Keyring: keys})
 	if err != nil {
 		return nil, err
 	}

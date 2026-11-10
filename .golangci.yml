@@ -126,10 +126,10 @@ linters:
       # The SQLite and PostgreSQL drivers' OpenDB names the engine in its
       # errors as the dialect layer names the operation ("sqlite: open: ...",
       # "postgres: parse dsn: ..."), or returns the sentinels ErrPathRequired
-      # and ErrDSNRequired. The composite stores' Open passes them up as it
-      # did while the code was its own, and the store opener adds
-      # "open store: "; wrapping them again would change those texts. STO-19
-      # moves the same call into app.
+      # and ErrDSNRequired. The composite store's openers in
+      # app/adapters/sql/sqlite and app/adapters/sql/postgres pass them up as
+      # they did while the code was their own, and app's store opener adds
+      # "open store: "; wrapping them again would change those texts.
       #
       # The remote policy's typed errors: remote.ResponseError turns an
       # upstream answer into its *source.HTTPError, and remote.PolicyError

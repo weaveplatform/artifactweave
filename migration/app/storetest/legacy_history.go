@@ -6,7 +6,7 @@ import (
 	"slices"
 	"testing"
 
-	sqlcommon "github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
+	appsql "github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	platsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
 )
@@ -35,7 +35,7 @@ func LegacyHistoryRefused(t *testing.T, db *sql.DB, d dialect.Dialect, open func
 		}
 	}
 	opened := open()
-	mods := sqlcommon.Modules()
+	mods := appsql.Modules()
 	_, up := dialect.Migrate(ctx, db, d, mods, "")
 	_, down := dialect.Rollback(ctx, db, d, mods, "", 0)
 	_, version := dialect.Version(ctx, db, d, mods)

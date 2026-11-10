@@ -1,7 +1,7 @@
 # What a split breaks without a compile error is reported: a test that reads
 # its package's own Go source, as filepath.Glob("*.go") in
-# internal/sqlstore/sqlcommon/reseal_test.go does, sees another set of files
-# on either side of the split; and a //go:embed pattern no longer matches when
+# migration/app/adapters/sql/store_test.go does, sees another set of files on
+# either side of the split; and a //go:embed pattern no longer matches when
 # the file and what it embeds part. A pattern that still matches, quoted or
 # not, is fine.
 ok move -ticket STO-05

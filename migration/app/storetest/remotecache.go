@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
+	appsql "github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -19,7 +19,7 @@ import (
 // RemoteLayoutPersistence checks that a layout edit fences the remote source
 // of a repository that uses the layout, and that the layout and the new
 // source generation survive reopening the backend together.
-func RemoteLayoutPersistence(t *testing.T, s *sql.Store, reopen func() *sql.Store) {
+func RemoteLayoutPersistence(t *testing.T, s *appsql.Store, reopen func() *appsql.Store) {
 	t.Helper()
 	Reset(t, s.DB(), s.Dialect())
 	if err := s.Repos().Create(t.Context(), repo.Config{
@@ -33,7 +33,7 @@ func RemoteLayoutPersistence(t *testing.T, s *sql.Store, reopen func() *sql.Stor
 	remoteLayoutPersistence(t, s, reopen)
 }
 
-func remoteLayoutPersistence(t *testing.T, s *sql.Store, reopen func() *sql.Store) {
+func remoteLayoutPersistence(t *testing.T, s *appsql.Store, reopen func() *appsql.Store) {
 	t.Helper()
 	ctx := t.Context()
 	c, err := s.Repos().Get(ctx, "first")

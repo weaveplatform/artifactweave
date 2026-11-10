@@ -11,7 +11,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
-	"github.com/weaveplatform/artifactweave/migration/app/storetest"
+	appstoretest "github.com/weaveplatform/artifactweave/migration/app/storetest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -85,8 +85,8 @@ func TestAccFindReferrers(t *testing.T) {
 	for name, open := range map[string]func(t *testing.T) item.Store{
 		"inmem": func(*testing.T) item.Store { return inmem.New() },
 		"sqlite": func(t *testing.T) item.Store {
-			st, err := storetest.OpenSQLite(context.Background(), filepath.Join(t.TempDir(), "aw.db"),
-				storetest.SQLiteOptions{})
+			st, err := appstoretest.OpenSQLite(context.Background(), filepath.Join(t.TempDir(), "aw.db"),
+				appstoretest.SQLiteOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}

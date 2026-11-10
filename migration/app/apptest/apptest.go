@@ -8,7 +8,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql/postgres"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql/sqlite"
-	"github.com/weaveplatform/artifactweave/migration/app/storetest"
+	appstoretest "github.com/weaveplatform/artifactweave/migration/app/storetest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/formattest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	platsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
@@ -43,7 +43,7 @@ func FormatBackends() []formattest.Backend {
 			t.Cleanup(func() { _ = st.Close() })
 			// The test binary shares one server, so each scenario starts
 			// empty.
-			storetest.Reset(t, st.DB(), st.Dialect())
+			appstoretest.Reset(t, st.DB(), st.Dialect())
 			return st
 		}},
 	}

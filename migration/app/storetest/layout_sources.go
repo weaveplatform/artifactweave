@@ -12,6 +12,9 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// errLayoutRollback rolls back the transaction that deletes a layout.
+var errLayoutRollback = errors.New("rollback layout mutation")
+
 func testRemoteLayoutFences(t *testing.T, s store.Store) {
 	ctx, canonical, key := remoteFixture(t, s)
 	canonical.RepoLayoutRef = "mapped-layout"
@@ -75,14 +78,13 @@ func testRemoteLayoutFences(t *testing.T, s store.Store) {
 		!state.RetryAfterUntil.IsZero() {
 		t.Fatal("layout edit retained old availability", state)
 	}
-	sentinel := errors.New("rollback layout mutation")
 	err := s.Tx(ctx, func(ctx context.Context) error {
 		if err := s.Configs().Delete(ctx, doc.Kind, doc.Key); err != nil {
-			return err
+			return err //nolint:wrapcheck // the transaction returns the store's own error
 		}
-		return sentinel
+		return errLayoutRollback
 	})
-	storekit.WantErr(t, err, sentinel)
+	storekit.WantErr(t, err, errLayoutRollback)
 	storekit.Same(
 		t,
 		"rolled-back source",
