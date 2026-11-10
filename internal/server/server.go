@@ -17,7 +17,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/descriptor"
 	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
 	accesshttp "github.com/weaveplatform/artifactweave/migration/access/adapters/http"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
@@ -70,6 +69,7 @@ import (
 	terraformbackendhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend/http"
 	vagranthttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/vagrant/http"
 	configapi "github.com/weaveplatform/artifactweave/migration/configuration/api"
+	"github.com/weaveplatform/artifactweave/migration/configuration/core/descriptor"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"

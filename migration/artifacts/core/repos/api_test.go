@@ -223,7 +223,7 @@ func TestUnitRepositoriesRemove(t *testing.T) {
 }
 
 // The payload is the one the configuration descriptor writes for a patch that
-// owes a reindex (internal/descriptor's Apply).
+// owes a reindex (migration/configuration/core/descriptor's Apply).
 func TestUnitRepositoriesRequestReindex(t *testing.T) {
 	ctx := context.Background()
 	db := world(t)

@@ -46,7 +46,7 @@ The source inspection for this design is against the P8 baseline:
   remote. JSON decoding ignores unknown fields, including through
   [partial updates](../../migration/artifacts/core/repos/repos.go), so a successful ordinary URL-based
   create/update does not prove these fields took effect. The
-  [descriptor parser](../../internal/descriptor/parse.go) rejects unknown repository fields. This
+  [descriptor parser](../../migration/configuration/core/descriptor/parse.go) rejects unknown repository fields. This
   design changes neither behavior.
 - **[S]** [parity-baseline.json](../../api/parity-baseline.json) retains the three field
   gaps across create/update/read/batch/list shapes and both missing admin operations.
