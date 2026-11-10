@@ -34,10 +34,15 @@ type fileMove struct{ from, to string }
 
 // selectTicket returns the pending move and merge entries of ticket and its
 // pending file move entries. A split or delete entry of the ticket, package
-// or file, is not moved by this tool; it is reported in notices instead.
+// or file, is not moved by this tool; it is reported in notices instead. So
+// is a done entry while the ticket still has pending ones: a ticket may move
+// its file entries in one run and its package entries in a later one, once
+// its split entries have become moves. A ticket with nothing pending left is
+// refused, naming its first done entry, so a second run changes nothing.
 func (t *tree) selectTicket(
 	ticket string,
 ) (entries []*entry, files []*fileEntry, notices []string, err error) {
+	var done []string
 	for _, p := range t.report.Packages {
 		switch {
 		case p.Ticket != ticket:
@@ -45,6 +50,8 @@ func (t *tree) selectTicket(
 			notices = append(notices, fmt.Sprintf(
 				"%s is a %s entry; move carries only move and merge entries and file move entries",
 				p.From, p.Action))
+		case p.Status == ledger.StatusDone:
+			done = append(done, p.From)
 		case p.Status != ledger.StatusPending:
 			return nil, nil, nil, fmt.Errorf(
 				"%w: %s is %s, not pending",
@@ -64,16 +71,24 @@ func (t *tree) selectTicket(
 			)
 		}
 	}
-	files, fileNotices, err := t.selectFiles(ticket)
+	files, fileNotices, doneFiles, err := t.selectFiles(ticket)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	if len(entries) == 0 && len(files) == 0 {
+	done = append(done, doneFiles...)
+	switch {
+	case len(entries) > 0 || len(files) > 0:
+	case len(done) > 0:
+		return nil, nil, nil, fmt.Errorf("%w: %s is done, not pending", errPrecondition, done[0])
+	default:
 		return nil, nil, nil, fmt.Errorf(
 			"%w: %s has no move or merge entry and no file move entry in the ledger",
 			errPrecondition,
 			ticket,
 		)
+	}
+	for _, from := range done {
+		fileNotices = append(fileNotices, from+" is done; move leaves it where it is")
 	}
 	return entries, files, slices.Concat(notices, fileNotices), nil
 }

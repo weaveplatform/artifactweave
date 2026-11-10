@@ -25,13 +25,14 @@ type fileEntry struct {
 	file ledger.File
 }
 
-// selectFiles returns the pending file move entries of ticket, and a notice
-// for each of its split and delete file entries, which are carried out by
-// hand.
-func (t *tree) selectFiles(ticket string) ([]*fileEntry, []string, error) {
+// selectFiles returns the pending file move entries of ticket, a notice for
+// each of its split and delete file entries, which are carried out by hand,
+// and the old paths of its done file move entries, which selectTicket weighs
+// against what is still pending.
+func (t *tree) selectFiles(ticket string) ([]*fileEntry, []string, []string, error) {
 	var (
-		files   []*fileEntry
-		notices []string
+		files         []*fileEntry
+		notices, done []string
 	)
 	for _, f := range t.report.Files {
 		switch {
@@ -40,13 +41,13 @@ func (t *tree) selectFiles(ticket string) ([]*fileEntry, []string, error) {
 			notices = append(notices, fmt.Sprintf(
 				"%s is a %s file entry; move carries only file move entries", f.From, f.Action))
 		case f.Status == ledger.StatusDone:
-			return nil, nil, fmt.Errorf("%w: %s is done, not pending", errPrecondition, f.From)
+			done = append(done, f.From)
 		default:
 			// In a clean tree a pending entry's old path is on disk, so a
 			// broken entry is one whose old path is gone or has another shape,
 			// which requireShape names.
 			if err := t.requireShape(f.From); err != nil {
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
 			files = append(files, &fileEntry{
 				from:   f.From,
@@ -56,7 +57,7 @@ func (t *tree) selectFiles(ticket string) ([]*fileEntry, []string, error) {
 			})
 		}
 	}
-	return files, notices, nil
+	return files, notices, done, nil
 }
 
 // requireShape checks that the from of a file entry says what the tree holds:

@@ -47,6 +47,11 @@
 //     tests becomes one, with a notice. A moved fuzz target's FUZZ_PKGS entry
 //     follows it, and a moved test's ownership inventory keys follow the
 //     rules of docs/testing/server-test-ownership.md, "Moving a root test".
+//   - move -ticket names in a notice, and leaves where they are, the
+//     ticket's split and delete entries and, while it has pending entries,
+//     its done ones: a ticket may move its file entries in one run and its
+//     package entries in a later one, once its split entries have become
+//     moves.
 //   - fix -ticket: each identifier that the ticket's file moves left
 //     unresolved is pointed at the package that now declares it, qualified
 //     with an import (named when its name is taken) or bare in that package,
@@ -90,14 +95,15 @@
 //   - Generated Go files are moved but never edited; make generate rewrites
 //     them (decision 0002). fix edits no generated file and no bridge file.
 //   - move and promote refuse a working tree with uncommitted changes to
-//     tracked files, a ledger that does not validate, an entry that is not
-//     pending, untracked files in a source directory, a target directory
-//     that already holds Go files or whose path runs through a regular file
-//     (on every operating system alike), a package rename that a wrapcheck
-//     exception matches by name and importers that do not type-check. move
-//     also refuses a file entry whose old path the tree does not hold in the
-//     entry's shape, two moves to one path, a move onto a tracked file and a
-//     moved fuzz target whose seed corpus has no file entry to follow it.
+//     tracked files, a ledger that does not validate, an entry that is neither
+//     pending nor done, a ticket with no pending entry left, untracked files
+//     in a source directory, a target directory that already holds Go files or
+//     whose path runs through a regular file (on every operating system
+//     alike), a package rename that a wrapcheck exception matches by name and
+//     importers that do not type-check. move also refuses a file entry whose
+//     old path the tree does not hold in the entry's shape, two moves to one
+//     path, a move onto a tracked file and a moved fuzz target whose seed
+//     corpus has no file entry to follow it.
 //   - fix repairs only what move did: it refuses a ticket whose file move
 //     entries are not done or that has none, and a moved Go file that does
 //     not parse.

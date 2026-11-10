@@ -269,7 +269,7 @@ cannot run.
 | Command | What it does |
 |---|---|
 | `status` | One line per entry with its derived status and a count per status. Given a legacy path (a package directory, a file in one, or a file entry) it prints where that path lives now, renames applied, such as `internal/server/npm/npm.go (pending, ECO-06; moves to migration/artifacts/ecosystem/npm/http/npm.go)`. `-ticket` keeps one ticket's entries; `-json` prints objects `{ticket, from, to, action, status}` |
-| `move -ticket` | Moves every pending `move` and `merge` entry of the ticket in one change, then its pending file `move` entries. The ticket's `split` and `delete` entries, package or file, are named in a notice and left alone |
+| `move -ticket` | Moves every pending `move` and `merge` entry of the ticket in one change, then its pending file `move` entries. The ticket's `split` and `delete` entries, package or file, are named in a notice and left alone, and so are its `done` entries while it has pending ones: a ticket may move its file entries first and its package entries once its `split` entries have become moves |
 | `move -from -to` | Re-homes a directory below `migration/` or `test/` that has no ledger entry, such as a staged package a later ticket puts elsewhere; `-name` sets the package name when it is not the last element of `-to` |
 | `check` | The stale-path step of CI: reports every remaining mention of an old path. `-ticket` checks one ticket's done entries; `-from` checks a re-homed directory |
 | `fmt` | Rewrites the ledger in [canonical form](#canonical-form); `-check` only reports a difference |
@@ -285,15 +285,16 @@ plan.
 
 `move` and `promote` run from the module root and refuse, changing nothing, unless the
 ledger validates and the working tree has no uncommitted change to a tracked file. `move`
-also refuses an entry that is not `pending`, untracked files in a source directory (`git
-mv` would leave them behind), a target directory of a package entry that already holds Go
-files (a target with placeholder subpackages below it is fine), two files that would land
-on one path, a file entry that would overwrite a tracked file, a file entry whose `from`
-the tree does not hold in that shape (an asset directory ends in `/`, a file does not), a
-moved test that declares a fuzz target `FuzzX` while no file entry of the ticket moves its
-seed corpus `testdata/fuzz/FuzzX/` to the new directory's `testdata/fuzz`, a package
-rename that a wrapcheck exception in `.golangci.yml` matches by name, and importers of a
-renamed package that do not type-check for linux, darwin and windows. Then it:
+also refuses an entry that is neither `pending` nor `done`, a ticket with no `pending`
+entry left, untracked files in a source directory (`git mv` would leave them behind), a
+target directory of a package entry that already holds Go files (a target with placeholder
+subpackages below it is fine), two files that would land on one path, a file entry that
+would overwrite a tracked file, a file entry whose `from` the tree does not hold in that
+shape (an asset directory ends in `/`, a file does not), a moved test that declares a fuzz
+target `FuzzX` while no file entry of the ticket moves its seed corpus
+`testdata/fuzz/FuzzX/` to the new directory's `testdata/fuzz`, a package rename that a
+wrapcheck exception in `.golangci.yml` matches by name, and importers of a renamed package
+that do not type-check for linux, darwin and windows. Then it:
 
 1. moves with `git mv` the files directly in each directory, with the entry's `rename`
    applied, and its asset subdirectories, such as `testdata/` and `migrations/`, that hold
