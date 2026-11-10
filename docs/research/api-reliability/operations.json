@@ -1264,12 +1264,11 @@
     "operation_id": "deleteDockerTag",
     "state": "implemented",
     "contract": "Deletes a tag of a Docker, OCI or Helm OCI image, including a multi-architecture tag. The tag folder is removed, and when it holds a manifest list or image index, so are the descriptive `\u003ctag\u003e-\u003cos\u003e-\u003carchitecture\u003e` tags its push added that still hold their platform manifests, and the platform manifests no other tag or index of the image references; manifests and layers another tag still uses stay. A tag holding a single image manifest is removed as the registry's own tag delete removes it. Needs Delete on the image. Removed files go to the trash can when it is on. Errors use the error envelope, as for every REST operation under the Docker API path.",
-    "handler": "internal/server/docker_rest.go: DockerAPI.DeleteDockerTag",
+    "handler": "migration/artifacts/ecosystem/docker/http/rest.go: DockerAPI.DeleteDockerTag",
     "direct_calls": [
       "acc.File",
       "apierror.New",
       "artgen.DeleteDockerTag200TextResponse",
-      "dockerhttp.ValidName",
       "errors.Is",
       "fmt.Sprintf",
       "httpkit.BadRequestf",
@@ -3962,7 +3961,7 @@
   {
     "route": "GET /artifactory/api/agentplugins/{repoKey}/{marketplace}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.AgentPluginItems.getAgentMarketplace-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/agentplugins/http.AgentPluginItems.getAgentMarketplace-fm",
     "review_family": "native-agentplugins",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6343,10 +6342,9 @@
     "operation_id": "getNpmAuth",
     "state": "implemented",
     "contract": "Returns .npmrc lines that authenticate npm to this server as the caller. A caller that sent its user name and password with Basic gets `_auth = \u003cbase64 of user:encrypted password\u003e`, where the encrypted password is the value `GET /api/security/encryptedPassword` returns; the password itself is never returned. A caller that sent an access or reference token gets that same token back: as `_auth = \u003cbase64 of user:token\u003e` when it sent the token as a Basic password, and as `_authToken = \u003ctoken\u003e` when it sent it as a Bearer token or in `X-JFrog-Art-Api`. No other line is sent. Needs an authenticated caller. Errors use the `{\"errors\":[{\"status\",\"message\"}]}` envelope.",
-    "handler": "internal/server/npm_auth.go: NPMAPI.GetNpmAuth",
+    "handler": "migration/artifacts/ecosystem/npm/http/login.go: NPMAPI.GetNpmAuth",
     "direct_calls": [
       "artgen.GetNpmAuth200TextResponse",
-      "npmhttp.AuthLines",
       "s.npmCredential"
     ],
     "review_family": "native-npm",
@@ -6465,14 +6463,12 @@
     "operation_id": "getNpmScopeAuth",
     "state": "implemented",
     "contract": "Returns .npmrc lines that point an npm scope at one npm repository and authenticate the caller to it. The first line is `@\u003cscope\u003e:registry=\u003cregistry URL\u003e`, where the registry URL is `\u003cbase\u003e/artifactory/api/npm/\u003crepoKey\u003e/`. The credential lines follow, each keyed to that URL without its scheme (`//\u003chost\u003e/artifactory/api/npm/\u003crepoKey\u003e/:`), so npm sends them to this registry only. A caller that sent Basic credentials gets `_password=\u003cbase64\u003e` and `username=\u003cuser\u003e`, where the base64 is of its encrypted password, the value `GET /api/security/encryptedPassword` returns, or of the token it sent as its password; the password itself is never returned. A caller that sent a token as a Bearer token or in `X-JFrog-Art-Api` gets `_authToken=\u003ctoken\u003e` with that same token. Any npm repository can be named, local, remote or virtual. Needs an authenticated caller. Errors use the `{\"errors\":[{\"status\",\"message\"}]}` envelope. Because this operation owns GET \u003cregistry\u003e/auth/\u003cscope\u003e, a package named auth cannot have its version manifests read through the registry; its packument and tarballs are unaffected.",
-    "handler": "internal/server/npm_auth.go: NPMAPI.GetNpmScopeAuth",
+    "handler": "migration/artifacts/ecosystem/npm/http/login.go: NPMAPI.GetNpmScopeAuth",
     "direct_calls": [
       "artgen.GetNpmScopeAuth200TextResponse",
       "baseurl.From",
       "httpkit.BadRequestf",
       "itemkit.ResolveRepo",
-      "npmhttp.ScopeAuthLines",
-      "npmhttp.ValidScope",
       "s.Content",
       "s.ItemError",
       "s.npmCredential",
@@ -6971,7 +6967,7 @@
   {
     "route": "GET /artifactory/api/pypi/{repoKey}/pypi/{package}/json",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pypi_routes.go: internal/server.PypiAPI.RegisterPypiMetadataRoutes.func1",
+    "handler": "migration/artifacts/ecosystem/pypi/http/routes.go: migration/artifacts/ecosystem/pypi/http.PypiAPI.RegisterPypiMetadataRoutes.func1",
     "review_family": "native-pypi",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6990,7 +6986,7 @@
   {
     "route": "GET /artifactory/api/pypi/{repoKey}/pypi/{package}/{version}/json",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pypi_routes.go: internal/server.PypiAPI.RegisterPypiMetadataRoutes.func1",
+    "handler": "migration/artifacts/ecosystem/pypi/http/routes.go: migration/artifacts/ecosystem/pypi/http.PypiAPI.RegisterPypiMetadataRoutes.func1",
     "review_family": "native-pypi",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -11823,7 +11819,7 @@
   {
     "route": "HEAD /artifactory/api/agentplugins/{repoKey}/{marketplace}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.AgentPluginItems.getAgentMarketplace-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/agentplugins/http.AgentPluginItems.getAgentMarketplace-fm",
     "review_family": "native-agentplugins",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -15439,7 +15435,7 @@
   {
     "route": "POST /artifactory/api/chef/{repoKey}/reindex",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/chef_routes.go: internal/server.ChefAPI.RegisterChefReindex.func1",
+    "handler": "migration/artifacts/ecosystem/chef/http/routes.go: migration/artifacts/ecosystem/chef/http.ChefAPI.RegisterChefReindex.func1",
     "review_family": "native-chef",
     "effects": "resource mutation/action; see served contract and handler calls; index rebuild/possibly queued work; queue coalescing is not a replay guarantee",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16807,7 +16803,7 @@
   {
     "route": "POST /artifactory/api/maven/calculateMetadata/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.MavenAPI.calculateMavenMetadata-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/maven/http.MavenAPI.calculateMavenMetadata-fm",
     "review_family": "native-maven",
     "effects": "resource mutation/action; see served contract and handler calls; index rebuild/possibly queued work; queue coalescing is not a replay guarantee",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16848,7 +16844,7 @@
   {
     "route": "POST /artifactory/api/maven/generatePom/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.MavenAPI.generateMavenPom-fm",
+    "handler": "internal/server/server.go: migration/artifacts/ecosystem/maven/http.MavenAPI.generateMavenPom-fm",
     "review_family": "native-maven",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16972,7 +16968,7 @@
     "operation_id": "calculateNpmRepositoryMetadata",
     "state": "implemented",
     "contract": "Rebuilds the package index of a local npm repository from the tarballs it holds and their properties. Each tarball on its canonical path is read again for its package.json, and its npm.disttag and npm.deprecated properties give the dist-tags and deprecations, latest among them; a package none of whose tarballs carries latest gets it on the version that ranks highest, a release above every pre-release and then the higher SemVer, written as that tarball's npm.disttag=latest. Packuments and version manifests are then served from the rebuilt index. Package metadata is derived from the index, so a reindex rewrites index entries and properties, never files. Tarballs off their canonical path, or without a readable package.json, stay unindexed until the strict-layout conversion moves them. The rebuild is queued on the persistent work queue under the repository's key and runs in the background; the 200, whose text is \"Recalculating index for npm repository \u003crepoKey\u003e scheduled to run\", says it was queued, not that it finished. Needs the Manage permission on the repository. Only npm local repositories are reindexed; any other repository, npm remote and virtual ones included, is rejected with 400.",
-    "handler": "internal/server/npm_operations.go: NPMAPI.CalculateNpmRepositoryMetadata",
+    "handler": "migration/artifacts/ecosystem/npm/http/operations.go: NPMAPI.CalculateNpmRepositoryMetadata",
     "direct_calls": [
       "artgen.CalculateNpmRepositoryMetadata200TextResponse",
       "s.Reindex"
@@ -17084,7 +17080,7 @@
   {
     "route": "POST /artifactory/api/puppet/{repoKey}/reindex",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/puppet_routes.go: internal/server.PuppetAPI.RegisterPuppetMetadataRoutes.func2",
+    "handler": "migration/artifacts/ecosystem/puppet/http/routes.go: migration/artifacts/ecosystem/puppet/http.PuppetAPI.RegisterPuppetMetadataRoutes.func2",
     "review_family": "native-puppet",
     "effects": "resource mutation/action; see served contract and handler calls; index rebuild/possibly queued work; queue coalescing is not a replay guarantee",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -18785,7 +18781,7 @@
     "operation_id": "migrateNpmRepositoryToStrictLayout",
     "state": "implemented",
     "contract": "Starts converting a local npm repository to strict layout. Every npm local repository here already behaves as one with \"Enforce strict layout\" on, so the conversion only moves tarballs: each .tgz that is stored but not indexed because it sits off its canonical path is moved to the canonical path its package.json gives, with its properties, and indexed there. A tarball without a readable package.json is left where it is, and so is one whose canonical path already holds the same content, which needs no move. A tarball whose canonical path holds anything else, or whose move the repository refuses, as its release and snapshot handling may, is left where it is too, and the conversion fails naming it, after moving every other tarball; the queue retries a failed conversion and parks it once its retries run out, for resume to queue again. The conversion is queued on the persistent work queue under the repository's key and runs in the background: asking again while one is pending joins it, and running it again after it finished changes nothing. Needs the Manage permission on the repository. Only npm local repositories convert; any other repository is rejected with 400. Answers 202 with no body.",
-    "handler": "internal/server/npm_operations.go: NPMAPI.MigrateNpmRepositoryToStrictLayout",
+    "handler": "migration/artifacts/ecosystem/npm/http/operations.go: NPMAPI.MigrateNpmRepositoryToStrictLayout",
     "direct_calls": [
       "s.Enqueue",
       "s.npmOperation"
@@ -18811,7 +18807,7 @@
     "operation_id": "resumeNpmRepositoryMigration",
     "state": "implemented",
     "contract": "Resumes a strict-layout conversion of a local npm repository that failed. The conversion, parked on the persistent work queue once its retries ran out, is queued again with a fresh set of attempts and carries on with the tarballs still off their canonical paths. A conversion cannot be cancelled, so a failed conversion is the only one to resume, and a repository without one is rejected with 400. Needs the Manage permission on the repository. Only npm local repositories convert; any other repository is rejected with 400. Answers 202 with no body.",
-    "handler": "internal/server/npm_operations.go: NPMAPI.ResumeNpmRepositoryMigration",
+    "handler": "migration/artifacts/ecosystem/npm/http/operations.go: NPMAPI.ResumeNpmRepositoryMigration",
     "direct_calls": [
       "errors.Is",
       "httpkit.BadRequestf",

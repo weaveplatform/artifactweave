@@ -9,7 +9,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	puppethttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/puppet/http"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
@@ -32,8 +31,8 @@ func (s PuppetAPI) RegisterPuppetMetadataRoutes(r chi.Router, o pkgroute.Options
 	pkgroute.Mount(
 		protocol,
 		o,
-		puppethttp.Protocol(
-			puppethttp.Options{Blobs: s.Blobs, RemoteSources: s.RemoteSources},
+		Protocol(
+			Options{Blobs: s.Blobs, RemoteSources: s.RemoteSources},
 		),
 	)
 	serve := func(w http.ResponseWriter, r *http.Request) {

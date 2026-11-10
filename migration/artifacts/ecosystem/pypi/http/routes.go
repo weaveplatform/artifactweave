@@ -8,7 +8,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
-	pypihttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi/http"
 )
 
 // PypiAPI serves PyPI's Warehouse JSON operations over the item kit.
@@ -26,8 +25,8 @@ func (s PypiAPI) RegisterPypiMetadataRoutes(r chi.Router, o pkgroute.Options) {
 	pkgroute.Mount(
 		protocol,
 		o,
-		pypihttp.Protocol(
-			pypihttp.Options{Format: s.FormatSettings.PyPI, RemoteSources: s.RemoteSources},
+		Protocol(
+			Options{Format: s.FormatSettings.PyPI, RemoteSources: s.RemoteSources},
 		),
 	)
 	serve := func(w http.ResponseWriter, r *http.Request) {

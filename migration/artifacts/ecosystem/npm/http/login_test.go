@@ -29,7 +29,7 @@ func TestAccNPMInternalPaths(t *testing.T) {
 		"/artifactory/api/go/auth":                 false,
 	} {
 		if got := NPMOperation(path); got != want {
-			t.Errorf("npmOperation(%s) = %v", path, got)
+			t.Errorf("NPMOperation(%s) = %v", path, got)
 		}
 	}
 	for path, want := range map[string]string{
@@ -38,7 +38,7 @@ func TestAccNPMInternalPaths(t *testing.T) {
 		"/artifactory/r/-/user/token/secret":         "/artifactory/r/-/user/token/secret",
 	} {
 		if got := NPMLoggedPath(path); got != want {
-			t.Errorf("npmLoggedPath(%s) = %s", path, got)
+			t.Errorf("NPMLoggedPath(%s) = %s", path, got)
 		}
 	}
 }

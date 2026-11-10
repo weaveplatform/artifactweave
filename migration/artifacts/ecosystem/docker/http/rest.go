@@ -10,7 +10,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
-	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
@@ -21,8 +20,8 @@ import (
 
 // DockerAPI is the Docker ecosystem's partial strict server: the JFrog REST
 // operations under a repository's Docker API path (tag delete, promotion and
-// parent manifest lists), over the item kit. The registry protocol itself is
-// dockerhttp's.
+// parent manifest lists), over the item kit. They are no registry paths, so
+// they answer in the Artifactory envelope, not the registry's.
 type DockerAPI struct{ *itemkit.Kit }
 
 // DeleteDockerTag is the multi-architecture tag delete, the JFrog REST
@@ -53,7 +52,7 @@ func (s DockerAPI) DeleteDockerTag(
 	switch {
 	case name == "" || tag == "":
 		return nil, httpkit.BadRequestf("dockerRepository and tag are required")
-	case !dockerhttp.ValidName(name):
+	case !ValidName(name):
 		return nil, httpkit.BadRequestf("invalid image name '%s'", name)
 	case !layout.ValidTag(tag):
 		return nil, httpkit.BadRequestf("invalid tag '%s'", tag)
@@ -165,9 +164,9 @@ func promotionArgs(b *artgen.PromoteDockerImageJSONRequestBody) (promotion, erro
 	a.toName = orDefault(httpkit.Deref(b.TargetDockerRepository), a.name)
 	a.toTag = orDefault(httpkit.Deref(b.TargetTag), a.tag)
 	switch {
-	case !dockerhttp.ValidName(a.name):
+	case !ValidName(a.name):
 		return a, httpkit.BadRequestf("invalid image name '%s'", a.name)
-	case !dockerhttp.ValidName(a.toName):
+	case !ValidName(a.toName):
 		return a, httpkit.BadRequestf("invalid image name '%s'", a.toName)
 	case a.tag == "" && a.toTag != "":
 		return a, httpkit.BadRequestf("targetTag needs tag: promoting every tag keeps their names")
@@ -245,7 +244,7 @@ func (s DockerAPI) FindParentManifestLists(
 	switch {
 	case name == "" || tag == "":
 		return nil, httpkit.BadRequestf("dockerRepository and tag are required")
-	case !dockerhttp.ValidName(name):
+	case !ValidName(name):
 		return nil, httpkit.BadRequestf("invalid image name '%s'", name)
 	case !layout.ValidTag(tag):
 		return nil, httpkit.BadRequestf("invalid tag '%s'", tag)
@@ -278,7 +277,7 @@ func (s DockerAPI) FindParentManifestLists(
 // not found, and anything but a local or federated Docker, OCI or Helm OCI
 // repository cannot take part (decision 0031).
 func promotionRepo(ctx context.Context, st store.Store, key string) (repo.Config, error) {
-	c, served, err := dockerhttp.Lookup(ctx, st, key)
+	c, served, err := Lookup(ctx, st, key)
 	switch {
 	case err != nil:
 		return c, err //nolint:wrapcheck // the lookup names itself
@@ -310,7 +309,7 @@ func orDefault(v, def string) string {
 // missing key or another package type is not found, and a remote or
 // virtual repository is refused until the registry serves those.
 func dockerRepo(ctx context.Context, st store.Store, key string) (repo.Config, error) {
-	c, found, err := dockerhttp.Lookup(ctx, st, key)
+	c, found, err := Lookup(ctx, st, key)
 	switch {
 	case err != nil:
 		return c, err //nolint:wrapcheck // the lookup names itself

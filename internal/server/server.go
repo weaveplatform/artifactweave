@@ -393,8 +393,8 @@ func New(cfg Config) http.Handler {
 	// the whole spec share one set of overlays and one redirect throttle.
 	kit := artAPI.Kit
 	vcsOps := vcshttp.VCSAPI{Kit: kit}
-	npmOps := npmhttp.NPMAPI{kit}
-	dockerOps := dockerhttp.DockerAPI{kit}
+	npmOps := npmhttp.NPMAPI{Kit: kit}
+	dockerOps := dockerhttp.DockerAPI{Kit: kit}
 	debianOps := debianhttp.DebianAPI{Kit: kit}
 	cranOps := cranhttp.CranAPI{Kit: kit, ArchiveMoverEnabled: cfg.CranArchiveMoverEnabled}
 	rpmOps := rpmhttp.RPMAPI{Kit: kit}
@@ -500,7 +500,7 @@ func New(cfg Config) http.Handler {
 	// so it replaces the 501 stub registered under that pattern rather than
 	// sitting beside it (decision 0002).
 	artAPI.RegisterItemRoutes(r)
-	agentpluginshttp.AgentPluginItems{kit}.RegisterAgentMarketplaceRoutes(r)
+	agentpluginshttp.AgentPluginItems{Kit: kit}.RegisterAgentMarketplaceRoutes(r)
 	cranOps.RegisterCranRoutes(r)
 	artAPI.RegisterTransferRoutes(r)
 	debianOps.RegisterDebianSnapshotRoutes(r)
@@ -509,7 +509,7 @@ func New(cfg Config) http.Handler {
 	artAPI.RegisterMultipartRoutes(r)
 	r.With(middleware.BodyLimit(middleware.ManagementBodyLimit)).Group(accessHTTP.RegisterRoutes)
 	artAPI.RegisterSearchRoutes(r)
-	mavenhttp.MavenAPI{kit}.RegisterMavenRoutes(r)
+	mavenhttp.MavenAPI{Kit: kit}.RegisterMavenRoutes(r)
 	// GitLab subgroup owners span path segments; the generated VCS routes
 	// handle the ordinary one-segment forms.
 	r.Get("/artifactory/api/vcs/*", vcsOps.VCSNested)
@@ -651,9 +651,9 @@ func New(cfg Config) http.Handler {
 		)
 	})
 
-	pypihttp.PypiAPI{kit}.RegisterPypiMetadataRoutes(r, artAPI.ProtocolOptions())
-	puppethttp.PuppetAPI{kit}.RegisterPuppetMetadataRoutes(r, artAPI.ProtocolOptions())
-	chefhttp.ChefAPI{kit}.RegisterChefReindex(r)
+	pypihttp.PypiAPI{Kit: kit}.RegisterPypiMetadataRoutes(r, artAPI.ProtocolOptions())
+	puppethttp.PuppetAPI{Kit: kit}.RegisterPuppetMetadataRoutes(r, artAPI.ProtocolOptions())
+	chefhttp.ChefAPI{Kit: kit}.RegisterChefReindex(r)
 
 	// Last, so every real handler above has already claimed its pattern.
 	registerHandwrittenStubs(r, logger)

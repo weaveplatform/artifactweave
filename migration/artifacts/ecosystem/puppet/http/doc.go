@@ -12,17 +12,19 @@
 // artifacts module, ecosystem layer: the native Puppet Forge v3 protocol of
 // the Puppet slice. It is named puppethttp so that it does not shadow
 // net/http. Outside tests, only its own http subtree, the module's http
-// adapters and app may import it (decision 0044, dependency rule 9).
+// adapters and app may import it (decision 0044, dependency rule 9); the
+// server root counts as app until it moves there.
 //
 // # Inputs
 //
 //   - Driving: the server, which mounts Protocol through the router kit
 //     (pkgroute) for repositories of package type puppet, local, federated,
-//     virtual or remote. The root file puppet_routes.go mounts it again
-//     behind the generated Forge operations and serves the repository's
-//     reindex (POST {repoKey}/reindex) beside it. An archive is published
-//     through the generic item routes, not through this protocol; the
-//     format's Handler admits it there.
+//     virtual or remote. The server also calls PuppetAPI's
+//     RegisterPuppetMetadataRoutes after the generated routes, which mounts
+//     Protocol again behind the generated Forge operations and serves the
+//     repository's reindex (POST {repoKey}/reindex) beside it. An archive is
+//     published through the generic item routes, not through this protocol;
+//     the format's Handler admits it there.
 //   - Driven: the router kit (pkgroute.Kit), which resolves the repository
 //     and the caller, checks permissions, reads the package index, items
 //     and blobs, and writes errors; the remote source service
@@ -30,12 +32,21 @@
 //     pages and archives into the remote cache; the blob store
 //     (Options.Blobs), which opens cached release pages; and the format
 //     package, whose rules check every name, version, path, manifest and
-//     archive.
+//     archive. PuppetAPI runs over the item kit
+//     (artifacts/adapters/http/itemkit): the second mount's Options come
+//     from its blob store and remote source service, and the reindex is its
+//     Reindex, which every format shares.
 //
 // # Outputs
 //
 //   - Protocol and Options: the routes, the source of each repository class
 //     and the Artifactory error profile.
+//   - PuppetAPI: the kit wrapper whose RegisterPuppetMetadataRoutes mounts
+//     GET of the Forge v3 module and release operations under
+//     /artifactory/api/puppet/{repoKey}, and POST
+//     /artifactory/api/puppet/{repoKey}/reindex, which refuses any query
+//     with 400, answers its text once the reindex has run, and writes
+//     errors in the Artifactory envelope.
 //   - Answers: release lists with Forge pagination, at most 1,000 releases
 //     a page; release and module records; search results; and archives.
 //     Every JSON answer is marked private, no-store.
@@ -73,17 +84,22 @@
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md,
 //     "Dependency rules".
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
-//     line 236 (ecosystem/puppet) and line 1017 (the mapping row).
+//     line 236 (ecosystem/puppet) and line 1017 (the mapping row). The
+//     server-root table does not list the root's puppet_routes.go, which
+//     joined this package as routes.go.
 //   - Plan: docs/implementation/plan.md#p33-automation-and-source-repositories
-//     and #p9d-modular-monolith-migration, epic ECO
-//     (https://github.com/weaveplatform/artifactweave/issues/943).
-//   - https://github.com/weaveplatform/artifactweave/issues/784 and
-//     https://github.com/weaveplatform/artifactweave/issues/1045
+//     and #p9d-modular-monolith-migration, epics ECO
+//     (https://github.com/weaveplatform/artifactweave/issues/943) and WEB
+//     (https://github.com/weaveplatform/artifactweave/issues/944).
+//   - https://github.com/weaveplatform/artifactweave/issues/784,
+//     https://github.com/weaveplatform/artifactweave/issues/1045 and
+//     https://github.com/weaveplatform/artifactweave/issues/1086
 //
 // # Status
 //
 // Implemented P9c, which delivered the plan's P33 group (issues #782 to
-// #788). Staged in P9d.
+// #788). Staged in P9d, which also moved the server root's Forge registrar
+// and reindex route here (WEB-17).
 //
 // # Testing
 //

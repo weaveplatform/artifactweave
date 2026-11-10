@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	npmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -80,11 +79,11 @@ func TestAccReindexFaults(t *testing.T) {
 		}
 	}
 	on := func(st store.Store) NPMAPI {
-		cfg := server.Config{Formats: recording(f)}
+		cfg := Config{Formats: recording(f)}
 		if st != nil {
 			cfg.Store = st
 		}
-		return NPMAPI{newKit(withAccess(cfg))}
+		return NPMAPI{newKit(withAccess(t, cfg))}
 	}
 	status := func(err error) int {
 		var e *apierror.Error

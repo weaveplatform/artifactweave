@@ -14,9 +14,9 @@
 // one format with four layouts (package types maven, gradle, ivy and sbt).
 // Its Handler plugs into the item service through the format hooks
 // (decision 0032), so every write, download and delete in a repository of
-// the Maven group reaches it whichever API carried it. The Maven protocol
-// is still the root file migration/artifacts/ecosystem/maven/http/maven.go, which serves the
-// calculateMetadata and generatePom operations with this package. Its
+// the Maven group reaches it whichever API carried it. Its http subpackage,
+// mavenhttp (artifacts/ecosystem/maven/http), serves the calculateMetadata
+// and generatePom operations with this package. Its
 // upstream rules make a remote repository of the Maven group retrieve,
 // check and cache format-aware over core remote's shared retrieval and
 // cache policy (decision 0007), which this package imports and which never
@@ -117,7 +117,7 @@
 //     https://maven.apache.org/ref/3-LATEST/maven-repository-metadata/repository-metadata.html.
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     line 228 (ecosystem/maven, also gradle, ivy and sbt), line 381 (one
-//     format, four layouts), line 401 (the protocol's later home,
+//     format, four layouts), line 401 (the protocol's home,
 //     ecosystem/maven/http), line 655 (the upstream rules, which keep the
 //     names remote_backend.go and remote_eager.go here because remote.go
 //     was taken), line 664 (the P10 virtual.go) and lines 997 and 1014

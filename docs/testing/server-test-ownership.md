@@ -118,7 +118,7 @@ those tests when that format changes:
 | `test/server/artifacts`: `reindex_test.go`; root: `reindex_internal_test.go` | Generic reindex orchestration using PyPI and Helm cases |
 | `test/server/artifacts`: `repositories_test.go` | Repository settings using NuGet contexts |
 | `test/server/artifacts`: `repositories_format_class_test.go` | Repository class validation across LuaRocks, NIM and Agent formats |
-| `npm_auth_paths_test.go` | Private middleware path recognition and log redaction for npm and LuaRocks |
+| root: `error_profiles_p8_test.go` | Error envelope selection, whose rules call npm's path predicates for its JFrog operations |
 | root: `registry_shared_test.go`; `test/server/artifacts`: `sidecar_rights_test.go` | Shared registry content type and sidecar permission rules using Docker and Helm |
 
 These tests use shared APIs or private server helpers. A format-only change

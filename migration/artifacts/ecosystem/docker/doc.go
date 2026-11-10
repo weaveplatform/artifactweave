@@ -28,11 +28,11 @@
 //     which name upload paths and digest folders, find blobs, manifests and
 //     referrers, set a stored manifest's properties and apply Max Unique
 //     Tags and Tag Retention (Retained, Manifests); the Docker REST
-//     endpoints (migration/artifacts/ecosystem/docker/http/rest.go), which check a promotion's
-//     tag; the registry source service the application builds over the
-//     shared policy of registry remotes, whose upstream fetches and cache
-//     uploads RegistryContent serves once installed, and whose reads it
-//     checks; the registry protocol's remote reads, which name their
+//     operations (DockerAPI in ecosystem/docker/http), which check a
+//     promotion's tag; the registry source service the application builds
+//     over the shared policy of registry remotes, whose upstream fetches and
+//     cache uploads RegistryContent serves once installed, and whose reads
+//     it checks; the registry protocol's remote reads, which name their
 //     resources with RegistryResource; and Smart Remote, which the
 //     application gives ParseRegistryPath (smart.NewSmart).
 //   - Driven: the format hooks' environment (format.Env), through which

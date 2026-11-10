@@ -123,14 +123,11 @@ func TestUnitOwnershipV2RejectsInvalidInventories(t *testing.T) {
 				"test/server/artifacts/widget":           "widget",
 			},
 			SharedFiles: map[string][]string{
-				"internal/server": {"npm_auth_paths_test.go", "status_test.go"},
+				"internal/server": {"npm_paths_test.go", "status_test.go"},
 				"migration/app":   {"router_test.go"},
 			},
 			FormatDependencies: map[string][]string{
-				"npm": {
-					"migration/artifacts/ecosystem/npm/http/login_test.go",
-					"migration/app/router_test.go",
-				},
+				"npm": {"internal/server/npm_paths_test.go", "migration/app/router_test.go"},
 				// A non-shared package owner may hold dependencies before the
 				// formats map knows it.
 				"widget": {"migration/app/router_test.go"},
@@ -207,12 +204,12 @@ func TestUnitOwnershipV2RejectsInvalidInventories(t *testing.T) {
 			o.FormatDependencies["npm"] = []string{"internal/server/unknown_test.go"}
 		}, "is not a listed shared test"},
 		{"bare dependency name", func(o *testOwnership) {
-			o.FormatDependencies["npm"] = []string{"npm_auth_paths_test.go"}
+			o.FormatDependencies["npm"] = []string{"npm_paths_test.go"}
 		}, "is not a listed shared test"},
 		{"duplicate dependency", func(o *testOwnership) {
 			o.FormatDependencies["npm"] = []string{
-				"migration/artifacts/ecosystem/npm/http/login_test.go",
-				"migration/artifacts/ecosystem/npm/http/login_test.go",
+				"internal/server/npm_paths_test.go",
+				"internal/server/npm_paths_test.go",
 			}
 		}, "duplicate format dependency"},
 	} {
@@ -263,7 +260,7 @@ func TestUnitSharedFilesFollowRootTestMoves(t *testing.T) {
 		"internal/server/status_test.go":                    "package server\nfunc TestAccStatus() {}\n",
 		"internal/server/registry_shared_test.go":           "package server\nfunc TestAccRegistryShared() {}\n",
 		"migration/artifacts/ecosystem/npm/tarball_test.go": "package npm\nfunc TestUnitTarball() {}\n",
-		"test/server/artifacts/npm/npm_auth_paths_test.go": "package npm\n" +
+		"test/server/artifacts/npm/npm_paths_test.go": "package npm\n" +
 			"func TestUnitNPMAuthPaths() {}\nfunc TestAccNPMAuthPaths() {}\n",
 	} {
 		target := filepath.Join(root, filepath.FromSlash(file))
@@ -278,14 +275,14 @@ func TestUnitSharedFilesFollowRootTestMoves(t *testing.T) {
 		Version:  2,
 		Packages: map[string]string{"internal/server": "shared"},
 		SharedFiles: map[string][]string{"internal/server": {
-			"npm_auth_paths_test.go", "registry_shared_test.go", "status_test.go",
+			"npm_paths_test.go", "registry_shared_test.go", "status_test.go",
 		}},
 		FormatDependencies: map[string][]string{
 			"docker": {"internal/server/registry_shared_test.go"},
-			"npm":    {"migration/artifacts/ecosystem/npm/http/login_test.go"},
+			"npm":    {"internal/server/npm_paths_test.go"},
 		},
 	})
-	owner, ok := serverTestOwner("migration/artifacts/ecosystem/npm/http/login_test.go")
+	owner, ok := serverTestOwner("internal/server/npm_paths_test.go")
 	if !ok || owner != "shared" {
 		t.Fatalf("root test before the move = %q, %t", owner, ok)
 	}
@@ -311,19 +308,19 @@ func TestUnitSharedFilesFollowRootTestMoves(t *testing.T) {
 		},
 	})
 	for file, want := range map[string]string{
-		"test/server/artifacts/npm/npm_auth_paths_test.go": "npm",
-		"internal/server/status_test.go":                   "shared",
-		"internal/server/registry_shared_test.go":          "shared",
+		"test/server/artifacts/npm/npm_paths_test.go": "npm",
+		"internal/server/status_test.go":              "shared",
+		"internal/server/registry_shared_test.go":     "shared",
 	} {
 		if owner, ok := serverTestOwner(file); !ok || owner != want {
 			t.Errorf("%s owner = %q, %t; want %q", file, owner, ok, want)
 		}
 	}
-	if _, ok := serverTestOwner("migration/artifacts/ecosystem/npm/http/login_test.go"); ok {
+	if _, ok := serverTestOwner("internal/server/npm_paths_test.go"); ok {
 		t.Error("a test recreated under its old root name is classified without review")
 	}
 	for _, c := range []change{
-		{status: "M", path: "migration/artifacts/ecosystem/npm/http/login_test.go"},
+		{status: "M", path: "internal/server/npm_paths_test.go"},
 		{status: "A", path: "test/server/artifacts/npm/new_test.go"},
 		{status: "R100", old: "internal/server/status_test.go", path: "test/server/artifacts/npm/status_test.go"},
 	} {
@@ -334,7 +331,7 @@ func TestUnitSharedFilesFollowRootTestMoves(t *testing.T) {
 			t.Errorf("%+v proposed %+v", c, got)
 		}
 	}
-	moved := change{status: "M", path: "test/server/artifacts/npm/npm_auth_paths_test.go"}
+	moved := change{status: "M", path: "test/server/artifacts/npm/npm_paths_test.go"}
 	npm := proposeAffected([]change{moved})
 	if npm.profile != "format" || npm.owner != "npm" || npm.hasSharedTests ||
 		!slices.Contains(npm.units, "./test/server/artifacts/npm") ||

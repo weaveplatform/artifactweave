@@ -12,7 +12,9 @@
 // (decision 0002). It parses each path into a Request and hands it to the
 // endpoint a feature registered for its kind and method; an operation the
 // specification defines that no feature has registered yet answers 405
-// UNSUPPORTED.
+// UNSUPPORTED. Beside the registry, the Docker partial strict server
+// (DockerAPI) answers the JFrog REST operations under a repository's
+// Docker API path: tag delete, promotion and parent manifest lists.
 //
 // # Role
 //
@@ -21,7 +23,7 @@
 // the package types docker, oci and helmoci. It is named dockerhttp so that
 // it does not shadow net/http. Outside tests, only its own http subtree, the
 // module's http adapters and app may import it (decision 0044, dependency
-// rule 9).
+// rule 9); the server root counts as app until it moves there.
 //
 // # Inputs
 //
@@ -29,9 +31,10 @@
 //     with Register before the generated servers, runs APIVersion and
 //     Challenge as middleware, and asks IsRegistryPath and
 //     ChallengesAnonymous while it authenticates, normalises content types
-//     and answers unimplemented operations; and the Docker REST endpoints
-//     (migration/artifacts/ecosystem/docker/http/rest.go), which check image names with
-//     ValidName and find repositories with Lookup.
+//     and answers unimplemented operations. The router also embeds
+//     DockerAPI in the artifactory spec's strict server; its operations
+//     (rest.go) check image names with ValidName and find repositories with
+//     Lookup.
 //   - Driven: the item store (store.Store), which resolves repositories and
 //     reads items; the registry's writes (artifacts/core/registry), which
 //     keep upload sessions and store blobs, mounts, manifests and deletes
@@ -45,11 +48,17 @@
 //     manifests, blobs, tags and referrers are read; and the server's
 //     download (Options.ServeBlob, Options.RedirectManifest), which applies
 //     the download redirect policy (decision 0029) and counts downloads.
+//     DockerAPI runs over the item kit (artifacts/adapters/http/itemkit),
+//     which resolves the caller's access, builds the registry service its
+//     deletes and promotions go through, and writes errors.
 //
 // # Outputs
 //
 //   - Registry: New with Options, Register, the Challenge middleware, and
 //     the Endpoint, Request and Kind its features register and serve.
+//   - DockerAPI: the Docker partial strict server, whose three operations
+//     (DeleteDockerTag, PromoteDockerImage, FindParentManifestLists) answer
+//     in the Artifactory envelope.
 //   - Middleware and predicates for the server: APIVersion,
 //     IsRegistryPath, ChallengesAnonymous, GrantsCatalog, ValidName,
 //     Serves and Lookup.
@@ -108,11 +117,12 @@
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md,
 //     "Dependency rules".
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
-//     line 229 (ecosystem/docker; http/ holds /v2), line 404 (the Docker REST
-//     endpoints that come here) and line 1022 (the mapping row).
+//     line 229 (ecosystem/docker; http/ holds /v2), line 404 (the root's
+//     docker_rest.go, now rest.go) and line 1022 (the mapping row).
 //   - Plan: docs/implementation/plan.md#p6-dockeroci,
-//     #p9-remote-repositories and #p9d-modular-monolith-migration, epic ECO
-//     (https://github.com/weaveplatform/artifactweave/issues/943).
+//     #p9-remote-repositories and #p9d-modular-monolith-migration, epics ECO
+//     (https://github.com/weaveplatform/artifactweave/issues/943) and WEB
+//     (https://github.com/weaveplatform/artifactweave/issues/944).
 //   - https://github.com/weaveplatform/artifactweave/issues/220 (routing),
 //     https://github.com/weaveplatform/artifactweave/issues/221 (tokens),
 //     https://github.com/weaveplatform/artifactweave/issues/222 (blobs),
@@ -121,11 +131,13 @@
 //     indexes and referrers),
 //     https://github.com/weaveplatform/artifactweave/issues/226 (listings and
 //     deletes), https://github.com/weaveplatform/artifactweave/issues/624
-//     (remote reads) and https://github.com/weaveplatform/artifactweave/issues/1022
+//     (remote reads), https://github.com/weaveplatform/artifactweave/issues/1022
+//     and https://github.com/weaveplatform/artifactweave/issues/1086
 //
 // # Status
 //
-// Implemented P6, with remote retrieval in P9. Staged in P9d.
+// Implemented P6, with remote retrieval in P9. Staged in P9d, which also
+// moved the server root's Docker REST operations here (WEB-17).
 //
 // # Testing
 //
@@ -151,5 +163,6 @@
 //     final fence.
 //   - The guard suites test/server/artifacts/docker and
 //     test/server/artifacts/helmoci, and the OCI conformance job, drive the
-//     registry through the whole server.
+//     registry through the whole server; the docker suite drives DockerAPI's
+//     operations too, which have no tests here, as the root file had none.
 package dockerhttp

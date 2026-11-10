@@ -305,6 +305,9 @@
       "internal/app/nix_remote_test.go",
       "internal/server/status_nix_test.go"
     ],
+    "npm": [
+      "internal/server/error_profiles_p8_test.go"
+    ],
     "nuget": [
       "internal/app/nuget_reindex_test.go",
       "test/server/artifacts/repositories_test.go"
