@@ -84,7 +84,11 @@ func serve(
 	// could let it finish. They are cancelled only once the drain has expired.
 	reqCtx, cancelRequests := context.WithCancel(context.WithoutCancel(ctx))
 	defer cancelRequests()
-	accessSettings, artifactsSettings := cfg.Access(), cfg.Artifacts()
+	// The artifacts module publishes no settings (decision 0044), so its
+	// options come from the configuration; the other modules' come from
+	// the modules, which were built with the same ones.
+	accessAPI, artifactsSettings := rt.modules.access.API(), cfg.Artifacts()
+	art := rt.modules.artifacts
 	srv := &http.Server{
 		Handler: newHandler(server.Config{
 			RequestLimits: limits,
@@ -97,12 +101,13 @@ func serve(
 			Blobs:         rt.blobs,
 			ColdBlobs:     rt.coldBlobs,
 			Auth:          rt.auth,
-			GC:            rt.gc,
+			GC:            art.GC(),
 			BlobLocation:  rt.location,
 			Mirrors:       rt.mirrorsAdmin(),
 			Multipart:     rt.multipart,
 			Tokens:        rt.tokens,
-			Access:        rt.access.API(),
+			Access:        accessAPI,
+			Configuration: rt.modules.configuration.API(),
 			Redirect: itemkit.Redirect{
 				MinSize: artifactsSettings.RedirectMinSize, TTL: artifactsSettings.RedirectTTL,
 				CDNMaxSize: cdnMaxSize(cfg.Blob),
@@ -118,21 +123,21 @@ func serve(
 				UserQueryLimit:     artifactsSettings.UserQueryLimit,
 				LimitInternalUsers: artifactsSettings.LimitInternalUsers,
 			},
-			DockerSubdomainMatch:           cfg.Configuration().DockerSubdomainMatch,
-			AllowBasicAuthTokens:           accessSettings.AllowBasicAuthTokens,
+			DockerSubdomainMatch:           rt.modules.configuration.Settings().DockerSubdomainMatch,
+			AllowBasicAuthTokens:           accessAPI.Settings.AllowBasicAuthTokens,
 			AllowDuplicateBuildEntries:     artifactsSettings.AllowDuplicateBuildEntries,
 			EnforceIdenticalChecksumDeploy: artifactsSettings.EnforceIdenticalChecksumDeploy,
 			NPMLoginTokenExpiry:            artifactsSettings.NPMLoginTokenExpiry,
 			NPMMaxPublishSize:              artifactsSettings.NPMMaxPublishSize,
-			FormatSettings:                 rt.formats,
+			FormatSettings:                 art.FormatSettings(),
 			CranArchiveMoverEnabled:        artifactsSettings.CranArchiveMoverEnabled,
 			HuggingFaceXetEnabled:          artifactsSettings.HuggingFaceXetEnabled,
-			GlobalEnvironmentLimit:         accessSettings.GlobalEnvironmentLimit,
+			GlobalEnvironmentLimit:         accessAPI.Settings.GlobalEnvironmentLimit,
 			Work:                           rt.work,
-			RemoteHTTP:                     &rt.remoteHTTP,
-			RemoteSources:                  rt.remoteSources,
-			RegistrySources:                rt.registrySources,
-			RemoteStatus:                   rt.smartRemote.Status,
+			RemoteHTTP:                     art.RemoteHTTP(),
+			RemoteSources:                  art.RemoteSources(),
+			RegistrySources:                art.RegistrySources(),
+			RemoteStatus:                   art.RemoteStatus,
 		}),
 		ReadHeaderTimeout: readHeaderTimeout,
 		BaseContext:       func(net.Listener) context.Context { return reqCtx },

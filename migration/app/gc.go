@@ -1,34 +1,11 @@
 package app
 
 import (
-	"log/slog"
 	"path/filepath"
 
 	"github.com/weaveplatform/artifactweave/migration/app/config"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 )
-
-// logGC logs each scheduled garbage collection pass: one that reclaimed
-// something at Info, a failed one at Warn, and idle or skipped ones at Debug.
-func logGC(log *slog.Logger) func(gc.Report, error) {
-	return func(r gc.Report, err error) {
-		switch {
-		case err != nil:
-			log.Warn("garbage collection failed", "error", err)
-		case r.Skipped:
-			log.Debug("garbage collection skipped: another instance holds the lease")
-		case r.TrashPurged+r.UploadsReaped+r.BlobsDeleted+r.OrphansDeleted == 0 &&
-			r.TokensExpired == 0:
-			log.Debug("garbage collection: nothing to do")
-		default:
-			log.Info("garbage collection",
-				"trash_purged", r.TrashPurged, "uploads_reaped", r.UploadsReaped,
-				"blobs_deleted", r.BlobsDeleted, "orphans_deleted", r.OrphansDeleted,
-				"bytes_freed", r.BytesFreed, "kept", r.Kept, "tokens_expired", r.TokensExpired)
-		}
-	}
-}
 
 // location describes the tier's blob store for the storage summary. Its type
 // is the name of the Artifactory binary provider template that stores blobs

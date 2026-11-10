@@ -1,9 +1,7 @@
 package app
 
 import (
-	"bytes"
 	"context"
-	"errors"
 	"log/slog"
 	"maps"
 	"path/filepath"
@@ -12,29 +10,9 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/app/config"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
-
-func TestAccLogGC(t *testing.T) {
-	var buf bytes.Buffer
-	f := logGC(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
-	f(gc.Report{}, errors.New("boom"))
-	f(gc.Report{Skipped: true}, nil)
-	f(gc.Report{}, nil)
-	f(gc.Report{BlobsDeleted: 2, BytesFreed: 10}, nil)
-	for _, want := range []string{
-		`level=WARN msg="garbage collection failed"`,
-		"another instance holds the lease",
-		"nothing to do",
-		`level=INFO msg="garbage collection" trash_purged=0 uploads_reaped=0 blobs_deleted=2`,
-	} {
-		if !strings.Contains(buf.String(), want) {
-			t.Errorf("missing %q in:\n%s", want, buf.String())
-		}
-	}
-}
 
 func TestAccLocation(t *testing.T) {
 	cfg := testConfig(t)
@@ -125,7 +103,7 @@ func TestAccRuntimeRunsGC(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rt.gc == nil || rt.location.Type != "file-system" {
+	if rt.modules.artifacts.GC() == nil || rt.location.Type != "file-system" {
 		t.Fatalf("runtime %+v", rt)
 	}
 	for deadline := time.Now().Add(5 * time.Second); !strings.Contains(logs.String(),

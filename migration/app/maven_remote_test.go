@@ -440,13 +440,13 @@ func TestAccMavenCompanionSurvivesRuntimeRestart(t *testing.T) {
 		},
 	)
 	up.Set("/"+p+".jar", fakeupstream.Resource{Body: sourceJAR(t, "durable")})
-	rt.mavenEager.Close()
+	rt.modules.artifacts.MavenEager().Close()
 	h := server.New(
 		server.Config{
 			Store:         rt.store,
 			Blobs:         rt.blobs,
 			Auth:          rt.auth,
-			RemoteSources: rt.remoteSources,
+			RemoteSources: rt.modules.artifacts.RemoteSources(),
 			Logger:        log,
 		},
 	)

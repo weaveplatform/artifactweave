@@ -31,7 +31,7 @@ func registryWorld(t *testing.T) *remoteWorld {
 			Auth:            w.rt.auth,
 			Tokens:          w.rt.tokens,
 			Keys:            w.rt.keys,
-			RegistrySources: w.rt.registrySources,
+			RegistrySources: w.rt.modules.artifacts.RegistrySources(),
 			Logger:          slog.New(slog.NewTextHandler(io.Discard, nil)),
 		},
 	)

@@ -6,10 +6,11 @@
 //
 // artifacts module, ecosystem layer: the registry of the format slices, one
 // slice per package type (decision 0032). Only the composition builds it:
-// app takes Settings from the artifacts module's settings, which
-// app/config's Artifacts accessor derives from the configuration, and adds
-// the keyring; the server that app starts hands Settings.For to the item,
-// build and registry services it builds. The registry is apart from the
+// the artifacts module's New takes Settings from the module's settings,
+// which app/config's Artifacts accessor derives from the configuration, and
+// adds the keyring; the server that app starts takes them from the module
+// and hands Settings.For to the item, build and registry services it
+// builds. The registry is apart from the
 // format contract, artifacts/core/format, so that a slice can implement
 // that contract without an import cycle. For the same reason core never
 // imports this package: every slice it lists imports core, so core takes
@@ -22,16 +23,18 @@
 //     the configuration (decision 0009) through app/config's Artifacts
 //     accessor, the Formats of the artifacts module's settings:
 //     conda.shards_enabled, helm.relative_urls, npm.tag_latest_by_publish and
-//     npm.enforce_path, and the four PyPI keys. app adds the master key's
-//     keyring, with which the Terraform backend's format opens states.
+//     npm.enforce_path, and the four PyPI keys. The artifacts module adds
+//     the master key's keyring, with which the Terraform backend's format
+//     opens states; app does too for keys rotate, which builds no module.
 //   - The slices: each format package's Serves, which says the package types
 //     it serves, and its Handler, which implements format.Handler.
 //
 // # Outputs
 //
 //   - Settings.For, a package type's format with s applied: the
-//     format.Registry of the work queue's item service, which app builds,
-//     and of the item, build and registry services that the server builds.
+//     format.Registry of the work queue's item service, which the artifacts
+//     module builds, and of the item, build and registry services that the
+//     server builds.
 //   - For, the same with every format's default settings. The Docker
 //     registry and registry upload expiry take it as their format.Registry,
 //     since they reach only docker, oci and helmoci repositories, whose

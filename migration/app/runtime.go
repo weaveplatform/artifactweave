@@ -15,19 +15,12 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/app/config"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/reindexauth"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/smart"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	debianhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian/http"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/mirror"
@@ -45,38 +38,23 @@ var repairEvery = mirror.DefaultRepairInterval
 var registerDebianSnapshotWork = debianhttp.RegisterDebianSnapshotWork
 
 // runtime is what serve holds open: the metadata store, the blob tiers, the
-// garbage collector, the work queue, and the background loops (mirror
-// repair, GC and the work queue's workers).
+// work queue, the modules, and the background loops (mirror repair, GC and
+// the work queue's workers).
 type runtime struct {
 	keys   *crypt.Keyring
 	store  store.Store
 	auth   *authn.Authenticator
 	tokens *token.Service // issues and verifies access tokens
-	// access is the access module over store, auth and tokens; the server
-	// is given its API beside them.
-	access           *access.Module
+	// modules are the access, artifacts and configuration modules over
+	// store, auth and tokens; the server is given their APIs and the
+	// artifacts module's remote sources beside them.
+	modules          modules
 	closeStore       func() error
 	blobs, coldBlobs blob.Store
 	location         usage.Location
-	gc               *gc.Collector
 	multipart        *multipart.Service
 	// work runs derived work after the changes that need it (decision 0033).
-	work            *work.Queue
-	mavenEager      *maven.MavenEager
-	smartRemote     *smart.Smart
-	smartRegistry   *smart.Smart
-	remoteHTTP      upstream.Pool
-	remoteSources   *source.Service
-	registryHTTP    upstream.RegistryPool
-	registrySources *source.Service
-	// registryPath is the registry path grammar both Smart Remote runtimes
-	// are given. Nil silently turns off property synchronisation for
-	// registry requests and refuses every side effect a registry token
-	// queued, with no error anywhere.
-	registryPath func(string) (image, operation, reference string, err error)
-	// formats are the formats' options, which the server and the work
-	// queue's item service share.
-	formats   ecosystem.Settings
+	work      *work.Queue
 	mirrors   []*mirror.Store
 	admin     *mirrorAdmin
 	stopLoops context.CancelFunc
@@ -106,11 +84,13 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	if err != nil {
 		return nil, errors.Join(err, st.Close())
 	}
-	authn, accessModule, err := openAccess(cfg, st, tokens, log)
+	authenticator, err := authn.NewAuthenticator(st.Users(), st.Settings(), authn.Options{
+		Hash: authHash, Tokens: tokens, Groups: st.Groups(),
+		APIRestrictions: st.APIRestrictions(),
+	})
 	if err != nil {
 		return nil, errors.Join(err, st.Close())
 	}
-	accessAPI := accessModule.API()
 	hotTier, coldTier := tiers(cfg, st)
 	hot, err := hotTier.open(ctx, st, log)
 	if err != nil {
@@ -123,10 +103,12 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	// JFrog CLI multipart uploads stage their parts under the data directory
 	// and append them to a hot-tier blob upload. Staging left by a crash
 	// after its session was dropped is swept now; the collector reaps
-	// sessions that go stale.
+	// sessions that go stale. The service and the collector are built before
+	// the work queue, so before the modules, and take access's store-only
+	// bindings, which bind what the access module's API does.
 	parts := &multipart.Service{
 		Store: st, Blobs: hot.store, Dir: filepath.Join(cfg.DataDir, "multipart"),
-		Restrictions: accessAPI.Restrictions,
+		Restrictions: access.RestrictionsOf(st),
 	}
 	if err := parts.Sweep(ctx); err != nil {
 		log.Warn("multipart upload staging sweep failed", "error", err)
@@ -145,7 +127,7 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 			registry.Backend:  uploads.Reap,
 		},
 		Expirers: []func(context.Context, time.Time) (int, error){uploads.ExpireUploads},
-		Tokens:   accessAPI.Tokens,
+		Tokens:   access.TokensOf(st, tokens),
 	})
 	if err != nil {
 		return nil, errors.Join(err, st.Close())
@@ -159,24 +141,18 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	if err != nil {
 		return nil, errors.Join(err, st.Close())
 	}
-	// The formats' derived work runs through the same item service, and
-	// format settings, the server writes with, and its kinds must be known
-	// before Run leases. The maxUniqueSnapshots cleanups wait for their timers,
-	// as 7.x's do.
-	fs := formatSettings(cfg, keys)
-	derived := &item.Service{
-		Store: st, Blobs: hot.store, Work: queue, Formats: fs.For,
-		Keys:             accessAPI.Keys,
-		ReindexAuthorize: reindexauth.New(accessAPI.Authenticator, accessAPI.Authorizer),
-		Periodic: map[string]time.Duration{
-			maven.KindSnapshots: settings.MavenSnapshotCleanupInterval,
-			nuget.KindSnapshots: settings.NuGetSnapshotCleanupInterval,
-		},
-	}
-	if err := derived.RegisterWork(queue); err != nil {
+	mods, err := buildModules(cfg, moduleDeps{
+		store: st, keys: keys, auth: authenticator, tokens: tokens,
+		blobs: hot.store, work: queue, gc: collector, log: log,
+	})
+	if err != nil {
 		return nil, errors.Join(err, st.Close())
 	}
-	if err := derived.RegisterCacheMaintenance(ctx, queue); err != nil {
+	art := mods.artifacts
+	// The formats' derived work runs through the artifacts module's item
+	// service, with the format settings the server writes with, and its
+	// kinds must be known before Run leases.
+	if err := art.RegisterWork(ctx); err != nil {
 		return nil, errors.Join(err, st.Close())
 	}
 	// The loops outlive startup's context and stop only through close, after
@@ -185,32 +161,24 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	rt := &runtime{
 		keys:       keys,
 		store:      st,
-		auth:       authn,
+		auth:       authenticator,
 		tokens:     tokens,
-		access:     accessModule,
+		modules:    mods,
 		closeStore: st.Close,
 		blobs:      hot.store,
 		coldBlobs:  cold.store,
 		location:   hotTier.location(),
-		gc:         collector,
 		multipart:  parts,
 		work:       queue,
-		formats:    fs,
 		stopLoops:  stop,
 	}
-	rt.remoteSources, err = rt.openRemoteSources(
-		ctx,
-		derived,
-		log,
-		settings.AllowedPrivateOrigins,
-	)
-	if err != nil {
+	if err := art.OpenRemoteSources(ctx); err != nil {
 		stop()
 		return nil, errors.Join(err, st.Close())
 	}
 	if err := registerDebianSnapshotWork(queue, itemkit.New(itemkit.Deps{
-		Store: st, Blobs: hot.store, Access: accessAPI, Work: queue,
-		RemoteSources: rt.remoteSources, FormatSettings: fs,
+		Store: st, Blobs: hot.store, Access: mods.access.API(), Work: queue,
+		RemoteSources: art.RemoteSources(), FormatSettings: art.FormatSettings(),
 	})); err != nil {
 		stop()
 		return nil, errors.Join(err, st.Close())
@@ -231,7 +199,7 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 		rt.mirrors = append(rt.mirrors, t.m)
 		rt.loops.Go(func() { _ = t.m.RunRepair(lctx, repairEvery, trigger) })
 	}
-	rt.loops.Go(func() { _ = collector.Loop(lctx, settings.GCInterval, logGC(log)) })
+	art.Start(lctx, rt.loops.Go)
 	// Stopping hands back the leases of runs it cuts short, so another node
 	// or the next start picks them up at once.
 	rt.loops.Go(func() { _ = queue.Run(lctx) })
@@ -239,52 +207,20 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 }
 
 // formatSettings are the formats' options from cfg's artifacts settings,
-// with keys, the master key's keyring, which is not configuration. The
-// server and the work queue's item service take the same ones, so a write
-// applies them whether a client or derived work makes it.
+// with keys, the master key's keyring, which is not configuration: the
+// options the artifacts module builds for the server and its item service,
+// for keys rotate, which builds no module, to reseal Terraform states with.
 func formatSettings(cfg config.Config, keys *crypt.Keyring) ecosystem.Settings {
 	formats := cfg.Artifacts().Formats
 	formats.TerraformBackend = terraformbackend.Settings{Keys: keys}
 	return formats
 }
 
-// openAccess builds the authenticator over st, then the access module over
-// st, the authenticator and tokens, with cfg's access settings: the server
-// reaches the same credentials and permissions directly and through the
-// module's API. Errors keep their texts, for openRuntime to join with
-// closing the store.
-//
-// New runs even when NewAuthenticator fails, with no early return between
-// them: New does no I/O and takes a nil authenticator, openRuntime discards
-// both results on any error, and NewAuthenticator fails only when
-// crypto/rand does, so an early return would be a branch no test can reach.
-func openAccess(
-	cfg config.Config,
-	st store.Store,
-	tokens *token.Service,
-	log *slog.Logger,
-) (*authn.Authenticator, *access.Module, error) {
-	authn, authErr := authn.NewAuthenticator(st.Users(), st.Settings(), authn.Options{
-		Hash: authHash, Tokens: tokens, Groups: st.Groups(),
-		APIRestrictions: st.APIRestrictions(),
-	})
-	m, err := access.New(access.Deps{
-		Store: st, Authenticator: authn, Tokens: tokens,
-		Settings: cfg.Access(),
-		Log:      log,
-	})
-	return authn, m, errors.Join(authErr, err)
-}
-
 // close stops the background loops, waits until ctx ends for mirror commits still
 // running after their quorum (so they are recorded rather than left pending
 // for the repair worker), and closes the store.
 func (rt *runtime) close(ctx context.Context) error {
-	rt.mavenEager.Close()
-	rt.smartRemote.Close()
-	rt.smartRegistry.Close()
-	rt.remoteHTTP.Close()
-	rt.registryHTTP.Close()
+	rt.modules.artifacts.Close()
 	rt.stopLoops()
 	rt.loops.Wait()
 	errs := make([]error, 0, len(rt.mirrors)+1)

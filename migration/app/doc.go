@@ -5,8 +5,9 @@
 // # Role
 //
 // app: the composition root. It opens what the modules share (the metadata
-// store, the blob tiers and their mirrors, the keyring, the work queue and
-// the remote sources), builds the access module over them, and hands
+// store, the blob tiers and their mirrors, the keyring and the work queue),
+// builds the access, artifacts and configuration modules over them in
+// buildModules, has the artifacts module open its remote sources, and hands
 // everything to the server root, which builds the router. It may import any
 // package, and only cmd/artifactweave imports it.
 //
@@ -38,10 +39,15 @@
 //
 //   - openRuntime opens the store, which applies pending migrations, seeds
 //     the built-in principals and applies the bootstrap, then opens the
-//     token service, the access module, both blob tiers, the garbage
-//     collector, the work queue and the remote sources, in that order, and
-//     starts the background loops last. A failure on the way closes what it
-//     opened so far.
+//     token service, the authenticator, both blob tiers, the garbage
+//     collector and the work queue, builds the modules, registers the
+//     artifacts module's work and opens its remote sources, in that order,
+//     and starts the background loops last. A failure on the way closes what
+//     it opened so far.
+//   - buildModules does no I/O, so building the modules once the work queue
+//     is open moves none of the start-up I/O. The multipart upload service
+//     and the garbage collector are built before them and take access's
+//     store-only bindings, as the bootstrap does.
 //   - The store opens, and its migrations finish, before the listener
 //     accepts a request.
 //   - Requests run on a context that the shutdown signal does not cancel, so
@@ -60,21 +66,23 @@
 //     (app is the composition root and may import any package).
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     lines 746 to 805 (the composition root).
-//   - https://github.com/weaveplatform/artifactweave/issues/1092
+//   - https://github.com/weaveplatform/artifactweave/issues/1092 and
+//     https://github.com/weaveplatform/artifactweave/issues/1094
 //
 // # Status
 //
-// Implemented P0 to P9c. Staged in P9d (WEB-18) unchanged; the module
-// settings, the module constructors, the file split and the router follow
-// in WEB-19 to WEB-22.
+// Implemented P0 to P9c. Staged in P9d (WEB-18); WEB-19 added the module
+// settings and WEB-20 the module constructors, which took over the remote
+// wiring and the garbage collection loop. The file split and the router
+// follow in WEB-21 and WEB-22.
 //
 // # Testing
 //
 // The tests start the runtime from a configuration as serve would:
 // app_test.go, runtime_test.go and store_test.go cover Run, openRuntime,
-// Migrate and RotateKeys; blob_test.go, mirrors_test.go and gc_test.go the
-// blob tiers; seed_test.go and descriptor_test.go the first start and
-// config apply; the *_remote_test.go suites remote repositories through the
-// composed runtime. make conan-accept runs conan_client_test.go. hash_test.go
+// Migrate and RotateKeys; modules_test.go buildModules; blob_test.go,
+// mirrors_test.go and gc_test.go the blob tiers; seed_test.go and
+// descriptor_test.go the first start and config apply; the *_remote_test.go
+// suites remote repositories through the composed runtime. make conan-accept runs conan_client_test.go. hash_test.go
 // lowers the password hashing cost and the token key size for all of them.
 package app

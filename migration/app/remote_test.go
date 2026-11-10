@@ -1,7 +1,6 @@
 package app
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -23,9 +22,13 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
+
+// remotePolicyKeySetting is the internal setting that holds the remote
+// policy key without a master key; it must match the artifacts module's
+// name, which no configuration descriptor may expose.
+const remotePolicyKeySetting = "remote.internal_policy_key"
 
 type remoteWorld struct {
 	t  *testing.T
@@ -79,8 +82,8 @@ func newRemoteWorld(t *testing.T) *remoteWorld {
 			Auth:          rt.auth,
 			Tokens:        rt.tokens,
 			Keys:          rt.keys,
-			RemoteSources: rt.remoteSources,
-			RemoteHTTP:    &rt.remoteHTTP,
+			RemoteSources: rt.modules.artifacts.RemoteSources(),
+			RemoteHTTP:    rt.modules.artifacts.RemoteHTTP(),
 			Logger:        slog.New(slog.NewTextHandler(io.Discard, nil)),
 		},
 	)
@@ -426,7 +429,7 @@ func TestAccGenericRemoteDefaultRestartKeepsCacheIdentity(t *testing.T) {
 				Store:         rt.store,
 				Blobs:         rt.blobs,
 				Auth:          rt.auth,
-				RemoteSources: rt.remoteSources,
+				RemoteSources: rt.modules.artifacts.RemoteSources(),
 				Logger:        log,
 			},
 		)
@@ -506,7 +509,7 @@ func TestAccGenericRemoteColdAndWarmSignedDelivery(t *testing.T) {
 			Store:         w.rt.store,
 			Blobs:         remoteSignedBlobs{Store: w.rt.blobs, edge: edge.URL},
 			Auth:          w.rt.auth,
-			RemoteSources: w.rt.remoteSources,
+			RemoteSources: w.rt.modules.artifacts.RemoteSources(),
 			Logger:        slog.New(slog.NewTextHandler(io.Discard, nil)),
 		},
 	)
@@ -586,36 +589,6 @@ func TestAccGenericRemoteRejectsMalformedColdChecksum(t *testing.T) {
 				t.Fatalf("sidecar persisted %v", err)
 			}
 		})
-	}
-}
-
-func TestAccRemotePolicyKeyInitialization(t *testing.T) {
-	rt := &runtime{store: inmem.New()}
-	const count = 8
-	keys := make(chan []byte, count)
-	errs := make(chan error, count)
-	for range count {
-		go func() { key, err := rt.remotePolicyKey(t.Context()); keys <- key; errs <- err }()
-	}
-	var first []byte
-	for range count {
-		if err := <-errs; err != nil {
-			t.Fatal(err)
-		}
-		key := <-keys
-		if first == nil {
-			first = key
-		}
-		if len(key) != 32 || !bytes.Equal(first, key) {
-			t.Fatal("initialization disagreed")
-		}
-	}
-	if err := rt.store.Settings().
-		Put(t.Context(), remotePolicyKeySetting, []byte("short")); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := rt.remotePolicyKey(t.Context()); err == nil {
-		t.Fatal("corrupt stored key accepted")
 	}
 }
 
