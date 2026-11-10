@@ -12,7 +12,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -79,7 +78,7 @@ func resolveTokens(
 
 // resolution is one download being resolved.
 type resolution struct {
-	st      store.Store
+	st      format.Store
 	c       repo.Config
 	r       reader
 	d       format.Download

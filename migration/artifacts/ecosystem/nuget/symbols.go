@@ -256,7 +256,7 @@ type symbolOwner struct {
 
 func symbolOwners(
 	ctx context.Context,
-	st store.Store,
+	st format.Store,
 	c repo.Config,
 ) (map[string]symbolOwner, error) {
 	out := map[string]symbolOwner{}

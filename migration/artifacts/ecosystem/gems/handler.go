@@ -12,7 +12,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -207,7 +206,7 @@ func stored(ctx context.Context, blobs format.Blobs, sha, path string) (Package,
 // Files lists every file, gem or not, in the tree the package index reads
 // (pkgindex.Stored: a remote repository's cache, and any other
 // repository's own items), through one AQL search of the store.
-func Files(ctx context.Context, st store.Store, c repo.Config) ([]types.Item, error) {
+func Files(ctx context.Context, st format.Store, c repo.Config) ([]types.Item, error) {
 	hits, err := st.Items().Search(ctx, &aql.Query{Criteria: aql.And{
 		aql.RepoSet{Refs: []aql.RepoRef{pkgindex.Stored(c)}},
 		&aql.FieldCriterion{Field: aql.FieldType, Op: aql.OpEq, Text: "file"},

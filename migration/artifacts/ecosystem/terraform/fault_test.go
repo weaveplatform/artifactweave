@@ -38,7 +38,7 @@ func (f *faults) fail(method string) bool {
 // faulty fails the item and package store methods its faults arm and
 // delegates the rest, transactions included.
 type faulty struct {
-	store.Store
+	format.Store
 	f *faults
 }
 

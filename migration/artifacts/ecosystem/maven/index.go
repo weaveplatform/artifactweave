@@ -55,7 +55,7 @@ func under(prefixes []string) aql.Or {
 // (Maven 1, whose files sit together by type) searches more and keeps less.
 func versionFiles(
 	ctx context.Context,
-	st store.Store,
+	st format.Store,
 	c repo.Config,
 	r reader,
 	cached bool,
@@ -134,7 +134,7 @@ func syncVersion(
 // dropVersion removes co's version from c's index, and its package when no
 // version is left. The item service prunes a version whose last file it
 // removed before Deleted runs, so either may already be gone.
-func dropVersion(ctx context.Context, st store.Store, c repo.Config, co Coordinates) error {
+func dropVersion(ctx context.Context, st format.Store, c repo.Config, co Coordinates) error {
 	p, err := st.Packages().Find(ctx, c.Key, co.Package)
 	if errors.Is(err, store.ErrNotFound) {
 		return nil
@@ -218,7 +218,7 @@ func reindex(ctx context.Context, env format.Env, c repo.Config, r reader) error
 // package name in c, so a reindex reads only the POMs that changed.
 func indexedMetadata(
 	ctx context.Context,
-	st store.Store,
+	st format.Store,
 	c repo.Config,
 	name string,
 ) (map[string][]byte, error) {

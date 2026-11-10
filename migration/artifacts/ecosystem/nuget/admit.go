@@ -86,7 +86,7 @@ func checkPackage(ctx context.Context, env format.Env, c repo.Config, w format.W
 // the one w writes or moves.
 func held(
 	ctx context.Context,
-	st store.Store,
+	st format.Store,
 	c repo.Config,
 	key versionKey,
 	k kind,

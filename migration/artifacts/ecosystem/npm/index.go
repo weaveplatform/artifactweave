@@ -24,7 +24,7 @@ import (
 // the write's own, or a copy's or a restore's carried over.
 func (h Handler) index(
 	ctx context.Context,
-	st store.Store,
+	st format.Store,
 	c repo.Config,
 	it types.Item,
 	t *Tarball,
@@ -68,7 +68,7 @@ func (h Handler) index(
 // time, which the item service read once for the whole write.
 func setProperties(
 	ctx context.Context,
-	st store.Store,
+	st format.Store,
 	it types.Item,
 	t *Tarball,
 ) (types.Properties, error) {
@@ -130,7 +130,7 @@ func keywordsValue(keywords []string) string {
 }
 
 // versionOf is the version the item with id is the tarball of.
-func versionOf(ctx context.Context, st store.Store, id int64) (types.PackageVersion, bool, error) {
+func versionOf(ctx context.Context, st format.Store, id int64) (types.PackageVersion, bool, error) {
 	return pkgindex.VersionOf(ctx, st, id) //nolint:wrapcheck // pkgindex wraps its own
 }
 
@@ -145,7 +145,7 @@ func versionOf(ctx context.Context, st store.Store, id int64) (types.PackageVers
 // properties the write brings (decision 0034), so none is left for a later
 // move to its own canonical path, by a conversion say, to hand to a
 // version that never had it, latest included (rule 1).
-func (h Handler) unindex(ctx context.Context, st store.Store, it types.Item) error {
+func (h Handler) unindex(ctx context.Context, st format.Store, it types.Item) error {
 	pv, ok, err := versionOf(ctx, st, it.ID)
 	if err != nil || !ok {
 		return err
@@ -170,7 +170,7 @@ func (h Handler) unindex(ctx context.Context, st store.Store, it types.Item) err
 // names to alone. The versions' Metadata says which carry them, so only
 // those tarballs are read.
 func moveTags(
-	ctx context.Context, st store.Store, to types.PackageVersion, tags []string, now time.Time,
+	ctx context.Context, st format.Store, to types.PackageVersion, tags []string, now time.Time,
 ) error {
 	versions, err := st.Packages().Versions(ctx, to.PackageID)
 	if err != nil {
@@ -204,7 +204,7 @@ func moveTags(
 }
 
 // dropTags removes tags from the npm.disttag of the item with id.
-func dropTags(ctx context.Context, st store.Store, id int64, tags []string, now time.Time) error {
+func dropTags(ctx context.Context, st format.Store, id int64, tags []string, now time.Time) error {
 	props, err := st.Items().Properties(ctx, id)
 	if err != nil {
 		return fmt.Errorf("npm: properties of item %d: %w", id, err)
@@ -225,7 +225,7 @@ func dropTags(ctx context.Context, st store.Store, id int64, tags []string, now 
 // refresh brings pv's Metadata in line with the properties of its tarball,
 // the item with id. Nothing else in it follows from properties, so the
 // tarball need not be read.
-func refresh(ctx context.Context, st store.Store, pv types.PackageVersion, id int64) error {
+func refresh(ctx context.Context, st format.Store, pv types.PackageVersion, id int64) error {
 	props, err := st.Items().Properties(ctx, id)
 	if err != nil {
 		return fmt.Errorf("npm: properties of item %d: %w", id, err)

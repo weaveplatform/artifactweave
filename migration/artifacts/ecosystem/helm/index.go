@@ -101,7 +101,7 @@ func detach(ctx context.Context, env format.Env, pv types.PackageVersion, id int
 }
 
 // drop removes pv, and its package when no version is left.
-func drop(ctx context.Context, st store.Store, pv types.PackageVersion) error {
+func drop(ctx context.Context, st format.Store, pv types.PackageVersion) error {
 	if err := st.Packages().DeleteVersion(ctx, pv.ID); err != nil {
 		return fmt.Errorf("helm: drop version %s: %w", pv.Version, err)
 	}
@@ -256,7 +256,7 @@ func handOver(ctx context.Context, env format.Env, pv types.PackageVersion, it t
 // straight to the store runs no Annotated hook, which the index has none
 // of anyway. They follow from the content, so they are written at the time
 // the content was, it.Updated.
-func setProperties(ctx context.Context, st store.Store, it types.Item, ch *Chart) error {
+func setProperties(ctx context.Context, st format.Store, it types.Item, ch *Chart) error {
 	props, err := st.Items().Properties(ctx, it.ID)
 	if err != nil {
 		return fmt.Errorf("helm: properties of %s: %w", it.FullPath(), err)

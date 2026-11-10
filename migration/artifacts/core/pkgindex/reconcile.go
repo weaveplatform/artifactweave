@@ -41,7 +41,7 @@ type IndexedVersion struct {
 // statistics and metadata, as the store cannot unlink one file.
 func Sync(
 	ctx context.Context,
-	st store.Store,
+	st Store,
 	p types.Package,
 	v IndexedVersion,
 ) (types.PackageVersion, error) {
@@ -86,7 +86,7 @@ func Sync(
 // store. What want keeps keeps its download statistics and its package's
 // date, so on an index the format's hooks kept right Reconcile changes
 // nothing. Call it inside a transaction.
-func Reconcile(ctx context.Context, st store.Store, c repo.Config, want []Indexed) error {
+func Reconcile(ctx context.Context, st Store, c repo.Config, want []Indexed) error {
 	byName := make(map[string]Indexed, len(want))
 	for _, p := range want {
 		byName[p.Name] = p
@@ -132,7 +132,7 @@ func Reconcile(ctx context.Context, st store.Store, c repo.Config, want []Indexe
 // otherwise each of its versions want does not list.
 func dropUnbacked(
 	ctx context.Context,
-	st store.Store,
+	st Store,
 	p types.Package,
 	want map[string]Indexed,
 ) error {
@@ -164,7 +164,7 @@ func dropUnbacked(
 // RecordDownload records a download of the item with itemID as its
 // version's last download, when the item belongs to a version, as the item
 // records its own (decision 0018).
-func RecordDownload(ctx context.Context, st store.Store, itemID int64, at time.Time) error {
+func RecordDownload(ctx context.Context, st Store, itemID int64, at time.Time) error {
 	pv, ok, err := VersionOf(ctx, st, itemID)
 	if err != nil || !ok {
 		return err

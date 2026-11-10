@@ -86,7 +86,7 @@ func (h Handler) Deleted(
 // must filter by its principal before returning any name or metadata.
 func Files(
 	ctx context.Context,
-	st store.Store,
+	st format.Store,
 	c repo.Config,
 	folder string,
 ) ([]types.Item, error) {

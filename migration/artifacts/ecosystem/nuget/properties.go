@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -101,7 +101,7 @@ func properties(n *Nuspec, it types.Item) types.Properties {
 // describes, at at, removing those n no longer gives.
 func setProperties(
 	ctx context.Context,
-	st store.Store,
+	st format.Store,
 	it types.Item,
 	n *Nuspec,
 	at time.Time,
@@ -120,7 +120,7 @@ func setProperties(
 // follow them.
 func patchProperties(
 	ctx context.Context,
-	st store.Store,
+	st format.Store,
 	it types.Item,
 	props types.Properties,
 	n *Nuspec,

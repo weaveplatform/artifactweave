@@ -86,7 +86,7 @@ func TestUnitLifecycleIgnoresNonSnapshotAndFencesReindex(t *testing.T) {
 }
 
 type reindexStore struct {
-	store.Store
+	format.Store
 	items    store.ItemStore
 	packages store.PackageStore
 }
@@ -139,7 +139,7 @@ func TestUnitReindexReportsStorageFailures(t *testing.T) {
 	stop := errors.New("metadata store unavailable")
 	for _, tc := range []struct {
 		name  string
-		store store.Store
+		store format.Store
 	}{
 		{"snapshot listing", reindexStore{Store: base, items: failingSnapshotList{ItemStore: base.Items(), err: stop}}},
 		{"package reconciliation", reindexStore{Store: base, packages: failingPackageList{PackageStore: base.Packages(), err: stop}}},

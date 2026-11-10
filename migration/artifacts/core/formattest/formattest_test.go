@@ -50,7 +50,7 @@ func coordinates(full string) (p, v string, ok bool) {
 
 // read reads version v of package p from c's tree; ok is false when it has
 // no files to link.
-func (h tagged) read(ctx context.Context, st store.Store, c repo.Config, p, v string) (
+func (h tagged) read(ctx context.Context, st format.Store, c repo.Config, p, v string) (
 	pkgindex.IndexedVersion, bool, error,
 ) {
 	out := pkgindex.IndexedVersion{Version: v}

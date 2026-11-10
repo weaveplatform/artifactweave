@@ -32,8 +32,11 @@
 //     WriteGuard, FolderAdmitter, AnnotationAdmitter, Resolver, Annotator,
 //     Reindexer, PathReindexer, Worker, Classifier, SidecarOwner and
 //     SidecarKeeper. The persistent work queue runs a Worker's items.
-//   - Env: the metadata store, its lease table and work queue (Leases and
-//     WorkQueue, platform/work), the signing key pairs (Keys, access/api),
+//   - Env: Store, the part of the metadata store a format reads and writes
+//     (repositories, items, the package index and the remote cache, from
+//     artifacts/core/port, with platform/tx's Runner for transactions), its
+//     lease table and work queue (Leases and WorkQueue, platform/work), the
+//     signing key pairs (Keys, access/api),
 //     the read half of the blob store (Blobs), the clock, the repository
 //     layouts (artifacts/core/layout), and the item service's Derive,
 //     Underive, Remove, Move and Enqueue, with the inspection of the file
@@ -42,6 +45,9 @@
 //
 // # Outputs
 //
+//   - Store, the store a format reads and writes through Env.Store. The
+//     item service's store and the metadata store's aggregate satisfy it, so
+//     each builder of Env passes the store it holds.
 //   - Registry, the function from a package type to its Handler. The
 //     application builds one from the format registry's Settings.For
 //     (artifacts/ecosystem) and gives it to the item, build and registry
@@ -116,8 +122,9 @@
 //     row of #build-status (https://github.com/weaveplatform/artifactweave/issues/753)
 //     and #p9d-modular-monolith-migration, epic ART
 //     (https://github.com/weaveplatform/artifactweave/issues/941).
-//   - https://github.com/weaveplatform/artifactweave/issues/969 and
-//     https://github.com/weaveplatform/artifactweave/issues/970
+//   - https://github.com/weaveplatform/artifactweave/issues/969,
+//     https://github.com/weaveplatform/artifactweave/issues/970 and
+//     https://github.com/weaveplatform/artifactweave/issues/1087
 //
 // # Status
 //
@@ -133,10 +140,10 @@
 // Write.By.
 // Staged in P9d, which added the injected Registry
 // (https://github.com/weaveplatform/artifactweave/issues/970), Env.Keys
-// (https://github.com/weaveplatform/artifactweave/issues/1004) and Env's
+// (https://github.com/weaveplatform/artifactweave/issues/1004), Env's
 // lease and work-queue stores
-// (https://github.com/weaveplatform/artifactweave/issues/1029). Roadmap: a
-// narrow format.Store in place of the whole store
+// (https://github.com/weaveplatform/artifactweave/issues/1029) and Store,
+// the narrow store Env.Store holds
 // (https://github.com/weaveplatform/artifactweave/issues/1087).
 //
 // # Testing

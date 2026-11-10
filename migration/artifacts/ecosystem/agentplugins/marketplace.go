@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -41,7 +42,7 @@ func IsReservedMarketplace(name string) bool {
 // each caller avoids exposing ZIPs hidden by path-scoped Read permissions.
 func Marketplace(
 	ctx context.Context,
-	st store.Store,
+	st format.Store,
 	repoKey, name string,
 	can func(string) bool,
 ) ([]byte, error) {

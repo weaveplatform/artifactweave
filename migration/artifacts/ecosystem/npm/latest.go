@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -135,7 +135,7 @@ func (s Settings) holderOf(
 // one does when a redeploy of other content took the tags off its file.
 func (s Settings) claimLatest(
 	ctx context.Context,
-	st store.Store,
+	st format.Store,
 	pv types.PackageVersion,
 	tags []string,
 	isNew bool,
@@ -169,7 +169,12 @@ func (s Settings) claimLatest(
 // settleLatest applies rule 4 to the package with id: when no version
 // carries latest, the version that outranks the others takes it. A package
 // with no version left has nothing to settle.
-func (s Settings) settleLatest(ctx context.Context, st store.Store, id int64, now time.Time) error {
+func (s Settings) settleLatest(
+	ctx context.Context,
+	st format.Store,
+	id int64,
+	now time.Time,
+) error {
 	versions, err := st.Packages().Versions(ctx, id)
 	if err != nil {
 		return fmt.Errorf("npm: versions of package %d: %w", id, err)
@@ -187,7 +192,7 @@ func (s Settings) settleLatest(ctx context.Context, st store.Store, id int64, no
 // unknown (#216).
 func (s Settings) giveLatest(
 	ctx context.Context,
-	st store.Store,
+	st format.Store,
 	versions []types.PackageVersion,
 	cs []Candidate,
 	now time.Time,
@@ -202,7 +207,7 @@ func (s Settings) giveLatest(
 
 // tagLatest adds latest to the dist-tags of pv's tarball, takes it from
 // the package's other versions and brings pv's Metadata in line, at now.
-func tagLatest(ctx context.Context, st store.Store, pv types.PackageVersion, now time.Time) error {
+func tagLatest(ctx context.Context, st format.Store, pv types.PackageVersion, now time.Time) error {
 	files, err := st.Packages().Files(ctx, pv.ID)
 	if err != nil {
 		return fmt.Errorf("npm: files of version %s: %w", pv.Version, err)

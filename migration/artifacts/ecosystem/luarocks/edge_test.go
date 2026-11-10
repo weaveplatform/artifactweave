@@ -41,7 +41,7 @@ type testBlobs struct {
 }
 
 type itemLookupStore struct {
-	store.Store
+	*inmem.Store
 	item      *types.Item
 	getErr    error
 	searchErr error

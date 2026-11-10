@@ -12,7 +12,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -213,7 +212,7 @@ func stored(ctx context.Context, blobs format.Blobs, sha, p string) (Package, er
 // Files lists the files repository c's package index reads
 // (pkgindex.Stored): a remote's cached files, or a hosted repository's
 // own, in no promised order. A search failure is returned wrapped.
-func Files(ctx context.Context, st store.Store, c repo.Config) ([]types.Item, error) {
+func Files(ctx context.Context, st format.Store, c repo.Config) ([]types.Item, error) {
 	hits, err := st.Items().Search(ctx, &aql.Query{Criteria: aql.And{
 		aql.RepoSet{Refs: []aql.RepoRef{pkgindex.Stored(c)}},
 		&aql.FieldCriterion{Field: aql.FieldType, Op: aql.OpEq, Text: "file"},

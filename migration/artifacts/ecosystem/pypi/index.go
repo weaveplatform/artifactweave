@@ -98,7 +98,7 @@ func yankedBy(props types.Properties) (bool, string) {
 // deploy.
 func setProperties(
 	ctx context.Context,
-	st store.Store,
+	st format.Store,
 	it types.Item,
 	d *Dist,
 ) (types.Properties, error) {
@@ -155,7 +155,7 @@ func propertyValue(s string) string {
 // ok is false, taking it from any other version it was a file of.
 func place(
 	ctx context.Context,
-	st store.Store,
+	st format.Store,
 	c repo.Config,
 	it types.Item,
 	e entry,
@@ -191,7 +191,7 @@ func place(
 
 // attach makes e's record, of the item with id, a file of e's version of
 // p.
-func attach(ctx context.Context, st store.Store, p types.Package, e entry, id int64) error {
+func attach(ctx context.Context, st format.Store, p types.Package, e entry, id int64) error {
 	var m Metadata
 	var files []int64
 	pv, err := st.Packages().Version(ctx, p.ID, e.version)
@@ -223,7 +223,7 @@ func attach(ctx context.Context, st store.Store, p types.Package, e entry, id in
 // that keeps others is relinked to them (pkgindex.Sync).
 func detach(
 	ctx context.Context,
-	st store.Store,
+	st format.Store,
 	p types.Package,
 	pv types.PackageVersion,
 	it types.Item,

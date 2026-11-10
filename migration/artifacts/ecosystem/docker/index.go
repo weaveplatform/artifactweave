@@ -114,7 +114,7 @@ func FolderManifest(
 // record that the first push did.
 func ensurePackage(
 	ctx context.Context,
-	st store.Store,
+	st format.Store,
 	c repo.Config,
 	name string,
 ) (types.Package, error) {
@@ -142,7 +142,7 @@ func ensurePackage(
 // ok is false when the folder is no tag in the index.
 func tagVersion(
 	ctx context.Context,
-	st store.Store,
+	st format.Store,
 	repoKey, name, folder string,
 ) (types.PackageVersion, bool, error) {
 	p, err := st.Packages().Find(ctx, repoKey, name)
@@ -163,7 +163,7 @@ func tagVersion(
 	return pv, true, nil
 }
 
-func link(ctx context.Context, st store.Store, pv types.PackageVersion, it types.Item) error {
+func link(ctx context.Context, st format.Store, pv types.PackageVersion, it types.Item) error {
 	if err := st.Packages().LinkFile(ctx, types.VersionFile{
 		VersionID: pv.ID, ItemID: it.ID,
 	}); err != nil {
@@ -211,7 +211,7 @@ func syncTag(
 // tag folder's version.
 func folderFiles(
 	ctx context.Context,
-	st store.Store,
+	st format.Store,
 	repoKey string,
 	cached bool,
 	dir string,
@@ -236,7 +236,7 @@ func folderFiles(
 
 // dropTag removes the version of a folder that no longer holds a manifest,
 // with its remaining file links.
-func dropTag(ctx context.Context, st store.Store, repoKey, name, folder string) error {
+func dropTag(ctx context.Context, st format.Store, repoKey, name, folder string) error {
 	pv, ok, err := tagVersion(ctx, st, repoKey, name, folder)
 	if err != nil || !ok {
 		return err
@@ -248,7 +248,7 @@ func dropTag(ctx context.Context, st store.Store, repoKey, name, folder string) 
 }
 
 // syncPackage keeps the image a package exactly while it holds a manifest.
-func syncPackage(ctx context.Context, st store.Store, c repo.Config, name string) error {
+func syncPackage(ctx context.Context, st format.Store, c repo.Config, name string) error {
 	_, has, err := firstManifest(ctx, st.Items(), c.Key, name)
 	if err != nil {
 		return err

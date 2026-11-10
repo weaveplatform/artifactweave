@@ -182,7 +182,7 @@ type packageFile struct {
 // links.
 func Versions(
 	ctx context.Context,
-	st store.Store,
+	st format.Store,
 	c repo.Config,
 	name string,
 ) ([]types.PackageVersion, map[int64][]types.Item, error) {
@@ -367,7 +367,7 @@ func writeSnapshotLevel(
 // folders directly in dir.
 func snapshotMetadataIn(
 	ctx context.Context,
-	st store.Store,
+	st format.Store,
 	c repo.Config,
 	dir string,
 ) ([]string, error) {

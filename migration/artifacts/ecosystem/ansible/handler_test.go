@@ -41,7 +41,7 @@ func (b blobFake) Stat(context.Context, string) (blob.Info, error) {
 }
 
 type faultStore struct {
-	store.Store
+	format.Store
 	stage string
 }
 

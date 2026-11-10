@@ -235,7 +235,7 @@ func TestUnitPublicationIndexFollowsCompleteStoredVersions(t *testing.T) {
 }
 
 type limitedStore struct {
-	store.Store
+	format.Store
 	fault string
 }
 

@@ -447,7 +447,7 @@ var errStore = errors.New("store boom")
 
 // faulty fails the store methods fail names and delegates the rest.
 type faulty struct {
-	store.Store
+	format.Store
 	fail map[string]bool
 }
 

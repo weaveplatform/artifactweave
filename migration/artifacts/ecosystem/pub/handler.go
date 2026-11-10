@@ -197,7 +197,7 @@ func metadataOf(ctx context.Context, env format.Env, it types.Item) (Metadata, e
 	return readStored(ctx, env.Blobs, it.Actual.SHA256)
 }
 
-func setProperties(ctx context.Context, st store.Store, it types.Item, meta Metadata) error {
+func setProperties(ctx context.Context, st format.Store, it types.Item, meta Metadata) error {
 	current, err := st.Items().Properties(ctx, it.ID)
 	if err != nil {
 		return fmt.Errorf("pub: get item properties: %w", err)

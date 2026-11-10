@@ -327,7 +327,7 @@ var errIndex = errors.New("index boom")
 // faulty fails the package and item store methods fail names and
 // delegates the rest.
 type faulty struct {
-	store.Store
+	format.Store
 	fail map[string]bool
 }
 
@@ -439,7 +439,7 @@ func TestUnitIndexFailures(t *testing.T) {
 		}
 		return out
 	}
-	deployed := func(w *world, st store.Store) error {
+	deployed := func(w *world, st format.Store) error {
 		it, err := w.db.Items().Get(w.ctx, w.c.Key, false, jar)
 		if err != nil {
 			w.t.Fatal(err)
@@ -451,8 +451,8 @@ func TestUnitIndexFailures(t *testing.T) {
 			it,
 		)
 	}
-	deleted := func(also ...string) func(w *world, st store.Store) error {
-		return func(w *world, st store.Store) error {
+	deleted := func(also ...string) func(w *world, st format.Store) error {
+		return func(w *world, st format.Store) error {
 			removed := gone(w, also...)
 			return h.Deleted(
 				w.ctx,
@@ -462,13 +462,13 @@ func TestUnitIndexFailures(t *testing.T) {
 			)
 		}
 	}
-	reindex := func(w *world, st store.Store) error {
+	reindex := func(w *world, st format.Store) error {
 		return h.Reindex(w.ctx, format.Env{Store: st, Layouts: layouts{}, Enqueue: noWork}, w.c)
 	}
 	for _, tc := range []struct {
 		name string
 		fail string
-		run  func(*world, store.Store) error
+		run  func(*world, format.Store) error
 	}{
 		{"deployed: search", "Search", deployed},
 		{"deployed: ensure", "Ensure", deployed},

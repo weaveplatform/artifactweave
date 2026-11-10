@@ -430,7 +430,7 @@ func readStored(ctx context.Context, blobs format.Blobs, sha, p string) (Package
 	return pkg, nil
 }
 
-func setProperties(ctx context.Context, st store.Store, it types.Item, pkg Package) error {
+func setProperties(ctx context.Context, st format.Store, it types.Item, pkg Package) error {
 	props, err := st.Items().Properties(ctx, it.ID)
 	if err != nil {
 		return fmt.Errorf("rpm: item properties: %w", err)
@@ -451,7 +451,7 @@ func setProperties(ctx context.Context, st store.Store, it types.Item, pkg Packa
 	return st.Items().PatchProperties(ctx, it.ID, set, nil, it.Updated) //nolint:wrapcheck
 }
 
-func files(ctx context.Context, st store.Store, c repo.Config) ([]types.Item, error) {
+func files(ctx context.Context, st format.Store, c repo.Config) ([]types.Item, error) {
 	hits, err := st.Items().Search(ctx, &aql.Query{Criteria: aql.And{
 		aql.RepoSet{Refs: []aql.RepoRef{pkgindex.Stored(c)}},
 		&aql.FieldCriterion{Field: aql.FieldType, Op: aql.OpEq, Text: "file"},

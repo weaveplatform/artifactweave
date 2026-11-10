@@ -10,9 +10,10 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/tx"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -38,12 +39,27 @@ type Handler interface {
 // and the slices import core.
 type Registry func(t repo.PackageType) Handler
 
+// Store is what a format reads and writes through Env.Store, inside the
+// operation's transaction: repositories, items, the package index and the
+// remote cache. Every call joins the transaction ctx carries; inside a hook,
+// Tx joins the operation's transaction rather than starting one of its own
+// (tx.Runner). It has no blob index: a format reads content only through
+// Env.Blobs (decision 0004). The metadata store's aggregate (pkg/store) is
+// a Store, so every builder of Env keeps the value it passes.
+type Store interface {
+	tx.Runner
+	Repos() port.RepoStore
+	Items() port.ItemStore
+	Packages() port.PackageStore
+	RemoteCache() port.RemoteCacheStore
+}
+
 // Env is what a hook runs with. The item service builds one per operation;
 // inside a hook, ctx carries the operation's transaction, which Store,
 // Leases, WorkQueue, Keys, Derive and Enqueue join.
 type Env struct {
-	// Store is the metadata store.
-	Store store.Store
+	// Store is the metadata store, narrowed to what formats use.
+	Store Store
 	// Leases is the store's lease table. A format takes a write lock through
 	// it inside the operation's transaction: Acquire and Release join the
 	// transaction in ctx, so it must be the same store as Store.

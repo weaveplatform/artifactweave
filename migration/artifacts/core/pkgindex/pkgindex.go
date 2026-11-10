@@ -8,9 +8,18 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
+
+// Store is the one store the index functions use: the package index. Its
+// calls join the transaction ctx carries, so a format's hooks link, prune
+// and reconcile as part of the operation that changed the item. A
+// format.Store is a Store, and so is the metadata store's aggregate.
+type Store interface {
+	Packages() port.PackageStore
+}
 
 // Stored is where c's package index finds its files: a remote repository's
 // cache, which alone holds a remote's items (decision 0018 indexes items
@@ -31,7 +40,7 @@ type Version struct {
 
 // Link records that the item with itemID is a file of v, creating the
 // package and version when they are new.
-func Link(ctx context.Context, st store.Store, v Version, itemID int64, at time.Time) error {
+func Link(ctx context.Context, st Store, v Version, itemID int64, at time.Time) error {
 	p, err := st.Packages().Ensure(ctx, types.Package{
 		RepoKey: v.RepoKey, Name: v.Package, Type: v.PackageType, Created: at,
 	})
@@ -58,7 +67,7 @@ func Link(ctx context.Context, st store.Store, v Version, itemID int64, at time.
 // false when it belongs to none.
 func VersionOf(
 	ctx context.Context,
-	st store.Store,
+	st Store,
 	itemID int64,
 ) (types.PackageVersion, bool, error) {
 	pv, err := st.Packages().VersionOf(ctx, itemID)
@@ -74,7 +83,7 @@ func VersionOf(
 // Prune runs after items were deleted, which removes their file links with
 // them: each of versions left with no files is deleted, and with it a
 // package left with no versions.
-func Prune(ctx context.Context, st store.Store, versions []types.PackageVersion) error {
+func Prune(ctx context.Context, st Store, versions []types.PackageVersion) error {
 	done := map[int64]bool{}
 	for _, pv := range versions {
 		if done[pv.ID] {
