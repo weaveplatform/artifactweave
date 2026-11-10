@@ -1,4 +1,4 @@
-package artifactshttp
+package search
 
 import (
 	"context"
@@ -13,7 +13,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/search"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
@@ -22,22 +21,22 @@ func (u *UpstreamSearch) mavenVersions(
 	ctx context.Context,
 	key, v string,
 	files bool,
-) ([]search.VersionEntry, error) {
-	if u.g != "" && u.a != "" && !search.HasWildcard(u.g+u.a) {
+) ([]VersionEntry, error) {
+	if u.g != "" && u.a != "" && !HasWildcard(u.g+u.a) {
 		if !searchMavenSegment(u.g) || !searchMavenSegment(u.a) {
 			return nil, source.ErrInvalidRequest
 		}
 		return u.mavenModule(ctx, key, path.Join(layout.OrgPath(u.g), u.a), v, files)
 	}
-	var out []search.VersionEntry
-	gp, ap := search.Wildcard(&u.g), search.Wildcard(&u.a)
+	var out []VersionEntry
+	gp, ap := Wildcard(&u.g), Wildcard(&u.a)
 	err := u.walk(ctx, key, true, func(full string) (bool, error) {
 		if path.Base(full) != "maven-metadata.xml" {
 			return false, nil
 		}
 		folder := path.Dir(full)
 		g, a := layout.Org(path.Dir(folder)), path.Base(folder)
-		if !search.Matches(gp, g) || !search.Matches(ap, a) {
+		if !Matches(gp, g) || !Matches(ap, a) {
 			return false, nil
 		}
 		versions, err := u.mavenModule(ctx, key, folder, v, files)
@@ -56,12 +55,12 @@ func (u *UpstreamSearch) mavenModule(
 	ctx context.Context,
 	key, folder, v string,
 	files bool,
-) ([]search.VersionEntry, error) {
+) ([]VersionEntry, error) {
 	d, err := u.mapping(ctx, key)
 	if err != nil {
 		return nil, err
 	}
-	var out []search.VersionEntry
+	var out []VersionEntry
 	g, a := layout.Org(path.Dir(folder)), path.Base(folder)
 	for _, scope := range d.Scopes(layout.Values{layout.TokenOrg: g, layout.TokenModule: a}) {
 		if !u.routes.ScopeAllowed(key, scope) {
@@ -82,13 +81,13 @@ func (u *UpstreamSearch) mavenModuleScope(
 	files bool,
 	d *remote.Discovery,
 	scope remote.DiscoveryScope,
-) ([]search.VersionEntry, error) {
+) ([]VersionEntry, error) {
 	metadata, result, err := u.readMaven(ctx, key, folder, "", scope)
 	if err != nil {
 		return nil, err
 	}
-	var out []search.VersionEntry
-	exact := v != "" && !search.HasWildcard(v)
+	var out []VersionEntry
+	exact := v != "" && !HasWildcard(v)
 	for _, version := range metadata.Versioning.Versions {
 		integration := strings.HasSuffix(version, "-SNAPSHOT")
 		if exact && (!integration || version != v) {
@@ -104,7 +103,7 @@ func (u *UpstreamSearch) mavenModuleScope(
 		if integration && (exact || files && v != "") {
 			entries, err := u.mavenSnapshots(ctx, key, folder, version, scope)
 			if errors.Is(err, kernel.ErrNotFound) {
-				out = append(out, search.VersionEntry{V: version, IsIntegration: true})
+				out = append(out, VersionEntry{V: version, IsIntegration: true})
 				continue
 			}
 			if err != nil {
@@ -115,7 +114,7 @@ func (u *UpstreamSearch) mavenModuleScope(
 			}
 			out = append(out, entries...)
 		} else {
-			out = append(out, search.VersionEntry{V: version, IsIntegration: integration})
+			out = append(out, VersionEntry{V: version, IsIntegration: integration})
 		}
 	}
 	return out, nil
@@ -187,12 +186,12 @@ func (u *UpstreamSearch) mavenSnapshots(
 	ctx context.Context,
 	key, folder, version string,
 	scope remote.DiscoveryScope,
-) ([]search.VersionEntry, error) {
+) ([]VersionEntry, error) {
 	metadata, result, err := u.readMaven(ctx, key, folder, version, scope)
 	if err != nil {
 		return nil, err
 	}
-	var out []search.VersionEntry
+	var out []VersionEntry
 	for _, snapshot := range metadata.Versioning.Snapshots {
 		filename := path.Base(folder) + "-" + snapshot.Value
 		if snapshot.Classifier != "" {
@@ -220,7 +219,7 @@ func (u *UpstreamSearch) mavenSnapshots(
 			u.checks,
 			func(ctx context.Context) error { return result.CheckRead(ctx, full) },
 		)
-		out = append(out, search.VersionEntry{V: co.FileVersion(), IsIntegration: true})
+		out = append(out, VersionEntry{V: co.FileVersion(), IsIntegration: true})
 	}
 	// Old Maven repositories may publish only timestamp/buildNumber. That is a
 	// version identity, not proof of any particular extension or classifier.
@@ -235,7 +234,7 @@ func (u *UpstreamSearch) mavenSnapshots(
 				snapshot.BuildNumber,
 			)
 		}
-		out = append(out, search.VersionEntry{V: identity, IsIntegration: true})
+		out = append(out, VersionEntry{V: identity, IsIntegration: true})
 	}
 	return out, nil
 }

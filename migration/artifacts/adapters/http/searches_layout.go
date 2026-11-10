@@ -160,7 +160,7 @@ const (
 // moduleUpstream is u as search.ModuleVersions takes it: a nil
 // *UpstreamSearch stored in the interface is not nil, and ModuleVersions
 // would call into it, so no upstream search is an untyped nil.
-func moduleUpstream(u *UpstreamSearch) search.Upstream {
+func moduleUpstream(u *search.UpstreamSearch) search.Upstream {
 	if u == nil {
 		return nil
 	}

@@ -1,4 +1,4 @@
-package artifactshttp
+package search
 
 import (
 	"context"
@@ -13,7 +13,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/search"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
@@ -77,8 +76,8 @@ type UpstreamDeps struct {
 // Maven metadata or bounded folder listings. It is not safe for concurrent
 // use: it counts its reads and records the checks Revalidate repeats.
 type UpstreamSearch struct {
-	r        *search.SearchRun
-	ls       search.LayoutScope
+	r        *SearchRun
+	ls       LayoutScope
 	g, a     string
 	budget   remote.ListingBudget
 	reads    int
@@ -94,8 +93,8 @@ type UpstreamSearch struct {
 // NewUpstreamSearch starts the upstream part of r for the organisation g and
 // the module a, over the layouts of ls, through d.
 func NewUpstreamSearch(
-	r *search.SearchRun,
-	ls search.LayoutScope,
+	r *SearchRun,
+	ls LayoutScope,
 	g, a *string,
 	d UpstreamDeps,
 ) *UpstreamSearch {
@@ -145,7 +144,7 @@ func (u *UpstreamSearch) failure(key string, err error) error {
 
 // Versions lists the versions the upstreams hold of the module, from Maven
 // metadata where the upstream layout is Maven's and from bounded listings
-// where the repository lists remote folders, as search.ModuleVersions counts
+// where the repository lists remote folders, as ModuleVersions counts
 // them from v and files. A repository that does not hard-fail leaves its
 // versions out when its upstream is unavailable; any other failure is
 // UpstreamDeps.Fail's answer.
@@ -153,33 +152,33 @@ func (u *UpstreamSearch) Versions(
 	ctx context.Context,
 	v string,
 	files bool,
-) ([]search.VersionEntry, error) {
+) ([]VersionEntry, error) {
 	if err := u.routes.CheckRoutes(ctx); err != nil {
 		return nil, u.failure("", err)
 	}
-	var out []search.VersionEntry
+	var out []VersionEntry
 	for _, key := range u.routes.Keys() {
 		if _, err := u.mapping(ctx, key); err != nil {
 			return nil, u.failure(key, err)
 		}
-		var found []search.VersionEntry
+		var found []VersionEntry
 		var err error
 		if maven.IsMavenLayout(u.mappings[key].Upstream()) {
 			found, err = u.mavenVersions(ctx, key, v, files)
 		} else if c := u.r.Configs[key]; c.ListRemoteFolderItems.Bool() {
-			var hits []search.LayoutHit
+			var hits []LayoutHit
 			hits, err = u.listFiles(ctx, key)
 			for _, hit := range hits {
-				if v != "" && !search.HasWildcard(v) && (!hit.Integration() || hit.Version() != v) {
+				if v != "" && !HasWildcard(v) && (!hit.Integration() || hit.Version() != v) {
 					continue
 				}
 				version := hit.Version()
-				if hit.Integration() && (files || v != "" && !search.HasWildcard(v)) {
+				if hit.Integration() && (files || v != "" && !HasWildcard(v)) {
 					version = hit.FileVersion()
 				}
 				found = append(
 					found,
-					search.VersionEntry{V: version, IsIntegration: hit.Integration()},
+					VersionEntry{V: version, IsIntegration: hit.Integration()},
 				)
 			}
 		}
@@ -198,11 +197,11 @@ func (u *UpstreamSearch) Versions(
 // whose version and classifier match v and c, each with the coordinates its
 // repository's layout reads; failures are passed over or answered as
 // Versions does.
-func (u *UpstreamSearch) Gavc(ctx context.Context, v, c *string) ([]search.LayoutHit, error) {
+func (u *UpstreamSearch) Gavc(ctx context.Context, v, c *string) ([]LayoutHit, error) {
 	if err := u.routes.CheckRoutes(ctx); err != nil {
 		return nil, u.failure("", err)
 	}
-	var out []search.LayoutHit
+	var out []LayoutHit
 	for _, key := range u.routes.Keys() {
 		if _, err := u.mapping(ctx, key); err != nil {
 			return nil, u.failure(key, err)
@@ -214,9 +213,9 @@ func (u *UpstreamSearch) Gavc(ctx context.Context, v, c *string) ([]search.Layou
 			}
 			continue
 		}
-		vp, cp := search.Wildcard(v), search.Wildcard(c)
+		vp, cp := Wildcard(v), Wildcard(c)
 		for _, hit := range found {
-			if search.Matches(vp, hit.Version()) && search.Matches(cp, hit.Classifier) {
+			if Matches(vp, hit.Version()) && Matches(cp, hit.Classifier) {
 				out = append(out, hit)
 			}
 		}
@@ -225,7 +224,7 @@ func (u *UpstreamSearch) Gavc(ctx context.Context, v, c *string) ([]search.Layou
 }
 
 // Disclose reports whether the search may name full, as Routes.Disclose
-// decides and records it, which makes an UpstreamSearch a search.Upstream.
+// decides and records it, which makes an UpstreamSearch a Upstream.
 func (u *UpstreamSearch) Disclose(key, full string, folder bool, cached ...bool) bool {
 	return u.routes.Disclose(key, full, folder, cached...)
 }
@@ -251,10 +250,10 @@ func (u *UpstreamSearch) mapping(ctx context.Context, key string) (*remote.Disco
 
 func searchValues(g, a string) layout.Values {
 	values := layout.Values{}
-	if g != "" && !search.HasWildcard(g) {
+	if g != "" && !HasWildcard(g) {
 		values[layout.TokenOrg] = g
 	}
-	if a != "" && !search.HasWildcard(a) {
+	if a != "" && !HasWildcard(a) {
 		values[layout.TokenModule] = a
 	}
 	return values
@@ -361,15 +360,15 @@ func (u *UpstreamSearch) walkScope(
 	return nil
 }
 
-func (u *UpstreamSearch) listFiles(ctx context.Context, key string) ([]search.LayoutHit, error) {
-	var out []search.LayoutHit
-	gp, ap := search.Wildcard(&u.g), search.Wildcard(&u.a)
+func (u *UpstreamSearch) listFiles(ctx context.Context, key string) ([]LayoutHit, error) {
+	var out []LayoutHit
+	gp, ap := Wildcard(&u.g), Wildcard(&u.a)
 	err := u.walk(ctx, key, false, func(full string) (bool, error) {
 		co, ok := u.ls.Layouts[key].Read(full)
-		if ok && search.Matches(gp, co.Org) && search.Matches(ap, co.Module) &&
+		if ok && Matches(gp, co.Org) && Matches(ap, co.Module) &&
 			u.Disclose(key, full, false) {
 			dir, name := path.Split(full)
-			out = append(out, search.LayoutHit{
+			out = append(out, LayoutHit{
 				Hit: aql.Hit{
 					Item: types.Item{RepoKey: key, Path: strings.TrimSuffix(dir, "/"), Name: name},
 				},

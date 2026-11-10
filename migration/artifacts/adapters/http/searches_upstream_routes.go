@@ -52,13 +52,13 @@ func (r *searchRun) upstreamSearch(
 	ls search.LayoutScope,
 	repos, g, a *string,
 	enabled bool,
-) (*UpstreamSearch, *searchRoutes) {
+) (*search.UpstreamSearch, *searchRoutes) {
 	if !enabled || r.s.cfg.RemoteSources == nil {
 		return nil, nil
 	}
 	routes := &searchRoutes{r: r, ls: ls}
 	routes.prepareRoutes(repos)
-	return NewUpstreamSearch(r.SearchRun, ls, g, a, UpstreamDeps{
+	return search.NewUpstreamSearch(r.SearchRun, ls, g, a, search.UpstreamDeps{
 		Sources: r.s.cfg.RemoteSources,
 		Items:   &item.Service{Store: r.st},
 		Routes:  routes,
@@ -144,7 +144,7 @@ func (u *searchRoutes) visitRoute(key string, route searchRoute, nodes *int) {
 	*nodes++
 	if *nodes > 1000 || len(route.virtuals) > 32 ||
 		slices.ContainsFunc(route.virtuals, func(c repo.Config) bool { return c.Key == key }) {
-		u.routeErr = InvalidSearchMetadata()
+		u.routeErr = search.InvalidSearchMetadata()
 		return
 	}
 	c, ok := u.r.Configs[key]
