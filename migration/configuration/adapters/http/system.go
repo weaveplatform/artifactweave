@@ -70,10 +70,10 @@ type SystemAPI struct {
 	instanceID *atomic.Pointer[string]
 }
 
-// NewSystemAPI returns the system handlers over d. They remember the
+// New returns the system handlers over d. They remember the
 // instance id the probes last read, so router health still names the
 // services by it while the database is down.
-func NewSystemAPI(d Deps) *SystemAPI {
+func New(d Deps) *SystemAPI {
 	return &SystemAPI{deps: d, instanceID: new(atomic.Pointer[string])}
 }
 
@@ -102,6 +102,10 @@ func (s SystemAPI) content() (instance.Store, error) {
 	return s.deps.Store, nil
 }
 
+// GetSystemVersion reports the compatibility version as Artifactory's
+// version, with the build revision and no add-ons, in the vendor type when
+// Accept names it (versionMediaType) and as JSON otherwise. The router
+// decides who may call it: Artifactory requires a user (RTFACT-26414).
 func (s SystemAPI) GetSystemVersion(
 	_ context.Context,
 	req artgen.GetSystemVersionRequestObject,

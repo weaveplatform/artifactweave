@@ -32,7 +32,7 @@ These are availability states, not permanent scope cuts:
 Status codes below assume a valid, authenticated request where required. Authentication
 and request binding can reject a request before it reaches a stub. Current evidence is
 [`server.go`](../../internal/server/server.go),
-[`system.go`](../../internal/server/system.go),
+[`system.go`](../../migration/configuration/adapters/http/system.go),
 [`stub_test.go`](../../internal/server/stub_test.go), the format status registrations and
 native acceptance features. A generated schema or a stored configuration field alone
 is not runtime support. Client contracts are recorded in

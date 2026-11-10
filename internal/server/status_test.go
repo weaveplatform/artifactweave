@@ -16,7 +16,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	"github.com/weaveplatform/artifactweave/migration/configuration/adapters/http"
 	configurationhttp "github.com/weaveplatform/artifactweave/migration/configuration/adapters/http"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -241,7 +240,7 @@ func systemStatusRows() []statusCase {
 }
 
 // sinkStatusRows are the telemetry sinks: public, and limited to
-// SinkBodyLimit bytes of body (#431).
+// configurationhttp.SinkBodyLimit bytes of body (#431).
 func sinkStatusRows() []statusCase {
 	const report = `{"productId":"jfrog-cli-go/2.60.0","features":[]}`
 	oversized := strings.Repeat("x", configurationhttp.SinkBodyLimit+1)

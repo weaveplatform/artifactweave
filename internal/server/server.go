@@ -386,7 +386,7 @@ func New(cfg Config) http.Handler {
 	debianOps := debianAPI{kit}
 	cranOps := cranAPI{Kit: kit, archiveMoverEnabled: cfg.CranArchiveMoverEnabled}
 	rpmOps := rpmAPI{kit}
-	sysAPI := configurationhttp.NewSystemAPI(configurationhttp.Deps{
+	sysAPI := configurationhttp.New(configurationhttp.Deps{
 		Store:         cfg.Store,
 		Blobs:         cfg.Blobs,
 		CompatVersion: cfg.CompatVersion,
@@ -693,8 +693,8 @@ func newAuthnOptions(
 }
 
 // newLimitOptions returns the request-limit middleware's options as the
-// router composes them: the probes (HealthRequest) and the recovery API
-// (APIRecoveryRequest) pass the shared limits.
+// router composes them: the probes (configurationhttp.HealthRequest) and
+// the recovery API (APIRecoveryRequest) pass the shared limits.
 func newLimitOptions(limits *apilimit.Service) limitOptions {
 	return limitOptions{
 		Health:   configurationhttp.HealthRequest,

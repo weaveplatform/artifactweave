@@ -15,12 +15,16 @@ import (
 
 	artifactshttp "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
-	"github.com/weaveplatform/artifactweave/migration/configuration/adapters/http"
 	configurationhttp "github.com/weaveplatform/artifactweave/migration/configuration/adapters/http"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/middleware"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
+
+// versionMediaType is the vendor type of the version document, which the
+// system handlers answer when Accept names it; the table keeps a copy of
+// their constant with the same text.
+const versionMediaType = "application/vnd.org.jfrog.artifactory.system.Version+json"
 
 func testHandler() http.Handler {
 	return New(
@@ -244,9 +248,10 @@ func (b *endlessBody) Read(p []byte) (int, error) {
 	return n, nil
 }
 
-// TestAccTelemetrySinkBodyLimit holds both sinks to SinkBodyLimit: a body at
-// the limit is drained and answered 200, and a longer one answers 413
-// without being read to the end, whether its length is declared or not.
+// TestAccTelemetrySinkBodyLimit holds both sinks to
+// configurationhttp.SinkBodyLimit: a body at the limit is drained and
+// answered 200, and a longer one answers 413 without being read to the
+// end, whether its length is declared or not.
 func TestAccTelemetrySinkBodyLimit(t *testing.T) {
 	h := testHandler()
 	tooLarge := `{"errors":[{"status":413,"message":"request body exceeds 1048576 bytes"}]}`

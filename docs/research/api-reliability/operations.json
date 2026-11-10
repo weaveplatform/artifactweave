@@ -8908,7 +8908,7 @@
     "operation_id": "getReverseProxyConfiguration",
     "state": "implemented",
     "contract": "Returns the reverse proxy settings. Without stored settings, the response describes this server. dockerReverseProxyMethod is SUBDOMAIN when docker.subdomain_match is on and REPOPATHPREFIX otherwise, serverName is the base URL's host and, with subdomains, serverNameExpression is its wildcard. Stored settings return both sslPort and httpsPort with the same value. An administrator gets every field; any other signed-in user gets dockerReverseProxyMethod and the port fields (artifactoryPort, httpPort, httpsPort, sslPort, useHttp, useHttps) that are set, and nothing else. Anonymous callers are refused.",
-    "handler": "internal/server/reverseproxy.go: SystemAPI.GetReverseProxyConfiguration",
+    "handler": "migration/configuration/adapters/http/reverseproxy.go: SystemAPI.GetReverseProxyConfiguration",
     "direct_calls": [
       "fmt.Errorf",
       "kernel.RequireAuthenticated",
@@ -8952,7 +8952,7 @@
     "operation_id": "getSystemLicense",
     "state": "implemented",
     "contract": "Returns the licence details of this server, which has no licence tiers. Admin only.",
-    "handler": "internal/server/system.go: SystemAPI.GetSystemLicense",
+    "handler": "migration/configuration/adapters/http/system.go: SystemAPI.GetSystemLicense",
     "direct_calls": [
       "httpkit.AdminOnly"
     ],
@@ -9146,7 +9146,7 @@
     "operation_id": "getServiceId",
     "state": "implemented",
     "contract": "Returns this instance's service id as plain text, `jfrt@` followed by a UUID, with no trailing newline. The UUID is generated when the instance first starts and never changes; the access tokens the instance issues carry it after `jfac@` in their issuer and subject, and `POST /api/security/token` accepts the scope `\u003cservice id\u003e:admin` for administrator permissions. Admin only.",
-    "handler": "internal/server/system.go: SystemAPI.GetServiceId",
+    "handler": "migration/configuration/adapters/http/system.go: SystemAPI.GetServiceId",
     "direct_calls": [
       "artgen.GetServiceId200TextResponse",
       "httpkit.AdminOnly",
@@ -9246,7 +9246,7 @@
     "operation_id": "getSystemVersion",
     "state": "implemented",
     "contract": "Reports the compatibility version in version, the server build in revision, and the installed add-ons. Any authenticated caller may read it. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled.",
-    "handler": "internal/server/system.go: SystemAPI.GetSystemVersion",
+    "handler": "migration/configuration/adapters/http/system.go: SystemAPI.GetSystemVersion",
     "direct_calls": [
       "artgen.GetSystemVersion200ApplicationVndOrgJfrogArtifactorySystemVersionPlusJSONResponse",
       "artgen.GetSystemVersion200JSONResponse",
@@ -9617,7 +9617,7 @@
     "operation_id": "getSystemLiveness",
     "state": "implemented",
     "contract": "Returns OK while the process serves requests. It probes no store. Answers without credentials.",
-    "handler": "internal/server/system.go: SystemAPI.GetSystemLiveness",
+    "handler": "migration/configuration/adapters/http/system.go: SystemAPI.GetSystemLiveness",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -9639,7 +9639,7 @@
     "operation_id": "getSystemReadiness",
     "state": "implemented",
     "contract": "Returns OK while the database and the binary store answer. Answers without credentials.",
-    "handler": "internal/server/system.go: SystemAPI.GetSystemReadiness",
+    "handler": "migration/configuration/adapters/http/system.go: SystemAPI.GetSystemReadiness",
     "direct_calls": [
       "s.probeArtifactory",
       "s.probeFailed"
@@ -11455,7 +11455,7 @@
   {
     "route": "GET /router/api/v1/system/health",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.SystemAPI.RouterHealth-fm",
+    "handler": "internal/server/server.go: migration/configuration/adapters/http.SystemAPI.RouterHealth-fm",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -11474,7 +11474,7 @@
   {
     "route": "GET /router/api/v1/system/liveness",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/system.go: internal/server.Liveness",
+    "handler": "migration/configuration/adapters/http/system.go: migration/configuration/adapters/http.Liveness",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -11493,7 +11493,7 @@
   {
     "route": "GET /router/api/v1/system/readiness",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/system.go: internal/server.SystemAPI.readiness.func1",
+    "handler": "migration/configuration/adapters/http/system.go: migration/configuration/adapters/http.SystemAPI.readiness.func1",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -19626,7 +19626,7 @@
   {
     "route": "POST /jfconnect/api/v1/backoffice/metrics/log",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/system.go: internal/server.SinkHandler",
+    "handler": "migration/configuration/adapters/http/system.go: migration/configuration/adapters/http.SinkHandler",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",

@@ -228,6 +228,7 @@ func apiReviewHandlers(t *testing.T) map[string]apiReviewHandler {
 		"internal/server",
 		"migration/access/adapters/http",
 		"migration/artifacts/adapters/http",
+		"migration/configuration/adapters/http",
 	} {
 		found, err := filepath.Glob(filepath.Join(root, dir, "*.go"))
 		if err != nil {

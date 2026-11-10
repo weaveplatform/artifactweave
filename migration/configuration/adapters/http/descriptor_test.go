@@ -2,6 +2,7 @@ package configurationhttp
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -9,16 +10,23 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
 const configPath = "/artifactory/api/system/configuration"
+
+var errBoom = errors.New("boom")
+
+// failingReader is a request body whose every read fails.
+type failingReader struct{}
+
+func (failingReader) Read([]byte) (int, error) { return 0, errBoom }
 
 // TestAccPatchConfigurationBody covers what the router never sends in tests: a
 // body over the limit while being read, an unreadable body, and a router
 // built without a store.
 func TestAccPatchConfigurationBody(t *testing.T) {
-	w := newRepoWorld(t)
-	svc := SystemAPI{deps: Deps{Store: w.db}}
+	svc := SystemAPI{deps: Deps{Store: inmem.New()}}
 	admin := kernel.WithPrincipal(
 		context.Background(),
 		kernel.Principal{Name: "admin", Admin: true},
