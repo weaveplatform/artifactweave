@@ -21,6 +21,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
+	platsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -62,7 +63,7 @@ func backends() []backend {
 			return open(), open
 		}},
 		{"postgres", func(t *testing.T) (registry.Store, func() registry.Store) {
-			dsn := sqltest.PostgresDSN(t)
+			dsn := platsqltest.PostgresDSN(t)
 			open := func() *sqlcommon.Store {
 				st, err := postgres.Open(context.Background(), dsn, postgres.Options{})
 				if err != nil {

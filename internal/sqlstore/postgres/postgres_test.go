@@ -13,12 +13,15 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
+	pgdrv "github.com/weaveplatform/artifactweave/migration/platform/sql/postgres"
+	platsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/storetest"
 )
 
 func TestAccContract(t *testing.T) {
-	dsn := sqltest.PostgresDSN(t)
+	dsn := platsqltest.PostgresDSN(t)
 	k, err := crypt.New([]byte("0123456789abcdef0123456789abcdef"))
 	if err != nil {
 		t.Fatal(err)
@@ -29,7 +32,7 @@ func TestAccContract(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		sqltest.Reset(t, s.DB(), postgres.Dialect)
+		sqltest.Reset(t, s.DB(), pgdrv.Dialect)
 		t.Cleanup(func() { _ = s.Close() })
 		return s
 	})
@@ -43,7 +46,7 @@ func TestAccOpenErrors(t *testing.T) {
 		postgres.Options{},
 	); !errors.Is(
 		err,
-		postgres.ErrDSNRequired,
+		pgdrv.ErrDSNRequired,
 	) {
 		t.Fatalf("empty DSN: %v", err)
 	}
@@ -60,7 +63,7 @@ func TestAccOpenErrors(t *testing.T) {
 }
 
 func TestAccKeyRotation(t *testing.T) {
-	dsn := sqltest.PostgresDSN(t)
+	dsn := platsqltest.PostgresDSN(t)
 	first := true
 	sqltest.Rotation(t, func(t *testing.T, k *crypt.Keyring) *sqlcommon.Store {
 		s, err := postgres.Open(
@@ -72,7 +75,7 @@ func TestAccKeyRotation(t *testing.T) {
 			t.Fatal(err)
 		}
 		if first {
-			sqltest.Reset(t, s.DB(), postgres.Dialect)
+			sqltest.Reset(t, s.DB(), pgdrv.Dialect)
 			first = false
 		}
 		t.Cleanup(func() { _ = s.Close() })
@@ -87,7 +90,7 @@ func TestAccKeyRotation(t *testing.T) {
 func TestAccLegacyHistoryRefused(t *testing.T) {
 	ctx := t.Context()
 	dsn := scratchSchema(t)
-	sqltest.LegacyHistoryRefused(t, openUnmigrated(t, dsn).DB(), postgres.Dialect, func() error {
+	sqltest.LegacyHistoryRefused(t, openUnmigrated(t, dsn).DB(), pgdrv.Dialect, func() error {
 		refused, err := postgres.Open(ctx, dsn, postgres.Options{})
 		if err == nil {
 			_ = refused.Close()
@@ -106,19 +109,19 @@ func TestAccStreamsMigrateAlone(t *testing.T) {
 		t.Run(m.Name, func(t *testing.T) {
 			ctx := t.Context()
 			db := openUnmigrated(t, scratchSchema(t)).DB()
-			up, err := sqlcommon.Migrate(ctx, db, postgres.Dialect, mods, m.Name)
+			up, err := dialect.Migrate(ctx, db, pgdrv.Dialect, mods, m.Name)
 			if err != nil || len(up) == 0 {
 				t.Fatalf("Migrate %s = %v, %v", m.Name, up, err)
 			}
-			got, err := sqltest.Schema(ctx, db, postgres.Dialect.Name)
+			got, err := sqltest.Schema(ctx, db, pgdrv.Dialect.Name)
 			if err != nil || got == "\n" {
 				t.Fatalf("Migrate %s created no table (%v)", m.Name, err)
 			}
-			down, err := sqlcommon.Rollback(ctx, db, postgres.Dialect, mods, m.Name, 0)
+			down, err := dialect.Rollback(ctx, db, pgdrv.Dialect, mods, m.Name, 0)
 			if err != nil || len(down) != len(up) {
 				t.Fatalf("Rollback %s = %v, %v; want %v reverted", m.Name, down, err, up)
 			}
-			got, err = sqltest.Schema(ctx, db, postgres.Dialect.Name)
+			got, err = sqltest.Schema(ctx, db, pgdrv.Dialect.Name)
 			if err != nil || got != "\n" {
 				t.Fatalf("Rollback %s left (%v):\n%s", m.Name, err, got)
 			}
@@ -135,7 +138,7 @@ func TestAccStreamsMigrateAlone(t *testing.T) {
 // the binary.
 func scratchSchema(t *testing.T) string {
 	t.Helper()
-	dsn := sqltest.PostgresDSN(t)
+	dsn := platsqltest.PostgresDSN(t)
 	name := "scratch_" + strings.ToLower(rand.Text())
 	admin := openUnmigrated(t, dsn)
 	if _, err := admin.DB().ExecContext(t.Context(), "CREATE SCHEMA "+name); err != nil {
@@ -175,7 +178,7 @@ func openUnmigrated(t *testing.T, dsn string) *sqlcommon.Store {
 }
 
 func TestAccRemoteCachePersistence(t *testing.T) {
-	dsn := sqltest.PostgresDSN(t)
+	dsn := platsqltest.PostgresDSN(t)
 	open := func() *sqlcommon.Store {
 		s, err := postgres.Open(context.Background(), dsn, postgres.Options{})
 		if err != nil {
@@ -188,7 +191,7 @@ func TestAccRemoteCachePersistence(t *testing.T) {
 }
 
 func TestAccRepositoryHeaderSecrets(t *testing.T) {
-	dsn := sqltest.PostgresDSN(t)
+	dsn := platsqltest.PostgresDSN(t)
 	first := true
 	sqltest.RepositoryHeaderEnvironmentRename(
 		t,
@@ -202,7 +205,7 @@ func TestAccRepositoryHeaderSecrets(t *testing.T) {
 				t.Fatal(err)
 			}
 			if first {
-				sqltest.Reset(t, s.DB(), postgres.Dialect)
+				sqltest.Reset(t, s.DB(), pgdrv.Dialect)
 				first = false
 			}
 			t.Cleanup(func() { _ = s.Close() })
@@ -212,7 +215,7 @@ func TestAccRepositoryHeaderSecrets(t *testing.T) {
 }
 
 func TestAccRepositoryHeaderMigration(t *testing.T) {
-	dsn := sqltest.PostgresDSN(t)
+	dsn := platsqltest.PostgresDSN(t)
 	first := true
 	sqltest.RepositoryHeadersOpen(t, func(t *testing.T, k *crypt.Keyring) *sqlcommon.Store {
 		s, err := postgres.Open(
@@ -224,7 +227,7 @@ func TestAccRepositoryHeaderMigration(t *testing.T) {
 			t.Fatal(err)
 		}
 		if first {
-			sqltest.Reset(t, s.DB(), postgres.Dialect)
+			sqltest.Reset(t, s.DB(), pgdrv.Dialect)
 			first = false
 		}
 		t.Cleanup(func() { _ = s.Close() })

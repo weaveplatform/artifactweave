@@ -7,6 +7,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
+	sqlitedrv "github.com/weaveplatform/artifactweave/migration/platform/sql/sqlite"
 )
 
 var update = flag.Bool("update", false, "rewrite the schema golden")
@@ -20,6 +21,6 @@ func TestAccSchemaGolden(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = s.Close() })
-	sqltest.SchemaGolden(t, s.DB(), sqlite.Dialect.Name,
+	sqltest.SchemaGolden(t, s.DB(), sqlitedrv.Dialect.Name,
 		filepath.Join("testdata", "schema.golden"), *update)
 }

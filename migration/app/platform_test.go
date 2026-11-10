@@ -33,6 +33,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
 	"github.com/weaveplatform/artifactweave/migration/platform/cdn"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -645,12 +646,12 @@ func TestAccMigrateCommand(t *testing.T) {
 	for _, action := range []string{"up", "down", "version"} {
 		err := Migrate(ctx, cfg, action, -1, "nope", &out)
 		want := "migrate " + action + `: sqlcommon: migration: unknown module "nope"`
-		if !errors.Is(err, sqlcommon.ErrUnknownModule) || err.Error() != want {
+		if !errors.Is(err, dialect.ErrUnknownModule) || err.Error() != want {
 			t.Fatalf("%s --module nope: %v; want %s", action, err, want)
 		}
 	}
 	err := Migrate(ctx, cfg, "down", 2, "", &out)
-	if !errors.Is(err, sqlcommon.ErrModuleRequired) ||
+	if !errors.Is(err, dialect.ErrModuleRequired) ||
 		err.Error() != "migrate down: sqlcommon: migration: a target version other than 0 needs a module" {
 		t.Fatalf("down --to 2 without a module: %v", err)
 	}

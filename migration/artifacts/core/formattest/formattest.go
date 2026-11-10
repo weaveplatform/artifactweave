@@ -23,6 +23,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
+	platsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -121,7 +122,7 @@ func Backends() []Backend {
 			return st
 		}},
 		{"postgres", func(t *testing.T) item.Store {
-			dsn := sqltest.PostgresDSN(t)
+			dsn := platsqltest.PostgresDSN(t)
 			st, err := postgres.Open(context.Background(), dsn, postgres.Options{})
 			if err != nil {
 				t.Fatal(err)

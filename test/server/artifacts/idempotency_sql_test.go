@@ -19,6 +19,8 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
+	pgdrv "github.com/weaveplatform/artifactweave/migration/platform/sql/postgres"
+	platsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
 	artclient "github.com/weaveplatform/artifactweave/pkg/client/artifactory"
 )
 
@@ -29,7 +31,7 @@ func TestAccAppendReplayDurability(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "replays.db")
 			dsn := ""
 			if backend == "postgres" {
-				dsn = sqltest.PostgresDSN(t)
+				dsn = platsqltest.PostgresDSN(t)
 			}
 			open := func() *sqlcommon.Store {
 				t.Helper()
@@ -48,7 +50,7 @@ func TestAccAppendReplayDurability(t *testing.T) {
 			}
 			first := open()
 			if backend == "postgres" {
-				sqltest.Reset(t, first.DB(), postgres.Dialect)
+				sqltest.Reset(t, first.DB(), pgdrv.Dialect)
 			}
 			cheapSeed(t, first)
 			blobs, err := fs.New(t.TempDir())

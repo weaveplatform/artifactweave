@@ -67,14 +67,14 @@ type Options struct {
 // pending migrations of every module's stream and then runs each module's
 // AfterMigrate hook, in the canonical module order of Modules. It closes db
 // on failure. Each backend opens its pool and calls it.
-func Open(ctx context.Context, db *sql.DB, d Dialect, o Options) (*Store, error) {
+func Open(ctx context.Context, db *sql.DB, d dialect.Dialect, o Options) (*Store, error) {
 	if err := db.PingContext(ctx); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("connect: %w", err)
 	}
 	mods := Modules()
 	if !o.SkipMigrate {
-		if _, err := Migrate(ctx, db, d, mods, ""); err != nil {
+		if _, err := dialect.Migrate(ctx, db, d, mods, ""); err != nil {
 			_ = db.Close()
 			return nil, err
 		}
@@ -98,7 +98,7 @@ func Open(ctx context.Context, db *sql.DB, d Dialect, o Options) (*Store, error)
 // layout watch with the platform's config store: a layout document that is
 // created, changed or deleted fences the remote repositories that use it,
 // in the same transaction (decision 0007).
-func New(db *sql.DB, d Dialect, keys *crypt.Keyring) *Store {
+func New(db *sql.DB, d dialect.Dialect, keys *crypt.Keyring) *Store {
 	s := &Store{Store: dialect.New(db, d, keys)}
 	s.artifacts = artsql.New(s.Store)
 	s.platform = platsql.New(s.Store, s.artifacts.LayoutWatch())

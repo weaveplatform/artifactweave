@@ -15,6 +15,8 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	pgdrv "github.com/weaveplatform/artifactweave/migration/platform/sql/postgres"
+	platsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -24,7 +26,7 @@ import (
 // timestamp is already expired. pg_blocking_pids proves the other writer is
 // blocked by PostgreSQL itself, not by a mutex or lease polling in this process.
 func TestAccNuGetWriteTransactionsOnPostgres(t *testing.T) {
-	dsn := sqltest.PostgresDSN(t)
+	dsn := platsqltest.PostgresDSN(t)
 	open := func() *sqlcommon.Store {
 		t.Helper()
 		db, err := postgres.Open(context.Background(), dsn, postgres.Options{})
@@ -37,7 +39,7 @@ func TestAccNuGetWriteTransactionsOnPostgres(t *testing.T) {
 	db, other := open(), open()
 	for _, mode := range []string{"commit", "rollback", "cancel owner", "cancel waiter", "copy", "move"} {
 		t.Run(mode, func(t *testing.T) {
-			sqltest.Reset(t, db.DB(), postgres.Dialect)
+			sqltest.Reset(t, db.DB(), pgdrv.Dialect)
 			f := newFixtureOn(t, db)
 			f.items.Store = other
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)

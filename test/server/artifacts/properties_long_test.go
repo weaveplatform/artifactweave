@@ -20,6 +20,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
+	pgdrv "github.com/weaveplatform/artifactweave/migration/platform/sql/postgres"
+	platsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -39,12 +41,12 @@ func TestAccLongPropertyValuesOnPostgres(
 
 func openPostgres(t *testing.T) store.Store {
 	t.Helper()
-	db, err := postgres.Open(context.Background(), sqltest.PostgresDSN(t), postgres.Options{})
+	db, err := postgres.Open(context.Background(), platsqltest.PostgresDSN(t), postgres.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	sqltest.Reset(t, db.DB(), postgres.Dialect)
+	sqltest.Reset(t, db.DB(), pgdrv.Dialect)
 	return db
 }
 

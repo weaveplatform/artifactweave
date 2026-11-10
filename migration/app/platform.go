@@ -459,7 +459,7 @@ func Migrate(
 	db, d, mods := s.DB(), s.Dialect(), sqlcommon.Modules()
 	switch action {
 	case "up":
-		done, err := sqlcommon.Migrate(ctx, db, d, mods, module)
+		done, err := dialect.Migrate(ctx, db, d, mods, module)
 		if err != nil {
 			return fmt.Errorf("migrate up: %w", err)
 		}
@@ -470,7 +470,7 @@ func Migrate(
 				return fmt.Errorf("migrate down: %w", err)
 			}
 		}
-		done, err := sqlcommon.Rollback(ctx, db, d, mods, module, to)
+		done, err := dialect.Rollback(ctx, db, d, mods, module, to)
 		if err != nil {
 			return fmt.Errorf("migrate down: %w", err)
 		}
@@ -478,9 +478,9 @@ func Migrate(
 	default:
 		known := slices.ContainsFunc(mods, func(m dialect.Module) bool { return m.Name == module })
 		if module != "" && !known {
-			return fmt.Errorf("migrate version: %w %q", sqlcommon.ErrUnknownModule, module)
+			return fmt.Errorf("migrate version: %w %q", dialect.ErrUnknownModule, module)
 		}
-		streams, err := sqlcommon.Version(ctx, db, d, mods)
+		streams, err := dialect.Version(ctx, db, d, mods)
 		if err != nil {
 			return fmt.Errorf("migrate version: %w", err)
 		}
@@ -505,11 +505,11 @@ func oneStep(
 	mods []dialect.Module,
 	module string,
 ) (string, int, error) {
-	streams, err := sqlcommon.Version(ctx, s.DB(), s.Dialect(), mods)
+	streams, err := dialect.Version(ctx, s.DB(), s.Dialect(), mods)
 	if err != nil {
 		return "", 0, err //nolint:wrapcheck // the caller names the action
 	}
-	last := sqlcommon.StreamVersion{Module: module}
+	last := dialect.StreamVersion{Module: module}
 	for _, v := range streams {
 		if v.Module == module || module == "" && v.Current > 0 {
 			last = v

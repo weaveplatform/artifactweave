@@ -18,6 +18,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/settings"
+	platsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
@@ -131,7 +132,7 @@ func TestAccSeedSQLite(t *testing.T) {
 
 // TestAccSeedPostgres needs Docker and skips without it; CI runs it on Linux.
 func TestAccSeedPostgres(t *testing.T) {
-	dsn := sqltest.PostgresDSN(t)
+	dsn := platsqltest.PostgresDSN(t)
 	ctx := context.Background()
 	st, err := postgres.Open(ctx, dsn, postgres.Options{})
 	if err != nil {

@@ -10,6 +10,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -36,10 +37,10 @@ func Rotation(t *testing.T, open Opener) {
 	populate(t, open(t, v1))
 
 	s := open(t, nil)
-	if _, err := s.Reseal(ctx); !errors.Is(err, sqlcommon.ErrNoKeyring) {
+	if _, err := s.Reseal(ctx); !errors.Is(err, dialect.ErrNoKeyring) {
 		t.Fatalf("Reseal without a keyring: %v", err)
 	}
-	if _, err := s.Repos().Get(ctx, "remote"); !errors.Is(err, sqlcommon.ErrNoKeyring) {
+	if _, err := s.Repos().Get(ctx, "remote"); !errors.Is(err, dialect.ErrNoKeyring) {
 		t.Fatalf("reading a sealed value without a keyring: %v", err)
 	}
 	if _, err := open(t, only2).Repos().Get(ctx, "remote"); !errors.Is(err, crypt.ErrUnknownKey) {

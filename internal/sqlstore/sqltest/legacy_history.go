@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 )
 
 // legacyHistory is a history table that predates the per-module migration
@@ -24,7 +25,7 @@ var legacyHistory = []string{
 // migrator's Migrate, Rollback and Version all fail with ErrLegacyHistory,
 // which wraps ErrMigration. Afterwards the database must hold that table
 // alone, with its columns and its row unchanged: the refusal writes nothing.
-func LegacyHistoryRefused(t *testing.T, db *sql.DB, d sqlcommon.Dialect, open func() error) {
+func LegacyHistoryRefused(t *testing.T, db *sql.DB, d dialect.Dialect, open func() error) {
 	t.Helper()
 	ctx := t.Context()
 	for _, q := range legacyHistory {
@@ -34,15 +35,15 @@ func LegacyHistoryRefused(t *testing.T, db *sql.DB, d sqlcommon.Dialect, open fu
 	}
 	opened := open()
 	mods := sqlcommon.Modules()
-	_, up := sqlcommon.Migrate(ctx, db, d, mods, "")
-	_, down := sqlcommon.Rollback(ctx, db, d, mods, "", 0)
-	_, version := sqlcommon.Version(ctx, db, d, mods)
+	_, up := dialect.Migrate(ctx, db, d, mods, "")
+	_, down := dialect.Rollback(ctx, db, d, mods, "", 0)
+	_, version := dialect.Version(ctx, db, d, mods)
 	for _, c := range []struct {
 		name string
 		err  error
 	}{{"Open", opened}, {"Migrate", up}, {"Rollback", down}, {"Version", version}} {
-		if !errors.Is(c.err, sqlcommon.ErrLegacyHistory) ||
-			!errors.Is(c.err, sqlcommon.ErrMigration) {
+		if !errors.Is(c.err, dialect.ErrLegacyHistory) ||
+			!errors.Is(c.err, dialect.ErrMigration) {
 			t.Errorf("%s = %v; want ErrLegacyHistory", c.name, c.err)
 		}
 	}

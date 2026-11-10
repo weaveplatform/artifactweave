@@ -29,6 +29,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
+	sqlitedrv "github.com/weaveplatform/artifactweave/migration/platform/sql/sqlite"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -144,7 +145,7 @@ func TestAccResolverSealedCredentialsAndRotation(t *testing.T) {
 	key, _ := crypt.New([]byte("0123456789abcdef0123456789abcdef"))
 	st, err := sqlite.Open(
 		t.Context(),
-		sqlite.Memory,
+		sqlitedrv.Memory,
 		sqlite.Options{Options: sqlcommon.Options{Keyring: key}},
 	)
 	if err != nil {
@@ -449,7 +450,7 @@ func TestAccResolverTLSClientIdentityAndRotation(t *testing.T) {
 	key, _ := crypt.New([]byte("0123456789abcdef0123456789abcdef"))
 	st, err := sqlite.Open(
 		t.Context(),
-		sqlite.Memory,
+		sqlitedrv.Memory,
 		sqlite.Options{Options: sqlcommon.Options{Keyring: key}},
 	)
 	if err != nil {

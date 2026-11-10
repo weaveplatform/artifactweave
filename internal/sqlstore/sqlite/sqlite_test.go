@@ -10,6 +10,8 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
+	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
+	sqlitedrv "github.com/weaveplatform/artifactweave/migration/platform/sql/sqlite"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/storetest"
 )
@@ -39,7 +41,7 @@ func TestAccContractFile(t *testing.T) {
 
 func TestAccContractMemory(t *testing.T) {
 	storetest.Run(t, func(t *testing.T) store.Store {
-		s, err := sqlite.Open(context.Background(), sqlite.Memory,
+		s, err := sqlite.Open(context.Background(), sqlitedrv.Memory,
 			sqlite.Options{Options: sqlcommon.Options{Keyring: keyring(t)}})
 		if err != nil {
 			t.Fatal(err)
@@ -57,7 +59,7 @@ func TestAccMigrationsUpDownUp(t *testing.T) {
 	}
 	defer func() { _ = s.Close() }()
 	mods := sqlcommon.Modules()
-	streams, err := sqlcommon.Version(ctx, s.DB(), sqlite.Dialect, mods)
+	streams, err := dialect.Version(ctx, s.DB(), sqlitedrv.Dialect, mods)
 	if err != nil || len(streams) != len(mods) {
 		t.Fatalf("Version = %v, %v", streams, err)
 	}
@@ -73,7 +75,7 @@ func TestAccMigrationsUpDownUp(t *testing.T) {
 		Scan(&applied); err != nil || applied < len(mods) {
 		t.Fatalf("applied migrations = %d, %v", applied, err)
 	}
-	down, err := sqlcommon.Rollback(ctx, s.DB(), sqlite.Dialect, mods, "", 0)
+	down, err := dialect.Rollback(ctx, s.DB(), sqlitedrv.Dialect, mods, "", 0)
 	if err != nil || len(down) != applied {
 		t.Fatalf("Rollback = %v, %v", down, err)
 	}
@@ -85,13 +87,13 @@ func TestAccMigrationsUpDownUp(t *testing.T) {
 		Scan(&n); err != nil || n != 0 {
 		t.Fatalf("%d tables left after rolling back, %v", n, err)
 	}
-	up, err := sqlcommon.Migrate(ctx, s.DB(), sqlite.Dialect, mods, "")
+	up, err := dialect.Migrate(ctx, s.DB(), sqlitedrv.Dialect, mods, "")
 	if err != nil || len(up) != applied {
 		t.Fatalf("Migrate = %v, %v", up, err)
 	}
 	// The streams applied again build the schema a fresh database has.
 	golden := filepath.Join("testdata", "schema.golden")
-	sqltest.SchemaGolden(t, s.DB(), sqlite.Dialect.Name, golden, false)
+	sqltest.SchemaGolden(t, s.DB(), sqlitedrv.Dialect.Name, golden, false)
 }
 
 // TestAccLegacyHistoryRefused opens a database whose history predates the
@@ -105,7 +107,7 @@ func TestAccLegacyHistoryRefused(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = s.Close() })
-	sqltest.LegacyHistoryRefused(t, s.DB(), sqlite.Dialect, func() error {
+	sqltest.LegacyHistoryRefused(t, s.DB(), sqlitedrv.Dialect, func() error {
 		refused, err := sqlite.Open(ctx, path, sqlite.Options{})
 		if err == nil {
 			_ = refused.Close()
@@ -116,7 +118,14 @@ func TestAccLegacyHistoryRefused(t *testing.T) {
 
 func TestAccOpenErrors(t *testing.T) {
 	ctx := context.Background()
-	if _, err := sqlite.Open(ctx, "", sqlite.Options{}); !errors.Is(err, sqlite.ErrPathRequired) {
+	if _, err := sqlite.Open(
+		ctx,
+		"",
+		sqlite.Options{},
+	); !errors.Is(
+		err,
+		sqlitedrv.ErrPathRequired,
+	) {
 		t.Fatalf("empty path: %v", err)
 	}
 	if _, err := sqlite.Open(
