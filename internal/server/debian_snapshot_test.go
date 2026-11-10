@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -214,15 +214,13 @@ func TestUnitDebianSnapshotWorkUsesCurrentPermissions(t *testing.T) {
 	}, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
-	a, err := authn.NewAuthenticator(st.Users(), st.Settings(), authn.Options{Hash: testHash})
-	if err != nil {
-		t.Fatal(err)
-	}
+	accessAPI := accesstest.Over(t, st).API()
+	a := accessAPI.Authenticator
 	q, err := work.New(st, work.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := RegisterDebianSnapshotWork(q, Config{Store: st, Auth: a}); err != nil {
+	if err := RegisterDebianSnapshotWork(q, Config{Store: st, Access: accessAPI}); err != nil {
 		t.Fatal(err)
 	}
 	run := func(user string) error {
