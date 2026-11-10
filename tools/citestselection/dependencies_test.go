@@ -10,12 +10,13 @@ import (
 
 func TestUnitReverseClosureIncludesTransitiveProductionConsumers(t *testing.T) {
 	base := modulePath + "/internal/"
+	migration := modulePath + "/migration/"
 	staged := modulePath + "/migration/artifacts/ecosystem/"
 	graph := map[string][]string{
 		staged + "npm":        nil,
 		staged + "npm/http":   {staged + "npm"},
 		base + "server":       {staged + "npm/http"},
-		base + "app":          {base + "server", staged + "npm"},
+		migration + "app":     {base + "server", staged + "npm"},
 		base + "format/maven": nil,
 	}
 	got := reverseClosure(graph, []string{staged + "npm"}, "npm")

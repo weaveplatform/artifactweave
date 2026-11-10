@@ -1,6 +1,3 @@
-// Package app wires configuration, the stores and the HTTP server
-// together. cmd/artifactweave stays a thin cobra shim and
-// calls Run; tests drive Run with a fake handler.
 package app
 
 import (

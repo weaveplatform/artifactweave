@@ -1,10 +1,3 @@
-// Package config loads the application configuration described in
-// docs/operations/configuration-reference.md and decision record 0009.
-//
-// The precedence is flag, then environment, then file, then default. The file
-// is strict YAML: an unknown key is an error rather than a silently ignored
-// typo, because a misspelt storage key would otherwise start the server on
-// the wrong backend without any warning.
 package config
 
 import (
