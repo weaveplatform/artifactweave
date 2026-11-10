@@ -39,7 +39,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
@@ -57,7 +56,7 @@ var (
 	cheapHash = support.CheapHash
 )
 
-func cheapSeed(t *testing.T, db store.Store) {
+func cheapSeed(t *testing.T, db *inmem.Store) {
 	t.Helper()
 	support.Seed(t, db)
 }
@@ -219,7 +218,7 @@ func newStatusFixture(
 // "user" holds READ and MANAGE on the st-managed* permissions. Every permission the
 // rows create or seed targets perm-local, a repository no other row reads:
 // a grant on a shared repository would change other rows' answers.
-func seedPermissions(t *testing.T, db store.Store) {
+func seedPermissions(t *testing.T, db *inmem.Store) {
 	t.Helper()
 	ctx := context.Background()
 	if err := db.Repos().
@@ -340,7 +339,7 @@ type statusSecrets map[string]string
 // token records with fixed ids the status table addresses (two of admin's,
 // one of user's, and a short-lived non-revocable one of admin's), and the
 // statusSecrets.
-func seedTokens(t *testing.T, db store.Store) (*token.Service, statusSecrets) {
+func seedTokens(t *testing.T, db harness.Store) (*token.Service, statusSecrets) {
 	t.Helper()
 	ctx := context.Background()
 	if err := db.Instance().Init(ctx, types.InstanceIdentity{
@@ -655,7 +654,7 @@ func keypairBody(name, alias, public string) string {
 // seedKeys adds what the key pair and certificate rows need to a status
 // fixture: a pair a repository signs with and a certificate a remote
 // repository presents, neither of which can be deleted.
-func seedKeys(t *testing.T, db store.Store) {
+func seedKeys(t *testing.T, db *inmem.Store) {
 	t.Helper()
 	ctx := context.Background()
 	k := testKeys()

@@ -15,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	configapi "github.com/weaveplatform/artifactweave/migration/configuration/api"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support"
@@ -100,7 +101,7 @@ const reindexKind = "reindex"
 // pairs and projects that access reads from st, the access module's
 // anonymous access switch, and st's own unit of work and configuration
 // documents. A fault a test puts in st reaches each of them.
-func depsOf(t *testing.T, st store.Store) Deps {
+func depsOf(t *testing.T, st applyStore) Deps {
 	t.Helper()
 	return Deps{
 		Tx:              st,
@@ -111,7 +112,16 @@ func depsOf(t *testing.T, st store.Store) Deps {
 	}
 }
 
-func apply(t *testing.T, st store.Store, doc string) (configapi.Result, error) {
+// applyStore is the store depsOf binds over: the repositories and
+// principals that support reads and seeds, the access module's store, and
+// the configuration documents. faulty wraps the in-memory composite as one.
+type applyStore interface {
+	support.SeedStore
+	accesstest.Store
+	Configs() configdoc.ConfigStore
+}
+
+func apply(t *testing.T, st applyStore, doc string) (configapi.Result, error) {
 	t.Helper()
 	p, err := Parse([]byte(doc), env(map[string]string{"PROXY_PASSWORD": "pp"}))
 	if err != nil {
@@ -120,7 +130,7 @@ func apply(t *testing.T, st store.Store, doc string) (configapi.Result, error) {
 	return Apply(context.Background(), depsOf(t, st), p, now, false)
 }
 
-func mustApply(t *testing.T, st store.Store, doc string) configapi.Result {
+func mustApply(t *testing.T, st *inmem.Store, doc string) configapi.Result {
 	t.Helper()
 	res, err := apply(t, st, doc)
 	if err != nil {
@@ -129,7 +139,7 @@ func mustApply(t *testing.T, st store.Store, doc string) configapi.Result {
 	return res
 }
 
-func seedRepo(t *testing.T, st store.Store, c repo.Config) {
+func seedRepo(t *testing.T, st *inmem.Store, c repo.Config) {
 	t.Helper()
 	if err := st.Repos().Create(context.Background(), *repo.Defaults(&c)); err != nil {
 		t.Fatal(err)

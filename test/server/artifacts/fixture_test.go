@@ -36,7 +36,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
@@ -68,7 +67,7 @@ var (
 	admin     = basic("admin", "pw")
 )
 
-func cheapSeed(t *testing.T, db store.Store) {
+func cheapSeed(t *testing.T, db support.SeedStore) {
 	t.Helper()
 	support.Seed(t, db)
 }

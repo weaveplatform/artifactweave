@@ -15,14 +15,14 @@ import (
 	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // restrictionsOver is the access module's API restriction check over st, the
 // store a test's multipart service shares with its server, as the runtime
 // binds it.
-func restrictionsOver(t *testing.T, st store.Store) accessapi.Restrictions {
+func restrictionsOver(t *testing.T, st harness.Store) accessapi.Restrictions {
 	t.Helper()
 	m, err := accessmodule.New(accessmodule.Deps{Store: st})
 	if err != nil {

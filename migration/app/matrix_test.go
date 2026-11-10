@@ -23,7 +23,6 @@ import (
 	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )
@@ -1422,7 +1421,7 @@ func TestAccMatrixCoversImplemented(t *testing.T) {
 // another's finds.
 type matrixFixture struct {
 	h     http.Handler
-	db    store.Store
+	db    *inmem.Store
 	items *item.Service
 	// secrets holds each token principal's Bearer token, and under
 	// "v-"+p an access token of v-{p}.
@@ -1687,7 +1686,7 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 // seedMatrixTokens issues the token principals' tokens, and for each
 // principal an access token of v-{p} and the token records t-{p}, its own
 // user's, and o-{p}, v-{p}'s.
-func seedMatrixTokens(t *testing.T, db store.Store) (*token.Service, map[string]string) {
+func seedMatrixTokens(t *testing.T, db *inmem.Store) (*token.Service, map[string]string) {
 	t.Helper()
 	ctx := context.Background()
 	must := func(err error) {

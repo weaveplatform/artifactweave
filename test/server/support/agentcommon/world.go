@@ -11,7 +11,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
@@ -91,7 +90,7 @@ func WantStatus(t *testing.T, rec *httptest.ResponseRecorder, want int) {
 
 // SetTrashcan turns the trash can on or off in db, with a 14-day retention,
 // and fails t when the setting cannot be stored.
-func SetTrashcan(t *testing.T, db store.Store, on bool) {
+func SetTrashcan(t *testing.T, db *inmem.Store, on bool) {
 	t.Helper()
 	if err := db.Settings().Put(t.Context(), types.SettingTrashcan,
 		types.TrashcanSettings{Enabled: on, RetentionDays: 14}); err != nil {

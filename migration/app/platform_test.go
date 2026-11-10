@@ -195,7 +195,7 @@ func TestAccLogSigning(t *testing.T) {
 }
 
 // failingRepos is a store whose repository listing fails.
-type failingRepos struct{ store.Store }
+type failingRepos struct{ *inmem.Store }
 
 func (f failingRepos) Repos() store.RepoStore { return failingRepoList{f.Store.Repos()} }
 
@@ -809,7 +809,7 @@ const tfState = `{"version":4,"serial":1,"lineage":"l"}`
 func stateService(
 	t *testing.T,
 	cfg config.Config,
-	s store.Store,
+	s *appsql.Store,
 	k *crypt.Keyring,
 ) *terraformstate.Service {
 	t.Helper()
@@ -826,7 +826,7 @@ func stateService(
 
 // writeState writes tfState, sealed under k, to workspace app of a new
 // Terraform backend repository, and returns the repository.
-func writeState(t *testing.T, cfg config.Config, s store.Store, k *crypt.Keyring) repo.Config {
+func writeState(t *testing.T, cfg config.Config, s *appsql.Store, k *crypt.Keyring) repo.Config {
 	t.Helper()
 	ctx := context.Background()
 	c := *repo.Defaults(&repo.Config{Key: "tf", Class: repo.Local, PackageType: repo.TerraformBackend})
@@ -849,7 +849,7 @@ func writeState(t *testing.T, cfg config.Config, s store.Store, k *crypt.Keyring
 func readState(
 	t *testing.T,
 	cfg config.Config,
-	s store.Store,
+	s *appsql.Store,
 	k *crypt.Keyring,
 	c repo.Config,
 ) string {

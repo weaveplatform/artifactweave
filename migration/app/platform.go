@@ -18,6 +18,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/config"
 	artifactshttp "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	artport "github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/terraformstate"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -30,6 +31,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/cdn"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
@@ -56,8 +58,20 @@ type blobTier struct {
 	lease string
 }
 
+// tierStore is what the blob tiers are built over: the hot and cold tiers'
+// blob and replica indexes, the upload sessions their backends keep and the
+// leases a mirror's repair takes.
+type tierStore interface {
+	Blobs() artport.BlobIndex
+	Replicas() artport.ReplicaIndex
+	ColdBlobs() artport.BlobIndex
+	ColdReplicas() artport.ReplicaIndex
+	Uploads() session.UploadStore
+	Leases() work.LeaseStore
+}
+
 // tiers returns the hot and cold blob tiers of cfg over st.
-func tiers(cfg config.Config, st store.Store) (hot, cold blobTier) {
+func tiers(cfg config.Config, st tierStore) (hot, cold blobTier) {
 	coldRoot := cfg.ColdBlob.FS.Root
 	if coldRoot == "" {
 		coldRoot = filepath.Join(cfg.DataDir, "cold-blobs")
@@ -85,7 +99,7 @@ type openedTier struct {
 }
 
 // open builds the tier's blob store.
-func (t blobTier) open(ctx context.Context, st store.Store, log *slog.Logger) (openedTier, error) {
+func (t blobTier) open(ctx context.Context, st tierStore, log *slog.Logger) (openedTier, error) {
 	switch t.cfg.Backend {
 	case "":
 		return openedTier{}, nil
@@ -105,7 +119,7 @@ func (t blobTier) open(ctx context.Context, st store.Store, log *slog.Logger) (o
 
 func (t blobTier) openMirror(
 	ctx context.Context,
-	st store.Store,
+	st tierStore,
 	log *slog.Logger,
 ) (*mirror.Store, error) {
 	mc := t.cfg.Mirror
@@ -352,7 +366,12 @@ func logRepair(log *slog.Logger, section string) func(mirror.RepairReport, error
 // and warns once for every repository whose redirect flags ask for a route
 // it cannot sign, so a misconfigured store shows before downloads quietly
 // stream (decision 0029). Repositories created later are not checked.
-func logSigning(ctx context.Context, log *slog.Logger, st store.Store, blobs blob.Store) {
+func logSigning(
+	ctx context.Context,
+	log *slog.Logger,
+	st interface{ Repos() artport.RepoStore },
+	blobs blob.Store,
+) {
 	signer, _ := blobs.(blob.Signer)
 	signs := func(via blob.Via) bool { return signer != nil && signer.Signs(via) }
 	log.InfoContext(ctx, "download redirect routes",

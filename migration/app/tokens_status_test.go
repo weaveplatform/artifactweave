@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -39,7 +38,7 @@ type statusSecrets map[string]string
 // token records with fixed ids the status table addresses (two of admin's,
 // one of user's, and a short-lived non-revocable one of admin's), and the
 // statusSecrets.
-func seedTokens(t *testing.T, db store.Store) (*token.Service, statusSecrets) {
+func seedTokens(t *testing.T, db RouterStore) (*token.Service, statusSecrets) {
 	t.Helper()
 	ctx := context.Background()
 	if err := db.Instance().Init(ctx, types.InstanceIdentity{

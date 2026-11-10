@@ -13,6 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 const trashURL = "/artifactory/api/storage/auto-trashcan"
@@ -21,7 +22,7 @@ const trashURL = "/artifactory/api/storage/auto-trashcan"
 // at the times given, so the views' times are known.
 func seedTrash(
 	t *testing.T,
-	db store.Store,
+	db *inmem.Store,
 	repoKey, full string,
 	folder bool,
 	modified, deleted time.Time,
@@ -260,7 +261,7 @@ func (f faultySettings) Get(ctx context.Context, key string, into any) error {
 }
 
 // setTrashcan turns the trash can on or off, with Artifactory's retention.
-func setTrashcan(t *testing.T, db store.Store, on bool) {
+func setTrashcan(t *testing.T, db harness.Store, on bool) {
 	t.Helper()
 	if err := db.Settings().Put(context.Background(), types.SettingTrashcan,
 		types.TrashcanSettings{Enabled: on, RetentionDays: 14}); err != nil {

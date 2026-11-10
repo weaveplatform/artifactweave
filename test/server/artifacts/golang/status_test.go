@@ -9,7 +9,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
@@ -25,11 +24,11 @@ func (c statusCase) method() string { method, _, _ := strings.Cut(c.route, " ");
 
 type statusPart struct {
 	handwritten map[string]bool
-	seed        func(*testing.T, store.Store, blob.Store)
+	seed        func(*testing.T, harness.Store, blob.Store)
 	rows        func() []statusCase
 }
 
-func grantOverwriter(t *testing.T, db store.Store, key, under string) {
+func grantOverwriter(t *testing.T, db harness.Store, key, under string) {
 	t.Helper()
 	if err := db.Permissions().Create(t.Context(), types.Permission{
 		Name: "st-overwrite-" + key,

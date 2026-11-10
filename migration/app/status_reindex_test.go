@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -95,7 +95,7 @@ func withReindexFakes(c *RouterConfig) {
 }
 
 // createReindexRepos creates reindexRepos in st.
-func createReindexRepos(t *testing.T, st store.Store) {
+func createReindexRepos(t *testing.T, st *inmem.Store) {
 	t.Helper()
 	for _, c := range reindexRepos {
 		if err := st.Repos().Create(context.Background(), *repo.Defaults(&c)); err != nil {
@@ -191,7 +191,7 @@ var reindexStatusPart = statusPart{
 			{reindexTerraform, terraform + "reindex-helm/reindex", "admin", "", 400},
 		}
 	},
-	seed: func(t *testing.T, db store.Store, _ blob.Store) {
+	seed: func(t *testing.T, db *inmem.Store, _ blob.Store) {
 		t.Helper()
 		ctx := context.Background()
 		createReindexRepos(t, db)

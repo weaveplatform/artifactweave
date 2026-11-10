@@ -186,7 +186,7 @@ func TestAccNpmConversion(t *testing.T) {
 
 // park parks the work item of kind on key, as the queue does once an
 // item's retries run out.
-func park(t *testing.T, st store.Store, kind, key string) {
+func park(t *testing.T, st harness.Store, kind, key string) {
 	t.Helper()
 	ctx := context.Background()
 	now := time.Now()

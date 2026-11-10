@@ -39,7 +39,7 @@ const snapshotMarker = "snapshots/first"
 // itemFaults is a store whose item calls fail with errFault where fails
 // says: call names the method, and key and path the item it touches.
 type itemFaults struct {
-	store.Store
+	*inmem.Store
 	fails func(call, key, path string) bool
 }
 
@@ -131,7 +131,7 @@ func refusingAuthorizer() *accessapitest.Authorizer {
 }
 
 // claim claims snapshotJob's tag in st as kittest's administrator.
-func claim(t *testing.T, st store.Store) {
+func claim(t *testing.T, st *inmem.Store) {
 	t.Helper()
 	if err := claimDebianSnapshot(t.Context(), st, snapshotJob, kittest.Admin); err != nil {
 		t.Fatal(err)
@@ -197,7 +197,7 @@ func TestUnitDebianSnapshotThroughTheQueue(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		target  string
-		queue   func(store.Store) store.Store
+		queue   func(*inmem.Store) work.Store
 		status  int
 		message string
 	}{
@@ -207,7 +207,7 @@ func TestUnitDebianSnapshotThroughTheQueue(t *testing.T) {
 		},
 		{
 			name: "queue refuses the work", target: snapshotJob.Target,
-			queue:  func(s store.Store) store.Store { return queueFault{s} },
+			queue:  func(s *inmem.Store) work.Store { return queueFault{s} },
 			status: http.StatusInternalServerError, message: "internal error",
 		},
 		{
@@ -359,7 +359,7 @@ func TestUnitDebianSnapshotClaimFailsOnStoreFaults(t *testing.T) {
 func TestUnitDebianSnapshotRepositoriesFailOnStoreFaults(t *testing.T) {
 	w := snapshotWorld(t)
 	for _, key := range []string{snapshotJob.Source, snapshotJob.Target} {
-		_, _, err := snapshotRepos(t.Context(), faulty{Store: w.db, repo: key}, snapshotJob,
+		_, _, err := snapshotRepos(t.Context(), faulty{serverStore: w.db, repo: key}, snapshotJob,
 			kittest.Admin, kittest.AdminAccess())
 		if !errors.Is(err, errFault) {
 			t.Errorf("%s lookup returned %v, want the store's fault", key, err)
@@ -478,7 +478,7 @@ func TestUnitDebianSnapshotCreationFailsClosed(t *testing.T) {
 			if tc.blobs != nil {
 				tc.blobs(w)
 			}
-			var st store.Store = w.db
+			var st serverStore = w.db
 			if tc.fails != nil {
 				st = itemFaults{Store: w.db, fails: tc.fails}
 			}

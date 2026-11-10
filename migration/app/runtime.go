@@ -47,7 +47,7 @@ type Runtime struct {
 	// Keys is the master key's keyring, nil without a master key.
 	Keys *crypt.Keyring
 	// Store is the metadata store, with its pending migrations applied.
-	Store store.Store
+	Store *appsql.Store
 	// Auth authenticates requests against Store's users and Tokens.
 	Auth *authn.Authenticator
 	// Tokens issues and verifies access tokens.

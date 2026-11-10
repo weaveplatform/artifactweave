@@ -31,7 +31,7 @@ func (f *fault) fails(op, path string) bool {
 }
 
 type faultyStore struct {
-	store.Store
+	harness.Store
 	fault *fault
 }
 

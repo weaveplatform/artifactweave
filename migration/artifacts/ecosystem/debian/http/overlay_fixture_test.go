@@ -50,7 +50,7 @@ var debBody = []byte("deb bytes")
 // overlayConfig is the part of the item kit's dependencies an overlay test
 // changes: a faulty store or blob store, or a remote source service.
 type overlayConfig struct {
-	Store         store.Store
+	Store         serverStore
 	Blobs         blob.Store
 	RemoteSources *source.Service
 }
@@ -90,7 +90,7 @@ func withSources(read sourceBackend) func(*overlayConfig) {
 }
 
 // withStore makes the kit read through the store wrap returns.
-func withStore(wrap func(store.Store) store.Store) func(*overlayConfig) {
+func withStore(wrap func(serverStore) serverStore) func(*overlayConfig) {
 	return func(c *overlayConfig) { c.Store = wrap(c.Store) }
 }
 
@@ -321,18 +321,18 @@ var errFault = errors.New("the store failed")
 
 // faulty is a store whose lookup of the repository repo, and whose item
 // reads in the repository items, answer errFault; every other call passes
-// to Store.
+// to the store it embeds.
 type faulty struct {
-	store.Store
+	serverStore
 	repo, items string
 }
 
 func (s faulty) Repos() store.RepoStore {
-	return faultyRepos{RepoStore: s.Store.Repos(), fail: s.repo}
+	return faultyRepos{RepoStore: s.serverStore.Repos(), fail: s.repo}
 }
 
 func (s faulty) Items() store.ItemStore {
-	return faultyItems{ItemStore: s.Store.Items(), fail: s.items}
+	return faultyItems{ItemStore: s.serverStore.Items(), fail: s.items}
 }
 
 type faultyRepos struct {

@@ -16,7 +16,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	pgdrv "github.com/weaveplatform/artifactweave/migration/platform/sql/postgres"
 	platsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 func TestAccContract(t *testing.T) {
@@ -25,7 +24,7 @@ func TestAccContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	appstoretest.Run(t, func(t *testing.T) store.Store {
+	appstoretest.Run(t, func(t *testing.T) appstoretest.Store {
 		s, err := postgres.Open(context.Background(), dsn,
 			postgres.Options{Options: appsql.Options{Keyring: k}, MaxOpenConns: 8})
 		if err != nil {

@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/test/server/support"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // Routes the Terraform backend's storage answers on (#557): the item and
@@ -23,7 +23,7 @@ const (
 // which #558 extends with the API's routes.
 var tfbeStatusPart = statusPart{
 	handwritten: support.TerraformBackendRoutes(),
-	seed: func(t *testing.T, db store.Store, blobs blob.Store) {
+	seed: func(t *testing.T, db harness.Store, blobs blob.Store) {
 		t.Helper()
 		seedTfbe(t, db, blobs, tfbeKeys(t), "tfbe-local")
 		seedTfbe(t, db, blobs, tfbeKeys(t), "tfbe-local", "api")

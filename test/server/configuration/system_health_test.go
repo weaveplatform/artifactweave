@@ -35,7 +35,7 @@ var secretCause = errors.New(
 // error, then fails them, as a database that stopped answering does. It
 // records whether each read had a deadline.
 type healthStore struct {
-	store.Store
+	*inmem.Store
 	fail       atomic.Pointer[error]
 	noDeadline atomic.Bool
 }

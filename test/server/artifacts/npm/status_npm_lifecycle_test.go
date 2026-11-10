@@ -7,7 +7,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	npmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // The npm operations that change a package after its publish: npm
@@ -124,7 +124,7 @@ var npmLifecycleStatusPart = statusPart{
 			{npmUnpublish, npmBase + "npm-remote/status-gone/-rev/1-0", "admin", "", 501},
 		}
 	},
-	seed: func(t *testing.T, db store.Store, blobs blob.Store) {
+	seed: func(t *testing.T, db harness.Store, blobs blob.Store) {
 		t.Helper()
 		items := &item.Service{Store: db, Blobs: blobs, Formats: ecosystem.For}
 		deployNPM(t, items, "npm-local", "status-tags", "1.0.0", nil)

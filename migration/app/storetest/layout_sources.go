@@ -15,7 +15,7 @@ import (
 // errLayoutRollback rolls back the transaction that deletes a layout.
 var errLayoutRollback = errors.New("rollback layout mutation")
 
-func testRemoteLayoutFences(t *testing.T, s store.Store) {
+func testRemoteLayoutFences(t *testing.T, s Store) {
 	ctx, canonical, key := remoteFixture(t, s)
 	canonical.RepoLayoutRef = "mapped-layout"
 	storekit.Must(t, s.Repos().Update(ctx, canonical))
@@ -108,13 +108,13 @@ func testRemoteLayoutFences(t *testing.T, s store.Store) {
 	)
 }
 
-// remoteFixture creates the remote repository a test starts from and
-// returns a cache key in it. The artifacts contract has the same fixture
-// for its remote cache tests; this copy serves the layout fence test, which
-// stays with the aggregate.
+// remoteFixture creates the remote repository a test starts from and returns a
+// cache key in it. The artifacts contract has the same fixture for its remote
+// cache tests; this copy serves the layout fence test, which needs a whole
+// composite.
 func remoteFixture(
 	t *testing.T,
-	s store.Store,
+	s Store,
 ) (context.Context, repo.Config, types.RemoteCacheKey) {
 	t.Helper()
 	ctx := context.Background()

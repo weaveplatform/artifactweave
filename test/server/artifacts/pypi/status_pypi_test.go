@@ -13,7 +13,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -62,7 +61,7 @@ func pypiWheel(t *testing.T, name, version string) []byte {
 
 // seedPypi deploys status-pkg 1.0's wheel to pypi-local through the item
 // service, which indexes it as the PyPI format does.
-func seedPypi(t *testing.T, items *item.Service, db store.Store, path, name string) {
+func seedPypi(t *testing.T, items *item.Service, db harness.Store, path, name string) {
 	t.Helper()
 	c, err := db.Repos().Get(context.Background(), "pypi-local")
 	if err != nil {
@@ -86,7 +85,7 @@ var pypiStatusPart = statusPart{
 		pypiJSONLatestHead: true, pypiJSONVersionHead: true,
 	},
 	generated: map[string]bool{pypiJSONLatest: true, pypiJSONVersion: true},
-	seed: func(t *testing.T, db store.Store, blobs blob.Store) {
+	seed: func(t *testing.T, db harness.Store, blobs blob.Store) {
 		t.Helper()
 		seedPypi(t, &item.Service{
 			Store: db, Blobs: blobs, Formats: ecosystem.For,

@@ -10,9 +10,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	npmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // npmRepos are npm's fixture repositories: npm-local, npm-remote and
@@ -176,7 +176,7 @@ var npmStatusPart = statusPart{
 			{npmUnpublishVersions, local + "status-pkg/-rev/1-abc", "admin", "{}", 400},
 		}
 	},
-	seed: func(t *testing.T, db store.Store, blobs blob.Store) {
+	seed: func(t *testing.T, db harness.Store, blobs blob.Store) {
 		t.Helper()
 		items := &item.Service{Store: db, Blobs: blobs, Formats: ecosystem.For}
 		next := types.Properties{npmfmt.PropDistTag: {"next"}}

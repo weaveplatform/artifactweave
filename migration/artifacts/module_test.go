@@ -17,7 +17,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // newModule builds the module over a fresh in-memory store and the real
@@ -52,7 +51,7 @@ func TestUnitNew(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	m, err := New(Deps{Store: struct{ store.Store }{}, Keys: keys})
+	m, err := New(Deps{Store: struct{ Store }{}, Keys: keys})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -8,8 +8,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	helmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 const (
@@ -26,7 +26,7 @@ var helmProtocolStatusPart = statusPart{
 		helmDownload:     true,
 		helmDownloadHead: true,
 	},
-	seed: func(t *testing.T, db store.Store, blobs blob.Store) {
+	seed: func(t *testing.T, db harness.Store, blobs blob.Store) {
 		t.Helper()
 		items := &item.Service{Store: db, Blobs: blobs, Formats: ecosystem.For}
 		seedHelm(t, items, db, "helm-local", true, "protocol/web-1.0.0.tgz")

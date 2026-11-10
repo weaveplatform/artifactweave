@@ -155,8 +155,8 @@ func TestAccDebianVirtualMetadataFailsClosed(t *testing.T) {
 	}{
 		{
 			name: "member lookup fails", members: []string{"deb-local"},
-			tune: []func(*overlayConfig){withStore(func(s store.Store) store.Store {
-				return faulty{Store: s, repo: "deb-local"}
+			tune: []func(*overlayConfig){withStore(func(s serverStore) serverStore {
+				return faulty{serverStore: s, repo: "deb-local"}
 			})},
 		},
 		{name: "member of another package type", members: []string{kittest.LocalKey}},
@@ -382,8 +382,8 @@ func TestAccDebianVirtualPackage(t *testing.T) {
 		},
 		{
 			name: "member lookup fails", members: []string{"deb-local"},
-			tune: []func(*overlayConfig){withStore(func(s store.Store) store.Store {
-				return faulty{Store: s, repo: "deb-local"}
+			tune: []func(*overlayConfig){withStore(func(s serverStore) serverStore {
+				return faulty{serverStore: s, repo: "deb-local"}
 			})},
 			status: http.StatusInternalServerError, message: "internal error",
 		},
@@ -393,8 +393,8 @@ func TestAccDebianVirtualPackage(t *testing.T) {
 		},
 		{
 			name: "member item read fails", members: []string{"deb-local"},
-			tune: []func(*overlayConfig){withStore(func(s store.Store) store.Store {
-				return faulty{Store: s, items: "deb-local"}
+			tune: []func(*overlayConfig){withStore(func(s serverStore) serverStore {
+				return faulty{serverStore: s, items: "deb-local"}
 			})},
 			status: http.StatusInternalServerError, message: "internal error",
 		},

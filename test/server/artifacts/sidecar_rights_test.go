@@ -12,11 +12,12 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // sidecarGetStore fails reading the item at one path.
 type sidecarGetStore struct {
-	store.Store
+	harness.Store
 	path *string
 }
 

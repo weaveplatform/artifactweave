@@ -15,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // buildSearchWorld is an item world with builds: app runs 1 (twice) and 2,
@@ -276,7 +277,7 @@ func TestAccBuildSearchStoreErrors(t *testing.T) {
 
 // buildSearchFaults fails the build or item store operation named fail.
 type buildSearchFaults struct {
-	store.Store
+	harness.Store
 	fail string
 }
 

@@ -10,26 +10,20 @@ import (
 	"strings"
 	"testing"
 
-	appsql "github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
-	artport "github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
-	fedport "github.com/weaveplatform/artifactweave/migration/federation/core/port"
-	ntfport "github.com/weaveplatform/artifactweave/migration/notifications/core/port"
+	appstoretest "github.com/weaveplatform/artifactweave/migration/app/storetest"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
-	relport "github.com/weaveplatform/artifactweave/migration/releases/core/port"
-	retport "github.com/weaveplatform/artifactweave/migration/retention/core/port"
-	wrkport "github.com/weaveplatform/artifactweave/migration/workers/core/port"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // Store embeds *dialect.Store, which promotes the dialect store's exported
 // methods onto it. A method Store declares under the same name shadows the
 // promoted one without a compile error: callers of Store reach the outer
 // method, while code that holds the *dialect.Store reaches the inner one. So
-// the dialect store exports no method named like an aggregate accessor
-// except Tx, AfterCommit and Close, which Store takes from it on purpose.
-// Reflection cannot tell a method Store declares from one promoted onto it,
-// so the methods Store declares, including those outside the aggregate such
-// as Reseal, are read from this package's source.
+// the dialect store exports no method named like an accessor of the
+// composite contract's store (appstoretest.Store) except Tx, AfterCommit
+// and Close, which Store takes from it on purpose. Reflection cannot tell a
+// method Store declares from one promoted onto it, so the methods Store
+// declares, including those outside the contract such as Reseal, are read
+// from this package's source.
 func TestUnitDialectStoreShadowsNoAccessor(t *testing.T) {
 	inner := reflect.TypeFor[*dialect.Store]()
 	fromDialect := []string{"Tx", "AfterCommit", "Close"}
@@ -42,9 +36,9 @@ func TestUnitDialectStoreShadowsNoAccessor(t *testing.T) {
 	if !slices.Contains(names, "Reseal") {
 		t.Fatal("found no Reseal method on Store; the scan is broken")
 	}
-	aggregate := reflect.TypeFor[store.Store]()
-	for i := range aggregate.NumMethod() {
-		name := aggregate.Method(i).Name
+	contract := reflect.TypeFor[appstoretest.Store]()
+	for i := range contract.NumMethod() {
+		name := contract.Method(i).Name
 		if !slices.Contains(fromDialect, name) && !slices.Contains(names, name) {
 			names = append(names, name)
 		}
@@ -90,17 +84,3 @@ func declaredStoreMethods(t *testing.T) []string {
 	}
 	return names
 }
-
-// The SQL store, the composite the SQLite and PostgreSQL stores embed, must
-// satisfy each module's port Store, which declares only the part of the
-// metadata store that module uses, so a module can take this store as its own
-// until its adapters move (STO-14, STO-15, STO-17, STO-18). The aggregate's
-// accessors return the bridged port interfaces, which are the same types.
-var (
-	_ artport.Store = (*appsql.Store)(nil)
-	_ ntfport.Store = (*appsql.Store)(nil)
-	_ retport.Store = (*appsql.Store)(nil)
-	_ fedport.Store = (*appsql.Store)(nil)
-	_ relport.Store = (*appsql.Store)(nil)
-	_ wrkport.Store = (*appsql.Store)(nil)
-)

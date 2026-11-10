@@ -8,7 +8,6 @@ import (
 	"io"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -29,7 +28,7 @@ func HelmChart(name, version string) []byte {
 
 // SeedHelmCharter gives the chart-only caller rights on charts but not their
 // provenance sidecars. Root and independent Helm matrices use the same grant.
-func SeedHelmCharter(t *testing.T, db store.Store, passwordHash []byte) {
+func SeedHelmCharter(t *testing.T, db SeedStore, passwordHash []byte) {
 	t.Helper()
 	ctx := t.Context()
 	if err := db.Users().

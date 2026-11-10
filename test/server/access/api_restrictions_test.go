@@ -9,12 +9,20 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
+
+// budgets is the request budget store of the in-memory composite that
+// newItemWorld builds the router over. The router's store leaves budgets out,
+// because the router never reads them: the application builds the limits.
+func budgets(c *Config) apilimit.Store {
+	return c.Store.(*inmem.Store) //nolint:forcetypeassert // fixture
+}
 
 func TestAccAPIRestrictionRecovery(t *testing.T) {
 	var limits *apilimit.Service
@@ -31,7 +39,7 @@ func TestAccAPIRestrictionRecovery(t *testing.T) {
 		o := apilimit.Default()
 		o.GlobalPerMinute, o.PrincipalPerMinute = 1, 1
 		o.MaxConcurrent, o.ExpensiveConcurrent, o.ExpensivePrincipalConcurrent = 1, 1, 1
-		limits, err = apilimit.New(c.Store, o, nil)
+		limits, err = apilimit.New(budgets(c), o, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -115,7 +123,7 @@ func TestAccAPIProjectQuotaUsesRepositoryOwner(t *testing.T) {
 		o := apilimit.Default()
 		o.ProjectPerMinute = 1
 		var err error
-		c.RequestLimits, err = apilimit.New(c.Store, o, nil)
+		c.RequestLimits, err = apilimit.New(budgets(c), o, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

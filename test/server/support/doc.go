@@ -20,9 +20,9 @@
 //     principal tables to its inventory, and the router's guards in
 //     migration/app count those routes as covered; DockerHandwrittenRoutes and
 //     NPMGeneratedRoutes give those guards the parts they treat apart.
-//   - Request helpers (Do, Basic, Bearer, ArtifactoryError) and seeding
-//     (Seed, with the fast TestHash and CheapHash, the hash of the shared
-//     password).
+//   - Request helpers (Do, Basic, Bearer, ArtifactoryError) and seeding (Seed,
+//     over any SeedStore, with the fast TestHash and CheapHash, the hash of
+//     the shared password).
 //   - The artifacts module's Repositories and Layouts, bound as the server
 //     binds them, for the tests of other modules that apply through them.
 //   - Format fixtures: npm publish bodies and tarballs, NuGet packages and

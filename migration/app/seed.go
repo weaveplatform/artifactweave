@@ -12,9 +12,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	accport "github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/app/config"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // authHash is the password hashing cost OpenRuntime uses when its options
@@ -28,13 +28,23 @@ var authHash authn.HashParams
 // log line, because logs are shipped and kept where the password must not be.
 const InitialPasswordFile = "initial-admin-password"
 
+// seedStore is what seedPrincipals reads and writes: the principals and the
+// seeded marker (authn.SeedStore), and the build-info repository, through the
+// artifacts module's binding (repos.Store) with the access module's key pairs
+// and projects (the access port's Store).
+type seedStore interface {
+	authn.SeedStore
+	repos.Store
+	accport.Store
+}
+
 // seedPrincipals creates the built-in principals on first start (decision
 // 0005). The admin password is bootstrap.admin_password, or a generated one
 // written to InitialPasswordFile, hashed at cost.
 func seedPrincipals(
 	ctx context.Context,
 	cfg config.Config,
-	st store.Store,
+	st seedStore,
 	cost authn.HashParams,
 	log *slog.Logger,
 ) error {

@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // trashOffStatusRows are the trash can's rows while it is off (#490), run
@@ -61,7 +61,7 @@ func trashOffStatusRows() []statusCase {
 // with no route of its own, so the rows need a fixture of their own, which
 // turns it off once the fixture files are trashed.
 func TestAccTrashOffStatus(t *testing.T) {
-	var off, on store.Store
+	var off, on harness.Store
 	offH := statusFixture(t, false, func(c *Config) { off = c.Store })
 	onH := statusFixture(t, true, func(c *Config) { on = c.Store })
 	for _, p := range []string{"fixture/del.txt", "fixture/move.txt"} {

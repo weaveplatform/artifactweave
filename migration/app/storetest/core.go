@@ -37,7 +37,7 @@ func blob(i int) types.Blob {
 
 var errBoom = errors.New("boom")
 
-func testTxCommit(t *testing.T, s store.Store) {
+func testTxCommit(t *testing.T, s Store) {
 	ctx := context.Background()
 	committed := false
 	storekit.Must(t, s.Tx(ctx, func(ctx context.Context) error {
@@ -64,7 +64,7 @@ func testTxCommit(t *testing.T, s store.Store) {
 	}
 }
 
-func testTxRollback(t *testing.T, s store.Store) {
+func testTxRollback(t *testing.T, s Store) {
 	ctx := context.Background()
 	storekit.Get[types.Blob](t)(s.Blobs().Ref(ctx, blob(1), 1))
 	notified := false
@@ -93,7 +93,7 @@ func testTxRollback(t *testing.T, s store.Store) {
 	}
 }
 
-func testTxNested(t *testing.T, s store.Store) {
+func testTxNested(t *testing.T, s Store) {
 	ctx := context.Background()
 	// The outer function returns the inner error, and both store families
 	// then roll the whole transaction back. When the outer function drops
@@ -126,7 +126,7 @@ func testTxNested(t *testing.T, s store.Store) {
 	storekit.Get[types.Blob](t)(s.Blobs().Get(ctx, blob(3).Checksums.SHA256))
 }
 
-func testCancelled(t *testing.T, s store.Store) {
+func testCancelled(t *testing.T, s Store) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	if _, err := s.Blobs().Ref(ctx, blob(1), 1); err == nil {
@@ -137,7 +137,7 @@ func testCancelled(t *testing.T, s store.Store) {
 	}
 }
 
-func testBadCursor(t *testing.T, s store.Store) {
+func testBadCursor(t *testing.T, s Store) {
 	ctx := context.Background()
 	storekit.Get[types.Blob](t)(s.Blobs().Ref(ctx, blob(1), 0))
 	_, _, err := s.Blobs().Unreferenced(ctx, store.Page{After: "%%%"})

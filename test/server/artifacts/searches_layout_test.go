@@ -13,6 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // mavenWorld is an item world holding Maven-layout files (every test
@@ -294,7 +295,7 @@ func TestAccLayoutSearchStoreErrors(t *testing.T) {
 }
 
 // failingConfigs fails every configuration document read.
-type failingConfigs struct{ store.Store }
+type failingConfigs struct{ harness.Store }
 
 func (f failingConfigs) Configs() store.ConfigStore { return failingConfigStore{f.Store.Configs()} }
 

@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 const storageURI = "https://reg.example/artifactory/api/storage/"
@@ -520,9 +521,9 @@ func TestAccSearchPages(t *testing.T) {
 
 // TestAccSearchStoreErrors: a store that fails answers 500 without detail.
 func TestAccSearchStoreErrors(t *testing.T) {
-	for name, wrap := range map[string]func(store.Store) store.Store{
-		"search": func(s store.Store) store.Store { return failingSearchStore{s} },
-		"repositories": func(s store.Store) store.Store {
+	for name, wrap := range map[string]func(harness.Store) harness.Store{
+		"search": func(s harness.Store) harness.Store { return failingSearchStore{s} },
+		"repositories": func(s harness.Store) harness.Store {
 			return faultyStore{Store: s.(*inmem.Store), fail: map[string]bool{"list": true}}
 		},
 	} {
@@ -545,7 +546,7 @@ func TestAccSearchStoreErrors(t *testing.T) {
 }
 
 // failingSearchStore fails every item search.
-type failingSearchStore struct{ store.Store }
+type failingSearchStore struct{ harness.Store }
 
 func (s failingSearchStore) Items() store.ItemStore { return failingItems{s.Store.Items()} }
 

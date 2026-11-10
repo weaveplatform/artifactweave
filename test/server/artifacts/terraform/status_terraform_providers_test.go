@@ -9,8 +9,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/terraformtest"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 const (
@@ -28,7 +28,7 @@ const (
 
 var providerTestKey = sync.OnceValues(terraformtest.NewKey)
 
-func seedRegistryProvider(t *testing.T, db store.Store, blobs blob.Store) {
+func seedRegistryProvider(t *testing.T, db harness.Store, blobs blob.Store) {
 	t.Helper()
 	k, err := providerTestKey()
 	if err != nil {

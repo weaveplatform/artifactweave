@@ -16,13 +16,18 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
+// budgets is the request budget store of the in-memory composite that
+// newItemWorld builds the router over. The router's store leaves budgets out,
+// because the router never reads them: the application builds the limits.
+func budgets(c *RouterConfig) apilimit.Store { return c.Store.(*inmem.Store) }
+
 func TestAccAPIRequestRates(t *testing.T) {
 	now := time.Date(2026, 10, 28, 12, 0, 15, 0, time.UTC)
 	w := newItemWorld(t, false, func(c *RouterConfig) {
 		o := apilimit.Default()
 		o.PrincipalPerMinute, o.GlobalPerMinute = 2, 3
 		var err error
-		c.RequestLimits, err = apilimit.New(c.Store, o, func() time.Time { return now })
+		c.RequestLimits, err = apilimit.New(budgets(c), o, func() time.Time { return now })
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -64,7 +69,7 @@ func TestAccAPIUnauthenticatedBudget(t *testing.T) {
 		o := apilimit.Default()
 		o.AuthenticationPerMinute = 1
 		var err error
-		c.RequestLimits, err = apilimit.New(c.Store, o, nil)
+		c.RequestLimits, err = apilimit.New(budgets(c), o, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -84,7 +89,7 @@ func TestAccAPIUnauthenticatedBudget(t *testing.T) {
 }
 
 type (
-	unavailableBudgetStore struct{ store.Store }
+	unavailableBudgetStore struct{}
 	unavailableBudget      struct{}
 )
 
@@ -98,7 +103,7 @@ func TestAccAPIBudgetBackendFailure(t *testing.T) {
 	w := newItemWorld(t, false, func(c *RouterConfig) {
 		var err error
 		c.RequestLimits, err = apilimit.New(
-			unavailableBudgetStore{c.Store},
+			unavailableBudgetStore{},
 			apilimit.Default(),
 			nil,
 		)

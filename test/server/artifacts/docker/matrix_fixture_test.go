@@ -12,14 +12,14 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 	"github.com/weaveplatform/artifactweave/test/server/support/registryfixture"
 )
 
 type matrixFixture struct {
 	h       http.Handler
-	db      store.Store
+	db      harness.Store
 	items   *item.Service
 	secrets map[string]string
 	uploads map[string]string
@@ -100,7 +100,11 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 	return f
 }
 
-func seedDockerMatrixTokens(t *testing.T, db store.Store, tokens *token.Service) map[string]string {
+func seedDockerMatrixTokens(
+	t *testing.T,
+	db harness.Store,
+	tokens *token.Service,
+) map[string]string {
 	t.Helper()
 	ctx := t.Context()
 	past, err := token.New(ctx, db, token.Options{

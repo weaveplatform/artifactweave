@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 func decodeJSON[T any](t *testing.T, body string) T {
@@ -220,7 +220,7 @@ func TestAccKeypairVaultKeyRefused(t *testing.T) {
 // it, as 7.x does (createkeypair), and the repository that refers to the
 // pair by name signs with the new material.
 func TestAccKeypairCreateReplaces(t *testing.T) {
-	var db store.Store
+	var db harness.Store
 	h := statusFixture(t, false, func(c *Config) { db = c.Store })
 	admin := basic("admin", "pw")
 	k := testKeys()
@@ -276,7 +276,7 @@ func TestAccKeypairVerifyText(t *testing.T) {
 // TestAccKeypairReadByNonAdmin: a user and anonymous read one pair and a
 // repository's public key, and never the private key or the passphrase.
 func TestAccKeypairReadByNonAdmin(t *testing.T) {
-	var db store.Store
+	var db harness.Store
 	h := statusFixture(t, true, func(c *Config) { db = c.Store })
 	k := testKeys()
 	const passphrase = "passphrase-never-read"

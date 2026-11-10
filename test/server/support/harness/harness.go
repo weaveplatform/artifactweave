@@ -16,6 +16,13 @@ import (
 // composite literals and Tune functions name the type the router takes.
 type Config = app.RouterConfig
 
+// Store is the type of Config.Store, the metadata store the router is built
+// over: app.RouterStore. It is an alias, so a suite's fake can embed it and
+// wrap whatever store the suite's Tune finds in Config.Store; test files of
+// a module, which may import test support from app but not app itself,
+// name it here.
+type Store = app.RouterStore
+
 // Tune adjusts a Config before the router is built from it, for a suite that
 // needs another blob store, a logger it can read or an option turned on. It is
 // an alias, so any func(*Config) is a Tune.

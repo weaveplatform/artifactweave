@@ -4,9 +4,9 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )
@@ -27,7 +27,7 @@ type statusPart struct {
 	generated map[string]bool
 	rows      func() []statusCase
 	// seed adds what the rows act on to the status fixture.
-	seed func(t *testing.T, db store.Store, blobs blob.Store)
+	seed func(t *testing.T, db *inmem.Store, blobs blob.Store)
 	// tune adjusts the fixture server's configuration.
 	tune func(*RouterConfig)
 }

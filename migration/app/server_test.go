@@ -21,6 +21,10 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/middleware"
 )
 
+// The tests build routers over the in-memory composite, which production
+// code never imports, so its RouterStore check lives here.
+var _ RouterStore = (*inmem.Store)(nil)
+
 // versionMediaType is the vendor type of the version document, which the
 // system handlers answer when Accept names it; the table keeps a copy of
 // their constant with the same text.

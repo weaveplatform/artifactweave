@@ -17,7 +17,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/migration/platform/instance"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // modules are the modules app builds, which the runtime holds for serve and
@@ -28,10 +27,18 @@ type modules struct {
 	configuration *configuration.Module
 }
 
+// moduleStore is the metadata store the modules are built over: the store
+// type each module's constructor declares.
+type moduleStore interface {
+	access.Store
+	artifacts.Store
+	configuration.Store
+}
+
 // moduleDeps is what OpenRuntime opens before the modules and buildModules
 // builds them over.
 type moduleDeps struct {
-	store store.Store
+	store moduleStore
 	// keys is the master key's keyring, nil without a master key.
 	keys *crypt.Keyring
 	// auth and tokens are the authenticator and the token service that the
@@ -96,7 +103,7 @@ var tokenKeyBits int
 
 // openTokens creates the instance identity when missing and the token
 // service over it, which creates the first signing key of keyBits bits.
-func openTokens(ctx context.Context, st store.Store, keyBits int) (*token.Service, error) {
+func openTokens(ctx context.Context, st token.Store, keyBits int) (*token.Service, error) {
 	if err := instance.EnsureInstance(ctx, st); err != nil {
 		return nil, err //nolint:wrapcheck // EnsureInstance's errors start "instance identity:"
 	}

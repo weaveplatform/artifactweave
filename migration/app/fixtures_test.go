@@ -386,7 +386,7 @@ var admin = basic("admin", "pw")
 
 // authorizerOver is the access module's Authorizer over st, as NewRouter
 // binds it for a RouterConfig whose Access is unset.
-func authorizerOver(st store.Store) accessapi.Authorizer {
+func authorizerOver(st *inmem.Store) accessapi.Authorizer {
 	return withAccess(RouterConfig{Store: st}).Access.Authorizer
 }
 
@@ -483,7 +483,7 @@ func keypairBody(name, alias, public string) string {
 // seedKeys adds what the key pair and certificate rows need to a status
 // fixture: a pair a repository signs with and a certificate a remote
 // repository presents, neither of which can be deleted.
-func seedKeys(t *testing.T, db store.Store) {
+func seedKeys(t *testing.T, db *inmem.Store) {
 	t.Helper()
 	ctx := context.Background()
 	k := testKeys()
@@ -1208,7 +1208,7 @@ func hitsOf(t *testing.T, rec *httptest.ResponseRecorder) []map[string]any {
 // restrictionsOver is the access module's API restriction check over st, the
 // store a test's multipart service shares with its server, as the runtime
 // binds it.
-func restrictionsOver(t *testing.T, st store.Store) accessapi.Restrictions {
+func restrictionsOver(t *testing.T, st *inmem.Store) accessapi.Restrictions {
 	t.Helper()
 	m, err := accessmodule.New(accessmodule.Deps{Store: st})
 	if err != nil {
@@ -1218,7 +1218,7 @@ func restrictionsOver(t *testing.T, st store.Store) accessapi.Restrictions {
 }
 
 // setTrashcan turns the trash can on or off, with Artifactory's retention.
-func setTrashcan(t *testing.T, db store.Store, on bool) {
+func setTrashcan(t *testing.T, db *inmem.Store, on bool) {
 	t.Helper()
 	if err := db.Settings().Put(context.Background(), types.SettingTrashcan,
 		types.TrashcanSettings{Enabled: on, RetentionDays: 14}); err != nil {
@@ -1235,7 +1235,7 @@ const overwriter = "overwriter:pw"
 // seedOverwriteStatus adds overwriter, its grant in libs-local, and the
 // files there its rows act on: taken.txt, which they would replace, and
 // other.txt, whose content a checksum deploy would put there.
-func seedOverwriteStatus(t *testing.T, db store.Store, items *item.Service) {
+func seedOverwriteStatus(t *testing.T, db *inmem.Store, items *item.Service) {
 	t.Helper()
 	ctx := context.Background()
 	name, _, _ := strings.Cut(overwriter, ":")
@@ -1485,7 +1485,7 @@ func (w *itemWorld) put(p, body string) {
 
 // grantOverwriter lets overwriter read and deploy, but not delete, under
 // the prefix in repository key.
-func grantOverwriter(t *testing.T, db store.Store, key, under string) {
+func grantOverwriter(t *testing.T, db *inmem.Store, key, under string) {
 	t.Helper()
 	name, _, _ := strings.Cut(overwriter, ":")
 	if err := db.Permissions().Create(context.Background(), types.Permission{
@@ -1530,7 +1530,7 @@ func (w *itemWorld) publish(doc string) {
 
 // buildSearchFaults fails the build or item store operation named fail.
 type buildSearchFaults struct {
-	store.Store
+	*inmem.Store
 	fail string
 }
 
@@ -1697,7 +1697,7 @@ var testHash = support.TestHash
 var cheapHash = support.CheapHash
 
 // cheapSeed seeds db with the built-in principals, admin's password "pw".
-func cheapSeed(t *testing.T, db store.Store) {
+func cheapSeed(t *testing.T, db *inmem.Store) {
 	t.Helper()
 	support.Seed(t, db)
 }

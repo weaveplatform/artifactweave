@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/app"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
@@ -23,7 +23,7 @@ var (
 	cheapHash = support.CheapHash
 )
 
-func cheapSeed(t *testing.T, db store.Store) { t.Helper(); support.Seed(t, db) }
+func cheapSeed(t *testing.T, db *inmem.Store) { t.Helper(); support.Seed(t, db) }
 
 func do(
 	t *testing.T, h http.Handler, method, path string, headers map[string]string, body string,

@@ -13,6 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 const (
@@ -237,7 +238,7 @@ func TestAccCRANArchiveMigrationHonorsDestinationPolicy(t *testing.T) {
 
 type (
 	cranMigrationFailure struct {
-		store.Store
+		harness.Store
 		fail   bool
 		mode   string
 		cancel context.CancelFunc

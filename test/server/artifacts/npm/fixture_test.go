@@ -15,7 +15,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
@@ -26,7 +25,7 @@ var (
 	cheapHash = support.CheapHash
 )
 
-func cheapSeed(t *testing.T, db store.Store) { t.Helper(); support.Seed(t, db) }
+func cheapSeed(t *testing.T, db *inmem.Store) { t.Helper(); support.Seed(t, db) }
 
 func do(
 	t *testing.T,
@@ -116,7 +115,7 @@ func npmServer(
 type statusPart struct {
 	handwritten, generated map[string]bool
 	rows                   func() []statusCase
-	seed                   func(*testing.T, store.Store, blob.Store)
+	seed                   func(*testing.T, harness.Store, blob.Store)
 }
 
 type statusCase struct {

@@ -3,9 +3,9 @@ package app
 import (
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -42,7 +42,7 @@ var cranArchiveStatusPart = statusPart{
 			{cranArchiveRoute, base + "cran-lost-blob" + suffix, "admin", "", 500},
 		}
 	},
-	seed: func(t *testing.T, db store.Store, _ blob.Store) {
+	seed: func(t *testing.T, db *inmem.Store, _ blob.Store) {
 		for _, key := range []string{"cran-migrate", "cran-collision", "cran-lost-blob"} {
 			if err := db.Repos().
 				Create(t.Context(), *repo.Defaults(&repo.Config{Key: key, Class: repo.Local, PackageType: repo.Cran})); err != nil {

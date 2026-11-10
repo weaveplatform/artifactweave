@@ -15,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // storageWorld is an item world with a small tree in libs-local and
@@ -489,7 +490,7 @@ func (failingRoots) EnsureRoot(context.Context, types.Item) (types.Item, error) 
 	return types.Item{}, errBoom
 }
 
-type failingRootStore struct{ store.Store }
+type failingRootStore struct{ harness.Store }
 
 func (s failingRootStore) Items() store.ItemStore { return failingRoots{s.Store.Items()} }
 

@@ -21,7 +21,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
@@ -86,7 +85,7 @@ func md5Hex(s string) string {
 	return hex.EncodeToString(b[:])
 }
 
-func setTrashcan(t *testing.T, db store.Store, on bool) {
+func setTrashcan(t *testing.T, db *inmem.Store, on bool) {
 	t.Helper()
 	if err := db.Settings().Put(context.Background(), types.SettingTrashcan,
 		types.TrashcanSettings{Enabled: on, RetentionDays: 14}); err != nil {
@@ -108,7 +107,7 @@ func conanTestArchiveEntries(t *testing.T, entries map[string]string) string {
 // it. The root fixture of the same name also seeds the token records that
 // the status tables address and returns their secrets; no test here reads
 // them, so the second result is always nil.
-func seedTokens(t *testing.T, db store.Store) (*token.Service, map[string]string) {
+func seedTokens(t *testing.T, db harness.Store) (*token.Service, map[string]string) {
 	t.Helper()
 	ctx := context.Background()
 	if err := db.Instance().Init(ctx, types.InstanceIdentity{

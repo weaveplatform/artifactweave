@@ -211,8 +211,11 @@ var raceStores = map[string]func(t *testing.T) raceStore{
 	"inmem": func(*testing.T) raceStore { return inmem.New() },
 	"sqlite": func(t *testing.T) raceStore {
 		t.Helper()
-		st, err := appstoretest.OpenSQLite(context.Background(), filepath.Join(t.TempDir(), "aw.db"),
-			appstoretest.SQLiteOptions{Options: appstoretest.Options{}})
+		st, err := appstoretest.OpenSQLite(
+			context.Background(),
+			filepath.Join(t.TempDir(), "aw.db"),
+			appstoretest.SQLiteOptions{Options: appstoretest.Options{}},
+		)
 		if err != nil {
 			t.Fatal(err)
 		}

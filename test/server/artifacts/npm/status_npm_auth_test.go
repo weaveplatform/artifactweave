@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 const (
@@ -107,7 +107,7 @@ var npmAuthStatusPart = statusPart{
 			{npmScopeAuth, local + "auth/acme", "", "", 401},
 		}
 	},
-	seed: func(t *testing.T, db store.Store, _ blob.Store) {
+	seed: func(t *testing.T, db harness.Store, _ blob.Store) {
 		t.Helper()
 		ctx := context.Background()
 		for _, u := range []types.User{

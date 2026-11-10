@@ -384,7 +384,7 @@ func TestAccPublishRejectsInvalidBoxes(t *testing.T) {
 var errFault = errors.New("injected store fault")
 
 type faultStore struct {
-	store.Store
+	*inmem.Store
 	stage string
 }
 

@@ -21,7 +21,11 @@ import (
 func TestAccSymbolsOppositeMovesOnPostgres(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
-	db, err := appstoretest.OpenPostgres(ctx, platsqltest.PostgresDSN(t), appstoretest.PostgresOptions{})
+	db, err := appstoretest.OpenPostgres(
+		ctx,
+		platsqltest.PostgresDSN(t),
+		appstoretest.PostgresOptions{},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

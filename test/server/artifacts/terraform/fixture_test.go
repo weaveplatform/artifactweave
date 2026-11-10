@@ -13,7 +13,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
@@ -29,7 +28,7 @@ var (
 		support.TerraformProviderRepos()...)
 )
 
-func cheapSeed(t *testing.T, db store.Store)        { t.Helper(); support.Seed(t, db) }
+func cheapSeed(t *testing.T, db *inmem.Store)       { t.Helper(); support.Seed(t, db) }
 func basic(user, password string) map[string]string { return support.Basic(user, password) }
 func bearerAuth(value string) map[string]string     { return support.Bearer(value) }
 func contentTypeOf(body string) (string, string)    { return "application/json", body }
@@ -103,7 +102,7 @@ func mintAdmin(t *testing.T, h http.Handler, body string) map[string]any {
 	return decodeObject(t, rec.Body.String())
 }
 
-func seedTokens(t *testing.T, db store.Store) (*token.Service, map[string]string) {
+func seedTokens(t *testing.T, db *inmem.Store) (*token.Service, map[string]string) {
 	t.Helper()
 	if err := db.Instance().
 		Init(t.Context(), types.InstanceIdentity{InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1}); err != nil {

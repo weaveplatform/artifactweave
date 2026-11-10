@@ -22,7 +22,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func adminPasswordIs(t *testing.T, st store.Store, password string) bool {
+func adminPasswordIs(t *testing.T, st *inmem.Store, password string) bool {
 	t.Helper()
 	u, err := st.Users().Get(context.Background(), authn.AdminUser)
 	if err != nil {
@@ -98,7 +98,7 @@ func TestAccSeedUsesConfiguredPassword(t *testing.T) {
 // hidden hides the seeded marker from its first reads, as if another
 // instance seeded in between.
 type hidden struct {
-	store.Store
+	*inmem.Store
 	hide atomic.Int32
 }
 

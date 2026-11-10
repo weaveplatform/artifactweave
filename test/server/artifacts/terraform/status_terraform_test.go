@@ -12,6 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // The Terraform registry's share of the status table (decision 0040). Its
@@ -36,7 +37,7 @@ var terraformRepos = []repo.Config{
 
 // seedTerraform creates terraformRepos and the key pairs they name: a GPG
 // pair and an RSA one.
-func seedTerraform(t *testing.T, db store.Store) {
+func seedTerraform(t *testing.T, db harness.Store) {
 	t.Helper()
 	ctx := context.Background()
 	for _, k := range []types.Keypair{
@@ -104,7 +105,7 @@ var terraformStatusPart = statusPart{
 			{update, r + "tf-untyped", "admin", `{"terraformType":"provider"}`, 200},
 		}
 	},
-	seed: func(t *testing.T, db store.Store, _ blob.Store) {
+	seed: func(t *testing.T, db harness.Store, _ blob.Store) {
 		t.Helper()
 		seedTerraform(t, db)
 	},

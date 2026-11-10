@@ -27,7 +27,11 @@ func TestAccNuGetWriteTransactionsOnPostgres(t *testing.T) {
 	dsn := platsqltest.PostgresDSN(t)
 	open := func() *appstoretest.SQLStore {
 		t.Helper()
-		db, err := appstoretest.OpenPostgres(context.Background(), dsn, appstoretest.PostgresOptions{})
+		db, err := appstoretest.OpenPostgres(
+			context.Background(),
+			dsn,
+			appstoretest.PostgresOptions{},
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -191,7 +195,12 @@ func existsAt(ctx context.Context, db pkgroute.Store, repo, path string) bool {
 	return err == nil
 }
 
-func waitForBlocked(t *testing.T, ctx context.Context, db *appstoretest.SQLStore, done <-chan error) {
+func waitForBlocked(
+	t *testing.T,
+	ctx context.Context,
+	db *appstoretest.SQLStore,
+	done <-chan error,
+) {
 	t.Helper()
 	tick := time.NewTicker(10 * time.Millisecond)
 	defer tick.Stop()

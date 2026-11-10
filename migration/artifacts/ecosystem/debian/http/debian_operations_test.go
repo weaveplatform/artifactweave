@@ -10,6 +10,7 @@ import (
 	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit/kittest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
@@ -19,7 +20,7 @@ import (
 
 // queueFault is a store whose work queue refuses every new item; every
 // other call passes to Store.
-type queueFault struct{ store.Store }
+type queueFault struct{ *inmem.Store }
 
 func (s queueFault) WorkQueue() store.WorkQueue { return refusingQueue{s.Store.WorkQueue()} }
 

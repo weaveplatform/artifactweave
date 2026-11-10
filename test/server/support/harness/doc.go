@@ -26,6 +26,8 @@
 // # Outputs
 //
 //   - Router: the production http.Handler built from a Config.
+//   - Store: the type of Config.Store, app.RouterStore, as an alias, which
+//     a suite's fakes embed.
 //   - Mirrors, MirrorStatus, SearchLimits and DefaultRedirectTTL: the types
 //     and the default of the Config fields that suites name, as aliases of
 //     those the artifacts module's HTTP adapter declares, so that a suite

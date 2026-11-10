@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -17,7 +17,7 @@ import (
 // Maven-layout file carrying version=1.0, for the layout and version
 // searches' rows, and publishes st-arts, which produced work/st-arts/a.bin,
 // for the build artifacts search's.
-func seedStatusSearches(t *testing.T, db store.Store, blobs blob.Store) {
+func seedStatusSearches(t *testing.T, db *inmem.Store, blobs blob.Store) {
 	t.Helper()
 	seedBuildArtifact(t, db, blobs, "st-arts", "work/st-arts/a.bin")
 	ctx := context.Background()

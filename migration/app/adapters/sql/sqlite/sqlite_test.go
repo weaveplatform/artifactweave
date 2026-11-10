@@ -28,7 +28,7 @@ func keyring(t *testing.T) *crypt.Keyring {
 }
 
 func TestAccContractFile(t *testing.T) {
-	appstoretest.Run(t, func(t *testing.T) store.Store {
+	appstoretest.Run(t, func(t *testing.T) appstoretest.Store {
 		s, err := sqlite.Open(context.Background(), filepath.Join(t.TempDir(), "aw.db"),
 			sqlite.Options{Options: appsql.Options{Keyring: keyring(t)}})
 		if err != nil {
@@ -40,7 +40,7 @@ func TestAccContractFile(t *testing.T) {
 }
 
 func TestAccContractMemory(t *testing.T) {
-	appstoretest.Run(t, func(t *testing.T) store.Store {
+	appstoretest.Run(t, func(t *testing.T) appstoretest.Store {
 		s, err := sqlite.Open(context.Background(), sqlitedrv.Memory,
 			sqlite.Options{Options: appsql.Options{Keyring: keyring(t)}})
 		if err != nil {

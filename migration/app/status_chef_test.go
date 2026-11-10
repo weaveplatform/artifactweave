@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -79,7 +79,7 @@ var chefStatusPart = statusPart{
 		}
 		return out
 	},
-	seed: func(t *testing.T, db store.Store, _ blob.Store) {
+	seed: func(t *testing.T, db *inmem.Store, _ blob.Store) {
 		t.Helper()
 		if err := db.Repos().
 			Create(t.Context(), *repo.Defaults(&repo.Config{Key: "chef-status", Class: repo.Local, PackageType: repo.Chef})); err != nil {

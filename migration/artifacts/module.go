@@ -39,13 +39,26 @@ import (
 // builds reads.
 var errNoStore = errors.New("artifacts: Deps.Store is required")
 
+// Store is the metadata store the module's services and remote wiring read
+// and write: the item service's (item.Store), the repositories binding's
+// (repos.Store), the remote policies' (remote.Store) and the credential
+// resolver's (upstream.ResolverStore). The leases and settings that guard
+// the remote policy key's first creation are the item service's. Every call
+// joins the transaction its context carries.
+type Store interface {
+	item.Store
+	repos.Store
+	remote.Store
+	upstream.ResolverStore
+}
+
 // Deps is what app passes New: what the module's services and its remote
 // wiring use, all over one metadata store.
 type Deps struct {
-	// Store is the metadata store's aggregate, which the item service, the
+	// Store is the metadata store, which the item service, the
 	// repositories binding and the remote wiring read and write. It is
 	// required.
-	Store store.Store
+	Store Store
 	// Blobs is the hot tier's blob store, which the item service and the
 	// remote policies write.
 	Blobs blob.Store
@@ -83,7 +96,7 @@ type Deps struct {
 // OpenRemoteSources opens. app calls its methods in OpenRuntime's order
 // from one goroutine; the services they open are safe for concurrent use.
 type Module struct {
-	store                 store.Store
+	store                 Store
 	blobs                 blob.Store
 	keys                  *crypt.Keyring
 	access                accessapi.API

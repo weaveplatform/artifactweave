@@ -14,7 +14,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // SHA256Digest is the registry digest of a fixture body.
@@ -93,7 +92,7 @@ func RegistryManifest(note string) string {
 // the tag; RegistryLayer must already be present in the image.
 func PushImage(
 	t *testing.T,
-	db store.Store,
+	db registry.Store,
 	blobs blob.Store,
 	c repo.Config,
 	name, tag, body string,

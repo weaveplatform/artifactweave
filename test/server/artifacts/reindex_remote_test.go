@@ -12,6 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 func TestAccRemoteReindexRechecksCurrentAuthority(t *testing.T) {
@@ -89,7 +90,7 @@ func createRemoteReindexGrant(t *testing.T, w *itemWorld, target string) {
 }
 
 type reindexSourceStore struct {
-	store.Store
+	harness.Store
 	before func(context.Context)
 	once   sync.Once
 }

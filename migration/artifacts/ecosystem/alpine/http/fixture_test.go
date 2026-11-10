@@ -41,10 +41,18 @@ const (
 	apkHelloPath = "v3.20/main/x86_64/hello-1.0-r0.apk"
 )
 
+// Store is the part of the metadata store that the tests here hand the
+// item kit and bind the access module over. A faulty store embeds it to
+// wrap the world's in-memory store.
+type Store interface {
+	itemkit.Store
+	accesstest.Store
+}
+
 // Config is the part of the router's configuration that the tests here
 // set, which newKit passes on to the item kit as the router does.
 type Config struct {
-	Store         store.Store
+	Store         Store
 	Blobs         blob.Store
 	RemoteSources *source.Service
 	Access        accessapi.API
@@ -76,7 +84,7 @@ func withAccess(t *testing.T, c Config) Config {
 type itemWorld struct {
 	t     *testing.T
 	world *kittest.World[*inmem.Store]
-	db    store.Store
+	db    *inmem.Store
 	blobs blob.Store
 	kit   *itemkit.Kit
 }
@@ -267,7 +275,7 @@ var errFault = errors.New("the store failed")
 // faultyRepos is a store whose repository lookup of the key fail answers
 // errFault; every other call passes to Store.
 type faultyRepos struct {
-	store.Store
+	Store
 	fail string
 }
 

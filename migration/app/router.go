@@ -22,6 +22,7 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
+	appsql "github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
 	artifactshttp "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
@@ -30,6 +31,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/smart"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
@@ -70,10 +72,36 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/middleware"
+	"github.com/weaveplatform/artifactweave/migration/platform/instance"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
+
+// RouterStore is the metadata store NewRouter hands to the handlers,
+// middleware and bindings it builds: the union of the store types they
+// declare, so the router asks for no accessor that none of them uses, and a
+// handler that starts using one more makes this interface, and nothing
+// else, grow. Every call joins the transaction its context carries. The
+// composite SQL store is a RouterStore, as is the in-memory composite that
+// the tests build routers over.
+type RouterStore interface {
+	// The artifacts handlers, with their item kit, package routes and
+	// replays.
+	artifactshttp.Store
+	// The Docker registry's uploads.
+	registry.Store
+	// The repositories given to the descriptor core and the access
+	// handlers, and the request budget's repository lookup.
+	repos.Store
+	// The access module's bindings.
+	accessmodule.Store
+	// The access handlers and the authentication middleware.
+	accesshttp.Store
+	// The system handlers' instance identity.
+	instance.Store
+}
+
+var _ RouterStore = (*appsql.Store)(nil)
 
 // RouterConfig is what NewRouter needs: the stores, the services app opens
 // over them and the settings it reads from the application configuration.
@@ -114,7 +142,7 @@ type RouterConfig struct {
 	// Store is the metadata store and Blobs the blob store that the content
 	// handlers read and write. ColdBlobs is the archive tier, nil when none
 	// is configured.
-	Store     store.Store
+	Store     RouterStore
 	Blobs     blob.Store
 	ColdBlobs blob.Store
 	// GC is the garbage collector the runtime schedules; POST
@@ -701,7 +729,7 @@ func redactLoggedPath(path string) string {
 // the system's public routes answer anyone.
 func newAuthnOptions(
 	a *authn.Authenticator,
-	st store.Store,
+	st accesshttp.Store,
 	skip ...func(*http.Request) bool,
 ) accesshttp.AuthnOptions {
 	public := accesshttp.PublicRoutes()

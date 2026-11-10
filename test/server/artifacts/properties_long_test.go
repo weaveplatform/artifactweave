@@ -25,6 +25,7 @@ import (
 	platsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // The long-property tests run the routes over the in-memory store and over
@@ -39,7 +40,7 @@ func TestAccLongPropertyValuesOnPostgres(
 	testLongPropertyValues(t, openPostgres(t))
 }
 
-func openPostgres(t *testing.T) store.Store {
+func openPostgres(t *testing.T) harness.Store {
 	t.Helper()
 	db, err := postgres.Open(context.Background(), platsqltest.PostgresDSN(t), postgres.Options{})
 	if err != nil {
@@ -52,7 +53,7 @@ func openPostgres(t *testing.T) store.Store {
 
 // propertyServer is the router over db, with libs-local and the seeded
 // admin, whose password is "pw".
-func propertyServer(t *testing.T, db store.Store) http.Handler {
+func propertyServer(t *testing.T, db harness.Store) http.Handler {
 	t.Helper()
 	ctx := context.Background()
 	cheapSeed(t, db)
@@ -74,7 +75,7 @@ func propertyServer(t *testing.T, db store.Store) http.Handler {
 // testLongPropertyValues sets property values of types.PropertyValueMax
 // characters through matrix parameters and the properties API, and one past
 // it: every request succeeds, and the longer value reads back cut.
-func testLongPropertyValues(t *testing.T, db store.Store) {
+func testLongPropertyValues(t *testing.T, db harness.Store) {
 	h := propertyServer(t, db)
 	admin := basic("admin", "pw")
 	call := func(method, path string) *http.Response {
@@ -135,7 +136,7 @@ func TestAccLongPropertyKeysOnPostgres(t *testing.T) { testLongPropertyKeys(t, o
 // every route that sets properties, and refuses one more character on each
 // with a 400 that leaves everything as it was. "é" is two bytes of UTF-8,
 // so the limit counts characters, not bytes.
-func testLongPropertyKeys(t *testing.T, db store.Store) {
+func testLongPropertyKeys(t *testing.T, db harness.Store) {
 	ctx := context.Background()
 	h := propertyServer(t, db)
 	key := strings.Repeat("é", types.PropertyKeyMax)

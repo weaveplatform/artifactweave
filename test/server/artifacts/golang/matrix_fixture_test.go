@@ -8,18 +8,18 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 type matrixFixture struct {
 	h       http.Handler
-	db      store.Store
+	db      *inmem.Store
 	items   *item.Service
 	secrets map[string]string
 }
@@ -106,7 +106,7 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 	return f
 }
 
-func seedGoMatrixTokens(t *testing.T, db store.Store, svc *token.Service) map[string]string {
+func seedGoMatrixTokens(t *testing.T, db *inmem.Store, svc *token.Service) map[string]string {
 	t.Helper()
 	ctx := t.Context()
 	past, err := token.New(ctx, db, token.Options{

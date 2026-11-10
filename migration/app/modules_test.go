@@ -15,11 +15,11 @@ import (
 )
 
 // buildModules over a store whose every call panics, because its embedded
-// store.Store is nil, succeeds: no constructor reads or writes anything, so
+// moduleStore is nil, succeeds: no constructor reads or writes anything, so
 // building the modules after the work queue moves none of OpenRuntime's I/O.
 // Without a store, the first constructor's refusal names its module.
 func TestUnitBuildModulesDoesNoIO(t *testing.T) {
-	mods, err := buildModules(config.Default(), moduleDeps{store: struct{ store.Store }{}})
+	mods, err := buildModules(config.Default(), moduleDeps{store: struct{ moduleStore }{}})
 	if err != nil {
 		t.Fatal(err)
 	}

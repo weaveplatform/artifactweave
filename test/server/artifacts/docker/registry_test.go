@@ -24,6 +24,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // The registry's own routing is tested in
@@ -74,7 +75,7 @@ var (
 // docker-blobs, admin-only like the rest, with registryLayer in the image
 // app, and admin's upload sessions, one per row that needs one, as
 // {upload-<row>} secrets.
-func seedRegistryStatus(t *testing.T, db store.Store, blobs blob.Store, secrets statusSecrets) {
+func seedRegistryStatus(t *testing.T, db harness.Store, blobs blob.Store, secrets statusSecrets) {
 	t.Helper()
 	ctx := context.Background()
 	c := *repo.Defaults(&repo.Config{Key: "docker-blobs", Class: repo.Local, PackageType: repo.Docker})
@@ -657,7 +658,7 @@ func contentTypeOf(body string) (contentType, rest string) {
 // already be in the image.
 func pushImage(
 	t *testing.T,
-	db store.Store,
+	db harness.Store,
 	blobs blob.Store,
 	c repo.Config,
 	name, tag, body string,
@@ -668,7 +669,7 @@ func pushImage(
 
 // seedRegistryManifests pushes registryManifest("v1") to docker-blobs'
 // image app as v1.
-func seedRegistryManifests(t *testing.T, db store.Store, blobs blob.Store) {
+func seedRegistryManifests(t *testing.T, db harness.Store, blobs blob.Store) {
 	t.Helper()
 	c, err := db.Repos().Get(context.Background(), "docker-blobs")
 	if err != nil {
@@ -756,7 +757,7 @@ func registryManifestMatrix() []matrixRow {
 // the registry and nothing else, and an anonymous one works only while
 // anonymous access does.
 func TestAccRegistryTokenFlow(t *testing.T) {
-	var db store.Store
+	var db harness.Store
 	h := statusFixture(t, true, func(c *Config) { db = c.Store })
 	admin := basic("admin", "pw")
 	if rec := do(t, h, http.MethodPut, "/artifactory/api/repositories/docker-local", jsonAs(admin),
@@ -856,7 +857,7 @@ const (
 
 // seedRegistryDeletes pushes the tags the status rows delete or promote to
 // docker-blobs' image app, each with a manifest of its own.
-func seedRegistryDeletes(t *testing.T, db store.Store, blobs blob.Store) {
+func seedRegistryDeletes(t *testing.T, db harness.Store, blobs blob.Store) {
 	t.Helper()
 	c, err := db.Repos().Get(context.Background(), "docker-blobs")
 	if err != nil {
@@ -1180,7 +1181,7 @@ func TestAccMultiArchDelete(t *testing.T) {
 }
 
 // failingGetStore fails reading any item.
-type failingGetStore struct{ store.Store }
+type failingGetStore struct{ harness.Store }
 
 func (s failingGetStore) Items() store.ItemStore { return failingGets{s.Store.Items()} }
 

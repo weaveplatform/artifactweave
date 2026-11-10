@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -21,7 +21,7 @@ const (
 // "user" holds READ and MANAGE on the st-managed* permissions. Every permission the
 // rows create or seed targets perm-local, a repository no other row reads:
 // a grant on a shared repository would change other rows' answers.
-func seedPermissions(t *testing.T, db store.Store) {
+func seedPermissions(t *testing.T, db *inmem.Store) {
 	t.Helper()
 	ctx := context.Background()
 	if err := db.Repos().

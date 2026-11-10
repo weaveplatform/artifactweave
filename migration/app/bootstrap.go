@@ -73,7 +73,7 @@ func ApplyDescriptor(
 // OpenRuntime builds them. Every contract is bound over st, the store whose
 // unit of work Apply writes in, so the anonymous access setting and the
 // repositories are written in Apply's transaction.
-func configurationOver(st store.Store) configapi.API {
+func configurationOver(st *appsql.Store) configapi.API {
 	return descriptor.NewAPI(descriptor.Deps{
 		Tx:              st,
 		Repositories:    repos.NewRepositories(st, access.KeysOf(st), access.ProjectsOf(st)),
@@ -112,7 +112,7 @@ type bootstrapMarker struct {
 func applyBootstrap(
 	ctx context.Context,
 	cfg config.Config,
-	st store.Store,
+	st *appsql.Store,
 	log *slog.Logger,
 ) error {
 	file := cfg.Bootstrap.Descriptor

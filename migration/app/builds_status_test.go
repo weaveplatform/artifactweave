@@ -7,12 +7,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -31,7 +31,7 @@ func buildDoc(name, number, started string) string {
 }
 
 // seedBuild publishes run number 1 of name, started at testStarted.
-func seedBuild(t *testing.T, db store.Store, blobs blob.Store, name string) {
+func seedBuild(t *testing.T, db *inmem.Store, blobs blob.Store, name string) {
 	t.Helper()
 	svc := build.Service{Store: db, Blobs: blobs, Formats: ecosystem.For}
 	if _, err := svc.Publish(
@@ -44,7 +44,7 @@ func seedBuild(t *testing.T, db store.Store, blobs blob.Store, name string) {
 // seedBuildArtifact publishes run 1 of name, started at testStarted, which
 // produced libs-local's file at path, deployed carrying the run's build
 // properties: a run the build artifacts search finds a file of.
-func seedBuildArtifact(t *testing.T, db store.Store, blobs blob.Store, name, path string) {
+func seedBuildArtifact(t *testing.T, db *inmem.Store, blobs blob.Store, name, path string) {
 	t.Helper()
 	ctx := context.Background()
 	libs, err := db.Repos().Get(ctx, "libs-local")
@@ -224,7 +224,7 @@ func aqlStatusRows() []statusCase {
 }
 
 // seedStatusBuilds publishes the runs buildStatusRows act on.
-func seedStatusBuilds(t *testing.T, db store.Store, blobs blob.Store) {
+func seedStatusBuilds(t *testing.T, db *inmem.Store, blobs blob.Store) {
 	t.Helper()
 	for _, name := range []string{"st-app", "st-ren", "st-del", "st-del2", "st-pro", "st-ret"} {
 		seedBuild(t, db, blobs, name)
