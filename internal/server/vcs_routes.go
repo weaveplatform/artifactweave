@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -20,30 +21,35 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// vcsAPI is the VCS ecosystem's partial strict server: the branch, tag and
+// ref listings and the archive and file downloads of a VCS remote
+// repository, and the route for GitLab subgroup owners, over the item kit.
+type vcsAPI struct{ *itemkit.Kit }
+
 type vcsAccess struct {
 	repo        repo.Config
 	principal   kernel.Principal
-	access      access
+	access      itemkit.Access
 	isCacheOnly bool
 }
 
-func (s artifactoryService) vcsRepository(
+func (s vcsAPI) vcsRepository(
 	ctx context.Context,
 	key, owner, name string,
 ) (vcsAccess, error) {
 	if !vcshttp.ValidProject(owner, name) {
 		return vcsAccess{}, apierror.New(http.StatusBadRequest, "invalid VCS repository path")
 	}
-	st, err := s.content()
+	st, err := s.Content()
 	if err != nil {
 		return vcsAccess{}, err
 	}
-	c, cacheOnly, err := resolveRepo(ctx, st, key)
+	c, cacheOnly, err := itemkit.ResolveRepo(ctx, st, key)
 	if err != nil {
-		return vcsAccess{}, s.itemError(ctx, "VCS repository", err)
+		return vcsAccess{}, s.ItemError(ctx, "VCS repository", err)
 	}
 	if c.PackageType != repo.VCS || c.Class != repo.Remote {
-		return vcsAccess{}, notFoundRepo(key)
+		return vcsAccess{}, itemkit.NotFoundRepo(key)
 	}
 	switch c.VCSGitProvider {
 	case "",
@@ -61,11 +67,11 @@ func (s artifactoryService) vcsRepository(
 			"VCS provider adapter unavailable",
 		)
 	}
-	p, acc, err := s.itemCaller(ctx, st)
+	p, acc, err := s.ItemCaller(ctx, st)
 	if err != nil {
 		return vcsAccess{}, err
 	}
-	if !acc.folder(c, owner+"/"+name, types.ActionRead) {
+	if !acc.Folder(c, owner+"/"+name, types.ActionRead) {
 		return vcsAccess{}, fmt.Errorf(
 			"vcs repository read denied: %w",
 			pkgroute.SourceError(source.ErrDenied, p.Anonymous),
@@ -74,24 +80,24 @@ func (s artifactoryService) vcsRepository(
 	return vcsAccess{repo: c, principal: p, access: acc, isCacheOnly: cacheOnly}, nil
 }
 
-func (s artifactoryService) vcsRead(
+func (s vcsAPI) vcsRead(
 	ctx context.Context,
 	a vcsAccess,
 	resource source.Resource,
 ) (source.Result, error) {
-	if s.cfg.RemoteSources == nil {
+	if s.RemoteSources == nil {
 		return source.Result{}, apierror.ErrNotImplemented
 	}
-	result, err := s.cfg.RemoteSources.Read(ctx, source.Request{
+	result, err := s.RemoteSources.Read(ctx, source.Request{
 		Repo:      a.repo,
 		Subject:   accessapi.SubjectOf(a.principal),
-		Access:    a.access.d,
+		Access:    a.access.Decider,
 		Resource:  resource,
 		Project:   a.repo.ProjectKey,
 		CacheOnly: a.isCacheOnly,
 	})
 	if err != nil {
-		return source.Result{}, s.itemError(
+		return source.Result{}, s.ItemError(
 			ctx,
 			"VCS source",
 			pkgroute.SourceError(err, a.principal.Anonymous),
@@ -100,7 +106,7 @@ func (s artifactoryService) vcsRead(
 	return result, nil
 }
 
-func (s artifactoryService) vcsResultBytes(
+func (s vcsAPI) vcsResultBytes(
 	ctx context.Context,
 	result source.Result,
 	limit int64,
@@ -110,13 +116,13 @@ func (s artifactoryService) vcsResultBytes(
 	case result.Stream != nil:
 		body = result.Stream.Body
 	case result.Item != nil:
-		if s.cfg.Blobs == nil {
+		if s.Blobs == nil {
 			return nil, apierror.ErrNotImplemented
 		}
 		var err error
-		body, _, err = s.cfg.Blobs.Open(ctx, result.Item.Actual.SHA256)
+		body, _, err = s.Blobs.Open(ctx, result.Item.Actual.SHA256)
 		if err != nil {
-			return nil, s.internalError(ctx, "VCS cached blob", err)
+			return nil, s.InternalError(ctx, "VCS cached blob", err)
 		}
 	default:
 		return nil, source.ErrInvalidResult
@@ -137,7 +143,7 @@ func (s artifactoryService) vcsResultBytes(
 	return data, nil
 }
 
-func (s artifactoryService) vcsRefs(
+func (s vcsAPI) vcsRefs(
 	ctx context.Context,
 	key, owner, name string,
 ) ([]vcshttp.Ref, vcsAccess, error) {
@@ -166,14 +172,14 @@ func (s artifactoryService) vcsRefs(
 		if ref.Branch {
 			kind = "heads"
 		}
-		if a.access.file(a.repo, owner+"/"+name+"/refs/"+kind+"/"+ref.Name, types.ActionRead) {
+		if a.access.File(a.repo, owner+"/"+name+"/refs/"+kind+"/"+ref.Name, types.ActionRead) {
 			filtered = append(filtered, ref)
 		}
 	}
 	return filtered, a, nil
 }
 
-func (s artifactoryService) vcsReadRefs(
+func (s vcsAPI) vcsReadRefs(
 	ctx context.Context, a vcsAccess, owner, name string, endpoint vcshttp.RefEndpoint,
 ) ([]vcshttp.Ref, error) {
 	resource := source.Resource{
@@ -206,7 +212,7 @@ func (s artifactoryService) vcsReadRefs(
 	}
 	data, err := s.vcsResultBytes(ctx, result, vcshttp.MaxRefsBytes)
 	if err != nil {
-		return nil, s.itemError(ctx, "VCS references", err)
+		return nil, s.ItemError(ctx, "VCS references", err)
 	}
 	refs, err := endpoint.Parse(data)
 	if err != nil {
@@ -249,7 +255,7 @@ func (r vcsListResponse) VisitGetVcsBranchesResponse(w http.ResponseWriter) erro
 	return r.write(w)
 }
 
-func (s artifactoryService) GetVcsTags(
+func (s vcsAPI) GetVcsTags(
 	ctx context.Context,
 	req artgen.GetVcsTagsRequestObject,
 ) (artgen.GetVcsTagsResponseObject, error) {
@@ -266,7 +272,7 @@ func (s artifactoryService) GetVcsTags(
 	return out, nil
 }
 
-func (s artifactoryService) GetVcsBranches(
+func (s vcsAPI) GetVcsBranches(
 	ctx context.Context,
 	req artgen.GetVcsBranchesRequestObject,
 ) (artgen.GetVcsBranchesResponseObject, error) {
@@ -283,7 +289,7 @@ func (s artifactoryService) GetVcsBranches(
 	return out, nil
 }
 
-func (s artifactoryService) GetVcsRefs(
+func (s vcsAPI) GetVcsRefs(
 	ctx context.Context,
 	req artgen.GetVcsRefsRequestObject,
 ) (artgen.GetVcsRefsResponseObject, error) {

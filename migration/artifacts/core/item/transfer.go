@@ -485,7 +485,8 @@ func (s *Service) Layout(ctx context.Context, name string) (*layout.Layout, erro
 		return nil, fmt.Errorf("item: layout %s: %w", name, err)
 	}
 	// The stored document carries the descriptor's camelCase keys, which
-	// internal/descriptor validated; read them as it does, through a map.
+	// migration/configuration/core/descriptor validated; read them as it
+	// does, through a map.
 	var m map[string]any
 	if err := json.Unmarshal(doc.Document, &m); err != nil {
 		return nil, fmt.Errorf("item: layout %s: %w", name, err)

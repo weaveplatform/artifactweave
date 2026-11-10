@@ -276,12 +276,12 @@ func TestAccReindexFaults(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	on := func(st store.Store) artifactoryService {
+	on := func(st store.Store) npmAPI {
 		cfg := Config{Formats: recording(f)}
 		if st != nil {
 			cfg.Store = st
 		}
-		return artifactoryService{cfg: withAccess(cfg)}
+		return npmAPI{newKit(withAccess(cfg))}
 	}
 	status := func(err error) int {
 		var e *apierror.Error
@@ -290,34 +290,34 @@ func TestAccReindexFaults(t *testing.T) {
 		}
 		return e.Status
 	}
-	if _, err := on(nil).reindex(ctx, repo.NuGet, "nuget-local", "", false); status(err) !=
+	if _, err := on(nil).Reindex(ctx, repo.NuGet, "nuget-local", "", false); status(err) !=
 		http.StatusNotImplemented {
 		t.Errorf("no store: %v", err)
 	}
-	if _, err := on(db).reindex(ctx, repo.NuGet, "nuget-local", "", false); status(err) !=
+	if _, err := on(db).Reindex(ctx, repo.NuGet, "nuget-local", "", false); status(err) !=
 		http.StatusUnauthorized {
 		t.Errorf("no caller: %v", err)
 	}
 	admin := kernel.WithPrincipal(ctx, kernel.Principal{Name: "admin", Admin: true})
 	for _, c := range []struct {
 		fail string
-		call func(artifactoryService) error
+		call func(npmAPI) error
 	}{
-		{"settings", func(s artifactoryService) error {
-			_, err := s.reindex(kernel.WithPrincipal(ctx, kernel.Principal{Name: "deployer"}),
+		{"settings", func(s npmAPI) error {
+			_, err := s.Reindex(kernel.WithPrincipal(ctx, kernel.Principal{Name: "deployer"}),
 				repo.NuGet, "nuget-local", "", false)
 			return err
 		}},
-		{"enqueue", func(s artifactoryService) error {
-			_, err := s.reindex(admin, repo.NuGet, "nuget-local", "", false)
+		{"enqueue", func(s npmAPI) error {
+			_, err := s.Reindex(admin, repo.NuGet, "nuget-local", "", false)
 			return err
 		}},
-		{"enqueue", func(s artifactoryService) error {
+		{"enqueue", func(s npmAPI) error {
 			_, err := s.MigrateNpmRepositoryToStrictLayout(admin,
 				artgen.MigrateNpmRepositoryToStrictLayoutRequestObject{RepoKey: "npm-local"})
 			return err
 		}},
-		{"get", func(s artifactoryService) error {
+		{"get", func(s npmAPI) error {
 			_, err := s.ResumeNpmRepositoryMigration(admin,
 				artgen.ResumeNpmRepositoryMigrationRequestObject{RepoKey: "npm-local"})
 			return err

@@ -169,8 +169,8 @@ version defaulting to 7.155.0 or newer on both endpoints, keep the real artifact
 version in `revision`, and return an empty `addons` list. Readiness reports health, not a
 build version. Multipart upload is implemented: `GET /api/v1/uploads/config` reports
 support when its service is configured, with `{"supported":false}` only when it is
-unavailable (`internal/server/items.go`, `GetUploadsConfig`). The earlier unconditional fallback is
-historical, not the current CLI path.
+unavailable (`migration/artifacts/adapters/http/items.go`, `GetUploadsConfig`). The
+earlier unconditional fallback is historical, not the current CLI path.
 
 ## The configuration descriptor
 
@@ -293,8 +293,8 @@ security:
 
 - `PATCH` applies `localRepositories`, `remoteRepositories`, `virtualRepositories`,
   `proxies`, `propertySets`, `repoLayouts` and `downloadRedirectConfig`
-  (`internal/descriptor/parse.go`, `redirect.go`). The last applies the whole-MB
-  `fileMinimumSize` setting used by CDN/storage redirects
+  (`migration/configuration/core/descriptor/parse.go`, `redirect.go`). The last applies
+  the whole-MB `fileMinimumSize` setting used by CDN/storage redirects
   ([research 19](19-cdn-and-download-redirect.md#5-artifactweave-today)). Artifactory
   applies every section its YAML pages document ([D]
   https://docs.jfrog.com/installation/docs/artifactory-yaml-configuration.md). A document

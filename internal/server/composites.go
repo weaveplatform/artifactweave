@@ -2,6 +2,11 @@ package server
 
 import (
 	accesshttp "github.com/weaveplatform/artifactweave/migration/access/adapters/http"
+	artifactshttp "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http"
+	cranhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cran/http"
+	debianhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian/http"
+	rpmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/rpm/http"
+	configurationhttp "github.com/weaveplatform/artifactweave/migration/configuration/adapters/http"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	distributiongen "github.com/weaveplatform/artifactweave/migration/platform/gen/distribution"
@@ -19,17 +24,28 @@ import (
 // operation sit at the same depth, which makes the method ambiguous and
 // fails the assertion below: the intended guard against a duplicate
 // implementation. A partial never embeds the stubs or another partial, and
-// state a partial embeds (accessState) defines no method named after an
-// operation, or it would collide with the stub at depth 2.
+// state a partial embeds (accessState, itemkit.Kit) defines no method named
+// after an operation, or it would collide with the stub at depth 2.
 
 // artifactoryStubs holds the artifactory spec's generated stubs.
 type artifactoryStubs struct{ artgen.UnimplementedStrict }
 
-// artifactoryServer is the artifactory spec's strict server.
+// artifactoryServer is the artifactory spec's strict server: the access
+// module's security operations, the system operations, the artifacts
+// module's operations, and those of each ecosystem that owns some (VCS,
+// npm, Docker, Debian, CRAN and RPM). Every artifacts and ecosystem partial
+// embeds the same item kit, whose methods sit at depth 2 beside the stubs
+// and are named after no operation.
 type artifactoryServer struct {
 	*accesshttp.SecurityAPI
-	*systemAPI
-	*artifactoryService
+	*configurationhttp.SystemAPI
+	*artifactshttp.ArtifactoryAPI
+	*vcsAPI
+	*npmAPI
+	*dockerAPI
+	*debianhttp.DebianAPI
+	*cranhttp.CranAPI
+	*rpmhttp.RPMAPI
 	artifactoryStubs
 }
 

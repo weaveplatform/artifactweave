@@ -10,6 +10,7 @@ import (
 	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
@@ -18,25 +19,6 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
-
-func healthRequest(r *http.Request) bool {
-	if r.Method != http.MethodGet {
-		return false
-	}
-	switch r.URL.EscapedPath() {
-	case "/artifactory/api/system/ping",
-		"/artifactory/api/v1/system/readiness",
-		"/artifactory/api/v1/system/liveness",
-		"/access/api/v1/system/ping",
-		"/access/api/v1/system/readiness",
-		"/access/api/v1/system/liveness",
-		"/router/api/v1/system/health",
-		"/router/api/v1/system/readiness",
-		"/router/api/v1/system/liveness":
-		return true
-	}
-	return false
-}
 
 // limitOptions are the values the request-limit middleware takes from the
 // router, which builds them from the code that owns each request kind.
@@ -53,9 +35,16 @@ type limitOptions struct {
 	Limits *apilimit.Service
 }
 
+// requestLimiter serves the request-limit middleware. It reads the router's
+// configuration rather than a handler partial's, because the resource
+// budgets charge projects and repositories of every module's routes.
+type requestLimiter struct {
+	cfg Config
+}
+
 // limitIngress admits each request to the process's concurrency and
 // authentication limits before authentication runs.
-func (s artifactoryService) limitIngress(o limitOptions) func(http.Handler) http.Handler {
+func (s requestLimiter) limitIngress(o limitOptions) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if o.Health(r) {
@@ -101,7 +90,7 @@ func (s artifactoryService) limitIngress(o limitOptions) func(http.Handler) http
 
 // limitPrincipal admits an authenticated request to its principal's
 // budget and, for an expensive one, to the expensive lane.
-func (s artifactoryService) limitPrincipal(o limitOptions) func(http.Handler) http.Handler {
+func (s requestLimiter) limitPrincipal(o limitOptions) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if o.Health(r) || o.Recovery(r) {
@@ -174,7 +163,7 @@ func expensiveRequest(r *http.Request) bool {
 // Resource quotas are charged only for existing resources visible to this
 // authenticated principal. Invented query/path labels cannot allocate counters
 // or exhaust another account's repository quota.
-func (s artifactoryService) budgetResources(
+func (s requestLimiter) budgetResources(
 	r *http.Request,
 	p kernel.Principal,
 	scope *apilimit.Scope,
@@ -215,7 +204,7 @@ func (s artifactoryService) budgetResources(
 	if err != nil {
 		return fmt.Errorf("budget repository: %w", err)
 	}
-	if (access{d}).visible(c) {
+	if (itemkit.Access{Decider: d}).Visible(c) {
 		scope.Repository = c.Key
 		// A query parameter cannot redirect a repository's project accounting.
 		scope.Project = c.ProjectKey

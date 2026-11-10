@@ -18,7 +18,7 @@ import (
 // segment, while a GitLab group/subgroup is represented by several segments.
 //
 //nolint:gocyclo // This bounded route grammar validates each documented subgroup form in one place.
-func (s artifactoryService) vcsNested(w http.ResponseWriter, r *http.Request) {
+func (s vcsAPI) vcsNested(w http.ResponseWriter, r *http.Request) {
 	const prefix = "/artifactory/api/vcs/"
 	rawPath := strings.ToLower(r.URL.RawPath)
 	if !strings.HasPrefix(r.URL.Path, prefix) || len(r.URL.Path) > 2048 ||

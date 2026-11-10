@@ -13,11 +13,18 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	artifactshttp "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
+	configurationhttp "github.com/weaveplatform/artifactweave/migration/configuration/adapters/http"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/middleware"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
+
+// versionMediaType is the vendor type of the version document, which the
+// system handlers answer when Accept names it; the table keeps a copy of
+// their constant with the same text.
+const versionMediaType = "application/vnd.org.jfrog.artifactory.system.Version+json"
 
 func testHandler() http.Handler {
 	return New(
@@ -241,9 +248,10 @@ func (b *endlessBody) Read(p []byte) (int, error) {
 	return n, nil
 }
 
-// TestAccTelemetrySinkBodyLimit holds both sinks to sinkBodyLimit: a body at
-// the limit is drained and answered 200, and a longer one answers 413
-// without being read to the end, whether its length is declared or not.
+// TestAccTelemetrySinkBodyLimit holds both sinks to
+// configurationhttp.SinkBodyLimit: a body at the limit is drained and
+// answered 200, and a longer one answers 413 without being read to the
+// end, whether its length is declared or not.
 func TestAccTelemetrySinkBodyLimit(t *testing.T) {
 	h := testHandler()
 	tooLarge := `{"errors":[{"status":413,"message":"request body exceeds 1048576 bytes"}]}`
@@ -261,11 +269,11 @@ func TestAccTelemetrySinkBodyLimit(t *testing.T) {
 	} {
 		t.Run(path, func(t *testing.T) {
 			// At the limit, declared and undeclared: read to the end.
-			atLimit := strings.Repeat("x", sinkBodyLimit)
+			atLimit := strings.Repeat("x", configurationhttp.SinkBodyLimit)
 			if rec := post(
 				path,
 				strings.NewReader(atLimit),
-				sinkBodyLimit,
+				configurationhttp.SinkBodyLimit,
 			); rec.Code != http.StatusOK {
 				t.Errorf("declared, at the limit: status %d: %s", rec.Code, rec.Body)
 			}
@@ -279,20 +287,20 @@ func TestAccTelemetrySinkBodyLimit(t *testing.T) {
 
 			// A declared length over the limit is refused before any read.
 			declared := &endlessBody{t: t}
-			rec := post(path, declared, sinkBodyLimit+1)
+			rec := post(path, declared, configurationhttp.SinkBodyLimit+1)
 			assertTooLarge(t, "declared", rec, tooLarge)
 
 			// An undeclared body is read one byte past the limit, which is
 			// how MaxBytesReader detects the overrun, and no further. The
 			// margin only keeps a regression from looping forever.
-			undeclared := &endlessBody{t: t, budget: sinkBodyLimit + 64<<10}
+			undeclared := &endlessBody{t: t, budget: configurationhttp.SinkBodyLimit + 64<<10}
 			rec = post(path, undeclared, -1)
 			assertTooLarge(t, "undeclared", rec, tooLarge)
-			if undeclared.read > sinkBodyLimit+1 {
+			if undeclared.read > configurationhttp.SinkBodyLimit+1 {
 				t.Errorf(
 					"undeclared: read %d bytes, want at most %d",
 					undeclared.read,
-					sinkBodyLimit+1,
+					configurationhttp.SinkBodyLimit+1,
 				)
 			}
 		})
@@ -512,7 +520,7 @@ func TestAccProtocolErrorProfiles404(t *testing.T) {
 // p8Paths are a path of each P8 protocol, under a repository that does not
 // exist, and the catch-all's answer to it while the protocol is not
 // mounted: a 404 rendered with the protocol's error response profile.
-// Once the format's pull request adds the protocol to protocols, its router
+// Once the format's pull request adds the protocol to Protocols, its router
 // kit answers instead, with a 404 in the protocol's own envelope, and the
 // row checks that. So no format's pull request has to change a row here.
 var p8Paths = []struct {
@@ -553,8 +561,8 @@ var p8Paths = []struct {
 
 // mounted returns the built-in protocol named name, if it is mounted.
 func mounted(name string) (pkgroute.Protocol, bool) {
-	for _, p := range protocols {
-		if proto := p(Config{}); proto.Name == name {
+	for _, proto := range artifactshttp.Protocols(artifactshttp.Deps{}) {
+		if proto.Name == name {
 			return proto, true
 		}
 	}
@@ -644,5 +652,40 @@ func TestAccStrictBindingErrorThroughRouter(t *testing.T) {
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/artifactory/api/system/version", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status %d", rec.Code)
+	}
+}
+
+func TestAccRequestDetailsReadFailure(t *testing.T) {
+	h := requestDetails(
+		newDetailOptions(),
+	)(
+		http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			t.Fatal("reached the handler")
+		}),
+	)
+	req := httptest.NewRequest(
+		"POST",
+		"/artifactory/api/repositories/x",
+		io.NopCloser(failingReader{}),
+	)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status %d", rec.Code)
+	}
+	for path, want := range map[string]bool{
+		"/artifactory/api/repositories/x":          true,
+		"/artifactory/api/v2/repositories/batch":   true,
+		"/artifactory/api/repositories/":           false,
+		"/artifactory/api/repositories/x/y":        false,
+		"/artifactory/api/repositories/existence2": true,
+	} {
+		// The path rule is unexported in the artifacts handlers, so the
+		// table reaches it through their predicate, which applies it to a
+		// POST.
+		got := artifactshttp.KeepsRepositoryBody(httptest.NewRequest(http.MethodPost, path, nil))
+		if got != want {
+			t.Errorf("%s: %v", path, got)
+		}
 	}
 }

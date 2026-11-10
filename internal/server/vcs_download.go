@@ -38,7 +38,7 @@ func (b *vcsBody) Read(p []byte) (int, error) {
 	return n, err //nolint:wrapcheck
 }
 
-func (s artifactoryService) vcsOpenResult(
+func (s vcsAPI) vcsOpenResult(
 	ctx context.Context,
 	result source.Result,
 ) (io.ReadCloser, int64, error) {
@@ -56,13 +56,13 @@ func (s artifactoryService) vcsOpenResult(
 	case result.Stream != nil:
 		body, size = result.Stream.Body, result.Stream.Size
 	case result.Item != nil:
-		if s.cfg.Blobs == nil {
+		if s.Blobs == nil {
 			return nil, 0, apierror.ErrNotImplemented
 		}
 		var err error
-		body, _, err = s.cfg.Blobs.Open(ctx, result.Item.Actual.SHA256)
+		body, _, err = s.Blobs.Open(ctx, result.Item.Actual.SHA256)
 		if err != nil {
-			return nil, 0, s.internalError(ctx, "VCS cached archive", err)
+			return nil, 0, s.InternalError(ctx, "VCS cached archive", err)
 		}
 		size = result.Item.Size
 	default:
@@ -108,7 +108,7 @@ func vcsArchiveURLPolicy(
 	}
 }
 
-func (s artifactoryService) vcsArchive(
+func (s vcsAPI) vcsArchive(
 	ctx context.Context,
 	key, owner, name, kind, ref, ext, propertyFilter string,
 ) (io.ReadCloser, int64, error) {
@@ -141,7 +141,7 @@ func (s artifactoryService) vcsArchive(
 		}
 	}
 	permissionPath := owner + "/" + name + "/refs/" + kind + "/" + ref
-	if !a.access.file(a.repo, permissionPath, types.ActionRead) {
+	if !a.access.File(a.repo, permissionPath, types.ActionRead) {
 		return nil, 0, fmt.Errorf(
 			"vcs archive read denied: %w",
 			pkgroute.SourceError(source.ErrDenied, a.principal.Anonymous),
@@ -187,7 +187,7 @@ func (s artifactoryService) vcsArchive(
 	return s.vcsOpenResult(ctx, result)
 }
 
-func (s artifactoryService) vcsMatchCachedProperties(
+func (s vcsAPI) vcsMatchCachedProperties(
 	ctx context.Context,
 	result source.Result,
 	filter map[string]string,
@@ -199,13 +199,13 @@ func (s artifactoryService) vcsMatchCachedProperties(
 		}
 		return notFound
 	}
-	st, err := s.content()
+	st, err := s.Content()
 	if err != nil {
 		return err
 	}
 	props, err := st.Items().Properties(ctx, result.Item.ID)
 	if err != nil {
-		return s.internalError(ctx, "VCS cached properties", err)
+		return s.InternalError(ctx, "VCS cached properties", err)
 	}
 	for key, value := range filter {
 		found := false
@@ -257,7 +257,7 @@ func vcsProperties(p *string) string {
 	return *p
 }
 
-func (s artifactoryService) DownloadVcsTag(
+func (s vcsAPI) DownloadVcsTag(
 	ctx context.Context,
 	req artgen.DownloadVcsTagRequestObject,
 ) (artgen.DownloadVcsTagResponseObject, error) {
@@ -280,7 +280,7 @@ func (s artifactoryService) DownloadVcsTag(
 	}, nil
 }
 
-func (s artifactoryService) DownloadVcsBranch(
+func (s vcsAPI) DownloadVcsBranch(
 	ctx context.Context,
 	req artgen.DownloadVcsBranchRequestObject,
 ) (artgen.DownloadVcsBranchResponseObject, error) {
@@ -303,7 +303,7 @@ func (s artifactoryService) DownloadVcsBranch(
 	}, nil
 }
 
-func (s artifactoryService) DownloadVcsCommit(
+func (s vcsAPI) DownloadVcsCommit(
 	ctx context.Context,
 	req artgen.DownloadVcsCommitRequestObject,
 ) (artgen.DownloadVcsCommitResponseObject, error) {
@@ -326,7 +326,7 @@ func (s artifactoryService) DownloadVcsCommit(
 	}, nil
 }
 
-func (s artifactoryService) DownloadVcsRelease(
+func (s vcsAPI) DownloadVcsRelease(
 	ctx context.Context,
 	req artgen.DownloadVcsReleaseRequestObject,
 ) (artgen.DownloadVcsReleaseResponseObject, error) {
@@ -349,7 +349,7 @@ func (s artifactoryService) DownloadVcsRelease(
 	}, nil
 }
 
-func (s artifactoryService) DownloadVcsTagAlternative(
+func (s vcsAPI) DownloadVcsTagAlternative(
 	ctx context.Context,
 	req artgen.DownloadVcsTagAlternativeRequestObject,
 ) (artgen.DownloadVcsTagAlternativeResponseObject, error) {
@@ -372,7 +372,7 @@ func (s artifactoryService) DownloadVcsTagAlternative(
 	}, nil
 }
 
-func (s artifactoryService) DownloadVcsBranchAlternative(
+func (s vcsAPI) DownloadVcsBranchAlternative(
 	ctx context.Context,
 	req artgen.DownloadVcsBranchAlternativeRequestObject,
 ) (artgen.DownloadVcsBranchAlternativeResponseObject, error) {
@@ -395,7 +395,7 @@ func (s artifactoryService) DownloadVcsBranchAlternative(
 	}, nil
 }
 
-func (s artifactoryService) DownloadVcsTagFromSubgroupRepository(
+func (s vcsAPI) DownloadVcsTagFromSubgroupRepository(
 	ctx context.Context,
 	req artgen.DownloadVcsTagFromSubgroupRepositoryRequestObject,
 ) (artgen.DownloadVcsTagFromSubgroupRepositoryResponseObject, error) {
@@ -418,7 +418,7 @@ func (s artifactoryService) DownloadVcsTagFromSubgroupRepository(
 	}, nil
 }
 
-func (s artifactoryService) DownloadVcsBranchFromSubgroupRepository(
+func (s vcsAPI) DownloadVcsBranchFromSubgroupRepository(
 	ctx context.Context,
 	req artgen.DownloadVcsBranchFromSubgroupRepositoryRequestObject,
 ) (artgen.DownloadVcsBranchFromSubgroupRepositoryResponseObject, error) {
@@ -441,7 +441,7 @@ func (s artifactoryService) DownloadVcsBranchFromSubgroupRepository(
 	}, nil
 }
 
-func (s artifactoryService) vcsFile(
+func (s vcsAPI) vcsFile(
 	ctx context.Context,
 	key, owner, name, kind, selector string,
 ) (io.Reader, int64, error) {
@@ -453,7 +453,7 @@ func (s artifactoryService) vcsFile(
 	if err != nil {
 		return nil, 0, err
 	}
-	if !a.access.file(a.repo, owner+"/"+name+"/refs/"+kind+"/"+ref+"/"+filename, types.ActionRead) {
+	if !a.access.File(a.repo, owner+"/"+name+"/refs/"+kind+"/"+ref+"/"+filename, types.ActionRead) {
 		return nil, 0, fmt.Errorf(
 			"vcs file read denied: %w",
 			pkgroute.SourceError(source.ErrDenied, a.principal.Anonymous),
@@ -488,7 +488,7 @@ func (s artifactoryService) vcsFile(
 	return bytes.NewReader(data), int64(len(data)), nil
 }
 
-func (s artifactoryService) DownloadFileWithinVcsTag(
+func (s vcsAPI) DownloadFileWithinVcsTag(
 	ctx context.Context,
 	req artgen.DownloadFileWithinVcsTagRequestObject,
 ) (artgen.DownloadFileWithinVcsTagResponseObject, error) {
@@ -502,7 +502,7 @@ func (s artifactoryService) DownloadFileWithinVcsTag(
 	}, nil
 }
 
-func (s artifactoryService) DownloadFileWithinVcsBranch(
+func (s vcsAPI) DownloadFileWithinVcsBranch(
 	ctx context.Context,
 	req artgen.DownloadFileWithinVcsBranchRequestObject,
 ) (artgen.DownloadFileWithinVcsBranchResponseObject, error) {
@@ -516,7 +516,7 @@ func (s artifactoryService) DownloadFileWithinVcsBranch(
 	}, nil
 }
 
-func (s artifactoryService) DownloadFileWithinVcsTagAlternative(
+func (s vcsAPI) DownloadFileWithinVcsTagAlternative(
 	ctx context.Context,
 	req artgen.DownloadFileWithinVcsTagAlternativeRequestObject,
 ) (artgen.DownloadFileWithinVcsTagAlternativeResponseObject, error) {
@@ -530,7 +530,7 @@ func (s artifactoryService) DownloadFileWithinVcsTagAlternative(
 	}, nil
 }
 
-func (s artifactoryService) DownloadFileWithinVcsBranchAlternative(
+func (s vcsAPI) DownloadFileWithinVcsBranchAlternative(
 	ctx context.Context,
 	req artgen.DownloadFileWithinVcsBranchAlternativeRequestObject,
 ) (artgen.DownloadFileWithinVcsBranchAlternativeResponseObject, error) {
@@ -551,7 +551,7 @@ func (s artifactoryService) DownloadFileWithinVcsBranchAlternative(
 	}, nil
 }
 
-func (s artifactoryService) DownloadFileInVcsTagInSubgroupRepository(
+func (s vcsAPI) DownloadFileInVcsTagInSubgroupRepository(
 	ctx context.Context,
 	req artgen.DownloadFileInVcsTagInSubgroupRepositoryRequestObject,
 ) (artgen.DownloadFileInVcsTagInSubgroupRepositoryResponseObject, error) {
@@ -565,7 +565,7 @@ func (s artifactoryService) DownloadFileInVcsTagInSubgroupRepository(
 	}, nil
 }
 
-func (s artifactoryService) DownloadFileInVcsBranchInSubgroupRepository(
+func (s vcsAPI) DownloadFileInVcsBranchInSubgroupRepository(
 	ctx context.Context,
 	req artgen.DownloadFileInVcsBranchInSubgroupRepositoryRequestObject,
 ) (artgen.DownloadFileInVcsBranchInSubgroupRepositoryResponseObject, error) {

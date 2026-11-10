@@ -64,8 +64,8 @@ When a test file leaves a shared directory such as `internal/server`:
 | Chef | `migration/artifacts/ecosystem/chef/http`, `test/server/artifacts/chef` |
 | Conan | `migration/artifacts/ecosystem/conan/http`, `test/server/artifacts/conan` |
 | Conda | `migration/artifacts/ecosystem/conda/http`, `test/server/artifacts/conda` |
-| CRAN | `test/server/artifacts/cran` |
-| Debian | `test/server/artifacts/debian` |
+| CRAN | `migration/artifacts/ecosystem/cran/http`, `test/server/artifacts/cran` |
+| Debian | `migration/artifacts/ecosystem/debian/http`, `test/server/artifacts/debian` |
 | Docker/OCI | `migration/artifacts/ecosystem/docker/http`, `test/server/artifacts/docker` |
 | Go modules | `migration/artifacts/ecosystem/golang/http`, `test/server/artifacts/golang` |
 | Helm | `migration/artifacts/ecosystem/helm/http`, `test/server/artifacts/helm` |
@@ -77,10 +77,10 @@ When a test file leaves a shared directory such as `internal/server`:
 | NIM model | `migration/artifacts/ecosystem/nimmodel/http` |
 | npm | `migration/artifacts/ecosystem/npm/http`, `test/server/artifacts/npm` |
 | NuGet | `migration/artifacts/ecosystem/nuget/http`, `test/server/artifacts/nuget` |
-| Opkg | `test/server/artifacts/opkg` |
-| P2 | `test/server/artifacts/p2` |
+| Opkg | `migration/artifacts/ecosystem/opkg/http`, `test/server/artifacts/opkg` |
+| P2 | `migration/artifacts/ecosystem/p2/http`, `test/server/artifacts/p2` |
 | PyPI | `migration/artifacts/ecosystem/pypi/http`, `test/server/artifacts/pypi` |
-| RPM | `test/server/artifacts/rpm` |
+| RPM | `migration/artifacts/ecosystem/rpm/http`, `test/server/artifacts/rpm` |
 | Dart pub | `migration/artifacts/ecosystem/pub/http` |
 | RubyGems | `migration/artifacts/ecosystem/gems/http`, `test/server/artifacts/gems` |
 | Skills | `migration/artifacts/ecosystem/skills/http` |

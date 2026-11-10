@@ -18,7 +18,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -1136,5 +1138,32 @@ func TestAccUploadsConfig(t *testing.T) {
 	rec := w.do("GET", "/artifactory/api/v1/uploads/config", "admin", "")
 	if rec.Code != 200 || strings.TrimSpace(rec.Body.String()) != `{"supported":false}` {
 		t.Fatalf("uploads config %d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestAccServeFilePreservesProtocolDisposition(t *testing.T) {
+	w := newItemWorld(t, false)
+	deployed := w.do("PUT", "/artifactory/libs-local/org/app/app-1.0.jar", "admin", "jar bytes")
+	wantStatus(t, deployed, http.StatusCreated)
+	it := w.item("libs-local", false, "org/app/app-1.0.jar")
+	s := newArtifactoryAPI(Config{Store: w.db, Blobs: w.blobs})
+	f := itemkit.Found{Repo: repo.Config{Key: "libs-local", Class: repo.Local}, Item: it}
+	r := httptest.NewRequest(http.MethodGet, "/native/download", nil)
+	rec := httptest.NewRecorder()
+	rec.Header().Set("Content-Disposition", `attachment; filename="plugin-com-weave-fixture.jar"`)
+	s.ServeFile(rec, r, w.db, f, kernel.Principal{Name: "reader"})
+	wantStatus(t, rec, http.StatusOK)
+	got := rec.Header().Get("Content-Disposition")
+	if got != `attachment; filename="plugin-com-weave-fixture.jar"` {
+		t.Fatalf("native disposition overwritten: %q", got)
+	}
+	if got := rec.Body.String(); got != "jar bytes" {
+		t.Fatalf("body %q", got)
+	}
+	ordinary := httptest.NewRecorder()
+	s.ServeFile(ordinary, r, w.db, f, kernel.Principal{Name: "reader"})
+	wantStatus(t, ordinary, http.StatusOK)
+	if got := ordinary.Header().Get("Content-Disposition"); got != blob.Disposition(it.Name) {
+		t.Fatalf("default disposition %q, want %q", got, blob.Disposition(it.Name))
 	}
 }

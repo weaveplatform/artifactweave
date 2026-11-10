@@ -4,6 +4,8 @@
     "internal/app": "shared",
     "internal/server": "shared",
     "migration/access/adapters/http": "shared",
+    "migration/artifacts/adapters/http": "shared",
+    "migration/artifacts/adapters/http/itemkit": "shared",
     "migration/artifacts/adapters/http/pkgroute": "shared",
     "migration/artifacts/ecosystem/aieditorextensions/http": "aieditorextensions",
     "migration/artifacts/ecosystem/ansible/http": "ansible",
@@ -15,6 +17,8 @@
     "migration/artifacts/ecosystem/composer/http": "composer",
     "migration/artifacts/ecosystem/conan/http": "conan",
     "migration/artifacts/ecosystem/conda/http": "conda",
+    "migration/artifacts/ecosystem/cran/http": "cran",
+    "migration/artifacts/ecosystem/debian/http": "debian",
     "migration/artifacts/ecosystem/docker/http": "docker",
     "migration/artifacts/ecosystem/gems/http": "gems",
     "migration/artifacts/ecosystem/gitlfs/http": "gitlfs",
@@ -29,15 +33,19 @@
     "migration/artifacts/ecosystem/nix/http": "nix",
     "migration/artifacts/ecosystem/npm/http": "npm",
     "migration/artifacts/ecosystem/nuget/http": "nuget",
+    "migration/artifacts/ecosystem/opkg/http": "opkg",
+    "migration/artifacts/ecosystem/p2/http": "p2",
     "migration/artifacts/ecosystem/pub/http": "pub",
     "migration/artifacts/ecosystem/puppet/http": "puppet",
     "migration/artifacts/ecosystem/pypi/http": "pypi",
+    "migration/artifacts/ecosystem/rpm/http": "rpm",
     "migration/artifacts/ecosystem/skills/http": "skills",
     "migration/artifacts/ecosystem/swift/http": "swift",
     "migration/artifacts/ecosystem/terraform/http": "terraform",
     "migration/artifacts/ecosystem/terraformbackend/http": "terraformbackend",
     "migration/artifacts/ecosystem/vagrant/http": "vagrant",
     "migration/artifacts/ecosystem/vcs/http": "vcs",
+    "migration/configuration/adapters/http": "shared",
     "test/server/access": "shared",
     "test/server/artifacts": "shared",
     "test/server/artifacts/agentpackages": "agentpackages",
@@ -97,51 +105,26 @@
     "internal/server": [
       "access_api_test.go",
       "access_identity_status_test.go",
-      "access_internal_test.go",
       "api_ledger_test.go",
       "api_restrictions_parts_test.go",
-      "aql_related_test.go",
-      "aql_transitive_peer_test.go",
-      "aql_transitive_test.go",
       "builds_status_test.go",
-      "cran_archive_internal_test.go",
-      "cran_internal_test.go",
-      "cran_routes_internal_test.go",
-      "debian_snapshot_security_internal_test.go",
-      "debian_snapshot_test.go",
-      "debian_source_test.go",
-      "descriptor_test.go",
       "error_profiles_p8_test.go",
       "fixtures_test.go",
       "format_tables_test.go",
       "hash_test.go",
       "helm_fixture_test.go",
-      "idempotency_internal_test.go",
-      "items_internal_test.go",
       "matrix_pkgtest_test.go",
       "matrix_reindex_test.go",
       "matrix_test.go",
       "npm_auth_paths_test.go",
       "npm_fixture_test.go",
       "oidc_status_test.go",
-      "opkg_internal_test.go",
-      "p2_external_error_internal_test.go",
-      "p2_external_helpers_test.go",
-      "p2_internal_test.go",
       "permissions_status_test.go",
-      "properties_long_internal_test.go",
-      "redirect_internal_test.go",
       "registry_shared_test.go",
       "reindex_internal_test.go",
-      "repositories_internal_test.go",
       "request_limits_test.go",
-      "reverseproxy_test.go",
-      "rpm_internal_test.go",
-      "searches_layout_internal_test.go",
       "searches_routes_test.go",
-      "searches_upstream_routes_internal_test.go",
       "server_test.go",
-      "service_id_test.go",
       "spec_contract_test.go",
       "spec_test.go",
       "status_chef_test.go",
@@ -153,14 +136,9 @@
       "status_puppet_test.go",
       "status_reindex_test.go",
       "status_test.go",
-      "storage_internal_test.go",
-      "storageinfo_internal_test.go",
       "stub_test.go",
-      "system_health_test.go",
       "tokens_fixture_test.go",
       "tokens_status_test.go",
-      "trash_handlers_internal_test.go",
-      "trash_views_internal_test.go",
       "vcs_routes_internal_test.go",
       "vcs_tables_test.go"
     ],
@@ -172,6 +150,31 @@
       "permissions_fault_test.go",
       "roles_internal_test.go",
       "tokens_internal_test.go"
+    ],
+    "migration/artifacts/adapters/http": [
+      "aql_related_test.go",
+      "aql_transitive_peer_test.go",
+      "aql_transitive_test.go",
+      "fixture_test.go",
+      "idempotency_test.go",
+      "items_test.go",
+      "repositories_test.go",
+      "searches_upstream_routes_test.go",
+      "storage_test.go",
+      "storageinfo_test.go",
+      "trash_handlers_test.go"
+    ],
+    "migration/artifacts/adapters/http/itemkit": [
+      "access_test.go",
+      "items_test.go",
+      "kit_test.go",
+      "redirect_test.go"
+    ],
+    "migration/configuration/adapters/http": [
+      "descriptor_test.go",
+      "reverseproxy_test.go",
+      "service_id_test.go",
+      "system_health_test.go"
     ],
     "test/server/access": [
       "access_identity_test.go",
@@ -192,6 +195,8 @@
     "test/server/artifacts": [
       "aql_actions_test.go",
       "aql_builds_test.go",
+      "aql_related_test.go",
+      "aql_transitive_test.go",
       "builds_diff_test.go",
       "builds_promote_test.go",
       "builds_routes_test.go",
@@ -239,8 +244,11 @@
       "virtual_members_test.go"
     ],
     "test/server/configuration": [
+      "descriptor_test.go",
       "fixture_test.go",
-      "forwarded_test.go"
+      "forwarded_test.go",
+      "service_id_test.go",
+      "system_health_test.go"
     ]
   },
   "format_dependencies": {
@@ -263,15 +271,7 @@
       "internal/app/conda_remote_test.go"
     ],
     "cran": [
-      "internal/server/cran_archive_internal_test.go",
-      "internal/server/cran_internal_test.go",
-      "internal/server/cran_routes_internal_test.go",
       "internal/server/status_cran_archive_test.go"
-    ],
-    "debian": [
-      "internal/server/debian_snapshot_security_internal_test.go",
-      "internal/server/debian_snapshot_test.go",
-      "internal/server/debian_source_test.go"
     ],
     "docker": [
       "internal/app/registry_remote_test.go",
@@ -314,14 +314,6 @@
       "internal/app/nuget_reindex_test.go",
       "test/server/artifacts/repositories_test.go"
     ],
-    "opkg": [
-      "internal/server/opkg_internal_test.go"
-    ],
-    "p2": [
-      "internal/server/p2_external_error_internal_test.go",
-      "internal/server/p2_external_helpers_test.go",
-      "internal/server/p2_internal_test.go"
-    ],
     "puppet": [
       "internal/app/puppet_remote_test.go",
       "internal/server/status_puppet_test.go"
@@ -329,9 +321,6 @@
     "pypi": [
       "internal/server/reindex_internal_test.go",
       "test/server/artifacts/reindex_test.go"
-    ],
-    "rpm": [
-      "internal/server/rpm_internal_test.go"
     ],
     "terraform": [
       "test/server/access/keypairs_test.go",

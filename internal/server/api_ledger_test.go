@@ -22,6 +22,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	accesshttp "github.com/weaveplatform/artifactweave/migration/access/adapters/http"
+	configurationhttp "github.com/weaveplatform/artifactweave/migration/configuration/adapters/http"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 )
 
@@ -219,11 +220,18 @@ func sortedReview(in []string) []string { sort.Strings(in); return slices.Compac
 
 func apiReviewHandlers(t *testing.T) map[string]apiReviewHandler {
 	t.Helper()
-	// The handlers live in the server root and in the modules' HTTP
-	// adapters, named by their paths from the repository root.
+	// The handlers live in the server root, in the modules' HTTP adapters
+	// and in the ecosystems' http packages, named by their paths from the
+	// repository root.
 	root := repopath.Root(t)
 	var files []string
-	for _, dir := range []string{"internal/server", "migration/access/adapters/http"} {
+	for _, dir := range []string{
+		"internal/server",
+		"migration/access/adapters/http",
+		"migration/artifacts/adapters/http",
+		"migration/artifacts/ecosystem/*/http",
+		"migration/configuration/adapters/http",
+	} {
 		found, err := filepath.Glob(filepath.Join(root, dir, "*.go"))
 		if err != nil {
 			t.Fatal(err)
@@ -233,10 +241,16 @@ func apiReviewHandlers(t *testing.T) map[string]apiReviewHandler {
 	// The artifactory spec's operations are split over partials
 	// (composites.go); each receiver keys its handlers by its spec.
 	specOf := map[string]string{
-		"artifactoryService": "artifactory",
-		"SecurityAPI":        "artifactory",
-		"systemAPI":          "artifactory",
-		"AccessService":      "access",
+		"ArtifactoryAPI": "artifactory",
+		"vcsAPI":         "artifactory",
+		"npmAPI":         "artifactory",
+		"dockerAPI":      "artifactory",
+		"DebianAPI":      "artifactory",
+		"CranAPI":        "artifactory",
+		"RPMAPI":         "artifactory",
+		"SecurityAPI":    "artifactory",
+		"SystemAPI":      "artifactory",
+		"AccessService":  "access",
 	}
 	out := map[string]apiReviewHandler{}
 	for _, file := range files {
@@ -329,7 +343,7 @@ func apiReviewPolicy(e *apiReviewOperation) {
 	if strings.Contains(path, "/api/storage/") {
 		e.Admission += "; ?list additionally selects expensive policy"
 	}
-	if healthRequest(r) {
+	if configurationhttp.HealthRequest(r) {
 		e.Admission = "health exemption"
 	}
 	if accesshttp.APIRecoveryRequest(r) {
@@ -431,7 +445,7 @@ func apiReviewPersistence(path string) (string, string, []string) {
 	}
 	if strings.HasPrefix(path, "/artifactory/api/build") {
 		return "build", "build names/numbers/runs retain complete legacy collections; store keysets may be collected; append/replay and run detail are singular", []string{
-			"internal/server/builds.go",
+			"migration/artifacts/adapters/http/builds.go",
 			"migration/artifacts/core/build/build.go",
 			"migration/artifacts/adapters/sql/builds.go",
 			"internal/server/builds_status_test.go",
@@ -440,7 +454,7 @@ func apiReviewPersistence(path string) (string, string, []string) {
 	if strings.HasPrefix(path, "/artifactory/api/repositories") ||
 		strings.HasPrefix(path, "/artifactory/api/v2/repositories") {
 		return "repository", "legacy arrays remain complete; store keysets are collected and filtered; not bounded by client page size", []string{
-			"internal/server/repositories.go",
+			"migration/artifacts/adapters/http/repositories.go",
 			"migration/artifacts/core/repos/repos.go",
 			"migration/artifacts/adapters/sql/content.go",
 		}
@@ -448,8 +462,8 @@ func apiReviewPersistence(path string) (string, string, []string) {
 	if strings.HasPrefix(path, "/artifactory/api/search/") ||
 		strings.HasPrefix(path, "/artifactory/api/versions/") {
 		return "search", "AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches collect authorized results from batches; no new keyset promise", []string{
-			"internal/server/searches.go",
-			"internal/server/aql.go",
+			"migration/artifacts/adapters/http/searches.go",
+			"migration/artifacts/adapters/http/aql.go",
 			"migration/artifacts/adapters/sql/content_items.go",
 			"docs/research/decisions/0012-search-and-aql.md",
 		}
@@ -468,8 +482,8 @@ func apiReviewPersistence(path string) (string, string, []string) {
 	}
 	return "content-and-configuration", "singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim", []string{
 		"internal/server/server.go",
-		"internal/server/items.go",
-		"internal/server/storage.go",
+		"migration/artifacts/adapters/http/items.go",
+		"migration/artifacts/adapters/http/storage.go",
 		"migration/artifacts/adapters/sql/content_items.go",
 		"migration/access/adapters/sql/projects.go",
 	}

@@ -3,7 +3,7 @@ package app
 import (
 	"context"
 
-	"github.com/weaveplatform/artifactweave/internal/server"
+	artifactshttp "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/mirror"
 )
 
@@ -21,7 +21,7 @@ type mirrorTier struct {
 
 // mirrorsAdmin returns the mirrors for server.Config, or a nil interface when
 // no tier is a mirror (a nil *mirrorAdmin in the interface would not be nil).
-func (rt *runtime) mirrorsAdmin() server.Mirrors {
+func (rt *runtime) mirrorsAdmin() artifactshttp.Mirrors {
 	if rt.admin == nil {
 		return nil
 	}
@@ -39,14 +39,14 @@ func (a *mirrorAdmin) Optimize() {
 	}
 }
 
-func (a *mirrorAdmin) Status(ctx context.Context) ([]server.MirrorStatus, error) {
-	out := make([]server.MirrorStatus, 0, len(a.tiers))
+func (a *mirrorAdmin) Status(ctx context.Context) ([]artifactshttp.MirrorStatus, error) {
+	out := make([]artifactshttp.MirrorStatus, 0, len(a.tiers))
 	for _, t := range a.tiers {
 		st, err := t.store.Status(ctx)
 		if err != nil {
 			return nil, err //nolint:wrapcheck // mirror errors name the package
 		}
-		out = append(out, server.MirrorStatus{Tier: t.name, Status: st})
+		out = append(out, artifactshttp.MirrorStatus{Tier: t.name, Status: st})
 	}
 	return out, nil
 }

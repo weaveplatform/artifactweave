@@ -2,19 +2,29 @@ package configuration_test
 
 // This file holds the configuration suites' fixtures: adapters, under the
 // names the tests had in internal/server, over test/server/support/harness
-// and test/server/support. Every router here is harness.Router, so a change
-// to the router's assembly reaches these tests without an edit here.
+// and test/server/support, and copies of the world and helpers that root
+// files staying in internal/server define, which the root keeps for its
+// own tests. Every router here is harness.Router, so a change to the
+// router's assembly reaches these tests without an edit here.
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"sync"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/settings"
+	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
+	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
@@ -22,6 +32,19 @@ import (
 // Config is the router configuration a test adjusts before the router is
 // built.
 type Config = harness.Config
+
+// New is the production router over c.
+func New(c Config) http.Handler { return harness.Router(c) }
+
+var (
+	testHash  = support.TestHash
+	cheapHash = support.CheapHash
+)
+
+func cheapSeed(t *testing.T, db store.Store) {
+	t.Helper()
+	support.Seed(t, db)
+}
 
 func do(
 	t *testing.T,
@@ -35,6 +58,16 @@ func do(
 }
 
 func basic(user, password string) map[string]string { return support.Basic(user, password) }
+
+func bearerAuth(token string) map[string]string { return support.Bearer(token) }
+
+func formAs(headers map[string]string) map[string]string {
+	out := map[string]string{"Content-Type": "application/x-www-form-urlencoded"}
+	for k, v := range headers {
+		out[k] = v
+	}
+	return out
+}
 
 func jsonAs(headers map[string]string) map[string]string {
 	out := map[string]string{"Content-Type": "application/json"}
@@ -84,3 +117,135 @@ func statusFixture(t *testing.T, anonymous bool, tune ...harness.Tune) http.Hand
 	}
 	return harness.Router(cfg)
 }
+
+func decode(t *testing.T, body string) any {
+	t.Helper()
+	var v any
+	if err := json.Unmarshal([]byte(body), &v); err != nil {
+		t.Fatalf("decode %q: %v", body, err)
+	}
+	return v
+}
+
+func decodeObject(t *testing.T, body string) map[string]any {
+	t.Helper()
+	var m map[string]any
+	if err := json.Unmarshal([]byte(body), &m); err != nil {
+		t.Fatalf("decode %q: %v", body, err)
+	}
+	return m
+}
+
+// repoWorld is a seeded store behind the router: admin and "reader" (in the
+// readers group, so the seeded Anything permission lets it read every
+// repository) both use password "pw".
+type repoWorld struct {
+	t  *testing.T
+	h  http.Handler
+	db *inmem.Store
+	// fail makes the store's repository index fail the named operations.
+	fail       map[string]bool
+	remoteHTTP *upstream.Pool
+}
+
+func newRepoWorld(t *testing.T) *repoWorld {
+	t.Helper()
+	ctx := context.Background()
+	db := inmem.New()
+	cheapSeed(t, db)
+	reader := types.User{
+		Name:         "reader",
+		PasswordHash: cheapHash,
+		Groups:       []string{authn.ReadersGroup},
+	}
+	if err := db.Users().Create(ctx, reader); err != nil {
+		t.Fatal(err)
+	}
+	a, err := authn.NewAuthenticator(db.Users(), db.Settings(), authn.Options{Hash: testHash})
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := &repoWorld{t: t, db: db, fail: map[string]bool{}}
+	w.remoteHTTP = new(upstream.Pool)
+	t.Cleanup(w.remoteHTTP.Close)
+	w.h = New(Config{
+		BaseURL: "https://reg.example", CompatVersion: "7.155.0",
+		Store: faultyStore{Store: db, fail: w.fail}, Auth: a,
+		RemoteHTTP: w.remoteHTTP,
+	})
+	return w
+}
+
+func (w *repoWorld) create(cs ...repo.Config) {
+	w.t.Helper()
+	for _, c := range cs {
+		if err := w.db.Repos().Create(context.Background(), *repo.Defaults(&c)); err != nil {
+			w.t.Fatal(err)
+		}
+	}
+}
+
+func (w *repoWorld) do(
+	method, path, as, body string,
+	headers ...string,
+) *httptest.ResponseRecorder {
+	w.t.Helper()
+	h := map[string]string{}
+	if as != "" {
+		h = basic(as, "pw")
+	}
+	if body != "" {
+		h["Content-Type"] = "application/json"
+	}
+	for i := 0; i+1 < len(headers); i += 2 {
+		h[headers[i]] = headers[i+1]
+	}
+	return do(w.t, w.h, method, path, h, body)
+}
+
+func (w *repoWorld) stored(key string) repo.Config {
+	w.t.Helper()
+	c, err := w.db.Repos().Get(context.Background(), key)
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	return c
+}
+
+// faultyStore fails the repository listing with errBoom while fail names
+// "list", the one failure the descriptor suite asks for.
+type faultyStore struct {
+	*inmem.Store
+	fail map[string]bool
+}
+
+var errBoom = errors.New("boom")
+
+func (f faultyStore) Repos() store.RepoStore {
+	return faultyRepos{RepoStore: f.Store.Repos(), fail: f.fail}
+}
+
+type faultyRepos struct {
+	store.RepoStore
+	fail map[string]bool
+}
+
+func (f faultyRepos) List(ctx context.Context, rf store.RepoFilter) ([]repo.Config, error) {
+	if f.fail["list"] {
+		return nil, errBoom
+	}
+	return f.RepoStore.List(ctx, rf) //nolint:wrapcheck // test double
+}
+
+// The router health states and the node id the system handlers write,
+// copied with the same text: the health suites build the documents they
+// expect from them.
+const (
+	stateHealthy   = "HEALTHY"
+	stateUnhealthy = "UNHEALTHY"
+)
+
+var nodeID = sync.OnceValue(func() string {
+	host, _ := os.Hostname()
+	return host
+})

@@ -11,7 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
-func (s artifactoryService) vcsPeerFile(
+func (s vcsAPI) vcsPeerFile(
 	ctx context.Context, a vcsAccess, owner, name, kind, ref, filename string,
 ) (io.Reader, int64, error) {
 	target, err := vcshttp.PeerFileURL(a.repo, owner, name, kind, ref, filename)

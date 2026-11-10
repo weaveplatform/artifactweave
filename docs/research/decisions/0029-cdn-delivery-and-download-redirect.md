@@ -92,7 +92,7 @@ checksum check after a redirect (research 19 section 2).
   a tag by. Never a checksum sidecar, an archive entry (`!/`), a folder download or a remote
   repository's cache miss.
 
-**Policy.** One function, `internal/server/redirect.go`, decides for every caller, in this
+**Policy.** One function, `migration/artifacts/adapters/http/itemkit/redirect.go`, decides for every caller, in this
 order:
 
 1. A conditional request whose validators decide the answer (304 or 412) is answered
@@ -357,5 +357,5 @@ still redirects a HEAD is on #216.
 - Decisions [0004](0004-storage-sql-metadata-and-blobs.md) (the blob contract),
   [0027](0027-cloud-blob-backends.md) (the cloud backends) and
   [0028](0028-blob-mirroring.md) (the mirror).
-- `internal/server/redirect.go` and `internal/server/items.go` (`serveFile`).
+- `migration/artifacts/adapters/http/itemkit/redirect.go` and `migration/artifacts/adapters/http/itemkit/items.go` (`ServeFile`).
 - `github.com/aws/aws-sdk-go-v2/feature/cloudfront/sign@v1.12.5`.

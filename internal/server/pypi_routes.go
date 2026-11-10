@@ -6,19 +6,25 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	pypihttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi/http"
 )
 
+// pypiAPI serves PyPI's Warehouse JSON operations over the item kit.
+type pypiAPI struct{ *itemkit.Kit }
+
 // Warehouse GET operations share the protocol's delivery fences and source
 // selection. Register after generated routes, retaining their declared paths.
-func (s artifactoryService) registerPypiMetadataRoutes(r chi.Router) {
+// o are the item routes' options (ProtocolOptions), as the protocol's own
+// mount takes them.
+func (s pypiAPI) registerPypiMetadataRoutes(r chi.Router, o pkgroute.Options) {
 	protocol := chi.NewRouter()
 	pkgroute.Mount(
 		protocol,
-		s.protocolOptions(),
+		o,
 		pypihttp.Protocol(
-			pypihttp.Options{Format: s.cfg.FormatSettings.PyPI, RemoteSources: s.cfg.RemoteSources},
+			pypihttp.Options{Format: s.FormatSettings.PyPI, RemoteSources: s.RemoteSources},
 		),
 	)
 	serve := func(w http.ResponseWriter, r *http.Request) {

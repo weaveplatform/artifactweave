@@ -37,7 +37,7 @@ func (b authorizer) Authorize(
 }
 
 // For is the evaluation that a handler without the request's decider made
-// itself (internal/server's accessFor), with its error texts.
+// itself (the item kit's AccessFor), with its error texts.
 func (b authorizer) For(ctx context.Context, p kernel.Principal) (accessapi.Decider, error) {
 	var on bool
 	err := b.st.Settings().Get(ctx, types.SettingAnonymousAccess, &on)

@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/agentplugins"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
@@ -14,65 +15,77 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func (s artifactoryService) getAgentMarketplace(w http.ResponseWriter, r *http.Request) {
+// registerAgentMarketplaceRoutes serves the agent plugin marketplace
+// documents. HEAD shares the GET handler, as on the item paths.
+func (s agentPluginItems) registerAgentMarketplaceRoutes(r chi.Router) {
+	r.Get("/artifactory/api/agentplugins/{repoKey}/{marketplace}", s.getAgentMarketplace)
+	r.Head("/artifactory/api/agentplugins/{repoKey}/{marketplace}", s.getAgentMarketplace)
+}
+
+func (s agentPluginItems) getAgentMarketplace(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	st, err := s.content()
+	st, err := s.Content()
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
 		return
 	}
-	p, acc, err := s.itemCaller(ctx, st)
+	p, acc, err := s.ItemCaller(ctx, st)
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
 		return
 	}
-	c, cached, err := resolveRepo(ctx, st, chi.URLParam(r, "repoKey"))
+	c, cached, err := itemkit.ResolveRepo(ctx, st, chi.URLParam(r, "repoKey"))
 	if err != nil {
-		httpkit.WriteErr(w, r, s.itemError(ctx, "resolve repository", err))
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "resolve repository", err))
 		return
 	}
 	name := chi.URLParam(r, "marketplace")
 	if c.PackageType != repo.AgentPlugins || c.Class != repo.Local || cached ||
 		!agentplugins.IsMarketplace(name) {
-		httpkit.WriteErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
 	s.serveAgentMarketplace(w, r, st, c, name, p, acc)
 }
 
-func (s artifactoryService) tryAgentMarketplaceItem(
-	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	cached bool, req itemRequest, p kernel.Principal, acc access,
+// agentPluginItems serves the agent plugin marketplace documents over the
+// item kit.
+type agentPluginItems struct{ *itemkit.Kit }
+
+func tryAgentMarketplaceItem(
+	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
+	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) bool {
+	s := agentPluginItems{k}
 	if c.PackageType != repo.AgentPlugins || c.Class != repo.Local || cached ||
-		req.isFolder || len(req.props) != 0 || !agentplugins.IsReservedMarketplace(req.path) {
+		req.IsFolder || len(req.Props) != 0 || !agentplugins.IsReservedMarketplace(req.Path) {
 		return false
 	}
-	if !agentplugins.IsMarketplace(req.path) {
-		httpkit.WriteErr(w, r, itemNotFound())
+	if !agentplugins.IsMarketplace(req.Path) {
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return true
 	}
-	s.serveAgentMarketplace(w, r, st, c, req.path, p, acc)
+	s.serveAgentMarketplace(w, r, st, c, req.Path, p, acc)
 	return true
 }
 
-func (s artifactoryService) serveAgentMarketplace(
+func (s agentPluginItems) serveAgentMarketplace(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	name string, p kernel.Principal, acc access,
+	name string, p kernel.Principal, acc itemkit.Access,
 ) {
 	if err := generic.CheckDownload(c, name, false); err != nil {
-		httpkit.WriteErr(w, r, s.itemError(r.Context(), "download check", err))
+		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "download check", err))
 		return
 	}
-	if !acc.folder(c, "", types.ActionRead) {
+	if !acc.Folder(c, "", types.ActionRead) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	data, err := agentplugins.Marketplace(r.Context(), st, c.Key, name, func(path string) bool {
-		return acc.file(c, path, types.ActionRead) && generic.CheckDownload(c, path, false) == nil
+		return acc.File(c, path, types.ActionRead) && generic.CheckDownload(c, path, false) == nil
 	})
 	if err != nil {
-		httpkit.WriteErr(w, r, s.internalError(r.Context(), "agent plugin marketplace", err))
+		httpkit.WriteErr(w, r, s.InternalError(r.Context(), "agent plugin marketplace", err))
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")

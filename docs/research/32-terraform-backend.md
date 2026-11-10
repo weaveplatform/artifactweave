@@ -382,8 +382,8 @@ and 7.38.6 (RTFACT-19768), 7.46.3 (RTDEV-27518) and 7.68.11 (RTFACT-29974).
   `terraformbackend` repository that leaves it out, and `pkg/repo/views.go:137-140` keeps it
   (with `terraformType` and the Terraform URLs) in the v2 read and the configurations list
   only for `terraform` and `terraformbackend`.
-- **[S]** `internal/descriptor/parse.go:359` reads the YAML `type: terraformbe` as
-  `terraformbackend`.
+- **[S]** `migration/configuration/core/descriptor/parse.go:366` reads the YAML
+  `type: terraformbe` as `terraformbackend`.
 - **[S]** `internal/server/stubs.go:23-24` answers unclaimed paths under
   `/artifactory/api/terraform/` in the registry envelope, `{"errors":["..."]}`, which go-tfe
   reads as messages too (section 1.4).

@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	puppethttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/puppet/http"
@@ -13,15 +14,20 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
+// puppetAPI serves Puppet's Forge operations and reindex over the item kit.
+type puppetAPI struct{ *itemkit.Kit }
+
 // Generated Forge operations share the native protocol's authorization,
 // metadata validation and delivery checks, just as Warehouse operations do.
-func (s artifactoryService) registerPuppetMetadataRoutes(r chi.Router) {
+// o are the item routes' options (ProtocolOptions), as the protocol's own
+// mount takes them.
+func (s puppetAPI) registerPuppetMetadataRoutes(r chi.Router, o pkgroute.Options) {
 	protocol := chi.NewRouter()
 	pkgroute.Mount(
 		protocol,
-		s.protocolOptions(),
+		o,
 		puppethttp.Protocol(
-			puppethttp.Options{Blobs: s.cfg.Blobs, RemoteSources: s.cfg.RemoteSources},
+			puppethttp.Options{Blobs: s.Blobs, RemoteSources: s.RemoteSources},
 		),
 	)
 	serve := func(w http.ResponseWriter, r *http.Request) {
@@ -42,7 +48,7 @@ func (s artifactoryService) registerPuppetMetadataRoutes(r chi.Router) {
 				)
 				return
 			}
-			_, err := s.reindex(
+			_, err := s.Reindex(
 				r.Context(),
 				repo.Puppet,
 				chi.URLParam(r, "repoKey"),

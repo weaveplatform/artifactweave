@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
@@ -33,10 +34,13 @@ const (
 const calculateMetadataActions = types.ActionManage | types.ActionDelete | types.ActionWrite |
 	types.ActionAnnotate | types.ActionRead
 
+// mavenAPI serves the Maven REST operations over the item kit.
+type mavenAPI struct{ *itemkit.Kit }
+
 // registerMavenRoutes serves the Maven REST operations, hand-written in
 // the spec, under the patterns httpkit.ChiPatterns derives so they replace the 501
 // stubs (decision 0036).
-func (s artifactoryService) registerMavenRoutes(r chi.Router) {
+func (s mavenAPI) registerMavenRoutes(r chi.Router) {
 	for _, p := range httpkit.ChiPatterns(mavenCalculatePrefix + "{repoKey}/{folderPath}") {
 		r.Post(p, s.calculateMavenMetadata)
 	}
@@ -49,7 +53,7 @@ func (s artifactoryService) registerMavenRoutes(r chi.Router) {
 // caller may act on it.
 type mavenTarget struct {
 	p    kernel.Principal
-	acc  access
+	acc  itemkit.Access
 	st   store.Store
 	c    repo.Config
 	path string
@@ -60,33 +64,33 @@ type mavenTarget struct {
 // for a caller who holds want at that path. The answers are Artifactory's
 // (research 27 section 9): 404 for a missing path or a repository that is
 // not local, and 400 for a type outside the Maven group.
-func (s artifactoryService) mavenTargetOf(
+func (s mavenAPI) mavenTargetOf(
 	r *http.Request,
 	prefix string,
 	want types.Actions,
 ) (mavenTarget, error) {
 	ctx := r.Context()
-	st, err := s.content()
+	st, err := s.Content()
 	if err != nil {
 		return mavenTarget{}, err
 	}
-	key, p, _, err := splitRepoPath(strings.TrimPrefix(r.URL.EscapedPath(), prefix))
+	key, p, _, err := itemkit.SplitRepoPath(strings.TrimPrefix(r.URL.EscapedPath(), prefix))
 	if err != nil {
 		return mavenTarget{}, err
 	}
-	who, acc, err := s.itemCaller(ctx, st)
+	who, acc, err := s.ItemCaller(ctx, st)
 	if err != nil {
 		return mavenTarget{}, err
 	}
 	missing := apierror.New(http.StatusNotFound, fmt.Sprintf("Could not find path '%s/%s'", key, p))
-	c, cached, err := resolveRepo(ctx, st, key)
+	c, cached, err := itemkit.ResolveRepo(ctx, st, key)
 	var api *apierror.Error
 	switch {
 	case errors.As(err, &api) && api.Status == http.StatusNotFound:
 		return mavenTarget{}, missing
 	case err != nil:
-		return mavenTarget{}, s.itemError(ctx, "resolve repository", err)
-	case !acc.file(c, p, want):
+		return mavenTarget{}, s.ItemError(ctx, "resolve repository", err)
+	case !acc.File(c, p, want):
 		return mavenTarget{}, httpkit.Denied(who)
 	case cached || c.Class != repo.Local:
 		return mavenTarget{}, apierror.New(http.StatusNotFound,
@@ -103,7 +107,7 @@ func (s artifactoryService) mavenTargetOf(
 	case errors.Is(err, store.ErrNotFound):
 		return mavenTarget{}, missing
 	case err != nil:
-		return mavenTarget{}, s.itemError(ctx, "get item", err)
+		return mavenTarget{}, s.ItemError(ctx, "get item", err)
 	}
 	return t, nil
 }
@@ -111,7 +115,7 @@ func (s artifactoryService) mavenTargetOf(
 // calculateMavenMetadata answers POST /api/maven/calculateMetadata: it
 // queues the metadata of the folder and, unless noneRecursive is true,
 // everything under it, and answers 200 with an empty body once it has.
-func (s artifactoryService) calculateMavenMetadata(w http.ResponseWriter, r *http.Request) {
+func (s mavenAPI) calculateMavenMetadata(w http.ResponseWriter, r *http.Request) {
 	recursive := true
 	if v := r.URL.Query().Get("noneRecursive"); v != "" {
 		none, err := strconv.ParseBool(v)
@@ -129,12 +133,12 @@ func (s artifactoryService) calculateMavenMetadata(w http.ResponseWriter, r *htt
 	ctx := r.Context()
 	if err := maven.CalculateMetadata(
 		ctx,
-		s.items(t.st).Env(),
+		s.Items(t.st).Env(),
 		t.c,
 		t.path,
 		recursive,
 	); err != nil {
-		httpkit.WriteErr(w, r, s.itemError(ctx, "calculate Maven metadata", err))
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "calculate Maven metadata", err))
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain")
@@ -147,7 +151,7 @@ func (s artifactoryService) calculateMavenMetadata(w http.ResponseWriter, r *htt
 // when the POM is already there. The caller needs Read on the jar, whose
 // content the POM may come from, and Deploy where the POM goes, which is
 // what writing it by hand would take (decision 0036).
-func (s artifactoryService) generateMavenPom(w http.ResponseWriter, r *http.Request) {
+func (s mavenAPI) generateMavenPom(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	t, err := s.mavenTargetOf(r, mavenGeneratePrefix, types.ActionRead)
 	if err == nil && (t.path == "" || t.it.Folder) {
@@ -157,10 +161,10 @@ func (s artifactoryService) generateMavenPom(w http.ResponseWriter, r *http.Requ
 		httpkit.WriteErr(w, r, err)
 		return
 	}
-	svc := s.items(t.st)
+	svc := s.Items(t.st)
 	at, body, err := maven.GeneratePOM(ctx, svc.Env(), t.c, t.it)
 	if err != nil {
-		httpkit.WriteErr(w, r, s.itemError(ctx, "generate POM", err))
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "generate POM", err))
 		return
 	}
 	if err := s.writePom(ctx, svc, t, at, body); err != nil {
@@ -172,14 +176,14 @@ func (s artifactoryService) generateMavenPom(w http.ResponseWriter, r *http.Requ
 
 // writePom deploys body at p unless something is there, for a caller who
 // may deploy at p.
-func (s artifactoryService) writePom(
+func (s mavenAPI) writePom(
 	ctx context.Context,
 	svc *item.Service,
 	t mavenTarget,
 	p string,
 	body []byte,
 ) error {
-	if !t.acc.file(t.c, p, types.ActionWrite) {
+	if !t.acc.File(t.c, p, types.ActionWrite) {
 		return httpkit.Denied(t.p)
 	}
 	_, err := svc.Deploy(ctx, item.Deploy{
@@ -189,5 +193,5 @@ func (s artifactoryService) writePom(
 	if err == nil || errors.Is(err, item.ErrExists) {
 		return nil
 	}
-	return s.itemError(ctx, "deploy POM", err)
+	return s.ItemError(ctx, "deploy POM", err)
 }

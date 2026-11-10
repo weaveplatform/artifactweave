@@ -19,9 +19,10 @@
 //   - Repository configuration JSON from the REST API: the create, replace,
 //     update and batch requests on /artifactory/api/repositories and
 //     /artifactory/api/v2/repositories, decoded into Config.
-//   - Configuration as code: the YAML descriptor, which internal/descriptor
-//     reads into Config (decision 0009), and the JFrog Terraform provider,
-//     which sends the REST document.
+//   - Configuration as code: the YAML descriptor, which
+//     migration/configuration/core/descriptor reads into Config (decision
+//     0009), and the JFrog Terraform provider, which sends the REST
+//     document.
 //   - The stored Config of a repository, for ValidateStored, ValidateUpdate
 //     and RestoreSecrets.
 //

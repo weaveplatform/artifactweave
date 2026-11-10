@@ -13,29 +13,29 @@
 // rules of the CRAN slice. Its Handler plugs into the item service through
 // the format hooks (decision 0032), so every write and delete in a CRAN
 // repository reaches it whichever API carried it, and it rebuilds the
-// indexes as queued work (decision 0033). The CRAN protocol is still the
-// root files internal/server/cran.go, cran_upload.go and cran_archive.go,
-// which serve every class's index, the native POST uploads and the legacy
-// archive migration with this package.
+// indexes as queued work (decision 0033). The CRAN protocol is the http
+// subpackage (cranhttp), which serves every class's index, the native POST
+// uploads and the legacy archive migration with this package.
 //
 // # Inputs
 //
 //   - Driving: the format registry (artifacts/ecosystem), which hands the
 //     item service's hooks for cran repositories to Handler; the work
 //     queue, which runs the index rebuild (KindIndex) through Handler.Work
-//     and every format's reindex through Handler.Reindex; and the server's
-//     root files: cran.go, which answers an index read by decoding the
-//     member's index (DecodeIndex: a local or federated repository's
-//     derived one once its rebuild is done, a remote's from upstream) and
-//     encoding again only the packages the caller may read, a virtual
-//     repository's members merged in order (EncodeIndex); cran_upload.go,
-//     whose POST /api/cran/{repoKey}/sources and binaries check the feed
-//     (Feed) and take the package's identity from the archive
-//     (ReadUploaded, ErrPackage); cran_archive.go, whose archive migration
-//     (GET /api/cran/{repoKey}/move-archives) finds what to move
-//     (LegacyArchiveTarget); and source.go, which checks an upstream index
-//     or package before a remote caches it (IndexPath, DecodeIndex,
-//     IsPackage, ReadPackage).
+//     and every format's reindex through Handler.Reindex; the protocol
+//     (cranhttp), which answers an index read by decoding the member's
+//     index (DecodeIndex: a local or federated repository's derived one
+//     once its rebuild is done, a remote's from upstream) and encoding
+//     again only the packages the caller may read, a virtual repository's
+//     members merged in order (EncodeIndex), whose POST
+//     /api/cran/{repoKey}/sources and binaries check the feed (Feed) and
+//     take the package's identity from the archive (ReadUploaded,
+//     ErrPackage), and whose archive migration (GET
+//     /api/cran/{repoKey}/move-archives) finds what to move
+//     (LegacyArchiveTarget); and the item kit
+//     (artifacts/adapters/http/itemkit), whose remote source request checks
+//     an upstream index or package before a remote caches it (IndexPath,
+//     DecodeIndex, IsPackage, ReadPackage).
 //   - Driven: the format hooks' environment (format.Env): its blobs hold
 //     the packages; its store holds the items, their properties and the
 //     package index (artifacts/core/pkgindex), and lists a repository's
@@ -45,8 +45,8 @@
 //     The generic deploy policy (artifacts/ecosystem/generic) is the first
 //     check Admit applies.
 //   - Settings: none. The archive migration's switch
-//     (cran.archive_mover_enabled, off by default) belongs to the root file
-//     that serves it.
+//     (cran.archive_mover_enabled, off by default) belongs to the protocol
+//     that serves it (cranhttp.CranAPI.ArchiveMoverEnabled).
 //
 // # Outputs
 //
@@ -90,7 +90,8 @@
 //     feed, so an upstream index cannot point a client elsewhere.
 //   - A local or federated repository's PACKAGES and PACKAGES.gz are
 //     derived, never uploaded (409); a remote caches the upstream's after
-//     source.go has checked it, and cached content queues no rebuild.
+//     the item kit's remote source request has checked it, and cached
+//     content queues no rebuild.
 //   - KindIndex and the property names are stored, so they stay
 //     byte-identical.
 //
@@ -111,8 +112,7 @@
 //     https://cran.r-project.org/doc/manuals/r-release/R-admin.html.
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     line 233 (ecosystem/cran), line 379 (the slice row), line 406 (the
-//     protocol's later home, ecosystem/cran/http) and line 997 (the mapping
-//     row).
+//     protocol's home, ecosystem/cran/http) and line 997 (the mapping row).
 //   - Plan: docs/implementation/plan.md#p32-data-and-model-repositories
 //     and #p9d-modular-monolith-migration, epic ECO
 //     (https://github.com/weaveplatform/artifactweave/issues/943).
@@ -145,8 +145,9 @@
 //
 // testdata holds the unchanged CRAN assertthat 0.2.1 source archive and
 // Windows binary and its published PACKAGES entry, which the suites in
-// test/server/artifacts/cran, internal/server's cran_internal_test.go and
-// cran_routes_internal_test.go, and the acceptance steps also read. The
+// test/server/artifacts/cran, the protocol's tests (http/cran_test.go,
+// cran_routes_test.go and cran_archive_test.go) and the acceptance steps
+// also read. The
 // protocol's native R evidence is the @cran acceptance partition
 // (test/acceptance/features/cran.feature).
 package cran

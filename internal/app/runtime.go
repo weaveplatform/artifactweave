@@ -10,12 +10,12 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/config"
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/migration/access"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -27,6 +27,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conda"
+	debianhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian/http"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
@@ -45,8 +46,8 @@ import (
 var repairEvery = mirror.DefaultRepairInterval
 
 // registerDebianSnapshotWork registers the Debian snapshot handler with the
-// work queue. It is a variable so tests can see the Config it is given.
-var registerDebianSnapshotWork = server.RegisterDebianSnapshotWork
+// work queue. It is a variable so tests can see the kit it is given.
+var registerDebianSnapshotWork = debianhttp.RegisterDebianSnapshotWork
 
 // runtime is what serve holds open: the metadata store, the blob tiers, the
 // garbage collector, the work queue, and the background loops (mirror
@@ -211,10 +212,10 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 		stop()
 		return nil, errors.Join(err, st.Close())
 	}
-	if err := registerDebianSnapshotWork(queue, server.Config{
+	if err := registerDebianSnapshotWork(queue, itemkit.New(itemkit.Deps{
 		Store: st, Blobs: hot.store, Access: accessAPI, Work: queue,
 		RemoteSources: rt.remoteSources, FormatSettings: fs,
-	}); err != nil {
+	})); err != nil {
 		stop()
 		return nil, errors.Join(err, st.Close())
 	}

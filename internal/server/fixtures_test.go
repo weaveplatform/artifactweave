@@ -392,14 +392,6 @@ func bearerAuth(token string) map[string]string {
 	return support.Bearer(token)
 }
 
-func formAs(headers map[string]string) map[string]string {
-	out := map[string]string{"Content-Type": "application/x-www-form-urlencoded"}
-	for k, v := range headers {
-		out[k] = v
-	}
-	return out
-}
-
 func jsonAs(headers map[string]string) map[string]string {
 	out := map[string]string{"Content-Type": "application/json"}
 	for k, v := range headers {
@@ -911,6 +903,19 @@ func md5Hex(s string) string {
 }
 
 const aqlURL = "/artifactory/api/search/aql"
+
+// The artifacts handlers' paths that the root's tests and guard tables name,
+// spelled as artifactshttp spells them, so that a change there fails a test
+// here.
+const (
+	buildsPath      = "/artifactory/api/build"
+	uploadsCreate   = "/artifactory/api/v1/uploads/create"
+	uploadsURLPart  = "/artifactory/api/v1/uploads/urlPart"
+	uploadsPart     = "/artifactory/api/v1/uploads/part"
+	uploadsComplete = "/artifactory/api/v1/uploads/complete"
+	uploadsStatus   = "/artifactory/api/v1/uploads/status"
+	uploadsAbort    = "/artifactory/api/v1/uploads/abort"
+)
 
 func decodeObject(t *testing.T, body string) map[string]any {
 	t.Helper()

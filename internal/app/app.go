@@ -16,6 +16,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/config"
 	"github.com/weaveplatform/artifactweave/internal/server"
+	artifactshttp "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
 	"github.com/weaveplatform/artifactweave/migration/platform/buildinfo"
 )
@@ -103,17 +105,17 @@ func serve(
 			Multipart:     rt.multipart,
 			Tokens:        rt.tokens,
 			Access:        rt.access.API(),
-			Redirect: server.Redirect{
+			Redirect: itemkit.Redirect{
 				MinSize: int64(cfg.Download.Redirect.MinSize), TTL: cfg.Download.Redirect.TTL,
 				CDNMaxSize: cdnMaxSize(cfg.Blob),
 			},
 			FolderDownloadMaxConcurrent: cfg.Download.Folder.MaxConcurrentRequests,
-			AQL: server.AQLLimits{
+			AQL: artifactshttp.AQLLimits{
 				MaxResults: cfg.Search.AQL.MaxResults,
 				ScanFactor: cfg.Search.AQL.NonAdminScanFactor,
 				Timeout:    cfg.AQLTimeout.Query, StreamTimeout: cfg.AQLTimeout.Streamed,
 			},
-			Search: server.SearchLimits{
+			Search: artifactshttp.SearchLimits{
 				UserQueryLimit:     cfg.Search.UserQueryLimit,
 				LimitInternalUsers: !cfg.Search.LimitAnonymousUsersOnly,
 			},

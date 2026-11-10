@@ -12,10 +12,9 @@
 // signing rules of the RPM slice. Its Handler plugs into the item service
 // through the format hooks (decision 0032), so every write and delete in
 // an RPM repository reaches it whichever API carried it, and it rebuilds
-// the repodata as queued work (decision 0033). The RPM protocol is still
-// the root file internal/server/rpm.go, which composes a virtual
-// repository's signed repodata and selects its packages with this
-// package.
+// the repodata as queued work (decision 0033). The RPM protocol is the
+// http subpackage (rpmhttp), which composes a virtual repository's signed
+// repodata and selects its packages with this package.
 //
 // # Inputs
 //
@@ -23,15 +22,16 @@
 //     item service's hooks for rpm repositories to Handler; the work queue,
 //     which runs the repodata rebuild (KindIndex) through Handler.Work and
 //     every format's reindex through Handler.Reindex, a local or federated
-//     repository's Yum calculation (POST /api/yum/{repoKey}) included; and
-//     the server's root files: the protocol (rpm.go), which reads member
-//     repodata (DecodeRepomd, DecodePrimary) and writes a virtual
-//     repository's (EncodeMetadata, SignRepomd), reindex.go, whose Yum
-//     calculation of a virtual repository checks that its view still
-//     composes (EncodeMetadata), source.go, which checks upstream repodata
-//     or a package before a remote caches it (DecodeRepomd,
-//     IsPrimaryMetadataPath, DecodePrimary, ReadPackage), and items.go,
-//     which sends a remote's downloads through the remote source (Serves).
+//     repository's Yum calculation (POST /api/yum/{repoKey}) included; the
+//     protocol (rpmhttp), which reads member repodata (DecodeRepomd,
+//     DecodePrimary) and writes a virtual repository's (EncodeMetadata,
+//     SignRepomd), and whose Yum calculation of a virtual repository checks
+//     that its view still composes (EncodeMetadata); and the item kit
+//     (artifacts/adapters/http/itemkit), whose remote source request checks
+//     upstream repodata or a package before a remote caches it
+//     (DecodeRepomd, IsPrimaryMetadataPath, DecodePrimary, ReadPackage),
+//     and whose item GET sends a remote's downloads through the remote
+//     source (Serves).
 //   - Driven: the format hooks' environment (format.Env): its blobs hold
 //     the packages; its store holds the items, their properties and the
 //     package index (artifacts/core/pkgindex), and lists a repository's
@@ -89,10 +89,10 @@
 //     index current but queue no repodata rebuild; a Yum calculation
 //     (Reindex) always queues one.
 //   - A local or federated repository's repodata is derived, never
-//     uploaded; a remote caches the upstream's after source.go has checked
-//     it: repomd.xml must name a checksum-named primary index under
-//     repodata/, and the primary index, gzip or zstd, must match that
-//     checksum and stay within 36 MiB.
+//     uploaded; a remote caches the upstream's after the item kit's remote
+//     source request has checked it: repomd.xml must name a checksum-named
+//     primary index under repodata/, and the primary index, gzip or zstd,
+//     must match that checksum and stay within 36 MiB.
 //   - The repodata work takes at most 100,000 packages per repository.
 //   - KindIndex and the property names are stored, so they stay
 //     byte-identical.
@@ -113,8 +113,7 @@
 //     https://docs.jfrog.com/artifactory/reference/calculateyumrepositorymetadata.
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     line 234 (ecosystem/rpm), line 379 (the slice row), line 405 (the
-//     protocol's later home, ecosystem/rpm/http) and line 997 (the mapping
-//     row).
+//     protocol's home, ecosystem/rpm/http) and line 997 (the mapping row).
 //   - Plan: docs/implementation/plan.md#p29-linux-package-repositories
 //     and #p9d-modular-monolith-migration, epic ECO
 //     (https://github.com/weaveplatform/artifactweave/issues/943).
@@ -146,8 +145,8 @@
 //
 // testdata holds the contract RPMs that build-contract-fixtures.sh makes in
 // the pinned Fedora 42 image, and the genuine Fedora 42 package
-// artifactweave-alpha-1.0-1.fc42.noarch.rpm with its alpha.spec, which
-// internal/server's rpm_internal_test.go and the acceptance steps also read.
+// artifactweave-alpha-1.0-1.fc42.noarch.rpm with its alpha.spec, which the
+// protocol's tests (http/rpm_test.go) and the acceptance steps also read.
 // The protocol's native dnf evidence is the @rpm acceptance partition
 // (test/acceptance/features/rpm.feature).
 package rpm

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"net/http/httptest"
 	"slices"
 	"strings"
@@ -11,6 +12,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -1094,4 +1097,30 @@ func TestAccNuGetEmptyContextsSurviveDirectAndSharedConfiguration(t *testing.T) 
 		*c.DownloadContextPath != repo.DefaultDownloadContextPath {
 		t.Fatal("null failed to reset defaults", c)
 	}
+}
+
+func TestAccRepositoriesWithoutStore(t *testing.T) {
+	// A router built without a store answers like the stubs it replaces.
+	h := testHandler()
+	for _, path := range []string{
+		"/artifactory/api/repositories", "/artifactory/api/repositories/x",
+		"/artifactory/api/repositories/x/configuration", "/artifactory/api/v2/repositories/x",
+		"/artifactory/api/v2/repositories/batch?names=x",
+	} {
+		if rec := do(t, h, "GET", path, nil, ""); rec.Code != http.StatusNotImplemented {
+			t.Errorf("%s: %d", path, rec.Code)
+		}
+	}
+	ctx := kernel.WithPrincipal(context.Background(), kernel.Principal{Name: "admin", Admin: true})
+	svc := newArtifactoryAPI(Config{})
+	if _, err := svc.Content(); err == nil {
+		t.Fatal("content without a store")
+	}
+	if _, err := svc.GetAllRepositoryConfigurations(ctx, artgenAllConfigs()); err == nil {
+		t.Fatal("configurations without a store")
+	}
+}
+
+func artgenAllConfigs() artgen.GetAllRepositoryConfigurationsRequestObject {
+	return artgen.GetAllRepositoryConfigurationsRequestObject{}
 }

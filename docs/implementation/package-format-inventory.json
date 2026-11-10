@@ -17,7 +17,7 @@
       "owner_issue": 757,
       "evidence": "test/acceptance/features/alpine.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/alpine-linux-repositories",
-      "route_file": "internal/server/alpine.go",
+      "route_file": "migration/artifacts/ecosystem/alpine/http/alpine.go",
       "p9c": true
     },
     {
@@ -145,7 +145,7 @@
       "owner_issue": 778,
       "evidence": "test/acceptance/features/cran.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/cran-repositories",
-      "route_file": "internal/server/cran.go",
+      "route_file": "migration/artifacts/ecosystem/cran/http/cran.go",
       "p9c": true
     },
     {
@@ -161,7 +161,7 @@
       "owner_issue": 758,
       "evidence": "test/acceptance/features/debian.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/debian-repositories",
-      "route_file": "internal/server/debian.go",
+      "route_file": "migration/artifacts/ecosystem/debian/http/debian.go",
       "p9c": true
     },
     {
@@ -385,7 +385,7 @@
       "owner_issue": 760,
       "evidence": "test/acceptance/features/opkg.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/opkg-repositories",
-      "route_file": "internal/server/opkg.go",
+      "route_file": "migration/artifacts/ecosystem/opkg/http/opkg.go",
       "p9c": true
     },
     {
@@ -449,7 +449,7 @@
       "owner_issue": 759,
       "evidence": "test/acceptance/features/rpm.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/rpm-repositories",
-      "route_file": "internal/server/items.go",
+      "route_file": "migration/artifacts/adapters/http/items.go",
       "p9c": true
     },
     {
@@ -577,7 +577,7 @@
       "owner_issue": 0,
       "evidence": "test/acceptance/features/round_trip.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/repository-support-for-package-clients",
-      "route_file": "internal/server/items.go",
+      "route_file": "migration/artifacts/adapters/http/items.go",
       "p9c": false
     },
     {
@@ -609,7 +609,7 @@
       "owner_issue": 773,
       "evidence": "test/acceptance/features/p2.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/p2-repositories",
-      "route_file": "internal/server/items.go",
+      "route_file": "migration/artifacts/adapters/http/items.go",
       "p9c": true
     },
     {
@@ -705,7 +705,7 @@
       "owner_issue": 0,
       "evidence": "",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
-      "route_file": "internal/server/items.go",
+      "route_file": "migration/artifacts/adapters/http/items.go",
       "p9c": false,
       "owner_phase": "P15/P24"
     },

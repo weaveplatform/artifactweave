@@ -19,10 +19,9 @@ type uncomparable struct {
 	f func()
 }
 
-// TestUnitWithAccess: New and RegisterDebianSnapshotWork begin by binding the
-// access module over a Config's store and services when the caller set no
-// contract of Access. A caller's Access is kept as it is, and a Config without
-// a store keeps a zero one.
+// TestUnitWithAccess: New begins by binding the access module over a Config's
+// store and services when the caller set no contract of Access. A caller's
+// Access is kept as it is, and a Config without a store keeps a zero one.
 func TestUnitWithAccess(t *testing.T) {
 	ctx := t.Context()
 	empty := withAccess(Config{}).Access
