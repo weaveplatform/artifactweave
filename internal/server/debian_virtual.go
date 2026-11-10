@@ -40,7 +40,7 @@ type debianVirtualView struct {
 // serveVirtualDebianMetadata composes an apt view from ordered member
 // Packages files. Its Release is signed with the virtual repository's key,
 // and every advertised Filename resolves through the same member order.
-func (s debianAPI) serveVirtualDebianMetadata(
+func (s DebianAPI) serveVirtualDebianMetadata(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
 	req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
@@ -71,7 +71,7 @@ func (s debianAPI) serveVirtualDebianMetadata(
 	http.ServeContent(w, r, req.Path, time.Time{}, bytes.NewReader(body))
 }
 
-func (s debianAPI) buildVirtualDebianView(
+func (s DebianAPI) buildVirtualDebianView(
 	ctx context.Context, st store.Store, c repo.Config, distribution string,
 	p kernel.Principal, acc itemkit.Access,
 ) (debianVirtualView, error) {
@@ -172,7 +172,7 @@ func mapKeys(set map[string]bool) []string {
 	return out
 }
 
-func (s debianAPI) addDebianMemberIndexes(
+func (s DebianAPI) addDebianMemberIndexes(
 	ctx context.Context, st store.Store, virtual, member repo.Config, distribution string,
 	p kernel.Principal, acc itemkit.Access,
 	indexes map[string][]debian.PackageRecord, selected map[string]map[string]bool,
@@ -231,7 +231,7 @@ func (s debianAPI) addDebianMemberIndexes(
 	return nil
 }
 
-func (s debianAPI) serveVirtualDebianPackage(
+func (s DebianAPI) serveVirtualDebianPackage(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
 	req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
@@ -289,7 +289,7 @@ func (s debianAPI) serveVirtualDebianPackage(
 // serveRemoteVirtualDebianPackage returns false only when a member lacks the
 // path, allowing ordered fallback. Integrity, permissions and upstream faults
 // are terminal so the virtual path never disguises a failed selected member.
-func (s debianAPI) serveRemoteVirtualDebianPackage(
+func (s DebianAPI) serveRemoteVirtualDebianPackage(
 	w http.ResponseWriter, r *http.Request, member repo.Config, req itemkit.ItemRequest,
 	p kernel.Principal, acc itemkit.Access,
 ) bool {
@@ -339,7 +339,7 @@ func (s debianAPI) serveRemoteVirtualDebianPackage(
 // debianMemberBytes reads only an authorized, validated member representation.
 // Remote metadata uses source.Policy so the selected cache variant retains
 // upstream freshness and redirect constraints.
-func (s debianAPI) debianMemberBytes(
+func (s DebianAPI) debianMemberBytes(
 	ctx context.Context, st store.Store, member repo.Config, path string,
 	p kernel.Principal, acc itemkit.Access,
 ) ([]byte, func(context.Context, string) error, error) {

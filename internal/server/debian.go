@@ -27,19 +27,19 @@ const debianIndexLimit = 64 << 20
 
 var errDebianIndexTooLarge = errors.New("server: debian Packages index exceeds limit")
 
-// debianAPI is the Debian ecosystem's partial strict server: the metadata
+// DebianAPI is the Debian ecosystem's partial strict server: the metadata
 // and snapshot operations, the snapshot routes, and the item overlay that
 // serves Debian's indexes and virtual repositories, over the item kit.
-type debianAPI struct{ *itemkit.Kit }
+type DebianAPI struct{ *itemkit.Kit }
 
-// tryDebianItem ensures a Packages index is never returned to a caller who
+// TryDebianItem ensures a Packages index is never returned to a caller who
 // cannot read every package it advertises. The ordinary item route cannot
 // make that guarantee for a cached or virtual metadata file.
-func tryDebianItem(
+func TryDebianItem(
 	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) bool {
-	s := debianAPI{k}
+	s := DebianAPI{k}
 	if !debian.Serves(c.PackageType) || req.IsFolder {
 		return false
 	}
@@ -65,7 +65,7 @@ func tryDebianItem(
 	return true
 }
 
-func (s debianAPI) serveDebianIndex(
+func (s DebianAPI) serveDebianIndex(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
@@ -197,7 +197,7 @@ func debianIndexPaths(path string, body []byte) ([]string, error) {
 	return paths, nil
 }
 
-func (s debianAPI) readDebianBlob(ctx context.Context, sha string) ([]byte, error) {
+func (s DebianAPI) readDebianBlob(ctx context.Context, sha string) ([]byte, error) {
 	r, _, err := s.Blobs.Open(ctx, sha)
 	if err != nil {
 		return nil, fmt.Errorf("debian: blob open: %w", err)

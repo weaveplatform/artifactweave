@@ -121,18 +121,17 @@ type Config struct {
 	// nil answers that API 501.
 	Tokens *token.Service
 	// Access is the access module's API, which app builds over Store, Auth
-	// and Tokens. When every contract in it is nil and Store is set, New and
-	// RegisterDebianSnapshotWork bind one over those fields, with
-	// AllowBasicAuthTokens and GlobalEnvironmentLimit as its settings, so a
-	// Config built by hand, as tests build it, answers as the application's
-	// does. Without a store it stays zero.
+	// and Tokens. When every contract in it is nil and Store is set, New
+	// binds one over those fields, with AllowBasicAuthTokens and
+	// GlobalEnvironmentLimit as its settings, so a Config built by hand, as
+	// tests build it, answers as the application's does. Without a store it
+	// stays zero.
 	Access accessapi.API
 	// Configuration is the configuration module's API, through which PATCH
 	// /api/system/configuration applies the descriptor and the item routes
 	// read its minimum redirect size. When both its contracts are nil and
-	// Store is set, New and RegisterDebianSnapshotWork bind one over Store
-	// and Access with the descriptor core, as they bind Access. Without a
-	// store it stays zero.
+	// Store is set, New binds one over Store and Access with the descriptor
+	// core, as it binds Access. Without a store it stays zero.
 	Configuration configapi.API
 	// AllowBasicAuthTokens lets a password sent with Basic create tokens
 	// through POST /access/api/v1/tokens (token.allow_basic_auth); the zero
@@ -308,7 +307,7 @@ var overlays = []itemkit.Overlay{
 	artifactshttp.TryMachineLearningItem,
 	artifactshttp.TryChefItem,
 	tryCranItem,
-	tryDebianItem,
+	TryDebianItem,
 	rpmhttp.TryRPMItem,
 	opkghttp.TryOpkgItem,
 	tryP2Item,
@@ -386,7 +385,7 @@ func New(cfg Config) http.Handler {
 	vcsOps := vcsAPI{kit}
 	npmOps := npmAPI{kit}
 	dockerOps := dockerAPI{kit}
-	debianOps := debianAPI{kit}
+	debianOps := DebianAPI{kit}
 	cranOps := cranAPI{Kit: kit, archiveMoverEnabled: cfg.CranArchiveMoverEnabled}
 	rpmOps := rpmhttp.RPMAPI{Kit: kit}
 	sysAPI := configurationhttp.New(configurationhttp.Deps{
@@ -494,7 +493,7 @@ func New(cfg Config) http.Handler {
 	agentPluginItems{kit}.registerAgentMarketplaceRoutes(r)
 	cranOps.registerCranRoutes(r)
 	artAPI.RegisterTransferRoutes(r)
-	debianOps.registerDebianSnapshotRoutes(r)
+	debianOps.RegisterDebianSnapshotRoutes(r)
 	artAPI.RegisterStorageRoutes(r)
 	artAPI.RegisterTrashRoutes(r)
 	artAPI.RegisterMultipartRoutes(r)
@@ -550,7 +549,7 @@ func New(cfg Config) http.Handler {
 				vcsAPI:         &vcsOps,
 				npmAPI:         &npmOps,
 				dockerAPI:      &dockerOps,
-				debianAPI:      &debianOps,
+				DebianAPI:      &debianOps,
 				cranAPI:        &cranOps,
 				RPMAPI:         &rpmOps,
 			}, nil, strictOpts),

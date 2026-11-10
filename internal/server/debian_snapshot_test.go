@@ -155,7 +155,7 @@ func TestUnitDebianSnapshotPreservesCompletedAndClaimedTags(t *testing.T) {
 				Tag:          "first",
 				Distribution: tc.distribution,
 			}
-			err = debianAPI{newKit(Config{Store: st})}.createDebianSnapshot(
+			err = DebianAPI{newKit(Config{Store: st})}.createDebianSnapshot(
 				ctx, st, job, p, acc,
 			)
 			if (err != nil) != tc.expectedErr {
@@ -220,7 +220,10 @@ func TestUnitDebianSnapshotWorkUsesCurrentPermissions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := RegisterDebianSnapshotWork(q, Config{Store: st, Access: accessAPI}); err != nil {
+	if err := RegisterDebianSnapshotWork(
+		q,
+		newKit(Config{Store: st, Access: accessAPI}),
+	); err != nil {
 		t.Fatal(err)
 	}
 	run := func(user string) error {
@@ -259,7 +262,7 @@ func TestUnitDebianSnapshotWorkWithoutAuthenticator(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := RegisterDebianSnapshotWork(q, Config{Store: st}); err != nil {
+	if err := RegisterDebianSnapshotWork(q, newKit(withAccess(Config{Store: st}))); err != nil {
 		t.Fatal(err)
 	}
 	payload, err := json.Marshal(debianSnapshotRequest{

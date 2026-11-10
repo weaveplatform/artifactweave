@@ -16,6 +16,7 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -45,7 +46,7 @@ import (
 var repairEvery = mirror.DefaultRepairInterval
 
 // registerDebianSnapshotWork registers the Debian snapshot handler with the
-// work queue. It is a variable so tests can see the Config it is given.
+// work queue. It is a variable so tests can see the kit it is given.
 var registerDebianSnapshotWork = server.RegisterDebianSnapshotWork
 
 // runtime is what serve holds open: the metadata store, the blob tiers, the
@@ -211,10 +212,10 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 		stop()
 		return nil, errors.Join(err, st.Close())
 	}
-	if err := registerDebianSnapshotWork(queue, server.Config{
+	if err := registerDebianSnapshotWork(queue, itemkit.New(itemkit.Deps{
 		Store: st, Blobs: hot.store, Access: accessAPI, Work: queue,
 		RemoteSources: rt.remoteSources, FormatSettings: fs,
-	}); err != nil {
+	})); err != nil {
 		stop()
 		return nil, errors.Join(err, st.Close())
 	}

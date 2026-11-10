@@ -45,7 +45,7 @@ type debianSnapshotRequest struct {
 
 // CreateDebianSnapshot captures metadata only. The persistent queue handles
 // async=1 and gives the synchronous operation the same atomic work identity.
-func (s debianAPI) CreateDebianSnapshot(
+func (s DebianAPI) CreateDebianSnapshot(
 	ctx context.Context, req artgen.CreateDebianSnapshotRequestObject,
 ) (artgen.CreateDebianSnapshotResponseObject, error) {
 	if req.Body == nil || !debianSnapshotSegment.MatchString(req.Body.Tag) ||
@@ -189,12 +189,16 @@ func snapshotSourceClass(c repo.Class) bool {
 	return c == repo.Local || c == repo.Remote || c == repo.Virtual || c == repo.Federated
 }
 
-// RegisterDebianSnapshotWork must run before Queue.Run. The queued credential
-// reference is checked against current credentials and permissions on every
-// attempt, including retries after a restart.
-func RegisterDebianSnapshotWork(q *work.Queue, cfg Config) error {
-	cfg = withConfiguration(withAccess(cfg))
-	s := debianAPI{newKit(cfg)}
+// RegisterDebianSnapshotWork registers on q the handler that runs a queued
+// Debian snapshot (kind "debian-snapshot") with k. It must run before
+// Queue.Run: only registered kinds are leased, and an item of a kind with
+// no handler waits (decision 0033), so the snapshots would stay queued.
+// Every attempt, a retry after a restart included, checks the queued
+// credential reference against the caller's current credentials and
+// permissions through k's access API; without an authenticator there,
+// the job is refused for good.
+func RegisterDebianSnapshotWork(q *work.Queue, k *itemkit.Kit) error {
+	s := DebianAPI{k}
 	err := q.Handle(debianSnapshotKind, func(ctx context.Context, it types.WorkItem) error {
 		var job debianSnapshotRequest
 		if err := json.Unmarshal(it.Payload, &job); err != nil ||
@@ -203,22 +207,22 @@ func RegisterDebianSnapshotWork(q *work.Queue, cfg Config) error {
 			job.Source == "" || job.Target == "" || job.Credential.Name == "" {
 			return fmt.Errorf("%w: invalid debian snapshot job", work.ErrPermanent)
 		}
-		if cfg.Access.Authenticator == nil {
+		if k.Access.Authenticator == nil {
 			return fmt.Errorf("%w: debian snapshot authentication unavailable", work.ErrPermanent)
 		}
-		p, err := cfg.Access.Authenticator.Current(ctx, job.Credential.Principal())
+		p, err := k.Access.Authenticator.Current(ctx, job.Credential.Principal())
 		if err != nil {
 			return fmt.Errorf("%w: debian snapshot caller expired: %w", work.ErrPermanent, err)
 		}
-		p, d, err := cfg.Access.Authorizer.Authorize(ctx, p, p.Anonymous)
+		p, d, err := k.Access.Authorizer.Authorize(ctx, p, p.Anonymous)
 		if err != nil {
 			return fmt.Errorf("snapshot current permissions: %w", err)
 		}
-		acc, err := itemkit.AccessFor(ctx, cfg.Access.Authorizer, p, d)
+		acc, err := itemkit.AccessFor(ctx, k.Access.Authorizer, p, d)
 		if err != nil {
 			return fmt.Errorf("snapshot access: %w", err)
 		}
-		if err := s.createDebianSnapshot(ctx, cfg.Store, job, p, acc); err != nil {
+		if err := s.createDebianSnapshot(ctx, k.Store, job, p, acc); err != nil {
 			return fmt.Errorf("snapshot %s/%s: %w", job.Target, job.Tag, err)
 		}
 		return nil
@@ -229,7 +233,7 @@ func RegisterDebianSnapshotWork(q *work.Queue, cfg Config) error {
 	return nil
 }
 
-func (s debianAPI) createDebianSnapshot(
+func (s DebianAPI) createDebianSnapshot(
 	ctx context.Context, st store.Store, job debianSnapshotRequest,
 	p kernel.Principal, acc itemkit.Access,
 ) error {
@@ -299,7 +303,7 @@ func (s debianAPI) createDebianSnapshot(
 	return nil
 }
 
-func (s debianAPI) debianSnapshotFiles(
+func (s DebianAPI) debianSnapshotFiles(
 	ctx context.Context, st store.Store, c repo.Config, distribution string,
 	p kernel.Principal, acc itemkit.Access,
 ) (map[string][]byte, error) {
@@ -367,9 +371,11 @@ func (s debianAPI) debianSnapshotFiles(
 	return files, nil
 }
 
-// Debian snapshots have a separate client root. Metadata lives in the target
-// repository; packages continue to resolve from the recorded source.
-func (s debianAPI) registerDebianSnapshotRoutes(r chi.Router) {
+// RegisterDebianSnapshotRoutes mounts the snapshot reads, GET and HEAD of
+// /artifactory/api/deb/{repoKey}/snapshots/{tag}/*, on r. Debian snapshots
+// have a separate client root: metadata lives in the target repository, and
+// packages continue to resolve from the recorded source.
+func (s DebianAPI) RegisterDebianSnapshotRoutes(r chi.Router) {
 	for _, method := range []string{http.MethodGet, http.MethodHead} {
 		r.MethodFunc(
 			method,
@@ -379,7 +385,7 @@ func (s debianAPI) registerDebianSnapshotRoutes(r chi.Router) {
 	}
 }
 
-func (s debianAPI) getDebianSnapshot(w http.ResponseWriter, r *http.Request) {
+func (s DebianAPI) getDebianSnapshot(w http.ResponseWriter, r *http.Request) {
 	st, err := s.Content()
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
@@ -449,7 +455,7 @@ func (s debianAPI) getDebianSnapshot(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusFound)
 }
 
-func (s debianAPI) checkDebianSnapshotIndex(
+func (s DebianAPI) checkDebianSnapshotIndex(
 	ctx context.Context, rel string, it types.Item, sourceRepo repo.Config,
 	p kernel.Principal, acc itemkit.Access,
 ) error {

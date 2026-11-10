@@ -5197,7 +5197,7 @@
   {
     "route": "GET /artifactory/api/deb/{repoKey}/snapshots/{tag}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.debianAPI.getDebianSnapshot-fm",
+    "handler": "internal/server/server.go: internal/server.DebianAPI.getDebianSnapshot-fm",
     "review_family": "native-deb",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12241,7 +12241,7 @@
   {
     "route": "HEAD /artifactory/api/deb/{repoKey}/snapshots/{tag}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.debianAPI.getDebianSnapshot-fm",
+    "handler": "internal/server/server.go: internal/server.DebianAPI.getDebianSnapshot-fm",
     "review_family": "native-deb",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -15846,7 +15846,7 @@
     "operation_id": "createDebianSnapshot",
     "state": "implemented",
     "contract": "Captures signed Debian metadata for one distribution from a local, remote, virtual or federated repository in a local Debian target. Package files remain in the source repository. The snapshot client root is /artifactory/api/deb/{targetRepo}/snapshots/{tag}.",
-    "handler": "internal/server/debian_snapshot.go: debianAPI.createDebianSnapshot",
+    "handler": "internal/server/debian_snapshot.go: DebianAPI.createDebianSnapshot",
     "direct_calls": [
       "acc.File",
       "apierror.New",

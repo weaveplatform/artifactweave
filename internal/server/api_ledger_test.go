@@ -245,7 +245,7 @@ func apiReviewHandlers(t *testing.T) map[string]apiReviewHandler {
 		"vcsAPI":         "artifactory",
 		"npmAPI":         "artifactory",
 		"dockerAPI":      "artifactory",
-		"debianAPI":      "artifactory",
+		"DebianAPI":      "artifactory",
 		"cranAPI":        "artifactory",
 		"RPMAPI":         "artifactory",
 		"SecurityAPI":    "artifactory",
