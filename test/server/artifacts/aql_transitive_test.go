@@ -15,7 +15,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
@@ -386,12 +385,12 @@ func TestAccTransitiveCachedNonmatchSuppressesUpstreamMetadata(t *testing.T) {
 
 func TestAccTransitiveAQLFinalExactPathFence(t *testing.T) {
 	w := transitiveFixture(t)
-	permission := accmodel.Permission{
+	permission := accesstest.Permission{
 		Name: "only-paths",
-		Resources: map[api.ResourceType]accmodel.Resource{
+		Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceArtifact: {
-				Targets: map[string]accmodel.Target{"up": {Include: []string{"allowed/**"}}},
-				Actions: accmodel.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+				Targets: map[string]accesstest.Target{"up": {Include: []string{"allowed/**"}}},
+				Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
 			},
 		},
 	}
@@ -417,7 +416,7 @@ func TestAccTransitiveAQLFinalExactPathFence(t *testing.T) {
 			q.Resource.Path == "allowed/b.bin" {
 			changed = true
 			resource := permission.Resources[api.ResourceArtifact]
-			resource.Targets["up"] = accmodel.Target{Include: []string{"allowed/b.bin"}}
+			resource.Targets["up"] = accesstest.Target{Include: []string{"allowed/b.bin"}}
 			permission.Resources[api.ResourceArtifact] = resource
 			return w.db.Permissions().Update(t.Context(), permission)
 		}

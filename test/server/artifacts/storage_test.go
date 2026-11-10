@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -214,11 +214,11 @@ func TestAccStorageList(t *testing.T) {
 // grant gives user actions on a repository.
 func grant(t *testing.T, w *itemWorld, name, user, repoKey string, a accessapi.Actions) {
 	t.Helper()
-	if err := w.db.Permissions().Create(context.Background(), accmodel.Permission{
+	if err := w.db.Permissions().Create(context.Background(), accesstest.Permission{
 		Name: name,
-		Resources: map[accessapi.ResourceType]accmodel.Resource{accessapi.ResourceArtifact: {
-			Actions: accmodel.Grants{Users: map[string]accessapi.Actions{user: a}},
-			Targets: map[string]accmodel.Target{repoKey: {Include: []string{"**"}}},
+		Resources: map[accessapi.ResourceType]accesstest.Resource{accessapi.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]accessapi.Actions{user: a}},
+			Targets: map[string]accesstest.Target{repoKey: {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)

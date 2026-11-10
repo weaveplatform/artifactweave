@@ -50,6 +50,10 @@
 //     include and exclude patterns, matched with kernel/antpath. AQL,
 //     listings, searches and the generic and Maven formats check paths with
 //     them.
+//   - ResolveKey: the stored key that a key as a client sent it names, and
+//     whether it names that remote repository's cache ("maven-remote-cache"
+//     is the cache of "maven-remote"); the access module evaluates
+//     permission targets on the stored key.
 //
 // # Invariants
 //
@@ -102,7 +106,8 @@
 //
 // Implemented P0 to P9c: the model, its JSON round trip and validation in P0
 // and P1, then the fields, defaults and package types of each ecosystem from
-// P3 to P9c. RepoPatterns and PatternsOf added in P9d. Staged in P9d.
+// P3 to P9c. RepoPatterns, PatternsOf and ResolveKey added in P9d. Staged in
+// P9d.
 //
 // # Testing
 //

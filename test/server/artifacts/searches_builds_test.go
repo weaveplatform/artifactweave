@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
 	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
@@ -34,13 +34,13 @@ func buildSearchWorld(t *testing.T, anonymous bool, tune ...func(*Config)) *item
 	if err := w.db.Repos().Create(ctx, *repo.Defaults(&proj)); err != nil {
 		t.Fatal(err)
 	}
-	if err := w.db.Permissions().Create(ctx, accmodel.Permission{
-		Name: "deployer-builds", Resources: map[api.ResourceType]accmodel.Resource{
+	if err := w.db.Permissions().Create(ctx, accesstest.Permission{
+		Name: "deployer-builds", Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceBuild: {
-				Actions: accmodel.Grants{
+				Actions: accesstest.Grants{
 					Users: map[string]api.Actions{"deployer": api.ActionRead},
 				},
-				Targets: map[string]accmodel.Target{
+				Targets: map[string]accesstest.Target{
 					api.BuildInfoRepository: {Include: []string{"app/**"}},
 				},
 			},
@@ -219,13 +219,13 @@ func TestAccSearchBuildArtifacts(t *testing.T) {
 		http.StatusForbidden)
 	// Anonymous callers are told to authenticate, even with anonymous
 	// access on and read on the run, which the dependency search shows.
-	if err := w.db.Permissions().Create(context.Background(), accmodel.Permission{
-		Name: "anonymous-builds", Resources: map[api.ResourceType]accmodel.Resource{
+	if err := w.db.Permissions().Create(context.Background(), accesstest.Permission{
+		Name: "anonymous-builds", Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceBuild: {
-				Actions: accmodel.Grants{
+				Actions: accesstest.Grants{
 					Users: map[string]api.Actions{kernel.AnonymousUser: api.ActionRead},
 				},
-				Targets: map[string]accmodel.Target{
+				Targets: map[string]accesstest.Target{
 					api.BuildInfoRepository: {Include: []string{"app/**"}},
 				},
 			},

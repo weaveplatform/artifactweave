@@ -21,7 +21,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/upstreamtest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
@@ -76,11 +75,11 @@ func smartFixture(t *testing.T) *smartWorld {
 	w.permit.Identity, _ = w.db.RemoteCache().Source(t.Context(), w.c.Key)
 	hash := accesstest.HashPassword(t, "reader-password")
 	if err := w.db.Users().
-		Create(t.Context(), accmodel.User{Name: "reader", PasswordHash: hash}); err != nil {
+		Create(t.Context(), accesstest.User{Name: "reader", PasswordHash: hash}); err != nil {
 		t.Fatal(err)
 	}
 	if err := w.db.Permissions().
-		Create(t.Context(), accmodel.Permission{Name: "read", Resources: map[accessapi.ResourceType]accmodel.Resource{accessapi.ResourceArtifact: {Targets: map[string]accmodel.Target{w.c.Key: {}}, Actions: accmodel.Grants{Users: map[string]accessapi.Actions{"reader": accessapi.ActionRead}}}}}); err != nil {
+		Create(t.Context(), accesstest.Permission{Name: "read", Resources: map[accessapi.ResourceType]accesstest.Resource{accessapi.ResourceArtifact: {Targets: map[string]accesstest.Target{w.c.Key: {}}, Actions: accesstest.Grants{Users: map[string]accessapi.Actions{"reader": accessapi.ActionRead}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	kit := accesstest.Over(t, w.db, accesstest.WithNow(w.clock.Now))

@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -45,7 +45,7 @@ func newProviderFixture(t *testing.T) *remoteProviderFixture {
 	}
 	permission, _ := f.db.Permissions().Get(t.Context(), "remote-read")
 	resource := permission.Resources[api.ResourceArtifact]
-	resource.Targets["remote"] = model.Target{Include: []string{"hashicorp/null/**"}}
+	resource.Targets["remote"] = accesstest.Target{Include: []string{"hashicorp/null/**"}}
 	permission.Resources[api.ResourceArtifact] = resource
 	if err := f.db.Permissions().Update(t.Context(), permission); err != nil {
 		t.Fatal(err)
@@ -366,7 +366,7 @@ func TestAccRemoteProviderUpstreamMirror(t *testing.T) {
 			}
 			permission, _ := f.db.Permissions().Get(t.Context(), "remote-read")
 			resource := permission.Resources[api.ResourceArtifact]
-			resource.Targets["remote"] = model.Target{
+			resource.Targets["remote"] = accesstest.Target{
 				Include: []string{"provider-mirrors/registry.terraform.io/hashicorp/null/**"},
 			}
 			permission.Resources[api.ResourceArtifact] = resource
@@ -444,7 +444,7 @@ func configureProviderMirrorFaultFixture(t *testing.T, f *remoteProviderFixture)
 		t.Fatal(err)
 	}
 	resource := permission.Resources[api.ResourceArtifact]
-	resource.Targets["remote"] = model.Target{
+	resource.Targets["remote"] = accesstest.Target{
 		Include: []string{"provider-mirrors/registry.terraform.io/hashicorp/null/**"},
 	}
 	permission.Resources[api.ResourceArtifact] = resource
@@ -621,7 +621,7 @@ func TestAccRemoteProviderMirrorIndexBoundsAndPlatformPermissions(t *testing.T) 
 			t.Fatal(err)
 		}
 		resource := permission.Resources[api.ResourceArtifact]
-		resource.Targets["remote"] = model.Target{Include: []string{
+		resource.Targets["remote"] = accesstest.Target{Include: []string{
 			"provider-mirrors/registry.terraform.io/hashicorp/null/index.json",
 			"provider-mirrors/registry.terraform.io/hashicorp/null/1.0.0.json",
 		}}
@@ -790,7 +790,7 @@ func TestAccRemoteProviderVisibilityRequiresReadablePlatform(t *testing.T) {
 			t.Fatal(err)
 		}
 		resource := permission.Resources[api.ResourceArtifact]
-		resource.Targets["remote"] = model.Target{Include: []string{
+		resource.Targets["remote"] = accesstest.Target{Include: []string{
 			"hashicorp/null/1.0.0/terraform-provider-null_1.0.0_windows_amd64.zip",
 		}}
 		permission.Resources[api.ResourceArtifact] = resource

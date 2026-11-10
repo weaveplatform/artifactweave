@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/instance"
@@ -53,7 +53,7 @@ func seedTokens(t *testing.T, db RouterStore) (*token.Service, statusSecrets) {
 		t.Fatal(err)
 	}
 	now := time.Now().Truncate(time.Second)
-	for _, r := range []model.Token{
+	for _, r := range []accesstest.Token{
 		{ID: "admin-token", Subject: subjectOf(tokens, "admin"), Revocable: true},
 		{ID: "admin-token-2", Subject: subjectOf(tokens, "admin"), Revocable: true},
 		{ID: "user-token", Subject: subjectOf(tokens, "user"), Revocable: true},

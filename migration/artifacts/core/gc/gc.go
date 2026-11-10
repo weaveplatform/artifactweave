@@ -9,7 +9,6 @@ import (
 	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -77,7 +76,7 @@ type Options struct {
 	// given, the upload expiry ago, and returns how many it removed.
 	Expirers []func(ctx context.Context, before time.Time) (int, error)
 	// Tokens removes, on each pass, the records of access tokens whose
-	// refresh grace (types.DefaultRefreshGrace) has run out, which
+	// refresh grace (accessapi.DefaultRefreshGrace) has run out, which
 	// Report.TokensExpired counts (decision 0005). Nil skips that step, for a
 	// collector built without a token service, as some tests build one.
 	Tokens accessapi.Tokens
@@ -180,13 +179,13 @@ func (c *Collector) renew(ctx context.Context) (bool, error) {
 }
 
 // expireTokens removes token records whose refresh token can no longer be
-// used: a refresh is accepted for types.DefaultRefreshGrace after the token
+// used: a refresh is accepted for accessapi.DefaultRefreshGrace after the token
 // expires, so the record is kept that long.
 func (c *Collector) expireTokens(ctx context.Context, rep *Report) error {
 	if c.tokens == nil {
 		return nil
 	}
-	n, err := c.tokens.DeleteExpired(ctx, c.now().Add(-model.DefaultRefreshGrace))
+	n, err := c.tokens.DeleteExpired(ctx, c.now().Add(-accessapi.DefaultRefreshGrace))
 	rep.TokensExpired += n
 	if err != nil {
 		return fmt.Errorf("gc: expired tokens: %w", err)

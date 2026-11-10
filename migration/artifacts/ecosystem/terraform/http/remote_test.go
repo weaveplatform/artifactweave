@@ -19,7 +19,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
@@ -58,7 +57,7 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 		t.Fatal(err)
 	}
 	if err := f.db.Permissions().
-		Create(t.Context(), accmodel.Permission{Name: "remote-read", Resources: map[accessapi.ResourceType]accmodel.Resource{accessapi.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]accessapi.Actions{"reader": accessapi.ActionRead}}, Targets: map[string]accmodel.Target{"remote": {Include: []string{"ns/name/aws/1.0.0.zip"}}}}}}); err != nil {
+		Create(t.Context(), accesstest.Permission{Name: "remote-read", Resources: map[accessapi.ResourceType]accesstest.Resource{accessapi.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]accessapi.Actions{"reader": accessapi.ActionRead}}, Targets: map[string]accesstest.Target{"remote": {Include: []string{"ns/name/aws/1.0.0.zip"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	resolver, err := upstream.NewResolver(
@@ -647,7 +646,7 @@ func TestAccRemoteModuleCredentialChangesAfterIssuance(t *testing.T) {
 		t.Run(mode, func(t *testing.T) {
 			f := newRemoteFixture(t)
 			f.modules("1.0.0")
-			tok := accmodel.Token{
+			tok := accesstest.Token{
 				ID:        "parent",
 				Subject:   "jfac@test/users/reader",
 				Scope:     kernel.UserScope(),
@@ -677,7 +676,7 @@ func TestAccRemoteModuleCredentialChangesAfterIssuance(t *testing.T) {
 				f.now = f.now.Add(31 * time.Second)
 			case "disabled":
 				u, _ := f.db.Users().Get(t.Context(), "reader")
-				u.Status = accmodel.UserDisabled
+				u.Status = accesstest.UserDisabled
 				if e = f.db.Users().Update(t.Context(), u); e != nil {
 					t.Fatal(e)
 				}

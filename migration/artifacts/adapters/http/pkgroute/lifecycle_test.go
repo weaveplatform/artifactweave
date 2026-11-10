@@ -9,8 +9,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -94,13 +94,13 @@ func TestAccAnnotateAndDelete(t *testing.T) {
 		t.Fatalf("not deleted: %v", err)
 	}
 	// Annotate needs its own grant.
-	if err := f.db.Permissions().Create(ctx, accmodel.Permission{
+	if err := f.db.Permissions().Create(ctx, accesstest.Permission{
 		Name: "annotator",
-		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-			Actions: accmodel.Grants{
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{
 				Users: map[string]api.Actions{"annotator": api.ActionAnnotate},
 			},
-			Targets: map[string]accmodel.Target{local: {Include: []string{"**"}}},
+			Targets: map[string]accesstest.Target{local: {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)

@@ -16,7 +16,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -45,19 +44,19 @@ func newTokenWorld(t *testing.T) *tokenWorld {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	for _, p := range []model.Permission{
-		{Name: "readers", Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]accessapi.Actions{
+	for _, p := range []accesstest.Permission{
+		{Name: "readers", Resources: map[accessapi.ResourceType]accesstest.Resource{accessapi.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]accessapi.Actions{
 				"reader": accessapi.ActionRead, kernel.AnonymousUser: accessapi.ActionRead,
 			}},
-			Targets: map[string]model.Target{"docker-local": {Include: []string{"pub/**"}}},
+			Targets: map[string]accesstest.Target{"docker-local": {Include: []string{"pub/**"}}},
 		}}},
-		{Name: "writers", Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]accessapi.Actions{
+		{Name: "writers", Resources: map[accessapi.ResourceType]accesstest.Resource{accessapi.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]accessapi.Actions{
 				"writer": accessapi.ActionRead | accessapi.ActionWrite | accessapi.ActionDelete |
 					accessapi.ActionAnnotate,
 			}},
-			Targets: map[string]model.Target{"docker-local": {Include: []string{"**"}}},
+			Targets: map[string]accesstest.Target{"docker-local": {Include: []string{"**"}}},
 		}}},
 	} {
 		if err := db.Permissions().Create(ctx, p); err != nil {
@@ -65,7 +64,7 @@ func newTokenWorld(t *testing.T) *tokenWorld {
 		}
 	}
 	if err := db.Users().
-		Create(ctx, model.User{Name: "writer", Email: "w@example.com"}); err != nil {
+		Create(ctx, accesstest.User{Name: "writer", Email: "w@example.com"}); err != nil {
 		t.Fatal(err)
 	}
 	// The registry reaches the service and the users through the access

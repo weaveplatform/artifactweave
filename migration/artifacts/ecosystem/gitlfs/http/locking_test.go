@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
@@ -40,18 +40,18 @@ type lockReply struct {
 func lockFixture(t *testing.T, class repo.Class) *fixture {
 	t.Helper()
 	f := newFixture(t, class)
-	targets := map[string]accmodel.Target{}
+	targets := map[string]accesstest.Target{}
 	keys := []string{"lfs"}
 	if class == repo.Virtual {
 		keys = []string{"lfs-empty", "lfs-local"}
 	}
 	for _, key := range keys {
-		targets[key] = accmodel.Target{Include: []string{"**"}}
+		targets[key] = accesstest.Target{Include: []string{"**"}}
 	}
-	err := f.db.Permissions().Create(t.Context(), accmodel.Permission{
-		Name: "lfs-lock-access", Resources: map[api.ResourceType]accmodel.Resource{
+	err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
+		Name: "lfs-lock-access", Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceArtifact: {
-				Actions: accmodel.Grants{Users: map[string]api.Actions{
+				Actions: accesstest.Grants{Users: map[string]api.Actions{
 					"alice":   api.ActionRead | api.ActionWrite,
 					"bob":     api.ActionRead | api.ActionWrite,
 					"manager": api.ActionRead | api.ActionWrite | api.ActionDelete,
@@ -237,13 +237,13 @@ func TestAccGitLFSLockWritePermissionAndOwnerUnlock(t *testing.T) {
 
 func TestAccGitLFSLockListingHidesRowsOutsidePathGrant(t *testing.T) {
 	f := newFixture(t, repo.Local)
-	if err := f.db.Permissions().Create(t.Context(), accmodel.Permission{
-		Name: "lfs-public-only", Resources: map[api.ResourceType]accmodel.Resource{
+	if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
+		Name: "lfs-public-only", Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceArtifact: {
-				Actions: accmodel.Grants{
+				Actions: accesstest.Grants{
 					Users: map[string]api.Actions{"alice": api.ActionRead | api.ActionWrite},
 				},
-				Targets: map[string]accmodel.Target{
+				Targets: map[string]accesstest.Target{
 					"lfs": {Include: []string{"assets/public.bin"}},
 				},
 			},
@@ -393,14 +393,14 @@ func TestAccGitLFSVirtualLockPaginationKeepsFirstMemberPrecedence(t *testing.T) 
 func TestAccGitLFSVirtualVerifyFailsClosedOnHiddenMember(t *testing.T) {
 	f := newFixture(t, repo.Virtual)
 	for _, key := range []string{"lfs-local"} {
-		err := f.db.Permissions().Create(t.Context(), accmodel.Permission{
+		err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
 			Name: "lock-" + key,
-			Resources: map[api.ResourceType]accmodel.Resource{
+			Resources: map[api.ResourceType]accesstest.Resource{
 				api.ResourceArtifact: {
-					Actions: accmodel.Grants{Users: map[string]api.Actions{
+					Actions: accesstest.Grants{Users: map[string]api.Actions{
 						"alice": api.ActionRead | api.ActionWrite,
 					}},
-					Targets: map[string]accmodel.Target{key: {Include: []string{"**"}}},
+					Targets: map[string]accesstest.Target{key: {Include: []string{"**"}}},
 				},
 			},
 		})
@@ -435,15 +435,15 @@ func TestAccGitLFSVirtualVerifyFailsClosedOnHiddenPathWithinMember(t *testing.T)
 	for key, include := range map[string]string{
 		"lfs-empty": "assets/public.bin", "lfs-local": "assets/**",
 	} {
-		if err := f.db.Permissions().Create(t.Context(), accmodel.Permission{
-			Name: "readwrite-" + key, Resources: map[api.ResourceType]accmodel.Resource{
+		if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
+			Name: "readwrite-" + key, Resources: map[api.ResourceType]accesstest.Resource{
 				api.ResourceArtifact: {
-					Actions: accmodel.Grants{
+					Actions: accesstest.Grants{
 						Users: map[string]api.Actions{
 							"alice": api.ActionRead | api.ActionWrite,
 						},
 					},
-					Targets: map[string]accmodel.Target{key: {Include: []string{include}}},
+					Targets: map[string]accesstest.Target{key: {Include: []string{include}}},
 				},
 			},
 		}); err != nil {
@@ -465,24 +465,24 @@ func TestAccGitLFSVirtualVerifyFailsClosedOnHiddenPathWithinMember(t *testing.T)
 func TestAccGitLFSVirtualVerifyHidesPathsOutsideDeploymentWriteGrant(t *testing.T) {
 	f := newFixture(t, repo.Virtual)
 	for _, key := range []string{"lfs-empty", "lfs-local"} {
-		if err := f.db.Permissions().Create(t.Context(), accmodel.Permission{
-			Name: "read-" + key, Resources: map[api.ResourceType]accmodel.Resource{
+		if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
+			Name: "read-" + key, Resources: map[api.ResourceType]accesstest.Resource{
 				api.ResourceArtifact: {
-					Actions: accmodel.Grants{
+					Actions: accesstest.Grants{
 						Users: map[string]api.Actions{"alice": api.ActionRead},
 					},
-					Targets: map[string]accmodel.Target{key: {Include: []string{"assets/**"}}},
+					Targets: map[string]accesstest.Target{key: {Include: []string{"assets/**"}}},
 				},
 			},
 		}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := f.db.Permissions().Create(t.Context(), accmodel.Permission{
-		Name: "write-public", Resources: map[api.ResourceType]accmodel.Resource{
+	if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
+		Name: "write-public", Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceArtifact: {
-				Actions: accmodel.Grants{Users: map[string]api.Actions{"alice": api.ActionWrite}},
-				Targets: map[string]accmodel.Target{
+				Actions: accesstest.Grants{Users: map[string]api.Actions{"alice": api.ActionWrite}},
+				Targets: map[string]accesstest.Target{
 					"lfs-local": {Include: []string{"assets/public.bin"}},
 				},
 			},
@@ -515,13 +515,13 @@ func TestAccGitLFSVirtualPathFilterSkipsUnreadableMember(t *testing.T) {
 	for key, include := range map[string]string{
 		"lfs-empty": "assets/public.bin", "lfs-local": "assets/private.bin",
 	} {
-		if err := f.db.Permissions().Create(t.Context(), accmodel.Permission{
-			Name: "read-" + key, Resources: map[api.ResourceType]accmodel.Resource{
+		if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
+			Name: "read-" + key, Resources: map[api.ResourceType]accesstest.Resource{
 				api.ResourceArtifact: {
-					Actions: accmodel.Grants{
+					Actions: accesstest.Grants{
 						Users: map[string]api.Actions{"alice": api.ActionRead},
 					},
-					Targets: map[string]accmodel.Target{key: {Include: []string{include}}},
+					Targets: map[string]accesstest.Target{key: {Include: []string{include}}},
 				},
 			},
 		}); err != nil {

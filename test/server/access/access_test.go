@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -28,12 +28,12 @@ func accessWorld(t *testing.T) (http.Handler, *token.Service) {
 	ctx := context.Background()
 	db := inmem.New()
 	cheapSeed(t, db)
-	for _, g := range []model.Group{{Name: "devs"}, {Name: "admins", AdminPrivileges: true}} {
+	for _, g := range []accesstest.Group{{Name: "devs"}, {Name: "admins", AdminPrivileges: true}} {
 		if err := db.Groups().Create(ctx, g); err != nil {
 			t.Fatal(err)
 		}
 	}
-	for _, u := range []model.User{
+	for _, u := range []accesstest.User{
 		{Name: "dev", PasswordHash: cheapHash, Groups: []string{"devs"}},
 		{Name: "ann", PasswordHash: cheapHash, Groups: []string{"admins"}},
 	} {
@@ -41,13 +41,13 @@ func accessWorld(t *testing.T) (http.Handler, *token.Service) {
 			t.Fatal(err)
 		}
 	}
-	if err := db.Permissions().Create(ctx, model.Permission{
-		Name: "dev-com", Resources: map[api.ResourceType]model.Resource{
+	if err := db.Permissions().Create(ctx, accesstest.Permission{
+		Name: "dev-com", Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceArtifact: {
-				Actions: model.Grants{Groups: map[string]api.Actions{
+				Actions: accesstest.Grants{Groups: map[string]api.Actions{
 					"devs": api.ActionRead | api.ActionWrite | api.ActionAnnotate,
 				}},
-				Targets: map[string]model.Target{"libs-local": {Include: []string{"com/**"}}},
+				Targets: map[string]accesstest.Target{"libs-local": {Include: []string{"com/**"}}},
 			},
 		},
 	}); err != nil {

@@ -14,6 +14,17 @@ import (
 // threshold that was neither forced revocable nor refreshable.
 var ErrNotRevocable = errors.New("token: token is not revocable")
 
+// The token lifetimes that other modules apply to the tokens access issues
+// (decision 0005).
+const (
+	// DefaultRefreshGrace is how long after a token expires its refresh
+	// token is still accepted, so its record is kept that long.
+	DefaultRefreshGrace = 24 * time.Hour
+	// RegistryTokenExpiry is a registry token's lifetime, shortened to the
+	// remaining life of the credential that obtained it.
+	RegistryTokenExpiry = time.Hour
+)
+
 // referenceTokenPattern is the documented reference-token form: base64 of
 // "reftkn:01..." ("cmVmd" plus 59 alphanumerics, 64 characters in all).
 var referenceTokenPattern = regexp.MustCompile(`^cmVmd[A-Za-z0-9]{59}$`)

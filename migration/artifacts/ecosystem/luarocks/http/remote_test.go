@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
@@ -48,13 +48,15 @@ func newRemoteFixture(t *testing.T, tune ...func(*pkgroute.Options, *item.Servic
 			if err = items.Store.Repos().Update(t.Context(), c); err != nil {
 				t.Fatal(err)
 			}
-			if err = db.Permissions().Create(t.Context(), accmodel.Permission{
+			if err = db.Permissions().Create(t.Context(), accesstest.Permission{
 				Name: "visible-only",
-				Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-					Actions: accmodel.Grants{
+				Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+					Actions: accesstest.Grants{
 						Users: map[string]api.Actions{"partial": api.ActionRead},
 					},
-					Targets: map[string]accmodel.Target{"rocks": {Include: []string{"visible-*"}}},
+					Targets: map[string]accesstest.Target{
+						"rocks": {Include: []string{"visible-*"}},
+					},
 				}},
 			}); err != nil {
 				t.Fatal(err)

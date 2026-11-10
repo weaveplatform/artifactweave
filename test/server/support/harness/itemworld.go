@@ -8,9 +8,9 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
@@ -90,7 +90,7 @@ func NewItemWorld(t *testing.T, anonymous bool, tune ...Tune) *ItemWorld {
 	db := inmem.New()
 	support.Seed(t, db)
 	hash := support.CheapHash
-	for _, u := range []accmodel.User{
+	for _, u := range []accesstest.User{
 		{Name: "reader", PasswordHash: hash, Groups: []string{authn.ReadersGroup}},
 		{Name: "deployer", PasswordHash: hash},
 		{Name: "user", PasswordHash: hash},
@@ -99,13 +99,13 @@ func NewItemWorld(t *testing.T, anonymous bool, tune ...Tune) *ItemWorld {
 			t.Fatal(err)
 		}
 	}
-	if err := db.Permissions().Create(ctx, accmodel.Permission{
+	if err := db.Permissions().Create(ctx, accesstest.Permission{
 		Name: "deploy-libs",
-		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-			Actions: accmodel.Grants{Users: map[string]api.Actions{
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{
 				"deployer": api.ActionRead | api.ActionWrite,
 			}},
-			Targets: map[string]accmodel.Target{"libs-local": {Include: []string{"**"}}},
+			Targets: map[string]accesstest.Target{"libs-local": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -116,13 +116,15 @@ func NewItemWorld(t *testing.T, anonymous bool, tune ...Tune) *ItemWorld {
 		}
 		// The seeded Any Remote grants anonymous nothing (#383), so anonymous
 		// reads remotes through a permission of its own, as JFrog advises.
-		if err := db.Permissions().Create(ctx, accmodel.Permission{
+		if err := db.Permissions().Create(ctx, accesstest.Permission{
 			Name: AnonymousRemotes,
-			Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-				Actions: accmodel.Grants{Users: map[string]api.Actions{
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+				Actions: accesstest.Grants{Users: map[string]api.Actions{
 					kernel.AnonymousUser: api.ActionRead,
 				}},
-				Targets: map[string]accmodel.Target{api.TargetAnyRemote: {Include: []string{"**"}}},
+				Targets: map[string]accesstest.Target{
+					api.TargetAnyRemote: {Include: []string{"**"}},
+				},
 			}},
 		}); err != nil {
 			t.Fatal(err)

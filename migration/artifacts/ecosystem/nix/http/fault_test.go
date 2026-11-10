@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
@@ -298,18 +298,18 @@ func TestAccNixExactPathPermissionsAndRevocation(t *testing.T) {
 			if err := f.db.Repos().Create(t.Context(), v); err != nil {
 				t.Fatal(err)
 			}
-			targets := map[string]accmodel.Target{"local": {}, "virtual": {}}
+			targets := map[string]accesstest.Target{"local": {}, "virtual": {}}
 			if mode == "metadata-only" {
-				targets["local"] = accmodel.Target{Include: []string{infoPath}}
+				targets["local"] = accesstest.Target{Include: []string{infoPath}}
 			}
 			if mode == "virtual-only" {
 				delete(targets, "local")
 			}
-			p := accmodel.Permission{
+			p := accesstest.Permission{
 				Name: "read",
-				Resources: map[api.ResourceType]accmodel.Resource{
+				Resources: map[api.ResourceType]accesstest.Resource{
 					api.ResourceArtifact: {
-						Actions: accmodel.Grants{
+						Actions: accesstest.Grants{
 							Users: map[string]api.Actions{"reader": api.ActionRead},
 						},
 						Targets: targets,

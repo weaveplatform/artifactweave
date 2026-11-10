@@ -18,8 +18,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
@@ -628,13 +628,13 @@ func TestAccDeployIdenticalContent(t *testing.T) {
 
 	// Under server-generated-checksums the declaration is not checked, so
 	// only the stored bytes can show the content is the file's.
-	if err := w.db.Permissions().Create(ctx, accmodel.Permission{
+	if err := w.db.Permissions().Create(ctx, accesstest.Permission{
 		Name: "deploy-server",
-		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-			Actions: accmodel.Grants{Users: map[string]api.Actions{
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{
 				"deployer": api.ActionRead | api.ActionWrite,
 			}},
-			Targets: map[string]accmodel.Target{"server-local": {Include: []string{"**"}}},
+			Targets: map[string]accesstest.Target{"server-local": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)

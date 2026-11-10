@@ -53,3 +53,12 @@ const (
 	KeypairGPG     = accessapi.KeypairGPG
 	KeypairEd25519 = accessapi.KeypairEd25519
 )
+
+var BuiltinEnvironments = accessapi.BuiltinEnvironments
+
+const (
+	EnvironmentDev      = accessapi.EnvironmentDev
+	EnvironmentProd     = accessapi.EnvironmentProd
+	DefaultRefreshGrace = accessapi.DefaultRefreshGrace
+	RegistryTokenExpiry = accessapi.RegistryTokenExpiry
+)

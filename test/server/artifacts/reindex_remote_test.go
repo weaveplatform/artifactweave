@@ -7,9 +7,9 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
@@ -40,7 +40,7 @@ func TestAccRemoteReindexRechecksCurrentAuthority(t *testing.T) {
 							t.Fatal(err)
 						}
 					} else {
-						u.Status = accmodel.UserDisabled
+						u.Status = accesstest.UserDisabled
 					}
 					if err = st.Users().Update(ctx, u); err != nil {
 						t.Fatal(err)
@@ -87,7 +87,7 @@ func createRemoteReindexGrant(t *testing.T, w *itemWorld, target string) {
 		t.Fatal(err)
 	}
 	if err := w.db.Permissions().
-		Create(t.Context(), accmodel.Permission{Name: "manage-remote", Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]api.Actions{"deployer": api.ActionManage}}, Targets: map[string]accmodel.Target{target: {Include: []string{"**"}}}}}}); err != nil {
+		Create(t.Context(), accesstest.Permission{Name: "manage-remote", Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]api.Actions{"deployer": api.ActionManage}}, Targets: map[string]accesstest.Target{target: {Include: []string{"**"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
 }

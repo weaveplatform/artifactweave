@@ -17,8 +17,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -471,13 +471,13 @@ func TestUnitRemoteMetadataDoesNotListFilesOutsideReadGrant(t *testing.T) {
 	}))
 	defer up.Close()
 	f := newFixture(t, repo.Remote, remoteSetup(t, up.URL, 3600))
-	if err := f.db.Permissions().Create(t.Context(), accmodel.Permission{
+	if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "metadata-only",
-		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-			Actions: accmodel.Grants{
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{
 				Users: map[string]api.Actions{"metadata-only": api.ActionRead},
 			},
-			Targets: map[string]accmodel.Target{
+			Targets: map[string]accesstest.Target{
 				"hf": {Include: []string{"models--acme--demo/api/**"}},
 			},
 		}},

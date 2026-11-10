@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
@@ -34,13 +34,13 @@ type statusPart struct {
 
 func grantOverwriter(t *testing.T, db harness.Store, key, under string) {
 	t.Helper()
-	if err := db.Permissions().Create(t.Context(), model.Permission{
+	if err := db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "st-overwrite-" + key,
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{
 				"overwriter": api.ActionRead | api.ActionWrite,
 			}},
-			Targets: map[string]model.Target{key: {Include: []string{under + "**"}}},
+			Targets: map[string]accesstest.Target{key: {Include: []string{under + "**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -68,7 +68,7 @@ func newPypiStatusWorld(t *testing.T, anonymous bool) pypiStatusWorld {
 				t.Fatal(err)
 			}
 		}
-		if err := cfg.Store.Users().Create(t.Context(), model.User{
+		if err := cfg.Store.Users().Create(t.Context(), accesstest.User{
 			Name: "overwriter", PasswordHash: cheapHash,
 		}); err != nil {
 			t.Fatal(err)

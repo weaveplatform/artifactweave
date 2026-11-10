@@ -2,6 +2,16 @@ package api
 
 import "context"
 
+// The built-in environments. They are not stored: they cannot be renamed or
+// deleted, and a repository belongs to DEV unless told otherwise.
+const (
+	EnvironmentDev  = "DEV"
+	EnvironmentProd = "PROD"
+)
+
+// BuiltinEnvironments are the global environments every instance has.
+var BuiltinEnvironments = []string{EnvironmentDev, EnvironmentProd}
+
 // Projects reads projects, their environments and their members (decision
 // 0013), for the modules that check a repository's project and
 // environments. Each call uses ctx for the store it reads, so a call inside

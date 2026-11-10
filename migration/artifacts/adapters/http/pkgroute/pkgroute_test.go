@@ -14,7 +14,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -123,11 +122,11 @@ func newKitFixture(t *testing.T, sources map[repo.Class]pkgroute.Source) *kitFix
 	}
 	grant := func(name, user, under string, a api.Actions) {
 		t.Helper()
-		if err := db.Permissions().Create(ctx, accmodel.Permission{
+		if err := db.Permissions().Create(ctx, accesstest.Permission{
 			Name: name,
-			Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-				Actions: accmodel.Grants{Users: map[string]api.Actions{user: a}},
-				Targets: map[string]accmodel.Target{
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+				Actions: accesstest.Grants{Users: map[string]api.Actions{user: a}},
+				Targets: map[string]accesstest.Target{
 					local:     {Include: []string{under + "**"}},
 					federated: {Include: []string{under + "**"}},
 				},
@@ -459,11 +458,11 @@ func TestAccSourceSeam(t *testing.T) {
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("remote without a grant: %d %s", rec.Code, rec.Body)
 	}
-	if err := f.db.Permissions().Create(context.Background(), accmodel.Permission{
+	if err := f.db.Permissions().Create(context.Background(), accesstest.Permission{
 		Name: "remote-reader",
-		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-			Actions: accmodel.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
-			Targets: map[string]accmodel.Target{"gen-remote": {Include: []string{"**"}}},
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
+			Targets: map[string]accesstest.Target{"gen-remote": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)

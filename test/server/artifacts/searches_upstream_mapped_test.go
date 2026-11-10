@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
@@ -18,12 +18,12 @@ const mappedVersions = `<metadata><groupId>org.acme</groupId><artifactId>lib</ar
 
 func mappedSearchGrant(t *testing.T, u *upstreamSearchWorld, patterns ...string) {
 	t.Helper()
-	grant := model.Permission{
+	grant := accesstest.Permission{
 		Name: "mapped-user",
-		Resources: map[api.ResourceType]model.Resource{
+		Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceArtifact: {
-				Actions: model.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
-				Targets: map[string]model.Target{"up": {Include: patterns}},
+				Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+				Targets: map[string]accesstest.Target{"up": {Include: patterns}},
 			},
 		},
 	}

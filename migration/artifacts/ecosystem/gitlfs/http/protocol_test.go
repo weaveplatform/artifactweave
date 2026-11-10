@@ -16,7 +16,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -71,10 +70,10 @@ func newFixture(t *testing.T, class repo.Class) *fixture {
 		permissionTarget = "lfs-local"
 	}
 	if err = db.Permissions().
-		Create(t.Context(), accmodel.Permission{Name: "lfs-access", Resources: map[api.ResourceType]accmodel.Resource{
-			api.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]api.Actions{
+		Create(t.Context(), accesstest.Permission{Name: "lfs-access", Resources: map[api.ResourceType]accesstest.Resource{
+			api.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]api.Actions{
 				"reader": api.ActionRead, "writer": api.ActionWrite,
-			}}, Targets: map[string]accmodel.Target{permissionTarget: {Include: []string{"objects/**"}}}},
+			}}, Targets: map[string]accesstest.Target{permissionTarget: {Include: []string{"objects/**"}}}},
 		}}); err != nil {
 		t.Fatal(err)
 	}

@@ -16,8 +16,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
@@ -386,11 +386,11 @@ func TestUnitSwiftLocalDoesNotAdvertiseStaleOrUnreadableReleases(t *testing.T) {
 			t.Fatalf("publish %s: %d %s", version, rec.Code, rec.Body)
 		}
 	}
-	if err := f.db.Permissions().Create(t.Context(), accmodel.Permission{
-		Name: "swift-single-version", Resources: map[api.ResourceType]accmodel.Resource{
+	if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
+		Name: "swift-single-version", Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceArtifact: {
-				Actions: accmodel.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
-				Targets: map[string]accmodel.Target{
+				Actions: accesstest.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
+				Targets: map[string]accesstest.Target{
 					"packages": {Include: []string{"acme/Widget/Widget-1.0.0.zip"}},
 				},
 			},
@@ -600,13 +600,13 @@ func TestUnitSwiftVirtualSkipsAbsentAndUnreadableMembers(t *testing.T) {
 			)
 		}
 	}
-	if err := f.db.Permissions().Create(t.Context(), accmodel.Permission{
-		Name: "swift-virtual-only", Resources: map[api.ResourceType]accmodel.Resource{
+	if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
+		Name: "swift-virtual-only", Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceArtifact: {
-				Actions: accmodel.Grants{
+				Actions: accesstest.Grants{
 					Users: map[string]api.Actions{"virtual-reader": api.ActionRead},
 				},
-				Targets: map[string]accmodel.Target{
+				Targets: map[string]accesstest.Target{
 					"virtual": {Include: []string{"**"}},
 				},
 			},

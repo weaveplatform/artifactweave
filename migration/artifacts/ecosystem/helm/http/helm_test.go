@@ -17,7 +17,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -67,7 +66,7 @@ func newFixture(t *testing.T, relative bool) *fixture {
 	}
 	for user, pattern := range map[string]string{"reader": "**", "partial": "visible/**"} {
 		if err := db.Permissions().
-			Create(ctx, accmodel.Permission{Name: user, Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]api.Actions{user: api.ActionRead}}, Targets: map[string]accmodel.Target{c.Key: {Include: []string{pattern}}}}}}); err != nil {
+			Create(ctx, accesstest.Permission{Name: user, Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]api.Actions{user: api.ActionRead}}, Targets: map[string]accesstest.Target{c.Key: {Include: []string{pattern}}}}}}); err != nil {
 			t.Fatal(err)
 		}
 	}

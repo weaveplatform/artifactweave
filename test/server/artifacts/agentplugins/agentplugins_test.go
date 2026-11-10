@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	agentpluginsfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/agentplugins"
@@ -54,11 +54,11 @@ func TestAccAgentPluginMarketplacesTrackTreeAndPermissions(t *testing.T) {
 		wantStatus(t, w.Do(http.MethodPut, "/artifactory/plugins-local/"+name,
 			"admin", "{}"), http.StatusConflict)
 	}
-	if err := w.DB.Permissions().Create(ctx, model.Permission{
+	if err := w.DB.Permissions().Create(ctx, accesstest.Permission{
 		Name: "old-plugin-only",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{"deployer": api.ActionRead}},
-			Targets: map[string]model.Target{
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"deployer": api.ActionRead}},
+			Targets: map[string]accesstest.Target{
 				"plugins-local": {Include: []string{"reader/1.9.0/**"}},
 			},
 		}},

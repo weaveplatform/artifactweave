@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -180,13 +180,13 @@ func TestUnitVirtualDeploymentRequiresAuthorizedLocalMember(t *testing.T) {
 					t.Fatal(err)
 				}
 				if tc.virtualOnly {
-					if err := f.db.Permissions().Create(t.Context(), model.Permission{
+					if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
 						Name: "virtual-only-write",
-						Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-							Actions: model.Grants{
+						Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+							Actions: accesstest.Grants{
 								Users: map[string]api.Actions{"virtual-only": api.ActionWrite},
 							},
-							Targets: map[string]model.Target{"hf": {Include: []string{"**"}}},
+							Targets: map[string]accesstest.Target{"hf": {Include: []string{"**"}}},
 						}},
 					}); err != nil {
 						t.Fatal(err)
@@ -484,13 +484,13 @@ func TestUnitPathScopedWritesCannotBypassSnapshotOrRefGrants(t *testing.T) {
 		{"refs-only", "models--acme--demo/refs/**", sha},
 		{"snapshots-only", "models--acme--demo/snapshots/**", "main"},
 	} {
-		if err := f.db.Permissions().Create(t.Context(), model.Permission{
+		if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
 			Name: "hf-" + grant.user,
-			Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-				Actions: model.Grants{
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+				Actions: accesstest.Grants{
 					Users: map[string]api.Actions{grant.user: api.ActionWrite},
 				},
-				Targets: map[string]model.Target{"hf": {Include: []string{grant.include}}},
+				Targets: map[string]accesstest.Target{"hf": {Include: []string{grant.include}}},
 			}},
 		}); err != nil {
 			t.Fatal(err)
@@ -524,11 +524,11 @@ func TestUnitIncrementalCommitRequiresParentReadAndReplacementDelete(t *testing.
 	}
 	grant := func(name, user, include string, actions api.Actions) {
 		t.Helper()
-		if err := f.db.Permissions().Create(t.Context(), model.Permission{
+		if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
 			Name: name,
-			Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-				Actions: model.Grants{Users: map[string]api.Actions{user: actions}},
-				Targets: map[string]model.Target{"hf": {Include: []string{include}}},
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+				Actions: accesstest.Grants{Users: map[string]api.Actions{user: actions}},
+				Targets: map[string]accesstest.Target{"hf": {Include: []string{include}}},
 			}},
 		}); err != nil {
 			t.Fatal(err)

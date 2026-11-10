@@ -63,12 +63,16 @@
 //     already carries, and DeciderFrom reads it back.
 //   - Tokens, with TokenRequest, RegistryTokenRequest and IssuedToken:
 //     issuing, revoking and clearing access tokens, and a user's encrypted
-//     password.
+//     password. DefaultRefreshGrace and RegistryTokenExpiry are the token
+//     lifetimes other modules apply: how long a token record outlives its
+//     expiry, and a registry token's lifetime.
 //   - Keys: reading key pairs and certificates.
 //   - Identity, with UserInfo and its Enabled rule: reading user accounts
 //     and the groups new users join.
 //   - Restrictions: checking a user's temporary API restriction.
 //   - Projects: reading project environments, membership and existence.
+//     EnvironmentDev, EnvironmentProd and BuiltinEnvironments are the
+//     built-in environments, which are not stored.
 //   - Grants, with PathPair and ErrScanLimit: who holds what on an item,
 //     and whether moving content changes who may reach it.
 //   - AnonymousAccess: reading and switching the anonymous access setting.

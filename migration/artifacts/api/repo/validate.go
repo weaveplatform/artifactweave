@@ -50,6 +50,19 @@ func (es ValidationError) Unwrap() error {
 // repository with that suffix would be unaddressable.
 const cacheSuffix = "-cache"
 
+// ResolveKey maps a repository key as a client sent it to the stored key and
+// whether it names that repository's cache: "maven-remote-cache" is the cache
+// of "maven-remote". Validate refuses keys that end in the suffix, so the
+// mapping is unambiguous. It is published here because access evaluates
+// permission targets on the stored key and may not import the artifacts
+// module's core.
+func ResolveKey(key string) (stored string, cached bool) {
+	if base, ok := strings.CutSuffix(key, cacheSuffix); ok && base != "" {
+		return base, true
+	}
+	return key, false
+}
+
 // Validate checks the rules a create or full update must satisfy. It returns
 // nil or a ValidationError list; it does not apply defaults, so run Defaults first when
 // validating a document that relies on them.

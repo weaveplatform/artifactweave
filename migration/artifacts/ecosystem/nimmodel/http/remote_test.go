@@ -14,7 +14,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
@@ -71,13 +70,13 @@ func newFixture(t *testing.T) *fixture {
 	if err := db.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Permissions().Create(t.Context(), accmodel.Permission{
-		Name: "nim-read", Resources: map[api.ResourceType]accmodel.Resource{
+	if err := db.Permissions().Create(t.Context(), accesstest.Permission{
+		Name: "nim-read", Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceArtifact: {
-				Actions: accmodel.Grants{Users: map[string]api.Actions{
+				Actions: accesstest.Grants{Users: map[string]api.Actions{
 					"reader": api.ActionRead, "nim-only": api.ActionRead,
 				}},
-				Targets: map[string]accmodel.Target{"nim-remote": {Include: []string{"**"}}},
+				Targets: map[string]accesstest.Target{"nim-remote": {Include: []string{"**"}}},
 			},
 		},
 	}); err != nil {
@@ -346,13 +345,13 @@ func TestAccNIMMetadataAndPairedDockerRegistryKeepSeparateAuthority(t *testing.T
 	if err := f.store.Repos().Create(t.Context(), dockerRepo); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.store.Permissions().Create(t.Context(), accmodel.Permission{
-		Name: "nvcr-read", Resources: map[api.ResourceType]accmodel.Resource{
+	if err := f.store.Permissions().Create(t.Context(), accesstest.Permission{
+		Name: "nvcr-read", Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceArtifact: {
-				Actions: accmodel.Grants{Users: map[string]api.Actions{
+				Actions: accesstest.Grants{Users: map[string]api.Actions{
 					"reader": api.ActionRead, "docker-only": api.ActionRead,
 				}},
-				Targets: map[string]accmodel.Target{
+				Targets: map[string]accesstest.Target{
 					"nvcr-remote": {Include: []string{"nim/meta/llama/**"}},
 				},
 			},

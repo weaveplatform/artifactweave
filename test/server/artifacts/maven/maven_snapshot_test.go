@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
@@ -25,13 +25,13 @@ func TestAccMavenSnapshotDeploy(t *testing.T) {
 	if err := w.db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
 		t.Fatal(err)
 	}
-	if err := w.db.Permissions().Create(ctx, model.Permission{
+	if err := w.db.Permissions().Create(ctx, accesstest.Permission{
 		Name: "deploy-maven",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{
 				"deployer": api.ActionRead | api.ActionWrite,
 			}},
-			Targets: map[string]model.Target{"maven-local": {Include: []string{"**"}}},
+			Targets: map[string]accesstest.Target{"maven-local": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)

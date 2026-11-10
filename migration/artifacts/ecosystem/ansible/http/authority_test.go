@@ -16,8 +16,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -216,12 +216,12 @@ func TestAccGalaxyFiltersUnreadableRemoteVersions(t *testing.T) {
 			Body:   []byte(`{"data":[{"version":"1.2.3"},{"version":"2.0.0"}]}`),
 		},
 	)
-	permission := model.Permission{
+	permission := accesstest.Permission{
 		Name: "selected-version",
-		Resources: map[api.ResourceType]model.Resource{
+		Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceArtifact: {
-				Actions: model.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
-				Targets: map[string]model.Target{
+				Actions: accesstest.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
+				Targets: map[string]accesstest.Target{
 					c.Key: {Include: []string{"collections/weave/sample/1.2.3/**"}},
 				},
 			},

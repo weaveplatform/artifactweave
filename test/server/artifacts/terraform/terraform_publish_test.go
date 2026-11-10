@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
@@ -31,14 +31,16 @@ func TestAccJFTerraformPublish(t *testing.T) {
 	h := statusFixture(t, false, allowBasicTokens, func(c *Config) {
 		c.BaseURL = ""
 		tuneRegistry(c)
-		if err := c.Store.Permissions().Create(t.Context(), model.Permission{
+		if err := c.Store.Permissions().Create(t.Context(), accesstest.Permission{
 			Name: "module-reader",
-			Resources: map[api.ResourceType]model.Resource{
+			Resources: map[api.ResourceType]accesstest.Resource{
 				api.ResourceArtifact: {
-					Actions: model.Grants{
+					Actions: accesstest.Grants{
 						Users: map[string]api.Actions{"user": api.ActionRead},
 					},
-					Targets: map[string]model.Target{"tf-publish": {Include: []string{"acme/**"}}},
+					Targets: map[string]accesstest.Target{
+						"tf-publish": {Include: []string{"acme/**"}},
+					},
 				},
 			},
 		}); err != nil {

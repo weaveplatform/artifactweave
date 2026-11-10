@@ -14,7 +14,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
@@ -122,12 +121,12 @@ func TestAccListingPermissionFilteringAndFinalRevocation(t *testing.T) {
 		),
 	)
 	if err := w.db.Permissions().
-		Create(t.Context(), accmodel.Permission{Name: "narrow", Resources: map[accessapi.ResourceType]accmodel.Resource{
+		Create(t.Context(), accesstest.Permission{Name: "narrow", Resources: map[accessapi.ResourceType]accesstest.Resource{
 			accessapi.ResourceArtifact: {
-				Actions: accmodel.Grants{
+				Actions: accesstest.Grants{
 					Users: map[string]accessapi.Actions{"limited": accessapi.ActionRead},
 				},
-				Targets: map[string]accmodel.Target{
+				Targets: map[string]accesstest.Target{
 					w.c.Key: {Include: []string{"public/allowed.txt"}},
 				},
 			},

@@ -16,7 +16,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
@@ -48,12 +47,12 @@ func request(t *testing.T, scope string) source.Request {
 	st := inmem.New()
 	ctx := t.Context()
 	if err := st.Permissions().
-		Create(ctx, accmodel.Permission{Name: "read", Resources: map[accessapi.ResourceType]accmodel.Resource{
+		Create(ctx, accesstest.Permission{Name: "read", Resources: map[accessapi.ResourceType]accesstest.Resource{
 			accessapi.ResourceArtifact: {
-				Actions: accmodel.Grants{
+				Actions: accesstest.Grants{
 					Users: map[string]accessapi.Actions{"reader": accessapi.ActionRead},
 				},
-				Targets: map[string]accmodel.Target{"up": {Include: []string{"**"}}},
+				Targets: map[string]accesstest.Target{"up": {Include: []string{"**"}}},
 			},
 		}}); err != nil {
 		t.Fatal(err)

@@ -16,7 +16,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -233,7 +233,7 @@ func TestAccGenericRemoteAuthorizationAndRevocation(t *testing.T) {
 					t.Fatal(e)
 				}
 				if mutation == "user" {
-					u.Status = model.UserDisabled
+					u.Status = accesstest.UserDisabled
 				} else {
 					u.PasswordHash = []byte("replacement")
 				}

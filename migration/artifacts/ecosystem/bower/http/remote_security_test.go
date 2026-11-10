@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -251,11 +251,13 @@ func TestUnitBowerGitCatalogFiltersNamesBeforeFetchingRefs(t *testing.T) {
 		{"name":"visible","url":"` + f.up.URL + `/git/team/visible.git"},
 		{"name":"secret","url":"` + f.up.URL + `/git/team/secret.git"}
 	]`)})
-	if err := f.db.Permissions().Create(t.Context(), accmodel.Permission{
+	if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "visible-bower",
-		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-			Actions: accmodel.Grants{Users: map[string]api.Actions{"limited": api.ActionRead}},
-			Targets: map[string]accmodel.Target{"bower-remote": {Include: []string{"visible/**"}}},
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"limited": api.ActionRead}},
+			Targets: map[string]accesstest.Target{
+				"bower-remote": {Include: []string{"visible/**"}},
+			},
 		}},
 	}); err != nil {
 		t.Fatal(err)

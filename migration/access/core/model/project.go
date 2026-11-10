@@ -85,12 +85,6 @@ type Role struct {
 // role's cannot.
 func (r Role) Editable() bool { return r.Type == RoleCustom || r.Type == RoleCustomGlobal }
 
-// Built-in environments.
-const (
-	EnvironmentDev  = "DEV"
-	EnvironmentProd = "PROD"
-)
-
 // Environment is a deployment stage repositories are assigned to. ProjectKey
 // is empty for global environments.
 type Environment struct {

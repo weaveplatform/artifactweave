@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/terraformtest"
@@ -205,7 +205,7 @@ func TestAccProviderVisibilityAndPermissionRevocation(t *testing.T) {
 		t.Helper()
 		_ = f.db.Permissions().Delete(t.Context(), "providers")
 		err := f.db.Permissions().
-			Create(t.Context(), accmodel.Permission{Name: "providers", Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}}, Targets: map[string]accmodel.Target{"provider": {Include: paths}}}}})
+			Create(t.Context(), accesstest.Permission{Name: "providers", Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}}, Targets: map[string]accesstest.Target{"provider": {Include: paths}}}}})
 		if err != nil {
 			t.Fatal(err)
 		}

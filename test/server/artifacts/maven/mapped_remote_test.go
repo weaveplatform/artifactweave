@@ -11,7 +11,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
@@ -158,7 +157,7 @@ func TestAccMappedRootRuntimePublicationAndDeliveryFences(t *testing.T) {
 					t.Fatal(err)
 				}
 				r := permission.Resources[accessapi.ResourceArtifact]
-				r.Targets[w.c.Key] = model.Target{Include: []string{"org.acme/app-1.0.jar"}}
+				r.Targets[w.c.Key] = accesstest.Target{Include: []string{"org.acme/app-1.0.jar"}}
 				permission.Resources[accessapi.ResourceArtifact] = r
 				if err = w.rt.Store.Permissions().Update(t.Context(), permission); err != nil {
 					t.Fatal(err)

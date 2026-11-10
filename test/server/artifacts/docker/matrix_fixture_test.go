@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -43,21 +43,21 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 			}
 		}
 		for _, name := range []string{"nobody", "writer", "member", "charter", "gadmin", "resmgr", "gresmgr"} {
-			user := model.User{Name: name, PasswordHash: cheapHash}
+			user := accesstest.User{Name: name, PasswordHash: cheapHash}
 			if name == "resmgr" {
 				user.Roles.ResourcesManager = true
 			}
 			must(cfg.Store.Users().Create(ctx, user))
 		}
-		must(cfg.Store.Groups().Create(ctx, model.Group{
+		must(cfg.Store.Groups().Create(ctx, accesstest.Group{
 			Name: "team", Members: []string{"member"},
 		}))
-		must(cfg.Store.Groups().Create(ctx, model.Group{
+		must(cfg.Store.Groups().Create(ctx, accesstest.Group{
 			Name: "ops", Members: []string{"gadmin"}, AdminPrivileges: true,
 		}))
-		must(cfg.Store.Groups().Create(ctx, model.Group{
+		must(cfg.Store.Groups().Create(ctx, accesstest.Group{
 			Name: "res-managers", Members: []string{"gresmgr"},
-			Roles: model.RoleFlags{ResourcesManager: true},
+			Roles: accesstest.RoleFlags{ResourcesManager: true},
 		}))
 		for _, c := range matrixRegistryRepos() {
 			must(cfg.Store.Repos().Create(ctx, *repo.Defaults(&c)))
@@ -71,11 +71,13 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 			{"writer", "work/**", map[string]api.Actions{"writer": rwd}, nil},
 			{"team", "**", nil, map[string]api.Actions{"team": rawd}},
 		} {
-			must(cfg.Store.Permissions().Create(ctx, model.Permission{
+			must(cfg.Store.Permissions().Create(ctx, accesstest.Permission{
 				Name: "matrix-docker-" + grant.name,
-				Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-					Actions: model.Grants{Users: grant.users, Groups: grant.groups},
-					Targets: map[string]model.Target{dockerA: {Include: []string{grant.under}}},
+				Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+					Actions: accesstest.Grants{Users: grant.users, Groups: grant.groups},
+					Targets: map[string]accesstest.Target{
+						dockerA: {Include: []string{grant.under}},
+					},
 				}},
 			}))
 		}

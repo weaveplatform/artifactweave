@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -183,11 +183,11 @@ func TestAccConanRevisionOrderingAndVirtualDeduplication(t *testing.T) {
 	if rec := w.do(http.MethodGet, longSearch, "admin", ""); rec.Code != http.StatusBadRequest {
 		t.Fatalf("unbounded Conan search accepted: %d %s", rec.Code, rec.Body)
 	}
-	if err := w.db.Permissions().Create(t.Context(), accmodel.Permission{
+	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "conan-virtual-only-reader",
-		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-			Actions: accmodel.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
-			Targets: map[string]accmodel.Target{"conan-union": {Include: []string{"**"}}},
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+			Targets: map[string]accesstest.Target{"conan-union": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -232,11 +232,11 @@ func TestAccConanRevisionOrderingAndVirtualDeduplication(t *testing.T) {
 			)
 		}
 	}
-	if err := w.db.Permissions().Create(t.Context(), accmodel.Permission{
+	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "conan-manifest-only-reader",
-		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-			Actions: accmodel.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
-			Targets: map[string]accmodel.Target{"conan-first": {
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+			Targets: map[string]accesstest.Target{"conan-first": {
 				Include: []string{"_/hello/1.0/_/rev-new/export/conanmanifest.txt"},
 			}},
 		}},
@@ -265,13 +265,13 @@ func TestAccConanRevisionOrderingAndVirtualDeduplication(t *testing.T) {
 			)
 		}
 	}
-	if err := w.db.Permissions().Create(t.Context(), accmodel.Permission{
+	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "conan-virtual-write-only",
-		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-			Actions: accmodel.Grants{
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{
 				Users: map[string]api.Actions{"deployer": api.ActionRead | api.ActionWrite},
 			},
-			Targets: map[string]accmodel.Target{"conan-union": {Include: []string{"**"}}},
+			Targets: map[string]accesstest.Target{"conan-union": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -284,11 +284,11 @@ func TestAccConanRevisionOrderingAndVirtualDeduplication(t *testing.T) {
 	); rec.Code != http.StatusForbidden {
 		t.Fatalf("virtual writer without target permission deployed: %d %s", rec.Code, rec.Body)
 	}
-	if err := w.db.Permissions().Create(t.Context(), accmodel.Permission{
+	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "conan-content-without-manifest",
-		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-			Actions: accmodel.Grants{Users: map[string]api.Actions{"deployer": api.ActionRead}},
-			Targets: map[string]accmodel.Target{"conan-first": {
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"deployer": api.ActionRead}},
+			Targets: map[string]accesstest.Target{"conan-first": {
 				Include: []string{"_/hello/1.0/_/rev-new/export/conanfile.py"},
 			}},
 		}},
@@ -1089,19 +1089,19 @@ func TestAccConanMalformedUpstreamMetadata(t *testing.T) {
 		}
 	}
 	deny = ""
-	for _, grant := range []accmodel.Permission{
+	for _, grant := range []accesstest.Permission{
 		{
 			Name: "conan-search-only",
-			Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-				Actions: accmodel.Grants{Users: map[string]api.Actions{"deployer": api.ActionRead}},
-				Targets: map[string]accmodel.Target{"conan-remote": {Include: []string{".conan/**"}}},
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+				Actions: accesstest.Grants{Users: map[string]api.Actions{"deployer": api.ActionRead}},
+				Targets: map[string]accesstest.Target{"conan-remote": {Include: []string{".conan/**"}}},
 			}},
 		},
 		{
 			Name: "conan-recipe-metadata-only",
-			Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-				Actions: accmodel.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
-				Targets: map[string]accmodel.Target{"conan-remote": {
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+				Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+				Targets: map[string]accesstest.Target{"conan-remote": {
 					Include: []string{"_/hello/1.0/_/abc/export/**"},
 				}},
 			}},

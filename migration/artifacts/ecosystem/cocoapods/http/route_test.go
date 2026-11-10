@@ -18,7 +18,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
@@ -508,11 +507,11 @@ func TestUnitVirtualStopsOnInvalidUpstreamMetadata(t *testing.T) {
 func TestUnitRemoteAndVirtualDoNotDiscloseForbiddenSource(t *testing.T) {
 	f := newRouteFixture(t)
 	f.seedRemote(t)
-	if err := f.db.Permissions().Create(t.Context(), accmodel.Permission{
+	if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "podspec-only",
-		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-			Actions: accmodel.Grants{Users: map[string]api.Actions{"partial": api.ActionRead}},
-			Targets: map[string]accmodel.Target{
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"partial": api.ActionRead}},
+			Targets: map[string]accesstest.Target{
 				"pods-remote":  {Include: []string{"RemotePod/2.0.0/safe.txt"}},
 				"pods-virtual": {Include: []string{"RemotePod/2.0.0/safe.txt"}},
 			},
@@ -777,11 +776,11 @@ func TestUnitLocalCDNPaginatesPackageIndex(t *testing.T) {
 func TestUnitVirtualDoesNotExposeUnreadablePodArchiveOrShard(t *testing.T) {
 	f := newRouteFixture(t)
 	f.seedLocal("LocalPod", "1.0.0")
-	if err := f.db.Permissions().Create(t.Context(), accmodel.Permission{
+	if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "pod-next-version-only",
-		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-			Actions: accmodel.Grants{Users: map[string]api.Actions{"partial": api.ActionRead}},
-			Targets: map[string]accmodel.Target{
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"partial": api.ActionRead}},
+			Targets: map[string]accesstest.Target{
 				"pods-local":   {Include: []string{"LocalPod/2.0.0/**"}},
 				"pods-virtual": {Include: []string{"LocalPod/2.0.0/**"}},
 			},

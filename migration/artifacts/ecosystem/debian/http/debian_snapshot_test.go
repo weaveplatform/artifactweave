@@ -9,7 +9,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -185,17 +184,17 @@ func TestUnitDebianSnapshotWorkUsesCurrentPermissions(t *testing.T) {
 	}
 	for _, name := range []string{"dev", "other"} {
 		if err := st.Users().
-			Create(ctx, accmodel.User{Name: name, PasswordHash: cheapHash}); err != nil {
+			Create(ctx, accesstest.User{Name: name, PasswordHash: cheapHash}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := st.Permissions().Create(ctx, accmodel.Permission{
+	if err := st.Permissions().Create(ctx, accesstest.Permission{
 		Name: "snapshots",
-		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-			Actions: accmodel.Grants{Users: map[string]api.Actions{
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{
 				"dev": api.ActionRead | api.ActionWrite | api.ActionManage,
 			}},
-			Targets: map[string]accmodel.Target{
+			Targets: map[string]accesstest.Target{
 				"deb-source": {Include: []string{"**"}},
 				"deb-target": {Include: []string{"**"}},
 			},

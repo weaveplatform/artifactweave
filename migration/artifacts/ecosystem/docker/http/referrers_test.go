@@ -11,8 +11,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -212,11 +212,11 @@ func TestAccReferrers(t *testing.T) {
 func TestAccReferrersPermissions(t *testing.T) {
 	w := newBlobWorld(t)
 	ctx := context.Background()
-	if err := w.db.Permissions().Create(ctx, model.Permission{
+	if err := w.db.Permissions().Create(ctx, accesstest.Permission{
 		Name: "docker",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
-			Targets: map[string]model.Target{"docker-local": {Include: []string{"**"}}},
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
+			Targets: map[string]accesstest.Target{"docker-local": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)

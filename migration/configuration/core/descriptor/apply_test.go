@@ -13,8 +13,6 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	configapi "github.com/weaveplatform/artifactweave/migration/configuration/api"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
@@ -363,7 +361,7 @@ func TestUnitApplyTrashesDeletedRepositoriesAsTheCaller(t *testing.T) {
 	} {
 		db := inmem.New()
 		seedRepo(t, db, repo.Config{Key: "gone", Class: repo.Local})
-		if _, err := db.Items().Put(ctx, model.Item{RepoKey: "gone", Name: "f.txt"}); err != nil {
+		if _, err := db.Items().Put(ctx, support.Item{RepoKey: "gone", Name: "f.txt"}); err != nil {
 			t.Fatal(err)
 		}
 		p, err := Parse([]byte("localRepositories:\n  gone: null\n"), env(nil))
@@ -505,7 +503,7 @@ func TestUnitApplyDryRun(t *testing.T) {
 	if err != nil || len(res.Created) != 6 || !strings.HasPrefix(res.String(), "Dry run") {
 		t.Fatalf("dry run %+v %v", res, err)
 	}
-	if repos, _ := db.Repos().List(context.Background(), port.RepoFilter{}); len(repos) != 0 {
+	if repos, _ := db.Repos().List(context.Background(), support.RepoFilter{}); len(repos) != 0 {
 		t.Fatalf("dry run wrote %v", repos)
 	}
 }
@@ -671,7 +669,7 @@ func (f *failingPut) Put(ctx context.Context, d configdoc.ConfigDocument) error 
 func storeState(t *testing.T, db *inmem.Store) string {
 	t.Helper()
 	ctx := t.Context()
-	repos, err := db.Repos().List(ctx, port.RepoFilter{})
+	repos, err := db.Repos().List(ctx, support.RepoFilter{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -700,7 +698,7 @@ func storeState(t *testing.T, db *inmem.Store) string {
 
 var errBoom = errors.New("boom")
 
-func (f faulty) Repos() port.RepoStore          { return faultyRepos{f.Store.Repos(), f.fail} }
+func (f faulty) Repos() support.RepoStore       { return faultyRepos{f.Store.Repos(), f.fail} }
 func (f faulty) Configs() configdoc.ConfigStore { return faultyConfigs{f.Store.Configs(), f.fail} }
 func (f faulty) Settings() settings.SettingsStore {
 	return faultySettings{f.Store.Settings(), f.fail}
@@ -719,11 +717,11 @@ func (f faultySettings) Put(ctx context.Context, key string, value any) error {
 }
 
 type faultyRepos struct {
-	port.RepoStore
+	support.RepoStore
 	fail string
 }
 
-func (f faultyRepos) List(ctx context.Context, rf port.RepoFilter) ([]repo.Config, error) {
+func (f faultyRepos) List(ctx context.Context, rf support.RepoFilter) ([]repo.Config, error) {
 	if f.fail == "list" {
 		return nil, errBoom
 	}

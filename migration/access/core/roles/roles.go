@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
@@ -78,7 +79,7 @@ func (s Service) Environments(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("roles: environments: %w", err)
 	}
-	out := slices.Clone(model.BuiltinEnvironments)
+	out := slices.Clone(accessapi.BuiltinEnvironments)
 	for _, e := range stored {
 		out = append(out, e.Name)
 	}

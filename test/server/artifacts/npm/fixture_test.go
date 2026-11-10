@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -67,7 +67,7 @@ func npmServer(
 	cheapSeed(t, db)
 	for _, name := range []string{"dev", "user"} {
 		if err := db.Users().
-			Create(ctx, model.User{Name: name, PasswordHash: cheapHash}); err != nil {
+			Create(ctx, accesstest.User{Name: name, PasswordHash: cheapHash}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -140,7 +140,7 @@ func newItemWorld(t *testing.T, anonymous bool, tune ...harness.Tune) *itemWorld
 	h, db, _ := npmServer(t, func(cfg *harness.Config) {
 		for _, name := range []string{"deployer"} {
 			if err := cfg.Store.Users().
-				Create(t.Context(), model.User{Name: name, PasswordHash: cheapHash}); err != nil {
+				Create(t.Context(), accesstest.User{Name: name, PasswordHash: cheapHash}); err != nil {
 				t.Fatal(err)
 			}
 		}

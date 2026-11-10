@@ -16,8 +16,8 @@ import (
 
 	"golang.org/x/crypto/blake2b"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -265,7 +265,7 @@ func TestAccUploadInspectsOnceAndChecksCanonicalPermission(t *testing.T) {
 				prefix = "elsewhere/**"
 			}
 			if err := f.db.Permissions().
-				Create(t.Context(), model.Permission{Name: "scoped", Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {Actions: model.Grants{Users: map[string]accessapi.Actions{"scoped": accessapi.ActionWrite}}, Targets: map[string]model.Target{"pypi-local": {Include: []string{prefix}}}}}}); err != nil {
+				Create(t.Context(), accesstest.Permission{Name: "scoped", Resources: map[accessapi.ResourceType]accesstest.Resource{accessapi.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]accessapi.Actions{"scoped": accessapi.ActionWrite}}, Targets: map[string]accesstest.Target{"pypi-local": {Include: []string{prefix}}}}}}); err != nil {
 				t.Fatal(err)
 			}
 			content := wheel(t, "demo", "1.0", metadata("demo", "1.0", ""))

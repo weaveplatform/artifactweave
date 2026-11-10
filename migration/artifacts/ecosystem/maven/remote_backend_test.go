@@ -12,7 +12,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
@@ -128,11 +127,11 @@ func TestAccMavenDurableCompanionAuthorityAndRetries(t *testing.T) {
 			w.permit.Identity, _ = w.db.RemoteCache().Source(t.Context(), w.c.Key)
 			hash := accesstest.HashPassword(t, "test-password")
 			if err := w.db.Users().
-				Create(t.Context(), accmodel.User{Name: "reader", PasswordHash: hash}); err != nil {
+				Create(t.Context(), accesstest.User{Name: "reader", PasswordHash: hash}); err != nil {
 				t.Fatal(err)
 			}
 			if err := w.db.Permissions().
-				Create(t.Context(), accmodel.Permission{Name: "read", Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {Targets: map[string]accmodel.Target{w.c.Key: {}}, Actions: accmodel.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}}}}}); err != nil {
+				Create(t.Context(), accesstest.Permission{Name: "read", Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Targets: map[string]accesstest.Target{w.c.Key: {}}, Actions: accesstest.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}}}}}); err != nil {
 				t.Fatal(err)
 			}
 			api := accesstest.Over(t, w.db, accesstest.WithNow(w.clock.Now)).API()
@@ -146,7 +145,7 @@ func TestAccMavenDurableCompanionAuthorityAndRetries(t *testing.T) {
 					t.Fatal(parseErr)
 				}
 				if err = w.db.Tokens().
-					Create(t.Context(), accmodel.Token{ID: "token", Subject: "jfac@test/users/reader", Scope: scope, ExpiresAt: w.clock.Now().Add(time.Hour)}); err != nil {
+					Create(t.Context(), accesstest.Token{ID: "token", Subject: "jfac@test/users/reader", Scope: scope, ExpiresAt: w.clock.Now().Add(time.Hour)}); err != nil {
 					t.Fatal(err)
 				}
 				p, err = api.Authenticator.Current(

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -49,11 +49,11 @@ func npmOpsWorld(t *testing.T) (*itemWorld, *work.Queue) {
 			t.Fatal(err)
 		}
 	}
-	if err := w.db.Permissions().Create(ctx, model.Permission{
+	if err := w.db.Permissions().Create(ctx, accesstest.Permission{
 		Name: "manage-npm",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{"deployer": api.ActionManage}},
-			Targets: map[string]model.Target{"npm-local": {Include: []string{"**"}}},
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"deployer": api.ActionManage}},
+			Targets: map[string]accesstest.Target{"npm-local": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)

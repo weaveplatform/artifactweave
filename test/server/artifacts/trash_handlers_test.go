@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
@@ -97,11 +97,11 @@ func TestAccTrashListingFiltered(t *testing.T) {
 	ctx := context.Background()
 	grant := func(name, user, repoKey string, a api.Actions, include, exclude []string) {
 		t.Helper()
-		if err := w.db.Permissions().Create(ctx, model.Permission{
+		if err := w.db.Permissions().Create(ctx, accesstest.Permission{
 			Name: name,
-			Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-				Actions: model.Grants{Users: map[string]api.Actions{user: a}},
-				Targets: map[string]model.Target{
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+				Actions: accesstest.Grants{Users: map[string]api.Actions{user: a}},
+				Targets: map[string]accesstest.Target{
 					repoKey: {Include: include, Exclude: exclude},
 				},
 			}},
@@ -224,11 +224,11 @@ func TestAccTrashRestoreNeedsOrigin(t *testing.T) {
 	ctx := context.Background()
 	grant := func(name, repoKey string, a api.Actions, include, exclude []string) {
 		t.Helper()
-		if err := w.db.Permissions().Create(ctx, model.Permission{
+		if err := w.db.Permissions().Create(ctx, accesstest.Permission{
 			Name: name,
-			Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-				Actions: model.Grants{Users: map[string]api.Actions{"user": a}},
-				Targets: map[string]model.Target{
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+				Actions: accesstest.Grants{Users: map[string]api.Actions{"user": a}},
+				Targets: map[string]accesstest.Target{
 					repoKey: {Include: include, Exclude: exclude},
 				},
 			}},
@@ -313,11 +313,11 @@ func TestAccTrashOriginReadFailure(t *testing.T) {
 	wantStatus(t, w.do("PUT", "/artifactory/libs-local/f.txt", "admin", "f"), http.StatusCreated)
 	wantStatus(t, w.do("DELETE", "/artifactory/libs-local/f.txt", "admin", ""),
 		http.StatusNoContent)
-	if err := w.db.Permissions().Create(context.Background(), model.Permission{
+	if err := w.db.Permissions().Create(context.Background(), accesstest.Permission{
 		Name: "restore-dest",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{"user": api.ActionManage}},
-			Targets: map[string]model.Target{"other-local": {Include: []string{"**"}}},
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionManage}},
+			Targets: map[string]accesstest.Target{"other-local": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -390,13 +390,13 @@ func TestAccRepositoryDeleteKeepsItsContent(t *testing.T) {
 	}
 	// user manages, deletes and deploys in both repositories, so only the
 	// deleted repository being gone keeps it out.
-	if err := w.db.Permissions().Create(ctx, model.Permission{
+	if err := w.db.Permissions().Create(ctx, accesstest.Permission{
 		Name: "user-all",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{
 				"user": api.ActionWrite | api.ActionDelete | api.ActionManage,
 			}},
-			Targets: map[string]model.Target{
+			Targets: map[string]accesstest.Target{
 				"libs-local": {Include: []string{"**"}}, "other-local": {Include: []string{"**"}},
 			},
 		}},

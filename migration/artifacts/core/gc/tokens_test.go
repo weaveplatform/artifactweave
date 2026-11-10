@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
-	"github.com/weaveplatform/artifactweave/migration/access/core/port"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
@@ -19,12 +19,12 @@ func TestUnitExpiredTokens(t *testing.T) {
 	ctx := context.Background()
 	now := w.now()
 	for id, expires := range map[string]time.Time{
-		"long-gone":   now.Add(-model.DefaultRefreshGrace - time.Hour),
+		"long-gone":   now.Add(-accessapi.DefaultRefreshGrace - time.Hour),
 		"refreshable": now.Add(-time.Hour),
 		"live":        now.Add(time.Hour),
 		"forever":     {},
 	} {
-		if err := w.db.Tokens().Create(ctx, model.Token{
+		if err := w.db.Tokens().Create(ctx, accesstest.Token{
 			ID:           id,
 			Subject:      "jfac@x/users/a",
 			IssuedAt:     now.Add(-48 * time.Hour),
@@ -53,9 +53,9 @@ func TestUnitExpiredTokens(t *testing.T) {
 
 type failingTokens struct{ *inmem.Store }
 
-func (f failingTokens) Tokens() port.TokenStore { return brokenTokens{f.Store.Tokens()} }
+func (f failingTokens) Tokens() accesstest.TokenStore { return brokenTokens{f.Store.Tokens()} }
 
-type brokenTokens struct{ port.TokenStore }
+type brokenTokens struct{ accesstest.TokenStore }
 
 func (brokenTokens) DeleteExpired(context.Context, time.Time) (int64, error) {
 	return 0, errors.New("database down")

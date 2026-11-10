@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
@@ -161,9 +160,9 @@ func CheckEnvironments(ctx context.Context, projects accessapi.Projects, c *repo
 		return nil
 	}
 	if len(c.Environments) == 0 {
-		c.Environments = []string{model.EnvironmentDev}
+		c.Environments = []string{accessapi.EnvironmentDev}
 	}
-	known := slices.Clone(model.BuiltinEnvironments)
+	known := slices.Clone(accessapi.BuiltinEnvironments)
 	global, err := projects.Environments(ctx, "")
 	if err != nil {
 		return fmt.Errorf("repos: global environments: %w", err)

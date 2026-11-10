@@ -22,7 +22,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -89,11 +88,11 @@ func newFixture(
 	}
 	grant := func(user, include string, actions accessapi.Actions) {
 		t.Helper()
-		if err := db.Permissions().Create(ctx, accmodel.Permission{
+		if err := db.Permissions().Create(ctx, accesstest.Permission{
 			Name: user,
-			Resources: map[accessapi.ResourceType]accmodel.Resource{accessapi.ResourceArtifact: {
-				Actions: accmodel.Grants{Users: map[string]accessapi.Actions{user: actions}},
-				Targets: map[string]accmodel.Target{
+			Resources: map[accessapi.ResourceType]accesstest.Resource{accessapi.ResourceArtifact: {
+				Actions: accesstest.Grants{Users: map[string]accessapi.Actions{user: actions}},
+				Targets: map[string]accesstest.Target{
 					"pypi-local": {Include: []string{include}},
 					"pypi-fed":   {Include: []string{include}},
 				},

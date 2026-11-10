@@ -15,7 +15,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
@@ -912,13 +911,13 @@ func TestAccStoreFailures(t *testing.T) {
 func TestAccRequire(t *testing.T) {
 	ctx := context.Background()
 	db := fixture(t)
-	if err := db.Permissions().Create(ctx, model.Permission{
+	if err := db.Permissions().Create(ctx, accesstest.Permission{
 		Name: "readers",
-		Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]accessapi.Actions{
+		Resources: map[accessapi.ResourceType]accesstest.Resource{accessapi.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]accessapi.Actions{
 				"reader": accessapi.ActionRead, kernel.AnonymousUser: accessapi.ActionRead,
 			}},
-			Targets: map[string]model.Target{"docker-local": {Include: []string{"pub/**"}}},
+			Targets: map[string]accesstest.Target{"docker-local": {Include: []string{"pub/**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)

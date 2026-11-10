@@ -18,8 +18,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
@@ -113,12 +113,12 @@ func TestAccLegacyMigrationPreservesRevisionsBytesPropertiesAndPolicy(t *testing
 			t.Run(string(class)+"/"+kind, func(t *testing.T) {
 				f := newFixture(t, class)
 				if err := f.db.Permissions().
-					Create(t.Context(), accmodel.Permission{Name: "readers", Resources: map[api.ResourceType]accmodel.Resource{
+					Create(t.Context(), accesstest.Permission{Name: "readers", Resources: map[api.ResourceType]accesstest.Resource{
 						api.ResourceArtifact: {
-							Actions: accmodel.Grants{
+							Actions: accesstest.Grants{
 								Users: map[string]api.Actions{"reader": api.ActionRead},
 							},
-							Targets: map[string]accmodel.Target{"hf": {Include: []string{"**"}}},
+							Targets: map[string]accesstest.Target{"hf": {Include: []string{"**"}}},
 						},
 					}}); err != nil {
 					t.Fatal(err)
@@ -307,7 +307,7 @@ func TestAccLegacyMigrationRollsBackInterruptedPublication(t *testing.T) {
 }
 
 func TestAccLegacyMigrationRefusesPermissionChanges(t *testing.T) {
-	for _, patterns := range []accmodel.Target{
+	for _, patterns := range []accesstest.Target{
 		{Include: []string{"models/acme/demo/**"}},
 		{Include: []string{"models--acme--demo/**"}},
 		{Include: []string{"models--acme--demo/**"}, Exclude: []string{"", " "}},
@@ -319,12 +319,12 @@ func TestAccLegacyMigrationRefusesPermissionChanges(t *testing.T) {
 			f := newFixture(t, repo.Local)
 			f.legacyRevision("models", "1700000000", sha, false)
 			if err := f.db.Permissions().
-				Create(t.Context(), accmodel.Permission{Name: "scoped", Resources: map[api.ResourceType]accmodel.Resource{
+				Create(t.Context(), accesstest.Permission{Name: "scoped", Resources: map[api.ResourceType]accesstest.Resource{
 					api.ResourceArtifact: {
-						Actions: accmodel.Grants{
+						Actions: accesstest.Grants{
 							Groups: map[string]api.Actions{"readers": api.ActionRead},
 						},
-						Targets: map[string]accmodel.Target{api.TargetAnyLocal: patterns},
+						Targets: map[string]accesstest.Target{api.TargetAnyLocal: patterns},
 					},
 				}}); err != nil {
 				t.Fatal(err)
@@ -401,14 +401,14 @@ func TestAccLegacyMigrationRechecksChangesDuringVerification(t *testing.T) {
 						_, err = f.db.Items().Put(ctx, it)
 					case "policy":
 						err = f.db.Permissions().
-							Create(ctx, accmodel.Permission{Name: "late grant", Resources: map[api.ResourceType]accmodel.Resource{
+							Create(ctx, accesstest.Permission{Name: "late grant", Resources: map[api.ResourceType]accesstest.Resource{
 								api.ResourceArtifact: {
-									Actions: accmodel.Grants{
+									Actions: accesstest.Grants{
 										Users: map[string]api.Actions{
 											"intruder": api.ActionRead,
 										},
 									},
-									Targets: map[string]accmodel.Target{
+									Targets: map[string]accesstest.Target{
 										"hf": {Include: []string{"models--acme--demo/**"}},
 									},
 								},
@@ -474,7 +474,7 @@ func TestAccLegacyMigrationBoundsAuthorityAndRerunConflicts(t *testing.T) {
 		f.legacyRevision("models", "1700000000", sha, false)
 		for n := 0; n < 1025; n++ {
 			if err := f.db.Permissions().
-				Create(t.Context(), accmodel.Permission{Name: fmt.Sprint(n)}); err != nil {
+				Create(t.Context(), accesstest.Permission{Name: fmt.Sprint(n)}); err != nil {
 				t.Fatal(err)
 			}
 		}

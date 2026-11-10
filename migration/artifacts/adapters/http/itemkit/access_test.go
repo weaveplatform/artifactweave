@@ -8,7 +8,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -50,13 +49,13 @@ func TestUnitAccessForEvaluatesWithoutDecider(t *testing.T) {
 
 	st := inmem.New()
 	c := repo.Config{Key: "libs-local", Class: repo.Local}
-	if err := st.Permissions().Create(ctx, model.Permission{
+	if err := st.Permissions().Create(ctx, accesstest.Permission{
 		Name: "anonymous-reads",
-		Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]accessapi.Actions{
+		Resources: map[accessapi.ResourceType]accesstest.Resource{accessapi.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]accessapi.Actions{
 				kernel.AnonymousUser: accessapi.ActionRead,
 			}},
-			Targets: map[string]model.Target{c.Key: {Include: []string{"**"}}},
+			Targets: map[string]accesstest.Target{c.Key: {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)

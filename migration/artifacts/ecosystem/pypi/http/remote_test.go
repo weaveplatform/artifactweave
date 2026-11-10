@@ -14,8 +14,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
@@ -57,7 +57,7 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 	}
 	for user, include := range map[string]string{"reader": "**", "partial": "demo/1.0/**"} {
 		err = f.db.Permissions().
-			Create(t.Context(), accmodel.Permission{Name: "remote-" + user, Resources: map[accessapi.ResourceType]accmodel.Resource{accessapi.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]accessapi.Actions{user: accessapi.ActionRead}}, Targets: map[string]accmodel.Target{"pypi-remote": {Include: []string{include}}}}}})
+			Create(t.Context(), accesstest.Permission{Name: "remote-" + user, Resources: map[accessapi.ResourceType]accesstest.Resource{accessapi.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]accessapi.Actions{user: accessapi.ActionRead}}, Targets: map[string]accesstest.Target{"pypi-remote": {Include: []string{include}}}}}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -685,7 +685,7 @@ func TestAccRemoteRedirectedMalformedIndexCanRetryImmediately(t *testing.T) {
 }
 
 func TestAccRemoteListRequiresActualReadableDistribution(t *testing.T) {
-	for _, target := range []accmodel.Target{{Include: []string{"demo/.project"}}, {Include: []string{"demo/**"}, Exclude: []string{"demo/1.0/**", "demo/2.0/**"}}} {
+	for _, target := range []accesstest.Target{{Include: []string{"demo/.project"}}, {Include: []string{"demo/**"}, Exclude: []string{"demo/1.0/**", "demo/2.0/**"}}} {
 		f := newRemoteFixture(t)
 		f.project(t, "demo", "1.0", "2.0")
 		f.setJSON(
@@ -699,7 +699,7 @@ func TestAccRemoteListRequiresActualReadableDistribution(t *testing.T) {
 			t.Fatal(err)
 		}
 		if err := f.db.Permissions().
-			Create(t.Context(), accmodel.Permission{Name: "restricted", Resources: map[accessapi.ResourceType]accmodel.Resource{accessapi.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]accessapi.Actions{"partial": accessapi.ActionRead}}, Targets: map[string]accmodel.Target{"pypi-remote": target}}}}); err != nil {
+			Create(t.Context(), accesstest.Permission{Name: "restricted", Resources: map[accessapi.ResourceType]accesstest.Resource{accessapi.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]accessapi.Actions{"partial": accessapi.ActionRead}}, Targets: map[string]accesstest.Target{"pypi-remote": target}}}}); err != nil {
 			t.Fatal(err)
 		}
 		requireRemote(

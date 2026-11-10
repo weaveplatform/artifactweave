@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app"
 	"github.com/weaveplatform/artifactweave/migration/app/config"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
@@ -49,15 +49,15 @@ func NewRemoteWorld(t *testing.T) *RemoteWorld {
 	}
 	for _, name := range []string{"reader", "denied"} {
 		if err := rt.Store.Users().
-			Create(t.Context(), model.User{Name: name, PasswordHash: support.CheapHash}); err != nil {
+			Create(t.Context(), accesstest.User{Name: name, PasswordHash: support.CheapHash}); err != nil {
 			t.Fatal(err)
 		}
 	}
 	if err := rt.Store.Permissions().
-		Create(t.Context(), model.Permission{Name: "remote-read", Resources: map[api.ResourceType]model.Resource{
+		Create(t.Context(), accesstest.Permission{Name: "remote-read", Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceArtifact: {
-				Actions: model.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
-				Targets: map[string]model.Target{"remote": {}},
+				Actions: accesstest.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
+				Targets: map[string]accesstest.Target{"remote": {}},
 			},
 		}}); err != nil {
 		t.Fatal(err)

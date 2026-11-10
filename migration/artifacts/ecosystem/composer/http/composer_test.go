@@ -16,7 +16,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -291,7 +290,7 @@ func TestAccComposerRefusalsAndVirtualAuthority(t *testing.T) {
 		t.Fatalf("denied p2 %d", got.Code)
 	}
 	if err := f.db.Permissions().
-		Create(context.Background(), accmodel.Permission{Name: "composer-second-only", Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}}, Targets: map[string]accmodel.Target{"all": {}, "second": {}}}}}); err != nil {
+		Create(context.Background(), accesstest.Permission{Name: "composer-second-only", Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}}, Targets: map[string]accesstest.Target{"all": {}, "second": {}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	if got := f.requestAs("GET", base+"/p2/acme/widget.json", "reader"); got.Code != 200 {

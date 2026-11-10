@@ -13,8 +13,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
-	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -78,20 +76,20 @@ func newFixture(t *testing.T) *fixture {
 			t.Fatal(err)
 		}
 	}
-	for _, u := range []accmodel.User{{Name: "admin", Admin: true}, {Name: "reader"}} {
+	for _, u := range []accesstest.User{{Name: "admin", Admin: true}, {Name: "reader"}} {
 		if err := db.Users().Create(t.Context(), u); err != nil {
 			t.Fatal(err)
 		}
 	}
 	if err := db.Permissions().
-		Create(t.Context(), accmodel.Permission{Name: "read", Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-			Actions: accmodel.Grants{
+		Create(t.Context(), accesstest.Permission{Name: "read", Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{
 				Users: map[string]api.Actions{
 					"reader":    api.ActionRead,
 					"anonymous": api.ActionRead,
 				},
 			},
-			Targets: map[string]accmodel.Target{
+			Targets: map[string]accesstest.Target{
 				"mods": {Include: []string{"ns/name/aws/1.0.0.zip"}},
 			},
 		}}}); err != nil {
@@ -304,7 +302,7 @@ func TestAccSignedDownloads(t *testing.T) {
 			case "restricted-user":
 				now := time.Now()
 				if _, err := f.db.APIRestrictions().
-					Put(t.Context(), port.APIRestriction{User: user, Actor: "admin", Reason: "Stop downloads", Changed: now, Until: now.Add(time.Hour)}); err != nil {
+					Put(t.Context(), accesstest.APIRestriction{User: user, Actor: "admin", Reason: "Stop downloads", Changed: now, Until: now.Add(time.Hour)}); err != nil {
 					t.Fatal(err)
 				}
 				status = 403
@@ -313,7 +311,7 @@ func TestAccSignedDownloads(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				u.Status = accmodel.UserDisabled
+				u.Status = accesstest.UserDisabled
 				if err = f.db.Users().Update(t.Context(), u); err != nil {
 					t.Fatal(err)
 				}

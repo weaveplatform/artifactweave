@@ -15,7 +15,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	coremodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
@@ -634,7 +633,7 @@ func (s Service) validRepository(ctx context.Context, key string) error {
 	}
 	// The key as given first: a repository may itself be named "x-cache".
 	cfg, err := s.Repositories.Get(ctx, key)
-	if name, cached := coremodel.ResolveRepoKey(key); cached && errors.Is(err, kernel.ErrNotFound) {
+	if name, cached := repo.ResolveKey(key); cached && errors.Is(err, kernel.ErrNotFound) {
 		cfg, err = s.Repositories.Get(ctx, name)
 		if err == nil && cfg.Class != repo.Remote {
 			err = kernel.ErrNotFound

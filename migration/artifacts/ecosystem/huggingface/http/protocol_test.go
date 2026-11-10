@@ -23,7 +23,6 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -75,7 +74,7 @@ func newFixture(t *testing.T, class repo.Class, setup ...func(*fixture) *source.
 	}
 	password := accesstest.HashPassword(t, "pw")
 	if err = db.Users().
-		Create(t.Context(), accmodel.User{Name: "admin", Admin: true, PasswordHash: password}); err != nil {
+		Create(t.Context(), accesstest.User{Name: "admin", Admin: true, PasswordHash: password}); err != nil {
 		t.Fatal(err)
 	}
 	// The middleware's kit reads db, not the store a setup swaps in, so a

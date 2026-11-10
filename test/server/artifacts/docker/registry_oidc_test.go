@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
@@ -27,14 +27,17 @@ func TestAccRegistryTokenForOIDCUsers(t *testing.T) {
 	h := statusFixture(t, false, func(c *Config) {
 		db := c.Store
 		tokens = c.Tokens
-		if err := db.Groups().Create(ctx, model.Group{Name: "ci", AutoJoin: true}); err != nil {
+		if err := db.Groups().
+			Create(ctx, accesstest.Group{Name: "ci", AutoJoin: true}); err != nil {
 			t.Fatal(err)
 		}
-		if err := db.Permissions().Create(ctx, model.Permission{
+		if err := db.Permissions().Create(ctx, accesstest.Permission{
 			Name: "ci-pull",
-			Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-				Actions: model.Grants{Groups: map[string]api.Actions{"ci": api.ActionRead}},
-				Targets: map[string]model.Target{"docker-blobs": {Include: []string{"app/**"}}},
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+				Actions: accesstest.Grants{Groups: map[string]api.Actions{"ci": api.ActionRead}},
+				Targets: map[string]accesstest.Target{
+					"docker-blobs": {Include: []string{"app/**"}},
+				},
 			}},
 		}); err != nil {
 			t.Fatal(err)

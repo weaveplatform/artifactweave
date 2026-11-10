@@ -13,8 +13,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
@@ -73,7 +73,7 @@ func TestAccRemoteAdapterExplicitGateAndRead(t *testing.T) {
 		},
 	)
 	if err := f.db.Permissions().
-		Create(t.Context(), accmodel.Permission{Name: "read-remote", Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}}, Targets: map[string]accmodel.Target{"gen-remote": {Include: []string{"**"}}}}}}); err != nil {
+		Create(t.Context(), accesstest.Permission{Name: "read-remote", Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}}, Targets: map[string]accesstest.Target{"gen-remote": {Include: []string{"**"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	b := &remoteBody{Reader: strings.NewReader("remote bytes")}

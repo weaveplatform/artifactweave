@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
@@ -16,10 +16,10 @@ import (
 func TestAccRepositoryEnvironments(t *testing.T) {
 	ctx := context.Background()
 	w := newRepoWorld(t)
-	if err := w.db.Projects().Create(ctx, model.Project{Key: "proj"}); err != nil {
+	if err := w.db.Projects().Create(ctx, accesstest.Project{Key: "proj"}); err != nil {
 		t.Fatal(err)
 	}
-	for _, e := range []model.Environment{{Name: "QA"}, {ProjectKey: "proj", Name: "stage"}} {
+	for _, e := range []accesstest.Environment{{Name: "QA"}, {ProjectKey: "proj", Name: "stage"}} {
 		if err := w.db.Projects().CreateEnvironment(ctx, e); err != nil {
 			t.Fatal(err)
 		}

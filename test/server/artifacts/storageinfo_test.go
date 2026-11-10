@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 )
 
@@ -14,7 +14,7 @@ import (
 // recalculation stays with administrators.
 func TestAccStorageSummaryAccess(t *testing.T) {
 	w := newIdentityWorld(t)
-	if err := w.db.Users().Create(context.Background(), model.User{
+	if err := w.db.Users().Create(context.Background(), accesstest.User{
 		Name: "watcher", PasswordHash: cheapHash,
 	}); err != nil {
 		t.Fatal(err)

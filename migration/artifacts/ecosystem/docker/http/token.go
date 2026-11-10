@@ -9,7 +9,6 @@ import (
 	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
@@ -117,7 +116,7 @@ func (g *Registry) serveToken(w http.ResponseWriter, r *http.Request, q Request)
 // credential behind it. A token that obtained one has a second left at
 // least, as it verified.
 func lifetime(p kernel.Principal, now time.Time) time.Duration {
-	d := model.RegistryTokenExpiry
+	d := accessapi.RegistryTokenExpiry
 	if !p.TokenExpires.IsZero() {
 		d = min(d, p.TokenExpires.Sub(now).Truncate(time.Second))
 	}

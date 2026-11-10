@@ -334,7 +334,7 @@ func TestUnitRefresh(t *testing.T) {
 	if _, err := s.Refresh(ctx, first.RefreshToken); !errors.Is(err, authn.ErrInvalidToken) {
 		t.Fatalf("a used refresh token: %v", err)
 	}
-	c.add(2*time.Hour + model.DefaultRefreshGrace)
+	c.add(2*time.Hour + accessapi.DefaultRefreshGrace)
 	if _, err := s.Refresh(ctx, next.RefreshToken); !errors.Is(err, authn.ErrInvalidToken) {
 		t.Fatalf("after the grace: %v", err)
 	}

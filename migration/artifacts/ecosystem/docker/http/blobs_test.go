@@ -15,7 +15,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
@@ -458,11 +457,11 @@ func TestAccPermissions(t *testing.T) {
 	w := newBlobWorld(t)
 	ctx := context.Background()
 	grant := func(name string, users map[string]accessapi.Actions, key string) {
-		if err := w.db.Permissions().Create(ctx, accmodel.Permission{
+		if err := w.db.Permissions().Create(ctx, accesstest.Permission{
 			Name: name,
-			Resources: map[accessapi.ResourceType]accmodel.Resource{accessapi.ResourceArtifact: {
-				Actions: accmodel.Grants{Users: users},
-				Targets: map[string]accmodel.Target{key: {Include: []string{"**"}}},
+			Resources: map[accessapi.ResourceType]accesstest.Resource{accessapi.ResourceArtifact: {
+				Actions: accesstest.Grants{Users: users},
+				Targets: map[string]accesstest.Target{key: {Include: []string{"**"}}},
 			}},
 		}); err != nil {
 			t.Fatal(err)
@@ -759,11 +758,11 @@ func TestAccMountWithRegistryTokens(t *testing.T) {
 	for key, a := range map[string]accessapi.Actions{
 		"docker-local": accessapi.ActionRead | accessapi.ActionWrite, "oci-local": accessapi.ActionRead,
 	} {
-		if err := w.db.Permissions().Create(ctx, accmodel.Permission{
+		if err := w.db.Permissions().Create(ctx, accesstest.Permission{
 			Name: "tw-" + key,
-			Resources: map[accessapi.ResourceType]accmodel.Resource{accessapi.ResourceArtifact: {
-				Actions: accmodel.Grants{Users: map[string]accessapi.Actions{"tw": a}},
-				Targets: map[string]accmodel.Target{key: {Include: []string{"**"}}},
+			Resources: map[accessapi.ResourceType]accesstest.Resource{accessapi.ResourceArtifact: {
+				Actions: accesstest.Grants{Users: map[string]accessapi.Actions{"tw": a}},
+				Targets: map[string]accesstest.Target{key: {Include: []string{"**"}}},
 			}},
 		}); err != nil {
 			t.Fatal(err)

@@ -20,6 +20,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
 )
 
@@ -53,6 +55,21 @@ type SeedStore interface {
 func Repositories(db SeedStore) artifactsapi.Repositories {
 	return repos.NewRepositories(db, access.KeysOf(db), access.ProjectsOf(db))
 }
+
+// The artifacts record and store port that the tests of other modules name
+// when they seed a SeedStore or wrap its repositories to fail. The artifacts
+// module declares them in core/model and core/port, which another module may
+// reach only through its api (decision 0044, dependency rule 11), so support
+// names them. Each is an alias: a fake built over them still satisfies
+// SeedStore.
+type (
+	// Item is a stored file or folder of a repository.
+	Item = model.Item
+	// RepoFilter selects the repositories RepoStore lists.
+	RepoFilter = port.RepoFilter
+	// RepoStore stores repository configurations.
+	RepoStore = port.RepoStore
+)
 
 // Layouts is the artifacts module's Layouts, bound as the server binds it:
 // the layout engine's check, which reads and writes nothing.

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
@@ -29,13 +29,13 @@ func seedPermissions(t *testing.T, db *inmem.Store) {
 		Create(ctx, *repo.Defaults(&repo.Config{Key: "perm-local", Class: repo.Local})); err != nil {
 		t.Fatal(err)
 	}
-	libs := map[string]model.Target{"perm-local": {Include: []string{"**"}}}
+	libs := map[string]accesstest.Target{"perm-local": {Include: []string{"**"}}}
 	for _, name := range []string{
 		"st-del-v1", "st-del-v2", "st-del-access", "st-res-put", "st-res-patch", "st-res-del",
 	} {
-		if err := db.Permissions().Create(ctx, model.Permission{
+		if err := db.Permissions().Create(ctx, accesstest.Permission{
 			Name: name,
-			Resources: map[api.ResourceType]model.Resource{
+			Resources: map[api.ResourceType]accesstest.Resource{
 				api.ResourceArtifact: {Targets: libs},
 			},
 		}); err != nil {
@@ -45,10 +45,10 @@ func seedPermissions(t *testing.T, db *inmem.Store) {
 	for _, name := range []string{
 		"st-managed", "st-managed-put", "st-managed-del", "st-managed-grant", "st-managed-other",
 	} {
-		if err := db.Permissions().Create(ctx, model.Permission{
+		if err := db.Permissions().Create(ctx, accesstest.Permission{
 			Name: name,
-			Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-				Actions: model.Grants{Users: map[string]api.Actions{
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+				Actions: accesstest.Grants{Users: map[string]api.Actions{
 					"user": api.ActionRead | api.ActionManage,
 				}},
 				Targets: libs,

@@ -85,7 +85,7 @@ func TestUnitRoleActions(t *testing.T) {
 // PROD, so artifacts are read, annotated and deployed but not deleted.
 func TestUnitDeveloperDefault(t *testing.T) {
 	dev, ok := BuiltinGlobalRole("Developer")
-	if !ok || !slices.Equal(dev.Environments, []string{EnvironmentDev, EnvironmentProd}) {
+	if !ok || !slices.Equal(dev.Environments, []string{api.EnvironmentDev, api.EnvironmentProd}) {
 		t.Fatalf("Developer %+v", dev)
 	}
 	if got := RoleActions(

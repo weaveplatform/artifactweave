@@ -17,8 +17,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -153,7 +153,7 @@ func newRepoWorld(t *testing.T) *repoWorld {
 	ctx := context.Background()
 	db := inmem.New()
 	cheapSeed(t, db)
-	reader := model.User{
+	reader := accesstest.User{
 		Name:         "reader",
 		PasswordHash: cheapHash,
 		Groups:       []string{authn.ReadersGroup},

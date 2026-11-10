@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface/xet"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -298,7 +298,7 @@ func TestUnitXetRejectsCorruptContentAndGenericBypasses(t *testing.T) {
 		}
 	}
 	if e := w.db.Permissions().
-		Create(t.Context(), model.Permission{Name: "xet-private-only", Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {Actions: model.Grants{Users: map[string]api.Actions{"user": api.ActionRead | api.ActionWrite | api.ActionManage | api.ActionDelete}}, Targets: map[string]model.Target{"hf": {Include: []string{"models--acme--demo/.xet/**"}}, "other-local": {Include: []string{"**"}}}}}}); e != nil {
+		Create(t.Context(), accesstest.Permission{Name: "xet-private-only", Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionRead | api.ActionWrite | api.ActionManage | api.ActionDelete}}, Targets: map[string]accesstest.Target{"hf": {Include: []string{"models--acme--demo/.xet/**"}}, "other-local": {Include: []string{"**"}}}}}}); e != nil {
 		t.Fatal(e)
 	}
 	sum := sha256.Sum256(xetFixture(t, "large.xorb"))
@@ -378,7 +378,7 @@ func TestUnitXetOversizedCapabilityIsRefusedAtIssuance(t *testing.T) {
 	// Legacy user creation does not impose Access v2's 255-byte name limit.
 	name := strings.Repeat("u", 16<<10)
 	if err := w.db.Users().
-		Create(t.Context(), model.User{Name: name, Admin: true, PasswordHash: cheapHash}); err != nil {
+		Create(t.Context(), accesstest.User{Name: name, Admin: true, PasswordHash: cheapHash}); err != nil {
 		t.Fatal(err)
 	}
 	endpoint := "/artifactory/api/huggingfaceml/hf"

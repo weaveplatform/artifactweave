@@ -10,9 +10,9 @@ import (
 	"time"
 
 	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/oidc"
 	"github.com/weaveplatform/artifactweave/migration/access/core/roles"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
@@ -1510,21 +1510,23 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 		}
 	}
 	for _, u := range []string{"nobody", "reader", "writer", "deployer", "member", "gadmin", "gresmgr"} {
-		must(db.Users().Create(ctx, accmodel.User{Name: u, PasswordHash: cheapHash}))
+		must(db.Users().Create(ctx, accesstest.User{Name: u, PasswordHash: cheapHash}))
 	}
-	must(db.Users().Create(ctx, accmodel.User{
-		Name: "resmgr", PasswordHash: cheapHash, Roles: accmodel.RoleFlags{ResourcesManager: true},
+	must(db.Users().Create(ctx, accesstest.User{
+		Name:         "resmgr",
+		PasswordHash: cheapHash,
+		Roles:        accesstest.RoleFlags{ResourcesManager: true},
 	}))
-	must(db.Groups().Create(ctx, accmodel.Group{
-		Name: "res-managers", Roles: accmodel.RoleFlags{ResourcesManager: true},
+	must(db.Groups().Create(ctx, accesstest.Group{
+		Name: "res-managers", Roles: accesstest.RoleFlags{ResourcesManager: true},
 		Members: []string{"gresmgr"},
 	}))
 	for _, p := range names {
-		must(db.Users().Create(ctx, accmodel.User{Name: "v-" + p, PasswordHash: cheapHash}))
-		must(db.Groups().Create(ctx, accmodel.Group{Name: "g-" + p}))
+		must(db.Users().Create(ctx, accesstest.User{Name: "v-" + p, PasswordHash: cheapHash}))
+		must(db.Groups().Create(ctx, accesstest.Group{Name: "g-" + p}))
 	}
-	must(db.Groups().Create(ctx, accmodel.Group{Name: "team", Members: []string{"member"}}))
-	must(db.Groups().Create(ctx, accmodel.Group{
+	must(db.Groups().Create(ctx, accesstest.Group{Name: "team", Members: []string{"member"}}))
+	must(db.Groups().Create(ctx, accesstest.Group{
 		Name: "ops", AdminPrivileges: true, Members: []string{"gadmin"},
 	}))
 
@@ -1549,16 +1551,16 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 		must(db.Repos().Create(ctx, *repo.Defaults(&c)))
 	}
 
-	grant := func(name string, g accmodel.Grants, target string, include ...string) {
-		must(db.Permissions().Create(ctx, accmodel.Permission{
+	grant := func(name string, g accesstest.Grants, target string, include ...string) {
+		must(db.Permissions().Create(ctx, accesstest.Permission{
 			Name: name,
-			Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-				Actions: g, Targets: map[string]accmodel.Target{target: {Include: include}},
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+				Actions: g, Targets: map[string]accesstest.Target{target: {Include: include}},
 			}},
 		}))
 	}
-	users := func(name string, a api.Actions) accmodel.Grants {
-		return accmodel.Grants{Users: map[string]api.Actions{name: a}}
+	users := func(name string, a api.Actions) accesstest.Grants {
+		return accesstest.Grants{Users: map[string]api.Actions{name: a}}
 	}
 	// The permissions behind matrixPrincipals' grants.
 	grant("matrix-reader", users("reader", api.ActionRead), "libs-local", "**")
@@ -1571,7 +1573,7 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 	)
 	grant(
 		"matrix-team",
-		accmodel.Grants{Groups: map[string]api.Actions{"team": rawd}},
+		accesstest.Grants{Groups: map[string]api.Actions{"team": rawd}},
 		"libs-local",
 		"**",
 	)
@@ -1581,10 +1583,10 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 	}
 	// The formats' repositories have one permission per principal, so
 	// their grants follow the same pattern as libs-local's.
-	formatGrant := func(name string, g accmodel.Grants, under string) {
-		must(db.Permissions().Create(ctx, accmodel.Permission{
+	formatGrant := func(name string, g accesstest.Grants, under string) {
+		must(db.Permissions().Create(ctx, accesstest.Permission{
 			Name: name,
-			Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
 				Actions: g, Targets: formatTargets(under),
 			}},
 		}))
@@ -1593,14 +1595,14 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 	formatGrant("matrix-formats-writer", users("writer", rwd), "work/")
 	formatGrant(
 		"matrix-formats-team",
-		accmodel.Grants{Groups: map[string]api.Actions{"team": rawd}},
+		accesstest.Grants{Groups: map[string]api.Actions{"team": rawd}},
 		"",
 	)
-	buildGrant := func(name string, g accmodel.Grants) {
-		must(db.Permissions().Create(ctx, accmodel.Permission{
+	buildGrant := func(name string, g accesstest.Grants) {
+		must(db.Permissions().Create(ctx, accesstest.Permission{
 			Name: name,
-			Resources: map[api.ResourceType]accmodel.Resource{api.ResourceBuild: {
-				Actions: g, Targets: map[string]accmodel.Target{
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceBuild: {
+				Actions: g, Targets: map[string]accesstest.Target{
 					api.BuildInfoRepository: {Include: []string{"**"}},
 				},
 			}},
@@ -1608,7 +1610,7 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 	}
 	buildGrant("matrix-build-reader", users("reader", api.ActionRead))
 	buildGrant("matrix-build-writer", users("writer", api.ActionRead|api.ActionWrite))
-	buildGrant("matrix-build-team", accmodel.Grants{Groups: map[string]api.Actions{"team": rwd}})
+	buildGrant("matrix-build-team", accesstest.Grants{Groups: map[string]api.Actions{"team": rwd}})
 
 	blobs, err := fs.New(t.TempDir())
 	must(err)
@@ -1643,9 +1645,9 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 		}))
 		must(db.Keys().PutCertificate(ctx, api.Certificate{Alias: "cert-" + p, PEM: k.bundle}))
 		must(rs.CreateEnvironment(ctx, "E-"+p))
-		must(rs.CreateRole(ctx, accmodel.Role{
+		must(rs.CreateRole(ctx, accesstest.Role{
 			Name:    "role-" + p,
-			Type:    accmodel.RoleCustomGlobal,
+			Type:    accesstest.RoleCustomGlobal,
 			Actions: []string{"READ_REPOSITORY"},
 		}))
 	}
@@ -1747,7 +1749,7 @@ func seedMatrixTokens(t *testing.T, db *inmem.Store) (*token.Service, map[string
 			tokens, "v-"+p.name, "applied-permissions/user", kernel.IdentityStored,
 		).AccessToken
 		for id, user := range map[string]string{"t-" + p.name: p.user, "o-" + p.name: "v-" + p.name} {
-			must(db.Tokens().Create(ctx, accmodel.Token{
+			must(db.Tokens().Create(ctx, accesstest.Token{
 				ID: id, Subject: subjectOf(tokens, user), Revocable: true,
 				Scope: kernel.UserScope(), IssuedAt: now, AccessDigest: []byte(id),
 			}))

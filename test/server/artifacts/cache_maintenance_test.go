@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -52,7 +52,7 @@ func TestAccCacheMaintenancePermissionsAndAliases(t *testing.T) {
 		entries[p] = out.Entry
 	}
 	if err = w.db.Permissions().
-		Create(ctx, accmodel.Permission{Name: "cache-maintenance", Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]api.Actions{"user": api.ActionManage}}, Targets: map[string]accmodel.Target{"up": {Include: []string{"allowed/**"}}}}}}); err != nil {
+		Create(ctx, accesstest.Permission{Name: "cache-maintenance", Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionManage}}, Targets: map[string]accesstest.Target{"up": {Include: []string{"allowed/**"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {
@@ -85,7 +85,7 @@ func TestAccCacheMaintenancePermissionsAndAliases(t *testing.T) {
 	// Delete-only authorization is also sufficient, and a confirmed miss can
 	// be removed through either remote name without needing a stored item.
 	if err = w.db.Permissions().
-		Create(ctx, accmodel.Permission{Name: "cache-delete", Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]api.Actions{"deployer": api.ActionDelete}}, Targets: map[string]accmodel.Target{"up": {Include: []string{"allowed/**"}}}}}}); err != nil {
+		Create(ctx, accesstest.Permission{Name: "cache-delete", Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]api.Actions{"deployer": api.ActionDelete}}, Targets: map[string]accesstest.Target{"up": {Include: []string{"allowed/**"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	wantStatus(

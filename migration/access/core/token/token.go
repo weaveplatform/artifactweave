@@ -291,7 +291,7 @@ type RegistryRequest struct {
 	// Username names the token's user, as Request's does.
 	Username string
 	// ExpiresIn is the lifetime; it must be positive, and at most
-	// model.RegistryTokenExpiry.
+	// accessapi.RegistryTokenExpiry.
 	ExpiresIn time.Duration
 	// Access is what the token grants, which its registry claim carries.
 	Access kernel.RegistryAccess
@@ -318,9 +318,9 @@ func (s *Service) IssueRegistry(_ context.Context, r RegistryRequest) (Issued, e
 	if r.Username == "" || strings.Contains(r.Username, "/") {
 		return Issued{}, fmt.Errorf("%w: a user name is required", ErrInvalidRequest)
 	}
-	if r.ExpiresIn <= 0 || r.ExpiresIn > model.RegistryTokenExpiry {
+	if r.ExpiresIn <= 0 || r.ExpiresIn > accessapi.RegistryTokenExpiry {
 		return Issued{}, fmt.Errorf("%w: a registry token lives at most %s",
-			ErrInvalidRequest, model.RegistryTokenExpiry)
+			ErrInvalidRequest, accessapi.RegistryTokenExpiry)
 	}
 	if !knownIdentity(r.Identity) {
 		return Issued{}, fmt.Errorf("%w: unknown identity %q", ErrInvalidRequest, r.Identity)
@@ -415,7 +415,7 @@ func (s *Service) Verify(ctx context.Context, raw string) (model.Token, error) {
 // subject are all still checked; a reference token always fails. It serves
 // only the refresh grant, which the JFrog CLI sends with the access token it
 // is replacing, by then often expired. The record outlives its expiry for
-// model.DefaultRefreshGrace (the gc keeps it), which bounds how long after
+// accessapi.DefaultRefreshGrace (the gc keeps it), which bounds how long after
 // expiry this succeeds.
 func (s *Service) VerifyExpired(ctx context.Context, raw string) (model.Token, error) {
 	if accessapi.IsReferenceToken(raw) {
@@ -547,7 +547,7 @@ func (s *Service) byDigest(
 
 // Refresh exchanges a refresh token for a new token with the same subject,
 // scope, lifetime and options, and revokes the old one. A refresh token
-// stays usable for model.DefaultRefreshGrace after its token expires.
+// stays usable for accessapi.DefaultRefreshGrace after its token expires.
 func (s *Service) Refresh(ctx context.Context, refreshToken string) (Issued, error) {
 	return s.RefreshAs(ctx, refreshToken, RefreshCheck{})
 }
@@ -578,7 +578,7 @@ func (s *Service) RefreshAs(
 			return err
 		}
 		if !old.ExpiresAt.IsZero() &&
-			!s.now().Before(old.ExpiresAt.Add(model.DefaultRefreshGrace)) {
+			!s.now().Before(old.ExpiresAt.Add(accessapi.DefaultRefreshGrace)) {
 			return fmt.Errorf("%w: refresh token expired", authn.ErrInvalidToken)
 		}
 		sub, err := model.ParseSubject(old.Subject)

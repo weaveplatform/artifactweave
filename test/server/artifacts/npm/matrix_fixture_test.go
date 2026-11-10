@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -40,21 +40,21 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 		}
 		for _, p := range matrixPrincipals {
 			if err := cfg.Store.Users().
-				Create(t.Context(), model.User{Name: "v-" + p.name, PasswordHash: cheapHash}); err != nil {
+				Create(t.Context(), accesstest.User{Name: "v-" + p.name, PasswordHash: cheapHash}); err != nil {
 				t.Fatal(err)
 			}
 		}
 		for _, name := range []string{"nobody", "reader", "writer", "deployer", "member", "gadmin", "charter", "resmgr", "gresmgr"} {
-			role := model.RoleFlags{ResourcesManager: name == "resmgr"}
+			role := accesstest.RoleFlags{ResourcesManager: name == "resmgr"}
 			if err := cfg.Store.Users().
-				Create(t.Context(), model.User{Name: name, PasswordHash: cheapHash, Roles: role}); err != nil {
+				Create(t.Context(), accesstest.User{Name: name, PasswordHash: cheapHash, Roles: role}); err != nil {
 				t.Fatal(err)
 			}
 		}
-		for _, group := range []model.Group{
+		for _, group := range []accesstest.Group{
 			{Name: "team", Members: []string{"member"}},
 			{Name: "ops", Members: []string{"gadmin"}, AdminPrivileges: true},
-			{Name: "res-managers", Members: []string{"gresmgr"}, Roles: model.RoleFlags{ResourcesManager: true}},
+			{Name: "res-managers", Members: []string{"gresmgr"}, Roles: accesstest.RoleFlags{ResourcesManager: true}},
 		} {
 			if err := cfg.Store.Groups().Create(t.Context(), group); err != nil {
 				t.Fatal(err)
@@ -69,14 +69,14 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 			{"writer", "work/**", map[string]api.Actions{"writer": rwd}, nil},
 			{"team", "**", nil, map[string]api.Actions{"team": rawd}},
 		} {
-			targets := map[string]model.Target{}
+			targets := map[string]accesstest.Target{}
 			for _, c := range npmRepos {
-				targets[c.Key] = model.Target{Include: []string{grant.under}}
+				targets[c.Key] = accesstest.Target{Include: []string{grant.under}}
 			}
-			if err := cfg.Store.Permissions().Create(t.Context(), model.Permission{
+			if err := cfg.Store.Permissions().Create(t.Context(), accesstest.Permission{
 				Name: "npm-matrix-" + grant.name,
-				Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-					Actions: model.Grants{
+				Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+					Actions: accesstest.Grants{
 						Users:  grant.users,
 						Groups: grant.groups,
 					},

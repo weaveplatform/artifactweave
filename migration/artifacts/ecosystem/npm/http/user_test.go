@@ -11,8 +11,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
-	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	npmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/instance"
@@ -43,12 +41,12 @@ func newAccounts(t *testing.T, settings map[string]any, expiry time.Duration) *a
 		}
 	}
 	hash := accesstest.HashPassword(t, "pw")
-	for _, u := range []model.User{
+	for _, u := range []accesstest.User{
 		{Name: "ann", PasswordHash: hash},
-		{Name: "locked", PasswordHash: hash, Status: model.UserLocked},
+		{Name: "locked", PasswordHash: hash, Status: accesstest.UserLocked},
 		{Name: "expired", PasswordHash: hash, PasswordExpired: true},
 		{Name: "external", PasswordHash: hash, InternalPasswordDisabled: true},
-		{Name: "off", PasswordHash: hash, Status: model.UserDisabled},
+		{Name: "off", PasswordHash: hash, Status: accesstest.UserDisabled},
 	} {
 		if err := f.db.Users().Create(ctx, u); err != nil {
 			t.Fatal(err)
@@ -128,7 +126,7 @@ func TestAccLoginNames(t *testing.T) {
 	ctx := context.Background()
 	hash := accesstest.HashPassword(t, "pw")
 	if err := f.db.Users().
-		Create(ctx, model.User{Name: "a@b.example", PasswordHash: hash}); err != nil {
+		Create(ctx, accesstest.User{Name: "a@b.example", PasswordHash: hash}); err != nil {
 		t.Fatal(err)
 	}
 	body := `{"name":"a@b.example","password":"pw"}`
@@ -174,7 +172,8 @@ func TestAccLoginRefusals(t *testing.T) {
 	} {
 		wantError(t, f.login(c.name, c.password), c.expected, c.msg)
 	}
-	issued, _, err := f.db.Tokens().List(context.Background(), port.TokenFilter{}, kernel.Page{})
+	issued, _, err := f.db.Tokens().
+		List(context.Background(), accesstest.TokenFilter{}, kernel.Page{})
 	if err != nil || len(issued) != 0 {
 		t.Errorf("refused logins issued tokens: %v, %v", issued, err)
 	}
@@ -192,8 +191,11 @@ func TestAccLoginBasicAuthDisabled(t *testing.T) {
 // Failed logins count toward the user lock as Basic ones do.
 func TestAccLoginCountsFailures(t *testing.T) {
 	f := newAccounts(t, map[string]any{
-		settings.SettingUserLockPolicy:     model.UserLockPolicy{Enabled: true, LoginAttempts: 2},
-		settings.SettingAccessLockSettings: model.AccessLockSettings{},
+		settings.SettingUserLockPolicy: accesstest.UserLockPolicy{
+			Enabled:       true,
+			LoginAttempts: 2,
+		},
+		settings.SettingAccessLockSettings: accesstest.AccessLockSettings{},
 	}, 0)
 	for range 2 {
 		wantError(t, f.login("ann", "wrong"), http.StatusUnauthorized, "Bad credentials")
@@ -215,7 +217,7 @@ func TestAccLoginCountsFailures(t *testing.T) {
 // suspension lasts even the right password is refused.
 func TestAccLoginSuspension(t *testing.T) {
 	f := newAccounts(t, map[string]any{
-		settings.SettingAccessLockSettings: model.AccessLockSettings{
+		settings.SettingAccessLockSettings: accesstest.AccessLockSettings{
 			ClientLoginSuspensionEnabled: true, MaxLoginDelayIncorrectAttempts: 1,
 			BaseLoginDelayMillis: 60_000, MaxLoginDelayMillis: 60_000,
 		},

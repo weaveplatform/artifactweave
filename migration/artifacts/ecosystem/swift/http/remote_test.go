@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
@@ -47,12 +47,12 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 			t.Fatal(err)
 		}
 		if err := db.Permissions().
-			Create(t.Context(), accmodel.Permission{Name: "swift-reader", Resources: map[api.ResourceType]accmodel.Resource{
+			Create(t.Context(), accesstest.Permission{Name: "swift-reader", Resources: map[api.ResourceType]accesstest.Resource{
 				api.ResourceArtifact: {
-					Actions: accmodel.Grants{
+					Actions: accesstest.Grants{
 						Users: map[string]api.Actions{"reader": api.ActionRead},
 					},
-					Targets: map[string]accmodel.Target{
+					Targets: map[string]accesstest.Target{
 						"packages": {Include: []string{"acme/Widget/Widget-1.0.0.zip"}},
 					},
 				},
@@ -338,12 +338,12 @@ func TestAccSwiftPMRemoteVirtualAndOffline(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := f.db.Permissions().
-		Create(t.Context(), accmodel.Permission{Name: "swiftpm-authenticated-reader", Resources: map[api.ResourceType]accmodel.Resource{
+		Create(t.Context(), accesstest.Permission{Name: "swiftpm-authenticated-reader", Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceArtifact: {
-				Actions: accmodel.Grants{
+				Actions: accesstest.Grants{
 					Users: map[string]api.Actions{"swift-client": api.ActionRead},
 				},
-				Targets: map[string]accmodel.Target{
+				Targets: map[string]accesstest.Target{
 					"packages": {Include: []string{"**"}},
 					"virtual":  {Include: []string{"**"}},
 					"empty":    {Include: []string{"**"}},

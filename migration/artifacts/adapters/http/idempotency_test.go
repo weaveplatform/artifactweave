@@ -11,8 +11,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
-	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -45,17 +43,17 @@ func TestUnitIdempotencyKey(t *testing.T) {
 	}
 }
 
-type replayDeadlineUsers struct{ port.UserStore }
+type replayDeadlineUsers struct{ accesstest.UserStore }
 
-func (u replayDeadlineUsers) Get(context.Context, string) (model.User, error) {
-	return model.User{}, context.DeadlineExceeded
+func (u replayDeadlineUsers) Get(context.Context, string) (accesstest.User, error) {
+	return accesstest.User{}, context.DeadlineExceeded
 }
 
 // replayDeadlineStore is a store whose users time out, for an access module
 // whose authenticator cannot recheck a caller.
 type replayDeadlineStore struct{ *inmem.Store }
 
-func (s replayDeadlineStore) Users() port.UserStore {
+func (s replayDeadlineStore) Users() accesstest.UserStore {
 	return replayDeadlineUsers{s.Store.Users()}
 }
 

@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 )
 
@@ -581,11 +581,11 @@ func TestAccUserListPagesAndFilters(t *testing.T) {
 	if !slices.Equal(p.names(), []string{"u3"}) {
 		t.Fatalf("locked %v", p.names())
 	}
-	if err := w.db.Permissions().Create(ctx, model.Permission{
-		Name: "p", Resources: map[api.ResourceType]model.Resource{
+	if err := w.db.Permissions().Create(ctx, accesstest.Permission{
+		Name: "p", Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceArtifact: {
-				Targets: map[string]model.Target{"libs": {}},
-				Actions: model.Grants{
+				Targets: map[string]accesstest.Target{"libs": {}},
+				Actions: accesstest.Grants{
 					Users:  map[string]api.Actions{"u1": api.ActionRead},
 					Groups: map[string]api.Actions{"bosses": api.ActionRead},
 				},

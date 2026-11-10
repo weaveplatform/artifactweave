@@ -13,8 +13,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
@@ -452,11 +452,11 @@ func TestAccChallenge(t *testing.T) {
 	f.deploy(t, "forced", "a.txt", "forced")
 	f.deploy(t, local, "open.txt", "open")
 	everyone := map[string]api.Actions{"anonymous": api.ActionRead, "reader": api.ActionRead}
-	if err := f.db.Permissions().Create(ctx, model.Permission{
+	if err := f.db.Permissions().Create(ctx, accesstest.Permission{
 		Name: "anyone-reads",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: everyone},
-			Targets: map[string]model.Target{
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: everyone},
+			Targets: map[string]accesstest.Target{
 				"forced": {Include: []string{"**"}}, local: {Include: []string{"**"}},
 			},
 		}},

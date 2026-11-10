@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 )
 
@@ -102,13 +102,13 @@ func TestUnitHubCreateBranchFromMainForNativeFolderUpload(t *testing.T) {
 
 func TestUnitHubCreateBranchRejectsInvalidOrUnauthorizedRequests(t *testing.T) {
 	f := newFixture(t, repo.Local)
-	if err := f.db.Permissions().Create(t.Context(), model.Permission{
+	if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "hf-snapshot-only",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{
 				Users: map[string]api.Actions{"snapshot-writer": api.ActionWrite},
 			},
-			Targets: map[string]model.Target{
+			Targets: map[string]accesstest.Target{
 				"hf": {Include: []string{"models--acme--demo/snapshots/**"}},
 			},
 		}},

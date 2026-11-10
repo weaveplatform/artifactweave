@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
@@ -197,19 +197,19 @@ var reindexStatusPart = statusPart{
 		t.Helper()
 		ctx := context.Background()
 		createReindexRepos(t, db)
-		if err := db.Users().Create(ctx, accmodel.User{
+		if err := db.Users().Create(ctx, accesstest.User{
 			Name: "reindexer", PasswordHash: cheapHash,
 		}); err != nil {
 			t.Fatal(err)
 		}
-		targets := map[string]accmodel.Target{}
+		targets := map[string]accesstest.Target{}
 		for _, c := range reindexRepos {
-			targets[c.Key] = accmodel.Target{Include: []string{"**"}}
+			targets[c.Key] = accesstest.Target{Include: []string{"**"}}
 		}
-		if err := db.Permissions().Create(ctx, accmodel.Permission{
+		if err := db.Permissions().Create(ctx, accesstest.Permission{
 			Name: "reindex-manage",
-			Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-				Actions: accmodel.Grants{Users: map[string]api.Actions{
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+				Actions: accesstest.Grants{Users: map[string]api.Actions{
 					"reindexer": api.ActionManage,
 				}},
 				Targets: targets,

@@ -30,15 +30,10 @@ func IsGlobalRoleAction(a string) bool { return slices.Contains(GlobalRoleAction
 // MaxCustomGlobalRoles is how many CUSTOM_GLOBAL roles JFrog allows.
 const MaxCustomGlobalRoles = 30
 
-// BuiltinEnvironments are the global environments every instance has. They
-// are not stored: they cannot be renamed or deleted, and a repository
-// belongs to DEV unless told otherwise.
-var BuiltinEnvironments = []string{EnvironmentDev, EnvironmentProd}
-
 // IsBuiltinEnvironment reports whether name is DEV or PROD, compared without
 // regard to case as environment names are.
 func IsBuiltinEnvironment(name string) bool {
-	return slices.ContainsFunc(BuiltinEnvironments, func(b string) bool {
+	return slices.ContainsFunc(api.BuiltinEnvironments, func(b string) bool {
 		return strings.EqualFold(b, name)
 	})
 }
@@ -63,13 +58,13 @@ var builtinGlobalRoles = []Role{
 	{
 		Name: "Project Admin", Type: RoleAdmin,
 		Description:  "Manages a project's members, roles and resources.",
-		Environments: []string{EnvironmentDev, EnvironmentProd},
+		Environments: []string{api.EnvironmentDev, api.EnvironmentProd},
 		Actions:      slices.Clone(GlobalRoleActions),
 	},
 	{
 		Name: "Developer", Type: RolePredefined,
 		Description:  "Reads and writes artifacts, builds and Release Bundles.",
-		Environments: []string{EnvironmentDev, EnvironmentProd},
+		Environments: []string{api.EnvironmentDev, api.EnvironmentProd},
 		// Read: read repository, Release Bundle, build and pipeline. Write:
 		// annotate and deploy/cache repository artifacts, annotate and create
 		// Release Bundles, annotate and deploy builds.
@@ -82,7 +77,7 @@ var builtinGlobalRoles = []Role{
 	{
 		Name: "Contributor", Type: RolePredefined,
 		Description:  "Reads, deploys and annotates artifacts and builds.",
-		Environments: []string{EnvironmentDev},
+		Environments: []string{api.EnvironmentDev},
 		Actions: []string{
 			"READ_REPOSITORY", "ANNOTATE_REPOSITORY", "DEPLOY_CACHE_REPOSITORY",
 			"READ_RELEASE_BUNDLE", "READ_BUILD", "ANNOTATE_BUILD", "DEPLOY_BUILD",
@@ -92,7 +87,7 @@ var builtinGlobalRoles = []Role{
 	{
 		Name: "Viewer", Type: RolePredefined,
 		Description:  "Reads artifacts, builds and Release Bundles.",
-		Environments: []string{EnvironmentDev, EnvironmentProd},
+		Environments: []string{api.EnvironmentDev, api.EnvironmentProd},
 		Actions: []string{
 			"READ_REPOSITORY", "READ_RELEASE_BUNDLE", "READ_BUILD", "READ_SOURCES_PIPELINE",
 		},
@@ -100,7 +95,7 @@ var builtinGlobalRoles = []Role{
 	{
 		Name: "Release Manager", Type: RolePredefined,
 		Description:  "Creates, distributes and deletes Release Bundles.",
-		Environments: []string{EnvironmentDev, EnvironmentProd},
+		Environments: []string{api.EnvironmentDev, api.EnvironmentProd},
 		Actions: []string{
 			"READ_REPOSITORY", "ANNOTATE_REPOSITORY", "DEPLOY_CACHE_REPOSITORY",
 			"READ_RELEASE_BUNDLE", "ANNOTATE_RELEASE_BUNDLE", "CREATE_RELEASE_BUNDLE",
@@ -111,7 +106,7 @@ var builtinGlobalRoles = []Role{
 	{
 		Name: "Security Manager", Type: RolePredefined,
 		Description:  "Manages Xray data, watches, policies and reports.",
-		Environments: []string{EnvironmentDev, EnvironmentProd},
+		Environments: []string{api.EnvironmentDev, api.EnvironmentProd},
 		Actions: []string{
 			"READ_REPOSITORY", "MANAGE_XRAY_MD_REPOSITORY", "READ_RELEASE_BUNDLE",
 			"MANAGE_XRAY_MD_RELEASE_BUNDLE", "READ_BUILD", "MANAGE_XRAY_MD_BUILD",

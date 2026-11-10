@@ -24,7 +24,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -220,19 +219,19 @@ func buildsAQLWorld(t *testing.T, tune ...func(*Config)) (http.Handler, *accesst
 	db := inmem.New()
 	cheapSeed(t, db)
 	if err := db.Users().
-		Create(ctx, accmodel.User{Name: "dev", PasswordHash: support.CheapHash}); err != nil {
+		Create(ctx, accesstest.User{Name: "dev", PasswordHash: support.CheapHash}); err != nil {
 		t.Fatal(err)
 	}
-	dev := accmodel.Grants{Users: map[string]accessapi.Actions{"dev": accessapi.ActionRead}}
-	if err := db.Permissions().Create(ctx, accmodel.Permission{
-		Name: "dev-app", Resources: map[accessapi.ResourceType]accmodel.Resource{
+	dev := accesstest.Grants{Users: map[string]accessapi.Actions{"dev": accessapi.ActionRead}}
+	if err := db.Permissions().Create(ctx, accesstest.Permission{
+		Name: "dev-app", Resources: map[accessapi.ResourceType]accesstest.Resource{
 			accessapi.ResourceArtifact: {
 				Actions: dev,
-				Targets: map[string]accmodel.Target{"libs-local": {Include: []string{"**"}}},
+				Targets: map[string]accesstest.Target{"libs-local": {Include: []string{"**"}}},
 			},
 			accessapi.ResourceBuild: {
 				Actions: dev,
-				Targets: map[string]accmodel.Target{
+				Targets: map[string]accesstest.Target{
 					"artifactory-build-info": {Include: []string{"app/**"}},
 				},
 			},

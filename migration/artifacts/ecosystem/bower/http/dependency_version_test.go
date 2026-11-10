@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 )
@@ -117,7 +117,7 @@ func TestAccBowerBinaryStaticPermission(t *testing.T) {
 		},
 	)
 	err := f.db.Permissions().
-		Create(t.Context(), model.Permission{Name: "exclude-version", Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {Actions: model.Grants{Users: map[string]api.Actions{"limited": api.ActionRead}}, Targets: map[string]model.Target{"virtual": {Include: []string{"dep/**"}}, "bower-remote": {Include: []string{"dep/**"}, Exclude: []string{"dep/2.0.0/**"}}}}}})
+		Create(t.Context(), accesstest.Permission{Name: "exclude-version", Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]api.Actions{"limited": api.ActionRead}}, Targets: map[string]accesstest.Target{"virtual": {Include: []string{"dep/**"}}, "bower-remote": {Include: []string{"dep/**"}, Exclude: []string{"dep/2.0.0/**"}}}}}})
 	if err != nil {
 		t.Fatal(err)
 	}

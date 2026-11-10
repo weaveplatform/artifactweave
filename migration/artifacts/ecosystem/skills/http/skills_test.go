@@ -17,7 +17,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -51,14 +50,14 @@ func newFixture(t *testing.T) *fixture {
 	if err := db.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Permissions().Create(t.Context(), accmodel.Permission{
+	if err := db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "skills-writer",
-		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-			Actions: accmodel.Grants{Users: map[string]api.Actions{
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{
 				"writer": api.ActionWrite,
 				"reader": api.ActionRead,
 			}},
-			Targets: map[string]accmodel.Target{c.Key: {Include: []string{"**"}}},
+			Targets: map[string]accesstest.Target{c.Key: {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)

@@ -24,7 +24,9 @@
 //     over any SeedStore, with the fast TestHash and CheapHash, the hash of
 //     the shared password).
 //   - The artifacts module's Repositories and Layouts, bound as the server
-//     binds them, for the tests of other modules that apply through them.
+//     binds them, for the tests of other modules that apply through them,
+//     with the artifacts record and store port those tests seed or wrap
+//     (Item, RepoFilter and RepoStore).
 //   - Format fixtures: npm publish bodies and tarballs, NuGet packages and
 //     PDBs, Helm charts, OCI images and manifests, Terraform repositories and
 //     the backend keyring, and the gzip-compressed tar archives of Conan and

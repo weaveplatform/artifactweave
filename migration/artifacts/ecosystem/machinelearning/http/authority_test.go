@@ -5,20 +5,20 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	ml "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/machinelearning"
 )
 
 func (f *fixture) grant(name string, actions accessapi.Actions, include, exclude []string) {
 	f.t.Helper()
-	p := model.Permission{
+	p := accesstest.Permission{
 		Name: name,
-		Resources: map[accessapi.ResourceType]model.Resource{
+		Resources: map[accessapi.ResourceType]accesstest.Resource{
 			accessapi.ResourceArtifact: {
-				Actions: model.Grants{Users: map[string]accessapi.Actions{name: actions}},
-				Targets: map[string]model.Target{"ml": {Include: include, Exclude: exclude}},
+				Actions: accesstest.Grants{Users: map[string]accessapi.Actions{name: actions}},
+				Targets: map[string]accesstest.Target{"ml": {Include: include, Exclude: exclude}},
 			},
 		},
 	}

@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
@@ -384,13 +384,13 @@ func TestAccSearchUpstreamGavcCurrentFileAuthority(t *testing.T) {
 			u.config(func(c *repo.Config) { c.StoreArtifactsLocally = ptr(!noStore) })
 			u.listing("org/acme/lib", "2.0/")
 			u.listing("org/acme/lib/2.0", "lib-2.0.jar", "lib-2.0-sources.jar", "lib-2.0.pom")
-			grant := accmodel.Permission{
+			grant := accesstest.Permission{
 				Name: "search-file",
-				Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-					Actions: accmodel.Grants{
+				Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+					Actions: accesstest.Grants{
 						Users: map[string]api.Actions{"user": api.ActionRead},
 					},
-					Targets: map[string]accmodel.Target{
+					Targets: map[string]accesstest.Target{
 						"up": {Include: []string{"org/acme/lib/2.0/lib-2.0.jar"}},
 					},
 				}},

@@ -18,7 +18,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
@@ -64,7 +63,7 @@ func newRemoteFixture(t *testing.T, options ...fakeupstream.Options) *remoteFixt
 	}
 	for user, pattern := range map[string]string{"reader": "**", "partial": "acme.mixed/1.*/*"} {
 		err = f.db.Permissions().
-			Create(t.Context(), accmodel.Permission{Name: "remote-" + user, Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]api.Actions{user: api.ActionRead}}, Targets: map[string]accmodel.Target{"nuget-remote": {Include: []string{pattern}}}}}})
+			Create(t.Context(), accesstest.Permission{Name: "remote-" + user, Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]api.Actions{user: api.ActionRead}}, Targets: map[string]accesstest.Target{"nuget-remote": {Include: []string{pattern}}}}}})
 		if err != nil {
 			t.Fatal(err)
 		}

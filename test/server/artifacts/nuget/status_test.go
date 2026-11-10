@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
@@ -35,18 +35,18 @@ func nugetStatusFixture(t *testing.T, anonymous bool) http.Handler {
 				t.Fatal(err)
 			}
 		}
-		if err := cfg.Store.Users().Create(t.Context(), model.User{
+		if err := cfg.Store.Users().Create(t.Context(), accesstest.User{
 			Name: "nugetreader", PasswordHash: cheapHash,
 		}); err != nil {
 			t.Fatal(err)
 		}
-		if err := cfg.Store.Permissions().Create(t.Context(), model.Permission{
+		if err := cfg.Store.Permissions().Create(t.Context(), accesstest.Permission{
 			Name: "nuget-read",
-			Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-				Actions: model.Grants{Users: map[string]api.Actions{
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+				Actions: accesstest.Grants{Users: map[string]api.Actions{
 					"nugetreader": api.ActionRead,
 				}},
-				Targets: map[string]model.Target{"nuget-local": {Include: []string{"**"}}},
+				Targets: map[string]accesstest.Target{"nuget-local": {Include: []string{"**"}}},
 			}},
 		}); err != nil {
 			t.Fatal(err)

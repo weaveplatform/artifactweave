@@ -18,7 +18,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -105,12 +104,15 @@ func newFixtureOn(
 	}
 	permit := func(name, user, include string, actions api.Actions) {
 		t.Helper()
-		target := accmodel.Target{Include: []string{include}}
-		if err := db.Permissions().Create(ctx, accmodel.Permission{
+		target := accesstest.Target{Include: []string{include}}
+		if err := db.Permissions().Create(ctx, accesstest.Permission{
 			Name: name,
-			Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-				Actions: accmodel.Grants{Users: map[string]api.Actions{user: actions}},
-				Targets: map[string]accmodel.Target{"nuget-local": target, "nuget-forced": target},
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+				Actions: accesstest.Grants{Users: map[string]api.Actions{user: actions}},
+				Targets: map[string]accesstest.Target{
+					"nuget-local":  target,
+					"nuget-forced": target,
+				},
 			}},
 		}); err != nil {
 			t.Fatal(err)

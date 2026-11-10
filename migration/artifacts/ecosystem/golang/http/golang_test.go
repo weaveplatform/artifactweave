@@ -14,7 +14,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -80,11 +79,11 @@ func newFixtureOn(t *testing.T, seed *inmem.Store, serve pkgroute.Store) *fixtur
 	}
 	grant := func(user, include string) {
 		t.Helper()
-		if err := seed.Permissions().Create(ctx, accmodel.Permission{
+		if err := seed.Permissions().Create(ctx, accesstest.Permission{
 			Name: user,
-			Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-				Actions: accmodel.Grants{Users: map[string]api.Actions{user: api.ActionRead}},
-				Targets: map[string]accmodel.Target{
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+				Actions: accesstest.Grants{Users: map[string]api.Actions{user: api.ActionRead}},
+				Targets: map[string]accesstest.Target{
 					local: {Include: []string{include}}, "go-fed": {Include: []string{include}},
 				},
 			}},

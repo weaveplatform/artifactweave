@@ -15,7 +15,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -104,14 +103,15 @@ func TestAccLegacyMigrationRefusesPermissionScanPastTheLimit(t *testing.T) {
 	w := newMigrationPolicyWorld(t)
 	for n := range 1024 {
 		if err := w.f.db.Permissions().
-			Create(t.Context(), model.Permission{Name: fmt.Sprintf("%04d", n)}); err != nil {
+			Create(t.Context(), accesstest.Permission{Name: fmt.Sprintf("%04d", n)}); err != nil {
 			t.Fatal(err)
 		}
 	}
 	if out := w.migrate(t, w.access.Grants, true); out.Code != http.StatusOK {
 		t.Fatalf("migration within the scan limit: %d %s", out.Code, out.Body)
 	}
-	if err := w.f.db.Permissions().Create(t.Context(), model.Permission{Name: "1024"}); err != nil {
+	if err := w.f.db.Permissions().
+		Create(t.Context(), accesstest.Permission{Name: "1024"}); err != nil {
 		t.Fatal(err)
 	}
 	expectRefusal(

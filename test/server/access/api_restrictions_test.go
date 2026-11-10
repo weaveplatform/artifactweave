@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -130,7 +130,7 @@ func TestAccAPIProjectQuotaUsesRepositoryOwner(t *testing.T) {
 		}
 		for _, project := range []string{"alpha", "beta"} {
 			if err := c.Store.Projects().
-				Create(t.Context(), model.Project{Key: project}); err != nil {
+				Create(t.Context(), accesstest.Project{Key: project}); err != nil {
 				t.Fatal(err)
 			}
 			if err := c.Store.Repos().
@@ -165,14 +165,14 @@ func TestAccAPIRecoveryRequiresMatchingEscapedRoute(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := w.db.Permissions().
-		Create(ctx, model.Permission{Name: "encoded-api", Resources: map[api.ResourceType]model.Resource{
+		Create(ctx, accesstest.Permission{Name: "encoded-api", Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceArtifact: {
-				Actions: model.Grants{
+				Actions: accesstest.Grants{
 					Users: map[string]api.Actions{
 						"deployer": api.ActionRead | api.ActionWrite,
 					},
 				},
-				Targets: map[string]model.Target{"api": {Include: []string{"**"}}},
+				Targets: map[string]accesstest.Target{"api": {Include: []string{"**"}}},
 			},
 		}}); err != nil {
 		t.Fatal(err)

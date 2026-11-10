@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -189,7 +189,7 @@ func TestAccTerraformModuleInit(t *testing.T) {
 		t.Fatal("range differs")
 	}
 	if err := db.Users().
-		Update(t.Context(), model.User{Name: "admin", Status: model.UserDisabled}); err != nil {
+		Update(t.Context(), accesstest.User{Name: "admin", Status: accesstest.UserDisabled}); err != nil {
 		t.Fatal(err)
 	}
 	wantStatus(t, do(t, h, "GET", signed, nil, ""), 403)

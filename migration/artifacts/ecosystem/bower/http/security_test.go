@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 )
@@ -125,13 +125,13 @@ func TestUnitBowerArchiveRequiresEveryFileReadable(t *testing.T) {
 	c := f.repo("bower-private", repo.Local)
 	f.deploy(c, "hello", "1.0.0", "bower.json", `{"name":"hello","version":"1.0.0"}`)
 	f.deploy(c, "hello", "1.0.0", "secret.txt", "private content")
-	if err := f.db.Permissions().Create(t.Context(), model.Permission{
+	if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "manifest-only",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{
 				Users: map[string]api.Actions{"manifest-reader": api.ActionRead},
 			},
-			Targets: map[string]model.Target{
+			Targets: map[string]accesstest.Target{
 				"bower-private": {Include: []string{"hello/1.0.0/bower.json"}},
 			},
 		}},

@@ -37,6 +37,12 @@
 //   - HashPassword and ErrLoginSuspended: cheap password hashes for the
 //     users a test stores, and the suspended-login sentinel, which the
 //     kernel does not declare.
+//   - The access records a test stores (User, Group, Permission, Token,
+//     Project, Role and the rest), the store ports a fake wraps (UserStore,
+//     PermissionStore, TokenStore, with TokenFilter and APIRestriction) and
+//     the constants a test sets (UserDisabled, UserLocked and
+//     RoleCustomGlobal): aliases of access/core/model and access/core/port,
+//     which a test outside access may not import.
 //
 // # Invariants
 //
@@ -79,7 +85,9 @@
 // Implemented P9d. Over takes the access Store with the instance identity
 // (https://github.com/weaveplatform/artifactweave/issues/1073), and New
 // builds over the access module's and the platform's in-memory adapters
-// (https://github.com/weaveplatform/artifactweave/issues/1098).
+// (https://github.com/weaveplatform/artifactweave/issues/1098). The record
+// and port aliases serve the tests that named access internals
+// (https://github.com/weaveplatform/artifactweave/issues/1100).
 //
 // # Testing
 //

@@ -5,8 +5,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -69,7 +69,7 @@ func backendServer(
 	db := inmem.New()
 	cheapSeed(t, db)
 	if err := db.Users().
-		Create(t.Context(), model.User{Name: "user", PasswordHash: cheapHash}); err != nil {
+		Create(t.Context(), accesstest.User{Name: "user", PasswordHash: cheapHash}); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Repos().

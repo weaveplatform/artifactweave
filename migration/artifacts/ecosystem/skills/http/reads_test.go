@@ -14,8 +14,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	skillsfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/skills"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -56,13 +56,13 @@ func TestAccSkillsReadsRespectVersionPermissions(t *testing.T) {
 	old := published(t, f, "alpha", "1.0.0")
 	newer := published(t, f, "alpha", "2.0.0")
 	_ = published(t, f, "secret", "1.0.0")
-	if err := f.db.Permissions().Create(t.Context(), model.Permission{
+	if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "skills-limited",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{
 				"limited": api.ActionRead,
 			}},
-			Targets: map[string]model.Target{f.repo.Key: {
+			Targets: map[string]accesstest.Target{f.repo.Key: {
 				Include: []string{"alpha/1.0.0/**"},
 			}},
 		}},

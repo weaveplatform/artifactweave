@@ -21,7 +21,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -671,10 +670,10 @@ func TestAccBrokenStoredIndexNeverAdvertisesCookbook(t *testing.T) {
 	}
 }
 
-func grant(t *testing.T, f *fixture, targets map[string]accmodel.Target) {
+func grant(t *testing.T, f *fixture, targets map[string]accesstest.Target) {
 	t.Helper()
 	if err := f.db.Permissions().
-		Create(t.Context(), accmodel.Permission{Name: "allowed", Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}}, Targets: targets}}}); err != nil {
+		Create(t.Context(), accesstest.Permission{Name: "allowed", Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}}, Targets: targets}}}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -687,7 +686,7 @@ func TestAccHostedCatalogAndLatestAreFilteredBeforeSelection(t *testing.T) {
 	grant(
 		t,
 		f,
-		map[string]accmodel.Target{
+		map[string]accesstest.Target{
 			f.c.Key: {Include: []string{"widget/**"}, Exclude: []string{"**/*-10.0.0.tar.gz"}},
 		},
 	)
@@ -749,7 +748,7 @@ func TestAccVirtualMembersRetainPriorityAndCurrentPermissions(t *testing.T) {
 	grant(
 		t,
 		f,
-		map[string]accmodel.Target{
+		map[string]accesstest.Target{
 			f.c.Key: {Include: []string{"**"}},
 			"first": {Include: []string{"**"}},
 		},

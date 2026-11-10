@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian"
@@ -163,12 +163,12 @@ func TestAccDebianSnapshotRefusesUnavailableOrCorruptIndex(t *testing.T) {
 	if _, err := w.db.Items().Put(t.Context(), it); err != nil {
 		t.Fatal(err)
 	}
-	if err := w.db.Permissions().Create(t.Context(), accmodel.Permission{
+	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "snapshot-metadata-only",
-		Resources: map[api.ResourceType]accmodel.Resource{
+		Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceArtifact: {
-				Actions: accmodel.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
-				Targets: map[string]accmodel.Target{
+				Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+				Targets: map[string]accesstest.Target{
 					"deb-snapshot-target": {Include: []string{"snapshots/first/" + rel}},
 					"deb-snapshot-source": {Include: []string{rel}},
 				},

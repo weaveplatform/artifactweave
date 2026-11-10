@@ -19,7 +19,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
@@ -91,7 +90,7 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	if err := db.Permissions().
-		Create(t.Context(), accmodel.Permission{Name: "editor-read", Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]api.Actions{"reader": api.ActionRead, kernel.AnonymousUser: api.ActionRead}}, Targets: map[string]accmodel.Target{"editor-remote": {Include: []string{"extensions/ms-vscode/hexeditor/**"}}}}}}); err != nil {
+		Create(t.Context(), accesstest.Permission{Name: "editor-read", Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]api.Actions{"reader": api.ActionRead, kernel.AnonymousUser: api.ActionRead}}, Targets: map[string]accesstest.Target{"editor-remote": {Include: []string{"extensions/ms-vscode/hexeditor/**"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	items := &item.Service{Store: db, Blobs: blobs, Formats: ecosystem.For}

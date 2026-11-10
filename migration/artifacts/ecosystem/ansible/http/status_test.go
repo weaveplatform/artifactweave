@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
@@ -134,12 +134,12 @@ func TestAccGalaxyVirtualOrderedReadableMembers(t *testing.T) {
 	if err := f.db.Repos().Create(t.Context(), virtual); err != nil {
 		t.Fatal(err)
 	}
-	permission := accmodel.Permission{
+	permission := accesstest.Permission{
 		Name: "reader",
-		Resources: map[api.ResourceType]accmodel.Resource{
+		Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceArtifact: {
-				Actions: accmodel.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
-				Targets: map[string]accmodel.Target{
+				Actions: accesstest.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
+				Targets: map[string]accesstest.Target{
 					"virtual": {Include: []string{"**"}},
 					"second":  {Include: []string{"**"}},
 				},
@@ -227,12 +227,12 @@ func TestAccGalaxyPaginationAndPathPermissions(t *testing.T) {
 	if !strings.Contains(w.Body.String(), "1.3.0") {
 		t.Fatalf("next page: %s", w.Body)
 	}
-	permission := accmodel.Permission{
+	permission := accesstest.Permission{
 		Name: "one-version",
-		Resources: map[api.ResourceType]accmodel.Resource{
+		Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceArtifact: {
-				Actions: accmodel.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
-				Targets: map[string]accmodel.Target{
+				Actions: accesstest.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
+				Targets: map[string]accesstest.Target{
 					f.repo.Key: {Include: []string{"collections/weave/sample/1.2.3/**"}},
 				},
 			},

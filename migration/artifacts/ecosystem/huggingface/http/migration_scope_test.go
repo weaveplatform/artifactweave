@@ -13,7 +13,6 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -25,9 +24,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 )
 
-type migrationTokenVerifier struct{ token model.Token }
+type migrationTokenVerifier struct{ token accesstest.Token }
 
-func (v migrationTokenVerifier) Verify(context.Context, string) (model.Token, error) {
+func (v migrationTokenVerifier) Verify(context.Context, string) (accesstest.Token, error) {
 	return v.token, nil
 }
 
@@ -57,7 +56,8 @@ func migrationScopeFixture(t *testing.T) (*fixture, *migrationReadCounter, http.
 		Create(t.Context(), *repo.Defaults(&repo.Config{Key: "hf", Class: repo.Local, PackageType: repo.HuggingFaceML})); err != nil {
 		t.Fatal(err)
 	}
-	if err = db.Users().Create(t.Context(), model.User{Name: "admin", Admin: true}); err != nil {
+	if err = db.Users().
+		Create(t.Context(), accesstest.User{Name: "admin", Admin: true}); err != nil {
 		t.Fatal(err)
 	}
 	f := &fixture{t: t, db: db, items: items}
@@ -84,7 +84,7 @@ func migrationWithScope(
 		t.Fatal(err)
 	}
 	kit := accesstest.Over(t, f.db, accesstest.WithTokenVerifier(migrationTokenVerifier{
-		token: model.Token{ID: "scoped", Subject: "jfac@fixture/users/admin", Scope: parsed},
+		token: accesstest.Token{ID: "scoped", Subject: "jfac@fixture/users/admin", Scope: parsed},
 	}))
 	principal, err := kit.API().Authenticator.Token(t.Context(), "scoped", "")
 	if err != nil {

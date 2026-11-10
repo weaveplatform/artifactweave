@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
 	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -368,11 +368,11 @@ func TestAccBuildPermissions(t *testing.T) {
 	ctx := context.Background()
 	grant := func(name, user string, a api.Actions, include string) {
 		t.Helper()
-		if err := w.db.Permissions().Create(ctx, accmodel.Permission{
+		if err := w.db.Permissions().Create(ctx, accesstest.Permission{
 			Name: name,
-			Resources: map[api.ResourceType]accmodel.Resource{api.ResourceBuild: {
-				Actions: accmodel.Grants{Users: map[string]api.Actions{user: a}},
-				Targets: map[string]accmodel.Target{
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceBuild: {
+				Actions: accesstest.Grants{Users: map[string]api.Actions{user: a}},
+				Targets: map[string]accesstest.Target{
 					api.BuildInfoRepository: {Include: []string{include}},
 				},
 			}},

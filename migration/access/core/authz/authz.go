@@ -10,7 +10,7 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/port"
-	coremodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artrepo "github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/kernel/antpath"
 )
@@ -350,7 +350,7 @@ func (r rule) allows(path string, folder bool) bool {
 // repository that no longer exists simply never matches, as Artifactory
 // keeps such targets and ignores them.
 func covers(target string, repo accessapi.Repo) bool {
-	key, cached := coremodel.ResolveRepoKey(repo.Key)
+	key, cached := artrepo.ResolveKey(repo.Key)
 	class := repo.Class
 	if cached {
 		class = "remote"
@@ -526,7 +526,7 @@ func scopeActions(
 	path string,
 	folder bool,
 ) accessapi.Actions {
-	key, _ := coremodel.ResolveRepoKey(repo.Key)
+	key, _ := artrepo.ResolveKey(repo.Key)
 	var a accessapi.Actions
 	for _, e := range entries {
 		if e.Target != "*" && e.Target != key {

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -55,14 +55,14 @@ func chefCachedDocument(t *testing.T, w *itemWorld, key string) artmodel.Item {
 
 func chefMetadataPermission(t *testing.T, w *itemWorld, keys ...string) {
 	t.Helper()
-	targets := map[string]accmodel.Target{}
+	targets := map[string]accesstest.Target{}
 	for _, key := range keys {
-		targets[key] = accmodel.Target{Include: []string{"**"}, Exclude: []string{"**/*.tar.gz"}}
+		targets[key] = accesstest.Target{Include: []string{"**"}, Exclude: []string{"**/*.tar.gz"}}
 	}
 	if err := w.db.Permissions().
-		Create(t.Context(), accmodel.Permission{Name: "chef-metadata", Resources: map[api.ResourceType]accmodel.Resource{
+		Create(t.Context(), accesstest.Permission{Name: "chef-metadata", Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceArtifact: {
-				Actions: accmodel.Grants{
+				Actions: accesstest.Grants{
 					Users: map[string]api.Actions{
 						"user": api.ActionRead | api.ActionWrite | api.ActionDelete | api.ActionManage,
 					},

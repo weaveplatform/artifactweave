@@ -11,7 +11,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
@@ -74,14 +73,17 @@ func discoveryFixture(
 
 func discoveryGrant(t *testing.T, w *policyWorld, q *source.Request, includes ...string) {
 	t.Helper()
-	grant := model.Permission{Name: "mapped", Resources: map[accessapi.ResourceType]model.Resource{
-		accessapi.ResourceArtifact: {
-			Actions: model.Grants{
-				Users: map[string]accessapi.Actions{"mapped": accessapi.ActionRead},
+	grant := accesstest.Permission{
+		Name: "mapped",
+		Resources: map[accessapi.ResourceType]accesstest.Resource{
+			accessapi.ResourceArtifact: {
+				Actions: accesstest.Grants{
+					Users: map[string]accessapi.Actions{"mapped": accessapi.ActionRead},
+				},
+				Targets: map[string]accesstest.Target{q.Repo.Key: {Include: includes}},
 			},
-			Targets: map[string]model.Target{q.Repo.Key: {Include: includes}},
 		},
-	}}
+	}
 	err := w.db.Permissions().Create(t.Context(), grant)
 	if errors.Is(err, kernel.ErrConflict) {
 		err = w.db.Permissions().Update(t.Context(), grant)

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 )
 
@@ -28,11 +28,13 @@ func xetProvenancePermission(t *testing.T, w *itemWorld, read bool) {
 	if read {
 		actions |= api.ActionRead
 	}
-	if err := w.db.Permissions().Create(t.Context(), model.Permission{
+	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "model-content-provenance",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{"user": actions}},
-			Targets: map[string]model.Target{"hf": {Include: []string{"models--acme--demo/**"}}},
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"user": actions}},
+			Targets: map[string]accesstest.Target{
+				"hf": {Include: []string{"models--acme--demo/**"}},
+			},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -44,11 +46,11 @@ func xetProvenancePermission(t *testing.T, w *itemWorld, read bool) {
 // grant for the target model.
 func xetProvenanceReadableOrigin(t *testing.T, w *itemWorld, key, prefix string) {
 	t.Helper()
-	if err := w.db.Permissions().Create(t.Context(), model.Permission{
+	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "read-other-model-content",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
-			Targets: map[string]model.Target{key: {Include: []string{prefix + "/**"}}},
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+			Targets: map[string]accesstest.Target{key: {Include: []string{prefix + "/**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)

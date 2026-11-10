@@ -12,9 +12,7 @@
 // evaluator in core/authz reads the stored documents through the permission
 // store, not through this package. The package imports the standard library,
 // the kernel, access/api (resource types, targets and actions), core/model and
-// core/port, artifacts/api (Repositories and repo), and pkg/types for
-// ResolveRepoKey alone, which artifacts' core model declares and access core
-// may not import.
+// core/port, and artifacts/api (Repositories, and repo with its ResolveKey).
 //
 // # Inputs
 //

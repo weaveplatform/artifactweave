@@ -16,8 +16,8 @@
 // building blocks (Actions and RepoConfig) stay on the concrete Decider,
 // which only access code imports. The package imports the standard
 // library, the kernel and kernel/antpath, the module's api, core/model and
-// core/port, and pkg/types for ResolveRepoKey alone, which artifacts'
-// core model declares and no artifacts api package exports.
+// core/port, and artifacts/api/repo for ResolveKey alone, which maps a
+// remote repository's cache key to the repository a target names.
 //
 // # Inputs
 //

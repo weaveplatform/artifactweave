@@ -38,7 +38,7 @@
 //     ProjectRepoKey and the sentinel ErrInvalidProjectKey; and the role and
 //     environment vocabulary: GlobalRoleActions, IsGlobalRoleAction,
 //     MaxCustomGlobalRoles, BuiltinGlobalRoles, BuiltinGlobalRole,
-//     RoleActions, BuiltinEnvironments, IsBuiltinEnvironment and
+//     RoleActions, IsBuiltinEnvironment and
 //     ValidEnvironmentName.
 //   - Token, Revocable, Subject and ParseSubject with the sentinel
 //     ErrInvalidSubject, the token defaults and

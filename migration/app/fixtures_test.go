@@ -38,10 +38,9 @@ import (
 	"time"
 
 	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
-	accport "github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
@@ -106,7 +105,7 @@ func newItemWorld(t *testing.T, anonymous bool, tune ...func(*RouterConfig)) *it
 	db := inmem.New()
 	cheapSeed(t, db)
 	hash := cheapHash
-	for _, u := range []accmodel.User{
+	for _, u := range []accesstest.User{
 		{Name: "reader", PasswordHash: hash, Groups: []string{authn.ReadersGroup}},
 		{Name: "deployer", PasswordHash: hash},
 		{Name: "user", PasswordHash: hash},
@@ -115,13 +114,13 @@ func newItemWorld(t *testing.T, anonymous bool, tune ...func(*RouterConfig)) *it
 			t.Fatal(err)
 		}
 	}
-	if err := db.Permissions().Create(ctx, accmodel.Permission{
+	if err := db.Permissions().Create(ctx, accesstest.Permission{
 		Name: "deploy-libs",
-		Resources: map[accessapi.ResourceType]accmodel.Resource{accessapi.ResourceArtifact: {
-			Actions: accmodel.Grants{Users: map[string]accessapi.Actions{
+		Resources: map[accessapi.ResourceType]accesstest.Resource{accessapi.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]accessapi.Actions{
 				"deployer": accessapi.ActionRead | accessapi.ActionWrite,
 			}},
-			Targets: map[string]accmodel.Target{"libs-local": {Include: []string{"**"}}},
+			Targets: map[string]accesstest.Target{"libs-local": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -132,13 +131,13 @@ func newItemWorld(t *testing.T, anonymous bool, tune ...func(*RouterConfig)) *it
 		}
 		// The seeded Any Remote grants anonymous nothing (#383), so anonymous
 		// reads remotes through a permission of its own, as JFrog advises.
-		if err := db.Permissions().Create(ctx, accmodel.Permission{
+		if err := db.Permissions().Create(ctx, accesstest.Permission{
 			Name: anonymousRemotes,
-			Resources: map[accessapi.ResourceType]accmodel.Resource{accessapi.ResourceArtifact: {
-				Actions: accmodel.Grants{Users: map[string]accessapi.Actions{
+			Resources: map[accessapi.ResourceType]accesstest.Resource{accessapi.ResourceArtifact: {
+				Actions: accesstest.Grants{Users: map[string]accessapi.Actions{
 					kernel.AnonymousUser: accessapi.ActionRead,
 				}},
-				Targets: map[string]accmodel.Target{
+				Targets: map[string]accesstest.Target{
 					accessapi.TargetAnyRemote: {Include: []string{"**"}},
 				},
 			}},
@@ -247,7 +246,7 @@ func newRepoWorld(t *testing.T) *repoWorld {
 	ctx := context.Background()
 	db := inmem.New()
 	cheapSeed(t, db)
-	reader := accmodel.User{
+	reader := accesstest.User{
 		Name:         "reader",
 		PasswordHash: cheapHash,
 		Groups:       []string{authn.ReadersGroup},
@@ -968,20 +967,20 @@ func (f faultyStore) Repos() artport.RepoStore {
 	return faultyRepos{RepoStore: f.Store.Repos(), fail: f.fail}
 }
 
-func (f faultyStore) Permissions() accport.PermissionStore {
+func (f faultyStore) Permissions() accesstest.PermissionStore {
 	if f.fail["permissions"] {
 		return failingPermissionStore{f.Store.Permissions()}
 	}
 	return f.Store.Permissions()
 }
 
-type failingPermissionStore struct{ accport.PermissionStore }
+type failingPermissionStore struct{ accesstest.PermissionStore }
 
 func (failingPermissionStore) ForPrincipal(
 	context.Context,
 	string,
 	[]string,
-) ([]accmodel.Permission, error) {
+) ([]accesstest.Permission, error) {
 	return nil, errBoom
 }
 
@@ -1086,19 +1085,19 @@ func buildsAQLWorld(t *testing.T, tune ...func(*RouterConfig)) (http.Handler, *t
 	db := inmem.New()
 	cheapSeed(t, db)
 	if err := db.Users().
-		Create(ctx, accmodel.User{Name: "dev", PasswordHash: cheapHash}); err != nil {
+		Create(ctx, accesstest.User{Name: "dev", PasswordHash: cheapHash}); err != nil {
 		t.Fatal(err)
 	}
-	dev := accmodel.Grants{Users: map[string]accessapi.Actions{"dev": accessapi.ActionRead}}
-	if err := db.Permissions().Create(ctx, accmodel.Permission{
-		Name: "dev-app", Resources: map[accessapi.ResourceType]accmodel.Resource{
+	dev := accesstest.Grants{Users: map[string]accessapi.Actions{"dev": accessapi.ActionRead}}
+	if err := db.Permissions().Create(ctx, accesstest.Permission{
+		Name: "dev-app", Resources: map[accessapi.ResourceType]accesstest.Resource{
 			accessapi.ResourceArtifact: {
 				Actions: dev,
-				Targets: map[string]accmodel.Target{"libs-local": {Include: []string{"**"}}},
+				Targets: map[string]accesstest.Target{"libs-local": {Include: []string{"**"}}},
 			},
 			accessapi.ResourceBuild: {
 				Actions: dev,
-				Targets: map[string]accmodel.Target{
+				Targets: map[string]accesstest.Target{
 					"artifactory-build-info": {Include: []string{"app/**"}},
 				},
 			},
@@ -1247,7 +1246,7 @@ func seedOverwriteStatus(t *testing.T, db *inmem.Store, items *item.Service) {
 	ctx := context.Background()
 	name, _, _ := strings.Cut(overwriter, ":")
 	if err := db.Users().
-		Create(ctx, accmodel.User{Name: name, PasswordHash: cheapHash}); err != nil {
+		Create(ctx, accesstest.User{Name: name, PasswordHash: cheapHash}); err != nil {
 		t.Fatal(err)
 	}
 	grantOverwriter(t, db, "libs-local", "overwrite/")
@@ -1496,13 +1495,13 @@ func (w *itemWorld) put(p, body string) {
 func grantOverwriter(t *testing.T, db *inmem.Store, key, under string) {
 	t.Helper()
 	name, _, _ := strings.Cut(overwriter, ":")
-	if err := db.Permissions().Create(context.Background(), accmodel.Permission{
+	if err := db.Permissions().Create(context.Background(), accesstest.Permission{
 		Name: "st-overwrite-" + key,
-		Resources: map[accessapi.ResourceType]accmodel.Resource{accessapi.ResourceArtifact: {
-			Actions: accmodel.Grants{Users: map[string]accessapi.Actions{
+		Resources: map[accessapi.ResourceType]accesstest.Resource{accessapi.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]accessapi.Actions{
 				name: accessapi.ActionRead | accessapi.ActionWrite,
 			}},
-			Targets: map[string]accmodel.Target{key: {Include: []string{under + "**"}}},
+			Targets: map[string]accesstest.Target{key: {Include: []string{under + "**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)

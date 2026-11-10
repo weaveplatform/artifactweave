@@ -10,8 +10,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -128,17 +128,17 @@ func reindexWorld(
 		cfg.Work = q
 	})
 	ctx := context.Background()
-	targets := map[string]model.Target{}
+	targets := map[string]accesstest.Target{}
 	for _, c := range p8Repos {
 		if err := w.db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
 			t.Fatal(err)
 		}
-		targets[c.Key] = model.Target{Include: []string{"**"}}
+		targets[c.Key] = accesstest.Target{Include: []string{"**"}}
 	}
-	if err := w.db.Permissions().Create(ctx, model.Permission{
+	if err := w.db.Permissions().Create(ctx, accesstest.Permission{
 		Name: "manage-p8",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{"deployer": api.ActionManage}},
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"deployer": api.ActionManage}},
 			Targets: targets,
 		}},
 	}); err != nil {

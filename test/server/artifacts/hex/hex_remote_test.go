@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -200,14 +200,14 @@ func TestUnitHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := w.db.Users().
-		Create(t.Context(), accmodel.User{Name: "partial", PasswordHash: cheapHash}); err != nil {
+		Create(t.Context(), accesstest.User{Name: "partial", PasswordHash: cheapHash}); err != nil {
 		t.Fatal(err)
 	}
-	if err := w.db.Permissions().Create(t.Context(), accmodel.Permission{
+	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "hex-one-version",
-		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-			Actions: accmodel.Grants{Users: map[string]api.Actions{"partial": api.ActionRead}},
-			Targets: map[string]accmodel.Target{
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"partial": api.ActionRead}},
+			Targets: map[string]accesstest.Target{
 				"hex-r": {Include: []string{
 					"tarballs/decimal-2.0.0.tar", "tarballs/ecto-3.12.5.tar",
 				}},

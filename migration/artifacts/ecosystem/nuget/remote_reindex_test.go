@@ -18,7 +18,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/apptest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
@@ -497,7 +496,7 @@ func reindexCredential(t *testing.T, w *world) json.RawMessage {
 	if _, err := acc.Users().Get(w.ctx, "tester"); errors.Is(err, kernel.ErrNotFound) {
 		hash := accesstest.HashPassword(t, "pw")
 		if err = acc.Users().
-			Create(w.ctx, accmodel.User{Name: "tester", PasswordHash: hash, Admin: true}); err != nil {
+			Create(w.ctx, accesstest.User{Name: "tester", PasswordHash: hash, Admin: true}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -532,7 +531,7 @@ func TestUnitRemoteReindexWorkerRevocation(t *testing.T) {
 					t.Fatal(err)
 				}
 				if err = acc.Permissions().
-					Create(w.ctx, accmodel.Permission{Name: "manager", Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]api.Actions{"tester": api.ActionManage}}, Targets: map[string]accmodel.Target{w.c.Key: {Include: []string{"**"}}}}}}); err != nil {
+					Create(w.ctx, accesstest.Permission{Name: "manager", Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]api.Actions{"tester": api.ActionManage}}, Targets: map[string]accesstest.Target{w.c.Key: {Include: []string{"**"}}}}}}); err != nil {
 					t.Fatal(err)
 				}
 				queueRemoteReindex(t, w)
@@ -564,7 +563,7 @@ func TestUnitRemoteReindexWorkerRevocation(t *testing.T) {
 							t.Fatal(err)
 						}
 						if revoke == "disabled" {
-							u.Status = accmodel.UserDisabled
+							u.Status = accesstest.UserDisabled
 						} else {
 							u.PasswordHash = []byte("changed revision")
 						}

@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
@@ -196,13 +196,15 @@ func TestAccBuildRetention(t *testing.T) {
 func TestAccBuildPublishRetention(t *testing.T) {
 	w := newItemWorld(t, false)
 	ctx := context.Background()
-	if err := w.db.Permissions().Create(ctx, accmodel.Permission{
+	if err := w.db.Permissions().Create(ctx, accesstest.Permission{
 		Name: "deploy-builds",
-		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceBuild: {
-			Actions: accmodel.Grants{Users: map[string]api.Actions{
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceBuild: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{
 				"deployer": api.ActionRead | api.ActionWrite,
 			}},
-			Targets: map[string]accmodel.Target{api.BuildInfoRepository: {Include: []string{"**"}}},
+			Targets: map[string]accesstest.Target{
+				api.BuildInfoRepository: {Include: []string{"**"}},
+			},
 		}},
 	}); err != nil {
 		t.Fatal(err)

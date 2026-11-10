@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/reindexauth"
@@ -42,11 +42,11 @@ func newPypiReindexWorld(t *testing.T) *itemWorld {
 	if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
 		t.Fatal(err)
 	}
-	if err := w.db.Permissions().Create(t.Context(), model.Permission{
+	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "manage-pypi",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{"deployer": api.ActionManage}},
-			Targets: map[string]model.Target{"pypi-local": {Include: []string{"**"}}},
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"deployer": api.ActionManage}},
+			Targets: map[string]accesstest.Target{"pypi-local": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)

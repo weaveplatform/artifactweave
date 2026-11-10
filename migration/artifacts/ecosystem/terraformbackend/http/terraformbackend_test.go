@@ -19,8 +19,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
-	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -66,7 +64,7 @@ func newFixture(t *testing.T) *fixture {
 			t.Fatal(err)
 		}
 	}
-	for _, u := range []model.User{{Name: "admin", Admin: true}, {Name: "alice"}, {Name: "bob"}, {Name: "reader"}, {Name: "writer"}, {Name: "deleter"}, {Name: "scoped"}, {Name: "nobody"}} {
+	for _, u := range []accesstest.User{{Name: "admin", Admin: true}, {Name: "alice"}, {Name: "bob"}, {Name: "reader"}, {Name: "writer"}, {Name: "deleter"}, {Name: "scoped"}, {Name: "nobody"}} {
 		if err := db.Users().Create(t.Context(), u); err != nil {
 			t.Fatal(err)
 		}
@@ -101,7 +99,7 @@ func newFixture(t *testing.T) *fixture {
 func (f *fixture) grant(name string, users map[string]api.Actions, path string) {
 	f.t.Helper()
 	err := f.db.Permissions().
-		Create(f.t.Context(), model.Permission{Name: name, Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {Actions: model.Grants{Users: users}, Targets: map[string]model.Target{"states": {Include: []string{path}}, "states__nested": {Include: []string{path}}}}}})
+		Create(f.t.Context(), accesstest.Permission{Name: name, Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Actions: accesstest.Grants{Users: users}, Targets: map[string]accesstest.Target{"states": {Include: []string{path}}, "states__nested": {Include: []string{path}}}}}})
 	if err != nil {
 		f.t.Fatal(err)
 	}
@@ -450,7 +448,7 @@ func TestAccUploadCapability(t *testing.T) {
 			switch kind {
 			case "restricted":
 				if _, err := f.db.APIRestrictions().
-					Put(t.Context(), port.APIRestriction{User: "alice", Actor: "admin", Reason: "Stop uploads", Changed: f.now, Until: f.now.Add(time.Hour)}); err != nil {
+					Put(t.Context(), accesstest.APIRestriction{User: "alice", Actor: "admin", Reason: "Stop uploads", Changed: f.now, Until: f.now.Add(time.Hour)}); err != nil {
 					t.Fatal(err)
 				}
 			case "bad-signature":
@@ -474,7 +472,7 @@ func TestAccUploadCapability(t *testing.T) {
 				}
 			case "disabled":
 				u, _ := f.db.Users().Get(t.Context(), "alice")
-				u.Status = model.UserDisabled
+				u.Status = accesstest.UserDisabled
 				if err := f.db.Users().Update(t.Context(), u); err != nil {
 					t.Fatal(err)
 				}
@@ -512,7 +510,7 @@ func TestAccUploadCapability(t *testing.T) {
 			)
 			if kind == "restricted" {
 				if _, err := f.db.APIRestrictions().
-					Put(t.Context(), port.APIRestriction{User: "alice", Actor: "admin", Reason: "Recovered", Changed: f.now}); err != nil {
+					Put(t.Context(), accesstest.APIRestriction{User: "alice", Actor: "admin", Reason: "Recovered", Changed: f.now}); err != nil {
 					t.Fatal(err)
 				}
 				expect(t, f.do("PUT", upload, "", body), 200)
@@ -676,9 +674,14 @@ func TestAccMissingDependenciesAndRouteBoundaries(t *testing.T) {
 	}
 }
 
-type fixedToken struct{ token model.Token }
+type fixedToken struct{ token accesstest.Token }
 
-func (v fixedToken) Verify(context.Context, string) (model.Token, error) { return v.token, nil }
+func (v fixedToken) Verify(
+	context.Context,
+	string,
+) (accesstest.Token, error) {
+	return v.token, nil
+}
 
 func TestAccCapabilityPreservesTokenIdentityScopeAndExpiry(t *testing.T) {
 	for _, kind := range []string{"scoped", "named-group", "transient", "synthetic", "transient-stored"} {
@@ -691,11 +694,11 @@ func TestAccCapabilityPreservesTokenIdentityScopeAndExpiry(t *testing.T) {
 			if kind != "scoped" {
 				scope = "applied-permissions/groups:backend"
 				if err := f.db.Groups().
-					Create(t.Context(), model.Group{Name: "backend", AutoJoin: true}); err != nil {
+					Create(t.Context(), accesstest.Group{Name: "backend", AutoJoin: true}); err != nil {
 					t.Fatal(err)
 				}
 				if err := f.db.Permissions().
-					Create(t.Context(), model.Permission{Name: "backend-group", Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {Targets: map[string]model.Target{"states": {}}, Actions: model.Grants{Groups: map[string]api.Actions{"backend": api.ActionWrite}}}}}); err != nil {
+					Create(t.Context(), accesstest.Permission{Name: "backend-group", Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Targets: map[string]accesstest.Target{"states": {}}, Actions: accesstest.Grants{Groups: map[string]api.Actions{"backend": api.ActionWrite}}}}}); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -716,7 +719,7 @@ func TestAccCapabilityPreservesTokenIdentityScopeAndExpiry(t *testing.T) {
 				t.Fatal(err)
 			}
 			authn := accesstest.Over(t, f.db, accesstest.WithTokenVerifier(fixedToken{
-				model.Token{
+				accesstest.Token{
 					ID:        "original-token",
 					Subject:   "jfac@fixture/users/" + name,
 					Scope:     parsed,

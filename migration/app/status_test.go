@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -285,12 +285,12 @@ func newStatusFixture(
 	db := inmem.New()
 	cheapSeed(t, db)
 	if err := db.Users().
-		Create(ctx, accmodel.User{Name: "user", PasswordHash: cheapHash}); err != nil {
+		Create(ctx, accesstest.User{Name: "user", PasswordHash: cheapHash}); err != nil {
 		t.Fatal(err)
 	}
 	// A locked account, until securityStatusRows unlocks every user.
-	if err := db.Users().Create(ctx, accmodel.User{
-		Name: "locked", PasswordHash: cheapHash, Status: accmodel.UserLocked,
+	if err := db.Users().Create(ctx, accesstest.User{
+		Name: "locked", PasswordHash: cheapHash, Status: accesstest.UserLocked,
 	}); err != nil {
 		t.Fatal(err)
 	}

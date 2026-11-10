@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
@@ -31,16 +31,16 @@ func actionWorld(t *testing.T, tune ...func(*Config)) *itemWorld {
 		"cleaner":   {api.ActionRead | api.ActionDelete, "a/**"},
 		"annotator": {api.ActionRead | api.ActionAnnotate, "a/*.jar"},
 	} {
-		if err := w.db.Users().Create(ctx, accmodel.User{
+		if err := w.db.Users().Create(ctx, accesstest.User{
 			Name: name, PasswordHash: cheapHash, Groups: []string{authn.ReadersGroup},
 		}); err != nil {
 			t.Fatal(err)
 		}
-		if err := w.db.Permissions().Create(ctx, accmodel.Permission{
+		if err := w.db.Permissions().Create(ctx, accesstest.Permission{
 			Name: name,
-			Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-				Actions: accmodel.Grants{Users: map[string]api.Actions{name: grant.actions}},
-				Targets: map[string]accmodel.Target{
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+				Actions: accesstest.Grants{Users: map[string]api.Actions{name: grant.actions}},
+				Targets: map[string]accesstest.Target{
 					"libs-local": {Include: []string{grant.include}},
 				},
 			}},

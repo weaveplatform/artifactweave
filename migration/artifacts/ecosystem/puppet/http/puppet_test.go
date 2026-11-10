@@ -21,7 +21,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -424,12 +423,12 @@ func TestAccVirtualOrderedVersionsAndMemberPermissions(t *testing.T) {
 			t.Fatalf("virtual: %d %s", r.Code, r.Body.String())
 		}
 	}
-	permission := accmodel.Permission{
+	permission := accesstest.Permission{
 		Name: "virtual-only",
-		Resources: map[api.ResourceType]accmodel.Resource{
+		Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceArtifact: {
-				Actions: accmodel.Grants{Users: map[string]api.Actions{"viewer": api.ActionRead}},
-				Targets: map[string]accmodel.Target{"virtual": {}},
+				Actions: accesstest.Grants{Users: map[string]api.Actions{"viewer": api.ActionRead}},
+				Targets: map[string]accesstest.Target{"virtual": {}},
 			},
 		},
 	}

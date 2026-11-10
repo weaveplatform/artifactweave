@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -408,11 +408,11 @@ func TestAccP2VirtualFiltersMembersAndDeniesUnpermittedChild(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := w.db.Permissions().Create(t.Context(), accmodel.Permission{
+	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "p2-child-path-limited",
-		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-			Actions: accmodel.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
-			Targets: map[string]accmodel.Target{
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+			Targets: map[string]accesstest.Target{
 				"p2-parent": {Include: []string{"**"}},
 				"p2-child":  {Include: []string{"plugins/**"}},
 			},

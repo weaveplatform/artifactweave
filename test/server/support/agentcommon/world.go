@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
@@ -37,7 +37,7 @@ func NewWorld(t *testing.T) *World {
 	db := inmem.New()
 	support.Seed(t, db)
 	for _, name := range []string{"deployer", "user"} {
-		if err := db.Users().Create(t.Context(), accmodel.User{
+		if err := db.Users().Create(t.Context(), accesstest.User{
 			Name: name, PasswordHash: support.CheapHash,
 		}); err != nil {
 			t.Fatal(err)

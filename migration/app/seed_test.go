@@ -15,9 +15,9 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -166,7 +166,7 @@ func TestAccSeedErrors(t *testing.T) {
 	}
 
 	db := inmem.New()
-	if err := db.Groups().Create(ctx, model.Group{Name: authn.ReadersGroup}); err != nil {
+	if err := db.Groups().Create(ctx, accesstest.Group{Name: authn.ReadersGroup}); err != nil {
 		t.Fatal(err)
 	}
 	cfg = testConfig(t)

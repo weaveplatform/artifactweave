@@ -12,9 +12,9 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
@@ -35,7 +35,7 @@ func newItemWorld(t *testing.T, anonymous bool, tune ...harness.Tune) *itemWorld
 	t.Helper()
 	db := inmem.New()
 	cheapSeed(t, db)
-	for _, user := range []accmodel.User{
+	for _, user := range []accesstest.User{
 		{Name: "reader", PasswordHash: cheapHash, Groups: []string{authn.ReadersGroup}},
 		{Name: "deployer", PasswordHash: cheapHash},
 		{Name: "user", PasswordHash: cheapHash},
@@ -44,13 +44,13 @@ func newItemWorld(t *testing.T, anonymous bool, tune ...harness.Tune) *itemWorld
 			t.Fatal(err)
 		}
 	}
-	if err := db.Permissions().Create(t.Context(), accmodel.Permission{
+	if err := db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "deploy-libs",
-		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-			Actions: accmodel.Grants{Users: map[string]api.Actions{
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{
 				"deployer": api.ActionRead | api.ActionWrite,
 			}},
-			Targets: map[string]accmodel.Target{"libs-local": {Include: []string{"**"}}},
+			Targets: map[string]accesstest.Target{"libs-local": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -121,11 +121,11 @@ func (w *itemWorld) item(key string, cached bool, path string) artmodel.Item {
 
 func grant(t *testing.T, w *itemWorld, name, user, repoKey string, actions api.Actions) {
 	t.Helper()
-	if err := w.db.Permissions().Create(context.Background(), accmodel.Permission{
+	if err := w.db.Permissions().Create(context.Background(), accesstest.Permission{
 		Name: name,
-		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-			Actions: accmodel.Grants{Users: map[string]api.Actions{user: actions}},
-			Targets: map[string]accmodel.Target{repoKey: {Include: []string{"**"}}},
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{user: actions}},
+			Targets: map[string]accesstest.Target{repoKey: {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)

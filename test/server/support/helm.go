@@ -8,8 +8,8 @@ import (
 	"io"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 )
 
 // HelmChart builds a minimal chart archive with the named version.
@@ -33,16 +33,16 @@ func SeedHelmCharter(t *testing.T, db SeedStore, passwordHash []byte) {
 	t.Helper()
 	ctx := t.Context()
 	if err := db.Users().
-		Create(ctx, model.User{Name: "charter", PasswordHash: passwordHash}); err != nil {
+		Create(ctx, accesstest.User{Name: "charter", PasswordHash: passwordHash}); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Permissions().Create(ctx, model.Permission{
+	if err := db.Permissions().Create(ctx, accesstest.Permission{
 		Name: "helm-charter",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{
 				"charter": api.ActionRead | api.ActionWrite | api.ActionDelete,
 			}},
-			Targets: map[string]model.Target{"helm-local": {
+			Targets: map[string]accesstest.Target{"helm-local": {
 				Include: []string{"**"}, Exclude: []string{"**/*.prov"},
 			}},
 		}},

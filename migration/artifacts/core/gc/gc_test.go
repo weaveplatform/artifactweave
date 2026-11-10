@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
-	accport "github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
@@ -60,7 +60,7 @@ func (w *world) advance(d time.Duration) { w.set(w.now().Add(d)) }
 // collector's Tokens option reaches, as the access module's binding does.
 type tokenStore interface {
 	gc.Store
-	Tokens() accport.TokenStore
+	Tokens() accesstest.TokenStore
 }
 
 // collector builds a collector over st whose Tokens removes expired records

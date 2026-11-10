@@ -20,9 +20,9 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	artifactshttp "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http"
@@ -298,11 +298,11 @@ func statusFixture(t *testing.T, anonymous bool, tune ...func(*Config)) http.Han
 	db := inmem.New()
 	cheapSeed(t, db)
 	if err := db.Users().
-		Create(ctx, accmodel.User{Name: "user", PasswordHash: cheapHash}); err != nil {
+		Create(ctx, accesstest.User{Name: "user", PasswordHash: cheapHash}); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Users().Create(ctx, accmodel.User{
-		Name: "locked", PasswordHash: cheapHash, Status: accmodel.UserLocked,
+	if err := db.Users().Create(ctx, accesstest.User{
+		Name: "locked", PasswordHash: cheapHash, Status: accesstest.UserLocked,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -396,7 +396,7 @@ func newRepoWorld(t *testing.T) *repoWorld {
 	ctx := context.Background()
 	db := inmem.New()
 	cheapSeed(t, db)
-	reader := accmodel.User{
+	reader := accesstest.User{
 		Name:         "reader",
 		PasswordHash: cheapHash,
 		Groups:       []string{authn.ReadersGroup},

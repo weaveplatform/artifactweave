@@ -14,8 +14,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
@@ -148,11 +148,11 @@ func TestUnitCondaChannelRejectsUnsafeRequestsAndVirtualCycles(t *testing.T) {
 		wantStatus(t, w.do(http.MethodGet, tc.path, "admin", ""), tc.expected)
 	}
 	wantStatus(t, w.do(http.MethodGet, base+"repodata.json", "user", ""), http.StatusForbidden)
-	if err := w.db.Permissions().Create(t.Context(), accmodel.Permission{
+	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "conda-virtual-only",
-		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-			Actions: accmodel.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
-			Targets: map[string]accmodel.Target{"conda-empty-virtual": {Include: []string{"**"}}},
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+			Targets: map[string]accesstest.Target{"conda-empty-virtual": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -647,11 +647,11 @@ func TestUnitCondaLocalAndVirtualNativeChannel(t *testing.T) {
 	if !bytes.Equal(fallbackArchive.Body.Bytes(), body) {
 		t.Fatal("virtual fallback changed package bytes")
 	}
-	if err := w.db.Permissions().Create(t.Context(), accmodel.Permission{
+	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "conda-index-only",
-		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-			Actions: accmodel.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
-			Targets: map[string]accmodel.Target{
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+			Targets: map[string]accesstest.Target{
 				"conda-local":   {Include: []string{"**"}, Exclude: []string{"**/*.tar.bz2"}},
 				"conda-virtual": {Include: []string{"**"}, Exclude: []string{"**/*.tar.bz2"}},
 			},
@@ -802,7 +802,7 @@ func TestAccCondaShardsLocalFederatedVirtualLifecycleAndPermissions(t *testing.T
 		)
 	}
 	if err := w.db.Permissions().
-		Create(t.Context(), accmodel.Permission{Name: "shard-view", Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]api.Actions{"user": api.ActionRead}}, Targets: map[string]accmodel.Target{"shard-local": {Include: []string{"**"}}, "shard-virtual": {Include: []string{"**"}, Exclude: []string{"**/*.tar.bz2"}}}}}}); err != nil {
+		Create(t.Context(), accesstest.Permission{Name: "shard-view", Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionRead}}, Targets: map[string]accesstest.Target{"shard-local": {Include: []string{"**"}}, "shard-virtual": {Include: []string{"**"}, Exclude: []string{"**/*.tar.bz2"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	hidden := w.do(
@@ -890,7 +890,7 @@ func TestAccCondaShardsGenericPathsCannotDiscloseUnfilteredMetadata(t *testing.T
 		},
 	)}
 	w := newCondaShardWorld(t, true, sources)
-	targets := map[string]accmodel.Target{}
+	targets := map[string]accesstest.Target{}
 	for _, c := range []repo.Config{
 		{Key: "raw-shard-local", Class: repo.Local, PackageType: repo.Conda},
 		{Key: "raw-shard-fed", Class: repo.Federated, PackageType: repo.Conda},
@@ -900,12 +900,15 @@ func TestAccCondaShardsGenericPathsCannotDiscloseUnfilteredMetadata(t *testing.T
 		if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
 			t.Fatal(err)
 		}
-		targets[c.Key] = accmodel.Target{Include: []string{"**"}, Exclude: []string{"**/*.tar.bz2"}}
+		targets[c.Key] = accesstest.Target{
+			Include: []string{"**"},
+			Exclude: []string{"**/*.tar.bz2"},
+		}
 	}
-	if err := w.db.Permissions().Create(t.Context(), accmodel.Permission{
-		Name: "raw-shards-metadata-only", Resources: map[api.ResourceType]accmodel.Resource{
+	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
+		Name: "raw-shards-metadata-only", Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceArtifact: {
-				Actions: accmodel.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+				Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
 				Targets: targets,
 			},
 		},
@@ -994,15 +997,15 @@ func TestAccCondaShardsCannotEscapeThroughTransfersOrChecksumReuse(t *testing.T)
 			if err := w.db.Repos().Create(t.Context(), c); err != nil {
 				t.Fatal(err)
 			}
-			if err := w.db.Permissions().Create(t.Context(), accmodel.Permission{
-				Name: "shard-transfer", Resources: map[api.ResourceType]accmodel.Resource{
+			if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
+				Name: "shard-transfer", Resources: map[api.ResourceType]accesstest.Resource{
 					api.ResourceArtifact: {
-						Actions: accmodel.Grants{
+						Actions: accesstest.Grants{
 							Users: map[string]api.Actions{
 								"user": api.ActionRead | api.ActionWrite | api.ActionDelete,
 							},
 						},
-						Targets: map[string]accmodel.Target{
+						Targets: map[string]accesstest.Target{
 							c.Key: {
 								Include: []string{"**"},
 								Exclude: []string{"**/*.tar.bz2"},
@@ -1114,13 +1117,13 @@ func TestAccCondaShardTrashRestorePreservesNativeBoundary(t *testing.T) {
 				{"restore-source-metadata", c.Key, api.ActionRead, []string{"**/*.tar.bz2"}},
 				{"restore-generic", "other-local", api.ActionManage | api.ActionRead, nil},
 			} {
-				if err := w.db.Permissions().Create(t.Context(), accmodel.Permission{
+				if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
 					Name: grant.name,
-					Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-						Actions: accmodel.Grants{
+					Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+						Actions: accesstest.Grants{
 							Users: map[string]api.Actions{"user": grant.actions},
 						},
-						Targets: map[string]accmodel.Target{
+						Targets: map[string]accesstest.Target{
 							grant.key: {Include: []string{"**"}, Exclude: grant.exclude},
 						},
 					}},

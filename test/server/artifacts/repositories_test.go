@@ -10,9 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
-	accport "github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
@@ -35,20 +34,20 @@ func (f faultyStore) Repos() artport.RepoStore {
 	return faultyRepos{RepoStore: f.Store.Repos(), fail: f.fail}
 }
 
-func (f faultyStore) Permissions() accport.PermissionStore {
+func (f faultyStore) Permissions() accesstest.PermissionStore {
 	if f.fail["permissions"] {
 		return failingPermissionStore{f.Store.Permissions()}
 	}
 	return f.Store.Permissions()
 }
 
-type failingPermissionStore struct{ accport.PermissionStore }
+type failingPermissionStore struct{ accesstest.PermissionStore }
 
 func (failingPermissionStore) ForPrincipal(
 	context.Context,
 	string,
 	[]string,
-) ([]accmodel.Permission, error) {
+) ([]accesstest.Permission, error) {
 	return nil, errBoom
 }
 

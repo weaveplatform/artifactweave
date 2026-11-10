@@ -13,8 +13,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -431,11 +431,11 @@ func TestUnitCRANPOSTUploadRefusalsAndVirtualTarget(t *testing.T) {
 	}
 	// A grant that reaches the feed folder does not authorize a different
 	// package filename inferred from the archive's own DESCRIPTION.
-	if err := w.db.Permissions().Create(t.Context(), accmodel.Permission{
+	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "other-cran-upload",
-		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-			Actions: accmodel.Grants{Users: map[string]api.Actions{"user": api.ActionWrite}},
-			Targets: map[string]accmodel.Target{"cran-post": {
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionWrite}},
+			Targets: map[string]accesstest.Target{"cran-post": {
 				Include: []string{"src/contrib/other_1.0.tar.gz"},
 			}},
 		}},

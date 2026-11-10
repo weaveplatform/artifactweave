@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
@@ -377,11 +377,11 @@ func TestAccTrashStorageViewsFiltered(t *testing.T) {
 	seedTrash(t, w.db, "libs-local", "a/one.txt", false, t0, t0)
 	seedTrash(t, w.db, "libs-local", "a/secret/two.txt", false, t0.Add(time.Hour), t0)
 	seedTrash(t, w.db, "other-local", "o/three.txt", false, t0.Add(2*time.Hour), t0)
-	if err := w.db.Permissions().Create(ctx, accmodel.Permission{
+	if err := w.db.Permissions().Create(ctx, accesstest.Permission{
 		Name: "deploy-a",
-		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-			Actions: accmodel.Grants{Users: map[string]api.Actions{"user": api.ActionWrite}},
-			Targets: map[string]accmodel.Target{
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionWrite}},
+			Targets: map[string]accesstest.Target{
 				"libs-local": {Include: []string{"a/**"}, Exclude: []string{"a/secret/**"}},
 			},
 		}},

@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/idtoken/idtokentest"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -40,19 +40,19 @@ func newOIDCWorld(t *testing.T) oidcWorld {
 			t.Fatal(err)
 		}
 	}
-	must(db.Groups().Create(ctx, model.Group{Name: "ci-team"}))
-	must(db.Groups().Create(ctx, model.Group{Name: "everyone", AutoJoin: true}))
+	must(db.Groups().Create(ctx, accesstest.Group{Name: "ci-team"}))
+	must(db.Groups().Create(ctx, accesstest.Group{Name: "everyone", AutoJoin: true}))
 	blobs, err := fs.New(t.TempDir())
 	must(err)
 	items := &item.Service{Store: db, Blobs: blobs, Formats: ecosystem.For}
 	for key, group := range map[string]string{"team-local": "ci-team", "open-local": "everyone"} {
 		c := repo.Defaults(&repo.Config{Key: key, Class: repo.Local})
 		must(db.Repos().Create(ctx, *c))
-		must(db.Permissions().Create(ctx, model.Permission{
+		must(db.Permissions().Create(ctx, accesstest.Permission{
 			Name: "read-" + key,
-			Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-				Actions: model.Grants{Groups: map[string]api.Actions{group: api.ActionRead}},
-				Targets: map[string]model.Target{key: {Include: []string{"**"}}},
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+				Actions: accesstest.Grants{Groups: map[string]api.Actions{group: api.ActionRead}},
+				Targets: map[string]accesstest.Target{key: {Include: []string{"**"}}},
 			}},
 		}))
 		_, err := items.Deploy(ctx, item.Deploy{

@@ -11,8 +11,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
@@ -230,11 +230,11 @@ func TestAccListingPermissions(t *testing.T) {
 	w.pushTags("team/app", "layer", "v1")
 	w.pushTags("other", "other", "v1")
 	w.deploy("oci-local", "tools/v1/manifest.json", image("x"))
-	if err := w.db.Permissions().Create(context.Background(), model.Permission{
+	if err := w.db.Permissions().Create(context.Background(), accesstest.Permission{
 		Name: "team",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
-			Targets: map[string]model.Target{"docker-local": {Include: []string{"team/**"}}},
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
+			Targets: map[string]accesstest.Target{"docker-local": {Include: []string{"team/**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -330,14 +330,14 @@ func TestAccDeleteUnknownManifests(t *testing.T) {
 func TestAccDeletePermissions(t *testing.T) {
 	w := newBlobWorld(t)
 	w.pushTags("app", "layer", "v1", "v2")
-	if err := w.db.Permissions().Create(context.Background(), model.Permission{
+	if err := w.db.Permissions().Create(context.Background(), accesstest.Permission{
 		Name: "docker",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{
 				"reader": api.ActionRead | api.ActionWrite,
 				"owner":  api.ActionRead | api.ActionDelete,
 			}},
-			Targets: map[string]model.Target{"docker-local": {Include: []string{"**"}}},
+			Targets: map[string]accesstest.Target{"docker-local": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)

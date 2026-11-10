@@ -16,7 +16,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
@@ -235,11 +234,11 @@ func cocoaPodsAuthorityFixture(t *testing.T) (*policyWorld, source.Request) {
 	q.Resource.Validate = func(ctx context.Context, body io.ReadSeeker, size int64) error {
 		return ValidateSourceArchive(ctx, body, size, ".tar.gz")
 	}
-	if err := w.db.Permissions().Create(t.Context(), accmodel.Permission{
-		Name: "git-reader", Resources: map[accessapi.ResourceType]accmodel.Resource{
+	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
+		Name: "git-reader", Resources: map[accessapi.ResourceType]accesstest.Resource{
 			accessapi.ResourceArtifact: {
-				Targets: map[string]accmodel.Target{w.c.Key: {}},
-				Actions: accmodel.Grants{
+				Targets: map[string]accesstest.Target{w.c.Key: {}},
+				Actions: accesstest.Grants{
 					Users: map[string]accessapi.Actions{"git-reader": accessapi.ActionRead},
 				},
 			},

@@ -18,8 +18,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
-	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -209,7 +207,7 @@ func TestUnitAPIRestrictionFencesExistingUpload(t *testing.T) {
 	w := newWorld(t)
 	s := w.service()
 	ctx := t.Context()
-	if err := w.db.Users().Create(ctx, model.User{Name: "admin"}); err != nil {
+	if err := w.db.Users().Create(ctx, accesstest.User{Name: "admin"}); err != nil {
 		t.Fatal(err)
 	}
 	token, err := s.Create(ctx, "libs", "f", 1, "admin")
@@ -225,7 +223,7 @@ func TestUnitAPIRestrictionFencesExistingUpload(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := time.Now()
-	r := port.APIRestriction{
+	r := accesstest.APIRestriction{
 		User:    "admin",
 		Actor:   "operator",
 		Reason:  "Stop upload load",

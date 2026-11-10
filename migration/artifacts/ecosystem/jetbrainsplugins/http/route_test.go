@@ -22,7 +22,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
@@ -69,13 +68,15 @@ func newRouteFixture(t *testing.T) *routeFixture {
 	if err := db.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Permissions().Create(t.Context(), accmodel.Permission{
-		Name: "jetbrains-read", Resources: map[api.ResourceType]accmodel.Resource{
+	if err := db.Permissions().Create(t.Context(), accesstest.Permission{
+		Name: "jetbrains-read", Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceArtifact: {
-				Actions: accmodel.Grants{Users: map[string]api.Actions{
+				Actions: accesstest.Grants{Users: map[string]api.Actions{
 					"reader": api.ActionRead,
 				}},
-				Targets: map[string]accmodel.Target{"jetbrains-remote": {Include: []string{"**"}}},
+				Targets: map[string]accesstest.Target{
+					"jetbrains-remote": {Include: []string{"**"}},
+				},
 			},
 		},
 	}); err != nil {
@@ -473,13 +474,15 @@ func TestAccPinnedIDEInstallsThroughNativeMarketplaceHost(t *testing.T) {
 	}
 	f := newRouteFixture(t)
 	f.seed(fixtureJar(t, "com.weave.fixture"))
-	if err := f.db.Permissions().Create(t.Context(), accmodel.Permission{
-		Name: "jetbrains-anonymous", Resources: map[api.ResourceType]accmodel.Resource{
+	if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
+		Name: "jetbrains-anonymous", Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceArtifact: {
-				Actions: accmodel.Grants{Users: map[string]api.Actions{
+				Actions: accesstest.Grants{Users: map[string]api.Actions{
 					"anonymous": api.ActionRead,
 				}},
-				Targets: map[string]accmodel.Target{"jetbrains-remote": {Include: []string{"**"}}},
+				Targets: map[string]accesstest.Target{
+					"jetbrains-remote": {Include: []string{"**"}},
+				},
 			},
 		},
 	}); err != nil {

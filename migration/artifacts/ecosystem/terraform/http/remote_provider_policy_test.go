@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -215,7 +215,7 @@ func TestAccRemoteProviderCurrentDisclosureAndSource(t *testing.T) {
 	f.svc.Revalidate = original
 	permission, _ := f.db.Permissions().Get(t.Context(), "remote-read")
 	resource := permission.Resources[api.ResourceArtifact]
-	resource.Targets["remote"] = model.Target{
+	resource.Targets["remote"] = accesstest.Target{
 		Include: []string{"hashicorp/null/**"},
 		Exclude: []string{"**/*_arm64.zip"},
 	}
@@ -281,7 +281,7 @@ func TestAccRemoteProviderPartialBundleStaysPrivate(t *testing.T) {
 
 func TestAccRemoteProviderSignedCredentialRevocation(t *testing.T) {
 	f := newProviderFixture(t)
-	token := model.Token{
+	token := accesstest.Token{
 		ID:        "provider-parent",
 		Subject:   "jfac@test/users/reader",
 		Scope:     kernel.UserScope(),

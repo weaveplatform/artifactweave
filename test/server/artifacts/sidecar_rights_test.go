@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
@@ -55,13 +55,13 @@ func sidecarWorld(t *testing.T) (*itemWorld, *string) {
 	if err := w.db.Repos().Create(ctx, c); err != nil {
 		t.Fatal(err)
 	}
-	if err := w.db.Permissions().Create(ctx, accmodel.Permission{
+	if err := w.db.Permissions().Create(ctx, accesstest.Permission{
 		Name: "deploy-charts",
-		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-			Actions: accmodel.Grants{Users: map[string]api.Actions{
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{
 				"deployer": api.ActionRead | api.ActionWrite,
 			}},
-			Targets: map[string]accmodel.Target{"charts": {Include: []string{"**"}}},
+			Targets: map[string]accesstest.Target{"charts": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)

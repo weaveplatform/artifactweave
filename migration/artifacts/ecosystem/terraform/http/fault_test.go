@@ -9,8 +9,7 @@ import (
 	"testing"
 	"time"
 
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
-	accport "github.com/weaveplatform/artifactweave/migration/access/core/port"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	artport "github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -30,13 +29,15 @@ func (s failingStore) Packages() artport.PackageStore {
 
 func (s failingStore) Items() artport.ItemStore { return failingItems{s.serverStore.Items(), s.fail} }
 
-func (s failingStore) Users() accport.UserStore { return failingUsers{s.serverStore.Users(), s.fail} }
+func (s failingStore) Users() accesstest.UserStore {
+	return failingUsers{s.serverStore.Users(), s.fail}
+}
 
 func (s failingStore) Settings() settings.SettingsStore {
 	return failingSettings{s.serverStore.Settings(), s.fail}
 }
 
-func (s failingStore) Permissions() accport.PermissionStore {
+func (s failingStore) Permissions() accesstest.PermissionStore {
 	return failingPermissions{s.serverStore.Permissions(), s.fail}
 }
 
@@ -97,13 +98,13 @@ func (s failingItems) Get(
 }
 
 type failingUsers struct {
-	accport.UserStore
+	accesstest.UserStore
 	fail string
 }
 
-func (s failingUsers) Get(ctx context.Context, name string) (accmodel.User, error) {
+func (s failingUsers) Get(ctx context.Context, name string) (accesstest.User, error) {
 	if s.fail == "user" {
-		return accmodel.User{}, errStore
+		return accesstest.User{}, errStore
 	}
 	return s.UserStore.Get(ctx, name)
 }
@@ -121,7 +122,7 @@ func (s failingSettings) Get(ctx context.Context, key string, into any) error {
 }
 
 type failingPermissions struct {
-	accport.PermissionStore
+	accesstest.PermissionStore
 	fail string
 }
 
@@ -129,7 +130,7 @@ func (s failingPermissions) ForPrincipal(
 	ctx context.Context,
 	user string,
 	groups []string,
-) ([]accmodel.Permission, error) {
+) ([]accesstest.Permission, error) {
 	if s.fail == "permissions" {
 		return nil, errStore
 	}

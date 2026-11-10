@@ -7,9 +7,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
@@ -29,7 +29,7 @@ func newItemWorld(t *testing.T, anonymous bool, tune ...harness.Tune) *itemWorld
 	t.Helper()
 	db := inmem.New()
 	cheapSeed(t, db)
-	for _, user := range []model.User{
+	for _, user := range []accesstest.User{
 		{Name: "reader", PasswordHash: cheapHash, Groups: []string{authn.ReadersGroup}},
 		{Name: "deployer", PasswordHash: cheapHash},
 		{Name: "user", PasswordHash: cheapHash},
@@ -38,13 +38,13 @@ func newItemWorld(t *testing.T, anonymous bool, tune ...harness.Tune) *itemWorld
 			t.Fatal(err)
 		}
 	}
-	if err := db.Permissions().Create(t.Context(), model.Permission{
+	if err := db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "deploy-libs",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{
 				"deployer": api.ActionRead | api.ActionWrite,
 			}},
-			Targets: map[string]model.Target{"libs-local": {Include: []string{"**"}}},
+			Targets: map[string]accesstest.Target{"libs-local": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)

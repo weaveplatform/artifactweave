@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	apmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/agentpackages"
@@ -67,13 +67,13 @@ func TestAccAgentPackagesAPMProtocolAndLifecycle(t *testing.T) {
 		base := "/artifactory/api/agentpackages/" + c.Key + "/v1/"
 		files := "/artifactory/" + c.Key + "/"
 		p2 := apmfmt.Path("acme", "my-pkg", "1.2.0")
-		if err := w.DB.Permissions().Create(ctx, model.Permission{
+		if err := w.DB.Permissions().Create(ctx, accesstest.Permission{
 			Name: "apm-v1-" + string(class),
-			Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-				Actions: model.Grants{
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+				Actions: accesstest.Grants{
 					Users: map[string]api.Actions{"deployer": api.ActionRead},
 				},
-				Targets: map[string]model.Target{c.Key: {
+				Targets: map[string]accesstest.Target{c.Key: {
 					Include: []string{apmfmt.Path("acme", "my-pkg", "1.0.0")},
 				}},
 			}},
@@ -215,11 +215,11 @@ func TestAccAgentPackagesAPMProtocolAndLifecycle(t *testing.T) {
 		if strings.Contains(denied.Body.String(), "my-pkg") {
 			t.Fatalf("search leaked denied package: %s", denied.Body.String())
 		}
-		if err := w.DB.Permissions().Create(ctx, model.Permission{
+		if err := w.DB.Permissions().Create(ctx, accesstest.Permission{
 			Name: "apm-unpublished-" + string(class),
-			Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-				Actions: model.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
-				Targets: map[string]model.Target{c.Key: {
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+				Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+				Targets: map[string]accesstest.Target{c.Key: {
 					Include: []string{apmfmt.Path("acme", "my-pkg", "9.0.0")},
 				}},
 			}},

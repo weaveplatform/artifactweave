@@ -4,8 +4,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -162,10 +162,10 @@ func formatGrants(under string, a api.Actions) []matrixGrant {
 
 // formatTargets is a permission target on every format repository, for
 // paths under the prefix.
-func formatTargets(under string) map[string]model.Target {
-	out := map[string]model.Target{}
+func formatTargets(under string) map[string]accesstest.Target {
+	out := map[string]accesstest.Target{}
 	for _, c := range formatRepos() {
-		out[c.Key] = model.Target{Include: []string{under + "**"}}
+		out[c.Key] = accesstest.Target{Include: []string{under + "**"}}
 	}
 	return out
 }

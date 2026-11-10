@@ -19,7 +19,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -321,12 +320,12 @@ func TestAccCatalogStatusAndPermissions(t *testing.T) {
 	f := newFixture(t, repo.Local)
 	f.publish("visible/a.box", "widget", "1.0", "virtualbox")
 	f.publish("hidden/a.box", "widget", "2.0", "docker")
-	permission := accmodel.Permission{
+	permission := accesstest.Permission{
 		Name: "reader",
-		Resources: map[api.ResourceType]accmodel.Resource{
+		Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceArtifact: {
-				Actions: accmodel.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
-				Targets: map[string]accmodel.Target{"boxes": {Include: []string{"visible/**"}}},
+				Actions: accesstest.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
+				Targets: map[string]accesstest.Target{"boxes": {Include: []string{"visible/**"}}},
 			},
 		},
 	}

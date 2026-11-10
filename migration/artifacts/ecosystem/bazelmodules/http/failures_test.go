@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -118,7 +118,7 @@ func TestAccRemotePatchAndPermissionFailures(t *testing.T) {
 		t.Fatalf("wrong archive path: %d", w.Code)
 	}
 	if err := x.f.db.Permissions().
-		Create(t.Context(), model.Permission{Name: "metadata-only", Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {Actions: model.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}}, Targets: map[string]model.Target{x.c.Key: {Include: []string{"modules/hello/metadata.json"}}}}}}); err != nil {
+		Create(t.Context(), accesstest.Permission{Name: "metadata-only", Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}}, Targets: map[string]accesstest.Target{x.c.Key: {Include: []string{"modules/hello/metadata.json"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	w := x.f.requestAs(http.MethodGet, x.root+"/modules/hello/metadata.json", "reader")
@@ -304,10 +304,10 @@ func TestAccLocalMetadataRequiresReadableCompletePublication(t *testing.T) {
 	)
 	f.publish(f.local, "modules/hello/1.0.0/hello-1.0.0.tar.gz", archive(t))
 	if err := f.db.Permissions().
-		Create(t.Context(), model.Permission{Name: "manifest-only", Resources: map[api.ResourceType]model.Resource{
+		Create(t.Context(), accesstest.Permission{Name: "manifest-only", Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceArtifact: {
-				Actions: model.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
-				Targets: map[string]model.Target{f.local.Key: {Include: []string{
+				Actions: accesstest.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
+				Targets: map[string]accesstest.Target{f.local.Key: {Include: []string{
 					"modules/hello/metadata.json",
 					"modules/hello/1.0.0/MODULE.bazel",
 					"modules/hello/1.0.0/source.json",

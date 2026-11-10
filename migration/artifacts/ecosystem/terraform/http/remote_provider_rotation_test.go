@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -35,7 +35,7 @@ func TestAccRemoteProviderMirrorDescriptorUsesOneRevision(t *testing.T) {
 			})
 			permission, _ := f.db.Permissions().Get(t.Context(), "remote-read")
 			resource := permission.Resources[api.ResourceArtifact]
-			resource.Targets["remote"] = model.Target{
+			resource.Targets["remote"] = accesstest.Target{
 				Include: []string{"provider-mirrors/registry.terraform.io/hashicorp/null/**"},
 			}
 			permission.Resources[api.ResourceArtifact] = resource

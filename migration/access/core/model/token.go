@@ -21,7 +21,6 @@ const (
 	// records the conflict, which the live check on #216 settles.
 	DefaultTokenExpiry        = 365 * 24 * time.Hour
 	DefaultRevocableThreshold = 6 * time.Hour
-	DefaultRefreshGrace       = 24 * time.Hour
 	// LegacyTokenExpiry is the lifetime of a token the legacy
 	// POST /api/security/token creates without expires_in. It is that
 	// route's own default, not token.default-expiry, so raising the Access
@@ -72,13 +71,6 @@ type Token struct {
 	// token it descends from; revoking that token revokes it.
 	Parent string `json:"-"`
 }
-
-// Registry token defaults (decision 0005).
-const (
-	// RegistryTokenExpiry is a registry token's lifetime, shortened to the
-	// remaining life of the credential that obtained it.
-	RegistryTokenExpiry = time.Hour
-)
 
 // Expired reports whether the token has expired at now.
 func (t Token) Expired(now time.Time) bool {

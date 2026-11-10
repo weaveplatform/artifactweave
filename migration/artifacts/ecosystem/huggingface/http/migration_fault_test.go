@@ -9,8 +9,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
-	accport "github.com/weaveplatform/artifactweave/migration/access/core/port"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	artport "github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
@@ -51,7 +50,7 @@ func (s *migrationFaultStore) Repos() artport.RepoStore {
 	return migrationFaultRepos{s.serverStore.Repos(), s}
 }
 
-func (s *migrationFaultStore) Permissions() accport.PermissionStore {
+func (s *migrationFaultStore) Permissions() accesstest.PermissionStore {
 	return migrationFaultPermissions{s.serverStore.Permissions(), s}
 }
 
@@ -68,14 +67,14 @@ func (s migrationFaultRepos) Get(ctx context.Context, key string) (repo.Config, 
 }
 
 type migrationFaultPermissions struct {
-	accport.PermissionStore
+	accesstest.PermissionStore
 	faults *migrationFaultStore
 }
 
 func (s migrationFaultPermissions) List(
 	ctx context.Context,
 	page kernel.Page,
-) ([]accmodel.Permission, string, error) {
+) ([]accesstest.Permission, string, error) {
 	if s.faults.planning.Load() && s.faults.fails("permission policy") {
 		return nil, "", errMigrationStorage
 	}

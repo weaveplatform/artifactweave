@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -435,11 +435,11 @@ func TestUnitBowerRemoteRefsHideUnreadableManifest(t *testing.T) {
 			return bowerMetadata(refs), nil
 		},
 	)
-	if err := f.db.Permissions().Create(t.Context(), accmodel.Permission{
+	if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "read-other-bower-file",
-		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-			Actions: accmodel.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
-			Targets: map[string]accmodel.Target{
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
+			Targets: map[string]accesstest.Target{
 				"bower-remote": {
 					Include: []string{"hello/**"}, Exclude: []string{"hello/1.0.0/bower.json"},
 				},
@@ -461,11 +461,11 @@ func TestUnitBowerVirtualCatalogSkipsUnreadableMember(t *testing.T) {
 	_ = f.repo("bower-virtual", repo.Virtual, private.Key, visible.Key)
 	f.deploy(private, "secret", "1.0.0", "bower.json", `{"name":"secret","version":"1.0.0"}`)
 	f.deploy(visible, "hello", "1.0.0", "bower.json", `{"name":"hello","version":"1.0.0"}`)
-	if err := f.db.Permissions().Create(t.Context(), accmodel.Permission{
+	if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "visible-bower-member",
-		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
-			Actions: accmodel.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
-			Targets: map[string]accmodel.Target{
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
+			Targets: map[string]accesstest.Target{
 				"bower-virtual": {Include: []string{"**"}},
 				"bower-visible": {Include: []string{"hello/**"}},
 			},

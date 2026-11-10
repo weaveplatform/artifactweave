@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -42,7 +42,7 @@ func newNugetKeyFixture(t *testing.T) *nugetKeyFixture {
 	}
 	for _, name := range []string{"dev", "u1", "u2", "u3", "u4"} {
 		if err := db.Users().
-			Create(ctx, model.User{Name: name, PasswordHash: cheapHash}); err != nil {
+			Create(ctx, accesstest.User{Name: name, PasswordHash: cheapHash}); err != nil {
 			t.Fatal(err)
 		}
 	}

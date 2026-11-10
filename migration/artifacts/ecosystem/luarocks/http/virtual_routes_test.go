@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -40,11 +40,11 @@ func newVirtualFixture(
 	if err := f.db.Repos().Create(t.Context(), virtual); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.db.Permissions().Create(t.Context(), model.Permission{
+	if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "partial-virtual",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{"partial": api.ActionRead}},
-			Targets: map[string]model.Target{
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"partial": api.ActionRead}},
+			Targets: map[string]accesstest.Target{
 				"combined": {Include: []string{"**"}},
 				"local":    {Include: []string{"local-*"}},
 			},
@@ -295,13 +295,13 @@ func TestAccVirtualReadRejectsQueriesAndConcealsDeniedMembers(t *testing.T) {
 
 func TestAccVirtualDeploymentRequiresValidLocalTargetAndBothGrants(t *testing.T) {
 	f := newVirtualFixture(t)
-	if err := f.db.Permissions().Create(t.Context(), model.Permission{
+	if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "virtual-publisher",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{
 				"publisher": api.ActionRead | api.ActionWrite,
 			}},
-			Targets: map[string]model.Target{"combined": {Include: []string{"**"}}},
+			Targets: map[string]accesstest.Target{"combined": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)

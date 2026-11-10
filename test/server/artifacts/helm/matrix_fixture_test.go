@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -46,7 +46,7 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 			"nobody", "reader", "writer", "member", "deployer",
 			"gadmin", "resmgr", "gresmgr",
 		} {
-			user := model.User{Name: name, PasswordHash: cheapHash}
+			user := accesstest.User{Name: name, PasswordHash: cheapHash}
 			if name == "resmgr" {
 				user.Roles.ResourcesManager = true
 			}
@@ -54,10 +54,10 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 				t.Fatal(err)
 			}
 		}
-		for _, group := range []model.Group{
+		for _, group := range []accesstest.Group{
 			{Name: "team", Members: []string{"member"}},
 			{Name: "admins", Members: []string{"gadmin"}, AdminPrivileges: true},
-			{Name: "res-managers", Members: []string{"gresmgr"}, Roles: model.RoleFlags{ResourcesManager: true}},
+			{Name: "res-managers", Members: []string{"gresmgr"}, Roles: accesstest.RoleFlags{ResourcesManager: true}},
 		} {
 			if err := cfg.Store.Groups().Create(t.Context(), group); err != nil {
 				t.Fatal(err)
@@ -80,14 +80,14 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 				map[string]api.Actions{"team": api.ActionRead | api.ActionWrite | api.ActionDelete | api.ActionAnnotate},
 			},
 		} {
-			targets := map[string]model.Target{}
+			targets := map[string]accesstest.Target{}
 			for _, key := range []string{"helm-local", "helm-remote", "helm-virtual"} {
-				targets[key] = model.Target{Include: []string{grant.under}}
+				targets[key] = accesstest.Target{Include: []string{grant.under}}
 			}
-			if err := cfg.Store.Permissions().Create(t.Context(), model.Permission{
+			if err := cfg.Store.Permissions().Create(t.Context(), accesstest.Permission{
 				Name: "helm-matrix-" + grant.name,
-				Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-					Actions: model.Grants{
+				Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+					Actions: accesstest.Grants{
 						Users:  grant.users,
 						Groups: grant.groups,
 					},

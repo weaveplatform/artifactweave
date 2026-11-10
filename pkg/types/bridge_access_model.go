@@ -14,7 +14,6 @@ var (
 
 var (
 	GlobalRoleActions         = accmodel.GlobalRoleActions
-	BuiltinEnvironments       = accmodel.BuiltinEnvironments
 	PermissionFromV1          = accmodel.PermissionFromV1
 	PermissionToV1            = accmodel.PermissionToV1
 	PermissionFromV2          = accmodel.PermissionFromV2
@@ -86,15 +85,11 @@ const (
 	RolePredefined                = accmodel.RolePredefined
 	RoleCustom                    = accmodel.RoleCustom
 	RoleCustomGlobal              = accmodel.RoleCustomGlobal
-	EnvironmentDev                = accmodel.EnvironmentDev
-	EnvironmentProd               = accmodel.EnvironmentProd
 	PrincipalUser                 = accmodel.PrincipalUser
 	PrincipalGroup                = accmodel.PrincipalGroup
 	MaxCustomGlobalRoles          = accmodel.MaxCustomGlobalRoles
 	DefaultTokenExpiry            = accmodel.DefaultTokenExpiry
 	DefaultRevocableThreshold     = accmodel.DefaultRevocableThreshold
-	DefaultRefreshGrace           = accmodel.DefaultRefreshGrace
 	LegacyTokenExpiry             = accmodel.LegacyTokenExpiry
 	TokenPurposeEncryptedPassword = accmodel.TokenPurposeEncryptedPassword
-	RegistryTokenExpiry           = accmodel.RegistryTokenExpiry
 )
