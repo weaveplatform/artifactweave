@@ -38,6 +38,7 @@ import (
 	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
 	luarockshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/luarocks/http"
 	terraformbackendhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend/http"
+	configurationhttp "github.com/weaveplatform/artifactweave/migration/configuration/adapters/http"
 	configapi "github.com/weaveplatform/artifactweave/migration/configuration/api"
 	"github.com/weaveplatform/artifactweave/migration/configuration/core/descriptor"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -385,7 +386,7 @@ func New(cfg Config) http.Handler {
 	debianOps := debianAPI{kit}
 	cranOps := cranAPI{Kit: kit, archiveMoverEnabled: cfg.CranArchiveMoverEnabled}
 	rpmOps := rpmAPI{kit}
-	sysAPI := NewSystemAPI(Deps{
+	sysAPI := configurationhttp.NewSystemAPI(configurationhttp.Deps{
 		Store:         cfg.Store,
 		Blobs:         cfg.Blobs,
 		CompatVersion: cfg.CompatVersion,
@@ -452,7 +453,7 @@ func New(cfg Config) http.Handler {
 	// After authentication, which it needs, and ahead of routing, which
 	// cannot match it (HelmPartialReindex).
 	if cfg.Store != nil {
-		r.Use(accessHTTP.CheckAPIRestriction(HealthRequest, writeLimitError))
+		r.Use(accessHTTP.CheckAPIRestriction(configurationhttp.HealthRequest, writeLimitError))
 	}
 	if cfg.RequestLimits != nil {
 		r.Use(limiter.limitPrincipal(limits))
@@ -464,17 +465,18 @@ func New(cfg Config) http.Handler {
 	// Hand-written routes go first so they win over anything a generated mux
 	// might later claim for the same prefix.
 	r.Get("/artifactory/api/system/ping", sysAPI.ArtifactoryPing())
-	r.With(middleware.BodyLimit(SinkBodyLimit)).Post("/artifactory/api/system/usage", SinkHandler)
-	r.With(middleware.BodyLimit(SinkBodyLimit)).
-		Post("/jfconnect/api/v1/backoffice/metrics/log", SinkHandler)
+	r.With(middleware.BodyLimit(configurationhttp.SinkBodyLimit)).
+		Post("/artifactory/api/system/usage", configurationhttp.SinkHandler)
+	r.With(middleware.BodyLimit(configurationhttp.SinkBodyLimit)).
+		Post("/jfconnect/api/v1/backoffice/metrics/log", configurationhttp.SinkHandler)
 	r.Get("/access/api/v1/system/ping", sysAPI.AccessPing())
 	// Access's and the router's own probes, which JFrog's Helm charts and
 	// secret rotator poll through the public URL. The router is ready when
 	// the services behind it are.
 	r.Get("/access/api/v1/system/readiness", sysAPI.AccessReadiness())
-	r.Get("/access/api/v1/system/liveness", Liveness)
+	r.Get("/access/api/v1/system/liveness", configurationhttp.Liveness)
 	r.Get("/router/api/v1/system/readiness", sysAPI.RouterReadiness())
-	r.Get("/router/api/v1/system/liveness", Liveness)
+	r.Get("/router/api/v1/system/liveness", configurationhttp.Liveness)
 	r.Get("/router/api/v1/system/health", sysAPI.RouterHealth)
 	r.Get("/artifactory/api/artifactweave/remote-status/{repoKey}", artAPI.SmartStatus)
 	r.With(middleware.BodyLimit(middleware.ManagementBodyLimit)).
@@ -675,7 +677,7 @@ func newAuthnOptions(
 	skip ...func(*http.Request) bool,
 ) accesshttp.AuthnOptions {
 	public := accesshttp.PublicRoutes()
-	maps.Copy(public, PublicRoutes())
+	maps.Copy(public, configurationhttp.PublicRoutes())
 	return accesshttp.AuthnOptions{
 		Auth:               a,
 		Store:              st,
@@ -695,7 +697,7 @@ func newAuthnOptions(
 // (APIRecoveryRequest) pass the shared limits.
 func newLimitOptions(limits *apilimit.Service) limitOptions {
 	return limitOptions{
-		Health:   HealthRequest,
+		Health:   configurationhttp.HealthRequest,
 		Recovery: accesshttp.APIRecoveryRequest,
 		Limits:   limits,
 	}

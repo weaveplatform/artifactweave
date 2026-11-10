@@ -22,6 +22,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	accesshttp "github.com/weaveplatform/artifactweave/migration/access/adapters/http"
+	configurationhttp "github.com/weaveplatform/artifactweave/migration/configuration/adapters/http"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 )
 
@@ -339,7 +340,7 @@ func apiReviewPolicy(e *apiReviewOperation) {
 	if strings.Contains(path, "/api/storage/") {
 		e.Admission += "; ?list additionally selects expensive policy"
 	}
-	if HealthRequest(r) {
+	if configurationhttp.HealthRequest(r) {
 		e.Admission = "health exemption"
 	}
 	if accesshttp.APIRecoveryRequest(r) {

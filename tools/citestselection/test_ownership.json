@@ -40,6 +40,7 @@
     "migration/artifacts/ecosystem/terraformbackend/http": "terraformbackend",
     "migration/artifacts/ecosystem/vagrant/http": "vagrant",
     "migration/artifacts/ecosystem/vcs/http": "vcs",
+    "migration/configuration/adapters/http": "shared",
     "test/server/access": "shared",
     "test/server/artifacts": "shared",
     "test/server/artifacts/agentpackages": "agentpackages",
@@ -108,7 +109,6 @@
       "debian_snapshot_security_internal_test.go",
       "debian_snapshot_test.go",
       "debian_source_test.go",
-      "descriptor_test.go",
       "error_profiles_p8_test.go",
       "fixtures_test.go",
       "format_tables_test.go",
@@ -128,11 +128,9 @@
       "registry_shared_test.go",
       "reindex_internal_test.go",
       "request_limits_test.go",
-      "reverseproxy_test.go",
       "rpm_internal_test.go",
       "searches_routes_test.go",
       "server_test.go",
-      "service_id_test.go",
       "spec_contract_test.go",
       "spec_test.go",
       "status_chef_test.go",
@@ -145,7 +143,6 @@
       "status_reindex_test.go",
       "status_test.go",
       "stub_test.go",
-      "system_health_test.go",
       "tokens_fixture_test.go",
       "tokens_status_test.go",
       "vcs_routes_internal_test.go",
@@ -178,6 +175,12 @@
       "items_test.go",
       "kit_test.go",
       "redirect_test.go"
+    ],
+    "migration/configuration/adapters/http": [
+      "descriptor_test.go",
+      "reverseproxy_test.go",
+      "service_id_test.go",
+      "system_health_test.go"
     ],
     "test/server/access": [
       "access_identity_test.go",

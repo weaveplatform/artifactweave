@@ -17,6 +17,8 @@ import (
 	accesshttp "github.com/weaveplatform/artifactweave/migration/access/adapters/http"
 	artifactshttp "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/configuration/adapters/http"
+	configurationhttp "github.com/weaveplatform/artifactweave/migration/configuration/adapters/http"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	distributiongen "github.com/weaveplatform/artifactweave/migration/platform/gen/distribution"
@@ -156,7 +158,7 @@ func TestAccHandwrittenRoutesNotGenerated(t *testing.T) {
 			artgen.HandlerWithOptions(
 				artgen.NewStrictHandler(artifactoryServer{
 					SecurityAPI:    &accesshttp.SecurityAPI{},
-					SystemAPI:      &SystemAPI{},
+					SystemAPI:      &configurationhttp.SystemAPI{},
 					ArtifactoryAPI: &artifactshttp.ArtifactoryAPI{},
 				}, nil),
 				artgen.ChiServerOptions{BaseRouter: r},

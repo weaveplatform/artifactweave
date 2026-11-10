@@ -15,6 +15,8 @@ import (
 
 	artifactshttp "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
+	"github.com/weaveplatform/artifactweave/migration/configuration/adapters/http"
+	configurationhttp "github.com/weaveplatform/artifactweave/migration/configuration/adapters/http"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/middleware"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -262,11 +264,11 @@ func TestAccTelemetrySinkBodyLimit(t *testing.T) {
 	} {
 		t.Run(path, func(t *testing.T) {
 			// At the limit, declared and undeclared: read to the end.
-			atLimit := strings.Repeat("x", SinkBodyLimit)
+			atLimit := strings.Repeat("x", configurationhttp.SinkBodyLimit)
 			if rec := post(
 				path,
 				strings.NewReader(atLimit),
-				SinkBodyLimit,
+				configurationhttp.SinkBodyLimit,
 			); rec.Code != http.StatusOK {
 				t.Errorf("declared, at the limit: status %d: %s", rec.Code, rec.Body)
 			}
@@ -280,20 +282,20 @@ func TestAccTelemetrySinkBodyLimit(t *testing.T) {
 
 			// A declared length over the limit is refused before any read.
 			declared := &endlessBody{t: t}
-			rec := post(path, declared, SinkBodyLimit+1)
+			rec := post(path, declared, configurationhttp.SinkBodyLimit+1)
 			assertTooLarge(t, "declared", rec, tooLarge)
 
 			// An undeclared body is read one byte past the limit, which is
 			// how MaxBytesReader detects the overrun, and no further. The
 			// margin only keeps a regression from looping forever.
-			undeclared := &endlessBody{t: t, budget: SinkBodyLimit + 64<<10}
+			undeclared := &endlessBody{t: t, budget: configurationhttp.SinkBodyLimit + 64<<10}
 			rec = post(path, undeclared, -1)
 			assertTooLarge(t, "undeclared", rec, tooLarge)
-			if undeclared.read > SinkBodyLimit+1 {
+			if undeclared.read > configurationhttp.SinkBodyLimit+1 {
 				t.Errorf(
 					"undeclared: read %d bytes, want at most %d",
 					undeclared.read,
-					SinkBodyLimit+1,
+					configurationhttp.SinkBodyLimit+1,
 				)
 			}
 		})

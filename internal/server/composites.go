@@ -3,6 +3,7 @@ package server
 import (
 	accesshttp "github.com/weaveplatform/artifactweave/migration/access/adapters/http"
 	artifactshttp "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http"
+	configurationhttp "github.com/weaveplatform/artifactweave/migration/configuration/adapters/http"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	distributiongen "github.com/weaveplatform/artifactweave/migration/platform/gen/distribution"
@@ -34,7 +35,7 @@ type artifactoryStubs struct{ artgen.UnimplementedStrict }
 // and are named after no operation.
 type artifactoryServer struct {
 	*accesshttp.SecurityAPI
-	*SystemAPI
+	*configurationhttp.SystemAPI
 	*artifactshttp.ArtifactoryAPI
 	*vcsAPI
 	*npmAPI
