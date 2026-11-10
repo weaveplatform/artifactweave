@@ -237,3 +237,41 @@ func TestAccSmartAQLExactPOSTBoundary(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// Smart's own read refuses these before it calls query, so query's checks
+// are its own last line: a caller that reaches it directly must not send
+// what Read would have refused.
+func TestAccSmartAQLQueryPreflight(t *testing.T) {
+	for _, tc := range []struct {
+		name, aql string
+		revision  string
+		want      error
+	}{
+		{"unparsable", `items.find(`, "", source.ErrInvalidRequest},
+		{"not a find", `items.delete({"repo":"source"})`, "", source.ErrInvalidRequest},
+		{"already transitive", `items.find({"repo":"source"}).transitive().limit(10)`, "", source.ErrInvalidRequest},
+		{"peer of another revision", "", "stale", source.ErrSuperseded},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := smartFixture(t)
+			peer, err := w.s.Discover(w.ctx, w.smartRequest(), w.permit)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.revision != "" {
+				peer = peer.WithRevision(tc.revision)
+			}
+			q := smartQueryRequest(w)
+			if tc.aql != "" {
+				q.Resource.SmartAQL = tc.aql
+			}
+			before := w.peerCalls()
+			if _, err = w.s.query(w.ctx, q, w.permit, peer); !errors.Is(err, tc.want) {
+				t.Fatal(err)
+			}
+			if w.peerCalls() != before {
+				t.Fatal("refused query reached the peer")
+			}
+		})
+	}
+}
