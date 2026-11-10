@@ -127,10 +127,10 @@
     ],
     "migration/app": [
       "access_test.go",
+      "bootstrap_test.go",
       "conan_client_test.go",
       "conan_remote_test.go",
       "conda_remote_test.go",
-      "descriptor_test.go",
       "hash_test.go",
       "instance_test.go",
       "mapped_remote_test.go",
