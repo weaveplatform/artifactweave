@@ -90,7 +90,6 @@
       "error_profiles_p8_test.go",
       "fixtures_test.go",
       "format_tables_test.go",
-      "hash_test.go",
       "helm_fixture_test.go",
       "matrix_pkgtest_test.go",
       "matrix_reindex_test.go",

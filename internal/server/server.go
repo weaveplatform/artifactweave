@@ -7,16 +7,20 @@ package server
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"maps"
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/api"
 	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
 	accesshttp "github.com/weaveplatform/artifactweave/migration/access/adapters/http"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
@@ -49,6 +53,7 @@ import (
 	puppethttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/puppet/http"
 	pypihttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi/http"
 	rpmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/rpm/http"
+	terraformhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/http"
 	terraformbackendhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend/http"
 	vcshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/vcs/http"
 	configurationhttp "github.com/weaveplatform/artifactweave/migration/configuration/adapters/http"
@@ -66,6 +71,7 @@ import (
 	pfedgen "github.com/weaveplatform/artifactweave/migration/platform/gen/pfed"
 	workergen "github.com/weaveplatform/artifactweave/migration/platform/gen/worker"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/middleware"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
@@ -783,3 +789,287 @@ func newDetailOptions() detailOptions {
 		),
 	}
 }
+
+// registerHandwrittenStubs gives every spec operation marked x-handwritten a
+// 501 route unless a real handler already claimed the same method and
+// pattern, or x-native-protocol marks a path owned by a pkgroute mount.
+// Generated operations get the same treatment from stubgen; without
+// this, a hand-written operation that is specified but not yet implemented
+// would fall through to the 404 catch-all and look like an unknown path to
+// clients, which is the wrong signal (research 10).
+func registerHandwrittenStubs(r chi.Router, logger *slog.Logger) {
+	existing := registeredRoutes(r)
+	for _, op := range handwrittenOps() {
+		for _, pattern := range httpkit.ChiPatterns(op.path) {
+			key := op.method + " " + pattern
+			if existing[key] {
+				continue
+			}
+			existing[key] = true
+			r.Method(op.method, pattern, handwrittenStub(op.method, op.path))
+			logger.Debug("hand-written operation stubbed", "method", op.method, "path", op.path)
+		}
+	}
+}
+
+// handwrittenOp is a hand-written operation: its method and its full path
+// template, the spec's server prefix included.
+type handwrittenOp struct{ method, path string }
+
+// handwrittenOps lists the routed hand-written operations of every embedded
+// spec. They are parsed and validated once per process: that takes seconds
+// under the race detector, and tests build a router per test.
+var handwrittenOps = sync.OnceValue(func() []handwrittenOp {
+	var ops []handwrittenOp
+	for _, name := range api.SpecFiles {
+		doc, err := loadEmbeddedSpec(name)
+		if err != nil {
+			// The bundled documents are validated by make generate and by the
+			// spec tests; failing here would only hide a build problem.
+			panic(fmt.Sprintf("server: embedded spec %s: %v", name, err))
+		}
+		prefix := ""
+		if len(doc.Servers) > 0 {
+			prefix = doc.Servers[0].URL
+		}
+		for path, item := range doc.Paths.Map() {
+			for method, op := range item.Operations() {
+				if v, ok := op.Extensions["x-handwritten"]; !ok || v != true {
+					continue
+				}
+				// Native package protocols own these paths through pkgroute's
+				// repository-aware wildcard handler.
+				if v, ok := op.Extensions["x-native-protocol"]; ok && v == true {
+					continue
+				}
+				// Documentation aliases (JFrog pages that describe a header
+				// variant under a path no client sends) stay in the spec for
+				// parity but must not shadow real item paths.
+				if v, ok := op.Extensions["x-not-routed"]; ok && v == true {
+					continue
+				}
+				// Native protocol routes are claimed by pkgroute, whose
+				// repository resolver can use a wildcard prefix.
+				if v, ok := op.Extensions["x-native-protocol"]; ok && v == true {
+					continue
+				}
+				ops = append(ops, handwrittenOp{method: method, path: prefix + path})
+			}
+		}
+	}
+	return ops
+})
+
+// registeredRoutes lists "METHOD pattern" for everything already on the router.
+func registeredRoutes(r chi.Router) map[string]bool {
+	routes := map[string]bool{}
+	_ = chi.Walk(
+		r,
+		func(method, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
+			routes[method+" "+route] = true
+			return nil
+		},
+	)
+	return routes
+}
+
+func handwrittenStub(method, path string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		apierror.Write(w, errorProfileFor(r.URL.Path), apierror.New(
+			http.StatusNotImplemented,
+			fmt.Sprintf("%s %s is specified but not implemented yet", method, path),
+		))
+	}
+}
+
+func loadEmbeddedSpec(name string) (*openapi3.T, error) {
+	raw, err := api.Specs.ReadFile(name)
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", name, err)
+	}
+	loader := openapi3.NewLoader()
+	doc, err := loader.LoadFromData(raw)
+	if err != nil {
+		return nil, fmt.Errorf("parse %s: %w", name, err)
+	}
+	if err := doc.Validate(context.Background()); err != nil {
+		return nil, fmt.Errorf("validate %s: %w", name, err)
+	}
+	return doc, nil
+}
+
+// errorProfileRules select the error response contract from the request
+// path. Terraform providers join errors[] entries, Docker reads
+// errors[].code, npm prints error, and jfrog-client-go prints the body.
+// Order matters: the JFrog operations beside the npm and Terraform
+// registries must match before the registries' own prefixes, and the first
+// matching rule wins.
+var errorProfileRules = []httpkit.ProfileRule{
+	{Match: pathPrefix("/xray/"), Profile: apierror.ProfileXray},
+	{
+		Match: func(path string) bool {
+			return npmhttp.NPMOperation(path) || npmhttp.IsNPMReindex(path) ||
+				terraformhttp.IsTerraformReindex(path)
+		},
+		Profile: apierror.ProfileArtifactory,
+	},
+	{Match: pathPrefix("/artifactory/api/npm/"), Profile: apierror.ProfileNPM},
+	{
+		Match: func(path string) bool {
+			return path == "/artifactory/api/terraform/remote/v2" ||
+				strings.HasPrefix(path, "/artifactory/api/terraform/remote/v2/")
+		},
+		Profile: apierror.ProfileTerraformBackend,
+	},
+	{Match: pathPrefix("/artifactory/api/terraform/"), Profile: apierror.ProfileTerraformRegistry},
+	{Match: pathPrefix("/artifactory/api/go/"), Profile: apierror.ProfileText},
+	{
+		// Named, though the default gives the same, because research 10
+		// once gave PyPI and Helm plain text. 7.x answers Artifactory's
+		// envelope under all three (decisions 0037, 0038 and 0039), and
+		// pip, twine, NuGet.Protocol and helm read only the status.
+		Match: pathPrefix(
+			"/artifactory/api/pypi/",
+			"/artifactory/api/nuget/",
+			"/artifactory/api/helm/",
+		),
+		Profile: apierror.ProfileArtifactory,
+	},
+	{
+		// The JFrog operations beside the registry (promote,
+		// parentManifests) keep the Artifactory envelope (decision 0031).
+		Match:   dockerhttp.IsRegistryPath,
+		Profile: apierror.ProfileOCI,
+	},
+	{Match: pathPrefix("/access/", "/event/", "/worker/"), Profile: apierror.ProfileAccess},
+	{Match: pathPrefix("/artifactory/api/retention/"), Profile: apierror.ProfileArtifactoryLegacy},
+	{
+		Match: pathPrefix(
+			"/artifactory/api/import/",
+			"/artifactory/api/export/",
+			"/artifactory/api/artifactexport/",
+		),
+		Profile: apierror.ProfileImportExport,
+	},
+	{Match: pathPrefix("/distribution/"), Profile: apierror.ProfileJFrogDistribution},
+	{Match: pathPrefix("/pfed/"), Profile: apierror.ProfilePlatformFederation},
+	{Match: pathPrefix("/grid/"), Profile: apierror.ProfileGrid},
+}
+
+// errorProfileFor is the profile errorProfileRules give path. Unclaimed
+// routes keep the same profile as handled requests so clients can read
+// their 404 responses.
+func errorProfileFor(path string) apierror.Profile {
+	return httpkit.ProfileFor(errorProfileRules, path)
+}
+
+// pathPrefix matches a path that starts with any of prefixes.
+func pathPrefix(prefixes ...string) func(path string) bool {
+	return func(path string) bool {
+		for _, p := range prefixes {
+			if strings.HasPrefix(path, p) {
+				return true
+			}
+		}
+		return false
+	}
+}
+
+// notSupported answers for JFrog products artifactweave deliberately does not
+// implement (Xray, Lifecycle, AppTrust, Evidence, Workers, Federation). 501 with
+// a product name tells a Terraform or jf user the feature is absent, not broken
+// (research 10).
+func notSupported(product string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		apierror.Write(w, errorProfileFor(r.URL.Path), apierror.NotSupported(product))
+	}
+}
+
+// notFound is the catch-all. Under /v2 the OCI code is NAME_UNKNOWN because
+// that is what registry clients expect for an unknown repository.
+func notFound(w http.ResponseWriter, r *http.Request) {
+	s := errorProfileFor(r.URL.Path)
+	e := apierror.New(http.StatusNotFound, "not found: "+r.Method+" "+r.URL.Path)
+	if s == apierror.ProfileOCI {
+		e.Code = "NAME_UNKNOWN"
+	}
+	apierror.Write(w, s, e)
+}
+
+// methodNotAllowed keeps the envelope rule for 405 too.
+func methodNotAllowed(w http.ResponseWriter, r *http.Request) {
+	apierror.Write(
+		w,
+		errorProfileFor(r.URL.Path),
+		apierror.New(http.StatusMethodNotAllowed, "method not allowed: "+r.Method+" "+r.URL.Path),
+	)
+}
+
+// The strict servers. Each generated interface is satisfied by a composite
+// that embeds its partials at depth 1 and the generated UnimplementedStrict
+// at depth 2, inside a stub holder. Go promotes the shallowest method, so
+// an operation a partial implements shadows its 501 stub, and one that no
+// partial implements still answers 501. Two partials implementing the same
+// operation sit at the same depth, which makes the method ambiguous and
+// fails the assertion below: the intended guard against a duplicate
+// implementation. A partial never embeds the stubs or another partial, and
+// state a partial embeds (accessState, itemkit.Kit) defines no method named
+// after an operation, or it would collide with the stub at depth 2.
+
+// artifactoryStubs holds the artifactory spec's generated stubs.
+type artifactoryStubs struct{ artgen.UnimplementedStrict }
+
+// artifactoryServer is the artifactory spec's strict server: the access
+// module's security operations, the system operations, the artifacts
+// module's operations, and those of each ecosystem that owns some (VCS,
+// npm, Docker, Debian, CRAN and RPM). Every artifacts and ecosystem partial
+// embeds the same item kit, whose methods sit at depth 2 beside the stubs
+// and are named after no operation.
+type artifactoryServer struct {
+	*accesshttp.SecurityAPI
+	*configurationhttp.SystemAPI
+	*artifactshttp.ArtifactoryAPI
+	*vcshttp.VCSAPI
+	*npmhttp.NPMAPI
+	*dockerhttp.DockerAPI
+	*debianhttp.DebianAPI
+	*cranhttp.CranAPI
+	*rpmhttp.RPMAPI
+	artifactoryStubs
+}
+
+// accessStubs holds the access spec's generated stubs.
+type accessStubs struct{ accessgen.UnimplementedStrict }
+
+// accessServer is the access spec's strict server.
+type accessServer struct {
+	*accesshttp.AccessService
+	accessStubs
+}
+
+// eventService serves /event (webhook subscriptions). Nothing is implemented
+// until the webhooks phase; the embedded stub answers 501 for every operation.
+type eventService struct {
+	eventgen.UnimplementedStrict
+}
+
+// The services brought into scope in P1b (research 16) start with every
+// operation stubbed; their phases replace the stubs.
+type (
+	distributionService struct {
+		distributiongen.UnimplementedStrict
+	}
+	workerService struct{ workergen.UnimplementedStrict }
+	pfedService   struct{ pfedgen.UnimplementedStrict }
+	gridService   struct{ gridgen.UnimplementedStrict }
+)
+
+var (
+	_ artgen.StrictServerInterface          = artifactoryServer{}
+	_ accessgen.StrictServerInterface       = accessServer{}
+	_ eventgen.StrictServerInterface        = eventService{}
+	_ distributiongen.StrictServerInterface = distributionService{}
+	_ workergen.StrictServerInterface       = workerService{}
+	_ pfedgen.StrictServerInterface         = pfedService{}
+	_ gridgen.StrictServerInterface         = gridService{}
+)

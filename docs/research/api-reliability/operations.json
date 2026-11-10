@@ -21,7 +21,7 @@
   {
     "route": "CONNECT /apptrust/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -192,7 +192,7 @@
   {
     "route": "CONNECT /evidence/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -211,7 +211,7 @@
   {
     "route": "CONNECT /lifecycle/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -230,7 +230,7 @@
   {
     "route": "CONNECT /mc/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notFound",
+    "handler": "internal/server/server.go: internal/server.notFound",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -287,7 +287,7 @@
   {
     "route": "CONNECT /xray/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -889,7 +889,7 @@
   {
     "route": "DELETE /apptrust/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -1982,7 +1982,7 @@
   {
     "route": "DELETE /artifactory/api/v1/service_trust/pairing/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/handwritten.go: internal/server.handwrittenStub.func1",
+    "handler": "internal/server/server.go: internal/server.handwrittenStub.func1",
     "review_family": "content-and-configuration",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -2319,7 +2319,7 @@
   {
     "route": "DELETE /evidence/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -2355,7 +2355,7 @@
   {
     "route": "DELETE /lifecycle/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -2374,7 +2374,7 @@
   {
     "route": "DELETE /mc/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notFound",
+    "handler": "internal/server/server.go: internal/server.notFound",
     "review_family": "content-and-configuration",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -2482,7 +2482,7 @@
   {
     "route": "DELETE /xray/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -3885,7 +3885,7 @@
   {
     "route": "GET /apptrust/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -5330,7 +5330,7 @@
   {
     "route": "GET /artifactory/api/download/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/handwritten.go: internal/server.handwrittenStub.func1",
+    "handler": "internal/server/server.go: internal/server.handwrittenStub.func1",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -7113,7 +7113,7 @@
   {
     "route": "GET /artifactory/api/replication/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/handwritten.go: internal/server.handwrittenStub.func1",
+    "handler": "internal/server/server.go: internal/server.handwrittenStub.func1",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -11194,7 +11194,7 @@
   {
     "route": "GET /evidence/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -11336,7 +11336,7 @@
   {
     "route": "GET /lifecycle/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -11355,7 +11355,7 @@
   {
     "route": "GET /mc/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notFound",
+    "handler": "internal/server/server.go: internal/server.notFound",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -11705,7 +11705,7 @@
   {
     "route": "GET /xray/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -11743,7 +11743,7 @@
   {
     "route": "HEAD /apptrust/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -13097,7 +13097,7 @@
   {
     "route": "HEAD /evidence/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -13116,7 +13116,7 @@
   {
     "route": "HEAD /lifecycle/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -13135,7 +13135,7 @@
   {
     "route": "HEAD /mc/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notFound",
+    "handler": "internal/server/server.go: internal/server.notFound",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -13192,7 +13192,7 @@
   {
     "route": "HEAD /xray/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -13230,7 +13230,7 @@
   {
     "route": "OPTIONS /apptrust/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -13401,7 +13401,7 @@
   {
     "route": "OPTIONS /evidence/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -13420,7 +13420,7 @@
   {
     "route": "OPTIONS /lifecycle/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -13439,7 +13439,7 @@
   {
     "route": "OPTIONS /mc/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notFound",
+    "handler": "internal/server/server.go: internal/server.notFound",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -13496,7 +13496,7 @@
   {
     "route": "OPTIONS /xray/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -13788,7 +13788,7 @@
   {
     "route": "PATCH /apptrust/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -14041,7 +14041,7 @@
   {
     "route": "PATCH /evidence/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -14080,7 +14080,7 @@
   {
     "route": "PATCH /lifecycle/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -14099,7 +14099,7 @@
   {
     "route": "PATCH /mc/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notFound",
+    "handler": "internal/server/server.go: internal/server.notFound",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -14156,7 +14156,7 @@
   {
     "route": "PATCH /xray/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -14976,7 +14976,7 @@
   {
     "route": "POST /apptrust/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -17180,7 +17180,7 @@
   {
     "route": "POST /artifactory/api/replication/execute/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/handwritten.go: internal/server.handwrittenStub.func1",
+    "handler": "internal/server/server.go: internal/server.handwrittenStub.func1",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -18835,7 +18835,7 @@
   {
     "route": "POST /artifactory/api/v1/service_trust/pairing/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/handwritten.go: internal/server.handwrittenStub.func1",
+    "handler": "internal/server/server.go: internal/server.handwrittenStub.func1",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -19583,7 +19583,7 @@
   {
     "route": "POST /evidence/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -19641,7 +19641,7 @@
   {
     "route": "POST /lifecycle/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -19660,7 +19660,7 @@
   {
     "route": "POST /mc/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notFound",
+    "handler": "internal/server/server.go: internal/server.notFound",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -19839,7 +19839,7 @@
   {
     "route": "POST /xray/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -20469,7 +20469,7 @@
   {
     "route": "PUT /apptrust/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -21888,7 +21888,7 @@
   {
     "route": "PUT /artifactory/api/v1/service_trust/pairing/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/handwritten.go: internal/server.handwrittenStub.func1",
+    "handler": "internal/server/server.go: internal/server.handwrittenStub.func1",
     "review_family": "content-and-configuration",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -22259,7 +22259,7 @@
   {
     "route": "PUT /evidence/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -22278,7 +22278,7 @@
   {
     "route": "PUT /lifecycle/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -22297,7 +22297,7 @@
   {
     "route": "PUT /mc/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notFound",
+    "handler": "internal/server/server.go: internal/server.notFound",
     "review_family": "content-and-configuration",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -22388,7 +22388,7 @@
   {
     "route": "PUT /xray/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -22426,7 +22426,7 @@
   {
     "route": "QUERY /apptrust/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -22597,7 +22597,7 @@
   {
     "route": "QUERY /evidence/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -22616,7 +22616,7 @@
   {
     "route": "QUERY /lifecycle/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -22635,7 +22635,7 @@
   {
     "route": "QUERY /mc/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notFound",
+    "handler": "internal/server/server.go: internal/server.notFound",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -22692,7 +22692,7 @@
   {
     "route": "QUERY /xray/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -22730,7 +22730,7 @@
   {
     "route": "TRACE /apptrust/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -22901,7 +22901,7 @@
   {
     "route": "TRACE /evidence/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -22920,7 +22920,7 @@
   {
     "route": "TRACE /lifecycle/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -22939,7 +22939,7 @@
   {
     "route": "TRACE /mc/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notFound",
+    "handler": "internal/server/server.go: internal/server.notFound",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -22996,7 +22996,7 @@
   {
     "route": "TRACE /xray/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/stubs.go: internal/server.notSupported.func1",
+    "handler": "internal/server/server.go: internal/server.notSupported.func1",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",

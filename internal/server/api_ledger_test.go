@@ -238,8 +238,8 @@ func apiReviewHandlers(t *testing.T) map[string]apiReviewHandler {
 		}
 		files = append(files, found...)
 	}
-	// The artifactory spec's operations are split over partials
-	// (composites.go); each receiver keys its handlers by its spec.
+	// The artifactory spec's operations are split over partials, which the
+	// router's composites embed; each receiver keys its handlers by its spec.
 	specOf := map[string]string{
 		"ArtifactoryAPI": "artifactory",
 		"VCSAPI":         "artifactory",
