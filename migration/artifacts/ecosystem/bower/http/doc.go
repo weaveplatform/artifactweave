@@ -19,13 +19,14 @@
 //     (pkgroute) for repositories of package type bower, local, federated,
 //     virtual or remote. The repository's reindex ({repoKey}/reindex) is a
 //     JFrog operation beside the protocol, which the protocol reserves.
-//   - Driven: the router kit (pkgroute.Kit), which resolves the repository
-//     and the caller, checks permissions, reads items and blobs, keeps
-//     Bower registrations and writes errors; the remote source service
-//     (Options.RemoteSources), which fetches registry pointers, Git refs
-//     and archives, or an upstream Artifactory's refs and binaries, into
-//     the remote cache; and the format package, whose rules check every
-//     name, version, path and manifest.
+//   - Driven: the router kit (pkgroute.Kit), whose store (pkgroute.Store)
+//     the handlers also reach through DB(), and which resolves the
+//     repository and the caller, checks permissions, reads items and blobs,
+//     keeps Bower registrations and writes errors; the remote source
+//     service (Options.RemoteSources), which fetches registry pointers, Git
+//     refs and archives, or an upstream Artifactory's refs and binaries,
+//     into the remote cache; and the format package, whose rules check
+//     every name, version, path and manifest.
 //
 // # Outputs
 //
@@ -71,8 +72,9 @@
 //   - Plan: docs/implementation/plan.md#p30-language-package-repositories
 //     and #p9d-modular-monolith-migration, epic ECO
 //     (https://github.com/weaveplatform/artifactweave/issues/943).
-//   - https://github.com/weaveplatform/artifactweave/issues/768 and
-//     https://github.com/weaveplatform/artifactweave/issues/1040
+//   - https://github.com/weaveplatform/artifactweave/issues/768,
+//     https://github.com/weaveplatform/artifactweave/issues/1040 and
+//     https://github.com/weaveplatform/artifactweave/issues/1089
 //
 // # Status
 //

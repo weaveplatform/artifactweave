@@ -387,7 +387,7 @@ func TestUnitHandlerLifecycleRejectsMissingAndUninspectableIPKs(t *testing.T) {
 }
 
 type (
-	opkgFailedSearchStore struct{ store.Store }
+	opkgFailedSearchStore struct{ format.Store }
 	opkgFailedSearchItems struct{ store.ItemStore }
 )
 

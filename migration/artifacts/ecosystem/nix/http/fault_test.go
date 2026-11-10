@@ -22,7 +22,12 @@ type testSource struct {
 	rechecks      int
 }
 
-func (*testSource) Item(context.Context, store.Store, repo.Config, string) (pkgroute.Found, error) {
+func (*testSource) Item(
+	context.Context,
+	pkgroute.Store,
+	repo.Config,
+	string,
+) (pkgroute.Found, error) {
 	return pkgroute.Found{}, source.ErrUnsupported
 }
 
@@ -335,7 +340,7 @@ func TestAccNixExactPathPermissionsAndRevocation(t *testing.T) {
 }
 
 type failStore struct {
-	store.Store
+	serverStore
 	repos store.RepoStore
 	items store.ItemStore
 }
@@ -344,14 +349,14 @@ func (s failStore) Repos() store.RepoStore {
 	if s.repos != nil {
 		return s.repos
 	}
-	return s.Store.Repos()
+	return s.serverStore.Repos()
 }
 
 func (s failStore) Items() store.ItemStore {
 	if s.items != nil {
 		return s.items
 	}
-	return s.Store.Items()
+	return s.serverStore.Items()
 }
 
 type failRepos struct {
@@ -381,14 +386,14 @@ func (failItems) Descendants(
 func TestAccNixFaultsDoNotLookLikeMisses(t *testing.T) {
 	f := newFixture(t)
 	f.publish()
-	f.st = failStore{Store: f.db, items: failItems{f.db.Items()}}
+	f.st = failStore{serverStore: f.db, items: failItems{f.db.Items()}}
 	f.mount(nil)
 	status(t, f.do("POST", prefix+"reindex", nil, ""), 500)
 	v := *repo.Defaults(&repo.Config{Key: "virtual", Class: repo.Virtual, PackageType: repo.Nix, Repositories: []string{"local"}})
 	if err := f.db.Repos().Create(t.Context(), v); err != nil {
 		t.Fatal(err)
 	}
-	f.st = failStore{Store: f.db, repos: failRepos{f.db.Repos(), "local"}}
+	f.st = failStore{serverStore: f.db, repos: failRepos{f.db.Repos(), "local"}}
 	f.mount(nil)
 	status(t, f.do("GET", "/artifactory/api/nix/virtual/"+infoPath, nil, ""), 500)
 }

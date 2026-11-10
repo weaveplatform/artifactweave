@@ -20,7 +20,7 @@ var errWork = errors.New("work boom")
 
 // workFaults fails the store methods a metadata run reads through, by name.
 type workFaults struct {
-	store.Store
+	format.Store
 	fail string
 }
 

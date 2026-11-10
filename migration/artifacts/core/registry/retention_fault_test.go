@@ -21,7 +21,7 @@ import (
 // retentionFaults fails the item reads and deletes, the version listing
 // and the blob opens its predicates pick, and delegates the rest.
 type retentionFaults struct {
-	store.Store
+	registry.Store
 	get, del func(path string) bool
 	search   func(q *aql.Query) bool
 	versions bool

@@ -20,7 +20,6 @@ import (
 	format "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 const signingPurpose = "huggingfaceml-lfs-upload-v1"
@@ -52,7 +51,7 @@ type virtualSource struct{}
 
 func (virtualSource) Item(
 	_ context.Context,
-	_ store.Store,
+	_ pkgroute.Store,
 	_ repo.Config,
 	_ string,
 ) (pkgroute.Found, error) {

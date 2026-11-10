@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -58,7 +57,7 @@ func mergeStats(s *types.ItemStats, patch map[string]json.RawMessage) error {
 // statistics are kept for files only, as the ?stats view answers.
 func setStats(
 	ctx context.Context,
-	st store.Store,
+	st Store,
 	it types.Item,
 	patch map[string]json.RawMessage,
 ) error {

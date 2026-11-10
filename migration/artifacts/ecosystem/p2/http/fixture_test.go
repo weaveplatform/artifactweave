@@ -19,7 +19,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -37,7 +37,7 @@ func newKit(c Config) *itemkit.Kit {
 }
 
 // authorizerOver is the access module's Authorizer over st.
-func authorizerOver(t *testing.T, st store.Store) accessapi.Authorizer {
+func authorizerOver(t *testing.T, st accesstest.Store) accessapi.Authorizer {
 	t.Helper()
 	return accesstest.Over(t, st).API().Authorizer
 }
@@ -45,7 +45,7 @@ func authorizerOver(t *testing.T, st store.Store) accessapi.Authorizer {
 // itemWorld is the store and blob store of the router's item world, for
 // the tests that call the protocol's code over them.
 type itemWorld struct {
-	db    store.Store
+	db    *inmem.Store
 	blobs blob.Store
 }
 

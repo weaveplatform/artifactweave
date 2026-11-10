@@ -56,7 +56,7 @@ type alpineItems struct{ *itemkit.Kit }
 // reports whether it answered; every other request, a folder among them,
 // it leaves to the overlays after it and the generic lookup.
 func TryAlpineItem(
-	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
+	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) bool {
 	s := alpineItems{k}
@@ -81,7 +81,7 @@ func TryAlpineItem(
 }
 
 func (s alpineItems) serveAlpineIndex(
-	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
+	w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
 	ctx := r.Context()
@@ -176,7 +176,7 @@ func alpinePackageReadable(
 }
 
 func (s alpineItems) alpineMemberIndex(
-	ctx context.Context, st store.Store, c repo.Config, cached bool, path string,
+	ctx context.Context, st itemkit.Store, c repo.Config, cached bool, path string,
 	p kernel.Principal, acc itemkit.Access,
 ) (alpineIndexView, error) {
 	view := alpineIndexView{repo: c}
@@ -259,7 +259,7 @@ func (s alpineItems) readAlpineBlob(ctx context.Context, sha string) ([]byte, er
 // alpineCandidates walks ordered virtual members. A duplicate path belongs to
 // the first readable member, which is the same member package GET must use.
 func (s alpineItems) alpineCandidates(
-	ctx context.Context, st store.Store, c repo.Config, indexPath string,
+	ctx context.Context, st itemkit.Store, c repo.Config, indexPath string,
 	p kernel.Principal, acc itemkit.Access, seen map[string]bool,
 ) ([]alpineCandidate, error) {
 	if seen[c.Key] || len(seen) >= 8 {
@@ -328,7 +328,7 @@ func (s alpineItems) alpineCandidates(
 }
 
 func (s alpineItems) serveVirtualAlpinePackage(
-	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
+	w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
 	if _, _, _, _, ok := alpine.ParsePath(req.Path); !ok || len(req.Props) != 0 ||

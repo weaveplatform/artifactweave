@@ -21,7 +21,7 @@ var errMigrationStorage = errors.New("injected migration storage failure")
 // Keep the real transactional store underneath every fault: a handler returning
 // an error is insufficient unless all previously published state rolls back.
 type migrationFaultStore struct {
-	store.Store
+	serverStore
 	fault    string
 	active   atomic.Bool
 	hit      atomic.Bool
@@ -37,19 +37,19 @@ func (s *migrationFaultStore) fails(operation string) bool {
 }
 
 func (s *migrationFaultStore) Items() store.ItemStore {
-	return migrationFaultItems{s.Store.Items(), s}
+	return migrationFaultItems{s.serverStore.Items(), s}
 }
 
 func (s *migrationFaultStore) Packages() store.PackageStore {
-	return migrationFaultPackages{s.Store.Packages(), s}
+	return migrationFaultPackages{s.serverStore.Packages(), s}
 }
 
 func (s *migrationFaultStore) Repos() store.RepoStore {
-	return migrationFaultRepos{s.Store.Repos(), s}
+	return migrationFaultRepos{s.serverStore.Repos(), s}
 }
 
 func (s *migrationFaultStore) Permissions() store.PermissionStore {
-	return migrationFaultPermissions{s.Store.Permissions(), s}
+	return migrationFaultPermissions{s.serverStore.Permissions(), s}
 }
 
 type migrationFaultRepos struct {
@@ -179,7 +179,7 @@ func TestAccLegacyMigrationStorageFailuresRollBackAndRetry(t *testing.T) {
 		t.Run(fault, func(t *testing.T) {
 			var faults *migrationFaultStore
 			f := newFixture(t, repo.Local, func(f *fixture) *source.Service {
-				faults = &migrationFaultStore{Store: f.db, fault: fault}
+				faults = &migrationFaultStore{serverStore: f.db, fault: fault}
 				f.db, f.items.Store = faults, faults
 				return nil
 			})

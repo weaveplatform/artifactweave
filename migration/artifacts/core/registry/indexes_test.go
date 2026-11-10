@@ -104,7 +104,7 @@ func (w *world) platforms() []string {
 // digest folders, where jf finds them (research 23, 5.1). Naming many
 // platforms, it carries no docker.os or docker.architecture.
 func TestAccPushIndex(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		ps := w.platforms()
 		for _, c := range []struct{ mediaType, tag string }{
 			{layout.MediaTypeOCIIndex, "v1"},
@@ -154,7 +154,7 @@ func TestAccPushIndex(t *testing.T) {
 // docker.os and docker.architecture, which a property search finds; the
 // config's variant goes into neither.
 func TestAccPlatformProperties(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		w.upload(layerA)
 		var bodies []string
 		paths := map[string]string{}
@@ -208,7 +208,7 @@ func TestAccPlatformProperties(t *testing.T) {
 // Every manifest an index lists must be in the image, by tag or by digest;
 // each one missing is named, under any algorithm, and nothing is stored.
 func TestAccIndexUnknownChildren(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		ps := w.platforms()
 		absent, _ := manifestOf(layerB, layerA)
 		// In another image, which does not count.
@@ -236,7 +236,7 @@ func TestAccIndexUnknownChildren(t *testing.T) {
 // A manifest with a subject carries oci.subject and oci.artifactType, its
 // own type or its config's; the subject need not be in the registry.
 func TestAccSubjectProperties(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		w.upload(emptyConfig, layerA)
 		for _, c := range []struct{ artifactType, expected, tag string }{
 			{"application/vnd.example.sig", "application/vnd.example.sig", "sig"},
@@ -258,7 +258,7 @@ func TestAccSubjectProperties(t *testing.T) {
 // The referrers of a digest are the manifests of the image whose subject
 // it is, once each and by digest, filtered by artifact type on request.
 func TestAccReferrers(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		ctx := context.Background()
 		ps := w.platforms()
 		w.upload(emptyConfig)
@@ -330,7 +330,7 @@ func TestAccReferrers(t *testing.T) {
 // A referrer deployed through the REST API has properties but no type; it
 // is listed without one, and a body that is no manifest without annotations.
 func TestAccReferrersDeployedThroughREST(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		ctx := context.Background()
 		for path, body := range map[string]string{
 			"app/a/manifest.json":      `{"schemaVersion":2,"config":{"mediaType":"x","digest":"sha256:` + sum("c") + `","size":1},"annotations":{"k":"v"}}`,
@@ -369,7 +369,7 @@ func TestAccReferrersDeployedThroughREST(t *testing.T) {
 // other tag holds and no other index lists, as Artifactory does from
 // 7.118.0, and nothing else.
 func TestAccDeleteMultiArch(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		ctx := context.Background()
 		ps := w.platforms()
 		folder := func(body string) string { return layout.DigestFolder(sum(body)) }
@@ -450,7 +450,7 @@ func TestAccDeleteMultiArch(t *testing.T) {
 // A platform listed by the deleted list whose folder is already gone is
 // skipped, and one under another algorithm has no folder to remove.
 func TestAccDeleteMultiArchMissingPlatforms(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		ctx := context.Background()
 		ps := w.platforms()
 		body := `{"schemaVersion":2,"manifests":[` +

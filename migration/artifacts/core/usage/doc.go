@@ -13,9 +13,9 @@
 //
 //   - Driving: the storage summary handler of GET /api/storageinfo, after
 //     its access check.
-//   - Driven: the metadata store, for the blob totals, the item totals of
-//     each repository and remote cache, the repositories, and the trash
-//     can's entries, a page at a time.
+//   - Driven: the metadata store, through Store, for the blob totals, the
+//     item totals of each repository and remote cache, the repositories,
+//     and the trash can's entries, a page at a time.
 //   - The hot blob store's Location, which the application derives from the
 //     blob store configuration and hands to the server: the name Artifactory
 //     gives its binary provider chain, the directory it reports, and the
@@ -67,7 +67,8 @@
 //     (task 2, storageinfo), #p2b-cloud-blob-storage-and-mirroring and
 //     #p9d-modular-monolith-migration, epic ART
 //     (https://github.com/weaveplatform/artifactweave/issues/941).
-//   - https://github.com/weaveplatform/artifactweave/issues/973
+//   - https://github.com/weaveplatform/artifactweave/issues/973 and
+//     https://github.com/weaveplatform/artifactweave/issues/1088
 //
 // # Status
 //
@@ -80,7 +81,7 @@
 // (https://github.com/weaveplatform/artifactweave/issues/390), and
 // NoFilesystem for an object store
 // (https://github.com/weaveplatform/artifactweave/issues/461). Staged in
-// P9d. Roadmap: Summarize takes a narrow store in place of the whole store
+// P9d, which narrowed Summarize's store to Store
 // (https://github.com/weaveplatform/artifactweave/issues/1088).
 //
 // # Testing

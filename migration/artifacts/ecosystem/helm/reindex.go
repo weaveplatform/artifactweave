@@ -97,7 +97,7 @@ func reindex(ctx context.Context, env format.Env, c repo.Config, under string) e
 // (pkgindex.Stored) at under or below it, all of them for "".
 func archivesUnder(
 	ctx context.Context,
-	st store.Store,
+	st format.Store,
 	c repo.Config,
 	under string,
 ) ([]types.Item, error) {
@@ -325,7 +325,7 @@ func reindexVersion(
 // holds none.
 func stored(
 	ctx context.Context,
-	st store.Store,
+	st format.Store,
 	c repo.Config,
 	k versionKey,
 ) (types.PackageVersion, bool, error) {

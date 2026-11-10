@@ -153,7 +153,7 @@ func TestAccPlatformTags(t *testing.T) {
 // properties, as 7.x does from 7.21.2. Pushing the list again changes
 // nothing, and a push by digest with tags tags the platforms for each.
 func TestAccListPushAddsPlatformTags(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		ma := w.multiArch(w.docker, "app")
 		for range 2 {
 			w.pushList(w.docker, "app", ma.list, ma.hash, "v1")
@@ -201,7 +201,7 @@ func TestAccListPushAddsPlatformTags(t *testing.T) {
 // platform in its descriptive tag, as 7.x moved it there (RTFACT-26810), so
 // the list never names a manifest the image lost.
 func TestAccListOverwritesItsOwnPlatform(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		w.upload(imageConfig, layerA)
 		amd, amdDigest := manifestWith(imageConfig, layerA)
 		w.pushTo(w.docker, "app", amd, amdDigest, "v1")
@@ -228,7 +228,7 @@ func TestAccListOverwritesItsOwnPlatform(t *testing.T) {
 // removes "all of the sub-manifests related to the original revision".
 // Under Tag Retention the previous revision is kept whole instead.
 func TestAccListOverwrittenByImage(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		ma := w.multiArch(w.docker, "app")
 		w.pushList(w.docker, "app", ma.list, ma.hash, "v1")
 		// Another list names the arm64 platform, which so stays.
@@ -271,7 +271,7 @@ func TestAccListOverwrittenByImage(t *testing.T) {
 // manifests, 7.x's default (DV-084); its descriptive tags follow the new
 // list.
 func TestAccListOverwrittenByList(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		ma := w.multiArch(w.docker, "app")
 		w.pushList(w.docker, "app", ma.list, ma.hash, "v1")
 		w.upload(armConfig, layerA)
@@ -296,7 +296,7 @@ func TestAccListOverwrittenByList(t *testing.T) {
 // The multi-architecture delete takes the tag's descriptive tags along, but
 // not one pushed over since; RemoveTag with Platforms does the same.
 func TestAccDeleteMultiArchTakesPlatformTags(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		ctx := context.Background()
 		ma := w.multiArch(w.docker, "app")
 		w.pushList(w.docker, "app", ma.list, ma.hash, "v1")
@@ -331,7 +331,7 @@ func TestAccDeleteMultiArchTakesPlatformTags(t *testing.T) {
 // Max Unique Tags counts a list with its descriptive tags as one tag, and
 // removes them with it.
 func TestAccMaxUniqueTagsCountsAListOnce(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		c := &clock{}
 		w.svc.Now = c.now
 		limited := w.repoOf(&repo.Config{
@@ -358,7 +358,7 @@ func TestAccMaxUniqueTagsCountsAListOnce(t *testing.T) {
 // descriptive tags at the target, as 7.111.4 stopped doing (RTDEV-55450);
 // a move takes the source's descriptive tags out with the list.
 func TestAccPromoteListWithPlatformTags(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		ctx := context.Background()
 		prod := w.repoOf(
 			&repo.Config{Key: "docker-prod", Class: repo.Local, PackageType: repo.Docker},
@@ -396,7 +396,7 @@ func TestAccPromoteListWithPlatformTags(t *testing.T) {
 
 // getFailingAt is a store whose item reads fail for any path containing at.
 type getFailingAt struct {
-	store.Store
+	registry.Store
 	at string
 }
 

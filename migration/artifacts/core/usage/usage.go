@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -69,8 +70,18 @@ type Summary struct {
 	Rows []Row
 }
 
+// Store is what the summary reads: the blob index's totals, the
+// repositories, the items' usage and the trash can's entries. The metadata
+// store's aggregate (pkg/store) is a Store.
+type Store interface {
+	Blobs() port.BlobIndex
+	Repos() port.RepoStore
+	Items() port.ItemStore
+	Trash() port.TrashStore
+}
+
 // Summarize computes the summary of st over the blob store at loc.
-func Summarize(ctx context.Context, st store.Store, loc Location) (Summary, error) {
+func Summarize(ctx context.Context, st Store, loc Location) (Summary, error) {
 	s := Summary{Location: loc}
 	var err error
 	if s.BinariesCount, s.BinariesSize, err = st.Blobs().Totals(ctx); err != nil {
@@ -136,7 +147,7 @@ func Summarize(ctx context.Context, st store.Store, loc Location) (Summary, erro
 // so a path trashed twice is one file there, and the folders above a trashed
 // item, its repository's among them, are folders of that repository. A count
 // of trash entries would differ on both.
-func trashUsage(ctx context.Context, st store.Store) (Row, error) {
+func trashUsage(ctx context.Context, st Store) (Row, error) {
 	row := Row{Key: trash.Repository, Type: "NA", ProjectKey: DefaultProject}
 	sizes := map[string]int64{}
 	folders := map[string]bool{}

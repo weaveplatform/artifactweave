@@ -68,7 +68,7 @@ type CacheUpload struct {
 	// MaxBytes bounds transient storage and parsed metadata, zero means the
 	// default 64MiB for metadata and no additional artifact size limit.
 	MaxBytes     int64
-	CheckCurrent func(context.Context, store.Store) error
+	CheckCurrent func(context.Context, Store) error
 }
 
 // CacheResult is either committed content or an owned transient reader. Close

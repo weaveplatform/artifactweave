@@ -94,7 +94,7 @@ func smartFixture(t *testing.T) *smartWorld {
 	}
 	resolver := upstreamtest.NewResolver(t, w.db, []byte("smart-test-only-credential-revision-key"))
 	w.p.Options = resolver.Options
-	w.p.CheckCurrent = func(ctx context.Context, _ store.Store, q source.Request, permit source.Permit, revision string) error {
+	w.p.CheckCurrent = func(ctx context.Context, _ remote.Store, q source.Request, permit source.Permit, revision string) error {
 		current, err := w.db.Repos().Get(ctx, q.Repo.Key)
 		if err != nil || store.RemotePolicyChanged(current, q.Repo) {
 			return source.ErrSuperseded
@@ -865,7 +865,7 @@ func TestAccSmartStatusOmitsRepresentationsWithoutTheirItem(t *testing.T) {
 }
 
 // The application serves registry remotes with a second Smart whose jobs
-// carry the kind remote.smart.registry (internal/app), so Status reads a
+// carry the kind remote.smart.registry (migration/app), so Status reads a
 // registry remote's work under that kind.
 func TestAccSmartStatusFindsRegistryWorkUnderItsKind(t *testing.T) {
 	w := smartFixture(t)

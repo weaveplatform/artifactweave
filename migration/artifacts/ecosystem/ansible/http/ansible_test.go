@@ -44,7 +44,7 @@ type fixture struct {
 	t      *testing.T
 	h      http.Handler
 	db     *inmem.Store
-	store  store.Store
+	store  pkgroute.Store
 	items  *item.Service
 	source *source.Service
 	repo   repo.Config

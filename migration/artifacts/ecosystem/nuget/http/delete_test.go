@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // dotnet nuget delete sends DELETE {PackagePublish}/{id}/{version}: a hard
@@ -95,7 +95,7 @@ func TestAccRelist(t *testing.T) {
 // A read the delete needs that fails is a fault.
 func TestAccDeleteFaults(t *testing.T) {
 	for _, failing := range []string{"version", "files", "byid"} {
-		f := newFixture(t, func(st store.Store) store.Store {
+		f := newFixture(t, func(st pkgroute.Store) pkgroute.Store {
 			return failingStore{Store: st, failing: failing}
 		})
 		f.push("Acme.Lib", "1.0.0", "")
@@ -107,7 +107,7 @@ func TestAccDeleteFaults(t *testing.T) {
 	}
 	// The item service refuses: the file went between the lookup and the
 	// delete.
-	f := newFixture(t, func(st store.Store) store.Store {
+	f := newFixture(t, func(st pkgroute.Store) pkgroute.Store {
 		return failingStore{Store: st, failing: "item"}
 	})
 	f.push("Acme.Lib", "1.0.0", "")

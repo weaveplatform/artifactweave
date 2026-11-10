@@ -11,6 +11,8 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -83,10 +85,20 @@ type Options struct {
 	Now func() time.Time
 }
 
+// Store is what a collection pass reads and writes: the trash can's store,
+// whose expired entries a pass purges (trash.Store), with the upload
+// sessions it expires and the lease table that keeps one pass running
+// across the nodes. The metadata store's aggregate (pkg/store) is a Store.
+type Store interface {
+	trash.Store
+	Uploads() session.UploadStore
+	Leases() work.LeaseStore
+}
+
 // Collector runs garbage collection passes over one store and its blob
 // store. Passes in one process run one at a time.
 type Collector struct {
-	store        store.Store
+	store        Store
 	blobs        blob.Store
 	trash        *trash.Service
 	grace        time.Duration
@@ -106,7 +118,7 @@ type Collector struct {
 }
 
 // New returns a Collector over st and blobs.
-func New(st store.Store, blobs blob.Store, o Options) (*Collector, error) {
+func New(st Store, blobs blob.Store, o Options) (*Collector, error) {
 	id, err := blob.NewUploadID()
 	if err != nil {
 		return nil, fmt.Errorf("gc: lease holder: %w", err)

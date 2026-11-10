@@ -83,5 +83,5 @@
 //     components and file names it refuses.
 //
 // The hooks are also tested end to end through the protocol, from the
-// server root's Conan suites and internal/app's (docs/testing/conan.md).
+// server root's Conan suites and migration/app's (docs/testing/conan.md).
 package conan

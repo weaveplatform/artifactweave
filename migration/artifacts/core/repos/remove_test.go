@@ -22,7 +22,7 @@ import (
 )
 
 // trashcan turns the trash can on or off.
-func trashcan(t *testing.T, db store.Store, on bool) {
+func trashcan(t *testing.T, db Store, on bool) {
 	t.Helper()
 	if err := db.Settings().Put(context.Background(), types.SettingTrashcan,
 		types.TrashcanSettings{Enabled: on, RetentionDays: 14}); err != nil {
@@ -31,7 +31,7 @@ func trashcan(t *testing.T, db store.Store, on bool) {
 }
 
 // entries counts what the trash can holds from repoKey.
-func entries(t *testing.T, db store.Store, repoKey string) int {
+func entries(t *testing.T, db Store, repoKey string) int {
 	t.Helper()
 	all, err := (&trash.Service{Store: db}).Entries(context.Background(), repoKey, "")
 	if err != nil {
@@ -41,7 +41,7 @@ func entries(t *testing.T, db store.Store, repoKey string) int {
 }
 
 // refs is the reference count of sha's blob.
-func refs(t *testing.T, db store.Store, sha string) int64 {
+func refs(t *testing.T, db Store, sha string) int64 {
 	t.Helper()
 	b, err := db.Blobs().Get(context.Background(), sha)
 	if err != nil {

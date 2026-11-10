@@ -296,7 +296,7 @@ func Merge(stored repo.Config, patch map[string]json.RawMessage) (repo.Config, e
 // The whole delete is one transaction, however large the repository, so a
 // failure part of the way leaves it whole, its content where it was and the
 // trash can as it was.
-func Remove(ctx context.Context, st store.Store, key, by string) (int64, bool, error) {
+func Remove(ctx context.Context, st Store, key, by string) (int64, bool, error) {
 	c, err := st.Repos().Get(ctx, key)
 	if errors.Is(err, store.ErrNotFound) {
 		return 0, false, nil
@@ -392,7 +392,7 @@ func Remove(ctx context.Context, st store.Store, key, by string) (int64, bool, e
 // would leave an entry holding a reference the delete never removed, which
 // purging the entry would release a second time, so that refuses the whole
 // delete as artifactsapi.ErrChanged instead.
-func release(ctx context.Context, st store.Store, removed, held map[string]int64) error {
+func release(ctx context.Context, st Store, removed, held map[string]int64) error {
 	for sha, n := range held {
 		if removed[sha] < n {
 			return fmt.Errorf("%w: blob %s", artifactsapi.ErrChanged, sha)

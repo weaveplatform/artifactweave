@@ -51,10 +51,17 @@ func (w *world) now() time.Time          { return *w.clock.Load() }
 func (w *world) set(t time.Time)         { w.clock.Store(&t) }
 func (w *world) advance(d time.Duration) { w.set(w.now().Add(d)) }
 
+// tokenStore is a collector's store with the token table that the
+// collector's Tokens option reaches, as the access module's binding does.
+type tokenStore interface {
+	gc.Store
+	Tokens() store.TokenStore
+}
+
 // collector builds a collector over st whose Tokens removes expired records
 // from st's token table, as the access module's binding does, so a test that
 // fails that table through st still fails the step.
-func (w *world) collector(t *testing.T, st store.Store) *gc.Collector {
+func (w *world) collector(t *testing.T, st tokenStore) *gc.Collector {
 	t.Helper()
 	c, err := gc.New(st, w.blobs, gc.Options{
 		Now:    w.now,

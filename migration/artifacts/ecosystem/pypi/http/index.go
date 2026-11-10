@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	pypifmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -42,7 +43,7 @@ type Reads func(path string) bool
 // the index has no such project or the caller may read none of its files.
 func load(
 	ctx context.Context,
-	st store.Store,
+	st format.Store,
 	key, name string,
 	reads Reads,
 ) (project, bool, error) {
@@ -61,7 +62,7 @@ func load(
 // probe is set, only enough of them to tell whether there is one.
 func readable(
 	ctx context.Context,
-	st store.Store,
+	st format.Store,
 	pkg types.Package,
 	reads Reads,
 	probe bool,
@@ -95,7 +96,7 @@ func readable(
 
 // projects are the normalised names of the projects in the repository key
 // with a file reads allows, in the order the index lists them, by name.
-func projects(ctx context.Context, st store.Store, key string, reads Reads) ([]string, error) {
+func projects(ctx context.Context, st format.Store, key string, reads Reads) ([]string, error) {
 	var names []string
 	page := store.Page{Limit: store.MaxLimit}
 	for {

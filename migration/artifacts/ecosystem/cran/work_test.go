@@ -33,7 +33,7 @@ func (b cranFixtureBlobs) Stat(_ context.Context, _ string) (blob.Info, error) {
 }
 
 type cranStorageFault struct {
-	store.Store
+	format.Store
 	packages store.PackageStore
 }
 

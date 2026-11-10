@@ -12,15 +12,18 @@
 // artifacts module, ecosystem layer: the native Chef Supermarket protocol of
 // the Chef slice. It is named chefhttp so that it does not shadow net/http.
 // Outside tests, only its own http subtree, the module's http adapters and
-// app may import it (decision 0044, dependency rule 9).
+// app may import it (decision 0044, dependency rule 9); the server root
+// counts as app until it moves there.
 //
 // # Inputs
 //
 //   - Driving: the server, which mounts Protocol through the router kit
 //     (pkgroute) for repositories of package type chef, local, federated,
-//     virtual or remote. The root file chef_routes.go serves the
-//     repository's reindex (POST {repoKey}/reindex) beside the protocol, and
-//     chef_item.go keeps the generic item routes from serving a remote's
+//     virtual or remote. The server also calls ChefAPI's
+//     RegisterChefReindex, which serves the repository's reindex (POST
+//     {repoKey}/reindex) beside the protocol, and lists the artifacts
+//     module's TryChefItem (artifacts/adapters/http) among the item kit's
+//     overlays, which keeps the generic item routes from serving a remote's
 //     cached metadata.
 //   - Driven: the router kit (pkgroute.Kit), which resolves the repository
 //     and the caller, checks permissions, reads the package index, items and
@@ -28,12 +31,18 @@
 //     the remote source service (Protocol's argument), which fetches an
 //     upstream Supermarket's catalog, cookbook and version documents and its
 //     archives into the remote cache; and the format package, whose rules
-//     check every name, version, path, document and archive.
+//     check every name, version, path, document and archive. ChefAPI's
+//     reindex is the item kit's Reindex (artifacts/adapters/http/itemkit),
+//     which every format shares.
 //
 // # Outputs
 //
 //   - Protocol: the routes, the source of each repository class and the
 //     Artifactory error profile.
+//   - ChefAPI: the kit wrapper whose RegisterChefReindex mounts POST
+//     /artifactory/api/chef/{repoKey}/reindex, which refuses any query with
+//     400, answers its text once the reindex has run, and writes errors in
+//     the Artifactory envelope.
 //   - Answers: catalogs paged by start and items, at most 1,000 entries a
 //     page; cookbook and version records whose links name the serving
 //     repository; archives; the version record of a published cookbook; and
@@ -75,17 +84,22 @@
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md,
 //     "Dependency rules".
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
-//     line 236 (ecosystem/chef) and line 1017 (the mapping row).
+//     line 236 (ecosystem/chef) and line 1017 (the mapping row). The
+//     server-root table does not list the root's chef_routes.go, which
+//     joined this package as routes.go.
 //   - Plan: docs/implementation/plan.md#p33-automation-and-source-repositories
-//     and #p9d-modular-monolith-migration, epic ECO
-//     (https://github.com/weaveplatform/artifactweave/issues/943).
-//   - https://github.com/weaveplatform/artifactweave/issues/783 and
-//     https://github.com/weaveplatform/artifactweave/issues/1045
+//     and #p9d-modular-monolith-migration, epics ECO
+//     (https://github.com/weaveplatform/artifactweave/issues/943) and WEB
+//     (https://github.com/weaveplatform/artifactweave/issues/944).
+//   - https://github.com/weaveplatform/artifactweave/issues/783,
+//     https://github.com/weaveplatform/artifactweave/issues/1045 and
+//     https://github.com/weaveplatform/artifactweave/issues/1086
 //
 // # Status
 //
 // Implemented P9c, which delivered the plan's P33 group (issues #782 to
-// #788). Staged in P9d.
+// #788). Staged in P9d, which also moved the server root's reindex route
+// here (WEB-17).
 //
 // # Testing
 //

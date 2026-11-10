@@ -11,6 +11,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -252,7 +253,7 @@ func TestUnitMaxUniqueSnapshotsStoreFailures(t *testing.T) {
 var errTrash = errors.New("trash can full")
 
 // failingTrash refuses every trash entry.
-type failingTrash struct{ store.Store }
+type failingTrash struct{ item.Store }
 
 func (f failingTrash) Trash() store.TrashStore { return refusingTrash{f.Store.Trash()} }
 

@@ -175,8 +175,8 @@ func withAccess(c Config) Config {
 // for the tests that call its operations and kit methods without the
 // router.
 func newArtifactoryAPI(c Config) artifactshttp.ArtifactoryAPI {
-	return artifactshttp.New(artifactshttp.Deps{Deps: itemkit.Deps{
-		Store: c.Store, Blobs: c.Blobs, Access: c.Access, Private: artifactshttp.PrivateItem,
+	return artifactshttp.New(artifactshttp.Deps{Store: c.Store, Deps: itemkit.Deps{
+		Blobs: c.Blobs, Access: c.Access, Private: artifactshttp.PrivateItem,
 	}})
 }
 

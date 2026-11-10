@@ -51,7 +51,7 @@ func syncVersion(ctx context.Context, env format.Env, c repo.Config, id Identity
 	return err //nolint:wrapcheck
 }
 
-func setProperties(ctx context.Context, st store.Store, it types.Item, id Identity) error {
+func setProperties(ctx context.Context, st format.Store, it types.Item, id Identity) error {
 	props, err := st.Items().Properties(ctx, it.ID)
 	if err != nil {
 		return fmt.Errorf("luarocks: properties: %w", err)
@@ -77,7 +77,7 @@ func setProperties(ctx context.Context, st store.Store, it types.Item, id Identi
 // the native upload client receives after a rockspec upload and sends back
 // with the rock, which VersionFile maps back. A missing package or version
 // fails with an error that wraps the store's.
-func VersionID(ctx context.Context, st store.Store, c repo.Config, id Identity) (int64, error) {
+func VersionID(ctx context.Context, st format.Store, c repo.Config, id Identity) (int64, error) {
 	p, err := st.Packages().Find(ctx, c.Key, id.Name)
 	if err != nil {
 		return 0, fmt.Errorf("luarocks: package %s: %w", id.Name, err)
@@ -94,7 +94,7 @@ func VersionID(ctx context.Context, st store.Store, c repo.Config, id Identity) 
 // has since been deleted. Scanning packages avoids ephemeral server state.
 func VersionFile(
 	ctx context.Context,
-	st store.Store,
+	st format.Store,
 	c repo.Config,
 	wanted int64,
 ) (Identity, error) {

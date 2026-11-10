@@ -35,15 +35,22 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	agentpluginshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/agentplugins/http"
 	alpinehttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/alpine/http"
+	chefhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/chef/http"
 	cranhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cran/http"
 	debianhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian/http"
 	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
 	luarockshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/luarocks/http"
+	mavenhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven/http"
+	npmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm/http"
 	opkghttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/opkg/http"
 	p2http "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/p2/http"
+	puppethttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/puppet/http"
+	pypihttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi/http"
 	rpmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/rpm/http"
 	terraformbackendhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend/http"
+	vcshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/vcs/http"
 	configurationhttp "github.com/weaveplatform/artifactweave/migration/configuration/adapters/http"
 	configapi "github.com/weaveplatform/artifactweave/migration/configuration/api"
 	"github.com/weaveplatform/artifactweave/migration/configuration/core/descriptor"
@@ -304,7 +311,7 @@ func withConfiguration(cfg Config) Config {
 // overlays are the format routes an item GET tries before the generic
 // lookup, in their dispatch order (itemkit.Deps.Overlays).
 var overlays = []itemkit.Overlay{
-	tryAgentMarketplaceItem,
+	agentpluginshttp.TryAgentMarketplaceItem,
 	alpinehttp.TryAlpineItem,
 	artifactshttp.TryCondaItem,
 	artifactshttp.TryMachineLearningItem,
@@ -351,6 +358,7 @@ func newKit(cfg Config) *itemkit.Kit { return itemkit.New(kitDeps(cfg)) }
 func artifactsDeps(cfg Config) artifactshttp.Deps {
 	return artifactshttp.Deps{
 		Deps:                        kitDeps(cfg),
+		Store:                       cfg.Store,
 		RemoteHTTP:                  cfg.RemoteHTTP,
 		RemoteStatus:                cfg.RemoteStatus,
 		GC:                          cfg.GC,
@@ -385,9 +393,9 @@ func New(cfg Config) http.Handler {
 	// Every partial embeds the kit newArtifactoryAPI built, so the routes of
 	// the whole spec share one set of overlays and one redirect throttle.
 	kit := artAPI.Kit
-	vcsOps := vcsAPI{kit}
-	npmOps := npmAPI{kit}
-	dockerOps := dockerAPI{kit}
+	vcsOps := vcshttp.VCSAPI{Kit: kit}
+	npmOps := npmhttp.NPMAPI{Kit: kit}
+	dockerOps := dockerhttp.DockerAPI{Kit: kit}
 	debianOps := debianhttp.DebianAPI{Kit: kit}
 	cranOps := cranhttp.CranAPI{Kit: kit, ArchiveMoverEnabled: cfg.CranArchiveMoverEnabled}
 	rpmOps := rpmhttp.RPMAPI{Kit: kit}
@@ -493,7 +501,7 @@ func New(cfg Config) http.Handler {
 	// so it replaces the 501 stub registered under that pattern rather than
 	// sitting beside it (decision 0002).
 	artAPI.RegisterItemRoutes(r)
-	agentPluginItems{kit}.registerAgentMarketplaceRoutes(r)
+	agentpluginshttp.AgentPluginItems{Kit: kit}.RegisterAgentMarketplaceRoutes(r)
 	cranOps.RegisterCranRoutes(r)
 	artAPI.RegisterTransferRoutes(r)
 	debianOps.RegisterDebianSnapshotRoutes(r)
@@ -502,10 +510,10 @@ func New(cfg Config) http.Handler {
 	artAPI.RegisterMultipartRoutes(r)
 	r.With(middleware.BodyLimit(middleware.ManagementBodyLimit)).Group(accessHTTP.RegisterRoutes)
 	artAPI.RegisterSearchRoutes(r)
-	mavenAPI{kit}.registerMavenRoutes(r)
+	mavenhttp.MavenAPI{Kit: kit}.RegisterMavenRoutes(r)
 	// GitLab subgroup owners span path segments; the generated VCS routes
 	// handle the ordinary one-segment forms.
-	r.Get("/artifactory/api/vcs/*", vcsOps.vcsNested)
+	r.Get("/artifactory/api/vcs/*", vcsOps.VCSNested)
 	registry.Register(r)
 	terraformbackendhttp.Register(
 		r,
@@ -549,9 +557,9 @@ func New(cfg Config) http.Handler {
 				SecurityAPI:    accessHTTP.Security,
 				SystemAPI:      sysAPI,
 				ArtifactoryAPI: &artAPI,
-				vcsAPI:         &vcsOps,
-				npmAPI:         &npmOps,
-				dockerAPI:      &dockerOps,
+				VCSAPI:         &vcsOps,
+				NPMAPI:         &npmOps,
+				DockerAPI:      &dockerOps,
 				DebianAPI:      &debianOps,
 				CranAPI:        &cranOps,
 				RPMAPI:         &rpmOps,
@@ -644,9 +652,9 @@ func New(cfg Config) http.Handler {
 		)
 	})
 
-	pypiAPI{kit}.registerPypiMetadataRoutes(r, artAPI.ProtocolOptions())
-	puppetAPI{kit}.registerPuppetMetadataRoutes(r, artAPI.ProtocolOptions())
-	chefAPI{kit}.registerChefReindex(r)
+	pypihttp.PypiAPI{Kit: kit}.RegisterPypiMetadataRoutes(r, artAPI.ProtocolOptions())
+	puppethttp.PuppetAPI{Kit: kit}.RegisterPuppetMetadataRoutes(r, artAPI.ProtocolOptions())
+	chefhttp.ChefAPI{Kit: kit}.RegisterChefReindex(r)
 
 	// Last, so every real handler above has already claimed its pattern.
 	registerHandwrittenStubs(r, logger)
@@ -667,7 +675,7 @@ func keepContentType(r *http.Request) bool {
 // the credentials that LuaRocks's upload paths and npm's logout paths name
 // replaced. Each redactor leaves a path outside its protocol unchanged.
 func redactLoggedPath(path string) string {
-	return npmLoggedPath(luarockshttp.RedactAPIKey(path))
+	return npmhttp.NPMLoggedPath(luarockshttp.RedactAPIKey(path))
 }
 
 // newAuthnOptions returns Authenticate's options as the router composes
@@ -687,11 +695,11 @@ func newAuthnOptions(
 		Auth:               a,
 		Store:              st,
 		SelfAuthenticated:  artifactshttp.SelfAuthenticated(),
-		Skip:               append([]func(*http.Request) bool{npmUserRequest}, skip...),
+		Skip:               append([]func(*http.Request) bool{npmhttp.NPMUserRequest}, skip...),
 		RegistryPath:       dockerhttp.IsRegistryPath,
 		ChallengeAnonymous: dockerhttp.ChallengesAnonymous,
 		CredentialKeepers: []func(context.Context, *http.Request, kernel.Principal) context.Context{
-			keepNPMCredential,
+			npmhttp.KeepNPMCredential,
 		},
 		PublicRoutes: public,
 	}

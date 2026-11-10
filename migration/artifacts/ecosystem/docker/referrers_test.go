@@ -82,9 +82,9 @@ func TestUnitSubjectProperties(t *testing.T) {
 // FindReferrers and ImageManifests are AQL queries, so they run on the
 // reference evaluator and on SQL, as FindManifest does.
 func TestAccFindReferrers(t *testing.T) {
-	for name, open := range map[string]func(t *testing.T) store.Store{
-		"inmem": func(*testing.T) store.Store { return inmem.New() },
-		"sqlite": func(t *testing.T) store.Store {
+	for name, open := range map[string]func(t *testing.T) item.Store{
+		"inmem": func(*testing.T) item.Store { return inmem.New() },
+		"sqlite": func(t *testing.T) item.Store {
 			st, err := sqlite.Open(context.Background(), filepath.Join(t.TempDir(), "aw.db"),
 				sqlite.Options{})
 			if err != nil {
@@ -98,7 +98,7 @@ func TestAccFindReferrers(t *testing.T) {
 	}
 }
 
-func findReferrers(t *testing.T, db store.Store) {
+func findReferrers(t *testing.T, db item.Store) {
 	ctx := context.Background()
 	blobs, err := fs.New(t.TempDir())
 	if err != nil {

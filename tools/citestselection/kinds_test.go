@@ -223,16 +223,16 @@ func TestUnitAffectedFormatSelectsOwnedMixedPackageEntries(t *testing.T) {
 		}
 	}
 	if sharedEntries == 0 || !slices.Contains(selection.Acc, "./test/server/artifacts/maven") ||
-		!slices.Contains(selection.Acc, "./internal/app") {
+		!slices.Contains(selection.Acc, "./migration/app") {
 		t.Fatalf("Maven acceptance dependencies omitted: %+v", selection)
 	}
 	appEntries := 0
 	for _, entry := range selection.Selected {
-		if entry.Package != "./internal/app" {
+		if entry.Package != "./migration/app" {
 			continue
 		}
 		appEntries++
-		if entry.Source != "internal/app/maven_remote_test.go" {
+		if entry.Source != "migration/app/maven_remote_test.go" {
 			t.Errorf("unrelated app suite selected: %+v", entry)
 		}
 	}
@@ -256,7 +256,7 @@ func TestUnitFormatAppDependenciesSelectOnlyOwnedFiles(t *testing.T) {
 				status: "M", path: "internal/format/" + owner + "/handler.go",
 			}})
 			if candidate.profile != "format" ||
-				!slices.Contains(candidate.units, "./internal/app") {
+				!slices.Contains(candidate.units, "./migration/app") {
 				t.Fatalf("app owner omitted: %+v", candidate)
 			}
 			selection, err := scanKinds(root, plan{profile: "format", candidate: candidate})
@@ -265,10 +265,10 @@ func TestUnitFormatAppDependenciesSelectOnlyOwnedFiles(t *testing.T) {
 			}
 			found := false
 			for _, entry := range selection.Selected {
-				if entry.Package != "./internal/app" {
+				if entry.Package != "./migration/app" {
 					continue
 				}
-				if entry.Source != "internal/app/"+file || entry.Kind != "acceptance" {
+				if entry.Source != "migration/app/"+file || entry.Kind != "acceptance" {
 					t.Errorf("unowned app test selected: %+v", entry)
 				}
 				found = true

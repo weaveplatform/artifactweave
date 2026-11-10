@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -113,7 +114,10 @@ func TestAccSourceRevocationBeforeDelivery(t *testing.T) {
 					}, nil
 				},
 			}
-			f := newFixtureWith(t, func(*item.Service) *source.Service { return service })
+			f := newFixtureWith(
+				t,
+				func(*inmem.Store, *item.Service) *source.Service { return service },
+			)
 			c := *repo.Defaults(&repo.Config{Key: "bazel-remote", Class: repo.Remote, PackageType: repo.BazelModules, URL: "https://source.example/registry/"})
 			if err := f.db.Repos().Create(t.Context(), c); err != nil {
 				t.Fatal(err)

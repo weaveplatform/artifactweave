@@ -1,0 +1,234 @@
+package app
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"path/filepath"
+	"sync"
+	"time"
+
+	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
+	"github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/token"
+	"github.com/weaveplatform/artifactweave/migration/app/config"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	debianhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian/http"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/mirror"
+	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
+	"github.com/weaveplatform/artifactweave/pkg/store"
+)
+
+// repairEvery is how often a mirror's repair loop runs a pass; a variable
+// so tests need not wait a minute for one.
+var repairEvery = mirror.DefaultRepairInterval
+
+// registerDebianSnapshotWork registers the Debian snapshot handler with the
+// work queue. It is a variable so tests can see the kit it is given.
+var registerDebianSnapshotWork = debianhttp.RegisterDebianSnapshotWork
+
+// runtime is what serve holds open: the metadata store, the blob tiers, the
+// work queue, the modules, and the background loops (mirror repair, GC and
+// the work queue's workers).
+type runtime struct {
+	keys   *crypt.Keyring
+	store  store.Store
+	auth   *authn.Authenticator
+	tokens *token.Service // issues and verifies access tokens
+	// modules are the access, artifacts and configuration modules over
+	// store, auth and tokens; the server is given their APIs and the
+	// artifacts module's remote sources beside them.
+	modules          modules
+	closeStore       func() error
+	blobs, coldBlobs blob.Store
+	location         usage.Location
+	multipart        *multipart.Service
+	// work runs derived work after the changes that need it (decision 0033).
+	work      *work.Queue
+	mirrors   []*mirror.Store
+	admin     *mirrorAdmin
+	stopLoops context.CancelFunc
+	loops     sync.WaitGroup
+}
+
+// openRuntime opens the store (applying pending migrations), builds both
+// blob tiers and starts a repair loop for each mirror. On failure everything
+// opened so far is closed again.
+func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*runtime, error) {
+	settings := cfg.Artifacts()
+	keys, err := Keyring(cfg)
+	if err != nil {
+		return nil, err
+	}
+	st, err := OpenStore(ctx, cfg, sqlcommon.Options{Keyring: keys})
+	if err != nil {
+		return nil, err
+	}
+	if err := seedPrincipals(ctx, cfg, st, log); err != nil {
+		return nil, errors.Join(err, st.Close())
+	}
+	if err := applyBootstrap(ctx, cfg, st, log); err != nil {
+		return nil, errors.Join(err, st.Close())
+	}
+	tokens, err := openTokens(ctx, st)
+	if err != nil {
+		return nil, errors.Join(err, st.Close())
+	}
+	authenticator, err := authn.NewAuthenticator(st.Users(), st.Settings(), authn.Options{
+		Hash: authHash, Tokens: tokens, Groups: st.Groups(),
+		APIRestrictions: st.APIRestrictions(),
+	})
+	if err != nil {
+		return nil, errors.Join(err, st.Close())
+	}
+	hotTier, coldTier := tiers(cfg, st)
+	hot, err := hotTier.open(ctx, st, log)
+	if err != nil {
+		return nil, errors.Join(err, st.Close())
+	}
+	cold, err := coldTier.open(ctx, st, log)
+	if err != nil {
+		return nil, errors.Join(err, st.Close())
+	}
+	// JFrog CLI multipart uploads stage their parts under the data directory
+	// and append them to a hot-tier blob upload. Staging left by a crash
+	// after its session was dropped is swept now; the collector reaps
+	// sessions that go stale. The service and the collector are built before
+	// the work queue, so before the modules, and take access's store-only
+	// bindings, which bind what the access module's API does.
+	parts := &multipart.Service{
+		Store: st, Blobs: hot.store, Dir: filepath.Join(cfg.DataDir, "multipart"),
+		Restrictions: access.RestrictionsOf(st),
+	}
+	if err := parts.Sweep(ctx); err != nil {
+		log.Warn("multipart upload staging sweep failed", "error", err)
+	}
+	// Registry upload sessions append to hot-tier blob uploads, and their
+	// finished uploads wait in the item tree until a manifest links them.
+	// Expiry purges them through the item service, only ever from docker,
+	// oci and helmoci repositories, whose format takes no settings.
+	uploads := &registry.Service{Store: st, Blobs: hot.store, Formats: ecosystem.For}
+	// The cold tier is not collected: nothing writes it until archiving (P16),
+	// which brings the references its collection would have to trust.
+	collector, err := gc.New(st, hot.store, gc.Options{
+		Grace: settings.GCGrace,
+		Reapers: map[string]func(context.Context, store.Upload) error{
+			multipart.Backend: parts.Reap,
+			registry.Backend:  uploads.Reap,
+		},
+		Expirers: []func(context.Context, time.Time) (int, error){uploads.ExpireUploads},
+		Tokens:   access.TokensOf(st, tokens),
+	})
+	if err != nil {
+		return nil, errors.Join(err, st.Close())
+	}
+	queue, err := work.New(st, work.Options{
+		Workers:     cfg.Work.Workers,
+		Lease:       cfg.Work.Lease,
+		MaxAttempts: cfg.Work.MaxAttempts,
+		Log:         log,
+	})
+	if err != nil {
+		return nil, errors.Join(err, st.Close())
+	}
+	mods, err := buildModules(cfg, moduleDeps{
+		store: st, keys: keys, auth: authenticator, tokens: tokens,
+		blobs: hot.store, work: queue, gc: collector, log: log,
+	})
+	if err != nil {
+		return nil, errors.Join(err, st.Close())
+	}
+	art := mods.artifacts
+	// The formats' derived work runs through the artifacts module's item
+	// service, with the format settings the server writes with, and its
+	// kinds must be known before Run leases.
+	if err := art.RegisterWork(ctx); err != nil {
+		return nil, errors.Join(err, st.Close())
+	}
+	// The loops outlive startup's context and stop only through close, after
+	// the HTTP server has drained.
+	lctx, stop := context.WithCancel(context.WithoutCancel(ctx))
+	rt := &runtime{
+		keys:       keys,
+		store:      st,
+		auth:       authenticator,
+		tokens:     tokens,
+		modules:    mods,
+		closeStore: st.Close,
+		blobs:      hot.store,
+		coldBlobs:  cold.store,
+		location:   hotTier.location(),
+		multipart:  parts,
+		work:       queue,
+		stopLoops:  stop,
+	}
+	if err := art.OpenRemoteSources(ctx); err != nil {
+		stop()
+		return nil, errors.Join(err, st.Close())
+	}
+	if err := registerDebianSnapshotWork(queue, itemkit.New(itemkit.Deps{
+		Store: st, Blobs: hot.store, Access: mods.access.API(), Work: queue,
+		RemoteSources: art.RemoteSources(), FormatSettings: art.FormatSettings(),
+	})); err != nil {
+		stop()
+		return nil, errors.Join(err, st.Close())
+	}
+	for _, t := range []struct {
+		name string
+		m    *mirror.Store
+	}{{hotTier.section, hot.mirror}, {coldTier.section, cold.mirror}} {
+		if t.m == nil {
+			continue
+		}
+		if rt.admin == nil {
+			rt.admin = &mirrorAdmin{}
+		}
+		// One slot: an optimize while a pass is already queued adds nothing.
+		trigger := make(chan struct{}, 1)
+		rt.admin.tiers = append(rt.admin.tiers, mirrorTier{t.name, t.m, trigger})
+		rt.mirrors = append(rt.mirrors, t.m)
+		rt.loops.Go(func() { _ = t.m.RunRepair(lctx, repairEvery, trigger) })
+	}
+	art.Start(lctx, rt.loops.Go)
+	// Stopping hands back the leases of runs it cuts short, so another node
+	// or the next start picks them up at once.
+	rt.loops.Go(func() { _ = queue.Run(lctx) })
+	return rt, nil
+}
+
+// formatSettings are the formats' options from cfg's artifacts settings,
+// with keys, the master key's keyring, which is not configuration: the
+// options the artifacts module builds for the server and its item service,
+// for keys rotate, which builds no module, to reseal Terraform states with.
+func formatSettings(cfg config.Config, keys *crypt.Keyring) ecosystem.Settings {
+	formats := cfg.Artifacts().Formats
+	formats.TerraformBackend = terraformbackend.Settings{Keys: keys}
+	return formats
+}
+
+// close stops the background loops, waits until ctx ends for mirror commits still
+// running after their quorum (so they are recorded rather than left pending
+// for the repair worker), and closes the store.
+func (rt *runtime) close(ctx context.Context) error {
+	rt.modules.artifacts.Close()
+	rt.stopLoops()
+	rt.loops.Wait()
+	errs := make([]error, 0, len(rt.mirrors)+1)
+	for _, m := range rt.mirrors {
+		errs = append(errs, m.WaitIdle(ctx))
+	}
+	if err := errors.Join(append(errs, rt.closeStore())...); err != nil {
+		return fmt.Errorf("close: %w", err)
+	}
+	return nil
+}

@@ -104,7 +104,7 @@ func (s *Kit) minRedirectSize(ctx context.Context) int64 {
 func (s *Kit) redirect(
 	w http.ResponseWriter,
 	r *http.Request,
-	st store.Store,
+	st Store,
 	f Found,
 	p kernel.Principal,
 ) bool {
@@ -120,7 +120,7 @@ func (s *Kit) redirect(
 func (s *Kit) RedirectManifest(
 	w http.ResponseWriter,
 	r *http.Request,
-	st store.Store,
+	st Store,
 	f Found,
 	mediaType string,
 ) bool {
@@ -133,7 +133,7 @@ func (s *Kit) RedirectManifest(
 func (s *Kit) redirectAs(
 	w http.ResponseWriter,
 	r *http.Request,
-	st store.Store,
+	st Store,
 	f Found,
 	p kernel.Principal,
 	contentType string,
@@ -261,7 +261,7 @@ func countsDownload(r *http.Request, status int) bool {
 // recordDownload updates the item's statistics and its package version's
 // last download (decision 0018). Best effort: a failed count must not fail
 // the download.
-func recordDownload(ctx context.Context, st store.Store, f Found, p kernel.Principal) {
+func recordDownload(ctx context.Context, st Store, f Found, p kernel.Principal) {
 	at := time.Now().UTC()
 	_ = st.Items().RecordDownload(ctx, f.Item.ID, store.Download{By: p.Name, At: at})
 	_ = pkgindex.RecordDownload(ctx, st, f.Item.ID, at)

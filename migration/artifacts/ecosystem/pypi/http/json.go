@@ -11,9 +11,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	pypifmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -22,7 +22,7 @@ import (
 // newer release nor the metadata of a hidden earlier file can leak.
 func JSONMetadata(
 	ctx context.Context,
-	st store.Store,
+	st format.Store,
 	key, name, version, base string,
 	reads Reads,
 ) (map[string]any, error) {

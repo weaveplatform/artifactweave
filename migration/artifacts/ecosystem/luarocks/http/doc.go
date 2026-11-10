@@ -19,15 +19,16 @@
 //
 //   - Driving: the server, which mounts Protocol through the router kit
 //     (pkgroute) for repositories of package type luarocks.
-//   - Driven: the router kit (pkgroute.Kit), which resolves the repository
-//     and the caller, checks permissions, reads multipart uploads, stores
-//     uploaded files and their signatures through the item service, where
-//     the format's hooks admit them, reads the package index, items and
-//     blobs, builds a virtual repository's member requests, serves items
-//     and writes errors; the remote source service, which fetches a
-//     remote's upstream manifests and rocks into the remote cache; and the
-//     format package, whose rules parse every file name, check every
-//     upstream file and map upload version ids.
+//   - Driven: the router kit (pkgroute.Kit), whose store (pkgroute.Store)
+//     the handlers also reach through DB(), and which resolves the
+//     repository and the caller, checks permissions, reads multipart
+//     uploads, stores uploaded files and their signatures through the item
+//     service, where the format's hooks admit them, reads the package
+//     index, items and blobs, builds a virtual repository's member
+//     requests, serves items and writes errors; the remote source service,
+//     which fetches a remote's upstream manifests and rocks into the remote
+//     cache; and the format package, whose rules parse every file name,
+//     check every upstream file and map upload version ids.
 //
 // # Outputs
 //
@@ -92,8 +93,9 @@
 //     (https://github.com/weaveplatform/artifactweave/issues/943).
 //   - https://github.com/weaveplatform/artifactweave/issues/684,
 //     https://github.com/weaveplatform/artifactweave/issues/685,
-//     https://github.com/weaveplatform/artifactweave/issues/686 and
-//     https://github.com/weaveplatform/artifactweave/issues/1050
+//     https://github.com/weaveplatform/artifactweave/issues/686,
+//     https://github.com/weaveplatform/artifactweave/issues/1050 and
+//     https://github.com/weaveplatform/artifactweave/issues/1089
 //
 // # Status
 //

@@ -22,8 +22,9 @@
 //     tag deletes), the item handlers, and the garbage collector,
 //     which the composition root gives Reap for stale sessions and
 //     ExpireUploads for finished uploads no manifest took in time.
-//   - Driven: the metadata store (the uploads table, items and their
-//     properties, through the whole store), the blob store
+//   - Driven: the metadata store, through Store (the item service's store,
+//     item.Store, for items and their properties, with the uploads table),
+//     the blob store
 //     (platform/blob.Store) whose uploads the sessions append to, and the
 //     item service with the format registry (Formats) and the work queue
 //     (Work), so every item it writes runs its format's hooks.
@@ -67,7 +68,8 @@
 //     #p8-pypi-nuget-helm-terraform-locals and
 //     #p9d-modular-monolith-migration, epic ART
 //     (https://github.com/weaveplatform/artifactweave/issues/941).
-//   - https://github.com/weaveplatform/artifactweave/issues/1011
+//   - https://github.com/weaveplatform/artifactweave/issues/1011 and
+//     https://github.com/weaveplatform/artifactweave/issues/1088
 //
 // # Status
 //

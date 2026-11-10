@@ -22,8 +22,9 @@
 //   - The repository configuration, the resolved remote.Options and each
 //     remote.Request, and the request-scoped remote.Outbound hooks, which Do
 //     applies to the first request and its redirects.
-//   - Driven: the resolver's store (repository configurations and their
-//     sealed credentials, headers, cookies and proxies), the keyring that
+//   - Driven: the resolver's store, ResolverStore (repository
+//     configurations and their sealed credentials, headers and cookies, and
+//     the proxy configuration documents), the keyring that
 //     unseals them and derives the credential revision, and the access API's
 //     Keys, which hold the client certificates a remote names.
 //
@@ -31,7 +32,8 @@
 //
 //   - Pool, the remote.Upstream of ordinary remotes, with Client and
 //     NewClient; Resolver, NewResolver and ResolverOptions, which turn a
-//     repository into its remote.Options and credential revision.
+//     repository into its remote.Options and credential revision, and
+//     ResolverStore, the store a Resolver reads.
 //   - RegistryPool, Registry, NewRegistry and RegistryOptions, the Docker
 //     registry clients, and RegistryClients, the remote.Registries over
 //     them; ErrRegistryChallenge.
@@ -77,11 +79,13 @@
 //   - Plan: docs/implementation/plan.md#p9-remote-repositories and
 //     #p9d-modular-monolith-migration, epic RMT
 //     (https://github.com/weaveplatform/artifactweave/issues/942).
-//   - https://github.com/weaveplatform/artifactweave/issues/1026
+//   - https://github.com/weaveplatform/artifactweave/issues/1026 and
+//     https://github.com/weaveplatform/artifactweave/issues/1091
 //
 // # Status
 //
-// Implemented P9. Staged in P9d.
+// Implemented P9. Staged in P9d, which narrowed the resolver's store to
+// ResolverStore (https://github.com/weaveplatform/artifactweave/issues/1091).
 //
 // # Testing
 //

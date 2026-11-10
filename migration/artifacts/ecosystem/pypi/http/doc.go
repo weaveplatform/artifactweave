@@ -13,27 +13,35 @@
 // artifacts module, ecosystem layer: the native PyPI simple and upload
 // protocol of the PyPI slice. It is named pypihttp so that it does not
 // shadow net/http. Outside tests, only its own http subtree, the module's
-// http adapters and app may import it (decision 0044, dependency rule 9).
+// http adapters and app may import it (decision 0044, dependency rule 9);
+// the server root counts as app until it moves there.
 //
 // # Inputs
 //
 //   - Driving: the server, which mounts Protocol through the router kit
-//     (pkgroute) for repositories of package type pypi, and again for the
-//     Warehouse JSON operations the generated routes declare (the root
-//     pypi_routes.go): GET and HEAD of the simple index, the core metadata
-//     files, the JSON API and the files; twine's upload POST; and a REST
-//     deploy's PUT.
-//   - Driven: the router kit (pkgroute.Kit), which resolves the repository
-//     and the caller, checks permissions, reads and writes items and writes
-//     errors; the format package (artifacts/ecosystem/pypi), whose index
-//     records and name rules the pages are built from; and the remote
-//     source service (Options.RemoteSources), which fetches upstream
-//     indexes, metadata and distributions into the remote cache.
+//     (pkgroute) for repositories of package type pypi, and again, through
+//     PypiAPI's RegisterPypiMetadataRoutes after the generated routes, for
+//     the Warehouse JSON operations they declare: GET and HEAD of the
+//     simple index, the core metadata files, the JSON API and the files;
+//     twine's upload POST; and a REST deploy's PUT.
+//   - Driven: the router kit (pkgroute.Kit), whose store (pkgroute.Store)
+//     the handlers also reach through DB(), and which resolves the
+//     repository and the caller, checks permissions, reads and writes items
+//     and writes errors; the format package (artifacts/ecosystem/pypi),
+//     whose index records and name rules the pages are built from; and the
+//     remote source service (Options.RemoteSources), which fetches upstream
+//     indexes, metadata and distributions into the remote cache. PypiAPI
+//     builds the second mount's Options from the item kit
+//     (artifacts/adapters/http/itemkit): its PyPI format settings and
+//     remote source service.
 //
 // # Outputs
 //
 //   - Protocol and Options: the routes, the source of each repository
 //     class and the Artifactory error profile.
+//   - PypiAPI: the kit wrapper whose RegisterPypiMetadataRoutes mounts GET
+//     /artifactory/api/pypi/{repoKey}/pypi/{package}/json and
+//     .../{package}/{version}/json, served by Protocol.
 //   - JSONMetadata and WriteMetadata, the Warehouse-shaped JSON document
 //     and its representation; RepoURL; Reads, the caller's read check that
 //     the pages filter by.
@@ -65,18 +73,22 @@
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md,
 //     "Dependency rules".
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
-//     line 231 (ecosystem/pypi), line 403 (the root pypi_routes.go, which
-//     joins this package later) and line 1017 (the mapping row).
+//     line 231 (ecosystem/pypi), line 403 (the root pypi_routes.go, now
+//     routes.go) and line 1017 (the mapping row).
 //   - Plan: docs/implementation/plan.md#p8-pypi-nuget-helm-terraform-locals,
-//     #p9-remote-repositories and #p9d-modular-monolith-migration, epic ECO
-//     (https://github.com/weaveplatform/artifactweave/issues/943).
+//     #p9-remote-repositories and #p9d-modular-monolith-migration, epics ECO
+//     (https://github.com/weaveplatform/artifactweave/issues/943) and WEB
+//     (https://github.com/weaveplatform/artifactweave/issues/944).
 //   - https://github.com/weaveplatform/artifactweave/issues/627 (remote
-//     Python repositories) and
-//     https://github.com/weaveplatform/artifactweave/issues/1032
+//     Python repositories),
+//     https://github.com/weaveplatform/artifactweave/issues/1032,
+//     https://github.com/weaveplatform/artifactweave/issues/1086 and
+//     https://github.com/weaveplatform/artifactweave/issues/1089
 //
 // # Status
 //
-// Implemented P8, with remote retrieval in P9. Staged in P9d.
+// Implemented P8, with remote retrieval in P9. Staged in P9d, which also
+// moved the server root's Warehouse JSON registrar here (WEB-17).
 //
 // # Testing
 //

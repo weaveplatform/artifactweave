@@ -215,7 +215,7 @@ Decisions: [0001](../research/decisions/0001-mirror-the-jfrog-api-surface.md),
 1. `make init NAME=artifactweave`; this documentation set; `CODEOWNERS`.
 2. `migration/artifacts/api/repo`: the `Config` model with every field in [research 03](../research/03-repository-configuration-model.md), JSON round-trip that accepts the string-typed booleans JFrog documents per rclass and writes booleans, validation (key syntax, rclass and packageType sets, virtual members exist, `defaultDeploymentRepo` is a member, `projectKey` implies `environments`).
 3. `migration/artifacts/core/layout`: pattern engine for `repoLayoutRef` tokens with the bundled layouts and the Maven-2 integration-revision regexes.
-4. `internal/config`: strict app YAML, flag > env > file precedence, unknown keys rejected, `config validate`.
+4. `migration/app/config`: strict app YAML, flag > env > file precedence, unknown keys rejected, `config validate`.
 5. `internal/server`: chi router, request id, slog access log, recovery, body limits, the per-surface errors table, the base-URL resolver middleware, content-type normalisation for `+json` vendor types and `application/yaml`.
 6. `api/*.openapi.yaml` skeletons with `GET /artifactory/api/system/{ping,version,license}`, `GET /artifactory/api/v1/system/{readiness,liveness}`, `GET /access/api/v1/system/{ping,version}`, `GET /router/api/v1/system/health`, `POST /artifactory/api/system/usage`, `POST /jfconnect/api/v1/backoffice/metrics/log`; `make generate` and the drift check; `TestAccOpenAPIFieldDescriptions`; `TestAccHandwrittenRoutesNotGenerated`.
 7. `internal/layout` import-tier test.

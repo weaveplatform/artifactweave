@@ -126,7 +126,7 @@ func (s *Kit) traceItem(w http.ResponseWriter, r *http.Request) {
 // is described only once the caller may read it.
 func (s *Kit) traceDownload(
 	ctx context.Context,
-	st store.Store,
+	st Store,
 	r *http.Request,
 	req ItemRequest,
 	p kernel.Principal,
@@ -229,7 +229,7 @@ func (s *Kit) traceDownload(
 // file they name, or else a 404.
 func (s *Kit) traceContained(
 	ctx context.Context,
-	st store.Store,
+	st Store,
 	method string,
 	c repo.Config,
 	cached bool,

@@ -11,7 +11,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -212,7 +211,7 @@ func (Handler) Annotated(
 // Metadata, m, in line with its yanked state in props.
 func reyank(
 	ctx context.Context,
-	st store.Store,
+	st format.Store,
 	pv types.PackageVersion,
 	m Metadata,
 	f File,

@@ -175,7 +175,7 @@ func metadataOf(ctx context.Context, env format.Env, it types.Item) (Metadata, e
 	return ReadArchive(rc, info.Size)
 }
 
-func setProperties(ctx context.Context, st store.Store, it types.Item, meta Metadata) error {
+func setProperties(ctx context.Context, st format.Store, it types.Item, meta Metadata) error {
 	current, err := st.Items().Properties(ctx, it.ID)
 	if err != nil {
 		return fmt.Errorf("agentpackages: properties of %s: %w", it.FullPath(), err)

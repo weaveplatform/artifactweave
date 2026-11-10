@@ -55,7 +55,7 @@ var accessInternalsAllowlist = []accessAllowance{
 	// TST-06 move its suites out, and WEB-22 deletes it.
 	{"internal/server/*_test.go", "TST-04, TST-05, TST-06, WEB-22"},
 	// The composition root builds the authenticator and the token service.
-	{"internal/app/*_test.go", "TST-07"},
+	{"migration/app/*_test.go", "TST-07"},
 	// The server-assembly harnesses fill server.Config.Auth and Tokens until
 	// WEB-22 composes the router from the access module.
 	{"test/server/**", "WEB-22"},
@@ -196,7 +196,7 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 	}
 	allow := []accessAllowance{
 		{"internal/server/*_test.go", "TST-04"},
-		{"internal/app/*_test.go", "TST-07"},
+		{"migration/app/*_test.go", "TST-07"},
 		{"test/server/**", "WEB-22"},
 	}
 	evaluator := root + "/access/core/authz"
@@ -207,7 +207,7 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 		// Each allowlisted root uses its entry; a file under test/ is a
 		// test even without the _test.go suffix.
 		"internal/server/server_test.go":  file(authenticator, tokens),
-		"internal/app/app_test.go":        file(tokens),
+		"migration/app/app_test.go":       file(tokens),
 		"test/server/access/auth_test.go": file(authenticator),
 		"test/server/support/assemble.go": file(tokens),
 		// Access's own tests: staged, and in legacy packages whose entries

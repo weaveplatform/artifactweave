@@ -200,7 +200,7 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 // syncModule makes version m.Version of m's module what the tree says:
 // linked to the first of its two spellings stored, <version>.zip before
 // v<version>.zip, and dated by it. Reindex reads the tree the same way.
-func syncModule(ctx context.Context, st store.Store, c repo.Config, m Module) error {
+func syncModule(ctx context.Context, st format.Store, c repo.Config, m Module) error {
 	cached := pkgindex.Stored(c).Cached
 	for _, v := range []bool{false, true} {
 		m.V = v
@@ -224,7 +224,7 @@ func syncModule(ctx context.Context, st store.Store, c repo.Config, m Module) er
 // package when it is new.
 func index(
 	ctx context.Context,
-	st store.Store,
+	st format.Store,
 	c repo.Config,
 	name string,
 	v pkgindex.IndexedVersion,
@@ -240,7 +240,11 @@ func index(
 }
 
 // modulesWanted reads every module version from c's tree.
-func modulesWanted(ctx context.Context, st store.Store, c repo.Config) ([]pkgindex.Indexed, error) {
+func modulesWanted(
+	ctx context.Context,
+	st format.Store,
+	c repo.Config,
+) ([]pkgindex.Indexed, error) {
 	items, err := search(ctx, st, c,
 		&aql.FieldCriterion{Field: aql.FieldName, Op: aql.OpMatch, Text: "*.zip"},
 		&aql.FieldCriterion{Field: aql.FieldDepth, Op: aql.OpEq, Number: 4},
@@ -319,7 +323,7 @@ func syncRelease(
 // records to known, where known has none for the content.
 func knownFromIndex(
 	ctx context.Context,
-	st store.Store,
+	st format.Store,
 	c repo.Config,
 	name, v string,
 	known map[string]string,
@@ -450,7 +454,7 @@ func release(
 // that meet more.
 func search(
 	ctx context.Context,
-	st store.Store,
+	st format.Store,
 	c repo.Config,
 	more ...aql.Node,
 ) ([]types.Item, error) {

@@ -26,8 +26,13 @@
 //     strict server beside the other partials and the stubs, mounts the
 //     registrars, SmartStatus and Protocols, and installs IdempotencyRoutes
 //     and HelmPartialReindex as middleware.
-//   - Deps, from the composition root: the item kit's dependencies (the
-//     stores, the remote sources, the work queue, the formats and their
+//   - Deps, from the composition root: the metadata store, through Store,
+//     which New gives the item kit too. It is the kit's store
+//     (itemkit.Store), the protocols' (pkgroute.Store) and the build
+//     service's replay records; the handlers read and write it and hand it
+//     to the search, build, trash, garbage collection, repository and usage
+//     code they call. Then the item kit's other dependencies (the blob
+//     store, the remote sources, the work queue, the formats and their
 //     settings, the access module's API, the redirect policy, the logger,
 //     the overlays and the private predicate) and the handlers' own: the
 //     remote connection pools, the remote status diagnostics, the garbage
@@ -41,6 +46,8 @@
 //
 // # Outputs
 //
+//   - Store, the store Deps.Store holds. It names no access or
+//     configuration-module store.
 //   - ArtifactoryAPI, built by New: the strict operations of its slice of
 //     the artifactory spec; the registrars RegisterItemRoutes,
 //     RegisterTransferRoutes, RegisterStorageRoutes, RegisterTrashRoutes,
@@ -90,12 +97,14 @@
 //     ("Dependency rules": a module reaches another only through its api).
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     lines 238 to 246 (artifacts/adapters/http).
-//   - https://github.com/weaveplatform/artifactweave/issues/1078
+//   - https://github.com/weaveplatform/artifactweave/issues/1078 and
+//     https://github.com/weaveplatform/artifactweave/issues/1090
 //
 // # Status
 //
 // Implemented P1 to P9c as the server root's management handlers; P9d made
-// them the ArtifactoryAPI partial (WEB-08) and moved them here (WEB-12).
+// them the ArtifactoryAPI partial (WEB-08), moved them here (WEB-12) and
+// narrowed their store to Store (ART-22).
 // The GET searches' logic, the upstream search's included, is in
 // artifacts/core/search; the upstream search's route and disclosure policy
 // stays here.

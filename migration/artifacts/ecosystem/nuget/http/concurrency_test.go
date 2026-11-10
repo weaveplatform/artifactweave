@@ -13,6 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/postgres"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -185,7 +186,7 @@ func TestAccNuGetWriteTransactionsOnPostgres(t *testing.T) {
 	}
 }
 
-func existsAt(ctx context.Context, db store.Store, repo, path string) bool {
+func existsAt(ctx context.Context, db pkgroute.Store, repo, path string) bool {
 	_, err := db.Items().Get(ctx, repo, false, path)
 	return err == nil
 }
@@ -215,7 +216,7 @@ func waitForBlocked(t *testing.T, ctx context.Context, db *sqlcommon.Store, done
 }
 
 type pausedWrite struct {
-	store.Store
+	item.Store
 	entered, resume chan struct{}
 	fail            error
 }

@@ -25,17 +25,24 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Config is the part of the router's configuration that the tests here
 // set, which newKit passes on to the item kit as the router does.
 type Config struct {
-	Store         store.Store
+	Store         serverStore
 	Blobs         blob.Store
 	RemoteSources *source.Service
 	Access        accessapi.API
+}
+
+// serverStore is the store the router's worlds hold: the item kit's, and
+// the access module's, which the router binds over the same store.
+type serverStore interface {
+	itemkit.Store
+	accesstest.Store
 }
 
 // newKit returns the item kit over c, with TryOpkgItem as its one overlay:
@@ -59,7 +66,7 @@ func withAccess(t *testing.T, c Config) Config {
 }
 
 // authorizerOver is the access module's Authorizer over st.
-func authorizerOver(t *testing.T, st store.Store) accessapi.Authorizer {
+func authorizerOver(t *testing.T, st accesstest.Store) accessapi.Authorizer {
 	t.Helper()
 	return accesstest.Over(t, st).API().Authorizer
 }
@@ -68,7 +75,7 @@ func authorizerOver(t *testing.T, st store.Store) accessapi.Authorizer {
 // requests as the router would.
 type itemWorld struct {
 	t     *testing.T
-	db    store.Store
+	db    *inmem.Store
 	blobs blob.Store
 	kit   *itemkit.Kit
 }

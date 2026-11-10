@@ -112,7 +112,7 @@ func syncFiles(
 // linkedMembers are the files linked to pv but add's and drop.
 func linkedMembers(
 	ctx context.Context,
-	st store.Store,
+	st format.Store,
 	pv types.PackageVersion,
 	add *member,
 	drop int64,
@@ -137,7 +137,7 @@ func linkedMembers(
 
 // dropVersion removes pv, whose last file left it, and its package with
 // its last version.
-func dropVersion(ctx context.Context, st store.Store, pv types.PackageVersion) error {
+func dropVersion(ctx context.Context, st format.Store, pv types.PackageVersion) error {
 	if err := st.Packages().DeleteVersion(ctx, pv.ID); err != nil {
 		return fmt.Errorf("nuget: drop version %s: %w", pv.Version, err)
 	}

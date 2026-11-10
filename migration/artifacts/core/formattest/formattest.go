@@ -102,7 +102,7 @@ type Format struct {
 // Backend opens a fresh, empty store for one scenario.
 type Backend struct {
 	Name string
-	Open func(t *testing.T) store.Store
+	Open func(t *testing.T) item.Store
 }
 
 // Backends are the stores the suite runs on: the in-memory reference,
@@ -110,8 +110,8 @@ type Backend struct {
 // containers.
 func Backends() []Backend {
 	return []Backend{
-		{"inmem", func(*testing.T) store.Store { return inmem.New() }},
-		{"sqlite", func(t *testing.T) store.Store {
+		{"inmem", func(*testing.T) item.Store { return inmem.New() }},
+		{"sqlite", func(t *testing.T) item.Store {
 			st, err := sqlite.Open(context.Background(),
 				filepath.Join(t.TempDir(), "aw.db"), sqlite.Options{})
 			if err != nil {
@@ -120,7 +120,7 @@ func Backends() []Backend {
 			t.Cleanup(func() { _ = st.Close() })
 			return st
 		}},
-		{"postgres", func(t *testing.T) store.Store {
+		{"postgres", func(t *testing.T) item.Store {
 			dsn := sqltest.PostgresDSN(t)
 			st, err := postgres.Open(context.Background(), dsn, postgres.Options{})
 			if err != nil {
@@ -279,7 +279,7 @@ type world struct {
 	ctx     context.Context
 	f       Format
 	h       format.Handler
-	st      store.Store
+	st      item.Store
 	items   *item.Service
 	trash   *trash.Service
 	now     time.Time
@@ -288,7 +288,7 @@ type world struct {
 
 var start = time.Date(2026, 10, 17, 9, 0, 0, 0, time.UTC)
 
-func newWorld(t *testing.T, st store.Store, f Format) *world {
+func newWorld(t *testing.T, st item.Store, f Format) *world {
 	t.Helper()
 	blobs, err := fs.New(t.TempDir())
 	if err != nil {

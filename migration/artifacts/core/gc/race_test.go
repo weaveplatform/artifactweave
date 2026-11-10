@@ -136,13 +136,20 @@ func (u seqUpload) Commit(ctx context.Context, want blob.Digests) (blob.Info, er
 	return info, err //nolint:wrapcheck // test double
 }
 
+// raceStore is what the race runs over: the store of the racing deploy's
+// item service, which is the collector's store too.
+type raceStore interface {
+	item.Store
+	gc.Store
+}
+
 // seqStore sequences the collector's mark (G1) and tombstone (G3).
 type seqStore struct {
-	store.Store
+	raceStore
 	seq *sequence
 }
 
-func (s seqStore) Blobs() store.BlobIndex { return seqIndex{s.Store.Blobs(), s.seq} }
+func (s seqStore) Blobs() store.BlobIndex { return seqIndex{s.raceStore.Blobs(), s.seq} }
 
 type seqIndex struct {
 	store.BlobIndex
@@ -201,9 +208,9 @@ var deployWins = map[string]bool{
 }
 
 // raceStores are the metadata stores the race runs on.
-var raceStores = map[string]func(t *testing.T) store.Store{
-	"inmem": func(*testing.T) store.Store { return inmem.New() },
-	"sqlite": func(t *testing.T) store.Store {
+var raceStores = map[string]func(t *testing.T) raceStore{
+	"inmem": func(*testing.T) raceStore { return inmem.New() },
+	"sqlite": func(t *testing.T) raceStore {
 		t.Helper()
 		st, err := sqlite.Open(context.Background(), filepath.Join(t.TempDir(), "aw.db"),
 			sqlite.Options{Options: sqlcommon.Options{}})
@@ -232,7 +239,7 @@ func TestAccNoContentLostToARacingDeploy(t *testing.T) {
 
 // raceOnce collects the raced content while a deploy of the same bytes
 // overwrites another file, in order, then checks nothing was lost.
-func raceOnce(t *testing.T, base store.Store, orphan bool, order []string) {
+func raceOnce(t *testing.T, base raceStore, orphan bool, order []string) {
 	ctx := context.Background()
 	disk, err := fs.New(t.TempDir())
 	if err != nil {

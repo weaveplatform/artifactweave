@@ -24,7 +24,7 @@ var errIndex = errors.New("index boom")
 // faulty fails the package and item store methods its maps name and
 // delegates the rest, transactions included.
 type faulty struct {
-	store.Store
+	format.Store
 	pkgs, items map[string]bool
 }
 
@@ -165,7 +165,7 @@ func (r faultyReads) Search(ctx context.Context, q *aql.Query, o aql.Options) ([
 // manifest and a blob) and a manifest pushed by digest, and whose image
 // fresh has a tag the index has lost.
 type indexed struct {
-	db                       store.Store
+	db                       format.Store
 	c                        repo.Config
 	items                    *item.Service
 	manifest, blob, byDigest types.Item
@@ -246,14 +246,14 @@ func (x *indexed) removeQuietly(t *testing.T, path string) {
 // caller, which rolls its transaction back.
 func TestUnitIndexFailures(t *testing.T) {
 	h := layout.Handler{}
-	deployed := func(pick func(x *indexed) types.Item) func(*indexed, store.Store) error {
-		return func(x *indexed, st store.Store) error {
+	deployed := func(pick func(x *indexed) types.Item) func(*indexed, format.Store) error {
+		return func(x *indexed, st format.Store) error {
 			return h.Deployed(context.Background(), format.Env{Store: st}, x.c, pick(x))
 		}
 	}
 	manifest := deployed(func(x *indexed) types.Item { return x.manifest })
 	fresh := deployed(func(x *indexed) types.Item { return x.freshManifest })
-	deleted := func(x *indexed, st store.Store) error {
+	deleted := func(x *indexed, st format.Store) error {
 		return h.Deleted(
 			context.Background(),
 			format.Env{Store: st},
@@ -261,7 +261,7 @@ func TestUnitIndexFailures(t *testing.T) {
 			[]types.Item{x.manifest, x.byDigest},
 		)
 	}
-	reindex := func(x *indexed, st store.Store) error {
+	reindex := func(x *indexed, st format.Store) error {
 		return h.Reindex(context.Background(), format.Env{Store: st}, x.c)
 	}
 	noManifest := func(t *testing.T, x *indexed) { x.removeQuietly(t, "app/v1/manifest.json") }
@@ -273,7 +273,7 @@ func TestUnitIndexFailures(t *testing.T) {
 		name        string
 		setup       func(*testing.T, *indexed)
 		pkgs, items []string
-		run         func(*indexed, store.Store) error
+		run         func(*indexed, format.Store) error
 	}{
 		{name: "tag manifest: get", items: []string{"Get"}, run: manifest},
 		{name: "tag manifest: find", pkgs: []string{"Find"}, run: manifest},

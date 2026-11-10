@@ -6,10 +6,13 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/smart"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
+	"github.com/weaveplatform/artifactweave/migration/platform/idempotency"
 )
 
 // ArtifactoryAPI is the artifacts module's partial strict server: the
@@ -27,13 +30,31 @@ type ArtifactoryAPI struct {
 	folderSlots chan struct{}
 }
 
+// Store is what the artifacts handlers read and write, and what they hand
+// on: the item kit's store (itemkit.Store), the protocols' (pkgroute.Store,
+// through ProtocolOptions) and the build service's replay records
+// (build.Store), so that one value serves the kit, the handlers, the
+// searches and the build, trash, repository and usage services they build.
+// It names no access or configuration-module store: the handlers reach the
+// access module through Deps.Access. The metadata store's aggregate
+// (pkg/store) is a Store.
+type Store interface {
+	itemkit.Store
+	pkgroute.Store
+	Replays() idempotency.ReplayStore
+}
+
 // Deps is what the artifacts handlers need: the item kit's dependencies,
 // over which New builds the kit, and the handlers' own.
 type Deps struct {
-	// Deps are the item kit's: the stores, the access module's API, the
-	// remote sources, the formats, and the overlays and private predicate
-	// the router passes.
+	// Deps are the item kit's: the access module's API, the remote sources,
+	// the formats, and the overlays and private predicate the router
+	// passes. New sets their Store to this Deps' Store.
 	itemkit.Deps
+	// Store is the metadata store the handlers read and write, which New
+	// gives the kit as its store too; nil answers every route like an
+	// unimplemented operation, as the kit's Content does.
+	Store Store
 	// RemoteHTTP drops the connection pool of a repository that is
 	// deleted. Assign it only a pool that exists, or leave it nil: a nil
 	// *upstream.Pool stored in it is a non-nil interface, so a delete would
@@ -85,12 +106,24 @@ type Deps struct {
 // artifacts partial is built here: a literal without a kit compiles and then
 // panics on its first kit call.
 func New(d Deps) ArtifactoryAPI {
+	kit := d.Deps
+	kit.Store = d.Store
 	return ArtifactoryAPI{
-		Kit: itemkit.New(d.Deps),
+		Kit: itemkit.New(kit),
 		cfg: d,
 		folderSlots: make(
 			chan struct{},
 			cmp.Or(d.FolderDownloadMaxConcurrent, defaultFolderSlots),
 		),
 	}
+}
+
+// content returns the handlers' store. A partial built without one (tests of
+// the routing alone) answers like an unimplemented operation, as the kit's
+// Content does.
+func (s ArtifactoryAPI) content() (Store, error) {
+	if s.cfg.Store == nil {
+		return nil, apierror.ErrNotImplemented
+	}
+	return s.cfg.Store, nil
 }

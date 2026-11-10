@@ -12,17 +12,17 @@
 // artifacts module, ecosystem layer: the Agent Plugins bundle admission,
 // manifest index and marketplace files of the Agent Plugins slice. Its
 // Handler plugs into the item service through the format hooks (decision
-// 0032). The slice has no protocol package yet: the root file
-// internal/server/agentplugins.go serves the marketplace files with
-// Marketplace.
+// 0032). Its http subpackage, agentpluginshttp
+// (artifacts/ecosystem/agentplugins/http), serves the marketplace files
+// with Marketplace.
 //
 // # Inputs
 //
 //   - Driving: the format registry (artifacts/ecosystem), which hands the
 //     item service's hooks for agentplugins repositories to Handler, and the
-//     work queue, which runs every format's reindex through it; and the
-//     server's root file agentplugins.go, which serves the marketplace files
-//     at /artifactory/api/agentplugins/{repoKey}/{marketplace} and, through
+//     work queue, which runs every format's reindex through it; and
+//     agentpluginshttp, which serves the marketplace files at
+//     /artifactory/api/agentplugins/{repoKey}/{marketplace} and, through
 //     the item routes, at the repository root (IsMarketplace,
 //     IsReservedMarketplace, Marketplace).
 //   - Driven: the format hooks' environment (format.Env): its blobs hold the
@@ -80,7 +80,7 @@
 //     https://docs.jfrog.com/artifactory/docs/agent-plugins-repositories.
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     line 232 (ecosystem/agentplugins), line 379 (the slice row), line 405
-//     (the root agentplugins.go, bound for ecosystem/agentplugins/http) and
+//     (the root agentplugins.go, now in ecosystem/agentplugins/http) and
 //     line 997 (the mapping row).
 //   - Plan: docs/implementation/plan.md#p9b-newly-identified-artifactory-formats
 //     and #p9d-modular-monolith-migration, epic ECO

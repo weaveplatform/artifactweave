@@ -54,7 +54,7 @@ func TestAccReadsContent(t *testing.T) {
 	if ok, err := readsContent(ctx, db, acc, sum, PrivateItem); !ok || err != nil {
 		t.Fatalf("a readable file on the second page: %v %v", ok, err)
 	}
-	for name, st := range map[string]store.Store{
+	for name, st := range map[string]Store{
 		"find": buildSearchFaults{Store: db, fail: "find"},
 		"repo": faultyStore{Store: db, fail: map[string]bool{"get": true}},
 	} {

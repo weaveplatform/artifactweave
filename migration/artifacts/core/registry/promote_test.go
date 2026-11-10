@@ -90,7 +90,7 @@ func (w *world) existsIn(c repo.Config, path string) bool {
 // tag in its manifest's properties, and indexes it; a move also leaves the
 // source, keeping the items' history; every tag goes when none is named.
 func TestAccPromote(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		ctx := context.Background()
 		prod := w.prod()
 		w.upload(imageConfig, layerA, layerB)
@@ -189,7 +189,7 @@ func TestAccPromote(t *testing.T) {
 // a move removes those nothing left in the source image names, and keeps
 // them when a renamed tag in the same image lists them still.
 func TestAccPromoteMultiArch(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		ctx := context.Background()
 		prod := w.prod()
 		ps := w.platforms()
@@ -263,7 +263,7 @@ func TestAccPromoteMultiArchHeldPlatforms(t *testing.T) {
 		{name: "repeated by move", again: true},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			each(t, func(t *testing.T, w *world, _ func() store.Store) {
+			each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 				ctx := context.Background()
 				prod := w.prod()
 				ps := w.platforms()
@@ -320,7 +320,7 @@ func TestAccPromoteMultiArchHeldPlatforms(t *testing.T) {
 // nothing of the old image stays in the folder, and under Tag Retention
 // the old manifest keeps its digest folder.
 func TestAccPromoteOverwrite(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		ctx := context.Background()
 		two := 2
 		prod := w.prod(func(c *repo.Config) { c.DockerTagRetention = &two })
@@ -356,7 +356,7 @@ func TestAccPromoteOverwrite(t *testing.T) {
 }
 
 func TestAccPromoteErrors(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		ctx := context.Background()
 		w.upload(imageConfig, layerA)
 		body, digest := manifestOf(layerA)
@@ -401,7 +401,7 @@ func TestAccPromoteErrors(t *testing.T) {
 // The parents of a manifest are the image's lists that name it, each once
 // with the tags it sits under; a list stored by digest adds no tag.
 func TestAccParentManifests(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		ctx := context.Background()
 		ps := w.platforms()
 		v1, d1 := indexOf(layout.MediaTypeOCIIndex, ps[0], ps[1])

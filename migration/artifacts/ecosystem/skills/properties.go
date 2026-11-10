@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -18,7 +18,7 @@ var propertyKeys = []string{
 
 func setProperties(
 	ctx context.Context,
-	st store.Store,
+	st format.Store,
 	it types.Item,
 	meta Metadata,
 ) (Metadata, error) {

@@ -105,7 +105,7 @@ func sdist(name, version, m string) []byte {
 type world struct {
 	t     *testing.T
 	ctx   context.Context
-	st    store.Store
+	st    item.Store
 	items *item.Service
 	h     pypi.Handler
 	c     repo.Config
@@ -117,7 +117,7 @@ func newWorld(t *testing.T, s pypi.Settings) *world {
 	return newWorldOn(t, inmem.New(), s)
 }
 
-func newWorldOn(t *testing.T, st store.Store, s pypi.Settings) *world {
+func newWorldOn(t *testing.T, st item.Store, s pypi.Settings) *world {
 	t.Helper()
 	blobs, err := fs.New(t.TempDir())
 	if err != nil {

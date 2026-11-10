@@ -16,12 +16,32 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
+
+// Store is what the kit resolves repositories and reads items in, and what
+// protocol handlers read and write through Kit.DB(): the artifacts module's
+// stores and transactions (port.Store), with the settings and configuration
+// documents, the work queue and the lease table, so a handler can hand DB()
+// on to the item service's, a format's and the package index's code
+// (item.Store, format.Store and pkgindex.Store). It names no access store:
+// protocols reach the access module through access/api. The metadata
+// store's aggregate (pkg/store) is a Store.
+type Store interface {
+	port.Store
+	Settings() settings.SettingsStore
+	Configs() configdoc.ConfigStore
+	WorkQueue() work.WorkQueue
+	Leases() work.LeaseStore
+}
 
 // Options is what the server gives every protocol: the store, and the item
 // routes' download, deploy and error mapping, so a protocol's files behave
@@ -29,7 +49,7 @@ import (
 type Options struct {
 	// Store resolves repositories. Nil answers every request 501, as the
 	// server's own handlers do without a store.
-	Store store.Store
+	Store Store
 	// Items returns the item service a deploy goes through, with the
 	// server's formats and work queue.
 	Items func() *item.Service
@@ -219,7 +239,7 @@ func (p Protocol) signed(r *http.Request) bool {
 type Source interface {
 	// Item returns the file or folder at path as c's class finds it, with
 	// the repository it lives in, or an error wrapping store.ErrNotFound.
-	Item(ctx context.Context, st store.Store, c repo.Config, path string) (Found, error)
+	Item(ctx context.Context, st Store, c repo.Config, path string) (Found, error)
 }
 
 // Found is an item a Source found, with the repository that holds it: for
@@ -233,7 +253,7 @@ type Found struct {
 type Local struct{}
 
 // Item returns the item at path in c.
-func (Local) Item(ctx context.Context, st store.Store, c repo.Config, path string) (Found, error) {
+func (Local) Item(ctx context.Context, st Store, c repo.Config, path string) (Found, error) {
 	it, err := st.Items().Get(ctx, c.Key, false, path)
 	if err != nil {
 		return Found{}, fmt.Errorf("item %s/%s: %w", c.Key, path, err)
@@ -682,7 +702,7 @@ func refusal(r *http.Request) error {
 // DB is the store the kit resolves repositories in, for a handler that
 // reads the package index (decision 0018) or lists a folder: Go's version
 // lists and npm's packuments are built from the index.
-func (k *Kit) DB() store.Store { return k.o.Store }
+func (k *Kit) DB() Store { return k.o.Store }
 
 // Item returns the item at path in the request's repository, through its
 // Source.

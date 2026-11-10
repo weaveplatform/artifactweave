@@ -12,6 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -28,7 +29,9 @@ func newRemoteCase(t *testing.T) remoteCase {
 	up := fakeupstream.New(t, fakeupstream.Options{})
 	f := newFixtureWith(
 		t,
-		func(items *item.Service) *source.Service { return remoteService(t, items) },
+		func(db *inmem.Store, items *item.Service) *source.Service {
+			return remoteService(t, db, items)
+		},
 	)
 	c := *repo.Defaults(&repo.Config{Key: "bazel-remote", Class: repo.Remote, PackageType: repo.BazelModules, URL: up.URL + "/registry/"})
 	if err := f.db.Repos().Create(t.Context(), c); err != nil {

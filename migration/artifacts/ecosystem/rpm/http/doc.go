@@ -21,13 +21,14 @@
 //     strict server and lists TryRPMItem eighth among the item kit's
 //     overlays (itemkit.Deps.Overlays), so that an item GET or HEAD in a
 //     virtual RPM repository reaches it before the generic lookup.
-//   - Driven: the item kit (artifacts/adapters/http/itemkit), which resolves
-//     the request and the caller's access, reads items and blobs, serves
-//     stored files and remote streams, runs the reindex and writes errors;
-//     the kit's remote source service, which fetches a remote member's
-//     repodata and packages under the kit's RPM source request
-//     (itemkit.RPMSourceRequest); access/api's Keys, which reads a virtual
-//     repository's GPG key pair; the generic download policy
+//   - Driven: the item kit (artifacts/adapters/http/itemkit), whose store
+//     (itemkit.Store) the overlay is handed and reads repositories and items
+//     from, and which resolves the request and the caller's access, reads
+//     items and blobs, serves stored files and remote streams, runs the
+//     reindex and writes errors; the kit's remote source service, which
+//     fetches a remote member's repodata and packages under the kit's RPM
+//     source request (itemkit.RPMSourceRequest); access/api's Keys, which
+//     reads a virtual repository's GPG key pair; the generic download policy
 //     (artifacts/ecosystem/generic); and the format package
 //     (artifacts/ecosystem/rpm), which decodes member repodata and encodes
 //     and signs the virtual view.
@@ -79,8 +80,9 @@
 //   - Plan: docs/implementation/plan.md#p29-linux-package-repositories
 //     and #p9d-modular-monolith-migration, epic WEB
 //     (https://github.com/weaveplatform/artifactweave/issues/944).
-//   - https://github.com/weaveplatform/artifactweave/issues/759 and
-//     https://github.com/weaveplatform/artifactweave/issues/1082
+//   - https://github.com/weaveplatform/artifactweave/issues/759,
+//     https://github.com/weaveplatform/artifactweave/issues/1082 and
+//     https://github.com/weaveplatform/artifactweave/issues/1090
 //
 // # Status
 //

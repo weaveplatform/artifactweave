@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -197,7 +198,7 @@ func TestAccSearchHidesUnreadable(t *testing.T) {
 // a fault: 500, and the cause goes to the access log.
 func TestAccSearchFaults(t *testing.T) {
 	for _, failing := range []string{"list", "find", "versions"} {
-		f := newFixture(t, func(st store.Store) store.Store {
+		f := newFixture(t, func(st pkgroute.Store) pkgroute.Store {
 			return listFailing{failingStore{Store: st, failing: failing}}
 		})
 		f.deployRich(t)

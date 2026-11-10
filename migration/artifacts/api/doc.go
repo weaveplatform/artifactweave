@@ -1,8 +1,8 @@
 // Package api is the artifacts module's published surface for other modules:
 // the repository operations they call (Repositories, with RepoFilter and the
 // shared names ErrChanged, MsgKeyExists and IsNull) and the layout check
-// (Layouts, with LayoutDefinition). The repository configuration model is its
-// subpackage repo.
+// (Layouts, with LayoutDefinition), which API holds as the module binds
+// them. The repository configuration model is its subpackage repo.
 //
 // # Role
 //
@@ -17,10 +17,12 @@
 //
 // # Inputs
 //
-// None: the package holds interfaces, two values and a pure function. The
-// artifacts module implements the interfaces: migration/artifacts/core/repos's
-// NewRepositories binds Repositories over the store and access's Keys and
-// Projects, and artifacts/core/layout's Checker implements Layouts.
+// None: the package holds interfaces, a struct of them, two values and a
+// pure function. The artifacts module implements the interfaces:
+// migration/artifacts/core/repos's NewRepositories binds Repositories over
+// the store and access's Keys and Projects, and artifacts/core/layout's
+// Checker implements Layouts; the module's API method returns both as an
+// API.
 //
 // # Outputs
 //
@@ -36,6 +38,8 @@
 //     which callers of Repositories use with its results.
 //   - Layouts, with LayoutDefinition: the check that configuration runs on a
 //     layout definition before it stores it.
+//   - API, the two contracts as the module binds them, which app hands to
+//     the configuration module.
 //
 // # Invariants
 //
@@ -74,12 +78,13 @@
 //     an update that sets terraformType owes).
 //   - Plan: docs/implementation/plan.md#p9d-modular-monolith-migration, epic
 //     ART (https://github.com/weaveplatform/artifactweave/issues/941).
-//   - https://github.com/weaveplatform/artifactweave/issues/1009
+//   - https://github.com/weaveplatform/artifactweave/issues/1009 and
+//     https://github.com/weaveplatform/artifactweave/issues/1094 (API)
 //
 // # Status
 //
-// Repositories and Layouts implemented in P9d. Not created, because no other
-// module calls them today (decision 0044): the target layout's Items,
+// Repositories, Layouts and API implemented in P9d. Not created, because no
+// other module calls them today (decision 0044): the target layout's Items,
 // Packages, Builds and Search; Gate (hooks.go), with the download and deploy
 // gates of P17; the artifacts events (events.go, P11); and
 // Repositories.SetProject, which a project attach will call (P11). The

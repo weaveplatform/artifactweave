@@ -33,7 +33,7 @@ func wrongSize(t *testing.T, body, content string, declared int) (string, string
 // config or on a layer is refused, naming each descriptor once, and
 // nothing is stored. Matching sizes are stored as before.
 func TestAccDescriptorSizes(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		w.upload(imageConfig, layerA, layerB)
 		good, gd := manifestOf(layerA, layerB)
 		if err := w.push(good, gd, "ok"); err != nil {
@@ -77,7 +77,7 @@ func TestAccDescriptorSizes(t *testing.T) {
 // A layer listed twice is looked up once and its wrong size named once;
 // content the image lacks is reported before any size.
 func TestAccDescriptorSizesRepeatsAndMissing(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		w.upload(imageConfig, layerA)
 		twice, _ := manifestOf(layerA, layerA)
 		body := strings.ReplaceAll(twice, sizeOf(layerA), `"sha256:`+sum(layerA)+`","size":1`)
@@ -101,7 +101,7 @@ func TestAccDescriptorSizesRepeatsAndMissing(t *testing.T) {
 
 // A manifest an index lists must be stored at the size the index gives.
 func TestAccIndexChildSize(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		ps := w.platforms()
 		good, _ := indexOf(layout.MediaTypeOCIIndex, ps...)
 		body, digest := wrongSize(t, good, ps[1], len(ps[1])+10)

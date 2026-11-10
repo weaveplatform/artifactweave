@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	luarockshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/luarocks/http"
+	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -31,49 +32,55 @@ func newRemoteFixture(t *testing.T, tune ...func(*pkgroute.Options, *item.Servic
 	t.Helper()
 	up := fakeupstream.New(t, fakeupstream.Options{})
 	clock := fakeupstream.NewClock(time.Date(2026, 10, 23, 0, 0, 0, 0, time.UTC))
-	f := newFixtureWithProtocol(t, repo.Remote, func(items *item.Service) luarockshttp.Options {
-		c, err := items.Store.Repos().Get(t.Context(), "rocks")
-		if err != nil {
-			t.Fatal(err)
-		}
-		c.URL = up.URL + "/rocks/"
-		ttl := 10
-		c.RetrievalCachePeriodSecs = &ttl
-		if err = items.Store.Repos().Update(t.Context(), c); err != nil {
-			t.Fatal(err)
-		}
-		if err = items.Store.Permissions().Create(t.Context(), types.Permission{
-			Name: "visible-only",
-			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{"partial": types.ActionRead}},
-				Targets: map[string]types.Target{"rocks": {Include: []string{"visible-*"}}},
-			}},
-		}); err != nil {
-			t.Fatal(err)
-		}
-		key := []byte(strings.Repeat("k", 32))
-		resolver, err := upstream.NewResolver(
-			items.Store,
-			nil,
-			upstream.ResolverOptions{RevisionKey: key},
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-		pool := new(upstream.Pool)
-		policy := &remote.Policy{
-			Store: items.Store, Blobs: items.Blobs, Items: items,
-			Pool: pool, Options: resolver.Options, Key: key, Now: clock.Now,
-		}
-		t.Cleanup(pool.Close)
-		svc := &source.Service{
-			HTTP: policy, Cache: policy,
-			Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
-				return items.Store.RemoteCache().Source(ctx, c.Key)
-			},
-		}
-		return luarockshttp.Options{RemoteSources: svc}
-	}, tune...)
+	f := newFixtureWithProtocol(
+		t,
+		repo.Remote,
+		func(db *inmem.Store, items *item.Service) luarockshttp.Options {
+			c, err := items.Store.Repos().Get(t.Context(), "rocks")
+			if err != nil {
+				t.Fatal(err)
+			}
+			c.URL = up.URL + "/rocks/"
+			ttl := 10
+			c.RetrievalCachePeriodSecs = &ttl
+			if err = items.Store.Repos().Update(t.Context(), c); err != nil {
+				t.Fatal(err)
+			}
+			if err = db.Permissions().Create(t.Context(), types.Permission{
+				Name: "visible-only",
+				Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
+					Actions: types.Grants{
+						Users: map[string]types.Actions{"partial": types.ActionRead},
+					},
+					Targets: map[string]types.Target{"rocks": {Include: []string{"visible-*"}}},
+				}},
+			}); err != nil {
+				t.Fatal(err)
+			}
+			key := []byte(strings.Repeat("k", 32))
+			resolver, err := upstream.NewResolver(
+				db,
+				nil,
+				upstream.ResolverOptions{RevisionKey: key},
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			pool := new(upstream.Pool)
+			policy := &remote.Policy{
+				Store: db, Blobs: items.Blobs, Items: items,
+				Pool: pool, Options: resolver.Options, Key: key, Now: clock.Now,
+			}
+			t.Cleanup(pool.Close)
+			svc := &source.Service{
+				HTTP: policy, Cache: policy,
+				Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
+					return items.Store.RemoteCache().Source(ctx, c.Key)
+				},
+			}
+			return luarockshttp.Options{RemoteSources: svc}
+		},
+		tune...)
 	return &remoteFixture{fixture: f, up: up, clock: clock}
 }
 

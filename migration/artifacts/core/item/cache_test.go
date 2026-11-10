@@ -337,7 +337,7 @@ func TestUnitRemoteCacheRejectsIncompleteAndUnsafe(t *testing.T) {
 		}, io.ErrUnexpectedEOF},
 		{"html", func(u *CacheUpload) { u.Body = strings.NewReader("<!DOCTYPE HTML><html>login</html>"); u.Length = -1 }, ErrRemoteMIME},
 		{"badtype", func(u *CacheUpload) { u.ContentType = "invalid;" }, ErrRemoteMIME},
-		{"denied", func(u *CacheUpload) { u.CheckCurrent = func(context.Context, store.Store) error { return errBoom } }, errBoom},
+		{"denied", func(u *CacheUpload) { u.CheckCurrent = func(context.Context, Store) error { return errBoom } }, errBoom},
 		{"wrongclass", func(u *CacheUpload) { u.Repo.Class = repo.Local }, store.ErrInvalid},
 		{"wrongkey", func(u *CacheUpload) { u.Repo.Key = "elsewhere" }, store.ErrInvalid},
 		{"nilbody", func(u *CacheUpload) { u.Body = nil }, store.ErrInvalid},
@@ -451,7 +451,7 @@ func TestUnitRemoteNoStore(t *testing.T) {
 			case "limit":
 				u.MaxBytes = 3
 			case "denied":
-				u.CheckCurrent = func(context.Context, store.Store) error { return errBoom }
+				u.CheckCurrent = func(context.Context, Store) error { return errBoom }
 			case "cancelled":
 				var cancel context.CancelFunc
 				ctx, cancel = context.WithCancel(ctx)
@@ -586,7 +586,7 @@ func TestUnitRemoteMetadataCollectionFence(t *testing.T) {
 		t.Run(mode, func(t *testing.T) {
 			w, u := remoteWorld(t)
 			u.Kind = types.RemoteMetadata
-			u.CheckCurrent = func(ctx context.Context, _ store.Store) error {
+			u.CheckCurrent = func(ctx context.Context, _ Store) error {
 				b := types.Blob{Checksums: sums("payload"), Size: 7, Created: at}
 				if _, err := w.db.Blobs().MarkDeleting(ctx, b, at); err != nil {
 					return err

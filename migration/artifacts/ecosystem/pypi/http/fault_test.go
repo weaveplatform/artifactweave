@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	pypifmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -16,7 +17,7 @@ var errFault = errors.New("the store failed")
 // faulty is a store whose method named fail fails; the rest pass to
 // Store.
 type faulty struct {
-	store.Store
+	pkgroute.Store
 	fail string
 }
 
@@ -95,9 +96,13 @@ func TestAccReadFaults(t *testing.T) {
 		{"Get", api + "demo/1.0/demo-1.0-py3-none-any.whl.metadata"},
 		{"VersionOf", api + "demo/1.0/demo-1.0-py3-none-any.whl.metadata"},
 	} {
-		f := newFixture(t, pypifmt.Settings{CoreMetadata: true}, func(s store.Store) store.Store {
-			return faulty{Store: s, fail: c.fail}
-		})
+		f := newFixture(
+			t,
+			pypifmt.Settings{CoreMetadata: true},
+			func(s pkgroute.Store) pkgroute.Store {
+				return faulty{Store: s, fail: c.fail}
+			},
+		)
 		seedDemo(t, f)
 		rec := f.do(http.MethodGet, c.path, "reader")
 		if rec.Code != http.StatusInternalServerError || len(f.faults) != 1 ||

@@ -21,8 +21,9 @@
 //     registry's expiry of finished uploads, and runs a pass every interval
 //     (Loop); and the storage API, whose POST /api/system/storage/gc runs
 //     one pass (Run).
-//   - Driven: the metadata store (leases, upload sessions, the blob index,
-//     through the whole store), the blob store (platform/blob.Store) whose
+//   - Driven: the metadata store, through Store (the lease table, upload
+//     sessions, and the trash can's store, trash.Store, which holds the blob
+//     index), the blob store (platform/blob.Store) whose
 //     content it deletes, the trash service (artifacts/core/trash), which
 //     purges expired entries, the reapers and expirers Options names, and
 //     accessapi.Tokens.
@@ -66,7 +67,8 @@
 //     (trash can and garbage collection, #48) and
 //     #p9d-modular-monolith-migration, epic ART
 //     (https://github.com/weaveplatform/artifactweave/issues/941).
-//   - https://github.com/weaveplatform/artifactweave/issues/1012
+//   - https://github.com/weaveplatform/artifactweave/issues/1012 and
+//     https://github.com/weaveplatform/artifactweave/issues/1088
 //
 // # Status
 //

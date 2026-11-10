@@ -32,7 +32,7 @@ const dir = "example.com/m/@v/v1.0.0"
 type world struct {
 	t     *testing.T
 	ctx   context.Context
-	st    store.Store
+	st    item.Store
 	items *item.Service
 	now   time.Time
 }
@@ -447,7 +447,7 @@ var errStore = errors.New("store boom")
 
 // faulty fails the store methods fail names and delegates the rest.
 type faulty struct {
-	store.Store
+	format.Store
 	fail map[string]bool
 }
 

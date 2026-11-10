@@ -142,7 +142,7 @@ func reverseClosure(graph map[string][]string, changedPackages []string, owner s
 			for _, imported := range imports {
 				if active[imported] {
 					seen[pkg] = true
-					if formatPackageOwner(pkg) == owner {
+					if carriesChange(pkg, owner) {
 						active[pkg] = true
 						updated = true
 					}
@@ -159,6 +159,26 @@ func reverseClosure(graph map[string][]string, changedPackages []string, owner s
 	}
 	slices.Sort(units)
 	return units
+}
+
+// carriesChange reports whether pkg, which imports a package a change
+// reached, passes the change on to its own importers: owner's packages do,
+// and so does the composition root's configuration package, which builds
+// the formats' settings for app. Without it a change to a format whose
+// settings that package builds would select the configuration's tests but
+// not app's, although app starts the server with those settings. As in
+// formatPackageOwner, the package is named under both roots, since
+// migration/ is renamed to internal/ at promotion.
+func carriesChange(pkg, owner string) bool {
+	if formatPackageOwner(pkg) == owner {
+		return true
+	}
+	for _, root := range []string{"/migration", "/internal"} {
+		if pkg == modulePath+root+"/app/config" {
+			return true
+		}
+	}
+	return false
 }
 
 // formatPackageOwner names the format whose packages carry a change onward

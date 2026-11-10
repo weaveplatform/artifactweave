@@ -29,8 +29,10 @@
 //   - Module, whose API returns one binding of each access/api contract:
 //     Authenticator, Authorizer, Tokens, Keys, Identity, Restrictions,
 //     Projects, Grants and AnonymousAccess, with the Settings.
-//   - KeysOf, ProjectsOf and AnonymousAccessOf: the store-only bindings, for
-//     code that holds a store before any module exists, such as bootstrap.
+//   - KeysOf, ProjectsOf, AnonymousAccessOf, RestrictionsOf and TokensOf:
+//     the store-only bindings, for code that holds a store before any
+//     module exists, such as bootstrap, and the multipart upload service
+//     and the garbage collector, which app builds before the work queue.
 //
 // # Invariants
 //

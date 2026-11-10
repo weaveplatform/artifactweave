@@ -37,7 +37,7 @@ func (b boxStore) Open(context.Context, string) (io.ReadSeekCloser, blob.Info, e
 }
 
 type failureStore struct {
-	store.Store
+	format.Store
 	stage string
 }
 

@@ -27,14 +27,17 @@
 //     routes; app, which registers the snapshot work with
 //     RegisterDebianSnapshotWork before the work queue runs; and the work
 //     queue, which runs each queued snapshot.
-//   - Driven: the item kit (artifacts/adapters/http/itemkit), which resolves
-//     the request and the caller's access, reads items and blobs, serves
-//     stored files and remote streams, deploys a snapshot's metadata through
-//     the item service, runs the reindex, queues and awaits work, and writes
-//     errors; the kit's remote source service, which fetches a remote's or a
-//     remote member's metadata and packages under the kit's Debian source
-//     request (itemkit.DebianSourceRequest); access/api, whose Authenticator
-//     and Authorizer recheck a queued snapshot's caller and whose Keys read a
+//   - Driven: the item kit (artifacts/adapters/http/itemkit), whose store
+//     (itemkit.Store) the overlay is handed and the handlers read
+//     repositories and items from, claiming a snapshot in one of its
+//     transactions, and which resolves the request and the caller's access,
+//     reads items and blobs, serves stored files and remote streams, deploys
+//     a snapshot's metadata through the item service, runs the reindex,
+//     queues and awaits work, and writes errors; the kit's remote source
+//     service, which fetches a remote's or a remote member's metadata and
+//     packages under the kit's Debian source request
+//     (itemkit.DebianSourceRequest); access/api, whose Authenticator and
+//     Authorizer recheck a queued snapshot's caller and whose Keys read a
 //     virtual repository's GPG key pair; the work queue (platform/work); the
 //     generic download policy (artifacts/ecosystem/generic); and the format
 //     package (artifacts/ecosystem/debian), which decodes and checks indexes
@@ -116,8 +119,9 @@
 //   - Plan: docs/implementation/plan.md#p29-linux-package-repositories
 //     and #p9d-modular-monolith-migration, epic WEB
 //     (https://github.com/weaveplatform/artifactweave/issues/944).
-//   - https://github.com/weaveplatform/artifactweave/issues/758 and
-//     https://github.com/weaveplatform/artifactweave/issues/1083
+//   - https://github.com/weaveplatform/artifactweave/issues/758,
+//     https://github.com/weaveplatform/artifactweave/issues/1083 and
+//     https://github.com/weaveplatform/artifactweave/issues/1090
 //
 // # Status
 //

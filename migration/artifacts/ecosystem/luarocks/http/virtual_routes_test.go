@@ -55,7 +55,7 @@ func newVirtualFixture(
 }
 
 type virtualFaultStore struct {
-	store.Store
+	pkgroute.Store
 	failKey *string
 }
 

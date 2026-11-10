@@ -88,8 +88,8 @@ func TestUnitModuleOnlyMappingNeedsTheModule(t *testing.T) {
 		never,
 		never,
 	)
-	text := "github.com/weaveplatform/artifactweave/migration/app ${MODULE}/migration/... migration/app migrations/ the migration"
-	want := "github.com/weaveplatform/artifactweave/internal/app ${MODULE}/internal/... migration/app migrations/ the migration"
+	text := "github.com/weaveplatform/artifactweave/migration/gateway ${MODULE}/migration/... migration/gateway migrations/ the migration"
+	want := "github.com/weaveplatform/artifactweave/internal/gateway ${MODULE}/internal/... migration/gateway migrations/ the migration"
 	if got := applyRefs(text, mt.find(text)); got != want {
 		t.Errorf("got  %q\nwant %q", got, want)
 	}

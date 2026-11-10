@@ -10,7 +10,6 @@ import (
 	condafmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conda"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // TryCondaItem is the item overlay (itemkit.Overlay) that answers 404 for
@@ -19,7 +18,7 @@ import (
 // representation the current caller is allowed to read. It writes nothing
 // and returns false for every other path.
 func TryCondaItem(
-	_ *itemkit.Kit, w http.ResponseWriter, r *http.Request, _ store.Store, c repo.Config,
+	_ *itemkit.Kit, w http.ResponseWriter, r *http.Request, _ itemkit.Store, c repo.Config,
 	_ bool, req itemkit.ItemRequest, _ kernel.Principal, _ itemkit.Access,
 ) bool {
 	if !protocolPrivateItem(c, req.Path) {

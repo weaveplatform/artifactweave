@@ -17,6 +17,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cargo"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -127,7 +128,7 @@ func respond(w http.ResponseWriter, r *http.Request, value any) {
 	_ = json.NewEncoder(w).Encode(value)
 }
 
-func recordFor(ctx context.Context, st store.Store, it types.Item) (cargo.Record, error) {
+func recordFor(ctx context.Context, st format.Store, it types.Item) (cargo.Record, error) {
 	props, err := st.Items().Properties(ctx, it.ID)
 	if err != nil {
 		return cargo.Record{}, fmt.Errorf("cargo: read index properties: %w", err)

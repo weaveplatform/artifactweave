@@ -16,7 +16,7 @@ import (
 // then encounter another transaction's committed row when inserting. Keep the
 // competing row outside the losing transaction so its rollback cannot erase it.
 type deployRaceStore struct {
-	store.Store
+	Store
 	destination string
 	missed      bool
 	creates     int

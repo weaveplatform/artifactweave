@@ -21,19 +21,21 @@
 //     (itemkit.Deps.Overlays), so that an item GET or HEAD in a CRAN
 //     repository reaches it before the generic lookup, and mounts the
 //     uploads with RegisterCranRoutes among the item routes.
-//   - Driven: the item kit (artifacts/adapters/http/itemkit), which resolves
-//     the request, the caller's access and an upload's target repository,
-//     reads items and blobs, waits for a repository's index rebuild, serves
-//     stored files and remote streams, deploys an upload and moves archives
-//     through the item service, and writes errors; the kit's remote source
-//     service, which fetches a remote's or a remote member's index and
-//     packages under the kit's CRAN source request
-//     (itemkit.CranSourceRequest); the generic download policy
-//     (artifacts/ecosystem/generic); pkgroute, for an upload's declared
-//     checksums and the source errors; and the format package
+//   - Driven: the item kit (artifacts/adapters/http/itemkit), whose store
+//     (itemkit.Store) the overlay is handed and the handlers read
+//     repositories and items from, moving archives in one of its
+//     transactions, and which resolves the request, the caller's access and
+//     an upload's target repository, reads items and blobs, waits for a
+//     repository's index rebuild, serves stored files and remote streams,
+//     deploys an upload and moves archives through the item service, and
+//     writes errors; the kit's remote source service, which fetches a
+//     remote's or a remote member's index and packages under the kit's CRAN
+//     source request (itemkit.CranSourceRequest); the generic download
+//     policy (artifacts/ecosystem/generic); pkgroute, for an upload's
+//     declared checksums and the source errors; and the format package
 //     (artifacts/ecosystem/cran), which decodes and encodes indexes, takes
-//     an uploaded package's identity from its archive and finds the
-//     archives still in the legacy layout.
+//     an uploaded package's identity from its archive and finds the archives
+//     still in the legacy layout.
 //   - Settings: CranAPI.ArchiveMoverEnabled, which the router sets from
 //     cran.archive_mover_enabled (off by default).
 //
@@ -92,8 +94,9 @@
 //   - Plan: docs/implementation/plan.md#p32-data-and-model-repositories
 //     and #p9d-modular-monolith-migration, epic WEB
 //     (https://github.com/weaveplatform/artifactweave/issues/944).
-//   - https://github.com/weaveplatform/artifactweave/issues/778 and
-//     https://github.com/weaveplatform/artifactweave/issues/1084
+//   - https://github.com/weaveplatform/artifactweave/issues/778,
+//     https://github.com/weaveplatform/artifactweave/issues/1084 and
+//     https://github.com/weaveplatform/artifactweave/issues/1090
 //
 // # Status
 //

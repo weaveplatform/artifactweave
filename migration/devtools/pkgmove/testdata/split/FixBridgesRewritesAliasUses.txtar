@@ -13,8 +13,8 @@ git status --porcelain
 fail fix -bridges
 runs make fmt
 cmp pkg/store/store.go want/store.go
-cmp internal/app/app.go want/app.go
-cmp internal/app/app_test.go want/app_test.go
+cmp internal/alpha/alpha.go want/alpha.go
+cmp internal/alpha/alpha_test.go want/alpha_test.go
 cmp internal/only/only.go want/only.go
 cmp internal/embed/embed.go want/embed.go
 cmp pkg/store/bridge_kernel.go want/bridge_kernel.go
@@ -30,7 +30,7 @@ go $GOVERSION
     "staging_root": "migration",
     "final_root": "internal",
     "packages": [
-        {"from":"internal/app","action":"move","to":"app","ticket":"WEB-18"},
+        {"from":"internal/alpha","action":"move","to":"app","ticket":"WEB-18"},
         {"from":"internal/differ","action":"move","to":"platform/differ","ticket":"PLT-90"},
         {"from":"internal/embed","action":"move","to":"platform/embed","ticket":"PLT-90"},
         {"from":"internal/only","action":"move","to":"platform/only","ticket":"PLT-90"},
@@ -117,9 +117,9 @@ func Get(p Page) error {
 	}
 	return nil
 }
--- internal/app/app.go --
-// Package app uses the store.
-package app
+-- internal/alpha/alpha.go --
+// Package alpha uses the store.
+package alpha
 
 import (
 	"errors"
@@ -134,8 +134,8 @@ func App(rows []string) ([]string, string, bool) {
 	pair := store.Pair[string, int]{Key: "k", Val: 1}
 	return store.Trim(rows, p.Limit), store.Cursor(p) + pair.Key, errors.Is(err, store.ErrNotFound)
 }
--- internal/app/app_test.go --
-package app
+-- internal/alpha/alpha_test.go --
+package alpha
 
 import (
 	"testing"
@@ -187,12 +187,12 @@ func Differ() int64 { return store.Differ("x") }
 // Clone clones.
 func Clone() any { return store.Clone(1) }
 -- want/plan --
-  rewrite internal/app/app.go: 1 import, 5 qualifiers
-  rewrite internal/app/app_test.go: 1 import, 1 qualifier
+  rewrite internal/alpha/alpha.go: 1 import, 5 qualifiers
+  rewrite internal/alpha/alpha_test.go: 1 import, 1 qualifier
   rewrite internal/embed/embed.go: 1 import, 1 qualifier
   rewrite internal/only/only.go: 2 qualifiers, 1 removed unused import
   rewrite pkg/store/store.go: 1 import, 3 qualifiers
-internal/app/app_test.go:10: assigns to the var bridge Cursor, which is not assigning to kernel.Cursor; rewrite it by hand
+internal/alpha/alpha_test.go:10: assigns to the var bridge Cursor, which is not assigning to kernel.Cursor; rewrite it by hand
 internal/differ/differ.go:7: Differ is a bridge that fix cannot point at a target: Differ does more than call another function
 internal/differ/differ.go:10: Clone is a bridge that fix cannot point at a target: the signature of Clone differs from that of kernel.Clone
 internal/embed/embed.go:8: the embedded field Embedded would become Named if it named kernel.Named; rewrite it by hand
@@ -210,9 +210,9 @@ func Get(p kernel.Page) error {
 	}
 	return nil
 }
--- want/app.go --
-// Package app uses the store.
-package app
+-- want/alpha.go --
+// Package alpha uses the store.
+package alpha
 
 import (
 	"errors"
@@ -228,8 +228,8 @@ func App(rows []string) ([]string, string, bool) {
 	pair := kernel.Pair[string, int]{Key: "k", Val: 1}
 	return kernel.Trim(rows, p.Limit), kernel.Cursor(p) + pair.Key, errors.Is(err, kernel.ErrNotFound)
 }
--- want/app_test.go --
-package app
+-- want/alpha_test.go --
+package alpha
 
 import (
 	"testing"

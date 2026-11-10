@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -36,9 +37,18 @@ var (
 	ErrDigest = errors.New("registry: digest mismatch")
 )
 
+// Store is what registry uploads read and write: the item service's store,
+// which every manifest and blob write goes through (item.Store), with the
+// upload sessions a chunked upload keeps between requests. The metadata
+// store's aggregate (pkg/store) is a Store.
+type Store interface {
+	item.Store
+	Uploads() session.UploadStore
+}
+
 // Service runs registry uploads over a metadata store and its blob store.
 type Service struct {
-	Store store.Store
+	Store Store
 	Blobs blob.Store
 	// Now supplies the time; nil means time.Now.
 	Now func() time.Time

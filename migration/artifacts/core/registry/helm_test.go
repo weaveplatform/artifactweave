@@ -97,7 +97,7 @@ func (w *world) metadataOf(c repo.Config, name, tag string) string {
 // is a version, whose metadata is the chart's own name, version, with its
 // "+", and appVersion. Its config sets no platform or label properties.
 func TestAccHelmChartPush(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		c := w.helmRepo(nil)
 		for _, f := range []string{
 			"config.json", "acme-1.2.3+build.4.tgz",
@@ -148,7 +148,7 @@ func TestAccHelmChartPush(t *testing.T) {
 // to the trash can, and the twins of the tags it keeps stay (decision
 // 0039; known issue RTDEV-88173).
 func TestAccMaxUniqueTagsTakesTheDigestTwin(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		c := &clock{}
 		w.svc.Now = c.now
 		limited := w.helmRepo(func(c *repo.Config) { c.MaxUniqueTags = ptr(2) })
@@ -183,7 +183,7 @@ func TestAccMaxUniqueTagsTakesTheDigestTwin(t *testing.T) {
 // other, and Max Unique Tags removes the tag with its retained versions and
 // its current twin.
 func TestAccTagRetentionAdoptsTheDigestTwin(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		c := &clock{}
 		w.svc.Now = c.now
 		kept := w.helmRepo(func(c *repo.Config) { c.DockerTagRetention = ptr(3) })
@@ -233,7 +233,7 @@ func TestAccTagRetentionAdoptsTheDigestTwin(t *testing.T) {
 // twin as any manifest pushed by digest stays; Max Unique Tags then removes
 // the tag with its current twin only.
 func TestAccTagRetentionOfOneLeavesTheTwin(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		c := &clock{}
 		w.svc.Now = c.now
 		r := w.helmRepo(nil)
@@ -295,7 +295,7 @@ func (w *world) pushListTo(c repo.Config, name, body, folder string) {
 // that tag's retained version and stays, and a client's own delete of a tag
 // removes only the tag (decision 0031).
 func TestAccTwinsKeptByOthers(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		ctx := context.Background()
 		c := &clock{}
 		w.svc.Now = c.now

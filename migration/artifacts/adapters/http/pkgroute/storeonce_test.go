@@ -56,7 +56,7 @@ func onceFormat() pkgroute.Protocol {
 
 // onceOptions are the kit's options over st, with an item error mapping
 // that keeps what differs returns and the item service's refusals apart.
-func onceOptions(f *kitFixture, st store.Store) pkgroute.Options {
+func onceOptions(f *kitFixture, st pkgroute.Store) pkgroute.Options {
 	return pkgroute.Options{
 		Store: st,
 		Items: func() *item.Service { return f.items },
@@ -208,7 +208,7 @@ func TestAccCreatedWithoutBody(t *testing.T) {
 }
 
 // failingPatch fails writing properties.
-type failingPatch struct{ store.Store }
+type failingPatch struct{ item.Store }
 
 func (s failingPatch) Items() store.ItemStore { return failingPatchItems{s.Store.Items()} }
 

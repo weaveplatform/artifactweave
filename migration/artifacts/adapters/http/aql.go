@@ -21,7 +21,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -58,7 +57,7 @@ const aqlTrimmed = "AQL query reached the search hard limit, results are trimmed
 // properties.update run here too (aqlAction).
 func (s ArtifactoryAPI) searchAQL(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	st, err := s.Content()
+	st, err := s.content()
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
 		return
@@ -376,7 +375,7 @@ func reach(configs map[string]repo.Config, key string, reached map[string]bool) 
 func (s ArtifactoryAPI) dispatchAlternateAQL(
 	w http.ResponseWriter,
 	r *http.Request,
-	st store.Store,
+	st Store,
 	p kernel.Principal,
 	q *aql.Query,
 ) bool {

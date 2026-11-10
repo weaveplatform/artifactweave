@@ -13,7 +13,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	swiftfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/swift"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -61,7 +60,7 @@ type virtualSource struct{}
 
 func (virtualSource) Item(
 	context.Context,
-	store.Store,
+	pkgroute.Store,
 	repo.Config,
 	string,
 ) (pkgroute.Found, error) {

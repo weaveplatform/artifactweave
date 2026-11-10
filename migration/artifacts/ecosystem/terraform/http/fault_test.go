@@ -16,21 +16,21 @@ import (
 var errStore = errors.New("test store unavailable")
 
 type failingStore struct {
-	store.Store
+	serverStore
 	fail string
 }
 
 func (s failingStore) Packages() store.PackageStore {
-	return failingPackages{s.Store.Packages(), s.fail}
+	return failingPackages{s.serverStore.Packages(), s.fail}
 }
-func (s failingStore) Items() store.ItemStore { return failingItems{s.Store.Items(), s.fail} }
-func (s failingStore) Users() store.UserStore { return failingUsers{s.Store.Users(), s.fail} }
+func (s failingStore) Items() store.ItemStore { return failingItems{s.serverStore.Items(), s.fail} }
+func (s failingStore) Users() store.UserStore { return failingUsers{s.serverStore.Users(), s.fail} }
 func (s failingStore) Settings() store.SettingsStore {
-	return failingSettings{s.Store.Settings(), s.fail}
+	return failingSettings{s.serverStore.Settings(), s.fail}
 }
 
 func (s failingStore) Permissions() store.PermissionStore {
-	return failingPermissions{s.Store.Permissions(), s.fail}
+	return failingPermissions{s.serverStore.Permissions(), s.fail}
 }
 
 type failingPackages struct {

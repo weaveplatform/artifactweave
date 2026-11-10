@@ -20,14 +20,15 @@
 //     (pkgroute) for repositories of package type composer. Archives are
 //     published through the generic item routes, not through this
 //     protocol; the format's Handler admits them there.
-//   - Driven: the router kit (pkgroute.Kit), which resolves the repository
-//     (a key with the -cache suffix names a remote's cache) and the caller,
-//     checks permissions, lists items and reads their properties, builds a
-//     virtual repository's member requests, serves items and writes errors;
-//     the blob store in Options, from which the hosted catalogs read every
-//     archive; the remote source service, which fetches a remote's upstream
-//     packages.json, package metadata and archives into the remote cache;
-//     and the format package.
+//   - Driven: the router kit (pkgroute.Kit), whose store (pkgroute.Store)
+//     the handlers also reach through DB(), and which resolves the
+//     repository (a key with the -cache suffix names a remote's cache) and
+//     the caller, checks permissions, lists items and reads their
+//     properties, builds a virtual repository's member requests, serves
+//     items and writes errors; the blob store in Options, from which the
+//     hosted catalogs read every archive; the remote source service, which
+//     fetches a remote's upstream packages.json, package metadata and
+//     archives into the remote cache; and the format package.
 //
 // # Outputs
 //
@@ -79,8 +80,9 @@
 //   - Plan: docs/implementation/plan.md#p30-language-package-repositories
 //     and #p9d-modular-monolith-migration, epic ECO
 //     (https://github.com/weaveplatform/artifactweave/issues/943).
-//   - https://github.com/weaveplatform/artifactweave/issues/763 and
-//     https://github.com/weaveplatform/artifactweave/issues/1047
+//   - https://github.com/weaveplatform/artifactweave/issues/763,
+//     https://github.com/weaveplatform/artifactweave/issues/1047 and
+//     https://github.com/weaveplatform/artifactweave/issues/1089
 //
 // # Status
 //

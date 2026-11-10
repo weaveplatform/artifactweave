@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/platform/archive"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -501,7 +502,10 @@ func (a *archiveWriter) close() error {
 
 // FolderDownload reads the folder download setting, with Artifactory's
 // defaults for what is unset: off, 1024 MB and 5000 files.
-func FolderDownload(ctx context.Context, st store.Store) (types.FolderDownloadSettings, error) {
+func FolderDownload(
+	ctx context.Context,
+	st interface{ Settings() settings.SettingsStore },
+) (types.FolderDownloadSettings, error) {
 	fd := types.FolderDownloadSettings{}
 	err := st.Settings().Get(ctx, types.SettingFolderDownload, &fd)
 	if err != nil && !errors.Is(err, store.ErrNotFound) {

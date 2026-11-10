@@ -22,14 +22,18 @@
 //     checks.
 //   - Driven: the Upstream and Registries ports, for every upstream
 //     exchange; source.Request and source.Permit, the authorised request
-//     and its source identity; the store (repositories, the remote cache,
-//     the work queue and leases); the item service and its format registry,
+//     and its source identity; the store, through Store (transactions, the
+//     remote cache, repositories, items, the work queue and leases), which
+//     Policy.Store holds, CheckCurrent is handed and Smart's and the Maven
+//     slice's companion queues are built on, while a Discovery keeps only
+//     the remote cache's reader; the item service and its format registry,
 //     which publish what a fetch admits; and the policy hooks the
 //     application installs (Fetch, GitFetch, PrepareUpload,
 //     ProjectResponse, Options, CheckCurrent and Smart).
 //
 // # Outputs
 //
+//   - Store, the store Policy.Store holds. It names no access store.
 //   - Policy, its Read and the exported checks the slices and Smart call
 //     (Check, CacheKey, FlightKey, ReadEntry, Acquire, State, Cooldown,
 //     RecordFailure, RecordResponse), with PolicyError, ResponseError,
@@ -68,12 +72,14 @@
 //   - Plan: docs/implementation/plan.md#p9-remote-repositories and
 //     #p9d-modular-monolith-migration, epic RMT
 //     (https://github.com/weaveplatform/artifactweave/issues/942).
-//   - https://github.com/weaveplatform/artifactweave/issues/1026 and
-//     https://github.com/weaveplatform/artifactweave/issues/1027
+//   - https://github.com/weaveplatform/artifactweave/issues/1026,
+//     https://github.com/weaveplatform/artifactweave/issues/1027 and
+//     https://github.com/weaveplatform/artifactweave/issues/1091
 //
 // # Status
 //
-// Implemented P9. Staged in P9d.
+// Implemented P9. Staged in P9d, which narrowed Policy.Store to Store
+// (https://github.com/weaveplatform/artifactweave/issues/1091).
 //
 // # Testing
 //

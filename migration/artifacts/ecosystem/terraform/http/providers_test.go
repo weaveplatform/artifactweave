@@ -301,7 +301,7 @@ func TestAccProviderManifestAndFaults(t *testing.T) {
 // replacement. Reading by path twice would sign unverified new bytes.
 type (
 	replacingStore struct {
-		store.Store
+		serverStore
 		f        *fixture
 		path     string
 		replaced bool
@@ -312,7 +312,7 @@ type (
 	}
 )
 
-func (s *replacingStore) Items() store.ItemStore { return replacingItems{s.Store.Items(), s} }
+func (s *replacingStore) Items() store.ItemStore { return replacingItems{s.serverStore.Items(), s} }
 func (i replacingItems) GetByID(ctx context.Context, id int64) (types.Item, error) {
 	it, err := i.ItemStore.GetByID(ctx, id)
 	if err == nil && it.FullPath() == i.s.path && !i.s.replaced {
@@ -326,7 +326,7 @@ func TestAccProviderMetadataReplacement(t *testing.T) {
 	for _, suffix := range []string{"SHA256SUMS", "SHA256SUMS.sig", "linux_amd64.zip"} {
 		t.Run(suffix, func(t *testing.T) {
 			f, _, rel := providerFixture(t)
-			s := &replacingStore{Store: f.db, f: f, path: releasePath + rel.Name(suffix)}
+			s := &replacingStore{serverStore: f.db, f: f, path: releasePath + rel.Name(suffix)}
 			f.read = s
 			f.h = f.router(f.keys)
 			doc := downloadDoc(t, f)
@@ -344,11 +344,13 @@ func TestAccProviderMetadataReplacement(t *testing.T) {
 }
 
 type (
-	staleMetaStore    struct{ store.Store }
+	staleMetaStore    struct{ serverStore }
 	staleMetaPackages struct{ store.PackageStore }
 )
 
-func (s staleMetaStore) Packages() store.PackageStore { return staleMetaPackages{s.Store.Packages()} }
+func (s staleMetaStore) Packages() store.PackageStore {
+	return staleMetaPackages{s.serverStore.Packages()}
+}
 
 func (p staleMetaPackages) Versions(ctx context.Context, id int64) ([]types.PackageVersion, error) {
 	vs, err := p.PackageStore.Versions(ctx, id)

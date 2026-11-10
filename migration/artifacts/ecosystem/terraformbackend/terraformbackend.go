@@ -346,7 +346,7 @@ func (h Handler) metaOf(
 }
 
 // fileAt is the file at p in c, or nil when there is none.
-func fileAt(ctx context.Context, st store.Store, c repo.Config, p string) (*types.Item, error) {
+func fileAt(ctx context.Context, st format.Store, c repo.Config, p string) (*types.Item, error) {
 	it, err := st.Items().Get(ctx, c.Key, pkgindex.Stored(c).Cached, p)
 	switch {
 	case errors.Is(err, store.ErrNotFound) || err == nil && it.Folder:
@@ -360,7 +360,7 @@ func fileAt(ctx context.Context, st store.Store, c repo.Config, p string) (*type
 // versionNamed is version v of workspace ws's package, if the index has it.
 func versionNamed(
 	ctx context.Context,
-	st store.Store,
+	st format.Store,
 	c repo.Config,
 	ws, v string,
 ) (types.PackageVersion, bool, error) {
@@ -388,7 +388,7 @@ func versionNamed(
 
 // drop removes version pv, which no file names any more though one still
 // links it, and its package when that was its last version.
-func drop(ctx context.Context, st store.Store, pv types.PackageVersion) error {
+func drop(ctx context.Context, st format.Store, pv types.PackageVersion) error {
 	if err := st.Packages().DeleteVersion(ctx, pv.ID); err != nil {
 		return fmt.Errorf("terraformbackend: drop version %s: %w", pv.Version, err)
 	}

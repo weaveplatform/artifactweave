@@ -47,7 +47,7 @@ func (s ArtifactoryAPI) GetStorageSummaryInfo(
 	if err != nil {
 		return nil, err //nolint:wrapcheck // an apierror value
 	}
-	st, err := s.Content()
+	st, err := s.content()
 	if err != nil {
 		return nil, err
 	}

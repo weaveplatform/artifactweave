@@ -110,7 +110,7 @@ func (w *world) properties(path string) types.Properties {
 // manifest's exact bytes with its properties, and the config and layers
 // beside it, linked to the stored content.
 func TestAccPushByTag(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		w.upload(imageConfig, layerA, layerB)
 		body, digest := manifestOf(layerA, layerB)
 		if err := w.push(body, digest, "v1"); err != nil {
@@ -157,7 +157,7 @@ func TestAccPushByTag(t *testing.T) {
 // A push by digest goes to the digest folder, and each ?tag= to its own
 // tag folder, in one transaction.
 func TestAccPushByDigestWithTags(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		w.upload(imageConfig, layerA)
 		body, digest := manifestOf(layerA)
 		if err := w.push(body, digest, layout.DigestFolder(digest), "a", "b"); err != nil {
@@ -185,7 +185,7 @@ func TestAccPushByDigestWithTags(t *testing.T) {
 // Every blob must be in the image: each missing one is named, under any
 // algorithm, and nothing is stored.
 func TestAccUnknownBlobs(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		w.upload(layerA)
 		// In another image, which does not count.
 		w.deploy(w.docker, layout.UploadPath("other", sum(layerB)), layerB, start)
@@ -220,7 +220,7 @@ func TestAccUnknownBlobs(t *testing.T) {
 // Pushing over a tag replaces the folder's contents, properties included;
 // pushing what a folder holds changes nothing.
 func TestAccOverwrite(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		ctx := context.Background()
 		w.upload(imageConfig, layerA, layerB)
 		first, d1 := manifestOf(layerA)

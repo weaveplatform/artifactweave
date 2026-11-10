@@ -94,7 +94,7 @@ func (s *Service) now() time.Time {
 	return s.Now().UTC()
 }
 
-func (s *Service) store() store.Store { return s.Items.Store }
+func (s *Service) store() item.Store { return s.Items.Store }
 
 // at is the item service with its clock stopped at t, so what a write
 // stores is created at t: a state version's milliseconds name it, and the

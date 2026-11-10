@@ -21,7 +21,9 @@
 //     read or link versions directly, and the download path records a
 //     version's last download (RecordDownload).
 //   - Driven: the metadata store's package index (packages, versions and
-//     version files), through the whole store.
+//     version files), through Store, which holds only the package store
+//     (artifacts/core/port). A format passes its Env.Store, and the item
+//     service its own store; both satisfy it.
 //   - A Version (repository, package type, package and version), item IDs
 //     and times; a repository's configuration (Stored, Reconcile); and a
 //     format's reading of a repository's whole tree (Indexed and
@@ -29,6 +31,7 @@
 //
 // # Outputs
 //
+//   - Store, the one-accessor store the functions take.
 //   - Index rows written through the store. Link creates the package and
 //     version when they are new; Prune deletes the versions left with no
 //     files, and a package left with no versions; Sync makes one version
@@ -74,7 +77,8 @@
 //     (task 4, the package-index skeleton), #p7-npm-go-maven-locals and
 //     #p9d-modular-monolith-migration, epic ART
 //     (https://github.com/weaveplatform/artifactweave/issues/941).
-//   - https://github.com/weaveplatform/artifactweave/issues/973
+//   - https://github.com/weaveplatform/artifactweave/issues/973 and
+//     https://github.com/weaveplatform/artifactweave/issues/1087
 //
 // # Status
 //
@@ -86,8 +90,7 @@
 // (https://github.com/weaveplatform/artifactweave/issues/268), and Stored,
 // for the index of a remote repository's cache
 // (https://github.com/weaveplatform/artifactweave/issues/361). Staged in
-// P9d. Roadmap: the functions take the narrow package-index store in place
-// of the whole store
+// P9d, which narrowed the functions' store to Store
 // (https://github.com/weaveplatform/artifactweave/issues/1087).
 //
 // # Testing

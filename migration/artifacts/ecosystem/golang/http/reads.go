@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	goformat "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -230,7 +231,7 @@ func (h reads) readable(r *http.Request, m string) ([]version, error) {
 
 // files is the names of the files directly in folder, which for a module's
 // @v folder says which of every version's files are stored in one listing.
-func files(ctx context.Context, db store.Store, key, folder string) (map[string]bool, error) {
+func files(ctx context.Context, db format.Store, key, folder string) (map[string]bool, error) {
 	out := map[string]bool{}
 	page := store.Page{Limit: store.MaxLimit}
 	for {

@@ -31,7 +31,7 @@ import (
 type world struct {
 	t      *testing.T
 	ctx    context.Context
-	st     store.Store
+	st     item.Store
 	blobs  blob.Store
 	h      tfbe.Handler
 	items  *item.Service

@@ -140,7 +140,7 @@ func p2Fixture(t *testing.T, name string) []byte {
 }
 
 type p2FaultStore struct {
-	store.Store
+	itemkit.Store
 	err error
 }
 

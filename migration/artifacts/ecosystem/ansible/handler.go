@@ -143,7 +143,7 @@ var propertyKeys = []string{
 	"ansible.namespace", "ansible.name", "ansible.version", "ansible.sha256",
 }
 
-func setProperties(ctx context.Context, st store.Store, it types.Item, meta Metadata) error {
+func setProperties(ctx context.Context, st format.Store, it types.Item, meta Metadata) error {
 	current, err := st.Items().Properties(ctx, it.ID)
 	if err != nil {
 		return fmt.Errorf("ansible: item properties: %w", err)
@@ -169,7 +169,13 @@ func setProperties(ctx context.Context, st store.Store, it types.Item, meta Meta
 	return nil
 }
 
-func index(ctx context.Context, st store.Store, c repo.Config, it types.Item, meta Metadata) error {
+func index(
+	ctx context.Context,
+	st format.Store,
+	c repo.Config,
+	it types.Item,
+	meta Metadata,
+) error {
 	p, err := st.Packages().Ensure(ctx, types.Package{
 		RepoKey: c.Key, Type: c.PackageType,
 		Name: meta.Namespace + "." + meta.Name, Created: it.Created,

@@ -157,7 +157,7 @@ func TestAccTwinFailures(t *testing.T) {
 // A digest folder that holds no manifest, or another one than its name
 // says, is no twin, and removing the tag leaves it.
 func TestAccTwinIsTheManifestItNames(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		ctx := context.Background()
 		w.upload(imageConfig, layerA, layerB)
 		for i, layer := range []string{layerA, layerB} {

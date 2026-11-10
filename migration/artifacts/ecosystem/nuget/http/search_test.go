@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	nugethttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget/http"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
@@ -258,7 +259,7 @@ func TestAccAutocomplete(t *testing.T) {
 // A read of the index or the statistics that fails is a fault.
 func TestAccSearchFaults(t *testing.T) {
 	for _, failing := range []string{"list", "versions", "metadata", "stats", "item"} {
-		f := newFixture(t, func(st store.Store) store.Store {
+		f := newFixture(t, func(st pkgroute.Store) pkgroute.Store {
 			return failingStore{Store: st, failing: failing}
 		})
 		f.push("Acme.Lib", "1.0.0", "")

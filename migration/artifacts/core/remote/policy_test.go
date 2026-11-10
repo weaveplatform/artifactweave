@@ -455,7 +455,7 @@ func TestAccPolicyAdapterPreparationFailureAndFence(t *testing.T) {
 		t.Fatal("failure published", err)
 	}
 	w.p.PrepareUpload = func(context.Context, source.Request, source.Permit, remote.Options, *item.CacheUpload) error {
-		w.p.CheckCurrent = func(context.Context, store.Store, source.Request, source.Permit, string) error {
+		w.p.CheckCurrent = func(context.Context, remote.Store, source.Request, source.Permit, string) error {
 			return source.ErrDenied
 		}
 		return nil

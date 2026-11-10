@@ -25,7 +25,7 @@ import (
 // do nothing those would refuse.
 func (s ArtifactoryAPI) aqlAction(
 	ctx context.Context,
-	st store.Store,
+	st Store,
 	p kernel.Principal,
 	q *aql.Query,
 	configs map[string]repo.Config,
@@ -92,7 +92,7 @@ func actsOn(c repo.Config, it types.Item, a aql.Action) bool {
 // what its row shows either way.
 func updateProperties(
 	ctx context.Context,
-	st store.Store,
+	st Store,
 	items *item.Service,
 	configs map[string]repo.Config,
 	q *aql.Query,

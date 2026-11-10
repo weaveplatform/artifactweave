@@ -25,10 +25,18 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// serverStore is the one store the router kit serves and the access API is
+// bound over, as a server binds both, so a test that swaps in a failing
+// store fails the access reads too.
+type serverStore interface {
+	pkgroute.Store
+	accesstest.Store
+}
+
 type fixture struct {
 	t     *testing.T
 	db    *inmem.Store
-	read  store.Store
+	read  serverStore
 	items *item.Service
 	h     http.Handler
 	keys  *crypt.Keyring

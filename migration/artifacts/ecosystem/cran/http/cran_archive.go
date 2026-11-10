@@ -59,7 +59,7 @@ func (s CranAPI) MoveCranArchives(
 
 func (s CranAPI) moveCranArchives(
 	ctx context.Context,
-	st store.Store,
+	st itemkit.Store,
 	c repo.Config,
 	by string,
 ) (int, error) {

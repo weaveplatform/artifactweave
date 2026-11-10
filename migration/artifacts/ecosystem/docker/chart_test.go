@@ -43,7 +43,7 @@ func helmManifest(configType, config string) string {
 // charts is a Helm OCI repository whose items go through the item service.
 type charts struct {
 	t     *testing.T
-	db    store.Store
+	db    format.Store
 	blobs blob.Store
 	items *item.Service
 	c     repo.Config

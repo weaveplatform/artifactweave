@@ -2,14 +2,14 @@
 
 `tools/citestselection/test_ownership.json` is the machine-checked package inventory
 for the selective CI planner in #673. Version 2 keys everything by directory, so
-tests can leave `internal/server` and `internal/app` over many changes without a
+tests can leave `internal/server` and `migration/app` over many changes without a
 new schema:
 
 - `packages` maps every directory with server tests to its owner: a format, or
   `shared`.
 - `shared_files` lists, by file name, every test file in a shared directory whose
   files are reviewed one by one. Today these are `internal/server`,
-  `internal/app` and the module suites `test/server/access`,
+  `migration/app` and the module suites `test/server/access`,
   `test/server/artifacts` and `test/server/configuration`.
 - `format_dependencies` maps a format to the repository paths of the shared test
   files that exercise it.
@@ -118,7 +118,7 @@ those tests when that format changes:
 | `test/server/artifacts`: `reindex_test.go`; root: `reindex_internal_test.go` | Generic reindex orchestration using PyPI and Helm cases |
 | `test/server/artifacts`: `repositories_test.go` | Repository settings using NuGet contexts |
 | `test/server/artifacts`: `repositories_format_class_test.go` | Repository class validation across LuaRocks, NIM and Agent formats |
-| `npm_auth_paths_test.go` | Private middleware path recognition and log redaction for npm and LuaRocks |
+| root: `error_profiles_p8_test.go` | Error envelope selection, whose rules call npm's path predicates for its JFrog operations |
 | root: `registry_shared_test.go`; `test/server/artifacts`: `sidecar_rights_test.go` | Shared registry content type and sidecar permission rules using Docker and Helm |
 
 These tests use shared APIs or private server helpers. A format-only change
@@ -128,11 +128,11 @@ reverse dependencies. Unknown ownership selects full qualification.
 
 ## Application acceptance dependencies
 
-Some native format tests live in the mixed `internal/app` package because they
+Some native format tests live in the mixed `migration/app` package because they
 exercise application startup, remote cache and source policy through a running
-server. The inventory lists every `internal/app` test file under `shared_files`,
+server. The inventory lists every `migration/app` test file under `shared_files`,
 and `format_dependencies` maps the format-specific ones to format owners as
-`internal/app/<file>` paths. A narrow format PR selects only the mapped app files
+`migration/app/<file>` paths. A narrow format PR selects only the mapped app files
 and runs their `TestAcc` entries in the Go acceptance lane. The current map covers
 the Conda, Docker registry, Maven, Nix and Puppet remote tests and the NuGet
 reindex tests. New format app tests must be added to the map after ownership

@@ -62,7 +62,7 @@ type virtualSource struct{}
 
 func (virtualSource) Item(
 	_ context.Context,
-	_ store.Store,
+	_ pkgroute.Store,
 	_ repo.Config,
 	_ string,
 ) (pkgroute.Found, error) {

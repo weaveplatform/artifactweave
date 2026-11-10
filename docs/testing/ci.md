@@ -43,7 +43,7 @@ lane executes `^TestAcc`; native feature partitions execute the exact
 The full core native job runs the other acceptance-harness `TestAcc` entry
 points once. The package selector uses reviewed ownership and the reverse
 import graph. In a shared directory of the [ownership inventory](server-test-ownership.md)
-(a `shared_files` key; today the mixed `internal/server` and `internal/app`
+(a `shared_files` key; today the mixed `internal/server` and `migration/app`
 packages), a narrow PR selects only entry points in the files that
 `format_dependencies` lists for the changed format. The impact job retains the exact
 selected test names as a `test-selection` artifact and reports selected and
@@ -1479,4 +1479,4 @@ mismatches, source edits/delete-recreate, concurrent admission/overwrite/deletio
 user annotations, and current Manage/credential revocation before execution and publication.
 PostgreSQL runs on Linux CI; a local Docker-unavailable skip is not PostgreSQL evidence.
 
-The Conda `@conda` partition includes the opt-in `@conda_shards` scenarios. They use the same [digest-pinned micromamba client](ci-client-images.md), explicitly enable `MAMBA_USE_SHARDED_REPODATA`, and assert successful shard-index and content-shard GETs with no classic repodata requests. `XDG_CACHE_HOME` is isolated under the removable client root so the virtual/offline proof cannot pass using a prior client shard cache. Conda's application-level source/cache/revision tests are owned by `internal/app/conda_remote_test.go` in the selector inventory.
+The Conda `@conda` partition includes the opt-in `@conda_shards` scenarios. They use the same [digest-pinned micromamba client](ci-client-images.md), explicitly enable `MAMBA_USE_SHARDED_REPODATA`, and assert successful shard-index and content-shard GETs with no classic repodata requests. `XDG_CACHE_HOME` is isolated under the removable client root so the virtual/offline proof cannot pass using a prior client shard cache. Conda's application-level source/cache/revision tests are owned by `migration/app/conda_remote_test.go` in the selector inventory.

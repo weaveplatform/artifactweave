@@ -16,7 +16,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -35,7 +34,7 @@ const aqlBuildsRestricted = "non-admin queries may use only the items domain; " 
 func (s ArtifactoryAPI) searchBuildsAQL(
 	w http.ResponseWriter,
 	r *http.Request,
-	st store.Store,
+	st Store,
 	p kernel.Principal,
 	q *aql.Query,
 ) {
@@ -114,7 +113,7 @@ func (s ArtifactoryAPI) searchBuildsAQL(
 // then, for the items such an include reaches.
 func (s ArtifactoryAPI) nestBuilds(
 	ctx context.Context,
-	st store.Store,
+	st Store,
 	p kernel.Principal,
 	q *aql.Query,
 	now time.Time,

@@ -28,7 +28,7 @@ type Remote struct{ Service *source.Service }
 
 // Item cannot represent transient content. A protocol using Remote must consume
 // Read instead of assuming that every successful download has a stored item.
-func (Remote) Item(context.Context, store.Store, repo.Config, string) (Found, error) {
+func (Remote) Item(context.Context, Store, repo.Config, string) (Found, error) {
 	return Found{}, source.ErrUnsupported
 }
 

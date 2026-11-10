@@ -10,22 +10,47 @@ import (
 
 func TestUnitReverseClosureIncludesTransitiveProductionConsumers(t *testing.T) {
 	base := modulePath + "/internal/"
+	migration := modulePath + "/migration/"
 	staged := modulePath + "/migration/artifacts/ecosystem/"
 	graph := map[string][]string{
 		staged + "npm":        nil,
 		staged + "npm/http":   {staged + "npm"},
 		base + "server":       {staged + "npm/http"},
-		base + "app":          {base + "server", staged + "npm"},
+		migration + "app":     {base + "server", staged + "npm"},
 		base + "format/maven": nil,
 	}
 	got := reverseClosure(graph, []string{staged + "npm"}, "npm")
-	for _, want := range []string{"./migration/artifacts/ecosystem/npm", "./migration/artifacts/ecosystem/npm/http", "./internal/server", "./internal/app"} {
+	for _, want := range []string{"./migration/artifacts/ecosystem/npm", "./migration/artifacts/ecosystem/npm/http", "./internal/server", "./migration/app"} {
 		if !slices.Contains(got, want) {
 			t.Errorf("reverse closure omitted %s: %v", want, got)
 		}
 	}
 	if slices.Contains(got, "./migration/artifacts/ecosystem/maven") {
 		t.Fatal("unrelated format selected")
+	}
+}
+
+// A format's settings reach app through the composition root's
+// configuration package, which app imports, so app's tests are selected
+// although app imports no package of the format.
+func TestUnitReverseClosureCarriesFormatChangesThroughAppConfig(t *testing.T) {
+	migration := modulePath + "/migration/"
+	staged := migration + "artifacts/ecosystem/"
+	graph := map[string][]string{
+		staged + "npm":           nil,
+		staged + "maven":         nil,
+		migration + "app/config": {staged + "npm"},
+		migration + "app":        {migration + "app/config"},
+		migration + "artifacts":  {staged + "maven"},
+	}
+	got := reverseClosure(graph, []string{staged + "npm"}, "npm")
+	want := []string{
+		"./migration/app",
+		"./migration/app/config",
+		"./migration/artifacts/ecosystem/npm",
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("reverse closure = %v, want %v", got, want)
 	}
 }
 
@@ -53,7 +78,7 @@ func TestUnitActualNPMReverseDependencies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"./migration/artifacts/ecosystem/npm", "./migration/artifacts/ecosystem/npm/http", "./internal/server", "./internal/app"} {
+	for _, want := range []string{"./migration/artifacts/ecosystem/npm", "./migration/artifacts/ecosystem/npm/http", "./internal/server", "./migration/app"} {
 		if !slices.Contains(got, want) {
 			t.Errorf("actual import graph omitted %s: %v", want, got)
 		}

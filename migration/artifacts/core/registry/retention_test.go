@@ -54,7 +54,7 @@ func (w *world) trashed(c repo.Config, path string) bool {
 // an overwrite moves its tag to the newest place, and another image is
 // left as it is (research 23, 5.3).
 func TestAccMaxUniqueTagsRemovesTheOldestTags(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		c := &clock{}
 		w.svc.Now = c.now
 		limited := w.repoOf(&repo.Config{
@@ -123,7 +123,7 @@ const (
 // still naming the tag, at most the setting minus one, the oldest going
 // first; they are no tags, and Max Unique Tags removes them with their tag.
 func TestAccTagRetentionKeepsPreviousManifests(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		c := &clock{}
 		w.svc.Now = c.now
 		kept := w.repoOf(&repo.Config{
@@ -185,7 +185,7 @@ func TestAccTagRetentionKeepsPreviousManifests(t *testing.T) {
 // version: the tag folder is replaced and the digest folder names the tag
 // (decision 0039), in Docker repositories as in Helm OCI ones.
 func TestAccTagRetentionAdoptsAManifestPushedByDigest(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		c := &clock{}
 		w.svc.Now = c.now
 		kept := w.repoOf(&repo.Config{
@@ -228,7 +228,7 @@ func listOf(hexes ...string) string {
 // and no other tag holds, and with Retained the tag's kept manifests go
 // too.
 func TestAccRemoveTag(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		ctx := context.Background()
 		c := &clock{}
 		w.svc.Now = c.now

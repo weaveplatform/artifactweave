@@ -41,7 +41,7 @@ func TestUnitGetItemTriesOverlaysInOrder(t *testing.T) {
 			got *itemkit.Kit,
 			rw http.ResponseWriter,
 			_ *http.Request,
-			_ store.Store,
+			_ itemkit.Store,
 			c repo.Config,
 			_ bool,
 			req itemkit.ItemRequest,

@@ -67,7 +67,7 @@ func (f faultItems) Descendants(
 }
 
 type faultDB struct {
-	store.Store
+	format.Store
 	items store.ItemStore
 }
 

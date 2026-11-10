@@ -18,7 +18,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // The binding's tests check that each method answers what the call it
@@ -36,7 +35,7 @@ var (
 	}
 )
 
-func bound(db store.Store) artifactsapi.Repositories {
+func bound(db Store) artifactsapi.Repositories {
 	return NewRepositories(db, testKeys, testProjects)
 }
 

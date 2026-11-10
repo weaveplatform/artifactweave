@@ -169,7 +169,13 @@ func metadataOf(ctx context.Context, env format.Env, it types.Item) (Metadata, e
 	return ReadArchive(rc, info.Size)
 }
 
-func index(ctx context.Context, st store.Store, c repo.Config, it types.Item, meta Metadata) error {
+func index(
+	ctx context.Context,
+	st format.Store,
+	c repo.Config,
+	it types.Item,
+	meta Metadata,
+) error {
 	p, err := st.Packages().Ensure(ctx, types.Package{
 		RepoKey: c.Key, Type: c.PackageType, Name: meta.Slug, Created: it.Created,
 	})

@@ -420,7 +420,7 @@ and the setting is on NuGet local repositories in the UI and the Terraform provi
   keyed by the lower-cased id, in the deploy's transaction.
 - **The job** is the periodic job of #512 (`work.Queue.HandleEvery`), run every
   `nuget.snapshot_cleanup_interval`, five minutes by default and at least one second, a new
-  key in `internal/config/nuget.go`, as 7.x runs its cleanup every five minutes (KB
+  key in `migration/app/config/nuget.go`, as 7.x runs its cleanup every five minutes (KB
   000005403).
 - **The rule.** Per release, while more pre-release versions remain than
   `format.UniqueSnapshots(c)` (at least two), the one deployed first goes, a tie broken by

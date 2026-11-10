@@ -15,8 +15,9 @@
 //   - Driving: the Builds API handlers, the build searches, the
 //     idempotent replay of an append (AppendOnce), and the request limits,
 //     which find a build's repository through ProjectKey.
-//   - Driven: the metadata store (build runs, their promotions and the
-//     replay receipts, through the whole store), the blob store
+//   - Driven: the metadata store, through Store (the item service's store,
+//     item.Store, with build runs, their promotions and the replay
+//     receipts), the blob store
 //     (platform/blob.Store) that holds each run's document, and the item
 //     service with the format registry (Formats) and the work queue (Work),
 //     so a document item runs its format's hooks as any write does.
@@ -58,7 +59,8 @@
 //   - Plan: docs/implementation/plan.md#p5-full-aql-searches-build-info and
 //     #p9d-modular-monolith-migration, epic ART
 //     (https://github.com/weaveplatform/artifactweave/issues/941).
-//   - https://github.com/weaveplatform/artifactweave/issues/1011
+//   - https://github.com/weaveplatform/artifactweave/issues/1011 and
+//     https://github.com/weaveplatform/artifactweave/issues/1088
 //
 // # Status
 //

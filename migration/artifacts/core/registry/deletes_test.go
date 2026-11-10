@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -26,7 +27,7 @@ func (w *world) exists(path string) bool {
 // A tag delete removes the tag folder, into the trash can, and leaves the
 // manifest in any other folder holding it.
 func TestAccDeleteTag(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		ctx := context.Background()
 		w.upload(imageConfig, layerA)
 		body, digest := manifestOf(layerA)
@@ -58,7 +59,7 @@ func TestAccDeleteTag(t *testing.T) {
 
 // A digest delete removes every folder holding the manifest in one go.
 func TestAccDeleteManifest(t *testing.T) {
-	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
 		ctx := context.Background()
 		w.upload(imageConfig, layerA, layerB)
 		body, digest := manifestOf(layerA)

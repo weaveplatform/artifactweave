@@ -97,7 +97,7 @@ type enqueuePause struct {
 	resume  chan struct{}
 }
 type enqueuePauseStore struct {
-	store.Store
+	item.Store
 	pause *enqueuePause
 }
 

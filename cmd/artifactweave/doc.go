@@ -10,7 +10,7 @@
 // # Inputs
 //
 //   - Configuration from the file that --config names, the environment and
-//     the flags, with flag over environment over file; internal/config
+//     the flags, with flag over environment over file; migration/app/config
 //     rejects unknown keys. Secrets have no flags, so they stay out of shell
 //     history.
 //   - The subcommand and its arguments: serve; migrate up, down and version,
@@ -24,7 +24,7 @@
 //
 //   - The running server, schema migrations, a validated or applied
 //     configuration descriptor and a rotated master key, each done by
-//     internal/app.
+//     migration/app.
 //   - Logs through log/slog in the configured level and format. A failed
 //     command prints "error: " and the error on standard error and exits 1.
 //

@@ -11,10 +11,10 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	npmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
 	npmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -443,7 +443,7 @@ func TestAccLifecycleStoreFaults(t *testing.T) {
 		{"versions", "DELETE", registry + "rich/-rev/1-0", ""},
 		{"versions", "PUT", registry + "rich", `{"versions":{}}`},
 	} {
-		f := newFixture(t, func(st store.Store) store.Store {
+		f := newFixture(t, func(st pkgroute.Store) pkgroute.Store {
 			return failingStore{Store: st, failing: c.failing}
 		})
 		f.deployRich(t)

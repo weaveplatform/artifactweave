@@ -212,7 +212,12 @@ func saveProof(ctx context.Context, env format.Env, it types.Item, b Box) error 
 	return nil
 }
 
-func eachItem(ctx context.Context, st store.Store, key string, visit func(types.Item) error) error {
+func eachItem(
+	ctx context.Context,
+	st format.Store,
+	key string,
+	visit func(types.Item) error,
+) error {
 	page := store.Page{Limit: store.MaxLimit}
 	for {
 		items, next, err := st.Items().Descendants(ctx, key, false, "", page)

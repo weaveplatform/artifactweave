@@ -5,14 +5,18 @@
 // tarballs download through the item routes' download, so redirects and
 // download counts apply to them as to any file. A publish stores the
 // tarball through the item service, whose npm format indexes it as it
-// indexes a REST deploy.
+// indexes a REST deploy. Beside the registry, the npm partial strict server
+// (NPMAPI) answers the JFrog operations that hand npm its .npmrc lines and
+// queue an npm local repository's reindex and strict-layout conversion.
 //
 // # Role
 //
 // artifacts module, ecosystem layer: the native npm registry protocol of
-// the npm slice. It is named npmhttp so that it does not shadow net/http.
-// Outside tests, only its own http subtree, the module's http adapters and
-// app may import it (decision 0044, dependency rule 9).
+// the npm slice, and its HTTP layer for the JFrog operations beside it. It
+// is named npmhttp so that it does not shadow net/http. Outside tests, only
+// its own http subtree, the module's http adapters and app may import it
+// (decision 0044, dependency rule 9); the server root counts as app until
+// it moves there.
 //
 // # Inputs
 //
@@ -20,7 +24,12 @@
 //     (pkgroute) for repositories of package type npm: packuments, version
 //     manifests and tarballs; publish, dist-tags, deprecation and
 //     unpublish; search, ping and whoami; and npm's legacy login and
-//     logout.
+//     logout. The router also embeds NPMAPI in the artifactory spec's
+//     strict server, calls NPMOperation and IsNPMReindex in its
+//     error-profile rules, and gives the authentication middleware
+//     NPMUserRequest as its first skip and KeepNPMCredential as its
+//     credential keeper, and the access log NPMLoggedPath after the
+//     LuaRocks redactor.
 //   - Driven: the router kit (pkgroute.Kit), which resolves the repository
 //     and the caller, checks permissions, reads and writes items and writes
 //     errors; the format package (artifacts/ecosystem/npm), whose index and
@@ -28,6 +37,12 @@
 //     whose password check and token service the access module provides
 //     (access/api); and the remote source service (Options.RemoteSources),
 //     which fetches upstream metadata and tarballs into the remote cache.
+//     NPMAPI's operations run over the item kit
+//     (artifacts/adapters/http/itemkit), whose store (itemkit.Store) holds
+//     the parked conversion that a resume reads, and which resolves the
+//     repository, checks Manage and queues the reindex every format shares,
+//     and over access/api's Tokens, whose encrypted password stands in for a
+//     password caller's own in the .npmrc lines (DV-004).
 //
 // # Outputs
 //
@@ -36,8 +51,19 @@
 //     DefaultLoginTokenExpiry, decision 0034's defaults.
 //   - Accounts, Passwords and Tokens: what login and logout need from the
 //     server.
+//   - NPMAPI: the npm partial strict server, whose five operations answer
+//     the .npmrc lines (GetNpmAuth, GetNpmScopeAuth) and queue an npm local
+//     repository's reindex and strict-layout conversion
+//     (CalculateNpmRepositoryMetadata, MigrateNpmRepositoryToStrictLayout,
+//     ResumeNpmRepositoryMigration).
+//   - NPMOperation and IsNPMReindex, the paths that answer errors in
+//     Artifactory's envelope; NPMUserRequest, the login and logout paths
+//     the middleware reads no credentials on; KeepNPMCredential, which
+//     keeps the token a request authenticated with for the .npmrc lines;
+//     and NPMLoggedPath, which redacts the token of a logout path in the
+//     access log.
 //   - Credential, AuthLines, ScopeAuthLines and ValidScope: the .npmrc
-//     lines that the root npm auth operations answer.
+//     lines that GetNpmAuth and GetNpmScopeAuth answer.
 //   - Answers: for a local or federated repository, packuments and
 //     manifests built from the package index, with what the caller may not
 //     read left out; for a remote repository, the upstream metadata with
@@ -54,6 +80,9 @@
 //     the cache.
 //   - A write to a remote repository answers 405, and statuses and error
 //     texts stay byte-identical: npm reads them.
+//   - A caller's raw token reaches no handler but the .npmrc operations:
+//     only KeepNPMCredential stores it in the request's context, under a
+//     key private to this package, and only NPMAPI reads it back.
 //
 // # References
 //
@@ -70,18 +99,22 @@
 //     "Dependency rules".
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     "npm ecosystem" (lines 413 to 445), line 402 (the root npm_auth.go
-//     and npm_operations.go, which join this package later) and line 1017
+//     and npm_operations.go, now login.go and operations.go) and line 1017
 //     (the mapping row).
 //   - Plan: docs/implementation/plan.md#p7-npm-go-maven-locals,
-//     #p9-remote-repositories and #p9d-modular-monolith-migration, epic ECO
-//     (https://github.com/weaveplatform/artifactweave/issues/943).
+//     #p9-remote-repositories and #p9d-modular-monolith-migration, epics ECO
+//     (https://github.com/weaveplatform/artifactweave/issues/943) and WEB
+//     (https://github.com/weaveplatform/artifactweave/issues/944).
 //   - https://github.com/weaveplatform/artifactweave/issues/626 (the remote
-//     registry adapter) and
-//     https://github.com/weaveplatform/artifactweave/issues/1031
+//     registry adapter),
+//     https://github.com/weaveplatform/artifactweave/issues/1031,
+//     https://github.com/weaveplatform/artifactweave/issues/1086 and
+//     https://github.com/weaveplatform/artifactweave/issues/1090
 //
 // # Status
 //
-// Implemented P7, with remote retrieval in P9. Staged in P9d.
+// Implemented P7, with remote retrieval in P9. Staged in P9d, which also
+// moved the server root's npm operations here (WEB-17).
 //
 // # Testing
 //
@@ -93,4 +126,9 @@
 //   - remote_test.go, remote_dist_test.go and remote_integrity_test.go:
 //     remote metadata, tarball integrity, URL policy and outages.
 //   - npmrc_test.go: the .npmrc lines and scopes.
+//   - login_test.go: the login and logout path predicates, the
+//     configuration operations' paths and the logged-path redactor.
+//   - operations_test.go: NPMAPI's operations without the router, with no
+//     store, no caller and a store that fails under them; fixture_test.go
+//     holds their fixtures.
 package npmhttp

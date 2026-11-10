@@ -329,7 +329,7 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 	return nil
 }
 
-func files(ctx context.Context, st store.Store, c repo.Config) ([]types.Item, error) {
+func files(ctx context.Context, st format.Store, c repo.Config) ([]types.Item, error) {
 	hits, err := st.Items().Search(ctx, &aql.Query{Criteria: aql.And{
 		aql.RepoSet{Refs: []aql.RepoRef{pkgindex.Stored(c)}},
 		&aql.FieldCriterion{Field: aql.FieldType, Op: aql.OpEq, Text: "file"},

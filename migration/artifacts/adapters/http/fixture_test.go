@@ -44,11 +44,18 @@ import (
 // Config is the part of the router's configuration that the tests here
 // set, which newArtifactoryAPI passes on as the router does.
 type Config struct {
-	Store  store.Store
+	Store  serverStore
 	Blobs  blob.Store
 	Access accessapi.API
 	AQL    AQLLimits
 	GC     *gc.Collector
+}
+
+// serverStore is the store the router's worlds hold: the partial's, and the
+// access module's, which the router binds over the same store.
+type serverStore interface {
+	Store
+	accesstest.Store
 }
 
 // newArtifactoryAPI is the partial over c, with the private predicate the
@@ -56,8 +63,9 @@ type Config struct {
 // here serves an item GET.
 func newArtifactoryAPI(c Config) ArtifactoryAPI {
 	return New(Deps{
+		Store: c.Store,
 		Deps: itemkit.Deps{
-			Store: c.Store, Blobs: c.Blobs, Access: c.Access, Private: PrivateItem,
+			Blobs: c.Blobs, Access: c.Access, Private: PrivateItem,
 		},
 		AQL: c.AQL,
 		GC:  c.GC,
@@ -76,13 +84,13 @@ func withAccess(t *testing.T, c Config) Config {
 }
 
 // authorizerOver is the access module's Authorizer over st.
-func authorizerOver(t *testing.T, st store.Store) accessapi.Authorizer {
+func authorizerOver(t *testing.T, st accesstest.Store) accessapi.Authorizer {
 	t.Helper()
 	return accesstest.Over(t, st).API().Authorizer
 }
 
 // cheapSeed seeds db with the built-in principals, admin's password "pw".
-func cheapSeed(t *testing.T, db store.Store) {
+func cheapSeed(t *testing.T, db *inmem.Store) {
 	t.Helper()
 	support.Seed(t, db)
 }
@@ -310,7 +318,7 @@ func (f faultyRepos) Get(ctx context.Context, key string) (repo.Config, error) {
 // buildSearchFaults fails the item store's checksum search with errBoom
 // when fail is "find".
 type buildSearchFaults struct {
-	store.Store
+	Store
 	fail string
 }
 

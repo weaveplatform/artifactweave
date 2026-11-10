@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -23,7 +24,9 @@ func TestAccRemoteCacheOfflineIntegrityAndRedirect(t *testing.T) {
 	up := fakeupstream.New(t, fakeupstream.Options{})
 	f := newFixtureWith(
 		t,
-		func(items *item.Service) *source.Service { return remoteService(t, items) },
+		func(db *inmem.Store, items *item.Service) *source.Service {
+			return remoteService(t, db, items)
+		},
 	)
 	c := *repo.Defaults(&repo.Config{Key: "bazel-remote", Class: repo.Remote, PackageType: repo.BazelModules, URL: up.URL + "/registry/"})
 	if err := f.db.Repos().Create(t.Context(), c); err != nil {
@@ -202,11 +205,11 @@ func TestAccYankedMetadataFollowsSelectedMember(t *testing.T) {
 	}
 }
 
-func remoteService(t *testing.T, items *item.Service) *source.Service {
+func remoteService(t *testing.T, db *inmem.Store, items *item.Service) *source.Service {
 	t.Helper()
 	key := []byte(strings.Repeat("k", 32))
 	resolver, err := upstream.NewResolver(
-		items.Store,
+		db,
 		nil,
 		upstream.ResolverOptions{RevisionKey: key},
 	)
@@ -215,7 +218,7 @@ func remoteService(t *testing.T, items *item.Service) *source.Service {
 	}
 	pool := new(upstream.Pool)
 	policy := &remote.Policy{
-		Store:   items.Store,
+		Store:   db,
 		Blobs:   items.Blobs,
 		Items:   items,
 		Pool:    pool,

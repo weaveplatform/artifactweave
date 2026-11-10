@@ -137,7 +137,7 @@ func TestUnitDeleteArtifactsSidecars(t *testing.T) {
 
 // failingGets fails reading the item at path in repository key.
 type failingGets struct {
-	store.Store
+	Store
 	key, path string
 }
 

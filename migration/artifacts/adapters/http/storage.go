@@ -140,7 +140,7 @@ func storageMode(q url.Values) (string, error) {
 // it, the resolved configuration, and what the caller may do.
 type storageView struct {
 	s        ArtifactoryAPI
-	st       store.Store
+	st       Store
 	key      string
 	path     string
 	repo     repo.Config
@@ -343,7 +343,7 @@ func (s ArtifactoryAPI) storageRequest(
 ) (storageView, kernel.Principal, url.Values, error) {
 	ctx := r.Context()
 	var v storageView
-	st, err := s.Content()
+	st, err := s.content()
 	if err != nil {
 		return v, kernel.Principal{}, nil, err
 	}

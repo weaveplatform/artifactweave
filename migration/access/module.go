@@ -71,9 +71,10 @@ func New(d Deps) (*Module, error) {
 	m := &Module{
 		api: accessapi.API{
 			Authorizer:      authorizer{st: d.Store},
+			Tokens:          TokensOf(d.Store, d.Tokens),
 			Keys:            KeysOf(d.Store),
 			Identity:        identity{st: d.Store},
-			Restrictions:    restrictions{st: d.Store},
+			Restrictions:    RestrictionsOf(d.Store),
 			Projects:        ProjectsOf(d.Store),
 			Grants:          grants{st: d.Store},
 			AnonymousAccess: AnonymousAccessOf(d.Store),
@@ -84,9 +85,6 @@ func New(d Deps) (*Module, error) {
 	// would be a typed nil, which the callers' nil checks would let through.
 	if d.Authenticator != nil {
 		m.api.Authenticator = authenticator{a: d.Authenticator, st: d.Store}
-	}
-	if d.Tokens != nil {
-		m.api.Tokens = tokens{svc: d.Tokens, st: d.Store}
 	}
 	return m, nil
 }
@@ -104,6 +102,25 @@ func KeysOf(st port.Store) accessapi.Keys { return keys{st: st} }
 // ProjectsOf returns the Projects binding over st alone, for code that holds
 // a store before any module exists. The errors are the store's, unwrapped.
 func ProjectsOf(st port.Store) accessapi.Projects { return projects{st: st} }
+
+// RestrictionsOf returns the Restrictions binding over st alone, for code
+// that holds a store before any module exists, such as the multipart upload
+// service, which app builds before the work queue and so before the
+// modules. It reads the stored restriction on every call, as
+// API().Restrictions does.
+func RestrictionsOf(st Store) accessapi.Restrictions { return restrictions{st: st} }
+
+// TokensOf returns the Tokens binding over st and svc, for code that holds a
+// store before any module exists, such as the garbage collector, which app
+// builds before the work queue and so before the modules. It is nil when svc
+// is: a nil interface, never a typed nil, as API().Tokens is. The errors are
+// the service's and the store's, unwrapped.
+func TokensOf(st Store, svc *token.Service) accessapi.Tokens {
+	if svc == nil {
+		return nil
+	}
+	return tokens{svc: svc, st: st}
+}
 
 // AnonymousAccessOf returns the AnonymousAccess binding over st alone, for
 // code that holds a store before any module exists, such as applying the

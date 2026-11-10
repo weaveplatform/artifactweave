@@ -14,7 +14,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 )
 
 // serviceIndexDoc is the service index as the client reads it.
@@ -582,7 +582,7 @@ func TestAccRegistrationGzip(t *testing.T) {
 // A read the index fails is a fault, answered 500 and logged.
 func TestAccV3Faults(t *testing.T) {
 	for _, failing := range []string{"find", "versions", "version", "metadata"} {
-		f := newFixture(t, func(st store.Store) store.Store {
+		f := newFixture(t, func(st pkgroute.Store) pkgroute.Store {
 			return failingStore{Store: st, failing: failing}
 		})
 		f.push("Acme.Lib", "1.0.0", "")

@@ -131,7 +131,7 @@ func TestAccAnnotateAndDelete(t *testing.T) {
 }
 
 // failingTrash fails putting anything in the trash can.
-type failingTrash struct{ store.Store }
+type failingTrash struct{ item.Store }
 
 func (s failingTrash) Trash() store.TrashStore { return failingTrashStore{s.Store.Trash()} }
 

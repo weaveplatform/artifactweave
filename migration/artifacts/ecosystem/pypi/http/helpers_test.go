@@ -30,7 +30,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -71,7 +70,7 @@ type fixture struct {
 func newFixture(
 	t *testing.T,
 	settings pypifmt.Settings,
-	wrap ...func(store.Store) store.Store,
+	wrap ...func(pkgroute.Store) pkgroute.Store,
 ) *fixture {
 	t.Helper()
 	ctx := context.Background()
@@ -115,7 +114,7 @@ func newFixture(
 		Store: db, Blobs: blobs, Now: func() time.Time { return f.tick },
 		Formats: ecosystem.Settings{PyPI: settings}.For,
 	}
-	var backend store.Store = db
+	var backend pkgroute.Store = db
 	for _, w := range wrap {
 		backend = w(backend)
 	}

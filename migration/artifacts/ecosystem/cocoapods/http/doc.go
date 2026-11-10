@@ -19,12 +19,13 @@
 //     (pkgroute) for repositories of package type cocoapods: GET and HEAD
 //     for every CDN path of a local, remote, virtual or federated
 //     repository.
-//   - Driven: the router kit (pkgroute.Kit), which resolves the repository
-//     and the caller, checks permissions, reads items and remote sources
-//     and writes errors; the remote source service (Options.RemoteSources),
-//     which fetches upstream CDN metadata and pod source archives (over
-//     HTTP, or from Git) into the remote cache; and the format package,
-//     which checks names, versions and archives.
+//   - Driven: the router kit (pkgroute.Kit), whose store (pkgroute.Store)
+//     the handlers also reach through DB(), and which resolves the
+//     repository and the caller, checks permissions, reads items and remote
+//     sources and writes errors; the remote source service
+//     (Options.RemoteSources), which fetches upstream CDN metadata and pod
+//     source archives (over HTTP, or from Git) into the remote cache; and
+//     the format package, which checks names, versions and archives.
 //
 // # Outputs
 //
@@ -64,8 +65,9 @@
 //   - Plan: docs/implementation/plan.md#p31-native-build-and-plugin-repositories
 //     and #p9d-modular-monolith-migration, epic ECO
 //     (https://github.com/weaveplatform/artifactweave/issues/943).
-//   - https://github.com/weaveplatform/artifactweave/issues/771 and
-//     https://github.com/weaveplatform/artifactweave/issues/1016
+//   - https://github.com/weaveplatform/artifactweave/issues/771,
+//     https://github.com/weaveplatform/artifactweave/issues/1016 and
+//     https://github.com/weaveplatform/artifactweave/issues/1089
 //
 // # Status
 //

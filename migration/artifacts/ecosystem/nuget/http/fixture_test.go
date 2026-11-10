@@ -53,10 +53,19 @@ const (
 //   - teamwriter reads and deploys under team/ alone;
 //   - pkgdeleter reads all and deletes the .nupkg files at the root;
 //   - nobody holds nothing.
+//
+// serverStore is the one store the fixture's item service, router kit,
+// access kit and remote setup share, which a fault store can replace.
+type serverStore interface {
+	item.Store
+	pkgroute.Store
+	accesstest.Store
+}
+
 type fixture struct {
 	t     *testing.T
 	h     http.Handler
-	db    store.Store
+	db    serverStore
 	blobs blob.Store
 	items *item.Service
 	// mu guards tick and faults, which concurrent pushes reach.
@@ -65,12 +74,16 @@ type fixture struct {
 	faults []error
 }
 
-func newFixture(t *testing.T, wrap ...func(store.Store) store.Store) *fixture {
+func newFixture(t *testing.T, wrap ...func(pkgroute.Store) pkgroute.Store) *fixture {
 	t.Helper()
 	return newFixtureOn(t, inmem.New(), wrap...)
 }
 
-func newFixtureOn(t *testing.T, db store.Store, wrap ...func(store.Store) store.Store) *fixture {
+func newFixtureOn(
+	t *testing.T,
+	db serverStore,
+	wrap ...func(pkgroute.Store) pkgroute.Store,
+) *fixture {
 	t.Helper()
 	ctx := context.Background()
 	force := true
@@ -114,7 +127,7 @@ func newFixtureOn(t *testing.T, db store.Store, wrap ...func(store.Store) store.
 	}
 	f := &fixture{t: t, db: db, blobs: blobs, tick: time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC)}
 	f.items = &item.Service{Store: db, Blobs: blobs, Now: f.now, Formats: ecosystem.For}
-	backend := db
+	var backend pkgroute.Store = db
 	for _, w := range wrap {
 		backend = w(backend)
 	}
@@ -312,7 +325,7 @@ var errBroken = errors.New("broken store")
 // failingStore fails one of its package index's reads, or returns
 // versions whose metadata does not decode.
 type failingStore struct {
-	store.Store
+	pkgroute.Store
 	failing string
 }
 
