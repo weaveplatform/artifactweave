@@ -40,16 +40,16 @@ type rpmCandidate struct {
 	pkg  rpm.Package
 }
 
-// rpmAPI is the RPM ecosystem's partial strict server: the YUM metadata
+// RPMAPI is the RPM ecosystem's partial strict server: the YUM metadata
 // operation, and the item overlay that serves the RPM virtual repositories'
 // metadata and packages, over the item kit.
-type rpmAPI struct{ *itemkit.Kit }
+type RPMAPI struct{ *itemkit.Kit }
 
-func tryRPMItem(
+func TryRPMItem(
 	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) bool {
-	s := rpmAPI{k}
+	s := RPMAPI{k}
 	if c.PackageType != repo.RPM || c.Class != repo.Virtual || cached || req.IsFolder {
 		return false
 	}
@@ -64,7 +64,7 @@ func tryRPMItem(
 	return false
 }
 
-func (s rpmAPI) serveVirtualRPMMetadata(
+func (s RPMAPI) serveVirtualRPMMetadata(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
 	req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
@@ -132,7 +132,7 @@ func signVirtualRPM(
 	return nil
 }
 
-func (s rpmAPI) serveVirtualRPMPackage(
+func (s RPMAPI) serveVirtualRPMPackage(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
 	req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
@@ -182,7 +182,7 @@ func (s rpmAPI) serveVirtualRPMPackage(
 	httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 }
 
-func (s rpmAPI) serveVirtualRemoteRPMPackage(
+func (s RPMAPI) serveVirtualRemoteRPMPackage(
 	w http.ResponseWriter, r *http.Request, c repo.Config, req itemkit.ItemRequest,
 	wantSHA string, p kernel.Principal, acc itemkit.Access,
 ) {
@@ -245,7 +245,7 @@ func (s rpmAPI) serveVirtualRemoteRPMPackage(
 	s.ServeFile(w, r, s.Store, itemkit.Found{Repo: c, Item: *result.Item, Used: result.Used}, p)
 }
 
-func (s rpmAPI) rpmCandidates(
+func (s RPMAPI) rpmCandidates(
 	ctx context.Context, st store.Store, c repo.Config, root string,
 	p kernel.Principal, acc itemkit.Access, seen map[string]bool,
 ) ([]rpmCandidate, error) {
@@ -303,7 +303,7 @@ func (s rpmAPI) rpmCandidates(
 	return out, nil
 }
 
-func (s rpmAPI) rpmMemberPackages(
+func (s RPMAPI) rpmMemberPackages(
 	ctx context.Context, st store.Store, c repo.Config, root string,
 	p kernel.Principal, acc itemkit.Access,
 ) ([]rpm.Package, error) {
@@ -330,7 +330,7 @@ func (s rpmAPI) rpmMemberPackages(
 	return packages, nil
 }
 
-func (s rpmAPI) rpmMemberBytes(
+func (s RPMAPI) rpmMemberBytes(
 	ctx context.Context, st store.Store, c repo.Config, path string,
 	p kernel.Principal, acc itemkit.Access,
 ) ([]byte, error) {
@@ -404,7 +404,7 @@ func (s rpmAPI) rpmMemberBytes(
 	return s.rpmBlob(ctx, it.Actual.SHA256)
 }
 
-func (s rpmAPI) rpmBlob(ctx context.Context, sha string) ([]byte, error) {
+func (s RPMAPI) rpmBlob(ctx context.Context, sha string) ([]byte, error) {
 	rc, _, err := s.Blobs.Open(ctx, sha)
 	if err != nil {
 		return nil, fmt.Errorf("rpm: metadata blob: %w", err)
@@ -426,7 +426,7 @@ func boundedRPMMetadata(r io.Reader) ([]byte, error) {
 
 // CalculateYumRepositoryMetadata rebuilds hosted repodata from stored RPMs,
 // or verifies a virtual repository's current composed metadata view.
-func (s rpmAPI) CalculateYumRepositoryMetadata(
+func (s RPMAPI) CalculateYumRepositoryMetadata(
 	ctx context.Context,
 	req artgen.CalculateYumRepositoryMetadataRequestObject,
 ) (artgen.CalculateYumRepositoryMetadataResponseObject, error) {

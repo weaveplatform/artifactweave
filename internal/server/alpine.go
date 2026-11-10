@@ -50,7 +50,7 @@ type alpineCandidate struct {
 // alpineItems serves Alpine's indexes and packages over the item kit.
 type alpineItems struct{ *itemkit.Kit }
 
-func tryAlpineItem(
+func TryAlpineItem(
 	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) bool {

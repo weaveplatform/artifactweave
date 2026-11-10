@@ -306,7 +306,7 @@ func TestAccOpkgDirectRoutingRejectsUnsafeAndWrongClassRequests(t *testing.T) {
 		c.Class = tc.class
 		r := httptest.NewRequest(http.MethodGet, tc.url, nil)
 		response := httptest.NewRecorder()
-		got := tryOpkgItem(
+		got := TryOpkgItem(
 			svc.Kit,
 			response,
 			r,

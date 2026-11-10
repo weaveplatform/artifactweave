@@ -300,14 +300,14 @@ func withConfiguration(cfg Config) Config {
 // lookup, in their dispatch order (itemkit.Deps.Overlays).
 var overlays = []itemkit.Overlay{
 	tryAgentMarketplaceItem,
-	tryAlpineItem,
+	TryAlpineItem,
 	artifactshttp.TryCondaItem,
 	artifactshttp.TryMachineLearningItem,
 	artifactshttp.TryChefItem,
 	tryCranItem,
 	tryDebianItem,
-	tryRPMItem,
-	tryOpkgItem,
+	TryRPMItem,
+	TryOpkgItem,
 	tryP2Item,
 }
 
@@ -385,7 +385,7 @@ func New(cfg Config) http.Handler {
 	dockerOps := dockerAPI{kit}
 	debianOps := debianAPI{kit}
 	cranOps := cranAPI{Kit: kit, archiveMoverEnabled: cfg.CranArchiveMoverEnabled}
-	rpmOps := rpmAPI{kit}
+	rpmOps := RPMAPI{kit}
 	sysAPI := configurationhttp.New(configurationhttp.Deps{
 		Store:         cfg.Store,
 		Blobs:         cfg.Blobs,
@@ -549,7 +549,7 @@ func New(cfg Config) http.Handler {
 				dockerAPI:      &dockerOps,
 				debianAPI:      &debianOps,
 				cranAPI:        &cranOps,
-				rpmAPI:         &rpmOps,
+				RPMAPI:         &rpmOps,
 			}, nil, strictOpts),
 			artgen.ChiServerOptions{
 				BaseURL:          "/artifactory",

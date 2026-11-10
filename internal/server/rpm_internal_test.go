@@ -163,7 +163,7 @@ func TestAccRPMVirtualMemberGraphRejectsCyclesWrongTypesAndUnavailableSources(t 
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := rpmAPI{newKit(Config{Store: w.db, Blobs: w.blobs})}
+	svc := RPMAPI{newKit(Config{Store: w.db, Blobs: w.blobs})}
 	for _, tc := range []struct {
 		key      string
 		expected error
@@ -320,7 +320,7 @@ func TestAccRPMVirtualRemoteMemberRejectsUntrustedMetadata(t *testing.T) {
 			},
 		),
 	}
-	svc := rpmAPI{newKit(Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources})}
+	svc := RPMAPI{newKit(Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources})}
 	packages, err := svc.rpmMemberPackages(t.Context(), w.db, remote, "", p, acc)
 	if err != nil || len(packages) != 1 ||
 		packages[0].Path != "pool/artifactweave-alpha-1.0-1.fc42.noarch.rpm" {
@@ -448,7 +448,7 @@ func TestAccRPMRemoteMetadataClosesBodyWhenAuthorityIsRevoked(t *testing.T) {
 						},
 					),
 				}
-				svc := rpmAPI{newKit(Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources})}
+				svc := RPMAPI{newKit(Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources})}
 				remote := *repo.Defaults(&repo.Config{
 					Key: "rpm-remote", Class: repo.Remote, PackageType: repo.RPM, URL: "https://up.example",
 				})
@@ -508,9 +508,9 @@ func TestAccRPMVirtualRemotePackagePinsIndexedSHA(t *testing.T) {
 			},
 		),
 	}
-	svc := rpmAPI{newKit(Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources})}
+	svc := RPMAPI{newKit(Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources})}
 	request := itemkit.ItemRequest{Path: path}
-	serve := func(s rpmAPI, wantSHA string) *httptest.ResponseRecorder {
+	serve := func(s RPMAPI, wantSHA string) *httptest.ResponseRecorder {
 		t.Helper()
 		r := httptest.NewRequest(http.MethodGet, "/artifactory/rpm-virtual/"+path, nil)
 		response := httptest.NewRecorder()
@@ -581,7 +581,7 @@ func TestAccRPMVirtualLocalMemberRejectsIncompleteAndDriftedContent(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := rpmAPI{newKit(Config{Store: w.db, Blobs: w.blobs})}
+	svc := RPMAPI{newKit(Config{Store: w.db, Blobs: w.blobs})}
 	if _, err := svc.rpmMemberPackages(
 		t.Context(),
 		w.db,

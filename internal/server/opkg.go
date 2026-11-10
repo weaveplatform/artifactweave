@@ -47,7 +47,7 @@ type opkgCandidate struct {
 // opkgItems serves opkg's indexes and packages over the item kit.
 type opkgItems struct{ *itemkit.Kit }
 
-func tryOpkgItem(
+func TryOpkgItem(
 	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) bool {
