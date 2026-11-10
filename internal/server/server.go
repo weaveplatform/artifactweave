@@ -388,7 +388,7 @@ func New(cfg Config) http.Handler {
 	dockerOps := dockerAPI{kit}
 	debianOps := debianAPI{kit}
 	cranOps := cranAPI{Kit: kit, archiveMoverEnabled: cfg.CranArchiveMoverEnabled}
-	rpmOps := rpmhttp.RPMAPI{kit}
+	rpmOps := rpmhttp.RPMAPI{Kit: kit}
 	sysAPI := configurationhttp.New(configurationhttp.Deps{
 		Store:         cfg.Store,
 		Blobs:         cfg.Blobs,

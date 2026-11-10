@@ -50,6 +50,11 @@ type alpineCandidate struct {
 // alpineItems serves Alpine's indexes and packages over the item kit.
 type alpineItems struct{ *itemkit.Kit }
 
+// TryAlpineItem is the overlay (itemkit.Overlay) that serves an Alpine
+// repository's APKINDEX.tar.gz files and a virtual repository's .apk
+// packages, answering 404 for a package path the format refuses. It
+// reports whether it answered; every other request, a folder among them,
+// it leaves to the overlays after it and the generic lookup.
 func TryAlpineItem(
 	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,

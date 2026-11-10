@@ -220,14 +220,16 @@ func sortedReview(in []string) []string { sort.Strings(in); return slices.Compac
 
 func apiReviewHandlers(t *testing.T) map[string]apiReviewHandler {
 	t.Helper()
-	// The handlers live in the server root and in the modules' HTTP
-	// adapters, named by their paths from the repository root.
+	// The handlers live in the server root, in the modules' HTTP adapters
+	// and in the ecosystems' http packages, named by their paths from the
+	// repository root.
 	root := repopath.Root(t)
 	var files []string
 	for _, dir := range []string{
 		"internal/server",
 		"migration/access/adapters/http",
 		"migration/artifacts/adapters/http",
+		"migration/artifacts/ecosystem/*/http",
 		"migration/configuration/adapters/http",
 	} {
 		found, err := filepath.Glob(filepath.Join(root, dir, "*.go"))

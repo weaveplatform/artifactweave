@@ -33,11 +33,13 @@
 //     suites).
 //   - docs/testing/server-test-ownership.md: how CI selection gives the
 //     package an owner.
-//   - https://github.com/weaveplatform/artifactweave/issues/1068
+//   - https://github.com/weaveplatform/artifactweave/issues/1068 and
+//     https://github.com/weaveplatform/artifactweave/issues/1082
 //
 // # Status
 //
 // Implemented P9c (the plan's P29 group). P9d moved the router-level tests
-// here from internal/server (TST-06); the tests that call unexported server
-// code stay there as opkg_internal_test.go.
+// here from internal/server (TST-06), and the tests that call the
+// protocol's unexported code moved with it to
+// migration/artifacts/ecosystem/opkg/http (WEB-13).
 package opkg

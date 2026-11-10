@@ -12,8 +12,8 @@
 // through the format hooks (decision 0032), so every write and delete in
 // an Opkg repository reaches it whichever API carried it, and it rebuilds
 // the feed metadata as queued work (decision 0033). The Opkg protocol is
-// still the root file migration/artifacts/ecosystem/opkg/http/opkg.go, which builds a virtual
-// repository's signed feed and selects its IPKs with this package.
+// the http subpackage (opkghttp), which builds a virtual repository's
+// signed feed and selects its IPKs with this package.
 //
 // # Inputs
 //
@@ -21,12 +21,13 @@
 //     item service's hooks for opkg repositories to Handler; the work
 //     queue, which runs the feed rebuild (KindIndex) through Handler.Work
 //     and every format's reindex, the reindex operation's included (its
-//     writeProps=0 sets Env.SkipProperties), through Handler.Reindex; and
-//     the server's root files: the protocol (opkg.go), which reads member
-//     feeds (DecodeIndex) and writes a virtual repository's (EncodeIndex,
-//     SignFeed), and source.go, which checks upstream feed metadata or an
-//     IPK before a remote caches it (IsIndex, FeedPath, DecodeIndex,
-//     ValidateRelease, ValidPath, ReadPackage).
+//     writeProps=0 sets Env.SkipProperties), through Handler.Reindex; the
+//     protocol (opkghttp), which reads member feeds (DecodeIndex) and
+//     writes a virtual repository's (EncodeIndex, SignFeed); and the item
+//     kit's remote source request (artifacts/adapters/http/itemkit), which
+//     checks upstream feed metadata or an IPK before a remote caches it
+//     (IsIndex, FeedPath, DecodeIndex, ValidateRelease, ValidPath,
+//     ReadPackage).
 //   - Driven: the format hooks' environment (format.Env): its blobs hold
 //     the IPKs; its store holds the items, their properties and the
 //     package index (artifacts/core/pkgindex), and lists a repository's
@@ -70,9 +71,10 @@
 //     before it trusts the SHA256sum fields inside; those fields then bind
 //     each IPK it downloads.
 //   - A local or federated repository's feed metadata is derived, never
-//     uploaded; a remote caches the upstream's after source.go has checked
-//     it. An upstream Packages must keep every IPK inside its feed, give
-//     each a lowercase SHA-256 and a positive size, and name no file twice.
+//     uploaded; a remote caches the upstream's after the item kit's remote
+//     source request has checked it. An upstream Packages must keep every
+//     IPK inside its feed, give each a lowercase SHA-256 and a positive
+//     size, and name no file twice.
 //   - An IPK is at most 1 GiB stored and 2 GiB expanded, its control file
 //     at most 1 MiB; a Packages index is at most 36 MiB and 100,000
 //     packages, and the feed work takes at most 100,000 IPKs per
@@ -92,8 +94,8 @@
 //     https://docs.jfrog.com/artifactory/docs/opkg-repositories.
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     line 234 (ecosystem/opkg), line 379 (the slice row), line 405 (the
-//     protocol's later home, ecosystem/opkg/http) and line 997 (the
-//     mapping row).
+//     protocol's home, ecosystem/opkg/http) and line 997 (the mapping
+//     row).
 //   - Plan: docs/implementation/plan.md#p29-linux-package-repositories
 //     and #p9d-modular-monolith-migration, epic ECO
 //     (https://github.com/weaveplatform/artifactweave/issues/943).
@@ -123,8 +125,8 @@
 //     with KindIndex as the repository's work.
 //
 // testdata holds the contract IPKs that build-contract-fixtures.sh makes and
-// the published OpenWrt 24.10.0 index and IPK, which internal/server's
-// opkg_internal_test.go and the acceptance steps also read; .gitattributes
+// the published OpenWrt 24.10.0 index and IPK, which the protocol's tests
+// (http/opkg_test.go) and the acceptance steps also read; .gitattributes
 // keeps openwrt-Packages with LF line ends and its final blank line on every
 // OS. The protocol's native opkg evidence is the @opkg acceptance partition
 // (test/acceptance/features/opkg.feature).

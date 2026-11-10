@@ -77,10 +77,10 @@ When a test file leaves a shared directory such as `internal/server`:
 | NIM model | `migration/artifacts/ecosystem/nimmodel/http` |
 | npm | `migration/artifacts/ecosystem/npm/http`, `test/server/artifacts/npm` |
 | NuGet | `migration/artifacts/ecosystem/nuget/http`, `test/server/artifacts/nuget` |
-| Opkg | `test/server/artifacts/opkg` |
+| Opkg | `migration/artifacts/ecosystem/opkg/http`, `test/server/artifacts/opkg` |
 | P2 | `test/server/artifacts/p2` |
 | PyPI | `migration/artifacts/ecosystem/pypi/http`, `test/server/artifacts/pypi` |
-| RPM | `test/server/artifacts/rpm` |
+| RPM | `migration/artifacts/ecosystem/rpm/http`, `test/server/artifacts/rpm` |
 | Dart pub | `migration/artifacts/ecosystem/pub/http` |
 | RubyGems | `migration/artifacts/ecosystem/gems/http`, `test/server/artifacts/gems` |
 | Skills | `migration/artifacts/ecosystem/skills/http` |

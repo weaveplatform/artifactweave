@@ -14,7 +14,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -143,7 +142,7 @@ func TestAccOpkgSourceValidatesIndependentUpstreamContent(t *testing.T) {
 }
 
 func TestAccOpkgVirtualGraphAndRouteBoundaries(t *testing.T) {
-	w := newItemWorld(t, false)
+	w := newItemWorld(t)
 	hiddenFeed := "feed/Packages"
 	for _, c := range []repo.Config{
 		{Key: "opkg-wrong", Class: repo.Local, PackageType: repo.Maven},
@@ -161,11 +160,11 @@ func TestAccOpkgVirtualGraphAndRouteBoundaries(t *testing.T) {
 		}
 	}
 	p := kernel.Principal{Name: "admin", Admin: true}
-	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(w.db), p, nil)
+	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(t, w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := opkgItems{newKit(server.Config{Store: w.db, Blobs: w.blobs})}
+	svc := opkgItems{newKit(Config{Store: w.db, Blobs: w.blobs})}
 	for _, tc := range []struct {
 		key      string
 		expected error
@@ -283,13 +282,13 @@ func TestAccOpkgVirtualGraphAndRouteBoundaries(t *testing.T) {
 }
 
 func TestAccOpkgDirectRoutingRejectsUnsafeAndWrongClassRequests(t *testing.T) {
-	w := newItemWorld(t, false)
+	w := newItemWorld(t)
 	p := kernel.Principal{Name: "admin", Admin: true}
-	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(w.db), p, nil)
+	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(t, w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := opkgItems{newKit(server.Config{Store: w.db, Blobs: w.blobs})}
+	svc := opkgItems{newKit(Config{Store: w.db, Blobs: w.blobs})}
 	local := repo.Config{Key: "opkg-direct", Class: repo.Local, PackageType: repo.Opkg}
 	for _, tc := range []struct {
 		path, url string
@@ -358,7 +357,7 @@ func TestAccOpkgDirectRoutingRejectsUnsafeAndWrongClassRequests(t *testing.T) {
 
 func TestAccOpkgVirtualLocalPackageRejectsMissingAndDriftedBytes(t *testing.T) {
 	index, ipk := opkgUpstreamFixture(t)
-	w := newItemWorld(t, false)
+	w := newItemWorld(t)
 	member := *repo.Defaults(&repo.Config{Key: "opkg-member", Class: repo.Local, PackageType: repo.Opkg})
 	virtual := *repo.Defaults(&repo.Config{Key: "opkg-virtual", Class: repo.Virtual, PackageType: repo.Opkg, Repositories: []string{member.Key}})
 	for _, c := range []repo.Config{member, virtual} {
@@ -386,11 +385,11 @@ func TestAccOpkgVirtualLocalPackageRejectsMissingAndDriftedBytes(t *testing.T) {
 	}
 	seed("feed/Packages", index)
 	p := kernel.Principal{Name: "admin", Admin: true}
-	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(w.db), p, nil)
+	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(t, w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := opkgItems{newKit(server.Config{Store: w.db, Blobs: w.blobs})}
+	svc := opkgItems{newKit(Config{Store: w.db, Blobs: w.blobs})}
 	view, err := svc.opkgMemberIndex(t.Context(), w.db, member, false, "feed/Packages", p, acc)
 	if err != nil || len(view.packages) != 2 {
 		t.Fatalf(
@@ -458,7 +457,7 @@ func (opkgRepeatingReader) Read(p []byte) (int, error) {
 
 func TestAccOpkgRemoteIndexRejectsFaultsAndRevokedAuthority(t *testing.T) {
 	index, _ := opkgUpstreamFixture(t)
-	w := newItemWorld(t, false)
+	w := newItemWorld(t)
 	remote := *repo.Defaults(&repo.Config{Key: "opkg-source", Class: repo.Remote, PackageType: repo.Opkg, URL: "https://up.example"})
 	virtual := *repo.Defaults(&repo.Config{Key: "opkg-source-virtual", Class: repo.Virtual, PackageType: repo.Opkg, Repositories: []string{remote.Key}})
 	for _, c := range []repo.Config{remote, virtual} {
@@ -467,7 +466,7 @@ func TestAccOpkgRemoteIndexRejectsFaultsAndRevokedAuthority(t *testing.T) {
 		}
 	}
 	p := kernel.Principal{Name: "admin", Admin: true}
-	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(w.db), p, nil)
+	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(t, w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -482,7 +481,7 @@ func TestAccOpkgRemoteIndexRejectsFaultsAndRevokedAuthority(t *testing.T) {
 			return backendResult, backendError
 		},
 	)}
-	svc := opkgItems{newKit(server.Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources})}
+	svc := opkgItems{newKit(Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources})}
 	read := func() (opkgIndexView, error) {
 		t.Helper()
 		return svc.opkgMemberIndex(t.Context(), w.db, remote, false, "feed/Packages", p, acc)
@@ -706,7 +705,7 @@ func TestAccOpkgRemotePackagePinsIndependentIndexAndCachedBytes(t *testing.T) {
 		},
 	)
 	sources := &source.Service{Resolve: sourceIdentity, HTTP: backend}
-	w := newItemWorld(t, false, func(c *server.Config) { c.RemoteSources = sources })
+	w := newItemWorld(t, func(c *Config) { c.RemoteSources = sources })
 	if err := w.db.Repos().Create(t.Context(), remote); err != nil {
 		t.Fatal(err)
 	}
@@ -765,11 +764,11 @@ func TestAccOpkgRemotePackagePinsIndependentIndexAndCachedBytes(t *testing.T) {
 		t.Errorf("wrong cached size published success: status=%d used=%d", res.Code, used)
 	}
 	p := kernel.Principal{Name: "admin", Admin: true}
-	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(w.db), p, nil)
+	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(t, w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := opkgItems{newKit(server.Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources})}
+	svc := opkgItems{newKit(Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources})}
 	r := httptest.NewRequest(http.MethodGet, "/artifactory/opkg-download/../bad.ipk", nil)
 	response := httptest.NewRecorder()
 	svc.serveRemoteOpkgPackage(

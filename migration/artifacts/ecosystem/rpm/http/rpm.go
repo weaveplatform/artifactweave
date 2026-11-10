@@ -45,6 +45,11 @@ type rpmCandidate struct {
 // metadata and packages, over the item kit.
 type RPMAPI struct{ *itemkit.Kit }
 
+// TryRPMItem is the overlay (itemkit.Overlay) that serves a virtual RPM
+// repository's repodata and packages: a path that contains "repodata/" or
+// ends ".rpm", neither cached nor a folder. It reports whether it
+// answered; every other request it leaves to the overlays after it and the
+// generic lookup.
 func TryRPMItem(
 	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,

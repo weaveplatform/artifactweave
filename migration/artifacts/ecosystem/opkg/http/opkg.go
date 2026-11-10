@@ -47,6 +47,12 @@ type opkgCandidate struct {
 // opkgItems serves opkg's indexes and packages over the item kit.
 type opkgItems struct{ *itemkit.Kit }
 
+// TryOpkgItem is the overlay (itemkit.Overlay) that serves an Opkg
+// repository's feed: its Packages and Packages.gz, every feed file of a
+// virtual repository, and the IPKs of a virtual or remote repository,
+// answering 404 for an IPK path the format refuses. It reports whether it
+// answered; every other request, a folder among them, it leaves to the
+// overlays after it and the generic lookup.
 func TryOpkgItem(
 	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,

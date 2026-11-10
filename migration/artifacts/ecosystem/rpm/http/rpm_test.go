@@ -14,7 +14,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -144,7 +143,7 @@ func TestAccRPMSourceValidationUsesIndependentUpstreamMetadata(t *testing.T) {
 }
 
 func TestAccRPMVirtualMemberGraphRejectsCyclesWrongTypesAndUnavailableSources(t *testing.T) {
-	w := newItemWorld(t, false)
+	w := newItemWorld(t)
 	for _, c := range []repo.Config{
 		{Key: "rpm-wrong", Class: repo.Local, PackageType: repo.Maven},
 		{Key: "rpm-local", Class: repo.Local, PackageType: repo.RPM},
@@ -160,11 +159,11 @@ func TestAccRPMVirtualMemberGraphRejectsCyclesWrongTypesAndUnavailableSources(t 
 		}
 	}
 	p := kernel.Principal{Name: "admin", Admin: true}
-	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(w.db), p, nil)
+	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(t, w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := RPMAPI{newKit(server.Config{Store: w.db, Blobs: w.blobs})}
+	svc := RPMAPI{newKit(Config{Store: w.db, Blobs: w.blobs})}
 	for _, tc := range []struct {
 		key      string
 		expected error
@@ -250,7 +249,7 @@ func TestAccRPMVirtualMemberGraphRejectsCyclesWrongTypesAndUnavailableSources(t 
 }
 
 func TestAccRPMVirtualSigningRejectsMissingAndInvalidKeys(t *testing.T) {
-	w := newItemWorld(t, false)
+	w := newItemWorld(t)
 	for _, pair := range []types.Keypair{
 		{Name: "rpm-rsa", Type: types.KeypairRSA},
 		{Name: "rpm-invalid-gpg", Type: types.KeypairGPG, PrivateKey: "invalid key"},
@@ -260,7 +259,7 @@ func TestAccRPMVirtualSigningRejectsMissingAndInvalidKeys(t *testing.T) {
 		}
 	}
 	manifest, _, _ := rpmUpstreamFixture(t)
-	keys := withAccess(server.Config{Store: w.db}).Access.Keys
+	keys := withAccess(t, Config{Store: w.db}).Access.Keys
 	for _, tc := range []struct {
 		key      string
 		expected error
@@ -285,9 +284,9 @@ func TestAccRPMVirtualSigningRejectsMissingAndInvalidKeys(t *testing.T) {
 }
 
 func TestAccRPMVirtualRemoteMemberRejectsUntrustedMetadata(t *testing.T) {
-	w := newItemWorld(t, false)
+	w := newItemWorld(t)
 	p := kernel.Principal{Name: "admin", Admin: true}
-	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(w.db), p, nil)
+	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(t, w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -321,7 +320,7 @@ func TestAccRPMVirtualRemoteMemberRejectsUntrustedMetadata(t *testing.T) {
 			},
 		),
 	}
-	svc := RPMAPI{newKit(server.Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources})}
+	svc := RPMAPI{newKit(Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources})}
 	packages, err := svc.rpmMemberPackages(t.Context(), w.db, remote, "", p, acc)
 	if err != nil || len(packages) != 1 ||
 		packages[0].Path != "pool/artifactweave-alpha-1.0-1.fc42.noarch.rpm" {
@@ -418,9 +417,9 @@ func TestAccRPMRemoteMetadataClosesBodyWhenAuthorityIsRevoked(t *testing.T) {
 		t.Run(
 			map[int]string{2: "before_delivery", 3: "before_path_read"}[revokeAt],
 			func(t *testing.T) {
-				w := newItemWorld(t, false)
+				w := newItemWorld(t)
 				p := kernel.Principal{Name: "admin", Admin: true}
-				acc, err := itemkit.AccessFor(t.Context(), authorizerOver(w.db), p, nil)
+				acc, err := itemkit.AccessFor(t.Context(), authorizerOver(t, w.db), p, nil)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -449,9 +448,7 @@ func TestAccRPMRemoteMetadataClosesBodyWhenAuthorityIsRevoked(t *testing.T) {
 						},
 					),
 				}
-				svc := RPMAPI{
-					newKit(server.Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources}),
-				}
+				svc := RPMAPI{newKit(Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources})}
 				remote := *repo.Defaults(&repo.Config{
 					Key: "rpm-remote", Class: repo.Remote, PackageType: repo.RPM, URL: "https://up.example",
 				})
@@ -480,9 +477,9 @@ func TestAccRPMVirtualRemotePackagePinsIndexedSHA(t *testing.T) {
 	)
 	path := "pool/artifactweave-alpha-1.0-1.fc42.noarch.rpm"
 	correctSHA := fmt.Sprintf("%x", sha256.Sum256(body))
-	w := newItemWorld(t, false)
+	w := newItemWorld(t)
 	p := kernel.Principal{Name: "admin", Admin: true}
-	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(w.db), p, nil)
+	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(t, w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -511,7 +508,7 @@ func TestAccRPMVirtualRemotePackagePinsIndexedSHA(t *testing.T) {
 			},
 		),
 	}
-	svc := RPMAPI{newKit(server.Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources})}
+	svc := RPMAPI{newKit(Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources})}
 	request := itemkit.ItemRequest{Path: path}
 	serve := func(s RPMAPI, wantSHA string) *httptest.ResponseRecorder {
 		t.Helper()
@@ -544,7 +541,7 @@ func TestAccRPMVirtualRemotePackagePinsIndexedSHA(t *testing.T) {
 }
 
 func TestAccRPMVirtualLocalMemberRejectsIncompleteAndDriftedContent(t *testing.T) {
-	w := newItemWorld(t, false)
+	w := newItemWorld(t)
 	member := *repo.Defaults(&repo.Config{
 		Key: "rpm-member", Class: repo.Local, PackageType: repo.RPM,
 	})
@@ -580,11 +577,11 @@ func TestAccRPMVirtualLocalMemberRejectsIncompleteAndDriftedContent(t *testing.T
 	manifest, primary, primaryPath := rpmUpstreamFixture(t)
 	seed("repodata/repomd.xml", manifest)
 	p := kernel.Principal{Name: "admin", Admin: true}
-	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(w.db), p, nil)
+	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(t, w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := RPMAPI{newKit(server.Config{Store: w.db, Blobs: w.blobs})}
+	svc := RPMAPI{newKit(Config{Store: w.db, Blobs: w.blobs})}
 	if _, err := svc.rpmMemberPackages(
 		t.Context(),
 		w.db,

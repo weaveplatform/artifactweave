@@ -11,9 +11,8 @@
 // service through the format hooks (decision 0032), so every write and
 // delete in an Alpine repository reaches it whichever API carried it, and
 // it rebuilds the indexes as queued work (decision 0033). The Alpine
-// protocol is still the root file migration/artifacts/ecosystem/alpine/http/alpine.go, which builds
-// a virtual repository's signed index and selects its packages with this
-// package.
+// protocol is the http subpackage (alpinehttp), which builds a virtual
+// repository's signed index and selects its packages with this package.
 //
 // # Inputs
 //
@@ -21,12 +20,13 @@
 //     item service's hooks for alpine repositories to Handler; the work
 //     queue, which runs the index rebuild (KindIndex) through Handler.Work
 //     and every format's reindex, the reindex operation's included,
-//     through Handler.Reindex; and the server's root files: the protocol
-//     (alpine.go), which reads member indexes (DecodeIndex) and writes a
-//     virtual repository's (EncodeIndex, SigningKey), source.go, which
-//     checks an upstream index or package before a remote caches it
-//     (ParseIndexPath, DecodeIndex, ParsePath, ReadPackage), and items.go,
-//     which sends a remote's downloads through the remote source (Serves).
+//     through Handler.Reindex; the protocol (alpinehttp), which reads
+//     member indexes (DecodeIndex) and writes a virtual repository's
+//     (EncodeIndex, SigningKey); and the item kit
+//     (artifacts/adapters/http/itemkit), whose remote source request checks
+//     an upstream index or package before a remote caches it
+//     (ParseIndexPath, DecodeIndex, ParsePath, ReadPackage), and whose item
+//     GET sends a remote's downloads through the remote source (Serves).
 //   - Driven: the format hooks' environment (format.Env): its blobs hold
 //     the packages; its store holds the items, their properties and the
 //     package index (artifacts/core/pkgindex), and lists a repository's
@@ -72,8 +72,8 @@
 //     as abuild-sign writes it; the key name is the pair's alias (or name)
 //     ending .rsa.pub, the file apk looks for in /etc/apk/keys.
 //   - A local or federated repository's indexes are derived from its
-//     packages, never uploaded; a remote caches the upstream's after
-//     source.go has checked it.
+//     packages, never uploaded; a remote caches the upstream's after the
+//     item kit's remote source request has checked it.
 //   - The index work takes at most 100,000 packages per repository, and
 //     an index at most 32 MiB of records.
 //   - KindIndex and the property names are stored, so they stay
@@ -92,8 +92,8 @@
 //   - The APK v2 package format: https://wiki.alpinelinux.org/wiki/Apk_spec.
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     line 232 (ecosystem/alpine), line 379 (the slice row), line 405 (the
-//     protocol's later home, ecosystem/alpine/http) and line 997 (the
-//     mapping row).
+//     protocol's home, ecosystem/alpine/http) and line 997 (the mapping
+//     row).
 //   - Plan: docs/implementation/plan.md#p29-linux-package-repositories
 //     and #p9d-modular-monolith-migration, epic ECO
 //     (https://github.com/weaveplatform/artifactweave/issues/943).
