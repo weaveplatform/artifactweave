@@ -11,11 +11,11 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -51,26 +51,26 @@ func (u replayDeadlineUsers) Get(context.Context, string) (types.User, error) {
 	return types.User{}, context.DeadlineExceeded
 }
 
+// replayDeadlineStore is a store whose users time out, for an access module
+// whose authenticator cannot recheck a caller.
+type replayDeadlineStore struct{ *inmem.Store }
+
+func (s replayDeadlineStore) Users() store.UserStore {
+	return replayDeadlineUsers{s.Store.Users()}
+}
+
 func TestAccAppendIdempotencyRecheckDeadline(t *testing.T) {
 	w := newItemWorld(t, false)
 	w.publish(artifactDoc("app", "1", testStarted, "artifact"))
-	a, err := authn.NewAuthenticator(w.db.Users(), w.db.Settings(), authn.Options{Hash: testHash})
+	p, err := accesstest.Over(t, w.db).API().Authenticator.Basic(t.Context(), "admin", "pw")
 	if err != nil {
 		t.Fatal(err)
 	}
-	p, err := a.Basic(t.Context(), "admin", "pw")
-	if err != nil {
-		t.Fatal(err)
-	}
-	badAuth, err := authn.NewAuthenticator(
-		replayDeadlineUsers{w.db.Users()},
-		w.db.Settings(),
-		authn.Options{Hash: testHash},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	svc := newArtifactoryAPI(withAccess(Config{Store: w.db, Blobs: w.blobs, Auth: badAuth}))
+	// The access module over the store, whose authenticator alone reads
+	// users that time out.
+	access := accesstest.Over(t, w.db).API()
+	access.Authenticator = accesstest.Over(t, replayDeadlineStore{w.db}).API().Authenticator
+	svc := newArtifactoryAPI(Config{Store: w.db, Blobs: w.blobs, Access: access})
 	err = svc.appendOnce(
 		t.Context(),
 		svc.builds(w.db),
@@ -93,11 +93,8 @@ func TestAccAppendIdempotencyRecheckDeadline(t *testing.T) {
 func TestAccAppendIdempotencyReplayEvaluatesCurrentPermissions(t *testing.T) {
 	w := newItemWorld(t, false)
 	w.publish(artifactDoc("app", "1", testStarted, "artifact"))
-	a, err := authn.NewAuthenticator(w.db.Users(), w.db.Settings(), authn.Options{Hash: testHash})
-	if err != nil {
-		t.Fatal(err)
-	}
-	p, err := a.Basic(t.Context(), "admin", "pw")
+	access := accesstest.Over(t, w.db).API()
+	p, err := access.Authenticator.Basic(t.Context(), "admin", "pw")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +103,7 @@ func TestAccAppendIdempotencyReplayEvaluatesCurrentPermissions(t *testing.T) {
 		t.Fatalf("request decider: %v", err)
 	}
 	ctx := accessapi.WithCaller(t.Context(), p, decider)
-	svc := newArtifactoryAPI(withAccess(Config{Store: w.db, Blobs: w.blobs, Auth: a}))
+	svc := newArtifactoryAPI(Config{Store: w.db, Blobs: w.blobs, Access: access})
 	appendOnce := func() error {
 		return svc.appendOnce(
 			ctx,
