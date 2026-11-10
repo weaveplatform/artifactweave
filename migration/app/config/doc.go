@@ -7,6 +7,9 @@
 // cmd/artifactweave take the Config this package loads; no module imports
 // it. The YAML types stay here, beside the composition root, because
 // ByteSize decodes itself from the file (it implements yaml.Unmarshaler).
+// It turns the sections a module owns into that module's settings type
+// (access/api, configuration/api, and the artifacts module root, which only
+// app may import).
 //
 // # Inputs
 //
@@ -29,6 +32,14 @@
 //     from the Default constants.
 //   - ByteSize and ParseByteSize, EnvPrefix, and the errors Validate and
 //     Load wrap (ErrUnknownKey and the others).
+//   - The module settings, which app reads module-owned keys through:
+//     Access (token.allow_basic_auth, environments.global_limit),
+//     Artifacts (the download, search, aql_timeout, build, deploy, npm,
+//     cran, huggingface, maven, nuget, remote, gc, conda, helm and pypi
+//     sections) and Configuration (docker.subdomain_match). The platform's
+//     keys (listen, base_url, data_dir, compat, database, blob, cold_blob,
+//     the master keys, bootstrap, log, work and api) stay fields that app
+//     reads directly.
 //
 // # Invariants
 //
@@ -38,6 +49,10 @@
 //     start the server on the wrong backend without any warning.
 //   - String replaces every secret, so a pasted summary can never leak a
 //     key or a password.
+//   - Module settings are derived by the accessors, never stored as fields
+//     of Config: a field would be a key of the file and a line of the
+//     config validate output, which String marshals in field order.
+//     TestUnitConfigStringGolden pins that output.
 //
 // # References
 //
@@ -45,14 +60,16 @@
 //     ("Decision", layer 1: the application configuration).
 //   - docs/operations/configuration-reference.md: every key, its
 //     environment variable and its default.
-//   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md
-//     (the composition root and its configuration).
+//   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md,
+//     "Composition and HTTP" (per-module settings are accessor methods on
+//     Config).
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     lines 746 to 805 (config/ under the composition root).
-//   - https://github.com/weaveplatform/artifactweave/issues/1092
+//   - https://github.com/weaveplatform/artifactweave/issues/1092 and
+//     https://github.com/weaveplatform/artifactweave/issues/1093
 //
 // # Status
 //
 // Implemented P0 to P9c: each phase added the keys of what it built. Staged
-// in P9d (WEB-18) unchanged; WEB-19 gives the modules their own settings.
+// in P9d (WEB-18) unchanged; WEB-19 added the module settings accessors.
 package config

@@ -11,7 +11,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/migration/access"
-	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/app/config"
@@ -26,13 +25,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conda"
 	debianhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian/http"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/mirror"
@@ -92,6 +87,7 @@ type runtime struct {
 // blob tiers and starts a repair loop for each mirror. On failure everything
 // opened so far is closed again.
 func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*runtime, error) {
+	settings := cfg.Artifacts()
 	keys, err := Keyring(cfg)
 	if err != nil {
 		return nil, err
@@ -143,7 +139,7 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	// The cold tier is not collected: nothing writes it until archiving (P16),
 	// which brings the references its collection would have to trust.
 	collector, err := gc.New(st, hot.store, gc.Options{
-		Grace: cfg.GC.GracePeriod,
+		Grace: settings.GCGrace,
 		Reapers: map[string]func(context.Context, store.Upload) error{
 			multipart.Backend: parts.Reap,
 			registry.Backend:  uploads.Reap,
@@ -173,8 +169,8 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 		Keys:             accessAPI.Keys,
 		ReindexAuthorize: reindexauth.New(accessAPI.Authenticator, accessAPI.Authorizer),
 		Periodic: map[string]time.Duration{
-			maven.KindSnapshots: cfg.Maven.SnapshotCleanupInterval,
-			nuget.KindSnapshots: cfg.NuGet.SnapshotCleanupInterval,
+			maven.KindSnapshots: settings.MavenSnapshotCleanupInterval,
+			nuget.KindSnapshots: settings.NuGetSnapshotCleanupInterval,
 		},
 	}
 	if err := derived.RegisterWork(queue); err != nil {
@@ -206,7 +202,7 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 		ctx,
 		derived,
 		log,
-		cfg.Remote.AllowedPrivateOrigins,
+		settings.AllowedPrivateOrigins,
 	)
 	if err != nil {
 		stop()
@@ -235,33 +231,21 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 		rt.mirrors = append(rt.mirrors, t.m)
 		rt.loops.Go(func() { _ = t.m.RunRepair(lctx, repairEvery, trigger) })
 	}
-	rt.loops.Go(func() { _ = collector.Loop(lctx, cfg.GC.Interval, logGC(log)) })
+	rt.loops.Go(func() { _ = collector.Loop(lctx, settings.GCInterval, logGC(log)) })
 	// Stopping hands back the leases of runs it cuts short, so another node
 	// or the next start picks them up at once.
 	rt.loops.Go(func() { _ = queue.Run(lctx) })
 	return rt, nil
 }
 
-// formatSettings are the formats' options from cfg, with keys, the master
-// key's keyring. The server and the work queue's item service take the
-// same ones, so a write applies them whether a client or derived work
-// makes it.
+// formatSettings are the formats' options from cfg's artifacts settings,
+// with keys, the master key's keyring, which is not configuration. The
+// server and the work queue's item service take the same ones, so a write
+// applies them whether a client or derived work makes it.
 func formatSettings(cfg config.Config, keys *crypt.Keyring) ecosystem.Settings {
-	return ecosystem.Settings{
-		Conda: conda.Settings{ShardsEnabled: cfg.Conda.ShardsEnabled},
-		Helm:  helm.Settings{RelativeURLs: &cfg.Helm.RelativeURLs},
-		NPM: npm.Settings{
-			TagLatestByPublish: cfg.NPM.TagLatestByPublish,
-			EnforcePath:        cfg.NPM.EnforcePath,
-		},
-		PyPI: pypi.Settings{
-			EnforceLayout:              cfg.PyPI.EnforceLayout,
-			EnforceNamingNormalization: cfg.PyPI.EnforceNamingNormalization,
-			SimpleJSON:                 cfg.PyPI.SimpleJSON,
-			CoreMetadata:               cfg.PyPI.CoreMetadata,
-		},
-		TerraformBackend: terraformbackend.Settings{Keys: keys},
-	}
+	formats := cfg.Artifacts().Formats
+	formats.TerraformBackend = terraformbackend.Settings{Keys: keys}
+	return formats
 }
 
 // openAccess builds the authenticator over st, then the access module over
@@ -286,11 +270,8 @@ func openAccess(
 	})
 	m, err := access.New(access.Deps{
 		Store: st, Authenticator: authn, Tokens: tokens,
-		Settings: accessapi.Settings{
-			AllowBasicAuthTokens:   cfg.Token.AllowBasicAuth,
-			GlobalEnvironmentLimit: cfg.Environments.GlobalLimit,
-		},
-		Log: log,
+		Settings: cfg.Access(),
+		Log:      log,
 	})
 	return authn, m, errors.Join(authErr, err)
 }

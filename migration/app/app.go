@@ -84,6 +84,7 @@ func serve(
 	// could let it finish. They are cancelled only once the drain has expired.
 	reqCtx, cancelRequests := context.WithCancel(context.WithoutCancel(ctx))
 	defer cancelRequests()
+	accessSettings, artifactsSettings := cfg.Access(), cfg.Artifacts()
 	srv := &http.Server{
 		Handler: newHandler(server.Config{
 			RequestLimits: limits,
@@ -103,29 +104,30 @@ func serve(
 			Tokens:        rt.tokens,
 			Access:        rt.access.API(),
 			Redirect: itemkit.Redirect{
-				MinSize: int64(cfg.Download.Redirect.MinSize), TTL: cfg.Download.Redirect.TTL,
+				MinSize: artifactsSettings.RedirectMinSize, TTL: artifactsSettings.RedirectTTL,
 				CDNMaxSize: cdnMaxSize(cfg.Blob),
 			},
-			FolderDownloadMaxConcurrent: cfg.Download.Folder.MaxConcurrentRequests,
+			FolderDownloadMaxConcurrent: artifactsSettings.FolderDownloadMaxConcurrent,
 			AQL: artifactshttp.AQLLimits{
-				MaxResults: cfg.Search.AQL.MaxResults,
-				ScanFactor: cfg.Search.AQL.NonAdminScanFactor,
-				Timeout:    cfg.AQLTimeout.Query, StreamTimeout: cfg.AQLTimeout.Streamed,
+				MaxResults:    artifactsSettings.AQLMaxResults,
+				ScanFactor:    artifactsSettings.AQLScanFactor,
+				Timeout:       artifactsSettings.AQLTimeout,
+				StreamTimeout: artifactsSettings.AQLStreamTimeout,
 			},
 			Search: artifactshttp.SearchLimits{
-				UserQueryLimit:     cfg.Search.UserQueryLimit,
-				LimitInternalUsers: !cfg.Search.LimitAnonymousUsersOnly,
+				UserQueryLimit:     artifactsSettings.UserQueryLimit,
+				LimitInternalUsers: artifactsSettings.LimitInternalUsers,
 			},
-			DockerSubdomainMatch:           cfg.Docker.SubdomainMatch,
-			AllowBasicAuthTokens:           cfg.Token.AllowBasicAuth,
-			AllowDuplicateBuildEntries:     !cfg.Build.BlockDuplicateEntries,
-			EnforceIdenticalChecksumDeploy: cfg.Deploy.EnforceIdenticalChecksumDeploy,
-			NPMLoginTokenExpiry:            cfg.NPM.LoginTokenExpiry,
-			NPMMaxPublishSize:              int64(cfg.NPM.MaxPublishSize),
+			DockerSubdomainMatch:           cfg.Configuration().DockerSubdomainMatch,
+			AllowBasicAuthTokens:           accessSettings.AllowBasicAuthTokens,
+			AllowDuplicateBuildEntries:     artifactsSettings.AllowDuplicateBuildEntries,
+			EnforceIdenticalChecksumDeploy: artifactsSettings.EnforceIdenticalChecksumDeploy,
+			NPMLoginTokenExpiry:            artifactsSettings.NPMLoginTokenExpiry,
+			NPMMaxPublishSize:              artifactsSettings.NPMMaxPublishSize,
 			FormatSettings:                 rt.formats,
-			CranArchiveMoverEnabled:        cfg.Cran.ArchiveMoverEnabled,
-			HuggingFaceXetEnabled:          cfg.HuggingFace.XetEnabled,
-			GlobalEnvironmentLimit:         cfg.Environments.GlobalLimit,
+			CranArchiveMoverEnabled:        artifactsSettings.CranArchiveMoverEnabled,
+			HuggingFaceXetEnabled:          artifactsSettings.HuggingFaceXetEnabled,
+			GlobalEnvironmentLimit:         accessSettings.GlobalEnvironmentLimit,
 			Work:                           rt.work,
 			RemoteHTTP:                     &rt.remoteHTTP,
 			RemoteSources:                  rt.remoteSources,

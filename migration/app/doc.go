@@ -13,7 +13,9 @@
 // # Inputs
 //
 //   - The loaded config.Config (app/config), which cmd/artifactweave reads
-//     with config.Load from the file, the environment and the flags.
+//     with config.Load from the file, the environment and the flags. app
+//     reads the keys a module owns only through its accessors, Access,
+//     Artifacts and Configuration, and the platform's keys as fields.
 //   - The command line, through cmd/artifactweave: serve calls Run, migrate
 //     calls Migrate, keys rotate calls RotateKeys, and config apply calls
 //     ApplyDescriptor with the descriptor file it names.

@@ -6,21 +6,24 @@
 //
 // artifacts module, ecosystem layer: the registry of the format slices, one
 // slice per package type (decision 0032). Only the composition builds it:
-// app makes Settings from the configuration, and the server that app starts
-// hands Settings.For to the item, build and registry services it builds. The
-// registry is apart from the format contract, artifacts/core/format, so that
-// a slice can implement that contract without an import cycle. For the same
-// reason core never imports this package: every slice it lists imports
-// core, so core takes the registry as a format.Registry value (decision
-// 0044, "Artifacts and remote").
+// app takes Settings from the artifacts module's settings, which
+// app/config's Artifacts accessor derives from the configuration, and adds
+// the keyring; the server that app starts hands Settings.For to the item,
+// build and registry services it builds. The registry is apart from the
+// format contract, artifacts/core/format, so that a slice can implement
+// that contract without an import cycle. For the same reason core never
+// imports this package: every slice it lists imports core, so core takes
+// the registry as a format.Registry value (decision 0044, "Artifacts and
+// remote").
 //
 // # Inputs
 //
 //   - Settings: the server-wide options of the formats that take any, from
-//     the configuration (decision 0009): conda.shards_enabled,
-//     helm.relative_urls, npm.tag_latest_by_publish and npm.enforce_path, the
-//     four PyPI keys, and the master key's keyring, with which the Terraform
-//     backend's format opens states. app builds them.
+//     the configuration (decision 0009) through app/config's Artifacts
+//     accessor, the Formats of the artifacts module's settings:
+//     conda.shards_enabled, helm.relative_urls, npm.tag_latest_by_publish and
+//     npm.enforce_path, and the four PyPI keys. app adds the master key's
+//     keyring, with which the Terraform backend's format opens states.
 //   - The slices: each format package's Serves, which says the package types
 //     it serves, and its Handler, which implements format.Handler.
 //
