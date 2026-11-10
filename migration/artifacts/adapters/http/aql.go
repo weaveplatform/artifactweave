@@ -101,7 +101,7 @@ func (s ArtifactoryAPI) searchAQL(w http.ResponseWriter, r *http.Request) {
 		httpkit.WriteErr(w, r, s.InternalError(ctx, "aql repositories", err))
 		return
 	}
-	q.Resolve(aqlRepositories(configs))
+	q.Resolve(aql.AQLRepositories(configs))
 	run, scaled := q.ForNesting(), false
 	if !p.Admin {
 		if err := q.CheckRestricted(); err != nil {
@@ -294,24 +294,6 @@ func repoConfigs(ctx context.Context, st store.Store) (map[string]repo.Config, e
 		byKey[c.Key] = c
 	}
 	return byKey, nil
-}
-
-// aqlRepositories is what a repo criterion resolves keys against: remote and
-// virtual repositories stand for their caches and members, and every other
-// class holds its own items.
-func aqlRepositories(configs map[string]repo.Config) aql.Repositories {
-	out := make(aql.Repositories, len(configs))
-	for key, c := range configs {
-		switch c.Class {
-		case repo.Remote:
-			out[key] = aql.Repository{Class: aql.RepoRemote}
-		case repo.Virtual:
-			out[key] = aql.Repository{Class: aql.RepoVirtual, Members: c.Repositories}
-		default:
-			out[key] = aql.Repository{Class: aql.RepoLocal}
-		}
-	}
-	return out
 }
 
 // readable keeps the rows p may read, by repository and path, that the

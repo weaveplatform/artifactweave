@@ -5,6 +5,7 @@ import (
 	"math"
 	"slices"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -30,6 +31,24 @@ type Repository struct {
 
 // Repositories are the configured repositories, by key.
 type Repositories map[string]Repository
+
+// AQLRepositories is what a repo criterion resolves keys against: remote and
+// virtual repositories stand for their caches and members, and every other
+// class holds its own items.
+func AQLRepositories(configs map[string]repo.Config) Repositories {
+	out := make(Repositories, len(configs))
+	for key, c := range configs {
+		switch c.Class {
+		case repo.Remote:
+			out[key] = Repository{Class: RepoRemote}
+		case repo.Virtual:
+			out[key] = Repository{Class: RepoVirtual, Members: c.Repositories}
+		default:
+			out[key] = Repository{Class: RepoLocal}
+		}
+	}
+	return out
+}
 
 // RepoRef is one stored location of items: a repository key and whether it
 // is that repository's remote cache, the items table's (repo_key, cached).

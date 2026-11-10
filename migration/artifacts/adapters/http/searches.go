@@ -160,7 +160,7 @@ func (s ArtifactoryAPI) newSearch(ctx context.Context, named bool) (*searchRun, 
 		return nil, s.InternalError(ctx, "search repositories", err)
 	}
 	return &searchRun{
-		s: s, st: st, p: p, acc: acc, configs: configs, repos: aqlRepositories(configs),
+		s: s, st: st, p: p, acc: acc, configs: configs, repos: aql.AQLRepositories(configs),
 		now: time.Now().UTC(),
 	}, nil
 }

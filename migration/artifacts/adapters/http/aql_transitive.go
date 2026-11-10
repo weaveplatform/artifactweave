@@ -116,7 +116,7 @@ func (s ArtifactoryAPI) transitiveAQL(
 		}
 	}
 	original := *q
-	q.Resolve(aqlRepositories(configs))
+	q.Resolve(aql.AQLRepositories(configs))
 	if budget == 0 {
 		return transitiveSearch{hits: []aql.Hit{}}, nil
 	}
