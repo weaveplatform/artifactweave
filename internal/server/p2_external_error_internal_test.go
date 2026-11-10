@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/p2"
@@ -26,7 +27,7 @@ func TestUnitP2ReadFailsClosedAtSourceAndDeliveryFences(t *testing.T) {
 	})
 	w := newItemWorld(t, false)
 	p := kernel.Principal{Name: "admin", Admin: true}
-	acc, err := AccessFor(t.Context(), authorizerOver(w.db), p, nil)
+	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,7 +168,7 @@ func TestUnitP2ReadCachedMetadataUsesItsStoredBytes(t *testing.T) {
 	})
 	w := newItemWorld(t, false)
 	p := kernel.Principal{Name: "admin", Admin: true}
-	acc, err := AccessFor(t.Context(), authorizerOver(w.db), p, nil)
+	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,7 +212,7 @@ func TestUnitP2ReadBoundsStreamAndExtractsOnlyValidArchives(t *testing.T) {
 	})
 	w := newItemWorld(t, false)
 	p := kernel.Principal{Name: "admin", Admin: true}
-	acc, err := AccessFor(t.Context(), authorizerOver(w.db), p, nil)
+	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -259,7 +260,7 @@ func TestUnitP2ArchiveEntryValidationFailsBeforePublication(t *testing.T) {
 	})
 	w := newItemWorld(t, false)
 	p := kernel.Principal{Name: "admin", Admin: true}
-	acc, err := AccessFor(t.Context(), authorizerOver(w.db), p, nil)
+	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

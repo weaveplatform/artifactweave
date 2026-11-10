@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
@@ -180,7 +181,7 @@ func (s artifactoryService) promotionTags(
 	svc *registry.Service,
 	pr registry.Promotion,
 	args promotion,
-	acc Access,
+	acc itemkit.Access,
 	p kernel.Principal,
 ) ([]registry.Rename, error) {
 	tags, err := svc.PromotedTags(ctx, pr.From, args.tag)
@@ -276,7 +277,7 @@ func promotionRepo(ctx context.Context, st store.Store, key string) (repo.Config
 	case err != nil:
 		return c, err //nolint:wrapcheck // the lookup names itself
 	case c.Key == "":
-		return c, NotFoundRepo(key)
+		return c, itemkit.NotFoundRepo(key)
 	case !served:
 		return c, httpkit.BadRequestf("'%s' is not a Docker, OCI or Helm OCI repository", c.Key)
 	case c.Class != repo.Local && c.Class != repo.Federated:
@@ -308,7 +309,7 @@ func dockerRepo(ctx context.Context, st store.Store, key string) (repo.Config, e
 	case err != nil:
 		return c, err //nolint:wrapcheck // the lookup names itself
 	case !found:
-		return c, NotFoundRepo(key)
+		return c, itemkit.NotFoundRepo(key)
 	case c.Class == repo.Remote || c.Class == repo.Virtual:
 		return c, apierror.New(http.StatusMethodNotAllowed, fmt.Sprintf(
 			"%s is a %s repository, which the registry does not serve yet", c.Key, c.Class))

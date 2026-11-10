@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cran"
@@ -30,7 +31,7 @@ func (s artifactoryService) MoveCranArchives(
 	if !s.cfg.CranArchiveMoverEnabled {
 		return nil, apierror.New(http.StatusNotFound, "CRAN archive migration is disabled")
 	}
-	st, c, by, err := s.OperationRepo(ctx, repo.Cran, ReindexOp{
+	st, c, by, err := s.OperationRepo(ctx, repo.Cran, itemkit.ReindexOp{
 		IsAdminOnly: true,
 		Classes:     []repo.Class{repo.Local, repo.Federated},
 		Refused:     "Repository '%s' must be a local or federated CRAN repository",

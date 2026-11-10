@@ -11,6 +11,7 @@ import (
 	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -47,11 +48,11 @@ type alpineCandidate struct {
 }
 
 // alpineItems serves Alpine's indexes and packages over the item kit.
-type alpineItems struct{ *Kit }
+type alpineItems struct{ *itemkit.Kit }
 
 func tryAlpineItem(
-	k *Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	cached bool, req ItemRequest, p kernel.Principal, acc Access,
+	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
+	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) bool {
 	s := alpineItems{k}
 	if !alpine.Serves(c.PackageType) || req.IsFolder {
@@ -63,7 +64,7 @@ func tryAlpineItem(
 	}
 	if strings.HasSuffix(req.Path, ".apk") {
 		if _, _, _, _, ok := alpine.ParsePath(req.Path); !ok {
-			httpkit.WriteErr(w, r, ItemNotFound())
+			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 			return true
 		}
 		if c.Class == repo.Virtual {
@@ -76,12 +77,12 @@ func tryAlpineItem(
 
 func (s alpineItems) serveAlpineIndex(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	cached bool, req ItemRequest, p kernel.Principal, acc Access,
+	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
 	ctx := r.Context()
 	if _, _, _, ok := alpine.ParseIndexPath(req.Path); !ok || len(req.Props) != 0 ||
 		r.URL.RawQuery != "" {
-		httpkit.WriteErr(w, r, ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
 	if !acc.Folder(c, req.Path, types.ActionRead) ||
@@ -91,7 +92,7 @@ func (s alpineItems) serveAlpineIndex(
 		return
 	}
 	if cached && c.Class != repo.Remote {
-		httpkit.WriteErr(w, r, ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
 	var body []byte
@@ -144,7 +145,7 @@ func (s alpineItems) serveAlpineIndex(
 	}
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Cache-Control", "private, no-store")
-	sw := &StatusWriter{ResponseWriter: w}
+	sw := &itemkit.StatusWriter{ResponseWriter: w}
 	http.ServeContent(sw, r, alpine.IndexName, time.Time{}, bytes.NewReader(body))
 	if sw.Complete(r) && used != nil {
 		_ = used(ctx)
@@ -152,7 +153,7 @@ func (s alpineItems) serveAlpineIndex(
 }
 
 func alpinePackageReadable(
-	ctx context.Context, c repo.Config, path string, acc Access,
+	ctx context.Context, c repo.Config, path string, acc itemkit.Access,
 	check func(context.Context, string) error,
 ) (bool, error) {
 	if !acc.File(c, path, types.ActionRead) || generic.CheckDownload(c, path, false) != nil {
@@ -171,7 +172,7 @@ func alpinePackageReadable(
 
 func (s alpineItems) alpineMemberIndex(
 	ctx context.Context, st store.Store, c repo.Config, cached bool, path string,
-	p kernel.Principal, acc Access,
+	p kernel.Principal, acc itemkit.Access,
 ) (alpineIndexView, error) {
 	view := alpineIndexView{repo: c}
 	if c.Class == repo.Remote {
@@ -183,7 +184,7 @@ func (s alpineItems) alpineMemberIndex(
 			CacheOnly: cached,
 			Resource:  source.Resource{Path: path, Method: http.MethodGet},
 		}
-		query, err := AlpineSourceRequest(query)
+		query, err := itemkit.AlpineSourceRequest(query)
 		if err != nil {
 			return view, err
 		}
@@ -254,7 +255,7 @@ func (s alpineItems) readAlpineBlob(ctx context.Context, sha string) ([]byte, er
 // the first readable member, which is the same member package GET must use.
 func (s alpineItems) alpineCandidates(
 	ctx context.Context, st store.Store, c repo.Config, indexPath string,
-	p kernel.Principal, acc Access, seen map[string]bool,
+	p kernel.Principal, acc itemkit.Access, seen map[string]bool,
 ) ([]alpineCandidate, error) {
 	if seen[c.Key] || len(seen) >= 8 {
 		return nil, errAlpineVirtualCycle
@@ -323,11 +324,11 @@ func (s alpineItems) alpineCandidates(
 
 func (s alpineItems) serveVirtualAlpinePackage(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	req ItemRequest, p kernel.Principal, acc Access,
+	req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
 	if _, _, _, _, ok := alpine.ParsePath(req.Path); !ok || len(req.Props) != 0 ||
 		r.URL.RawQuery != "" {
-		httpkit.WriteErr(w, r, ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
 	if !acc.File(c, req.Path, types.ActionRead) ||
@@ -356,18 +357,18 @@ func (s alpineItems) serveVirtualAlpinePackage(
 			return
 		}
 		if it.Folder {
-			httpkit.WriteErr(w, r, ItemNotFound())
+			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 			return
 		}
-		s.ServeFile(w, r, st, Found{Repo: candidate.repo, Item: it}, p)
+		s.ServeFile(w, r, st, itemkit.Found{Repo: candidate.repo, Item: it}, p)
 		return
 	}
-	httpkit.WriteErr(w, r, ItemNotFound())
+	httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 }
 
 func (s alpineItems) serveRemoteAlpinePackage(
-	w http.ResponseWriter, r *http.Request, c repo.Config, req ItemRequest,
-	p kernel.Principal, acc Access,
+	w http.ResponseWriter, r *http.Request, c repo.Config, req itemkit.ItemRequest,
+	p kernel.Principal, acc itemkit.Access,
 ) {
 	query := source.Request{
 		Repo:    c,
@@ -380,7 +381,7 @@ func (s alpineItems) serveRemoteAlpinePackage(
 			Method: r.Method,
 		},
 	}
-	query, err := AlpineSourceRequest(query)
+	query, err := itemkit.AlpineSourceRequest(query)
 	if err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "Alpine source", err))
 		return
@@ -410,5 +411,5 @@ func (s alpineItems) serveRemoteAlpinePackage(
 		return
 	}
 	s.ServeFile(w, r, s.Store,
-		Found{Repo: c, Item: *result.Item, Used: result.Used}, p)
+		itemkit.Found{Repo: c, Item: *result.Item, Used: result.Used}, p)
 }

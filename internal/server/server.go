@@ -23,6 +23,7 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -156,7 +157,7 @@ type Config struct {
 	// tiny cost.
 	PasswordHash authn.HashParams
 	// Redirect tunes downloadRedirect and cdnRedirect (decision 0029).
-	Redirect Redirect
+	Redirect itemkit.Redirect
 	// FolderDownloadMaxConcurrent is how many folder archive downloads run
 	// at once (download.folder.max_concurrent_requests); zero means
 	// Artifactory's 10.
@@ -364,14 +365,20 @@ func newRegistry(cfg Config, artSvc artifactoryService) *dockerhttp.Registry {
 		// when the repository says so (decision 0029), and counted.
 		ServeBlob: func(w http.ResponseWriter, r *http.Request, c repo.Config, it types.Item) {
 			p, _ := kernel.FromContext(r.Context())
-			artSvc.ServeFile(w, r, cfg.Store, Found{Repo: c, Item: it}, p)
+			artSvc.ServeFile(w, r, cfg.Store, itemkit.Found{Repo: c, Item: it}, p)
 		},
 		// A manifest at or above the minimum size redirects too, as on 7.x
 		// (RTFACT-29705), carrying its media type to the object store.
 		RedirectManifest: func(
 			w http.ResponseWriter, r *http.Request, c repo.Config, it types.Item, mediaType string,
 		) bool {
-			return artSvc.RedirectManifest(w, r, cfg.Store, Found{Repo: c, Item: it}, mediaType)
+			return artSvc.RedirectManifest(
+				w,
+				r,
+				cfg.Store,
+				itemkit.Found{Repo: c, Item: it},
+				mediaType,
+			)
 		},
 		Tokens:   cfg.Access.Tokens,
 		Identity: cfg.Access.Identity,
@@ -430,7 +437,7 @@ func accessUnset(a accessapi.API) bool {
 
 // overlays are the format routes an item GET tries before the generic
 // lookup, in their dispatch order (itemkit.Deps.Overlays).
-var overlays = []Overlay{
+var overlays = []itemkit.Overlay{
 	tryAgentMarketplaceItem,
 	tryAlpineItem,
 	tryCondaItem,
@@ -453,8 +460,8 @@ func privateItem(c repo.Config, p string) bool {
 // newKit returns the item kit over cfg, with the router's overlays and
 // private predicate. The descriptor stays behind DownloadRedirectMinSize:
 // the artifacts module may not import the configuration module's core.
-func newKit(cfg Config) *Kit {
-	d := Deps{
+func newKit(cfg Config) *itemkit.Kit {
+	d := itemkit.Deps{
 		Store:                          cfg.Store,
 		Blobs:                          cfg.Blobs,
 		Keys:                           cfg.Keys,
@@ -476,7 +483,7 @@ func newKit(cfg Config) *Kit {
 			return descriptor.DownloadRedirectMinSize(ctx, cfg.Store.Configs())
 		}
 	}
-	return NewKit(d)
+	return itemkit.NewKit(d)
 }
 
 // newArtifactoryService returns the artifacts service over cfg with its own

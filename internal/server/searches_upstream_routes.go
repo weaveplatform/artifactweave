@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -182,7 +183,7 @@ func (u *upstreamSearch) checkDisclosures(ctx context.Context) error {
 		}
 		if !allows(
 			types.ResourceArtifact,
-			Target(u.r.configs[entry.key]),
+			itemkit.Target(u.r.configs[entry.key]),
 			entry.path,
 			types.ActionRead,
 		) ||

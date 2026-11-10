@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -35,7 +36,7 @@ func (s artifactoryService) GetStorageSummaryInfo(
 		return nil, err
 	}
 	d, _ := accessapi.DeciderFrom(ctx)
-	a, err := AccessFor(ctx, s.cfg.Access.Authorizer, p, d)
+	a, err := itemkit.AccessFor(ctx, s.cfg.Access.Authorizer, p, d)
 	if err != nil {
 		return nil, s.InternalError(ctx, "storage summary access", err)
 	}

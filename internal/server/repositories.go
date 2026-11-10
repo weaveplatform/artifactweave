@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
@@ -149,7 +150,7 @@ func (s artifactoryService) readerFor(
 		return p, nil, err
 	}
 	d, _ := accessapi.DeciderFrom(ctx)
-	acc, err := AccessFor(ctx, s.cfg.Access.Authorizer, p, d)
+	acc, err := itemkit.AccessFor(ctx, s.cfg.Access.Authorizer, p, d)
 	if err != nil {
 		return p, nil, s.InternalError(ctx, "repository read rights", err)
 	}
@@ -347,13 +348,13 @@ func (s artifactoryService) readOne(
 	c, err := st.Repos().Get(ctx, key)
 	switch {
 	case errors.Is(err, store.ErrNotFound):
-		return p, repo.Config{}, NotFoundRepo(key)
+		return p, repo.Config{}, itemkit.NotFoundRepo(key)
 	case err != nil:
 		return p, repo.Config{}, s.InternalError(ctx, "get repository", err)
 	case !can(c):
 		return p, repo.Config{}, httpkit.Denied(p)
 	}
-	return p, View(p, c), nil
+	return p, itemkit.View(p, c), nil
 }
 
 func (s artifactoryService) GetRepositoryConfiguration(
@@ -535,7 +536,7 @@ func (s artifactoryService) GetBatchOfRepositoriesByName(
 		case err != nil:
 			return nil, s.InternalError(ctx, "get repository", err)
 		case can(c):
-			out[key] = View(p, c)
+			out[key] = itemkit.View(p, c)
 		}
 	}
 	return out, nil
@@ -731,7 +732,7 @@ func (s artifactoryService) UpdateRepositoryConfiguration(
 	stored, err := st.Repos().Get(ctx, key)
 	switch {
 	case errors.Is(err, store.ErrNotFound):
-		return nil, NotFoundRepo(key)
+		return nil, itemkit.NotFoundRepo(key)
 	case err != nil:
 		return nil, s.InternalError(ctx, "get repository", err)
 	}
@@ -864,7 +865,7 @@ func (s artifactoryService) UpdateMultipleRepositories(
 		stored, err := st.Repos().Get(ctx, key)
 		switch {
 		case errors.Is(err, store.ErrNotFound):
-			return nil, NotFoundRepo(key)
+			return nil, itemkit.NotFoundRepo(key)
 		case err != nil:
 			return nil, s.InternalError(ctx, "get repository", err)
 		}

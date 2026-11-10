@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -30,7 +31,7 @@ const versionMediaType = "application/vnd.org.jfrog.artifactory.system.Version+j
 type artifactoryService struct {
 	// Kit is the item kit every service shares; newArtifactoryService
 	// builds it, and a literal without one panics on its first kit call.
-	*Kit
+	*itemkit.Kit
 	cfg Config
 	// folderSlots holds a token for each folder archive download running;
 	// nil, in services built only to reach the store, limits nothing.

@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/opkg"
@@ -53,7 +54,9 @@ func TestAccOpkgSourceValidatesIndependentUpstreamContent(t *testing.T) {
 		{"feed/Packages.sig", []byte("-----BEGIN PGP SIGNATURE-----\ntest\n")},
 	} {
 		t.Run(tc.path, func(t *testing.T) {
-			q, err := OpkgSourceRequest(source.Request{Resource: source.Resource{Path: tc.path}})
+			q, err := itemkit.OpkgSourceRequest(
+				source.Request{Resource: source.Resource{Path: tc.path}},
+			)
 			if err != nil || q.Resource.Kind != source.ResourceKindMetadata ||
 				!q.Resource.PermissionFolder ||
 				q.Resource.ValidateMetadata == nil {
@@ -92,13 +95,15 @@ func TestAccOpkgSourceValidatesIndependentUpstreamContent(t *testing.T) {
 				})
 			}
 			q.Resource.Query = "download=1"
-			if _, err := OpkgSourceRequest(q); !errors.Is(err, source.ErrInvalidRequest) {
+			if _, err := itemkit.OpkgSourceRequest(q); !errors.Is(err, source.ErrInvalidRequest) {
 				t.Errorf("metadata query accepted: %v", err)
 			}
 		})
 	}
 	packagePath := "feed/464xlat_13_x86_64.ipk"
-	q, err := OpkgSourceRequest(source.Request{Resource: source.Resource{Path: packagePath}})
+	q, err := itemkit.OpkgSourceRequest(
+		source.Request{Resource: source.Resource{Path: packagePath}},
+	)
 	if err != nil || q.Resource.Validate == nil || q.Resource.Variant != "opkg-package-v1" {
 		t.Fatalf("package validation missing: %+v, %v", q.Resource, err)
 	}
@@ -115,10 +120,10 @@ func TestAccOpkgSourceValidatesIndependentUpstreamContent(t *testing.T) {
 		t.Fatal("corrupt IPK accepted")
 	}
 	q.Resource.Query = "download=1"
-	if _, err := OpkgSourceRequest(q); !errors.Is(err, source.ErrInvalidRequest) {
+	if _, err := itemkit.OpkgSourceRequest(q); !errors.Is(err, source.ErrInvalidRequest) {
 		t.Errorf("package query accepted: %v", err)
 	}
-	if _, err := OpkgSourceRequest(
+	if _, err := itemkit.OpkgSourceRequest(
 		source.Request{Resource: source.Resource{Path: "../wrong.ipk"}},
 	); !errors.Is(
 		err,
@@ -126,7 +131,7 @@ func TestAccOpkgSourceValidatesIndependentUpstreamContent(t *testing.T) {
 	) {
 		t.Errorf("invalid IPK path accepted: %v", err)
 	}
-	if _, err := OpkgSourceRequest(
+	if _, err := itemkit.OpkgSourceRequest(
 		source.Request{Resource: source.Resource{Path: "../Packages"}},
 	); !errors.Is(
 		err,
@@ -155,7 +160,7 @@ func TestAccOpkgVirtualGraphAndRouteBoundaries(t *testing.T) {
 		}
 	}
 	p := kernel.Principal{Name: "admin", Admin: true}
-	acc, err := AccessFor(t.Context(), authorizerOver(w.db), p, nil)
+	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -279,7 +284,7 @@ func TestAccOpkgVirtualGraphAndRouteBoundaries(t *testing.T) {
 func TestAccOpkgDirectRoutingRejectsUnsafeAndWrongClassRequests(t *testing.T) {
 	w := newItemWorld(t, false)
 	p := kernel.Principal{Name: "admin", Admin: true}
-	acc, err := AccessFor(t.Context(), authorizerOver(w.db), p, nil)
+	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -301,7 +306,17 @@ func TestAccOpkgDirectRoutingRejectsUnsafeAndWrongClassRequests(t *testing.T) {
 		c.Class = tc.class
 		r := httptest.NewRequest(http.MethodGet, tc.url, nil)
 		response := httptest.NewRecorder()
-		got := tryOpkgItem(svc.Kit, response, r, w.db, c, false, ItemRequest{Path: tc.path}, p, acc)
+		got := tryOpkgItem(
+			svc.Kit,
+			response,
+			r,
+			w.db,
+			c,
+			false,
+			itemkit.ItemRequest{Path: tc.path},
+			p,
+			acc,
+		)
 		if got != tc.handled || got && response.Code != tc.status {
 			t.Errorf(
 				"%s class %s: handled=%t status=%d, want %t/%d",
@@ -323,7 +338,7 @@ func TestAccOpkgDirectRoutingRejectsUnsafeAndWrongClassRequests(t *testing.T) {
 	r := httptest.NewRequest(http.MethodGet, "/feed/alpha_1_all.ipk", nil)
 	response := httptest.NewRecorder()
 	svc.serveOpkgPackage(response, r, w.db, remote, false,
-		ItemRequest{Path: "feed/alpha_1_all.ipk"}, p, acc)
+		itemkit.ItemRequest{Path: "feed/alpha_1_all.ipk"}, p, acc)
 	if response.Code == http.StatusOK {
 		t.Error("remote package was delivered without an authoritative feed source")
 	}
@@ -370,7 +385,7 @@ func TestAccOpkgVirtualLocalPackageRejectsMissingAndDriftedBytes(t *testing.T) {
 	}
 	seed("feed/Packages", index)
 	p := kernel.Principal{Name: "admin", Admin: true}
-	acc, err := AccessFor(t.Context(), authorizerOver(w.db), p, nil)
+	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -451,7 +466,7 @@ func TestAccOpkgRemoteIndexRejectsFaultsAndRevokedAuthority(t *testing.T) {
 		}
 	}
 	p := kernel.Principal{Name: "admin", Admin: true}
-	acc, err := AccessFor(t.Context(), authorizerOver(w.db), p, nil)
+	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -552,7 +567,7 @@ func TestAccOpkgRemoteIndexRejectsFaultsAndRevokedAuthority(t *testing.T) {
 			Representation: source.Representation{Size: int64(len(index))},
 		}
 	}
-	request := ItemRequest{Path: "feed/Packages"}
+	request := itemkit.ItemRequest{Path: "feed/Packages"}
 	serve := func() int {
 		t.Helper()
 		freshStream()
@@ -749,7 +764,7 @@ func TestAccOpkgRemotePackagePinsIndependentIndexAndCachedBytes(t *testing.T) {
 		t.Errorf("wrong cached size published success: status=%d used=%d", res.Code, used)
 	}
 	p := kernel.Principal{Name: "admin", Admin: true}
-	acc, err := AccessFor(t.Context(), authorizerOver(w.db), p, nil)
+	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -761,7 +776,7 @@ func TestAccOpkgRemotePackagePinsIndependentIndexAndCachedBytes(t *testing.T) {
 		r,
 		remote,
 		false,
-		ItemRequest{Path: "../bad.ipk"},
+		itemkit.ItemRequest{Path: "../bad.ipk"},
 		want,
 		p,
 		acc,

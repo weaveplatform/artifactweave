@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -67,9 +68,9 @@ func (s artifactoryService) uploadCran(
 		httpkit.WriteErr(w, r, err)
 		return
 	}
-	c, cached, err := ResolveRepo(ctx, st, chi.URLParam(r, "repoKey"))
+	c, cached, err := itemkit.ResolveRepo(ctx, st, chi.URLParam(r, "repoKey"))
 	if err == nil {
-		c, err = DeployTarget(ctx, st, c, cached)
+		c, err = itemkit.DeployTarget(ctx, st, c, cached)
 	}
 	if err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(ctx, "resolve CRAN upload repository", err))
@@ -130,6 +131,6 @@ func (s artifactoryService) uploadCran(
 		httpkit.WriteErr(w, r, s.ItemError(ctx, "deploy CRAN package", err))
 		return
 	}
-	w.Header().Set("Location", DownloadURI(ctx, it.ReportedRepoKey(), it.FullPath()))
-	httpkit.WriteJSON(w, http.StatusCreated, ItemCreated(ctx, it))
+	w.Header().Set("Location", itemkit.DownloadURI(ctx, it.ReportedRepoKey(), it.FullPath()))
+	httpkit.WriteJSON(w, http.StatusCreated, itemkit.ItemCreated(ctx, it))
 }

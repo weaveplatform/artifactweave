@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
@@ -22,7 +23,7 @@ func TestAccDebianRemoteSourceRejectsInvalidPackages(t *testing.T) {
 		{"pool/alpha_1.0_amd64_0.deb", "alpha_1.0_amd64_0.deb"},
 		{"pool/alpha_1.0-1.dsc", "alpha_1.0-1.dsc"},
 	} {
-		q, err := DebianSourceRequest(source.Request{
+		q, err := itemkit.DebianSourceRequest(source.Request{
 			Repo:     repo.Config{PackageType: repo.Debian},
 			Resource: source.Resource{Path: tc.path, Method: http.MethodGet},
 		})
@@ -46,7 +47,7 @@ func TestAccDebianRemoteSourceRejectsInvalidPackages(t *testing.T) {
 		}
 	}
 	for _, p := range []string{"../outside.deb", "pool/bad name.deb", "pool/../bad.dsc"} {
-		_, err := DebianSourceRequest(source.Request{
+		_, err := itemkit.DebianSourceRequest(source.Request{
 			Repo:     repo.Config{PackageType: repo.Debian},
 			Resource: source.Resource{Path: p, Method: http.MethodGet},
 		})
@@ -64,7 +65,7 @@ func TestAccDebianRemoteMetadataIsFetchableAndVerified(t *testing.T) {
 		"dists/stable/main/binary-amd64/Packages.gz",
 		"dists/stable/main/binary-amd64/by-hash/SHA256/" + strings.Repeat("a", 64),
 	} {
-		q, err := DebianSourceRequest(source.Request{
+		q, err := itemkit.DebianSourceRequest(source.Request{
 			Repo:     repo.Config{PackageType: repo.Debian},
 			Resource: source.Resource{Path: path, Method: http.MethodGet},
 		})
@@ -74,7 +75,7 @@ func TestAccDebianRemoteMetadataIsFetchableAndVerified(t *testing.T) {
 		}
 	}
 	path := "dists/stable/main/binary-amd64/by-hash/SHA256/" + strings.Repeat("a", 64)
-	q, err := DebianSourceRequest(source.Request{
+	q, err := itemkit.DebianSourceRequest(source.Request{
 		Repo:     repo.Config{PackageType: repo.Debian},
 		Resource: source.Resource{Path: path, Method: http.MethodGet},
 	})

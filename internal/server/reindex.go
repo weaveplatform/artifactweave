@@ -11,6 +11,7 @@ import (
 	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/rpm"
@@ -92,7 +93,7 @@ func (s artifactoryService) CalculateYumRepositoryMetadata(
 	ctx context.Context,
 	req artgen.CalculateYumRepositoryMetadataRequestObject,
 ) (artgen.CalculateYumRepositoryMetadataResponseObject, error) {
-	st, c, _, err := s.OperationRepo(ctx, repo.RPM, ReindexOps[repo.RPM], req.RepoKey)
+	st, c, _, err := s.OperationRepo(ctx, repo.RPM, itemkit.ReindexOps[repo.RPM], req.RepoKey)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +107,7 @@ func (s artifactoryService) CalculateYumRepositoryMetadata(
 			return nil, err
 		}
 		d, _ := accessapi.DeciderFrom(ctx)
-		acc, err := AccessFor(ctx, s.cfg.Access.Authorizer, p, d)
+		acc, err := itemkit.AccessFor(ctx, s.cfg.Access.Authorizer, p, d)
 		if err != nil {
 			return nil, s.InternalError(ctx, "RPM virtual rights", err)
 		}

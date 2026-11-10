@@ -11,6 +11,7 @@ import (
 	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -41,18 +42,18 @@ type cranCandidate struct {
 }
 
 // cranAPI serves CRAN's indexes and packages over the item kit.
-type cranAPI struct{ *Kit }
+type cranAPI struct{ *itemkit.Kit }
 
 func tryCranItem(
-	k *Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	cached bool, req ItemRequest, p kernel.Principal, acc Access,
+	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
+	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) bool {
 	s := cranAPI{k}
 	if !cran.Serves(c.PackageType) || req.IsFolder {
 		return false
 	}
 	if strings.HasSuffix(req.Path, "/PACKAGES.rds") {
-		httpkit.WriteErr(w, r, ItemNotFound()) // R falls back to PACKAGES.gz.
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound()) // R falls back to PACKAGES.gz.
 		return true
 	}
 	if _, _, ok := cran.IndexPath(req.Path); ok {
@@ -71,13 +72,13 @@ func tryCranItem(
 
 func (s cranAPI) serveCranIndex(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	cached bool, req ItemRequest, p kernel.Principal, acc Access,
+	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
 	ctx := r.Context()
 	feed, name, ok := cran.IndexPath(req.Path)
 	if !ok || len(req.Props) != 0 || r.URL.RawQuery != "" ||
 		cached && c.Class != repo.Remote {
-		httpkit.WriteErr(w, r, ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
 	if !acc.Folder(c, feed, types.ActionRead) || !acc.File(c, req.Path, types.ActionRead) ||
@@ -133,7 +134,7 @@ func (s cranAPI) serveCranIndex(
 		w.Header().Set("Content-Type", "application/gzip")
 	}
 	w.Header().Set("Cache-Control", "private, no-store")
-	sw := &StatusWriter{ResponseWriter: w}
+	sw := &itemkit.StatusWriter{ResponseWriter: w}
 	http.ServeContent(sw, r, name, time.Time{}, bytes.NewReader(body))
 	if sw.Complete(r) && used != nil {
 		_ = used(ctx)
@@ -141,7 +142,7 @@ func (s cranAPI) serveCranIndex(
 }
 
 func cranPackageReadable(
-	ctx context.Context, c repo.Config, p string, acc Access,
+	ctx context.Context, c repo.Config, p string, acc itemkit.Access,
 	check func(context.Context, string) error,
 ) (bool, error) {
 	if !acc.File(c, p, types.ActionRead) || generic.CheckDownload(c, p, false) != nil {
@@ -160,7 +161,7 @@ func cranPackageReadable(
 
 func (s cranAPI) cranMemberIndex(
 	ctx context.Context, st store.Store, c repo.Config, cached bool, indexPath string,
-	p kernel.Principal, acc Access,
+	p kernel.Principal, acc itemkit.Access,
 ) (cranIndexView, error) {
 	view := cranIndexView{repo: c}
 	var body []byte
@@ -175,7 +176,7 @@ func (s cranAPI) cranMemberIndex(
 			CacheOnly: cached,
 			Resource:  source.Resource{Path: indexPath, Method: http.MethodGet},
 		}
-		query, err = CranSourceRequest(query)
+		query, err = itemkit.CranSourceRequest(query)
 		if err != nil {
 			return view, err
 		}
@@ -255,7 +256,7 @@ func (s cranAPI) readCranBlob(ctx context.Context, sha string) ([]byte, error) {
 
 func (s cranAPI) cranCandidates(
 	ctx context.Context, st store.Store, c repo.Config, indexPath string,
-	p kernel.Principal, acc Access, seen map[string]bool,
+	p kernel.Principal, acc itemkit.Access, seen map[string]bool,
 ) ([]cranCandidate, error) {
 	if seen[c.Key] || len(seen) >= 8 {
 		return nil, errCranVirtualCycle
@@ -330,10 +331,10 @@ func (s cranAPI) cranCandidates(
 
 func (s cranAPI) serveCranPackage(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	cached bool, req ItemRequest, p kernel.Principal, acc Access,
+	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
 	if len(req.Props) != 0 || r.URL.RawQuery != "" || cached && c.Class != repo.Remote {
-		httpkit.WriteErr(w, r, ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
 	if !acc.File(c, req.Path, types.ActionRead) ||
@@ -378,18 +379,18 @@ func (s cranAPI) serveCranPackage(
 			return
 		}
 		if it.Folder {
-			httpkit.WriteErr(w, r, ItemNotFound())
+			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 			return
 		}
-		s.ServeFile(w, r, st, Found{Repo: candidate.repo, Item: it}, p)
+		s.ServeFile(w, r, st, itemkit.Found{Repo: candidate.repo, Item: it}, p)
 		return
 	}
-	httpkit.WriteErr(w, r, ItemNotFound())
+	httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 }
 
 func (s cranAPI) serveRemoteCranPackage(
 	w http.ResponseWriter, r *http.Request, c repo.Config, cached bool,
-	req ItemRequest, expected cran.Package, p kernel.Principal, acc Access,
+	req itemkit.ItemRequest, expected cran.Package, p kernel.Principal, acc itemkit.Access,
 ) {
 	query := source.Request{
 		Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.Decider, Project: c.ProjectKey,
@@ -399,7 +400,7 @@ func (s cranAPI) serveRemoteCranPackage(
 			Checksums: types.Checksums{MD5: expected.MD5},
 		},
 	}
-	query, err := CranSourceRequest(query)
+	query, err := itemkit.CranSourceRequest(query)
 	if err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "CRAN source", err))
 		return
@@ -425,5 +426,5 @@ func (s cranAPI) serveRemoteCranPackage(
 		return
 	}
 	s.ServeFile(w, r, s.Store,
-		Found{Repo: c, Item: *result.Item, Used: result.Used}, p)
+		itemkit.Found{Repo: c, Item: *result.Item, Used: result.Used}, p)
 }

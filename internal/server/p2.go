@@ -14,6 +14,7 @@ import (
 	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -30,20 +31,20 @@ var errP2VirtualCycle = errors.New("server: p2 virtual repository cycle")
 
 // p2Items serves P2's virtual and composite repositories over the item
 // kit.
-type p2Items struct{ *Kit }
+type p2Items struct{ *itemkit.Kit }
 
 // tryP2Item reserves the update-site wire paths before generic item routing.
 // Remote reads still cross the common source policy and cache boundary.
 func tryP2Item(
-	k *Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	cached bool, req ItemRequest, p kernel.Principal, acc Access,
+	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
+	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) bool {
 	s := p2Items{k}
 	if c.PackageType != repo.P2 {
 		return false
 	}
 	if req.IsFolder || len(req.Props) != 0 || r.URL.RawQuery != "" {
-		httpkit.WriteErr(w, r, ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return true
 	}
 	if c.Class == repo.Virtual {
@@ -51,7 +52,7 @@ func tryP2Item(
 		return true
 	}
 	if c.Class != repo.Remote || p2.Classify(req.Path) == p2.KindInvalid {
-		httpkit.WriteErr(w, r, ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return true
 	}
 	if strings.HasPrefix(req.Path, "__p2_ext/") || p2CompositeName(req.Path) {
@@ -80,7 +81,7 @@ func p2ArchiveURL(raw string) (string, bool) {
 }
 
 func (s p2Items) serveP2Archive(w http.ResponseWriter, r *http.Request,
-	c repo.Config, cached bool, req ItemRequest, p kernel.Principal, acc Access,
+	c repo.Config, cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 	archiveURL string,
 ) {
 	if !acc.File(c, req.Path, types.ActionRead) ||
@@ -156,7 +157,7 @@ func (s p2Items) serveP2Archive(w http.ResponseWriter, r *http.Request,
 	}
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Cache-Control", "private, no-store")
-	sw := &StatusWriter{ResponseWriter: w}
+	sw := &itemkit.StatusWriter{ResponseWriter: w}
 	http.ServeContent(sw, r, path.Base(req.Path), time.Time{}, bytes.NewReader(body))
 	if sw.Complete(r) && result.Used != nil {
 		_ = result.Used(r.Context())
@@ -164,7 +165,7 @@ func (s p2Items) serveP2Archive(w http.ResponseWriter, r *http.Request,
 }
 
 func (s p2Items) serveP2Virtual(w http.ResponseWriter, r *http.Request,
-	st store.Store, c repo.Config, req ItemRequest, p kernel.Principal, acc Access,
+	st store.Store, c repo.Config, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
 	if !acc.Folder(c, req.Path, types.ActionRead) ||
 		!acc.File(c, req.Path, types.ActionRead) ||
@@ -180,12 +181,12 @@ func (s p2Items) serveP2Virtual(w http.ResponseWriter, r *http.Request,
 	if strings.HasPrefix(req.Path, "__p2/") {
 		parts := strings.SplitN(strings.TrimPrefix(req.Path, "__p2/"), "/", 2)
 		if len(parts) != 2 || p2.Classify(parts[1]) == p2.KindInvalid {
-			httpkit.WriteErr(w, r, ItemNotFound())
+			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 			return
 		}
 		i, parseErr := strconv.Atoi(parts[0])
 		if parseErr != nil || i < 0 || i >= len(members) || strconv.Itoa(i) != parts[0] {
-			httpkit.WriteErr(w, r, ItemNotFound())
+			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 			return
 		}
 		member := members[i]
@@ -216,7 +217,7 @@ func (s p2Items) serveP2Virtual(w http.ResponseWriter, r *http.Request,
 	case "compositeArtifacts.xml":
 		body = p2Composite("artifact", members)
 	default:
-		httpkit.WriteErr(w, r, ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
 	w.Header().Set("Cache-Control", "private, no-store")
@@ -231,7 +232,7 @@ func (s p2Items) serveP2Virtual(w http.ResponseWriter, r *http.Request,
 // p2Members keeps the virtual order and removes members a caller cannot
 // traverse. Only a P2 remote or a local Maven/Generic update site can supply
 // native metadata. A nested P2 virtual is permitted if its graph is acyclic.
-func p2Members(ctx context.Context, st store.Store, c repo.Config, acc Access,
+func p2Members(ctx context.Context, st store.Store, c repo.Config, acc itemkit.Access,
 	visited map[string]bool,
 ) ([]repo.Config, error) {
 	if visited[c.Key] {

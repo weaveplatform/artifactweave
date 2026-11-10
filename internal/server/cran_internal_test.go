@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -25,7 +26,7 @@ func TestUnitCRANSourceValidatesPublishedBytes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	q, err := CranSourceRequest(source.Request{Resource: source.Resource{
+	q, err := itemkit.CranSourceRequest(source.Request{Resource: source.Resource{
 		Path: "src/contrib/PACKAGES", Method: http.MethodGet,
 	}})
 	if err != nil || q.Resource.ValidateMetadata == nil || !q.Resource.PermissionFolder ||
@@ -51,10 +52,10 @@ func TestUnitCRANSourceValidatesPublishedBytes(t *testing.T) {
 		})
 	}
 	q.Resource.Query = "malformed=1"
-	if _, err := CranSourceRequest(q); !errors.Is(err, source.ErrInvalidRequest) {
+	if _, err := itemkit.CranSourceRequest(q); !errors.Is(err, source.ErrInvalidRequest) {
 		t.Fatalf("index query admitted: %v", err)
 	}
-	pkg, err := CranSourceRequest(source.Request{Resource: source.Resource{
+	pkg, err := itemkit.CranSourceRequest(source.Request{Resource: source.Resource{
 		Path: "src/contrib/assertthat_0.2.1.tar.gz", Method: http.MethodGet,
 	}})
 	if err != nil || pkg.Resource.Validate == nil || pkg.Resource.Variant != "cran-package-v1" {
@@ -80,7 +81,7 @@ func TestUnitCRANSourceValidatesPublishedBytes(t *testing.T) {
 		"src/contrib/PACKAGES.rds", "src/contrib/../secret.tar.gz",
 		"bin/windows/contrib/latest/demo_1.0.zip",
 	} {
-		if _, err := CranSourceRequest(
+		if _, err := itemkit.CranSourceRequest(
 			source.Request{Resource: source.Resource{Path: p}},
 		); !errors.Is(
 			err,
@@ -105,7 +106,7 @@ func TestUnitCRANVirtualRejectsCyclesAndWrongMembers(t *testing.T) {
 		}
 	}
 	p := kernel.Principal{Name: "admin", Admin: true}
-	acc, err := AccessFor(t.Context(), authorizerOver(w.db), p, nil)
+	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

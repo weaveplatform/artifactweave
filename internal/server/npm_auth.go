@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	npmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -150,7 +151,7 @@ func (s artifactoryService) GetNpmScopeAuth(
 	if err != nil {
 		return nil, err
 	}
-	rc, cached, err := ResolveRepo(ctx, st, req.RepoKey)
+	rc, cached, err := itemkit.ResolveRepo(ctx, st, req.RepoKey)
 	switch {
 	case err != nil:
 		return nil, s.ItemError(ctx, "resolve repository", err)

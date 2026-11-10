@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/server"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 )
 
@@ -34,7 +35,7 @@ type SearchLimits = server.SearchLimits
 
 // DefaultRedirectTTL is how long a signed download URL stays valid when
 // Config.Redirect sets no TTL.
-const DefaultRedirectTTL = server.DefaultRedirectTTL
+const DefaultRedirectTTL = itemkit.DefaultRedirectTTL
 
 // Router returns the production router built from c, with every protocol
 // route, authentication and the middleware the server runs. Suites build the

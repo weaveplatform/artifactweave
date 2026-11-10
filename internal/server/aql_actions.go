@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -36,7 +37,7 @@ func (s artifactoryService) aqlAction(
 	}
 	if !p.Admin {
 		d, _ := accessapi.DeciderFrom(ctx)
-		acc, err := AccessFor(ctx, s.cfg.Access.Authorizer, p, d)
+		acc, err := itemkit.AccessFor(ctx, s.cfg.Access.Authorizer, p, d)
 		if err != nil {
 			return nil, err
 		}

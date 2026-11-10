@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
@@ -49,7 +50,7 @@ func (s artifactoryService) registerMavenRoutes(r chi.Router) {
 // caller may act on it.
 type mavenTarget struct {
 	p    kernel.Principal
-	acc  Access
+	acc  itemkit.Access
 	st   store.Store
 	c    repo.Config
 	path string
@@ -70,7 +71,7 @@ func (s artifactoryService) mavenTargetOf(
 	if err != nil {
 		return mavenTarget{}, err
 	}
-	key, p, _, err := SplitRepoPath(strings.TrimPrefix(r.URL.EscapedPath(), prefix))
+	key, p, _, err := itemkit.SplitRepoPath(strings.TrimPrefix(r.URL.EscapedPath(), prefix))
 	if err != nil {
 		return mavenTarget{}, err
 	}
@@ -79,7 +80,7 @@ func (s artifactoryService) mavenTargetOf(
 		return mavenTarget{}, err
 	}
 	missing := apierror.New(http.StatusNotFound, fmt.Sprintf("Could not find path '%s/%s'", key, p))
-	c, cached, err := ResolveRepo(ctx, st, key)
+	c, cached, err := itemkit.ResolveRepo(ctx, st, key)
 	var api *apierror.Error
 	switch {
 	case errors.As(err, &api) && api.Status == http.StatusNotFound:

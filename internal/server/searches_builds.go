@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
@@ -162,7 +163,7 @@ func (s artifactoryService) SearchBuildArtifacts(
 			continue
 		}
 		entries = append(entries, map[string]any{
-			"downloadUri": DownloadURI(ctx, it.ReportedRepoKey(), full),
+			"downloadUri": itemkit.DownloadURI(ctx, it.ReportedRepoKey(), full),
 		})
 		if len(entries) == limit {
 			break

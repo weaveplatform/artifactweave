@@ -12,6 +12,7 @@ import (
 	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -39,11 +40,11 @@ type rpmCandidate struct {
 
 // rpmAPI serves the RPM virtual repositories' metadata and packages over
 // the item kit.
-type rpmAPI struct{ *Kit }
+type rpmAPI struct{ *itemkit.Kit }
 
 func tryRPMItem(
-	k *Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	cached bool, req ItemRequest, p kernel.Principal, acc Access,
+	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
+	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) bool {
 	s := rpmAPI{k}
 	if c.PackageType != repo.RPM || c.Class != repo.Virtual || cached || req.IsFolder {
@@ -62,12 +63,12 @@ func tryRPMItem(
 
 func (s rpmAPI) serveVirtualRPMMetadata(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	req ItemRequest, p kernel.Principal, acc Access,
+	req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
 	root, name, ok := strings.Cut(req.Path, "repodata/")
 	if !ok || name == "" || strings.Contains(name, "/") || len(req.Props) != 0 ||
 		r.URL.RawQuery != "" {
-		httpkit.WriteErr(w, r, ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
 	if !acc.Folder(c, req.Path, types.ActionRead) || !acc.File(c, req.Path, types.ActionRead) ||
@@ -95,10 +96,10 @@ func (s rpmAPI) serveVirtualRPMMetadata(
 	}
 	body, ok := meta.Files["repodata/"+name]
 	if !ok {
-		httpkit.WriteErr(w, r, ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
-	sw := &StatusWriter{ResponseWriter: w}
+	sw := &itemkit.StatusWriter{ResponseWriter: w}
 	http.ServeContent(sw, r, name, time.Time{}, bytes.NewReader(body))
 	_ = sw.Complete(r)
 }
@@ -130,10 +131,10 @@ func signVirtualRPM(
 
 func (s rpmAPI) serveVirtualRPMPackage(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	req ItemRequest, p kernel.Principal, acc Access,
+	req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
 	if len(req.Props) != 0 || r.URL.RawQuery != "" {
-		httpkit.WriteErr(w, r, ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
 	if !acc.Folder(c, req.Path, types.ActionRead) || !acc.File(c, req.Path, types.ActionRead) ||
@@ -145,7 +146,7 @@ func (s rpmAPI) serveVirtualRPMPackage(
 	if c.YumRootDepth != nil && *c.YumRootDepth > 0 {
 		parts := strings.Split(req.Path, "/")
 		if len(parts) <= *c.YumRootDepth {
-			httpkit.WriteErr(w, r, ItemNotFound())
+			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 			return
 		}
 		root = strings.Join(parts[:*c.YumRootDepth], "/") + "/"
@@ -169,21 +170,21 @@ func (s rpmAPI) serveVirtualRPMPackage(
 			return
 		}
 		if it.Folder || it.Actual.SHA256 != candidate.pkg.SHA256 {
-			httpkit.WriteErr(w, r, ItemNotFound())
+			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 			return
 		}
-		s.ServeFile(w, r, st, Found{Repo: candidate.repo, Item: it}, p)
+		s.ServeFile(w, r, st, itemkit.Found{Repo: candidate.repo, Item: it}, p)
 		return
 	}
-	httpkit.WriteErr(w, r, ItemNotFound())
+	httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 }
 
 func (s rpmAPI) serveVirtualRemoteRPMPackage(
-	w http.ResponseWriter, r *http.Request, c repo.Config, req ItemRequest,
-	wantSHA string, p kernel.Principal, acc Access,
+	w http.ResponseWriter, r *http.Request, c repo.Config, req itemkit.ItemRequest,
+	wantSHA string, p kernel.Principal, acc itemkit.Access,
 ) {
 	if s.RemoteSources == nil {
-		httpkit.WriteErr(w, r, ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
 	q := source.Request{
@@ -197,7 +198,7 @@ func (s rpmAPI) serveVirtualRemoteRPMPackage(
 			Method: r.Method,
 		},
 	}
-	q, err := RPMSourceRequest(q)
+	q, err := itemkit.RPMSourceRequest(q)
 	if err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "RPM source", err))
 		return
@@ -209,12 +210,12 @@ func (s rpmAPI) serveVirtualRemoteRPMPackage(
 			return err
 		}
 		if _, err := body.Seek(0, io.SeekStart); err != nil {
-			return RPMSourceIntegrity()
+			return itemkit.RPMSourceIntegrity()
 		}
 		h := sha256.New()
 		read, err := io.Copy(h, io.LimitReader(body, size))
 		if err != nil || read != size || fmt.Sprintf("%x", h.Sum(nil)) != wantSHA {
-			return RPMSourceIntegrity()
+			return itemkit.RPMSourceIntegrity()
 		}
 		return nil
 	}
@@ -235,15 +236,15 @@ func (s rpmAPI) serveVirtualRemoteRPMPackage(
 		return
 	}
 	if result.Item == nil || result.Item.Actual.SHA256 != wantSHA {
-		httpkit.WriteErr(w, r, pkgroute.SourceError(RPMSourceIntegrity(), p.Anonymous))
+		httpkit.WriteErr(w, r, pkgroute.SourceError(itemkit.RPMSourceIntegrity(), p.Anonymous))
 		return
 	}
-	s.ServeFile(w, r, s.Store, Found{Repo: c, Item: *result.Item, Used: result.Used}, p)
+	s.ServeFile(w, r, s.Store, itemkit.Found{Repo: c, Item: *result.Item, Used: result.Used}, p)
 }
 
 func (s rpmAPI) rpmCandidates(
 	ctx context.Context, st store.Store, c repo.Config, root string,
-	p kernel.Principal, acc Access, seen map[string]bool,
+	p kernel.Principal, acc itemkit.Access, seen map[string]bool,
 ) ([]rpmCandidate, error) {
 	if seen[c.Key] || len(seen) >= 8 {
 		return nil, errRPMVirtualCycle
@@ -301,7 +302,7 @@ func (s rpmAPI) rpmCandidates(
 
 func (s rpmAPI) rpmMemberPackages(
 	ctx context.Context, st store.Store, c repo.Config, root string,
-	p kernel.Principal, acc Access,
+	p kernel.Principal, acc itemkit.Access,
 ) ([]rpm.Package, error) {
 	manifest, err := s.rpmMemberBytes(ctx, st, c, root+"repodata/repomd.xml", p, acc)
 	if err != nil {
@@ -328,7 +329,7 @@ func (s rpmAPI) rpmMemberPackages(
 
 func (s rpmAPI) rpmMemberBytes(
 	ctx context.Context, st store.Store, c repo.Config, path string,
-	p kernel.Principal, acc Access,
+	p kernel.Principal, acc itemkit.Access,
 ) ([]byte, error) {
 	if c.Class == repo.Remote {
 		if s.RemoteSources == nil {
@@ -338,7 +339,7 @@ func (s rpmAPI) rpmMemberBytes(
 			Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.Decider, Project: c.ProjectKey,
 			Resource: source.Resource{Path: path, Method: http.MethodGet},
 		}
-		q, err := RPMSourceRequest(q)
+		q, err := itemkit.RPMSourceRequest(q)
 		if err != nil {
 			return nil, err
 		}

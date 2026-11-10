@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/rpm"
@@ -61,7 +62,7 @@ func TestAccRPMSourceValidationUsesIndependentUpstreamMetadata(t *testing.T) {
 		{"repodata/repomd.xml", manifest},
 		{primaryPath, primary},
 	} {
-		q, err := RPMSourceRequest(source.Request{
+		q, err := itemkit.RPMSourceRequest(source.Request{
 			Repo:     repo.Config{PackageType: repo.RPM},
 			Resource: source.Resource{Path: tc.path, Method: http.MethodGet},
 		})
@@ -105,7 +106,7 @@ func TestAccRPMSourceValidationUsesIndependentUpstreamMetadata(t *testing.T) {
 			})
 		}
 		q.Resource.Query = "download=1"
-		if _, err := RPMSourceRequest(q); !errors.Is(err, source.ErrInvalidRequest) {
+		if _, err := itemkit.RPMSourceRequest(q); !errors.Is(err, source.ErrInvalidRequest) {
 			t.Errorf("%s: metadata query allowed: %v", tc.path, err)
 		}
 	}
@@ -114,7 +115,7 @@ func TestAccRPMSourceValidationUsesIndependentUpstreamMetadata(t *testing.T) {
 		t,
 		"migration/artifacts/ecosystem/rpm/testdata/artifactweave-alpha-1.0-1.fc42.noarch.rpm",
 	)
-	q, err := RPMSourceRequest(source.Request{Resource: source.Resource{
+	q, err := itemkit.RPMSourceRequest(source.Request{Resource: source.Resource{
 		Path: "pool/artifactweave-alpha-1.0-1.fc42.noarch.rpm", Method: http.MethodGet,
 	}})
 	if err != nil || q.Resource.Validate == nil {
@@ -136,7 +137,7 @@ func TestAccRPMSourceValidationUsesIndependentUpstreamMetadata(t *testing.T) {
 		t.Fatal("corrupt upstream RPM accepted")
 	}
 	q.Resource.Query = "download=1"
-	if _, err := RPMSourceRequest(q); !errors.Is(err, source.ErrInvalidRequest) {
+	if _, err := itemkit.RPMSourceRequest(q); !errors.Is(err, source.ErrInvalidRequest) {
 		t.Errorf("RPM package query allowed: %v", err)
 	}
 }
@@ -158,7 +159,7 @@ func TestAccRPMVirtualMemberGraphRejectsCyclesWrongTypesAndUnavailableSources(t 
 		}
 	}
 	p := kernel.Principal{Name: "admin", Admin: true}
-	acc, err := AccessFor(t.Context(), authorizerOver(w.db), p, nil)
+	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -285,7 +286,7 @@ func TestAccRPMVirtualSigningRejectsMissingAndInvalidKeys(t *testing.T) {
 func TestAccRPMVirtualRemoteMemberRejectsUntrustedMetadata(t *testing.T) {
 	w := newItemWorld(t, false)
 	p := kernel.Principal{Name: "admin", Admin: true}
-	acc, err := AccessFor(t.Context(), authorizerOver(w.db), p, nil)
+	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -418,7 +419,7 @@ func TestAccRPMRemoteMetadataClosesBodyWhenAuthorityIsRevoked(t *testing.T) {
 			func(t *testing.T) {
 				w := newItemWorld(t, false)
 				p := kernel.Principal{Name: "admin", Admin: true}
-				acc, err := AccessFor(t.Context(), authorizerOver(w.db), p, nil)
+				acc, err := itemkit.AccessFor(t.Context(), authorizerOver(w.db), p, nil)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -478,7 +479,7 @@ func TestAccRPMVirtualRemotePackagePinsIndexedSHA(t *testing.T) {
 	correctSHA := fmt.Sprintf("%x", sha256.Sum256(body))
 	w := newItemWorld(t, false)
 	p := kernel.Principal{Name: "admin", Admin: true}
-	acc, err := AccessFor(t.Context(), authorizerOver(w.db), p, nil)
+	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -508,7 +509,7 @@ func TestAccRPMVirtualRemotePackagePinsIndexedSHA(t *testing.T) {
 		),
 	}
 	svc := rpmAPI{newKit(Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources})}
-	request := ItemRequest{Path: path}
+	request := itemkit.ItemRequest{Path: path}
 	serve := func(s rpmAPI, wantSHA string) *httptest.ResponseRecorder {
 		t.Helper()
 		r := httptest.NewRequest(http.MethodGet, "/artifactory/rpm-virtual/"+path, nil)
@@ -576,7 +577,7 @@ func TestAccRPMVirtualLocalMemberRejectsIncompleteAndDriftedContent(t *testing.T
 	manifest, primary, primaryPath := rpmUpstreamFixture(t)
 	seed("repodata/repomd.xml", manifest)
 	p := kernel.Principal{Name: "admin", Admin: true}
-	acc, err := AccessFor(t.Context(), authorizerOver(w.db), p, nil)
+	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

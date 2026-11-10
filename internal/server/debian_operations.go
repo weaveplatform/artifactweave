@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
@@ -30,7 +31,12 @@ func (s artifactoryService) CalculateDebianRepositoryMetadata(
 		}
 		return artgen.CalculateDebianRepositoryMetadata200TextResponse(msg), nil
 	}
-	st, c, by, err := s.OperationRepo(ctx, repo.Debian, ReindexOps[repo.Debian], req.RepoKey)
+	st, c, by, err := s.OperationRepo(
+		ctx,
+		repo.Debian,
+		itemkit.ReindexOps[repo.Debian],
+		req.RepoKey,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -43,5 +49,5 @@ func (s artifactoryService) CalculateDebianRepositoryMetadata(
 		}
 	}
 	return artgen.CalculateDebianRepositoryMetadata200TextResponse(
-		fmt.Sprintf(ReindexOps[repo.Debian].Answer, c.Key)), nil
+		fmt.Sprintf(itemkit.ReindexOps[repo.Debian].Answer, c.Key)), nil
 }

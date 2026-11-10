@@ -4,6 +4,7 @@
     "internal/app": "shared",
     "internal/server": "shared",
     "migration/access/adapters/http": "shared",
+    "migration/artifacts/adapters/http/itemkit": "shared",
     "migration/artifacts/adapters/http/pkgroute": "shared",
     "migration/artifacts/ecosystem/aieditorextensions/http": "aieditorextensions",
     "migration/artifacts/ecosystem/ansible/http": "ansible",
@@ -97,7 +98,6 @@
     "internal/server": [
       "access_api_test.go",
       "access_identity_status_test.go",
-      "access_internal_test.go",
       "api_ledger_test.go",
       "api_restrictions_parts_test.go",
       "aql_related_test.go",
@@ -130,7 +130,6 @@
       "p2_internal_test.go",
       "permissions_status_test.go",
       "properties_long_internal_test.go",
-      "redirect_internal_test.go",
       "registry_shared_test.go",
       "reindex_internal_test.go",
       "repositories_internal_test.go",
@@ -172,6 +171,10 @@
       "permissions_fault_test.go",
       "roles_internal_test.go",
       "tokens_internal_test.go"
+    ],
+    "migration/artifacts/adapters/http/itemkit": [
+      "access_test.go",
+      "redirect_test.go"
     ],
     "test/server/access": [
       "access_identity_test.go",

@@ -17,6 +17,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian"
@@ -62,7 +63,7 @@ func (s artifactoryService) CreateDebianSnapshot(
 		return nil, err
 	}
 	d, _ := accessapi.DeciderFrom(ctx)
-	acc, err := AccessFor(ctx, s.cfg.Access.Authorizer, p, d)
+	acc, err := itemkit.AccessFor(ctx, s.cfg.Access.Authorizer, p, d)
 	if err != nil {
 		return nil, s.InternalError(ctx, "Debian snapshot access", err)
 	}
@@ -154,18 +155,18 @@ func claimDebianSnapshot(
 
 func snapshotRepos(
 	ctx context.Context, st store.Store, job debianSnapshotRequest,
-	p kernel.Principal, acc Access,
+	p kernel.Principal, acc itemkit.Access,
 ) (repo.Config, repo.Config, error) {
 	sourceRepo, err := st.Repos().Get(ctx, job.Source)
 	if errors.Is(err, store.ErrNotFound) {
-		return repo.Config{}, repo.Config{}, NotFoundRepo(job.Source)
+		return repo.Config{}, repo.Config{}, itemkit.NotFoundRepo(job.Source)
 	}
 	if err != nil {
 		return repo.Config{}, repo.Config{}, fmt.Errorf("snapshot source repository: %w", err)
 	}
 	targetRepo, err := st.Repos().Get(ctx, job.Target)
 	if errors.Is(err, store.ErrNotFound) {
-		return repo.Config{}, repo.Config{}, NotFoundRepo(job.Target)
+		return repo.Config{}, repo.Config{}, itemkit.NotFoundRepo(job.Target)
 	}
 	if err != nil {
 		return repo.Config{}, repo.Config{}, fmt.Errorf("snapshot target repository: %w", err)
@@ -213,7 +214,7 @@ func RegisterDebianSnapshotWork(q *work.Queue, cfg Config) error {
 		if err != nil {
 			return fmt.Errorf("snapshot current permissions: %w", err)
 		}
-		acc, err := AccessFor(ctx, cfg.Access.Authorizer, p, d)
+		acc, err := itemkit.AccessFor(ctx, cfg.Access.Authorizer, p, d)
 		if err != nil {
 			return fmt.Errorf("snapshot access: %w", err)
 		}
@@ -230,7 +231,7 @@ func RegisterDebianSnapshotWork(q *work.Queue, cfg Config) error {
 
 func (s artifactoryService) createDebianSnapshot(
 	ctx context.Context, st store.Store, job debianSnapshotRequest,
-	p kernel.Principal, acc Access,
+	p kernel.Principal, acc itemkit.Access,
 ) error {
 	sourceRepo, targetRepo, err := snapshotRepos(ctx, st, job, p, acc)
 	if err != nil {
@@ -300,7 +301,7 @@ func (s artifactoryService) createDebianSnapshot(
 
 func (s artifactoryService) debianSnapshotFiles(
 	ctx context.Context, st store.Store, c repo.Config, distribution string,
-	p kernel.Principal, acc Access,
+	p kernel.Principal, acc itemkit.Access,
 ) (map[string][]byte, error) {
 	if c.Class == repo.Virtual {
 		view, err := debianAPI{s.Kit}.buildVirtualDebianView(ctx, st, c, distribution, p, acc)
@@ -391,34 +392,34 @@ func (s artifactoryService) getDebianSnapshot(w http.ResponseWriter, r *http.Req
 	}
 	key, tag := chi.URLParam(r, "repoKey"), chi.URLParam(r, "tag")
 	if !debianSnapshotSegment.MatchString(tag) {
-		httpkit.WriteErr(w, r, ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
 	c, err := st.Repos().Get(r.Context(), key)
 	if err != nil || c.PackageType != repo.Debian || c.Class != repo.Local {
-		httpkit.WriteErr(w, r, ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
 	root := "snapshots/" + tag
 	marker, err := st.Items().Get(r.Context(), key, false, root)
 	if err != nil || !marker.Folder {
-		httpkit.WriteErr(w, r, ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
 	props, err := st.Items().Properties(r.Context(), marker.ID)
 	if err != nil || len(props["deb.snapshot.source"]) != 1 {
-		httpkit.WriteErr(w, r, ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
 	sourceKey := props["deb.snapshot.source"][0]
 	sourceRepo, err := st.Repos().Get(r.Context(), sourceKey)
 	if err != nil || sourceRepo.PackageType != repo.Debian {
-		httpkit.WriteErr(w, r, ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
 	rel := strings.TrimPrefix(chi.URLParam(r, "*"), "/")
 	if rel == "" || path.Clean(rel) != rel || strings.HasPrefix(rel, "../") {
-		httpkit.WriteErr(w, r, ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
 	if !acc.File(c, root+"/"+rel, types.ActionRead) ||
@@ -429,19 +430,19 @@ func (s artifactoryService) getDebianSnapshot(w http.ResponseWriter, r *http.Req
 	if strings.HasPrefix(rel, "dists/") {
 		it, err := st.Items().Get(r.Context(), key, false, root+"/"+rel)
 		if err != nil || it.Folder {
-			httpkit.WriteErr(w, r, ItemNotFound())
+			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 			return
 		}
 		if err := s.checkDebianSnapshotIndex(r.Context(), rel, it, sourceRepo, p, acc); err != nil {
 			httpkit.WriteErr(w, r, s.ItemError(r.Context(), "Debian snapshot index", err))
 			return
 		}
-		s.ServeFile(w, r, st, Found{Repo: c, Item: it}, p)
+		s.ServeFile(w, r, st, itemkit.Found{Repo: c, Item: it}, p)
 		return
 	}
 	if !debian.ValidBinaryPath(rel) && !debian.ValidSourcePath(rel) &&
 		!strings.HasPrefix(rel, "pool/") {
-		httpkit.WriteErr(w, r, ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
 	w.Header().Set("Location", "/artifactory/"+sourceKey+"/"+httpkit.EscapePath(rel))
@@ -450,7 +451,7 @@ func (s artifactoryService) getDebianSnapshot(w http.ResponseWriter, r *http.Req
 
 func (s artifactoryService) checkDebianSnapshotIndex(
 	ctx context.Context, rel string, it types.Item, sourceRepo repo.Config,
-	p kernel.Principal, acc Access,
+	p kernel.Principal, acc itemkit.Access,
 ) error {
 	_, byHash := debian.ByHashMetadataPath(rel)
 	if !debian.PackagesIndexPath(rel) && !debian.SourcesIndexPath(rel) && !byHash {

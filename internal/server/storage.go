@@ -14,6 +14,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -143,7 +144,7 @@ type storageView struct {
 	path     string
 	repo     repo.Config
 	isCached bool
-	acc      Access
+	acc      itemkit.Access
 }
 
 // uri is the storage API URL of p (a full path, "" for the root) under the
@@ -165,7 +166,7 @@ func (v storageView) downloadURI(ctx context.Context, p string) string {
 // its record and when its properties last changed, when properties have
 // given it one: the other root views describe the repository the same way
 // whether or not it has a record.
-func (v storageView) target(ctx context.Context) (Found, error) {
+func (v storageView) target(ctx context.Context) (itemkit.Found, error) {
 	if v.path == "" {
 		root := types.Item{RepoKey: v.repo.Key, Cached: v.isCached, Folder: true}
 		if v.repo.Class != repo.Virtual {
@@ -175,14 +176,14 @@ func (v storageView) target(ctx context.Context) (Found, error) {
 			case err == nil:
 				root.ID, root.PropertiesModified = rec.ID, rec.PropertiesModified
 			case !errors.Is(err, store.ErrNotFound):
-				return Found{}, fmt.Errorf("repository root: %w", err)
+				return itemkit.Found{}, fmt.Errorf("repository root: %w", err)
 			}
 		}
-		return Found{Repo: v.repo, Item: root}, nil
+		return itemkit.Found{Repo: v.repo, Item: root}, nil
 	}
 	// The storage API describes the item at the path as given; only
 	// downloads resolve it through the format.
-	return Lookup(ctx, v.st, v.repo, v.isCached, v.path, v.acc, nil, map[string]bool{})
+	return itemkit.Lookup(ctx, v.st, v.repo, v.isCached, v.path, v.acc, nil, map[string]bool{})
 }
 
 // trees are the repository trees a folder view reads: the repository, or a
@@ -191,16 +192,16 @@ func (v storageView) trees(
 	ctx context.Context,
 	c repo.Config,
 	seen map[string]bool,
-) ([]Found, error) {
+) ([]itemkit.Found, error) {
 	if seen[c.Key] {
 		return nil, nil
 	}
 	seen[c.Key] = true
 	if c.Class != repo.Virtual {
 		cached := c.Class == repo.Remote || (c.Key == v.repo.Key && v.isCached)
-		return []Found{{Repo: c, Item: types.Item{RepoKey: c.Key, Cached: cached}}}, nil
+		return []itemkit.Found{{Repo: c, Item: types.Item{RepoKey: c.Key, Cached: cached}}}, nil
 	}
-	var out []Found
+	var out []itemkit.Found
 	for _, key := range c.Repositories {
 		m, err := v.st.Repos().Get(ctx, key)
 		if errors.Is(err, store.ErrNotFound) {
@@ -345,7 +346,7 @@ func (s artifactoryService) storageRequest(
 	if err != nil {
 		return v, kernel.Principal{}, nil, err
 	}
-	req, err := ParseEscapedItemPath(strings.TrimPrefix(r.URL.EscapedPath(), prefix))
+	req, err := itemkit.ParseEscapedItemPath(strings.TrimPrefix(r.URL.EscapedPath(), prefix))
 	if err != nil {
 		return v, kernel.Principal{}, nil, err
 	}
@@ -357,7 +358,7 @@ func (s artifactoryService) storageRequest(
 	if err != nil {
 		return v, p, nil, err
 	}
-	c, cached, err := ResolveRepo(ctx, st, req.Key)
+	c, cached, err := itemkit.ResolveRepo(ctx, st, req.Key)
 	if err != nil {
 		return v, p, nil, s.ItemError(ctx, "resolve repository", err)
 	}
@@ -374,7 +375,7 @@ func putTime(body map[string]any, key string, t time.Time) {
 	}
 }
 
-func (v storageView) info(ctx context.Context, f Found) (string, any, error) {
+func (v storageView) info(ctx context.Context, f itemkit.Found) (string, any, error) {
 	it := f.Item
 	body := map[string]any{
 		"uri":  v.uri(ctx, it.FullPath()),
@@ -394,8 +395,8 @@ func (v storageView) info(ctx context.Context, f Found) (string, any, error) {
 		body["downloadUri"] = v.downloadURI(ctx, it.FullPath())
 		body["size"] = strconv.FormatInt(it.Size, 10)
 		body["mimeType"] = it.MimeType
-		body["checksums"] = ChecksumsJSON(it.Actual)
-		body["originalChecksums"] = ChecksumsJSON(it.Original)
+		body["checksums"] = itemkit.ChecksumsJSON(it.Actual)
+		body["originalChecksums"] = itemkit.ChecksumsJSON(it.Original)
 		if it.RemoteURL != "" {
 			body["remoteUrl"] = it.RemoteURL
 		}
@@ -414,7 +415,7 @@ func (v storageView) info(ctx context.Context, f Found) (string, any, error) {
 }
 
 // list renders the FileList view of a folder.
-func (v storageView) list(ctx context.Context, f Found, q url.Values) (string, any, error) {
+func (v storageView) list(ctx context.Context, f itemkit.Found, q url.Values) (string, any, error) {
 	if !f.Item.Folder {
 		return "", nil, httpkit.BadRequestf(
 			"%s is a file; list needs a folder",
@@ -536,7 +537,11 @@ func segments(p string) int {
 
 // properties renders an item's properties, or only the keys named in
 // "k1,k2"; nothing to show is a 404.
-func (v storageView) properties(ctx context.Context, f Found, names string) (string, any, error) {
+func (v storageView) properties(
+	ctx context.Context,
+	f itemkit.Found,
+	names string,
+) (string, any, error) {
 	if f.Item.ID == 0 {
 		return "", nil, noProperties()
 	}
@@ -562,7 +567,7 @@ func (v storageView) properties(ctx context.Context, f Found, names string) (str
 }
 
 // stats renders a file's download statistics. A folder has none.
-func (v storageView) stats(ctx context.Context, f Found) (string, any, error) {
+func (v storageView) stats(ctx context.Context, f itemkit.Found) (string, any, error) {
 	if f.Item.Folder {
 		return "", nil, httpkit.BadRequestf("%s is a folder; statistics are kept for files",
 			f.Item.StoragePath())
@@ -588,7 +593,7 @@ func (v storageView) stats(ctx context.Context, f Found) (string, any, error) {
 
 // lastModified renders a file's modification time, or for a folder the
 // newest item below it, which is what the view reports.
-func (v storageView) lastModified(ctx context.Context, f Found) (string, any, error) {
+func (v storageView) lastModified(ctx context.Context, f itemkit.Found) (string, any, error) {
 	newest := f.Item
 	if f.Item.Folder {
 		items, err := v.below(ctx, f.Item.FullPath(), true)
@@ -601,7 +606,7 @@ func (v storageView) lastModified(ctx context.Context, f Found) (string, any, er
 			}
 		}
 		if newest.Modified.IsZero() {
-			return "", nil, ItemNotFound()
+			return "", nil, itemkit.ItemNotFound()
 		}
 	}
 	return mediaLastModified, map[string]any{
@@ -613,7 +618,7 @@ func (v storageView) lastModified(ctx context.Context, f Found) (string, any, er
 // permissions renders who holds which actions on the item, in the legacy
 // letters: grants whose target names the item's repository and whose include
 // and exclude patterns admit its path.
-func (v storageView) permissions(ctx context.Context, f Found) (string, any, error) {
+func (v storageView) permissions(ctx context.Context, f itemkit.Found) (string, any, error) {
 	targets := []string{f.Repo.Key, types.TargetAny}
 	switch f.Repo.Class {
 	case repo.Local, repo.Federated:

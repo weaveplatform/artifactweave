@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/agentplugins"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
@@ -26,7 +27,7 @@ func (s artifactoryService) getAgentMarketplace(w http.ResponseWriter, r *http.R
 		httpkit.WriteErr(w, r, err)
 		return
 	}
-	c, cached, err := ResolveRepo(ctx, st, chi.URLParam(r, "repoKey"))
+	c, cached, err := itemkit.ResolveRepo(ctx, st, chi.URLParam(r, "repoKey"))
 	if err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(ctx, "resolve repository", err))
 		return
@@ -34,7 +35,7 @@ func (s artifactoryService) getAgentMarketplace(w http.ResponseWriter, r *http.R
 	name := chi.URLParam(r, "marketplace")
 	if c.PackageType != repo.AgentPlugins || c.Class != repo.Local || cached ||
 		!agentplugins.IsMarketplace(name) {
-		httpkit.WriteErr(w, r, ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
 	agentPluginItems{s.Kit}.serveAgentMarketplace(w, r, st, c, name, p, acc)
@@ -42,11 +43,11 @@ func (s artifactoryService) getAgentMarketplace(w http.ResponseWriter, r *http.R
 
 // agentPluginItems serves the agent plugin marketplace documents over the
 // item kit.
-type agentPluginItems struct{ *Kit }
+type agentPluginItems struct{ *itemkit.Kit }
 
 func tryAgentMarketplaceItem(
-	k *Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	cached bool, req ItemRequest, p kernel.Principal, acc Access,
+	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
+	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) bool {
 	s := agentPluginItems{k}
 	if c.PackageType != repo.AgentPlugins || c.Class != repo.Local || cached ||
@@ -54,7 +55,7 @@ func tryAgentMarketplaceItem(
 		return false
 	}
 	if !agentplugins.IsMarketplace(req.Path) {
-		httpkit.WriteErr(w, r, ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return true
 	}
 	s.serveAgentMarketplace(w, r, st, c, req.Path, p, acc)
@@ -63,7 +64,7 @@ func tryAgentMarketplaceItem(
 
 func (s agentPluginItems) serveAgentMarketplace(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	name string, p kernel.Principal, acc Access,
+	name string, p kernel.Principal, acc itemkit.Access,
 ) {
 	if err := generic.CheckDownload(c, name, false); err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "download check", err))

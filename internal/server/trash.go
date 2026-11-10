@@ -15,6 +15,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
@@ -345,7 +346,7 @@ func (s artifactoryService) trashStorage(w http.ResponseWriter, r *http.Request)
 		httpkit.WriteErr(w, r, s.InternalError(ctx, "trash can settings", err))
 		return
 	case !cfg.Enabled:
-		httpkit.WriteErr(w, r, ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
 	mode, err := storageMode(q)
@@ -372,7 +373,7 @@ func (s artifactoryService) trashStorage(w http.ResponseWriter, r *http.Request)
 	n, children, err := v.target(ctx)
 	switch {
 	case errors.Is(err, store.ErrNotFound):
-		httpkit.WriteErr(w, r, ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	case err != nil:
 		httpkit.WriteErr(w, r, s.InternalError(ctx, "find trash", err))
@@ -570,7 +571,7 @@ func (v trashView) lastModified(ctx context.Context, n trash.Node) (string, any,
 			}
 		}
 		if newest.Modified.IsZero() {
-			return "", nil, ItemNotFound()
+			return "", nil, itemkit.ItemNotFound()
 		}
 	}
 	return mediaLastModified, map[string]any{
@@ -646,8 +647,8 @@ func trashFileInfo(uri, dir string, e types.TrashEntry) map[string]any {
 		"created": httpkit.FormatTime(it.Created), "createdBy": it.CreatedBy,
 		"lastModified": httpkit.FormatTime(it.Modified), "modifiedBy": it.ModifiedBy,
 		"lastUpdated": httpkit.FormatTime(it.Updated), "mimeType": it.MimeType,
-		"size": fmt.Sprint(it.Size), "checksums": ChecksumsJSON(it.Actual),
-		"originalChecksums": ChecksumsJSON(it.Original),
+		"size": fmt.Sprint(it.Size), "checksums": itemkit.ChecksumsJSON(it.Actual),
+		"originalChecksums": itemkit.ChecksumsJSON(it.Original),
 		"properties":        trashProperties(e),
 		"uri":               uri,
 	}
@@ -725,7 +726,7 @@ func (s artifactoryService) zapCache(w http.ResponseWriter, r *http.Request) {
 		httpkit.WriteErr(w, r, err)
 		return
 	}
-	c, cached, err := ResolveRepo(ctx, st, key)
+	c, cached, err := itemkit.ResolveRepo(ctx, st, key)
 	switch {
 	case err != nil:
 		httpkit.WriteErr(w, r, s.ItemError(ctx, "resolve zap target", err))

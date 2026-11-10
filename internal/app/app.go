@@ -16,6 +16,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/config"
 	"github.com/weaveplatform/artifactweave/internal/server"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
 	"github.com/weaveplatform/artifactweave/migration/platform/buildinfo"
 )
@@ -103,7 +104,7 @@ func serve(
 			Multipart:     rt.multipart,
 			Tokens:        rt.tokens,
 			Access:        rt.access.API(),
-			Redirect: server.Redirect{
+			Redirect: itemkit.Redirect{
 				MinSize: int64(cfg.Download.Redirect.MinSize), TTL: cfg.Download.Redirect.TTL,
 				CDNMaxSize: cdnMaxSize(cfg.Blob),
 			},

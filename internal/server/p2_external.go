@@ -18,6 +18,7 @@ import (
 	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -157,7 +158,7 @@ type p2ReadResult struct {
 
 //nolint:gocyclo // This bounded read handles cached, streamed, and archive-backed P2 resources.
 func (s p2Items) p2Read(r *http.Request, c repo.Config, cached bool,
-	pathName string, external *url.URL, archiveEntry string, p kernel.Principal, acc Access,
+	pathName string, external *url.URL, archiveEntry string, p kernel.Principal, acc itemkit.Access,
 	expected ...types.Checksums,
 ) (p2ReadResult, error) {
 	if s.RemoteSources == nil {
@@ -193,7 +194,7 @@ func (s p2Items) p2Read(r *http.Request, c repo.Config, cached bool,
 	}
 	var err error
 	if archiveEntry == "" {
-		q, err = P2SourceRequest(q)
+		q, err = itemkit.P2SourceRequest(q)
 		if err != nil {
 			return p2ReadResult{}, err
 		}
@@ -310,8 +311,15 @@ func p2CheckBytes(body []byte, want types.Checksums) error {
 	return nil
 }
 
-func (s p2Items) p2ArtifactChecksums(r *http.Request, c repo.Config,
-	cached bool, synthetic string, site *url.URL, resource string, p kernel.Principal, acc Access,
+func (s p2Items) p2ArtifactChecksums(
+	r *http.Request,
+	c repo.Config,
+	cached bool,
+	synthetic string,
+	site *url.URL,
+	resource string,
+	p kernel.Principal,
+	acc itemkit.Access,
 ) (types.Checksums, error) {
 	parent := strings.TrimSuffix(synthetic, "/"+resource)
 	for _, candidate := range []string{"artifacts.xml.xz", "artifacts.jar", "artifacts.xml"} {
@@ -382,7 +390,7 @@ func p2ExternalParts(name string) ([]string, string, error) {
 }
 
 func (s p2Items) p2ResolveExternal(r *http.Request, c repo.Config, cached bool,
-	name string, p kernel.Principal, acc Access,
+	name string, p kernel.Principal, acc itemkit.Access,
 ) (*url.URL, error) {
 	tokens, resource, err := p2ExternalParts(name)
 	if err != nil {
@@ -458,7 +466,7 @@ func (s p2Items) p2ResolveExternal(r *http.Request, c repo.Config, cached bool,
 }
 
 func (s p2Items) serveP2CompositeChild(w http.ResponseWriter, r *http.Request,
-	c repo.Config, cached bool, req ItemRequest, p kernel.Principal, acc Access,
+	c repo.Config, cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
 	if !acc.File(c, req.Path, types.ActionRead) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
@@ -478,7 +486,7 @@ func (s p2Items) serveP2CompositeChild(w http.ResponseWriter, r *http.Request,
 	if target != nil {
 		_, filename, err = p2ExternalParts(name)
 		if err != nil {
-			httpkit.WriteErr(w, r, ItemNotFound())
+			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 			return
 		}
 	}
@@ -488,7 +496,7 @@ func (s p2Items) serveP2CompositeChild(w http.ResponseWriter, r *http.Request,
 		var err error
 		external, archiveEntry, err = p2ChildResourceURL(target, filename)
 		if err != nil {
-			httpkit.WriteErr(w, r, ItemNotFound())
+			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 			return
 		}
 	}
@@ -547,7 +555,7 @@ func (s p2Items) serveP2CompositeChild(w http.ResponseWriter, r *http.Request,
 	if p2CompositeName(filename) {
 		w.Header().Set("Content-Type", "application/octet-stream")
 	}
-	sw := &StatusWriter{ResponseWriter: w}
+	sw := &itemkit.StatusWriter{ResponseWriter: w}
 	http.ServeContent(sw, r, filename, time.Time{}, bytes.NewReader(body))
 	if sw.Complete(r) && result.used != nil {
 		_ = result.used(r.Context())

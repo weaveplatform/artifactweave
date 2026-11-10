@@ -10,6 +10,7 @@ import (
 	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
@@ -215,7 +216,7 @@ func (s artifactoryService) budgetResources(
 	if err != nil {
 		return fmt.Errorf("budget repository: %w", err)
 	}
-	if (Access{d}).Visible(c) {
+	if (itemkit.Access{d}).Visible(c) {
 		scope.Repository = c.Key
 		// A query parameter cannot redirect a repository's project accounting.
 		scope.Project = c.ProjectKey

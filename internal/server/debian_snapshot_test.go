@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
@@ -89,7 +90,7 @@ func TestUnitDebianSnapshotRequiresValidRepositoriesAndPermissions(t *testing.T)
 			if tc.user != "" {
 				p = kernel.Principal{Name: tc.user}
 			}
-			acc, err := AccessFor(ctx, authorizerOver(st), p, nil)
+			acc, err := itemkit.AccessFor(ctx, authorizerOver(st), p, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -144,7 +145,7 @@ func TestUnitDebianSnapshotPreservesCompletedAndClaimedTags(t *testing.T) {
 				t.Fatal(err)
 			}
 			p := kernel.Principal{Name: "admin", Admin: true}
-			acc, err := AccessFor(ctx, authorizerOver(st), p, nil)
+			acc, err := itemkit.AccessFor(ctx, authorizerOver(st), p, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

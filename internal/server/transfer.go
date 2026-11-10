@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -83,7 +84,7 @@ func (s artifactoryService) transfer(w http.ResponseWriter, r *http.Request, mov
 	if move {
 		verb = "move"
 	}
-	srcKey, srcPath, _, err := SplitRepoPath(
+	srcKey, srcPath, _, err := itemkit.SplitRepoPath(
 		strings.TrimPrefix(r.URL.EscapedPath(), "/artifactory/api/"+verb+"/"))
 	if err != nil {
 		refuseTransfer(w, err.Error())
@@ -115,7 +116,7 @@ func (s artifactoryService) transfer(w http.ResponseWriter, r *http.Request, mov
 		httpkit.WriteErr(w, r, err)
 		return
 	}
-	from, cached, err := ResolveRepo(ctx, st, srcKey)
+	from, cached, err := itemkit.ResolveRepo(ctx, st, srcKey)
 	var missing *apierror.Error
 	switch {
 	case errors.As(err, &missing) && missing.Status == http.StatusNotFound:
@@ -214,7 +215,7 @@ type landing struct {
 func (s artifactoryService) overwriteRight(
 	ctx context.Context,
 	st store.Store,
-	acc Access,
+	acc itemkit.Access,
 	p kernel.Principal,
 	l landing,
 ) (bool, error) {
@@ -291,7 +292,7 @@ func (s artifactoryService) downloadFolderArchive(w http.ResponseWriter, r *http
 		httpkit.WriteErr(w, r, err)
 		return
 	}
-	key, p, _, err := SplitRepoPath(
+	key, p, _, err := itemkit.SplitRepoPath(
 		strings.TrimPrefix(r.URL.EscapedPath(), "/artifactory/api/archive/download/"))
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
@@ -312,7 +313,7 @@ func (s artifactoryService) downloadFolderArchive(w http.ResponseWriter, r *http
 		httpkit.WriteErr(w, r, err)
 		return
 	}
-	c, cached, err := ResolveRepo(ctx, st, key)
+	c, cached, err := itemkit.ResolveRepo(ctx, st, key)
 	if err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(ctx, "resolve repository", err))
 		return

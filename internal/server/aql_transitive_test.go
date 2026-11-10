@@ -13,6 +13,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -109,7 +110,7 @@ func transitiveFixture(t *testing.T) *transitiveWorld {
 					path = q.Resource.PermissionPath
 					allows = decider.AllowsFolder
 				}
-				if !allows(types.ResourceArtifact, Target(q.Repo), path, types.ActionRead) {
+				if !allows(types.ResourceArtifact, itemkit.Target(q.Repo), path, types.ActionRead) {
 					return source.ErrDenied
 				}
 				return nil

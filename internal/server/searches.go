@@ -12,6 +12,7 @@ import (
 	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
@@ -128,7 +129,7 @@ type searchRun struct {
 	s       artifactoryService
 	st      store.Store
 	p       kernel.Principal
-	acc     Access
+	acc     itemkit.Access
 	configs map[string]repo.Config
 	repos   aql.Repositories
 	now     time.Time
@@ -149,7 +150,7 @@ func (s artifactoryService) newSearch(ctx context.Context, named bool) (*searchR
 		return nil, err //nolint:wrapcheck // apierror values, rendered by status
 	}
 	d, _ := accessapi.DeciderFrom(ctx)
-	acc, err := AccessFor(ctx, s.cfg.Access.Authorizer, p, d)
+	acc, err := itemkit.AccessFor(ctx, s.cfg.Access.Authorizer, p, d)
 	if err != nil {
 		return nil, s.InternalError(ctx, "search permissions", err)
 	}
@@ -364,7 +365,7 @@ func (r *searchRun) entries(
 				s: r.s, st: r.st, key: h.Item.ReportedRepoKey(), repo: c,
 				isCached: h.Item.Cached, acc: r.acc,
 			}
-			_, body, err := v.info(ctx, Found{Repo: c, Item: h.Item})
+			_, body, err := v.info(ctx, itemkit.Found{Repo: c, Item: h.Item})
 			if err != nil {
 				return nil, r.s.InternalError(ctx, "search result info", err)
 			}
@@ -615,7 +616,7 @@ func (s artifactoryService) SearchCreation(
 	}
 	scope, missing := r.repoScope(req.Params.Repos, false)
 	if len(missing) > 0 {
-		return nil, NotFoundRepo(missing[0])
+		return nil, itemkit.NotFoundRepo(missing[0])
 	}
 	hits, err := r.collect(ctx, all(files(), scope, within(aql.FieldCreated, from, to)), nil,
 		r.userLimit(), nil)

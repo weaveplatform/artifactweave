@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -39,7 +40,7 @@ func TestUnitCRANReadAuthorityCallbacks(t *testing.T) {
 		{"upstream fault", admin, errors.New("upstream fault"), false, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			acc, err := AccessFor(t.Context(), authorizerOver(w.db), tc.who, nil)
+			acc, err := itemkit.AccessFor(t.Context(), authorizerOver(w.db), tc.who, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -75,7 +76,7 @@ func TestUnitCRANSourceClassifiesCompressedIndexAndWindowsBinary(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			q, err := CranSourceRequest(source.Request{Resource: source.Resource{
+			q, err := itemkit.CranSourceRequest(source.Request{Resource: source.Resource{
 				Kind: source.ResourceKindArtifact, Path: tc.path, Method: http.MethodGet,
 			}})
 			if err != nil || q.Resource.Kind != tc.kind {
@@ -108,7 +109,7 @@ func TestUnitCRANSourceClassifiesCompressedIndexAndWindowsBinary(t *testing.T) {
 	for _, path := range []string{
 		"src/contrib/PACKAGES.gz", "bin/windows/contrib/4.5/assertthat_0.2.1.zip",
 	} {
-		if _, err := CranSourceRequest(source.Request{Resource: source.Resource{
+		if _, err := itemkit.CranSourceRequest(source.Request{Resource: source.Resource{
 			Path: path, Query: "bypass=1", Method: http.MethodGet,
 		}}); !errors.Is(err, source.ErrInvalidRequest) {
 			t.Fatalf("query on CRAN path %q admitted: %v", path, err)

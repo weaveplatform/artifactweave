@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	npmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
@@ -29,7 +30,7 @@ func (s artifactoryService) npmOperation(
 	ctx context.Context,
 	key string,
 ) (store.Store, repo.Config, string, error) {
-	return s.OperationRepo(ctx, repo.NPM, ReindexOps[repo.NPM], key)
+	return s.OperationRepo(ctx, repo.NPM, itemkit.ReindexOps[repo.NPM], key)
 }
 
 func (s artifactoryService) CalculateNpmRepositoryMetadata(

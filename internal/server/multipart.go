@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
@@ -115,9 +116,9 @@ func (s artifactoryService) createMultipart(w http.ResponseWriter, r *http.Reque
 		httpkit.WriteErr(w, r, httpkit.BadRequestf("malformed path %q", repoPath))
 		return
 	}
-	c, cached, err := ResolveRepo(ctx, st, q.Get("repoKey"))
+	c, cached, err := itemkit.ResolveRepo(ctx, st, q.Get("repoKey"))
 	if err == nil {
-		c, err = DeployTarget(ctx, st, c, cached)
+		c, err = itemkit.DeployTarget(ctx, st, c, cached)
 	}
 	if err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(ctx, "resolve deploy target", err))

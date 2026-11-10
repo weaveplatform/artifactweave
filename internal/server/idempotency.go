@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
@@ -127,7 +128,7 @@ func (s artifactoryService) appendOnce(
 		// Not the request's decider: a replay evaluates the permissions of
 		// the credential as it stands now, so revoked permissions cannot
 		// recover a replayed append (decision 0043).
-		a, err := AccessFor(ctx, s.cfg.Access.Authorizer, current, nil)
+		a, err := itemkit.AccessFor(ctx, s.cfg.Access.Authorizer, current, nil)
 		return buildAccess{a}, err
 	})
 	switch {

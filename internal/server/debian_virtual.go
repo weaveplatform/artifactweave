@@ -13,6 +13,7 @@ import (
 	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -41,7 +42,7 @@ type debianVirtualView struct {
 // and every advertised Filename resolves through the same member order.
 func (s debianAPI) serveVirtualDebianMetadata(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	req ItemRequest, p kernel.Principal, acc Access,
+	req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
 	if len(req.Props) != 0 || r.URL.RawQuery != "" ||
 		!acc.Folder(c, req.Path, types.ActionRead) ||
@@ -52,7 +53,7 @@ func (s debianAPI) serveVirtualDebianMetadata(
 	}
 	parts := strings.Split(req.Path, "/")
 	if len(parts) < 3 {
-		httpkit.WriteErr(w, r, ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
 	view, err := s.buildVirtualDebianView(r.Context(), st, c, parts[1], p, acc)
@@ -62,7 +63,7 @@ func (s debianAPI) serveVirtualDebianMetadata(
 	}
 	body, ok := view.files[req.Path]
 	if !ok {
-		httpkit.WriteErr(w, r, ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
 	w.Header().Set("Content-Type", "application/octet-stream")
@@ -72,7 +73,7 @@ func (s debianAPI) serveVirtualDebianMetadata(
 
 func (s debianAPI) buildVirtualDebianView(
 	ctx context.Context, st store.Store, c repo.Config, distribution string,
-	p kernel.Principal, acc Access,
+	p kernel.Principal, acc itemkit.Access,
 ) (debianVirtualView, error) {
 	if len(c.Repositories) == 0 || len(c.Repositories) > 128 {
 		return debianVirtualView{}, store.ErrNotFound
@@ -173,7 +174,7 @@ func mapKeys(set map[string]bool) []string {
 
 func (s debianAPI) addDebianMemberIndexes(
 	ctx context.Context, st store.Store, virtual, member repo.Config, distribution string,
-	p kernel.Principal, acc Access,
+	p kernel.Principal, acc itemkit.Access,
 	indexes map[string][]debian.PackageRecord, selected map[string]map[string]bool,
 ) error {
 	releasePath := "dists/" + distribution + "/Release"
@@ -232,7 +233,7 @@ func (s debianAPI) addDebianMemberIndexes(
 
 func (s debianAPI) serveVirtualDebianPackage(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	req ItemRequest, p kernel.Principal, acc Access,
+	req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
 	ctx := r.Context()
 	if len(req.Props) != 0 || r.URL.RawQuery != "" ||
@@ -278,19 +279,19 @@ func (s debianAPI) serveVirtualDebianPackage(
 			return
 		}
 		if !it.Folder {
-			s.ServeFile(w, r, st, Found{Repo: member, Item: it}, p)
+			s.ServeFile(w, r, st, itemkit.Found{Repo: member, Item: it}, p)
 			return
 		}
 	}
-	httpkit.WriteErr(w, r, ItemNotFound())
+	httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 }
 
 // serveRemoteVirtualDebianPackage returns false only when a member lacks the
 // path, allowing ordered fallback. Integrity, permissions and upstream faults
 // are terminal so the virtual path never disguises a failed selected member.
 func (s debianAPI) serveRemoteVirtualDebianPackage(
-	w http.ResponseWriter, r *http.Request, member repo.Config, req ItemRequest,
-	p kernel.Principal, acc Access,
+	w http.ResponseWriter, r *http.Request, member repo.Config, req itemkit.ItemRequest,
+	p kernel.Principal, acc itemkit.Access,
 ) bool {
 	if s.RemoteSources == nil {
 		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "Debian virtual source",
@@ -299,9 +300,9 @@ func (s debianAPI) serveRemoteVirtualDebianPackage(
 	}
 	q := source.Request{
 		Repo: member, Subject: accessapi.SubjectOf(p), Access: acc.Decider,
-		Project: member.ProjectKey, Resource: RemoteResource(r, req.Path),
+		Project: member.ProjectKey, Resource: itemkit.RemoteResource(r, req.Path),
 	}
-	q, err := DebianSourceRequest(q)
+	q, err := itemkit.DebianSourceRequest(q)
 	if err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "Debian virtual package", err))
 		return true
@@ -331,7 +332,7 @@ func (s debianAPI) serveRemoteVirtualDebianPackage(
 		return true
 	}
 	s.ServeFile(w, r, s.Store,
-		Found{Repo: member, Item: *result.Item, Used: result.Used}, p)
+		itemkit.Found{Repo: member, Item: *result.Item, Used: result.Used}, p)
 	return true
 }
 
@@ -340,7 +341,7 @@ func (s debianAPI) serveRemoteVirtualDebianPackage(
 // upstream freshness and redirect constraints.
 func (s debianAPI) debianMemberBytes(
 	ctx context.Context, st store.Store, member repo.Config, path string,
-	p kernel.Principal, acc Access,
+	p kernel.Principal, acc itemkit.Access,
 ) ([]byte, func(context.Context, string) error, error) {
 	if !acc.File(member, path, types.ActionRead) ||
 		generic.CheckDownload(member, path, false) != nil {
@@ -357,7 +358,7 @@ func (s debianAPI) debianMemberBytes(
 				Path: path, EscapedPath: httpkit.EscapePath(path), Method: http.MethodGet,
 			},
 		}
-		q, err := DebianSourceRequest(q)
+		q, err := itemkit.DebianSourceRequest(q)
 		if err != nil {
 			return nil, nil, err
 		}

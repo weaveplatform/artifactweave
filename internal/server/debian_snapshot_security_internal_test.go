@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -67,7 +68,7 @@ func TestUnitDebianSnapshotRejectsUnboundMetadata(t *testing.T) {
 				put(index, tc.index)
 			}
 			p := kernel.Principal{Name: "admin", Admin: true}
-			acc, err := AccessFor(t.Context(), authorizerOver(w.db), p, nil)
+			acc, err := itemkit.AccessFor(t.Context(), authorizerOver(w.db), p, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

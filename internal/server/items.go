@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
@@ -87,7 +88,7 @@ func (s artifactoryService) deployEscapedItem(
 		httpkit.WriteErr(w, r, err)
 		return
 	}
-	req, err := ParseEscapedItemPath(escaped)
+	req, err := itemkit.ParseEscapedItemPath(escaped)
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
 		return
@@ -97,9 +98,9 @@ func (s artifactoryService) deployEscapedItem(
 		httpkit.WriteErr(w, r, err)
 		return
 	}
-	c, cached, err := ResolveRepo(ctx, st, req.Key)
+	c, cached, err := itemkit.ResolveRepo(ctx, st, req.Key)
 	if err == nil {
-		c, err = DeployTarget(ctx, st, c, cached)
+		c, err = itemkit.DeployTarget(ctx, st, c, cached)
 	}
 	if err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(ctx, "resolve deploy target", err))
@@ -126,7 +127,7 @@ func (s artifactoryService) deployEscapedItem(
 	switch {
 	case err == nil && !existing.Folder && !req.IsFolder && !explode &&
 		!s.MayBeIdentical(byChecksum) && !acc.File(c, req.Path, types.ActionDelete):
-		httpkit.WriteErr(w, r, OverwriteRefusal(ctx, &item.OverwriteDeniedError{
+		httpkit.WriteErr(w, r, itemkit.OverwriteRefusal(ctx, &item.OverwriteDeniedError{
 			Repo: c.Key, Path: req.Path, User: p.Name,
 		}))
 		return
@@ -171,7 +172,7 @@ func (s artifactoryService) deployEscapedItem(
 	// Every deploy names what it stored, where a format may have put it, as
 	// 6.20's SuccessfulDeploymentResponseHelper does; an archive names the
 	// folder it was extracted into.
-	w.Header().Set("Location", DownloadURI(ctx, it.ReportedRepoKey(), it.FullPath()))
+	w.Header().Set("Location", itemkit.DownloadURI(ctx, it.ReportedRepoKey(), it.FullPath()))
 	if explode {
 		// The deployartifactsfromarchive page documents a text/plain 201
 		// and gives no text. jfrog-client-go decodes any body an upload
@@ -181,7 +182,7 @@ func (s artifactoryService) deployEscapedItem(
 		w.WriteHeader(http.StatusCreated)
 		return
 	}
-	httpkit.WriteJSON(w, http.StatusCreated, ItemCreated(ctx, it))
+	httpkit.WriteJSON(w, http.StatusCreated, itemkit.ItemCreated(ctx, it))
 }
 
 // answered writes the status of a write the format took without making it
@@ -198,7 +199,7 @@ func answered(w http.ResponseWriter, err error) bool {
 func (artifactoryService) deployRequest(
 	r *http.Request,
 	t item.Target,
-	req ItemRequest,
+	req itemkit.ItemRequest,
 	p kernel.Principal,
 ) item.Deploy {
 	return item.Deploy{
@@ -216,9 +217,9 @@ func (artifactoryService) deployRequest(
 func (s artifactoryService) fileDeploy(
 	r *http.Request,
 	t item.Target,
-	req ItemRequest,
+	req itemkit.ItemRequest,
 	p kernel.Principal,
-	acc Access,
+	acc itemkit.Access,
 ) item.Deploy {
 	d := s.deployRequest(r, t, req, p)
 	d.CanOverwritePath = func(full string) bool { return acc.File(t.Repo, full, types.ActionDelete) }
@@ -234,7 +235,7 @@ func (s artifactoryService) fileDeploy(
 func (s artifactoryService) reusable(
 	st store.Store,
 	p kernel.Principal,
-	acc Access,
+	acc itemkit.Access,
 	token string,
 ) func(context.Context, types.Blob) (bool, error) {
 	return func(ctx context.Context, b types.Blob) (bool, error) {
@@ -256,7 +257,7 @@ func (s artifactoryService) reusable(
 func readsContent(
 	ctx context.Context,
 	st store.Store,
-	acc Access,
+	acc itemkit.Access,
 	sum string,
 	private func(repo.Config, string) bool,
 ) (bool, error) {
@@ -330,7 +331,8 @@ func (s artifactoryService) recordChecksum(
 	// The file the checksum was recorded on, which a format may have named
 	// differently from the sidecar (UploadServiceUtils
 	// .sendUploadedChecksumResponse in 6.20).
-	w.Header().Set("Location", DownloadURI(r.Context(), it.ReportedRepoKey(), it.FullPath()))
+	w.Header().
+		Set("Location", itemkit.DownloadURI(r.Context(), it.ReportedRepoKey(), it.FullPath()))
 	w.WriteHeader(http.StatusCreated)
 }
 
@@ -343,7 +345,7 @@ func (s artifactoryService) deleteItem(w http.ResponseWriter, r *http.Request) {
 		httpkit.WriteErr(w, r, err)
 		return
 	}
-	req, err := ParseItemPath(r)
+	req, err := itemkit.ParseItemPath(r)
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
 		return
@@ -353,7 +355,7 @@ func (s artifactoryService) deleteItem(w http.ResponseWriter, r *http.Request) {
 		httpkit.WriteErr(w, r, err)
 		return
 	}
-	c, cached, err := ResolveRepo(ctx, st, req.Key)
+	c, cached, err := itemkit.ResolveRepo(ctx, st, req.Key)
 	if err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(ctx, "resolve repository", err))
 		return

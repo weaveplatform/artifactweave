@@ -12,6 +12,7 @@ import (
 	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -44,11 +45,11 @@ type opkgCandidate struct {
 }
 
 // opkgItems serves opkg's indexes and packages over the item kit.
-type opkgItems struct{ *Kit }
+type opkgItems struct{ *itemkit.Kit }
 
 func tryOpkgItem(
-	k *Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	cached bool, req ItemRequest, p kernel.Principal, acc Access,
+	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
+	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) bool {
 	s := opkgItems{k}
 	if !opkg.Serves(c.PackageType) || req.IsFolder {
@@ -64,7 +65,7 @@ func tryOpkgItem(
 	}
 	if strings.HasSuffix(req.Path, ".ipk") {
 		if !opkg.ValidPath(req.Path) {
-			httpkit.WriteErr(w, r, ItemNotFound())
+			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 			return true
 		}
 		if c.Class == repo.Virtual || c.Class == repo.Remote {
@@ -77,13 +78,13 @@ func tryOpkgItem(
 
 func (s opkgItems) serveOpkgIndex(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	cached bool, req ItemRequest, p kernel.Principal, acc Access,
+	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
 	ctx := r.Context()
 	feed, ok := opkg.FeedPath(req.Path)
 	if !ok || len(req.Props) != 0 || r.URL.RawQuery != "" ||
 		cached && c.Class != repo.Remote {
-		httpkit.WriteErr(w, r, ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
 	if !acc.Folder(c, req.Path, types.ActionRead) ||
@@ -115,7 +116,7 @@ func (s opkgItems) serveOpkgIndex(
 		}
 		body = files[path.Base(req.Path)]
 		if body == nil {
-			httpkit.WriteErr(w, r, ItemNotFound())
+			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 			return
 		}
 	} else {
@@ -145,7 +146,7 @@ func (s opkgItems) serveOpkgIndex(
 	}
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Cache-Control", "private, no-store")
-	sw := &StatusWriter{ResponseWriter: w}
+	sw := &itemkit.StatusWriter{ResponseWriter: w}
 	http.ServeContent(sw, r, path.Base(req.Path), time.Time{}, bytes.NewReader(body))
 	if sw.Complete(r) && used != nil {
 		_ = used(ctx)
@@ -153,7 +154,7 @@ func (s opkgItems) serveOpkgIndex(
 }
 
 func opkgPackageReadable(
-	ctx context.Context, c repo.Config, p string, acc Access,
+	ctx context.Context, c repo.Config, p string, acc itemkit.Access,
 	check func(context.Context, string) error,
 ) (bool, error) {
 	if !acc.File(c, p, types.ActionRead) || generic.CheckDownload(c, p, false) != nil {
@@ -172,7 +173,7 @@ func opkgPackageReadable(
 
 func (s opkgItems) opkgMemberIndex(
 	ctx context.Context, st store.Store, c repo.Config, cached bool, indexPath string,
-	p kernel.Principal, acc Access,
+	p kernel.Principal, acc itemkit.Access,
 ) (opkgIndexView, error) {
 	view := opkgIndexView{repo: c}
 	if c.Class == repo.Remote {
@@ -184,7 +185,7 @@ func (s opkgItems) opkgMemberIndex(
 			CacheOnly: cached,
 			Resource:  source.Resource{Path: indexPath, Method: http.MethodGet},
 		}
-		query, err := OpkgSourceRequest(query)
+		query, err := itemkit.OpkgSourceRequest(query)
 		if err != nil {
 			return view, err
 		}
@@ -251,7 +252,7 @@ func (s opkgItems) readOpkgBlob(ctx context.Context, sha string) ([]byte, error)
 
 func (s opkgItems) opkgCandidates(
 	ctx context.Context, st store.Store, c repo.Config, indexPath string,
-	p kernel.Principal, acc Access, seen map[string]bool,
+	p kernel.Principal, acc itemkit.Access, seen map[string]bool,
 ) ([]opkgCandidate, error) {
 	if seen[c.Key] || len(seen) >= 8 {
 		return nil, errOpkgVirtualCycle
@@ -320,10 +321,10 @@ func (s opkgItems) opkgCandidates(
 
 func (s opkgItems) serveOpkgPackage(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	cached bool, req ItemRequest, p kernel.Principal, acc Access,
+	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
 	if len(req.Props) != 0 || r.URL.RawQuery != "" || cached && c.Class != repo.Remote {
-		httpkit.WriteErr(w, r, ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
 	if !acc.File(c, req.Path, types.ActionRead) ||
@@ -366,18 +367,18 @@ func (s opkgItems) serveOpkgPackage(
 			return
 		}
 		if it.Folder || it.Actual.SHA256 != candidate.pkg.SHA256 {
-			httpkit.WriteErr(w, r, ItemNotFound())
+			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 			return
 		}
-		s.ServeFile(w, r, st, Found{Repo: candidate.repo, Item: it}, p)
+		s.ServeFile(w, r, st, itemkit.Found{Repo: candidate.repo, Item: it}, p)
 		return
 	}
-	httpkit.WriteErr(w, r, ItemNotFound())
+	httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 }
 
 func (s opkgItems) serveRemoteOpkgPackage(
 	w http.ResponseWriter, r *http.Request, c repo.Config, cached bool,
-	req ItemRequest, expected opkg.Package, p kernel.Principal, acc Access,
+	req itemkit.ItemRequest, expected opkg.Package, p kernel.Principal, acc itemkit.Access,
 ) {
 	query := source.Request{
 		Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.Decider, Project: c.ProjectKey,
@@ -387,7 +388,7 @@ func (s opkgItems) serveRemoteOpkgPackage(
 			Checksums: types.Checksums{SHA256: expected.SHA256},
 		},
 	}
-	query, err := OpkgSourceRequest(query)
+	query, err := itemkit.OpkgSourceRequest(query)
 	if err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "Opkg source", err))
 		return
@@ -414,5 +415,5 @@ func (s opkgItems) serveRemoteOpkgPackage(
 		return
 	}
 	s.ServeFile(w, r, s.Store,
-		Found{Repo: c, Item: *result.Item, Used: result.Used}, p)
+		itemkit.Found{Repo: c, Item: *result.Item, Used: result.Used}, p)
 }

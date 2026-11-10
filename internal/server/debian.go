@@ -11,6 +11,7 @@ import (
 	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -28,14 +29,14 @@ var errDebianIndexTooLarge = errors.New("server: debian Packages index exceeds l
 
 // debianAPI serves Debian's indexes and virtual repositories over the item
 // kit.
-type debianAPI struct{ *Kit }
+type debianAPI struct{ *itemkit.Kit }
 
 // tryDebianItem ensures a Packages index is never returned to a caller who
 // cannot read every package it advertises. The ordinary item route cannot
 // make that guarantee for a cached or virtual metadata file.
 func tryDebianItem(
-	k *Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	cached bool, req ItemRequest, p kernel.Principal, acc Access,
+	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
+	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) bool {
 	s := debianAPI{k}
 	if !debian.Serves(c.PackageType) || req.IsFolder {
@@ -47,7 +48,7 @@ func tryDebianItem(
 			debian.PackagesIndexPath(req.Path) || byHash {
 			s.serveVirtualDebianMetadata(w, r, st, c, req, p, acc)
 		} else {
-			httpkit.WriteErr(w, r, ItemNotFound())
+			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		}
 		return true
 	}
@@ -65,11 +66,11 @@ func tryDebianItem(
 
 func (s debianAPI) serveDebianIndex(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	cached bool, req ItemRequest, p kernel.Principal, acc Access,
+	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
 	ctx := r.Context()
 	if len(req.Props) != 0 || r.URL.RawQuery != "" {
-		httpkit.WriteErr(w, r, ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
 	if !acc.Folder(c, req.Path, types.ActionRead) ||
@@ -79,7 +80,7 @@ func (s debianAPI) serveDebianIndex(
 		return
 	}
 	if cached && c.Class != repo.Remote {
-		httpkit.WriteErr(w, r, ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
 	var body []byte
@@ -106,7 +107,7 @@ func (s debianAPI) serveDebianIndex(
 			CacheOnly: cached,
 			Resource:  source.Resource{Path: req.Path, Method: r.Method},
 		}
-		query, err = DebianSourceRequest(query)
+		query, err = itemkit.DebianSourceRequest(query)
 		if err != nil {
 			break
 		}
@@ -165,7 +166,7 @@ func (s debianAPI) serveDebianIndex(
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Cache-Control", "private, no-store")
-	sw := &StatusWriter{ResponseWriter: w}
+	sw := &itemkit.StatusWriter{ResponseWriter: w}
 	http.ServeContent(sw, r, req.Path, time.Time{}, bytes.NewReader(body))
 	if sw.Complete(r) && used != nil {
 		_ = used(ctx)

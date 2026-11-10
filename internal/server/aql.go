@@ -14,6 +14,7 @@ import (
 	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -228,7 +229,7 @@ func nesting(
 		return n, nil
 	}
 	d, _ := accessapi.DeciderFrom(ctx)
-	acc, err := AccessFor(ctx, az, p, d)
+	acc, err := itemkit.AccessFor(ctx, az, p, d)
 	if err != nil {
 		return n, err
 	}
@@ -325,7 +326,7 @@ func readable(
 	hits []aql.Hit,
 ) ([]aql.Hit, error) {
 	d, _ := accessapi.DeciderFrom(ctx)
-	acc, err := AccessFor(ctx, az, p, d)
+	acc, err := itemkit.AccessFor(ctx, az, p, d)
 	if err != nil {
 		return nil, err
 	}

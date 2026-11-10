@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -303,7 +304,7 @@ func (s artifactoryService) SearchGavc(
 			key = upstream.routeKey(f.Item.RepoKey, f.Item.FullPath(), false, f.Item.Cached)
 		}
 		e := map[string]any{
-			"downloadUri": DownloadURI(ctx, key, f.Item.FullPath()),
+			"downloadUri": itemkit.DownloadURI(ctx, key, f.Item.FullPath()),
 			"ext":         f.Ext, "version": f.Version(),
 		}
 		if f.Classifier != "" {

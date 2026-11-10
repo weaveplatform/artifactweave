@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -23,7 +24,7 @@ import (
 type vcsAccess struct {
 	repo        repo.Config
 	principal   kernel.Principal
-	access      Access
+	access      itemkit.Access
 	isCacheOnly bool
 }
 
@@ -38,12 +39,12 @@ func (s artifactoryService) vcsRepository(
 	if err != nil {
 		return vcsAccess{}, err
 	}
-	c, cacheOnly, err := ResolveRepo(ctx, st, key)
+	c, cacheOnly, err := itemkit.ResolveRepo(ctx, st, key)
 	if err != nil {
 		return vcsAccess{}, s.ItemError(ctx, "VCS repository", err)
 	}
 	if c.PackageType != repo.VCS || c.Class != repo.Remote {
-		return vcsAccess{}, NotFoundRepo(key)
+		return vcsAccess{}, itemkit.NotFoundRepo(key)
 	}
 	switch c.VCSGitProvider {
 	case "",

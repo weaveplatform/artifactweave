@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -103,7 +104,7 @@ func (s artifactoryService) latestVersionByProperties(w http.ResponseWriter, req
 		for _, h := range hits {
 			if h.Properties.Has(versionProperty, best) {
 				artifacts = append(artifacts, map[string]any{
-					"uri": DownloadURI(ctx, h.Item.ReportedRepoKey(), h.Item.FullPath()),
+					"uri": itemkit.DownloadURI(ctx, h.Item.ReportedRepoKey(), h.Item.FullPath()),
 				})
 			}
 		}

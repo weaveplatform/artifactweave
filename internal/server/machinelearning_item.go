@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	ml "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/machinelearning"
@@ -24,12 +25,12 @@ func machineLearningPrivate(c repo.Config, p string) bool {
 }
 
 func tryMachineLearningItem(
-	_ *Kit, w http.ResponseWriter, r *http.Request, _ store.Store, c repo.Config,
-	_ bool, req ItemRequest, _ kernel.Principal, _ Access,
+	_ *itemkit.Kit, w http.ResponseWriter, r *http.Request, _ store.Store, c repo.Config,
+	_ bool, req itemkit.ItemRequest, _ kernel.Principal, _ itemkit.Access,
 ) bool {
 	if !machineLearningPrivate(c, req.Path) {
 		return false
 	}
-	httpkit.WriteErr(w, r, ItemNotFound())
+	httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 	return true
 }

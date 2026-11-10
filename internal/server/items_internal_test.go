@@ -9,6 +9,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -23,7 +24,7 @@ func TestAccServeFilePreservesProtocolDisposition(t *testing.T) {
 	wantStatus(t, deployed, http.StatusCreated)
 	it := w.item("libs-local", false, "org/app/app-1.0.jar")
 	s := newArtifactoryService(Config{Store: w.db, Blobs: w.blobs})
-	f := Found{Repo: repo.Config{Key: "libs-local", Class: repo.Local}, Item: it}
+	f := itemkit.Found{Repo: repo.Config{Key: "libs-local", Class: repo.Local}, Item: it}
 	r := httptest.NewRequest(http.MethodGet, "/native/download", nil)
 	rec := httptest.NewRecorder()
 	rec.Header().Set("Content-Disposition", `attachment; filename="plugin-com-weave-fixture.jar"`)
@@ -68,7 +69,7 @@ func TestAccReadsContent(t *testing.T) {
 	for n := range store.MaxLimit {
 		put("gone", fmt.Sprintf("f%d.bin", n))
 	}
-	acc, err := AccessFor(
+	acc, err := itemkit.AccessFor(
 		ctx,
 		authorizerOver(db),
 		kernel.Principal{Name: "admin", Admin: true},
@@ -120,7 +121,7 @@ func TestAccMatrixParameterDecoding(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			req, err := ParseEscapedItemPath(c.escaped)
+			req, err := itemkit.ParseEscapedItemPath(c.escaped)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -142,7 +143,7 @@ func TestAccMatrixParameterDecoding(t *testing.T) {
 			}
 		})
 	}
-	if _, err := ParseEscapedItemPath("libs/a.txt;k=%zz"); err == nil {
+	if _, err := itemkit.ParseEscapedItemPath("libs/a.txt;k=%zz"); err == nil {
 		t.Error("a malformed escape was accepted")
 	}
 }

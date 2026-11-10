@@ -35,7 +35,7 @@ var withPrincipalSites = []string{
 	// The remote reindex stores the caller it has just rechecked without a
 	// decider, so that the repository check that follows evaluates that
 	// caller's current permissions rather than the request's.
-	"internal/server/reindex_itemkit.go",
+	"migration/artifacts/adapters/http/itemkit/reindex.go",
 }
 
 // withPrincipalRule ends every problem: what to use instead.
@@ -69,16 +69,16 @@ func v(ctx context.Context, p kernel.Principal) {
 	f := WithPrincipal
 	_ = f`)
 	conforming := map[string]string{
-		"go.mod":                                 "module github.com/weaveplatform/artifactweave\n",
-		"internal/auth/bridge_kernel.go":         uses,
-		"migration/access/api/context.go":        uses,
-		"internal/server/reindex_itemkit.go":     uses,
-		"internal/server/handler_test.go":        uses,
-		"migration/kernel/context_test.go":       uses,
-		"internal/server/testdata/x.go":          uses,
-		"internal/nested/go.mod":                 "module example.com/nested\n",
-		"internal/nested/n.go":                   uses,
-		".worktrees/copy/internal/server/x/x.go": uses,
+		"go.mod":                          "module github.com/weaveplatform/artifactweave\n",
+		"internal/auth/bridge_kernel.go":  uses,
+		"migration/access/api/context.go": uses,
+		"migration/artifacts/adapters/http/itemkit/reindex.go": uses,
+		"internal/server/handler_test.go":                      uses,
+		"migration/kernel/context_test.go":                     uses,
+		"internal/server/testdata/x.go":                        uses,
+		"internal/nested/go.mod":                               "module example.com/nested\n",
+		"internal/nested/n.go":                                 uses,
+		".worktrees/copy/internal/server/x/x.go":               uses,
 		// The declaration itself is no use, nor is a comment that names it.
 		"migration/kernel/context.go": `package kernel
 

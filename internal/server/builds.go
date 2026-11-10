@@ -11,6 +11,7 @@ import (
 	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -31,7 +32,7 @@ const buildsPath = "/artifactory/api/build"
 // buildAccess answers the build service's permission questions from the
 // request's evaluator: the build resource on the build-info repository,
 // and the artifact resource on an artifact's item.
-type buildAccess struct{ Access }
+type buildAccess struct{ itemkit.Access }
 
 func (b buildAccess) Build(repoKey, path string, folder bool, want types.Actions) bool {
 	t := accessapi.Repo{Key: repoKey, Class: string(repo.Local)}
@@ -74,7 +75,7 @@ func (s artifactoryService) buildError(
 			strings.TrimPrefix(err.Error(), build.ErrInvalid.Error()+": "),
 		)
 	case errors.Is(err, build.ErrNoRepository):
-		return NotFoundRepo(types.BuildInfoRepo(build.ProjectKey(project)))
+		return itemkit.NotFoundRepo(types.BuildInfoRepo(build.ProjectKey(project)))
 	case errors.Is(err, build.ErrConflict):
 		return apierror.New(http.StatusConflict, err.Error())
 	case errors.Is(err, build.ErrNotFound):
@@ -412,7 +413,7 @@ func (s artifactoryService) GetBuildArtifacts(
 	}
 	project, ok := buildInfoProject(req.BuildRepo)
 	if !ok {
-		return nil, NotFoundRepo(req.BuildRepo)
+		return nil, itemkit.NotFoundRepo(req.BuildRepo)
 	}
 	items, err := svc.Artifacts(ctx, project, req.BuildName, req.BuildNumber, a)
 	if err != nil {
