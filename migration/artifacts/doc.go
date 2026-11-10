@@ -109,6 +109,13 @@
 //     TestAccRemoteWiringInstallsFormatHooks: the log of each kind of
 //     garbage collection pass, the policy key's first-start initialization
 //     under concurrency, and the format hooks the remote wiring installs.
+//   - TestUnitRegisterWorkStopsAtTheItemServiceError,
+//     TestUnitOpenRemoteSourcesPolicyKeyFailures,
+//     TestUnitOpenRemoteSourcesRefusesABadPrivateOrigin and the four
+//     TestUnitRemote tests, over a store with one failing call: each error
+//     path's error, a failed start that opens nothing and leaves the policy
+//     key and its lease as they were, and the remote reads' fences refusing
+//     a read that no longer stands.
 //   - app's tests start the module through openRuntime, and its remote
 //     suites read remote content through it.
 package artifacts
