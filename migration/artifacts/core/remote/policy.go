@@ -17,12 +17,33 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/tx"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
+
+// Store is the persistence that the policy, Smart Remote and the ecosystem
+// remote rules reach through Policy.Store: the remote cache, repositories
+// and items, the work queue and the lease table, in transactions. Every
+// call made inside a policy transaction joins it, and work.New builds the
+// Smart and Maven companion queues on it, so work they enqueue exists
+// exactly when the change that needs it commits (decision 0033).
+// CheckCurrent is handed it. It names no access store: credentials reach
+// the policy through Options. The metadata store's aggregate (pkg/store)
+// is a Store.
+type Store interface {
+	tx.Runner
+	RemoteCache() port.RemoteCacheStore
+	Repos() port.RepoStore
+	Items() port.ItemStore
+	WorkQueue() work.WorkQueue
+	Leases() work.LeaseStore
+}
 
 // Policy implements the shared remote retrieval table. Authorization belongs to
 // source.Service; CheckCurrent repeats it inside the short publication transaction
@@ -52,7 +73,7 @@ type Policy struct {
 	// holds when the fetch ends. An error it returns ends the fetch as it is, with
 	// no fallback to a cached copy, so it is one of the source service's errors.
 	ProjectResponse func(q source.Request, res *http.Response) error
-	Store           store.Store
+	Store           Store
 	Blobs           blob.Store
 	Items           *item.Service
 	// Pool opens the upstream connections. Left nil, with Fetch nil too, every
@@ -61,7 +82,7 @@ type Policy struct {
 	// passes that check and the format rules' own.
 	Pool         Upstream
 	Options      func(context.Context, repo.Config) (Options, error)
-	CheckCurrent func(context.Context, store.Store, source.Request, source.Permit, string) error
+	CheckCurrent func(context.Context, Store, source.Request, source.Permit, string) error
 	// Key is a stable keyring-derived HMAC key, never a logged cache identifier.
 	Key           []byte
 	Now           func() time.Time

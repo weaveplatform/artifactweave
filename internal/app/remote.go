@@ -115,8 +115,8 @@ func (rt *runtime) openRemoteSources(
 	registryRevalidate := func(ctx context.Context, q source.Request, permit source.Permit) error {
 		return revalidatePrincipal(ctx, q, permit, true)
 	}
-	checkCurrent := func(check func(context.Context, source.Request, source.Permit) error) func(context.Context, store.Store, source.Request, source.Permit, string) error {
-		return func(ctx context.Context, _ store.Store, q source.Request, permit source.Permit, revision string) error {
+	checkCurrent := func(check func(context.Context, source.Request, source.Permit) error) func(context.Context, remote.Store, source.Request, source.Permit, string) error {
+		return func(ctx context.Context, _ remote.Store, q source.Request, permit source.Permit, revision string) error {
 			if err := check(ctx, q, permit); err != nil {
 				return err
 			}

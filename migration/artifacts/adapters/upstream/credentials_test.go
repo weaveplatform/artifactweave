@@ -29,12 +29,19 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func resolverFor(t *testing.T, st store.Store, opts ResolverOptions) *Resolver {
+// fixtureStore is what resolverFor builds over: the resolver's store, and
+// the access module's, whose Keys stands in for the certificates binding
+// the application gives the resolver.
+type fixtureStore interface {
+	ResolverStore
+	accesstest.Store
+}
+
+func resolverFor(t *testing.T, st fixtureStore, opts ResolverOptions) *Resolver {
 	t.Helper()
 	key, err := crypt.New([]byte("0123456789abcdef0123456789abcdef"))
 	if err != nil {
@@ -53,7 +60,7 @@ func resolverFor(t *testing.T, st store.Store, opts ResolverOptions) *Resolver {
 	return r
 }
 
-func saveRepo(t *testing.T, st store.Store, c repo.Config) {
+func saveRepo(t *testing.T, st ResolverStore, c repo.Config) {
 	t.Helper()
 	if err := st.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
@@ -100,7 +107,7 @@ func rootsFor(servers ...*fakeupstream.Server) []byte {
 
 func putProxy(
 	t *testing.T,
-	st store.Store,
+	st ResolverStore,
 	key string,
 	p wire.ProxyConfiguration,
 	password string,
@@ -408,7 +415,7 @@ func TestAccResolverCookiesArePerRepositoryAndRevision(t *testing.T) {
 	}
 }
 
-func storeIdentity(t *testing.T, st store.Store, alias string, cert tls.Certificate) {
+func storeIdentity(t *testing.T, st accesstest.Store, alias string, cert tls.Certificate) {
 	t.Helper()
 	var certPEM []byte
 	for _, der := range cert.Certificate {
@@ -600,7 +607,7 @@ func TestAccResolverConfigurationFailures(t *testing.T) {
 	st := inmem.New()
 	key, _ := crypt.New([]byte("0123456789abcdef0123456789abcdef"))
 	for _, tc := range []struct {
-		st   store.Store
+		st   ResolverStore
 		key  *crypt.Keyring
 		opts ResolverOptions
 	}{{nil, key, ResolverOptions{}}, {st, nil, ResolverOptions{}}, {st, key, ResolverOptions{RootCAsPEM: []byte("not a certificate")}}, {st, key, ResolverOptions{AllowedPrivateOrigins: []string{"ftp://example.com"}}}} {

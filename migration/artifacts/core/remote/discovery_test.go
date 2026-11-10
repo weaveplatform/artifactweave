@@ -65,7 +65,7 @@ func discoveryFixture(
 			q.Resource.PermissionFolder || q.Resource.PermissionRoot,
 		)
 	}
-	w.p.CheckCurrent = func(ctx context.Context, _ store.Store, q source.Request, p source.Permit, _ string) error {
+	w.p.CheckCurrent = func(ctx context.Context, _ remote.Store, q source.Request, p source.Permit, _ string) error {
 		return service.Revalidate(ctx, q, p)
 	}
 	return w, service, q, d

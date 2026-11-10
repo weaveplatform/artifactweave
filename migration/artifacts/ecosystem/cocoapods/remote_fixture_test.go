@@ -16,7 +16,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
@@ -114,7 +113,7 @@ func (w *policyWorld) bytes(result source.Result) string {
 
 func ptr[T any](v T) *T { return &v }
 
-func resolverFor(t *testing.T, st store.Store, opts upstream.ResolverOptions) *upstream.Resolver {
+func resolverFor(t *testing.T, st *inmem.Store, opts upstream.ResolverOptions) *upstream.Resolver {
 	t.Helper()
 	key, err := crypt.New([]byte("0123456789abcdef0123456789abcdef"))
 	if err != nil {
@@ -135,7 +134,7 @@ func resolverFor(t *testing.T, st store.Store, opts upstream.ResolverOptions) *u
 	return r
 }
 
-func saveRepo(t *testing.T, st store.Store, c repo.Config) {
+func saveRepo(t *testing.T, st *inmem.Store, c repo.Config) {
 	t.Helper()
 	if err := st.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)

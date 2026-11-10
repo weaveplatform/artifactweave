@@ -264,7 +264,7 @@ var errStoreFault = errors.New("smart test: store fault")
 // faultStore passes every call to the store it wraps, transactions
 // included, except the calls fail picks, which answer errStoreFault.
 type faultStore struct {
-	store.Store
+	item.Store
 	fail func(call string) bool
 }
 
@@ -678,7 +678,7 @@ func TestAccSmartDiscoveryKeptOnlyAfterItsRecheck(t *testing.T) {
 			var rechecked atomic.Bool
 			check := w.p.CheckCurrent
 			w.p.CheckCurrent = func(
-				ctx context.Context, st store.Store, q source.Request, permit source.Permit, revision string,
+				ctx context.Context, st remote.Store, q source.Request, permit source.Permit, revision string,
 			) error {
 				if w.db.InTx(ctx) {
 					rechecked.Store(true)

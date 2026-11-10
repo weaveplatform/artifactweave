@@ -251,7 +251,7 @@ func cocoaPodsAuthorityFixture(t *testing.T) (*policyWorld, source.Request) {
 	// w.db asks the same permissions, inside the policy's transaction
 	// through ctx.
 	kit := accesstest.Over(t, w.db)
-	w.p.CheckCurrent = func(ctx context.Context, st store.Store, q source.Request, _ source.Permit, revision string) error {
+	w.p.CheckCurrent = func(ctx context.Context, st remote.Store, q source.Request, _ source.Permit, revision string) error {
 		current, err := st.Repos().Get(ctx, q.Repo.Key)
 		if err != nil || store.RemotePolicyChanged(current, q.Repo) {
 			return source.ErrSuperseded

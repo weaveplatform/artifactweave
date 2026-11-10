@@ -17,6 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -26,7 +27,7 @@ import (
 // traversal inputs only; consumers receive canonical paths after lossless
 // translation and current authorization.
 type Discovery struct {
-	store       item.Store
+	store       interface{ RemoteCache() port.RemoteCacheStore }
 	repository  repo.Config
 	identity    types.SourceIdentity
 	canonical   *layout.Layout

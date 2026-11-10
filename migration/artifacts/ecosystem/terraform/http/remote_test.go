@@ -125,7 +125,7 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 		}
 		return nil
 	}
-	p.CheckCurrent = func(ctx context.Context, _ store.Store, q source.Request, permit source.Permit, _ string) error {
+	p.CheckCurrent = func(ctx context.Context, _ remote.Store, q source.Request, permit source.Permit, _ string) error {
 		return svc.Revalidate(ctx, q, permit)
 	}
 	out := &remoteFixture{fixture: f, up: up, policy: p, svc: svc, clock: clock, kit: kit}

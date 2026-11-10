@@ -53,10 +53,19 @@ const (
 //   - teamwriter reads and deploys under team/ alone;
 //   - pkgdeleter reads all and deletes the .nupkg files at the root;
 //   - nobody holds nothing.
+//
+// serverStore is the one store the fixture's item service, router kit,
+// access kit and remote setup share, which a fault store can replace.
+type serverStore interface {
+	item.Store
+	pkgroute.Store
+	accesstest.Store
+}
+
 type fixture struct {
 	t     *testing.T
 	h     http.Handler
-	db    store.Store
+	db    serverStore
 	blobs blob.Store
 	items *item.Service
 	// mu guards tick and faults, which concurrent pushes reach.
@@ -72,7 +81,7 @@ func newFixture(t *testing.T, wrap ...func(pkgroute.Store) pkgroute.Store) *fixt
 
 func newFixtureOn(
 	t *testing.T,
-	db store.Store,
+	db serverStore,
 	wrap ...func(pkgroute.Store) pkgroute.Store,
 ) *fixture {
 	t.Helper()

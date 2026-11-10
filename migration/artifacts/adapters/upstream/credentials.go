@@ -23,10 +23,11 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
+	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -49,13 +50,22 @@ type ResolverOptions struct {
 	Certificates accessapi.Keys
 }
 
+// ResolverStore is what Resolver reads: the stored repository (its sealed
+// credentials, headers and security settings, which the store unseals on
+// read) and the proxy configuration documents. The metadata store's
+// aggregate (pkg/store) is a ResolverStore.
+type ResolverStore interface {
+	Repos() port.RepoStore
+	Configs() configdoc.ConfigStore
+}
+
 // Resolver turns a stored repository configuration into the transport's
 // remote.Options: its sealed credentials, headers, cookies, client
 // certificate and proxy, the destination policy, and the credential
 // revision that fences the remote cache against credential changes. It is
 // safe for concurrent use.
 type Resolver struct {
-	store   store.Store
+	store   ResolverStore
 	key     []byte
 	roots   *x509.CertPool
 	options ResolverOptions
@@ -67,7 +77,11 @@ type Resolver struct {
 // store, or with an AllowedPrivateOrigins entry that is no checked URL, it
 // answers remote.ErrConfiguration. Root certificates that cannot be loaded
 // answer remote.ErrSecurity.
-func NewResolver(st store.Store, keyring *crypt.Keyring, opts ResolverOptions) (*Resolver, error) {
+func NewResolver(
+	st ResolverStore,
+	keyring *crypt.Keyring,
+	opts ResolverOptions,
+) (*Resolver, error) {
 	if st == nil || keyring == nil && len(opts.RevisionKey) < 32 {
 		return nil, remote.ErrConfiguration
 	}

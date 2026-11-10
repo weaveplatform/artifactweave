@@ -171,14 +171,14 @@ func TestUnitReindexRefusesCallerThatLostManage(t *testing.T) {
 // binds its store and authenticator. The API reads everything from st, so a
 // store that fails permissions or tokens fails the Authorizer or the
 // credential check.
-func bind(t *testing.T, st store.Store, now func() time.Time) accessapi.API {
+func bind(t *testing.T, st accesstest.Store, now func() time.Time) accessapi.API {
 	t.Helper()
 	return accesstest.Over(t, st, accesstest.WithNow(now)).API()
 }
 
 var errStore = errors.New("permission storage failure")
 
-type permissionFailure struct{ store.Store }
+type permissionFailure struct{ accesstest.Store }
 
 func (s permissionFailure) Permissions() store.PermissionStore {
 	return brokenPermissions{s.Store.Permissions()}
@@ -192,7 +192,7 @@ func (p brokenPermissions) ForPrincipal(
 	return nil, errStore
 }
 
-type tokenFailure struct{ store.Store }
+type tokenFailure struct{ accesstest.Store }
 
 func (s tokenFailure) Tokens() store.TokenStore { return brokenTokens{s.Store.Tokens()} }
 

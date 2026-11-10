@@ -34,17 +34,24 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const sha = "0123456789012345678901234567890123456789"
 
+// serverStore is the one store the fixture's item service, router kit,
+// access kit and remote setup share, which a fault store can replace.
+type serverStore interface {
+	item.Store
+	pkgroute.Store
+	accesstest.Store
+}
+
 type fixture struct {
 	xetEnabled bool
 	t          *testing.T
-	db         store.Store
+	db         serverStore
 	items      *item.Service
 	server     *httptest.Server
 }
