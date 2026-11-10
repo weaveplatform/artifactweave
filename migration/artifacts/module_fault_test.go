@@ -12,17 +12,18 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
+	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // errFault is what the call a faultStore names fails with.
@@ -34,26 +35,26 @@ var errFault = errors.New("injected store fault")
 // it would up to the failing call. fail is fixed when the module is built:
 // the remote runtimes' workers read the store from their own goroutines.
 type faultStore struct {
-	store.Store
+	*inmem.Store
 	fail string
 }
 
-func (s faultStore) Leases() store.LeaseStore { return faultLeases{s.Store.Leases(), s.fail} }
+func (s faultStore) Leases() work.LeaseStore { return faultLeases{s.Store.Leases(), s.fail} }
 
-func (s faultStore) Settings() store.SettingsStore {
+func (s faultStore) Settings() settings.SettingsStore {
 	return faultSettings{s.Store.Settings(), s.fail}
 }
 
-func (s faultStore) RemoteCache() store.RemoteCacheStore {
+func (s faultStore) RemoteCache() port.RemoteCacheStore {
 	return faultRemoteCache{s.Store.RemoteCache(), s.fail}
 }
 
 type faultLeases struct {
-	store.LeaseStore
+	work.LeaseStore
 	fail string
 }
 
-func (l faultLeases) Acquire(ctx context.Context, lease types.Lease, now time.Time) (bool, error) {
+func (l faultLeases) Acquire(ctx context.Context, lease work.Lease, now time.Time) (bool, error) {
 	if l.fail == "Leases.Acquire" {
 		return false, errFault
 	}
@@ -61,7 +62,7 @@ func (l faultLeases) Acquire(ctx context.Context, lease types.Lease, now time.Ti
 }
 
 type faultSettings struct {
-	store.SettingsStore
+	settings.SettingsStore
 	fail string
 }
 
@@ -80,13 +81,13 @@ func (s faultSettings) Put(ctx context.Context, key string, v any) error {
 }
 
 type faultRemoteCache struct {
-	store.RemoteCacheStore
+	port.RemoteCacheStore
 	fail string
 }
 
-func (c faultRemoteCache) Source(ctx context.Context, key string) (types.SourceIdentity, error) {
+func (c faultRemoteCache) Source(ctx context.Context, key string) (model.SourceIdentity, error) {
 	if c.fail == "RemoteCache.Source" {
-		return types.SourceIdentity{}, errFault
+		return model.SourceIdentity{}, errFault
 	}
 	return c.RemoteCacheStore.Source(ctx, key)
 }
@@ -98,7 +99,7 @@ func (c faultRemoteCache) Source(ctx context.Context, key string) (types.SourceI
 // periodic whatever Settings hold, and the queue refuses it.
 func TestUnitRegisterWorkStopsAtTheItemServiceError(t *testing.T) {
 	ctx := t.Context()
-	register := func(s Settings) (store.Store, error) {
+	register := func(s Settings) (*inmem.Store, error) {
 		st := inmem.New()
 		q, err := work.New(st, work.Options{})
 		if err != nil {
@@ -110,9 +111,9 @@ func TestUnitRegisterWorkStopsAtTheItemServiceError(t *testing.T) {
 		}
 		return st, m.RegisterWork(ctx)
 	}
-	scheduled := func(st store.Store) bool {
+	scheduled := func(st *inmem.Store) bool {
 		_, err := st.WorkQueue().Get(ctx, item.KindCacheCleanupSchedule, "scan")
-		if err != nil && !errors.Is(err, store.ErrNotFound) {
+		if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 			t.Fatal(err)
 		}
 		return err == nil
@@ -177,7 +178,7 @@ func TestUnitOpenRemoteSourcesPolicyKeyFailures(t *testing.T) {
 			name: "another node holds the lease",
 			prepare: func(t *testing.T, st *inmem.Store) {
 				now := time.Now().UTC()
-				held, err := st.Leases().Acquire(t.Context(), types.Lease{
+				held, err := st.Leases().Acquire(t.Context(), work.Lease{
 					Name: remotePolicyKeySetting, Holder: "another-node",
 					Acquired: now, Expires: now.Add(time.Hour),
 				}, now)
@@ -239,11 +240,11 @@ func TestUnitOpenRemoteSourcesPolicyKeyFailures(t *testing.T) {
 }
 
 // storedPolicyKey returns the remote policy key st holds, nil when none.
-func storedPolicyKey(t *testing.T, st store.Store) []byte {
+func storedPolicyKey(t *testing.T, st *inmem.Store) []byte {
 	t.Helper()
 	var key []byte
 	err := st.Settings().Get(t.Context(), remotePolicyKeySetting, &key)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return nil
 	}
 	if err != nil {
@@ -253,7 +254,7 @@ func storedPolicyKey(t *testing.T, st store.Store) []byte {
 }
 
 // allLeases returns every lease st holds.
-func allLeases(t *testing.T, st store.Store) []types.Lease {
+func allLeases(t *testing.T, st *inmem.Store) []work.Lease {
 	t.Helper()
 	leases, err := st.Leases().List(t.Context())
 	if err != nil {
@@ -289,7 +290,7 @@ type remoteFixture struct {
 	m    *Module
 	repo repo.Config
 	// id is the repository's source identity, which a permit for it holds.
-	id types.SourceIdentity
+	id model.SourceIdentity
 }
 
 // newRemoteFixture builds the module over a faultStore failing the call that
