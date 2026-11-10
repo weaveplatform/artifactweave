@@ -14,11 +14,11 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -47,9 +47,9 @@ func TestAccRemoteAdapterExplicitGateAndRead(t *testing.T) {
 	var result source.Result
 	var fail error
 	svc := &source.Service{
-		Resolve: func(context.Context, repo.Config) (model.SourceIdentity, error) {
-			return model.SourceIdentity{
-				Kind:       model.ExternalHTTP,
+		Resolve: func(context.Context, repo.Config) (artmodel.SourceIdentity, error) {
+			return artmodel.SourceIdentity{
+				Kind:       artmodel.ExternalHTTP,
 				Repository: "repo",
 				ID:         "source",
 				Generation: "1",
@@ -73,7 +73,7 @@ func TestAccRemoteAdapterExplicitGateAndRead(t *testing.T) {
 		},
 	)
 	if err := f.db.Permissions().
-		Create(t.Context(), model.Permission{Name: "read-remote", Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {Actions: model.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}}, Targets: map[string]model.Target{"gen-remote": {Include: []string{"**"}}}}}}); err != nil {
+		Create(t.Context(), accmodel.Permission{Name: "read-remote", Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}}, Targets: map[string]accmodel.Target{"gen-remote": {Include: []string{"**"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	b := &remoteBody{Reader: strings.NewReader("remote bytes")}
@@ -88,7 +88,7 @@ func TestAccRemoteAdapterExplicitGateAndRead(t *testing.T) {
 	if res.Code != 200 || res.Body.String() != "remote bytes" || b.closes.Load() != 1 {
 		t.Fatalf("%d %s closed%d", res.Code, res.Body, b.closes.Load())
 	}
-	result = source.Result{Item: &model.Item{RepoKey: "gen-remote", Name: "a b", Cached: true}}
+	result = source.Result{Item: &artmodel.Item{RepoKey: "gen-remote", Name: "a b", Cached: true}}
 	res = f.do(http.MethodGet, base+"gen-remote/files/a%20b", "reader", "")
 	if res.Code != 200 || res.Body.String() != "served a b" {
 		t.Fatal(res.Code, res.Body)

@@ -16,13 +16,13 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -68,7 +68,7 @@ func newFixtureWithSource(t *testing.T, remote *source.Service) *fixture {
 			}
 			return err
 		},
-		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it model.Item) {
+		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it artmodel.Item) {
 			body, _, err := blobs.Open(r.Context(), it.Actual.SHA256)
 			if err != nil {
 				t.Fatal(err)
@@ -220,7 +220,7 @@ func TestAccHostedComposerMetadataAndDist(t *testing.T) {
 			if _, err := f.items.Restore(
 				context.Background(),
 				item.Target{Repo: c, Path: "acme/widget/1.2.3.zip"},
-				model.TrashRecord{Item: stored, Properties: properties},
+				artmodel.TrashRecord{Item: stored, Properties: properties},
 				"admin",
 			); err != nil {
 				t.Fatal(err)
@@ -291,7 +291,7 @@ func TestAccComposerRefusalsAndVirtualAuthority(t *testing.T) {
 		t.Fatalf("denied p2 %d", got.Code)
 	}
 	if err := f.db.Permissions().
-		Create(context.Background(), model.Permission{Name: "composer-second-only", Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {Actions: model.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}}, Targets: map[string]model.Target{"all": {}, "second": {}}}}}); err != nil {
+		Create(context.Background(), accmodel.Permission{Name: "composer-second-only", Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}}, Targets: map[string]accmodel.Target{"all": {}, "second": {}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	if got := f.requestAs("GET", base+"/p2/acme/widget.json", "reader"); got.Code != 200 {
@@ -375,7 +375,7 @@ func TestAccHostedComposerDevelopmentAndStoredIntegrity(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := f.db.Items().
-		Put(context.Background(), model.Item{RepoKey: c.Key, Name: "acme/widget/2.0.0.zip", Actual: kernel.Checksums{SHA256: info.Digests.SHA256}}); err != nil {
+		Put(context.Background(), artmodel.Item{RepoKey: c.Key, Name: "acme/widget/2.0.0.zip", Actual: kernel.Checksums{SHA256: info.Digests.SHA256}}); err != nil {
 		t.Fatal(err)
 	}
 	if got := f.request("POST", base+"/reindex"); got.Code != 502 {

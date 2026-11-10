@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
@@ -52,7 +52,7 @@ func documentPath(name, number, started string) string {
 	if err != nil {
 		panic(err)
 	}
-	_, p := model.Build{Name: name, Number: number, Started: t}.DocumentItem()
+	_, p := artmodel.Build{Name: name, Number: number, Started: t}.DocumentItem()
 	return p
 }
 
@@ -368,11 +368,11 @@ func TestAccBuildPermissions(t *testing.T) {
 	ctx := context.Background()
 	grant := func(name, user string, a api.Actions, include string) {
 		t.Helper()
-		if err := w.db.Permissions().Create(ctx, model.Permission{
+		if err := w.db.Permissions().Create(ctx, accmodel.Permission{
 			Name: name,
-			Resources: map[api.ResourceType]model.Resource{api.ResourceBuild: {
-				Actions: model.Grants{Users: map[string]api.Actions{user: a}},
-				Targets: map[string]model.Target{
+			Resources: map[api.ResourceType]accmodel.Resource{api.ResourceBuild: {
+				Actions: accmodel.Grants{Users: map[string]api.Actions{user: a}},
+				Targets: map[string]accmodel.Target{
 					api.BuildInfoRepository: {Include: []string{include}},
 				},
 			}},
@@ -436,7 +436,7 @@ func TestAccBuildInfoWithoutDocument(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := w.db.Builds().Put(context.Background(), model.Build{
+	if _, err := w.db.Builds().Put(context.Background(), artmodel.Build{
 		Name: "bare", Number: "1", Started: started,
 	}); err != nil {
 		t.Fatal(err)

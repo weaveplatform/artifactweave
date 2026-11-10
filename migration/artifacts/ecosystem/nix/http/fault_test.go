@@ -8,10 +8,10 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -21,7 +21,7 @@ import (
 type testSource struct {
 	meta, archive []byte
 	mode          string
-	cached        *model.Item
+	cached        *artmodel.Item
 	rechecks      int
 }
 
@@ -140,7 +140,7 @@ func TestAccNixRemoteRequiresValidatedAuthority(t *testing.T) {
 			}
 			src := &testSource{meta: f.meta, archive: f.data, mode: tc.mode, cached: &it}
 			if tc.mode == "missing blob" {
-				src.cached = &model.Item{Actual: kernel.Checksums{SHA256: "missing"}}
+				src.cached = &artmodel.Item{Actual: kernel.Checksums{SHA256: "missing"}}
 			}
 			if tc.mode == "malformed" {
 				src.meta = []byte("invalid")
@@ -298,18 +298,18 @@ func TestAccNixExactPathPermissionsAndRevocation(t *testing.T) {
 			if err := f.db.Repos().Create(t.Context(), v); err != nil {
 				t.Fatal(err)
 			}
-			targets := map[string]model.Target{"local": {}, "virtual": {}}
+			targets := map[string]accmodel.Target{"local": {}, "virtual": {}}
 			if mode == "metadata-only" {
-				targets["local"] = model.Target{Include: []string{infoPath}}
+				targets["local"] = accmodel.Target{Include: []string{infoPath}}
 			}
 			if mode == "virtual-only" {
 				delete(targets, "local")
 			}
-			p := model.Permission{
+			p := accmodel.Permission{
 				Name: "read",
-				Resources: map[api.ResourceType]model.Resource{
+				Resources: map[api.ResourceType]accmodel.Resource{
 					api.ResourceArtifact: {
-						Actions: model.Grants{
+						Actions: accmodel.Grants{
 							Users: map[string]api.Actions{"reader": api.ActionRead},
 						},
 						Targets: targets,
@@ -382,7 +382,7 @@ func (failItems) Descendants(
 	bool,
 	string,
 	kernel.Page,
-) ([]model.Item, string, error) {
+) ([]artmodel.Item, string, error) {
 	return nil, "", io.ErrUnexpectedEOF
 }
 

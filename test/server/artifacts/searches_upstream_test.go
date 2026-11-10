@@ -12,12 +12,12 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
@@ -73,7 +73,7 @@ func searchUpstreamWorld(t *testing.T) *upstreamSearchWorld {
 		t.Cleanup(pool.Close)
 		backend := &maven.MavenBackend{Policy: policy}
 		u.svc = &source.Service{
-			Resolve: func(ctx context.Context, r repo.Config) (model.SourceIdentity, error) {
+			Resolve: func(ctx context.Context, r repo.Config) (artmodel.SourceIdentity, error) {
 				return c.Store.RemoteCache().Source(ctx, r.Key)
 			},
 			Revalidate: func(ctx context.Context, q source.Request, permit source.Permit) error {
@@ -318,11 +318,13 @@ func TestAccSearchUpstreamFailureClassification(t *testing.T) {
 func TestAccSearchUpstreamVisibilityAndRevocation(t *testing.T) {
 	u := searchUpstreamWorld(t)
 	u.metadata("org/acme/lib", searchMetadata)
-	grant := model.Permission{
+	grant := accmodel.Permission{
 		Name: "search-user",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
-			Targets: map[string]model.Target{"up": {Include: []string{"org/acme/lib/2.0/*.jar"}}},
+		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
+			Actions: accmodel.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+			Targets: map[string]accmodel.Target{
+				"up": {Include: []string{"org/acme/lib/2.0/*.jar"}},
+			},
 		}},
 	}
 	if err := u.db.Permissions().Create(t.Context(), grant); err != nil {

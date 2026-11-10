@@ -8,17 +8,17 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	appsql "github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/federation/core/model"
+	fedmodel "github.com/weaveplatform/artifactweave/migration/federation/core/model"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/migration/notifications/core/model"
+	ntfmodel "github.com/weaveplatform/artifactweave/migration/notifications/core/model"
 	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/migration/platform/instance"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
-	"github.com/weaveplatform/artifactweave/migration/workers/core/model"
+	wrkmodel "github.com/weaveplatform/artifactweave/migration/workers/core/model"
 )
 
 // Opener opens the same database each call with the given keyring (nil for
@@ -100,27 +100,27 @@ func populate(t *testing.T, s *appsql.Store) {
 		Name: "kp", Type: api.KeypairGPG,
 		PrivateKey: "kp-private", Passphrase: "kp-pass",
 	}))
-	check(s.Keys().PutSigningKey(ctx, model.SigningKey{
+	check(s.Keys().PutSigningKey(ctx, accmodel.SigningKey{
 		Alias:      "sk",
 		PrivateKey: "sk-private", Passphrase: "sk-pass", IsDefault: true,
 	}))
 	check(s.Keys().PutCertificate(ctx, api.Certificate{
 		Alias: "cert", PEM: "cert-pem", PrivateKey: "cert-private",
 	}))
-	check(s.Tokens().Create(ctx, model.Token{
+	check(s.Tokens().Create(ctx, accmodel.Token{
 		ID: "tok", Subject: "alice", Scope: kernel.UserScope(), Secret: "token-secret",
 	}))
-	check(s.Replications().Put(ctx, model.Replication{
+	check(s.Replications().Put(ctx, fedmodel.Replication{
 		RepoKey: "remote", Key: "rep",
 		URL: "https://peer.example/artifactory/remote", Password: "rep-pw",
 	}))
-	check(s.Webhooks().Create(ctx, model.WebhookSubscription{
+	check(s.Webhooks().Create(ctx, ntfmodel.WebhookSubscription{
 		Key:        "hook",
 		Enabled:    true,
-		Domain:     model.DomainArtifact,
+		Domain:     ntfmodel.DomainArtifact,
 		EventTypes: []string{"deployed"},
-		Handlers: []model.WebhookHandler{
-			{Type: model.HandlerWebhook, URL: "https://hook.example", Secret: "hook-secret"},
+		Handlers: []ntfmodel.WebhookHandler{
+			{Type: ntfmodel.HandlerWebhook, URL: "https://hook.example", Secret: "hook-secret"},
 		},
 	}))
 	check(s.Configs().Put(ctx, configdoc.ConfigDocument{
@@ -131,8 +131,8 @@ func populate(t *testing.T, s *appsql.Store) {
 		),
 		Secrets: map[string]string{"manager_password": "ldap-pw"},
 	}))
-	check(s.Workers().Create(ctx, model.Worker{
-		Key: "w", Action: model.WorkerAction("BEFORE_DOWNLOAD"),
+	check(s.Workers().Create(ctx, wrkmodel.Worker{
+		Key: "w", Action: wrkmodel.WorkerAction("BEFORE_DOWNLOAD"),
 		SourceCode: "export default async () => ({})",
 	}))
 	check(s.Workers().PutSecret(ctx, "w", "token", "worker-secret"))

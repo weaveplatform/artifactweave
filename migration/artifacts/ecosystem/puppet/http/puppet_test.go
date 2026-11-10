@@ -21,13 +21,13 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
@@ -110,7 +110,7 @@ func newFixtureStore(
 			}
 			return err
 		},
-		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it model.Item) {
+		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it artmodel.Item) {
 			rc, _, err := blobs.Open(r.Context(), it.Actual.SHA256)
 			if err != nil {
 				t.Fatal(err)
@@ -128,7 +128,7 @@ func newFixtureStore(
 type metadataSource struct {
 	bodyAt                 func(source.Resource) string
 	metadataBase           string
-	cachedItem             *model.Item
+	cachedItem             *artmodel.Item
 	skipMetadataValidation bool
 	redirect               *url.URL
 	checkNilURL            bool
@@ -248,7 +248,7 @@ func (s metadataSource) Read(
 	}
 	if s.badCachedItem {
 		result.Stream = nil
-		result.Item = &model.Item{Actual: kernel.Checksums{SHA256: "missing"}}
+		result.Item = &artmodel.Item{Actual: kernel.Checksums{SHA256: "missing"}}
 	}
 	if s.cachedItem != nil {
 		result.Stream = nil
@@ -271,7 +271,7 @@ func fixtureArchive(t *testing.T) []byte {
 	return repopath.Read(t, "test/acceptance/fixtures/puppet/acme-widget-1.0.0.tar.gz")
 }
 
-func (f *fixture) deploy(c repo.Config, body []byte) model.Item {
+func (f *fixture) deploy(c repo.Config, body []byte) artmodel.Item {
 	f.t.Helper()
 	it, err := f.items.Deploy(
 		f.t.Context(),
@@ -424,12 +424,12 @@ func TestAccVirtualOrderedVersionsAndMemberPermissions(t *testing.T) {
 			t.Fatalf("virtual: %d %s", r.Code, r.Body.String())
 		}
 	}
-	permission := model.Permission{
+	permission := accmodel.Permission{
 		Name: "virtual-only",
-		Resources: map[api.ResourceType]model.Resource{
+		Resources: map[api.ResourceType]accmodel.Resource{
 			api.ResourceArtifact: {
-				Actions: model.Grants{Users: map[string]api.Actions{"viewer": api.ActionRead}},
-				Targets: map[string]model.Target{"virtual": {}},
+				Actions: accmodel.Grants{Users: map[string]api.Actions{"viewer": api.ActionRead}},
+				Targets: map[string]accmodel.Target{"virtual": {}},
 			},
 		},
 	}
@@ -591,19 +591,19 @@ type faultPackages struct {
 	f *faultStore
 }
 
-func (f faultPackages) Find(ctx context.Context, key, name string) (model.Package, error) {
+func (f faultPackages) Find(ctx context.Context, key, name string) (artmodel.Package, error) {
 	if f.f.find {
-		return model.Package{}, context.Canceled
+		return artmodel.Package{}, context.Canceled
 	}
 	return f.PackageStore.Find(ctx, key, name)
 }
 
-func (f faultPackages) Versions(ctx context.Context, id int64) ([]model.PackageVersion, error) {
+func (f faultPackages) Versions(ctx context.Context, id int64) ([]artmodel.PackageVersion, error) {
 	if f.f.versions {
 		return nil, context.Canceled
 	}
 	if f.f.huge {
-		return make([]model.PackageVersion, 4097), nil
+		return make([]artmodel.PackageVersion, 4097), nil
 	}
 	return f.PackageStore.Versions(ctx, id)
 }
@@ -618,9 +618,9 @@ func (f faultItems) Get(
 	key string,
 	cached bool,
 	path string,
-) (model.Item, error) {
+) (artmodel.Item, error) {
 	if f.f.items {
-		return model.Item{}, context.Canceled
+		return artmodel.Item{}, context.Canceled
 	}
 	return f.ItemStore.Get(ctx, key, cached, path)
 }
@@ -765,7 +765,9 @@ func TestAccCachedMetadataAuthorityAndURLFence(t *testing.T) {
 			)
 			if tc.cached {
 				info := blobtest.Put(t.Context(), t, f.items.Blobs, []byte(src.body))
-				src.cachedItem = &model.Item{Actual: kernel.Checksums{SHA256: info.Digests.SHA256}}
+				src.cachedItem = &artmodel.Item{
+					Actual: kernel.Checksums{SHA256: info.Digests.SHA256},
+				}
 			}
 			r := f.do("GET", base+"/v3/releases?module=acme-widget", "admin")
 			if r.Code != tc.want {

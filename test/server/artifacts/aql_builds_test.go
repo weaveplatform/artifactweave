@@ -11,12 +11,12 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
@@ -31,19 +31,20 @@ func buildsAQLWorld(t *testing.T, tune ...func(*Config)) (http.Handler, *token.S
 	ctx := context.Background()
 	db := inmem.New()
 	cheapSeed(t, db)
-	if err := db.Users().Create(ctx, model.User{Name: "dev", PasswordHash: cheapHash}); err != nil {
+	if err := db.Users().
+		Create(ctx, accmodel.User{Name: "dev", PasswordHash: cheapHash}); err != nil {
 		t.Fatal(err)
 	}
-	dev := model.Grants{Users: map[string]api.Actions{"dev": api.ActionRead}}
-	if err := db.Permissions().Create(ctx, model.Permission{
-		Name: "dev-app", Resources: map[api.ResourceType]model.Resource{
+	dev := accmodel.Grants{Users: map[string]api.Actions{"dev": api.ActionRead}}
+	if err := db.Permissions().Create(ctx, accmodel.Permission{
+		Name: "dev-app", Resources: map[api.ResourceType]accmodel.Resource{
 			api.ResourceArtifact: {
 				Actions: dev,
-				Targets: map[string]model.Target{"libs-local": {Include: []string{"**"}}},
+				Targets: map[string]accmodel.Target{"libs-local": {Include: []string{"**"}}},
 			},
 			api.ResourceBuild: {
 				Actions: dev,
-				Targets: map[string]model.Target{
+				Targets: map[string]accmodel.Target{
 					"artifactory-build-info": {Include: []string{"app/**"}},
 				},
 			},
@@ -67,18 +68,18 @@ func buildsAQLWorld(t *testing.T, tune ...func(*Config)) (http.Handler, *token.S
 		t.Fatal(err)
 	}
 	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	jar := model.BuildFile{Name: "app.jar", Checksums: kernel.Checksums{SHA1: sha1Hex("jar")}}
+	jar := artmodel.BuildFile{Name: "app.jar", Checksums: kernel.Checksums{SHA1: sha1Hex("jar")}}
 	for n, run := range [][2]string{{"app", "1"}, {"app", "2"}, {"tool", "1"}} {
-		b, err := db.Builds().Put(ctx, model.Build{
+		b, err := db.Builds().Put(ctx, artmodel.Build{
 			Name: run[0], Number: run[1], Started: base.Add(time.Duration(n) * time.Minute),
 			Created: base.Add(time.Hour), CreatedBy: "ci", URL: "https://ci/" + run[0],
-			Modules: []model.BuildModule{{ID: run[0], Artifacts: []model.BuildFile{jar}}},
+			Modules: []artmodel.BuildModule{{ID: run[0], Artifacts: []artmodel.BuildFile{jar}}},
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
 		if n == 0 {
-			if _, err := db.Builds().AddPromotion(ctx, model.BuildPromotion{
+			if _, err := db.Builds().AddPromotion(ctx, artmodel.BuildPromotion{
 				BuildID: b.ID, Created: base.Add(2 * time.Hour), CreatedBy: "admin",
 				Status: "released", Repo: "libs-release", CIUser: "jenkins",
 			}); err != nil {

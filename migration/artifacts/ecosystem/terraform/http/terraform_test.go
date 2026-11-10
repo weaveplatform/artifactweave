@@ -13,13 +13,13 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
@@ -78,20 +78,22 @@ func newFixture(t *testing.T) *fixture {
 			t.Fatal(err)
 		}
 	}
-	for _, u := range []model.User{{Name: "admin", Admin: true}, {Name: "reader"}} {
+	for _, u := range []accmodel.User{{Name: "admin", Admin: true}, {Name: "reader"}} {
 		if err := db.Users().Create(t.Context(), u); err != nil {
 			t.Fatal(err)
 		}
 	}
 	if err := db.Permissions().
-		Create(t.Context(), model.Permission{Name: "read", Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{
+		Create(t.Context(), accmodel.Permission{Name: "read", Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
+			Actions: accmodel.Grants{
 				Users: map[string]api.Actions{
 					"reader":    api.ActionRead,
 					"anonymous": api.ActionRead,
 				},
 			},
-			Targets: map[string]model.Target{"mods": {Include: []string{"ns/name/aws/1.0.0.zip"}}},
+			Targets: map[string]accmodel.Target{
+				"mods": {Include: []string{"ns/name/aws/1.0.0.zip"}},
+			},
 		}}}); err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +134,7 @@ func (f *fixture) router(keys *crypt.Keyring) http.Handler {
 		pkgroute.Options{
 			Store: f.read,
 			Items: func() *item.Service { return f.items },
-			ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it model.Item) {
+			ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it artmodel.Item) {
 				w.Header().Set("X-Checksum-Sha256", it.Actual.SHA256)
 				if r.Method != "HEAD" {
 					_, _ = w.Write([]byte(it.FullPath()))
@@ -311,7 +313,7 @@ func TestAccSignedDownloads(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				u.Status = model.UserDisabled
+				u.Status = accmodel.UserDisabled
 				if err = f.db.Users().Update(t.Context(), u); err != nil {
 					t.Fatal(err)
 				}

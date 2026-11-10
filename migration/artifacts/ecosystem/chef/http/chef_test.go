@@ -21,13 +21,13 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
@@ -108,7 +108,7 @@ func newFixtureStore(
 			}
 			return err
 		},
-		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it model.Item) {
+		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it artmodel.Item) {
 			rc, _, err := blobs.Open(r.Context(), it.Actual.SHA256)
 			if err != nil {
 				t.Fatal(err)
@@ -126,7 +126,7 @@ func newFixtureStore(
 type metadataSource struct {
 	bodyAt                 func(source.Resource) string
 	metadataBase           string
-	cachedItem             *model.Item
+	cachedItem             *artmodel.Item
 	skipMetadataValidation bool
 	redirect               *url.URL
 	checkNilURL            bool
@@ -246,7 +246,7 @@ func (s metadataSource) Read(
 	}
 	if s.badCachedItem {
 		result.Stream = nil
-		result.Item = &model.Item{Actual: kernel.Checksums{SHA256: "missing"}}
+		result.Item = &artmodel.Item{Actual: kernel.Checksums{SHA256: "missing"}}
 	}
 	if s.cachedItem != nil {
 		result.Stream = nil
@@ -306,7 +306,7 @@ func (f *fixture) upload(name string, body []byte, user string) *httptest.Respon
 	return w
 }
 
-func (f *fixture) deploy(c repo.Config, name, version string, body []byte) model.Item {
+func (f *fixture) deploy(c repo.Config, name, version string, body []byte) artmodel.Item {
 	f.t.Helper()
 	it, err := f.items.Deploy(
 		f.t.Context(),
@@ -567,19 +567,19 @@ type faultPackages struct {
 	f *faultStore
 }
 
-func (f faultPackages) Find(ctx context.Context, key, name string) (model.Package, error) {
+func (f faultPackages) Find(ctx context.Context, key, name string) (artmodel.Package, error) {
 	if f.f.find {
-		return model.Package{}, context.Canceled
+		return artmodel.Package{}, context.Canceled
 	}
 	return f.PackageStore.Find(ctx, key, name)
 }
 
-func (f faultPackages) Versions(ctx context.Context, id int64) ([]model.PackageVersion, error) {
+func (f faultPackages) Versions(ctx context.Context, id int64) ([]artmodel.PackageVersion, error) {
 	if f.f.versions {
 		return nil, context.Canceled
 	}
 	if f.f.huge {
-		return make([]model.PackageVersion, 4097), nil
+		return make([]artmodel.PackageVersion, 4097), nil
 	}
 	return f.PackageStore.Versions(ctx, id)
 }
@@ -588,7 +588,7 @@ func (f faultPackages) List(
 	ctx context.Context,
 	key string,
 	p kernel.Page,
-) ([]model.Package, string, error) {
+) ([]artmodel.Package, string, error) {
 	if f.f.list {
 		return nil, "", context.Canceled
 	}
@@ -605,9 +605,9 @@ func (f faultItems) Get(
 	key string,
 	cached bool,
 	path string,
-) (model.Item, error) {
+) (artmodel.Item, error) {
 	if f.f.items {
-		return model.Item{}, context.Canceled
+		return artmodel.Item{}, context.Canceled
 	}
 	return f.ItemStore.Get(ctx, key, cached, path)
 }
@@ -671,10 +671,10 @@ func TestAccBrokenStoredIndexNeverAdvertisesCookbook(t *testing.T) {
 	}
 }
 
-func grant(t *testing.T, f *fixture, targets map[string]model.Target) {
+func grant(t *testing.T, f *fixture, targets map[string]accmodel.Target) {
 	t.Helper()
 	if err := f.db.Permissions().
-		Create(t.Context(), model.Permission{Name: "allowed", Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {Actions: model.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}}, Targets: targets}}}); err != nil {
+		Create(t.Context(), accmodel.Permission{Name: "allowed", Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}}, Targets: targets}}}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -687,7 +687,7 @@ func TestAccHostedCatalogAndLatestAreFilteredBeforeSelection(t *testing.T) {
 	grant(
 		t,
 		f,
-		map[string]model.Target{
+		map[string]accmodel.Target{
 			f.c.Key: {Include: []string{"widget/**"}, Exclude: []string{"**/*-10.0.0.tar.gz"}},
 		},
 	)
@@ -749,7 +749,7 @@ func TestAccVirtualMembersRetainPriorityAndCurrentPermissions(t *testing.T) {
 	grant(
 		t,
 		f,
-		map[string]model.Target{
+		map[string]accmodel.Target{
 			f.c.Key: {Include: []string{"**"}},
 			"first": {Include: []string{"**"}},
 		},

@@ -17,14 +17,14 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
@@ -64,11 +64,11 @@ func newWorldWith(t *testing.T, configure harness.Tune) *world {
 	db := inmem.New()
 	support.Seed(t, db)
 	if err := db.Users().
-		Create(t.Context(), model.User{Name: "reader", PasswordHash: support.CheapHash}); err != nil {
+		Create(t.Context(), accmodel.User{Name: "reader", PasswordHash: support.CheapHash}); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Permissions().
-		Create(t.Context(), model.Permission{Name: "gem-reader", Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {Actions: model.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}}, Targets: map[string]model.Target{"gems-local": {Include: []string{"**"}}, "gems-fed": {Include: []string{"**"}}, "gems-virtual": {Include: []string{"**"}}}}}}); err != nil {
+		Create(t.Context(), accmodel.Permission{Name: "gem-reader", Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}}, Targets: map[string]accmodel.Target{"gems-local": {Include: []string{"**"}}, "gems-fed": {Include: []string{"**"}}, "gems-virtual": {Include: []string{"**"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	for _, c := range []repo.Config{{Key: "gems-local", Class: repo.Local, PackageType: repo.Gems}, {Key: "gems-fed", Class: repo.Federated, PackageType: repo.Gems}, {Key: "gems-virtual", Class: repo.Virtual, PackageType: repo.Gems, Repositories: []string{"gems-local", "gems-fed"}, DefaultDeploymentRepo: "gems-local"}} {
@@ -325,7 +325,7 @@ func TestAccNativePushAndPermissions(t *testing.T) {
 func TestAccNativeMetadataRequiresReadPermission(t *testing.T) {
 	w := newWorld(t)
 	if err := w.db.Users().
-		Create(t.Context(), model.User{Name: "outsider", PasswordHash: support.CheapHash}); err != nil {
+		Create(t.Context(), accmodel.User{Name: "outsider", PasswordHash: support.CheapHash}); err != nil {
 		t.Fatal(err)
 	}
 	for _, path := range []string{"names", "versions", "api/v1/search.json?query=rake"} {
@@ -480,11 +480,11 @@ func TestAccVirtualFiltersUnreadableMember(t *testing.T) {
 		http.StatusCreated,
 	)
 	if err := w.db.Users().
-		Create(t.Context(), model.User{Name: "limited", PasswordHash: support.CheapHash}); err != nil {
+		Create(t.Context(), accmodel.User{Name: "limited", PasswordHash: support.CheapHash}); err != nil {
 		t.Fatal(err)
 	}
 	if err := w.db.Permissions().
-		Create(t.Context(), model.Permission{Name: "virtual-only", Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {Actions: model.Grants{Users: map[string]api.Actions{"limited": api.ActionRead}}, Targets: map[string]model.Target{"gems-virtual": {Include: []string{"**"}}}}}}); err != nil {
+		Create(t.Context(), accmodel.Permission{Name: "virtual-only", Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]api.Actions{"limited": api.ActionRead}}, Targets: map[string]accmodel.Target{"gems-virtual": {Include: []string{"**"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	versions := w.do(http.MethodGet, "/artifactory/api/gems/gems-virtual/versions", "limited", nil)
@@ -533,7 +533,7 @@ func TestAccVirtualRejectsMemberCycleAndSkipsRemovedMember(t *testing.T) {
 
 func TestAccLocalIndexFailsClosedOnMissingArchiveBlob(t *testing.T) {
 	w := newWorld(t)
-	if _, err := w.db.Items().Put(t.Context(), model.Item{
+	if _, err := w.db.Items().Put(t.Context(), artmodel.Item{
 		RepoKey: "gems-local", Path: "gems", Name: "rake-12.3.1.gem",
 		Actual: kernel.Checksums{SHA256: strings.Repeat("a", 64)}, Size: 123,
 	}); err != nil {
@@ -561,7 +561,7 @@ func TestAccLocalAndVirtualIndexesFailClosedOnCorruptStoredArchive(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := w.db.Items().Put(t.Context(), model.Item{
+	if _, err := w.db.Items().Put(t.Context(), artmodel.Item{
 		RepoKey: "gems-local", Path: "gems", Name: "rake-12.3.1.gem",
 		Actual: kernel.Checksums{SHA256: info.Digests.SHA256}, Size: int64(len(invalid)),
 	}); err != nil {
@@ -759,7 +759,7 @@ func newRemoteWorld(t *testing.T, up *fakeupstream.Server) *world {
 		cfg.RemoteSources = &source.Service{
 			HTTP:  policy,
 			Cache: policy,
-			Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
+			Resolve: func(ctx context.Context, c repo.Config) (artmodel.SourceIdentity, error) {
 				return cfg.Store.RemoteCache().Source(ctx, c.Key)
 			},
 		}
@@ -867,11 +867,11 @@ func TestAccRemoteMetadataFiltersDeniedGem(t *testing.T) {
 	up.Set("/info/rake", fakeupstream.Resource{Body: gemfmt.CompactInfo("rake", packages)})
 	up.Set("/gems/rake-12.3.1.gem", fakeupstream.Resource{Body: w.gem})
 	if err := w.db.Users().
-		Create(t.Context(), model.User{Name: "remote-limited", PasswordHash: support.CheapHash}); err != nil {
+		Create(t.Context(), accmodel.User{Name: "remote-limited", PasswordHash: support.CheapHash}); err != nil {
 		t.Fatal(err)
 	}
 	if err := w.db.Permissions().
-		Create(t.Context(), model.Permission{Name: "remote-limited", Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {Actions: model.Grants{Users: map[string]api.Actions{"remote-limited": api.ActionRead}}, Targets: map[string]model.Target{"gems-remote": {Include: []string{"**"}, Exclude: []string{"gems/rake-12.3.1.gem"}}}}}}); err != nil {
+		Create(t.Context(), accmodel.Permission{Name: "remote-limited", Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]api.Actions{"remote-limited": api.ActionRead}}, Targets: map[string]accmodel.Target{"gems-remote": {Include: []string{"**"}, Exclude: []string{"gems/rake-12.3.1.gem"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	base := "/artifactory/api/gems/gems-remote/"

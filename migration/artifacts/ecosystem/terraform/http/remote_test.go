@@ -19,13 +19,13 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -58,7 +58,7 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 		t.Fatal(err)
 	}
 	if err := f.db.Permissions().
-		Create(t.Context(), model.Permission{Name: "remote-read", Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {Actions: model.Grants{Users: map[string]accessapi.Actions{"reader": accessapi.ActionRead}}, Targets: map[string]model.Target{"remote": {Include: []string{"ns/name/aws/1.0.0.zip"}}}}}}); err != nil {
+		Create(t.Context(), accmodel.Permission{Name: "remote-read", Resources: map[accessapi.ResourceType]accmodel.Resource{accessapi.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]accessapi.Actions{"reader": accessapi.ActionRead}}, Targets: map[string]accmodel.Target{"remote": {Include: []string{"ns/name/aws/1.0.0.zip"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	resolver, err := upstream.NewResolver(
@@ -85,7 +85,7 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 	svc := &source.Service{
 		HTTP:  p,
 		Cache: p,
-		Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
+		Resolve: func(ctx context.Context, c repo.Config) (artmodel.SourceIdentity, error) {
 			return f.db.RemoteCache().Source(ctx, c.Key)
 		},
 	}
@@ -161,7 +161,7 @@ func (f *remoteFixture) mount() {
 		pkgroute.Options{
 			Store: f.db,
 			Items: func() *item.Service { return f.items },
-			ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it model.Item) {
+			ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it artmodel.Item) {
 				b, _, err := f.items.Blobs.Open(r.Context(), it.Actual.SHA256)
 				if err != nil {
 					f.t.Error(err)
@@ -491,7 +491,7 @@ func TestUnitRemoteModuleDeliveryRejectsUnreadableAndRevokedSources(t *testing.T
 		r,
 		"ns/name/aws/1.0.0.zip",
 		strings.Repeat("0", 64),
-		model.SourceIdentity{},
+		artmodel.SourceIdentity{},
 		"",
 		"zip",
 	); target != "" || !errors.Is(err, kernel.ErrBadCredentials) {
@@ -647,7 +647,7 @@ func TestAccRemoteModuleCredentialChangesAfterIssuance(t *testing.T) {
 		t.Run(mode, func(t *testing.T) {
 			f := newRemoteFixture(t)
 			f.modules("1.0.0")
-			tok := model.Token{
+			tok := accmodel.Token{
 				ID:        "parent",
 				Subject:   "jfac@test/users/reader",
 				Scope:     kernel.UserScope(),
@@ -677,7 +677,7 @@ func TestAccRemoteModuleCredentialChangesAfterIssuance(t *testing.T) {
 				f.now = f.now.Add(31 * time.Second)
 			case "disabled":
 				u, _ := f.db.Users().Get(t.Context(), "reader")
-				u.Status = model.UserDisabled
+				u.Status = accmodel.UserDisabled
 				if e = f.db.Users().Update(t.Context(), u); e != nil {
 					t.Fatal(e)
 				}

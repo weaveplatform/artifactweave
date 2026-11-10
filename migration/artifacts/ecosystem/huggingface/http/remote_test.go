@@ -18,11 +18,11 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -143,7 +143,7 @@ func remoteSetup(t *testing.T, upstreamURL string, ttl int) func(*fixture) *sour
 		return &source.Service{
 			HTTP:  policy,
 			Cache: policy,
-			Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
+			Resolve: func(ctx context.Context, c repo.Config) (artmodel.SourceIdentity, error) {
 				return f.db.RemoteCache().Source(ctx, c.Key)
 			},
 		}
@@ -471,13 +471,13 @@ func TestUnitRemoteMetadataDoesNotListFilesOutsideReadGrant(t *testing.T) {
 	}))
 	defer up.Close()
 	f := newFixture(t, repo.Remote, remoteSetup(t, up.URL, 3600))
-	if err := f.db.Permissions().Create(t.Context(), model.Permission{
+	if err := f.db.Permissions().Create(t.Context(), accmodel.Permission{
 		Name: "metadata-only",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{
+		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
+			Actions: accmodel.Grants{
 				Users: map[string]api.Actions{"metadata-only": api.ActionRead},
 			},
-			Targets: map[string]model.Target{
+			Targets: map[string]accmodel.Target{
 				"hf": {Include: []string{"models--acme--demo/api/**"}},
 			},
 		}},

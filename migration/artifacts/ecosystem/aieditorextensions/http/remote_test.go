@@ -19,13 +19,13 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
@@ -91,7 +91,7 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	if err := db.Permissions().
-		Create(t.Context(), model.Permission{Name: "editor-read", Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {Actions: model.Grants{Users: map[string]api.Actions{"reader": api.ActionRead, kernel.AnonymousUser: api.ActionRead}}, Targets: map[string]model.Target{"editor-remote": {Include: []string{"extensions/ms-vscode/hexeditor/**"}}}}}}); err != nil {
+		Create(t.Context(), accmodel.Permission{Name: "editor-read", Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]api.Actions{"reader": api.ActionRead, kernel.AnonymousUser: api.ActionRead}}, Targets: map[string]accmodel.Target{"editor-remote": {Include: []string{"extensions/ms-vscode/hexeditor/**"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	items := &item.Service{Store: db, Blobs: blobs, Formats: ecosystem.For}
@@ -116,7 +116,7 @@ func newFixture(t *testing.T) *fixture {
 	svc := &source.Service{
 		HTTP:  policy,
 		Cache: policy,
-		Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
+		Resolve: func(ctx context.Context, c repo.Config) (artmodel.SourceIdentity, error) {
 			return db.RemoteCache().Source(ctx, c.Key)
 		},
 	}
@@ -134,7 +134,7 @@ func newFixture(t *testing.T) *fixture {
 		pkgroute.Options{
 			Store: db,
 			Items: func() *item.Service { return items },
-			ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it model.Item) {
+			ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it artmodel.Item) {
 				body, _, err := blobs.Open(r.Context(), it.Actual.SHA256)
 				if err != nil {
 					t.Fatal(err)

@@ -21,11 +21,11 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/upstreamtest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -42,7 +42,7 @@ type smartWorld struct {
 	service      *source.Service
 	ctx          context.Context
 	mu           sync.Mutex
-	props        model.Properties
+	props        artmodel.Properties
 	present      bool
 	status       int
 	statsStatus  int
@@ -57,7 +57,7 @@ func smartFixture(t *testing.T) *smartWorld {
 	t.Helper()
 	w := &smartWorld{
 		policyWorld: policyFixture(t),
-		props:       model.Properties{"color": {"blue"}},
+		props:       artmodel.Properties{"color": {"blue"}},
 		present:     true,
 	}
 	router := chi.NewRouter()
@@ -76,11 +76,11 @@ func smartFixture(t *testing.T) *smartWorld {
 	w.permit.Identity, _ = w.db.RemoteCache().Source(t.Context(), w.c.Key)
 	hash := accesstest.HashPassword(t, "reader-password")
 	if err := w.db.Users().
-		Create(t.Context(), model.User{Name: "reader", PasswordHash: hash}); err != nil {
+		Create(t.Context(), accmodel.User{Name: "reader", PasswordHash: hash}); err != nil {
 		t.Fatal(err)
 	}
 	if err := w.db.Permissions().
-		Create(t.Context(), model.Permission{Name: "read", Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {Targets: map[string]model.Target{w.c.Key: {}}, Actions: model.Grants{Users: map[string]accessapi.Actions{"reader": accessapi.ActionRead}}}}}); err != nil {
+		Create(t.Context(), accmodel.Permission{Name: "read", Resources: map[accessapi.ResourceType]accmodel.Resource{accessapi.ResourceArtifact: {Targets: map[string]accmodel.Target{w.c.Key: {}}, Actions: accmodel.Grants{Users: map[string]accessapi.Actions{"reader": accessapi.ActionRead}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	kit := accesstest.Over(t, w.db, accesstest.WithNow(w.clock.Now))
@@ -162,7 +162,7 @@ func smartFixture(t *testing.T) *smartWorld {
 	w.service = &source.Service{
 		HTTP:  w.p,
 		Cache: w.p,
-		Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
+		Resolve: func(ctx context.Context, c repo.Config) (artmodel.SourceIdentity, error) {
 			return w.db.RemoteCache().Source(ctx, c.Key)
 		},
 	}
@@ -250,7 +250,7 @@ func (w *smartWorld) smartRead() source.Result {
 	return result
 }
 
-func (w *smartWorld) smartEntry() model.RemoteCacheEntry {
+func (w *smartWorld) smartEntry() artmodel.RemoteCacheEntry {
 	w.t.Helper()
 	opts, err := w.p.Options(w.ctx, w.c)
 	if err != nil {
@@ -274,13 +274,13 @@ func TestAccSmartPropertiesRefreshOwnershipAndOffline(t *testing.T) {
 		w.ctx,
 		w.c,
 		*first.Item,
-		model.Properties{"local": {"keep"}, "color": {"mine"}},
+		artmodel.Properties{"local": {"keep"}, "color": {"mine"}},
 		nil,
 	); err != nil {
 		t.Fatal(err)
 	}
 	w.mu.Lock()
-	w.props = model.Properties{"color": {"red"}, "new": {"value"}}
+	w.props = artmodel.Properties{"color": {"red"}, "new": {"value"}}
 	w.mu.Unlock()
 	w.clock.Advance(31 * time.Second)
 	w.smartRead()
@@ -389,7 +389,7 @@ func (w *smartWorld) queued(statistics bool) work.WorkItem {
 }
 
 // changeEntry rewrites file.bin's cache entry with change.
-func (w *smartWorld) changeEntry(change func(*model.RemoteCacheEntry)) {
+func (w *smartWorld) changeEntry(change func(*artmodel.RemoteCacheEntry)) {
 	w.t.Helper()
 	key := w.smartEntry().Token.Key
 	if err := w.db.Tx(w.ctx, func(tx context.Context) error {
@@ -516,7 +516,7 @@ func TestAccSmartFlagsAndInitialOnlyProperties(t *testing.T) {
 				t.Fatal(mode, props)
 			}
 			w.mu.Lock()
-			w.props = model.Properties{"color": {"red"}}
+			w.props = artmodel.Properties{"color": {"red"}}
 			before := w.calls
 			w.mu.Unlock()
 			w.clock.Advance(31 * time.Second)
@@ -718,7 +718,7 @@ func TestAccSmartEmptySnapshotRemovesOwnedPropertiesOnRefill(t *testing.T) {
 		t.Fatal(props, err)
 	}
 	w.mu.Lock()
-	w.props = model.Properties{}
+	w.props = artmodel.Properties{}
 	w.mu.Unlock()
 	w.clock.Advance(31 * time.Second)
 	if _, err = w.service.Read(w.ctx, q); err != nil {
@@ -736,13 +736,13 @@ func TestAccSmartPropertyOwnershipAcrossRepresentations(t *testing.T) {
 	q := w.smartRequest()
 	q.Resource.Accept = "application/octet-stream"
 	w.mu.Lock()
-	w.props = model.Properties{"color": {"red"}}
+	w.props = artmodel.Properties{"color": {"red"}}
 	w.mu.Unlock()
 	if _, err := w.service.Read(w.ctx, q); err != nil {
 		t.Fatal(err)
 	}
 	w.mu.Lock()
-	w.props = model.Properties{"color": {"green"}}
+	w.props = artmodel.Properties{"color": {"green"}}
 	w.mu.Unlock()
 	w.clock.Advance(31 * time.Second)
 	w.smartRead()
@@ -754,7 +754,7 @@ func TestAccSmartPropertyOwnershipAcrossRepresentations(t *testing.T) {
 		w.ctx,
 		w.c,
 		*first.Item,
-		model.Properties{"color": {"local"}},
+		artmodel.Properties{"color": {"local"}},
 		nil,
 	); err != nil {
 		t.Fatal(err)
@@ -839,13 +839,13 @@ func TestAccSmartStatusFailsOnUnreadableState(t *testing.T) {
 func TestAccSmartStatusOmitsRepresentationsWithoutTheirItem(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
-		change func(*smartWorld, model.Item) error
+		change func(*smartWorld, artmodel.Item) error
 	}{
-		{"removed", func(w *smartWorld, _ model.Item) error {
+		{"removed", func(w *smartWorld, _ artmodel.Item) error {
 			_, err := w.db.Items().Delete(w.ctx, w.c.Key, true, "file.bin")
 			return err
 		}},
-		{"replaced", func(w *smartWorld, it model.Item) error {
+		{"replaced", func(w *smartWorld, it artmodel.Item) error {
 			it.Actual.SHA256 = strings.Repeat("f", 64)
 			_, err := w.db.Items().Put(w.ctx, it)
 			return err

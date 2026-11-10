@@ -15,12 +15,12 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	pypifmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi"
@@ -57,7 +57,7 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 	}
 	for user, include := range map[string]string{"reader": "**", "partial": "demo/1.0/**"} {
 		err = f.db.Permissions().
-			Create(t.Context(), model.Permission{Name: "remote-" + user, Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {Actions: model.Grants{Users: map[string]accessapi.Actions{user: accessapi.ActionRead}}, Targets: map[string]model.Target{"pypi-remote": {Include: []string{include}}}}}})
+			Create(t.Context(), accmodel.Permission{Name: "remote-" + user, Resources: map[accessapi.ResourceType]accmodel.Resource{accessapi.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]accessapi.Actions{user: accessapi.ActionRead}}, Targets: map[string]accmodel.Target{"pypi-remote": {Include: []string{include}}}}}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -85,11 +85,11 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 	svc := &source.Service{
 		HTTP:  p,
 		Cache: p,
-		Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
+		Resolve: func(ctx context.Context, c repo.Config) (artmodel.SourceIdentity, error) {
 			return f.db.RemoteCache().Source(ctx, c.Key)
 		},
 	}
-	f.opts.ServeItem = func(w http.ResponseWriter, r *http.Request, _ repo.Config, it model.Item) {
+	f.opts.ServeItem = func(w http.ResponseWriter, r *http.Request, _ repo.Config, it artmodel.Item) {
 		body, _, err := f.items.Blobs.Open(r.Context(), it.Actual.SHA256)
 		if err != nil {
 			t.Error(err)
@@ -685,7 +685,7 @@ func TestAccRemoteRedirectedMalformedIndexCanRetryImmediately(t *testing.T) {
 }
 
 func TestAccRemoteListRequiresActualReadableDistribution(t *testing.T) {
-	for _, target := range []model.Target{{Include: []string{"demo/.project"}}, {Include: []string{"demo/**"}, Exclude: []string{"demo/1.0/**", "demo/2.0/**"}}} {
+	for _, target := range []accmodel.Target{{Include: []string{"demo/.project"}}, {Include: []string{"demo/**"}, Exclude: []string{"demo/1.0/**", "demo/2.0/**"}}} {
 		f := newRemoteFixture(t)
 		f.project(t, "demo", "1.0", "2.0")
 		f.setJSON(
@@ -699,7 +699,7 @@ func TestAccRemoteListRequiresActualReadableDistribution(t *testing.T) {
 			t.Fatal(err)
 		}
 		if err := f.db.Permissions().
-			Create(t.Context(), model.Permission{Name: "restricted", Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {Actions: model.Grants{Users: map[string]accessapi.Actions{"partial": accessapi.ActionRead}}, Targets: map[string]model.Target{"pypi-remote": target}}}}); err != nil {
+			Create(t.Context(), accmodel.Permission{Name: "restricted", Resources: map[accessapi.ResourceType]accmodel.Resource{accessapi.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]accessapi.Actions{"partial": accessapi.ActionRead}}, Targets: map[string]accmodel.Target{"pypi-remote": target}}}}); err != nil {
 			t.Fatal(err)
 		}
 		requireRemote(

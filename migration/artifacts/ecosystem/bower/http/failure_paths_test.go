@@ -8,9 +8,9 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
@@ -31,7 +31,7 @@ func scriptedBowerRemote(t *testing.T, git bool, read bowerSourceRead) *fixture 
 	}
 	f.mount(&source.Service{
 		HTTP: read, Cache: read,
-		Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
+		Resolve: func(ctx context.Context, c repo.Config) (artmodel.SourceIdentity, error) {
 			return f.db.RemoteCache().Source(ctx, c.Key)
 		},
 	})
@@ -222,7 +222,7 @@ func TestUnitBowerRemoteMetadataRequiresAValidatedStream(t *testing.T) {
 						t.Fatalf("unexpected metadata request: %s", q.Resource.Path)
 					}
 					cut := strings.LastIndexByte(tc.target, '/')
-					it := model.Item{
+					it := artmodel.Item{
 						RepoKey: "bower-remote", Cached: true,
 						Path: tc.target[:cut], Name: tc.target[cut+1:],
 					}
@@ -352,7 +352,7 @@ func TestUnitBowerMetadataStopsWhenSourceRevisionChanges(t *testing.T) {
 			resolves := 0
 			f.mount(&source.Service{
 				HTTP: backend, Cache: backend,
-				Resolve: func(context.Context, repo.Config) (model.SourceIdentity, error) {
+				Resolve: func(context.Context, repo.Config) (artmodel.SourceIdentity, error) {
 					resolves++
 					current := identity
 					if resolves >= 3 {
@@ -435,11 +435,11 @@ func TestUnitBowerRemoteRefsHideUnreadableManifest(t *testing.T) {
 			return bowerMetadata(refs), nil
 		},
 	)
-	if err := f.db.Permissions().Create(t.Context(), model.Permission{
+	if err := f.db.Permissions().Create(t.Context(), accmodel.Permission{
 		Name: "read-other-bower-file",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
-			Targets: map[string]model.Target{
+		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
+			Actions: accmodel.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
+			Targets: map[string]accmodel.Target{
 				"bower-remote": {
 					Include: []string{"hello/**"}, Exclude: []string{"hello/1.0.0/bower.json"},
 				},
@@ -461,11 +461,11 @@ func TestUnitBowerVirtualCatalogSkipsUnreadableMember(t *testing.T) {
 	_ = f.repo("bower-virtual", repo.Virtual, private.Key, visible.Key)
 	f.deploy(private, "secret", "1.0.0", "bower.json", `{"name":"secret","version":"1.0.0"}`)
 	f.deploy(visible, "hello", "1.0.0", "bower.json", `{"name":"hello","version":"1.0.0"}`)
-	if err := f.db.Permissions().Create(t.Context(), model.Permission{
+	if err := f.db.Permissions().Create(t.Context(), accmodel.Permission{
 		Name: "visible-bower-member",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
-			Targets: map[string]model.Target{
+		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
+			Actions: accmodel.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
+			Targets: map[string]accmodel.Target{
 				"bower-virtual": {Include: []string{"**"}},
 				"bower-visible": {Include: []string{"hello/**"}},
 			},

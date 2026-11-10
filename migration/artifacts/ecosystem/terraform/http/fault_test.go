@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
-	"github.com/weaveplatform/artifactweave/migration/access/core/port"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accport "github.com/weaveplatform/artifactweave/migration/access/core/port"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artport "github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 )
@@ -24,32 +24,38 @@ type failingStore struct {
 	fail string
 }
 
-func (s failingStore) Packages() port.PackageStore {
+func (s failingStore) Packages() artport.PackageStore {
 	return failingPackages{s.serverStore.Packages(), s.fail}
 }
-func (s failingStore) Items() port.ItemStore { return failingItems{s.serverStore.Items(), s.fail} }
-func (s failingStore) Users() port.UserStore { return failingUsers{s.serverStore.Users(), s.fail} }
+
+func (s failingStore) Items() artport.ItemStore { return failingItems{s.serverStore.Items(), s.fail} }
+
+func (s failingStore) Users() accport.UserStore { return failingUsers{s.serverStore.Users(), s.fail} }
+
 func (s failingStore) Settings() settings.SettingsStore {
 	return failingSettings{s.serverStore.Settings(), s.fail}
 }
 
-func (s failingStore) Permissions() port.PermissionStore {
+func (s failingStore) Permissions() accport.PermissionStore {
 	return failingPermissions{s.serverStore.Permissions(), s.fail}
 }
 
 type failingPackages struct {
-	port.PackageStore
+	artport.PackageStore
 	fail string
 }
 
-func (s failingPackages) Find(ctx context.Context, key, name string) (model.Package, error) {
+func (s failingPackages) Find(ctx context.Context, key, name string) (artmodel.Package, error) {
 	if s.fail == "package" {
-		return model.Package{}, errStore
+		return artmodel.Package{}, errStore
 	}
 	return s.PackageStore.Find(ctx, key, name)
 }
 
-func (s failingPackages) Versions(ctx context.Context, id int64) ([]model.PackageVersion, error) {
+func (s failingPackages) Versions(
+	ctx context.Context,
+	id int64,
+) ([]artmodel.PackageVersion, error) {
 	if s.fail == "versions" {
 		return nil, errStore
 	}
@@ -64,16 +70,16 @@ func (s failingPackages) Files(ctx context.Context, id int64) ([]int64, error) {
 }
 
 type failingItems struct {
-	port.ItemStore
+	artport.ItemStore
 	fail string
 }
 
-func (s failingItems) GetByID(ctx context.Context, id int64) (model.Item, error) {
+func (s failingItems) GetByID(ctx context.Context, id int64) (artmodel.Item, error) {
 	if s.fail == "item" {
-		return model.Item{}, errStore
+		return artmodel.Item{}, errStore
 	}
 	if s.fail == "gone" {
-		return model.Item{}, kernel.ErrNotFound
+		return artmodel.Item{}, kernel.ErrNotFound
 	}
 	return s.ItemStore.GetByID(ctx, id)
 }
@@ -83,21 +89,21 @@ func (s failingItems) Get(
 	key string,
 	cached bool,
 	path string,
-) (model.Item, error) {
+) (artmodel.Item, error) {
 	if s.fail == "download" {
-		return model.Item{}, errStore
+		return artmodel.Item{}, errStore
 	}
 	return s.ItemStore.Get(ctx, key, cached, path)
 }
 
 type failingUsers struct {
-	port.UserStore
+	accport.UserStore
 	fail string
 }
 
-func (s failingUsers) Get(ctx context.Context, name string) (model.User, error) {
+func (s failingUsers) Get(ctx context.Context, name string) (accmodel.User, error) {
 	if s.fail == "user" {
-		return model.User{}, errStore
+		return accmodel.User{}, errStore
 	}
 	return s.UserStore.Get(ctx, name)
 }
@@ -115,7 +121,7 @@ func (s failingSettings) Get(ctx context.Context, key string, into any) error {
 }
 
 type failingPermissions struct {
-	port.PermissionStore
+	accport.PermissionStore
 	fail string
 }
 
@@ -123,7 +129,7 @@ func (s failingPermissions) ForPrincipal(
 	ctx context.Context,
 	user string,
 	groups []string,
-) ([]model.Permission, error) {
+) ([]accmodel.Permission, error) {
 	if s.fail == "permissions" {
 		return nil, errStore
 	}

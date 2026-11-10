@@ -2,13 +2,13 @@ package inmem
 
 import (
 	accinmem "github.com/weaveplatform/artifactweave/migration/access/adapters/inmem"
-	"github.com/weaveplatform/artifactweave/migration/access/core/port"
+	accport "github.com/weaveplatform/artifactweave/migration/access/core/port"
 	artinmem "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/inmem"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	artport "github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	fedinmem "github.com/weaveplatform/artifactweave/migration/federation/adapters/inmem"
-	"github.com/weaveplatform/artifactweave/migration/federation/core/port"
+	fedport "github.com/weaveplatform/artifactweave/migration/federation/core/port"
 	ntfinmem "github.com/weaveplatform/artifactweave/migration/notifications/adapters/inmem"
-	"github.com/weaveplatform/artifactweave/migration/notifications/core/port"
+	ntfport "github.com/weaveplatform/artifactweave/migration/notifications/core/port"
 	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
 	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
@@ -20,11 +20,11 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	relinmem "github.com/weaveplatform/artifactweave/migration/releases/adapters/inmem"
-	"github.com/weaveplatform/artifactweave/migration/releases/core/port"
+	relport "github.com/weaveplatform/artifactweave/migration/releases/core/port"
 	retinmem "github.com/weaveplatform/artifactweave/migration/retention/adapters/inmem"
-	"github.com/weaveplatform/artifactweave/migration/retention/core/port"
+	retport "github.com/weaveplatform/artifactweave/migration/retention/core/port"
 	wrkinmem "github.com/weaveplatform/artifactweave/migration/workers/adapters/inmem"
-	"github.com/weaveplatform/artifactweave/migration/workers/core/port"
+	wrkport "github.com/weaveplatform/artifactweave/migration/workers/core/port"
 )
 
 // Store is the in-memory composite store. The zero value is not usable; call
@@ -89,93 +89,93 @@ func (s *Store) Replays() idempotency.ReplayStore { return s.platform.Replays() 
 func (s *Store) RequestBudgets() apilimit.RequestBudgetStore { return s.platform.RequestBudgets() }
 
 // Repos is the artifacts module's repository store.
-func (s *Store) Repos() port.RepoStore { return s.artifacts.Repos() }
+func (s *Store) Repos() artport.RepoStore { return s.artifacts.Repos() }
 
 // RemoteCache is the artifacts module's remote cache store.
-func (s *Store) RemoteCache() port.RemoteCacheStore { return s.artifacts.RemoteCache() }
+func (s *Store) RemoteCache() artport.RemoteCacheStore { return s.artifacts.RemoteCache() }
 
 // Items is the artifacts module's item store.
-func (s *Store) Items() port.ItemStore { return s.artifacts.Items() }
+func (s *Store) Items() artport.ItemStore { return s.artifacts.Items() }
 
 // Trash is the artifacts module's trash store.
-func (s *Store) Trash() port.TrashStore { return s.artifacts.Trash() }
+func (s *Store) Trash() artport.TrashStore { return s.artifacts.Trash() }
 
 // Packages is the artifacts module's package store.
-func (s *Store) Packages() port.PackageStore { return s.artifacts.Packages() }
+func (s *Store) Packages() artport.PackageStore { return s.artifacts.Packages() }
 
 // Blobs is the artifacts module's blob index.
-func (s *Store) Blobs() port.BlobIndex { return s.artifacts.Blobs() }
+func (s *Store) Blobs() artport.BlobIndex { return s.artifacts.Blobs() }
 
 // Replicas is the artifacts module's replica index.
-func (s *Store) Replicas() port.ReplicaIndex { return s.artifacts.Replicas() }
+func (s *Store) Replicas() artport.ReplicaIndex { return s.artifacts.Replicas() }
 
 // GitLFSLocks is the artifacts module's Git LFS lock store.
-func (s *Store) GitLFSLocks() port.GitLFSLockStore { return s.artifacts.GitLFSLocks() }
+func (s *Store) GitLFSLocks() artport.GitLFSLockStore { return s.artifacts.GitLFSLocks() }
 
 // BowerRegistrations is the artifacts module's Bower registration store.
-func (s *Store) BowerRegistrations() port.BowerRegistrationStore {
+func (s *Store) BowerRegistrations() artport.BowerRegistrationStore {
 	return s.artifacts.BowerRegistrations()
 }
 
 // Builds is the artifacts module's build store.
-func (s *Store) Builds() port.BuildStore { return s.artifacts.Builds() }
+func (s *Store) Builds() artport.BuildStore { return s.artifacts.Builds() }
 
 // ArchivedItems is the artifacts module's archived-item store.
-func (s *Store) ArchivedItems() port.ArchivedItemStore { return s.artifacts.ArchivedItems() }
+func (s *Store) ArchivedItems() artport.ArchivedItemStore { return s.artifacts.ArchivedItems() }
 
 // ColdBlobs is the artifacts module's blob index over the archive tier.
-func (s *Store) ColdBlobs() port.BlobIndex { return s.artifacts.ColdBlobs() }
+func (s *Store) ColdBlobs() artport.BlobIndex { return s.artifacts.ColdBlobs() }
 
 // ColdReplicas is the artifacts module's replica index over the archive tier.
-func (s *Store) ColdReplicas() port.ReplicaIndex { return s.artifacts.ColdReplicas() }
+func (s *Store) ColdReplicas() artport.ReplicaIndex { return s.artifacts.ColdReplicas() }
 
 // Users is the access module's user store.
-func (s *Store) Users() port.UserStore { return s.access.Users() }
+func (s *Store) Users() accport.UserStore { return s.access.Users() }
 
 // Groups is the access module's group store.
-func (s *Store) Groups() port.GroupStore { return s.access.Groups() }
+func (s *Store) Groups() accport.GroupStore { return s.access.Groups() }
 
 // Permissions is the access module's permission store.
-func (s *Store) Permissions() port.PermissionStore { return s.access.Permissions() }
+func (s *Store) Permissions() accport.PermissionStore { return s.access.Permissions() }
 
 // Tokens is the access module's token store.
-func (s *Store) Tokens() port.TokenStore { return s.access.Tokens() }
+func (s *Store) Tokens() accport.TokenStore { return s.access.Tokens() }
 
 // Keys is the access module's key store.
-func (s *Store) Keys() port.KeyStore { return s.access.Keys() }
+func (s *Store) Keys() accport.KeyStore { return s.access.Keys() }
 
 // Projects is the access module's project store.
-func (s *Store) Projects() port.ProjectStore { return s.access.Projects() }
+func (s *Store) Projects() accport.ProjectStore { return s.access.Projects() }
 
 // APIRestrictions is the access module's API restriction store.
-func (s *Store) APIRestrictions() port.APIRestrictionStore { return s.access.APIRestrictions() }
+func (s *Store) APIRestrictions() accport.APIRestrictionStore { return s.access.APIRestrictions() }
 
 // Webhooks is the notifications module's webhook store.
-func (s *Store) Webhooks() port.WebhookStore { return s.notifications.Webhooks() }
+func (s *Store) Webhooks() ntfport.WebhookStore { return s.notifications.Webhooks() }
 
 // Cleanup is the retention module's cleanup store.
-func (s *Store) Cleanup() port.CleanupStore { return s.retention.Cleanup() }
+func (s *Store) Cleanup() retport.CleanupStore { return s.retention.Cleanup() }
 
 // Archive is the retention module's archive store.
-func (s *Store) Archive() port.ArchiveStore { return s.retention.Archive() }
+func (s *Store) Archive() retport.ArchiveStore { return s.retention.Archive() }
 
 // Replications is the federation module's replication store.
-func (s *Store) Replications() port.ReplicationStore { return s.federation.Replications() }
+func (s *Store) Replications() fedport.ReplicationStore { return s.federation.Replications() }
 
 // Peers is the federation module's peer store.
-func (s *Store) Peers() port.PeerStore { return s.federation.Peers() }
+func (s *Store) Peers() fedport.PeerStore { return s.federation.Peers() }
 
 // Federation is the federation module's federated repository store.
-func (s *Store) Federation() port.FederationStore { return s.federation.Federation() }
+func (s *Store) Federation() fedport.FederationStore { return s.federation.Federation() }
 
 // Platform is the federation module's platform federation store.
-func (s *Store) Platform() port.PlatformStore { return s.federation.Platform() }
+func (s *Store) Platform() fedport.PlatformStore { return s.federation.Platform() }
 
 // Bundles is the releases module's bundle store.
-func (s *Store) Bundles() port.BundleStore { return s.releases.Bundles() }
+func (s *Store) Bundles() relport.BundleStore { return s.releases.Bundles() }
 
 // Distribution is the releases module's distribution store.
-func (s *Store) Distribution() port.DistributionStore { return s.releases.Distribution() }
+func (s *Store) Distribution() relport.DistributionStore { return s.releases.Distribution() }
 
 // Workers is the workers module's worker store.
-func (s *Store) Workers() port.WorkerStore { return s.workers.Workers() }
+func (s *Store) Workers() wrkport.WorkerStore { return s.workers.Workers() }

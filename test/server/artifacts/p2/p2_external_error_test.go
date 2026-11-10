@@ -12,9 +12,9 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/p2"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -354,11 +354,11 @@ func TestAccP2VirtualInventoryKeepsOnlyReadableNativeMembersInOrder(t *testing.T
 		strings.Contains(res.Body.String(), "__p2/3") {
 		t.Fatalf("virtual native member order/filter changed: %d %s", res.Code, res.Body)
 	}
-	if err := w.db.Permissions().Create(t.Context(), model.Permission{
+	if err := w.db.Permissions().Create(t.Context(), accmodel.Permission{
 		Name: "p2-inventory-virtual-only",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
-			Targets: map[string]model.Target{"p2-inventory-root": {Include: []string{"**"}}},
+		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
+			Actions: accmodel.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+			Targets: map[string]accmodel.Target{"p2-inventory-root": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -368,11 +368,13 @@ func TestAccP2VirtualInventoryKeepsOnlyReadableNativeMembersInOrder(t *testing.T
 		strings.Contains(res.Body.String(), "__p2/") {
 		t.Fatalf("virtual-only grant disclosed member inventory: %d %s", res.Code, res.Body)
 	}
-	if err := w.db.Permissions().Create(t.Context(), model.Permission{
+	if err := w.db.Permissions().Create(t.Context(), accmodel.Permission{
 		Name: "p2-inventory-narrow-member",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
-			Targets: map[string]model.Target{"p2-inventory-remote": {Include: []string{"foo/**"}}},
+		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
+			Actions: accmodel.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+			Targets: map[string]accmodel.Target{
+				"p2-inventory-remote": {Include: []string{"foo/**"}},
+			},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -418,7 +420,7 @@ func TestAccP2ArchiveSuffixReadsStoredCacheOffline(t *testing.T) {
 						t.Fatalf("offline archive read escaped cache: %+v, %+v", permit, q.Resource)
 					}
 					return source.Result{
-						Item: &model.Item{
+						Item: &artmodel.Item{
 							RepoKey: q.Repo.Key,
 							Path:    kernel.RootPath,
 							Name:    q.Resource.Path,

@@ -14,9 +14,9 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -56,7 +56,7 @@ func TestUnitCRANRemoteIndexPackageAndInvalidMetadata(t *testing.T) {
 						return source.Result{}, source.ErrUnavailable
 					}
 					if badCachedArchive {
-						return source.Result{Item: &model.Item{
+						return source.Result{Item: &artmodel.Item{
 							RepoKey: "cran-proxy", Cached: true, Path: "src/contrib",
 							Name:   "assertthat_0.2.1.tar.gz",
 							Actual: kernel.Checksums{MD5: strings.Repeat("0", 32)},
@@ -280,7 +280,7 @@ func TestUnitCRANRemoteIndexRejectsRevokedPackageAuthority(t *testing.T) {
 }
 
 func TestUnitCRANOfflineCachedIndexAndArchive(t *testing.T) {
-	items := map[string]model.Item{}
+	items := map[string]artmodel.Item{}
 	sources := &source.Service{
 		Resolve: sourceIdentity,
 		Cache: sourceBackend(
@@ -320,7 +320,7 @@ func TestUnitCRANOfflineCachedIndexAndArchive(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		items[tc.path] = model.Item{
+		items[tc.path] = artmodel.Item{
 			RepoKey: "cran-cache", Cached: true, Path: path.Dir(tc.path),
 			Name: path.Base(tc.path), Size: int64(len(body)),
 			Actual: kernel.Checksums{
@@ -431,11 +431,11 @@ func TestUnitCRANPOSTUploadRefusalsAndVirtualTarget(t *testing.T) {
 	}
 	// A grant that reaches the feed folder does not authorize a different
 	// package filename inferred from the archive's own DESCRIPTION.
-	if err := w.db.Permissions().Create(t.Context(), model.Permission{
+	if err := w.db.Permissions().Create(t.Context(), accmodel.Permission{
 		Name: "other-cran-upload",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{"user": api.ActionWrite}},
-			Targets: map[string]model.Target{"cran-post": {
+		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
+			Actions: accmodel.Grants{Users: map[string]api.Actions{"user": api.ActionWrite}},
+			Targets: map[string]accmodel.Target{"cran-post": {
 				Include: []string{"src/contrib/other_1.0.tar.gz"},
 			}},
 		}},

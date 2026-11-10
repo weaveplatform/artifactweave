@@ -15,12 +15,12 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
@@ -92,7 +92,7 @@ func send(
 }
 
 // deploy stores a file in the repository key.
-func (w *blobWorld) deploy(key, path, body string) model.Item {
+func (w *blobWorld) deploy(key, path, body string) artmodel.Item {
 	w.t.Helper()
 	ctx := context.Background()
 	c, err := w.db.Repos().Get(ctx, key)
@@ -458,11 +458,11 @@ func TestAccPermissions(t *testing.T) {
 	w := newBlobWorld(t)
 	ctx := context.Background()
 	grant := func(name string, users map[string]accessapi.Actions, key string) {
-		if err := w.db.Permissions().Create(ctx, model.Permission{
+		if err := w.db.Permissions().Create(ctx, accmodel.Permission{
 			Name: name,
-			Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {
-				Actions: model.Grants{Users: users},
-				Targets: map[string]model.Target{key: {Include: []string{"**"}}},
+			Resources: map[accessapi.ResourceType]accmodel.Resource{accessapi.ResourceArtifact: {
+				Actions: accmodel.Grants{Users: users},
+				Targets: map[string]accmodel.Target{key: {Include: []string{"**"}}},
 			}},
 		}); err != nil {
 			t.Fatal(err)
@@ -589,10 +589,10 @@ func TestAccAbsoluteLocations(t *testing.T) {
 }
 
 func TestAccServeBlobHook(t *testing.T) {
-	var served model.Item
+	var served artmodel.Item
 	var in repo.Config
 	w := newBlobWorld(t, func(o *Options) {
-		o.ServeBlob = func(w http.ResponseWriter, _ *http.Request, c repo.Config, it model.Item) {
+		o.ServeBlob = func(w http.ResponseWriter, _ *http.Request, c repo.Config, it artmodel.Item) {
 			served, in = it, c
 			w.WriteHeader(http.StatusTeapot)
 		}
@@ -759,11 +759,11 @@ func TestAccMountWithRegistryTokens(t *testing.T) {
 	for key, a := range map[string]accessapi.Actions{
 		"docker-local": accessapi.ActionRead | accessapi.ActionWrite, "oci-local": accessapi.ActionRead,
 	} {
-		if err := w.db.Permissions().Create(ctx, model.Permission{
+		if err := w.db.Permissions().Create(ctx, accmodel.Permission{
 			Name: "tw-" + key,
-			Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {
-				Actions: model.Grants{Users: map[string]accessapi.Actions{"tw": a}},
-				Targets: map[string]model.Target{key: {Include: []string{"**"}}},
+			Resources: map[accessapi.ResourceType]accmodel.Resource{accessapi.ResourceArtifact: {
+				Actions: accmodel.Grants{Users: map[string]accessapi.Actions{"tw": a}},
+				Targets: map[string]accmodel.Target{key: {Include: []string{"**"}}},
 			}},
 		}); err != nil {
 			t.Fatal(err)

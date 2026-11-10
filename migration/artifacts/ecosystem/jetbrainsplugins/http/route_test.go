@@ -22,14 +22,14 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
@@ -69,13 +69,13 @@ func newRouteFixture(t *testing.T) *routeFixture {
 	if err := db.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Permissions().Create(t.Context(), model.Permission{
-		Name: "jetbrains-read", Resources: map[api.ResourceType]model.Resource{
+	if err := db.Permissions().Create(t.Context(), accmodel.Permission{
+		Name: "jetbrains-read", Resources: map[api.ResourceType]accmodel.Resource{
 			api.ResourceArtifact: {
-				Actions: model.Grants{Users: map[string]api.Actions{
+				Actions: accmodel.Grants{Users: map[string]api.Actions{
 					"reader": api.ActionRead,
 				}},
-				Targets: map[string]model.Target{"jetbrains-remote": {Include: []string{"**"}}},
+				Targets: map[string]accmodel.Target{"jetbrains-remote": {Include: []string{"**"}}},
 			},
 		},
 	}); err != nil {
@@ -97,7 +97,7 @@ func newRouteFixture(t *testing.T) *routeFixture {
 	t.Cleanup(pool.Close)
 	svc := &source.Service{
 		HTTP: policy, Cache: policy,
-		Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
+		Resolve: func(ctx context.Context, c repo.Config) (artmodel.SourceIdentity, error) {
 			return db.RemoteCache().Source(ctx, c.Key)
 		},
 	}
@@ -111,7 +111,7 @@ func newRouteFixture(t *testing.T) *routeFixture {
 	}))
 	pkgroute.Mount(router, pkgroute.Options{
 		Store: db, Items: func() *item.Service { return items },
-		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it model.Item) {
+		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it artmodel.Item) {
 			body, _, err := blobs.Open(r.Context(), it.Actual.SHA256)
 			if err != nil {
 				t.Fatal(err)
@@ -473,13 +473,13 @@ func TestAccPinnedIDEInstallsThroughNativeMarketplaceHost(t *testing.T) {
 	}
 	f := newRouteFixture(t)
 	f.seed(fixtureJar(t, "com.weave.fixture"))
-	if err := f.db.Permissions().Create(t.Context(), model.Permission{
-		Name: "jetbrains-anonymous", Resources: map[api.ResourceType]model.Resource{
+	if err := f.db.Permissions().Create(t.Context(), accmodel.Permission{
+		Name: "jetbrains-anonymous", Resources: map[api.ResourceType]accmodel.Resource{
 			api.ResourceArtifact: {
-				Actions: model.Grants{Users: map[string]api.Actions{
+				Actions: accmodel.Grants{Users: map[string]api.Actions{
 					"anonymous": api.ActionRead,
 				}},
-				Targets: map[string]model.Target{"jetbrains-remote": {Include: []string{"**"}}},
+				Targets: map[string]accmodel.Target{"jetbrains-remote": {Include: []string{"**"}}},
 			},
 		},
 	}); err != nil {

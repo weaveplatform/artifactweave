@@ -12,13 +12,13 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 )
@@ -68,7 +68,7 @@ func TestAccRemoteSparseCacheOfflineRedirectAndIntegrity(t *testing.T) {
 				}
 				return nil
 			},
-			Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
+			Resolve: func(ctx context.Context, c repo.Config) (artmodel.SourceIdentity, error) {
 				return items.Store.RemoteCache().Source(ctx, c.Key)
 			},
 		}
@@ -150,12 +150,12 @@ func TestAccRemoteSparseCacheOfflineRedirectAndIntegrity(t *testing.T) {
 		string(got.Body.Bytes()) != string(newCrate) {
 		t.Fatalf("refreshed crate: %d %s", got.Code, got.Body.String())
 	}
-	if err := f.db.Permissions().Create(t.Context(), model.Permission{
+	if err := f.db.Permissions().Create(t.Context(), accmodel.Permission{
 		Name: "cargo-index-reader",
-		Resources: map[api.ResourceType]model.Resource{
+		Resources: map[api.ResourceType]accmodel.Resource{
 			api.ResourceArtifact: {
-				Actions: model.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
-				Targets: map[string]model.Target{"cargo-test": {
+				Actions: accmodel.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
+				Targets: map[string]accmodel.Target{"cargo-test": {
 					Include: []string{"crates/hello_cargo", "crates/hello_cargo/**"},
 					Exclude: []string{"crates/hello_cargo/hello_cargo-1.1.0.crate"},
 				}},
@@ -169,14 +169,14 @@ func TestAccRemoteSparseCacheOfflineRedirectAndIntegrity(t *testing.T) {
 		strings.Contains(filtered.Body.String(), `"vers":"1.1.0"`) {
 		t.Fatalf("version-filtered index: %d %s", filtered.Code, filtered.Body.String())
 	}
-	if err := f.db.Permissions().Create(t.Context(), model.Permission{
+	if err := f.db.Permissions().Create(t.Context(), accmodel.Permission{
 		Name: "cargo-index-folder-only",
-		Resources: map[api.ResourceType]model.Resource{
+		Resources: map[api.ResourceType]accmodel.Resource{
 			api.ResourceArtifact: {
-				Actions: model.Grants{
+				Actions: accmodel.Grants{
 					Users: map[string]api.Actions{"folder-reader": api.ActionRead},
 				},
-				Targets: map[string]model.Target{"cargo-test": {
+				Targets: map[string]accmodel.Target{"cargo-test": {
 					Include: []string{"crates/hello_cargo"},
 				}},
 			},
@@ -255,7 +255,7 @@ func TestAccRemoteRejectsCorruptIndexAndCrate(t *testing.T) {
 		return &source.Service{
 			HTTP:  policy,
 			Cache: policy,
-			Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
+			Resolve: func(ctx context.Context, c repo.Config) (artmodel.SourceIdentity, error) {
 				return items.Store.RemoteCache().Source(ctx, c.Key)
 			},
 		}
@@ -351,7 +351,7 @@ func TestAccRemoteTemplateAndSparseValidation(t *testing.T) {
 		return &source.Service{
 			HTTP:  policy,
 			Cache: policy,
-			Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
+			Resolve: func(ctx context.Context, c repo.Config) (artmodel.SourceIdentity, error) {
 				return items.Store.RemoteCache().Source(ctx, c.Key)
 			},
 		}

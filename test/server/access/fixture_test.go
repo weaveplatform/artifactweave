@@ -33,12 +33,12 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -144,12 +144,12 @@ func newStatusFixture(
 	db := inmem.New()
 	cheapSeed(t, db)
 	if err := db.Users().
-		Create(ctx, model.User{Name: "user", PasswordHash: cheapHash}); err != nil {
+		Create(ctx, accmodel.User{Name: "user", PasswordHash: cheapHash}); err != nil {
 		t.Fatal(err)
 	}
 	// A locked account, until securityStatusRows unlocks every user.
-	if err := db.Users().Create(ctx, model.User{
-		Name: "locked", PasswordHash: cheapHash, Status: model.UserLocked,
+	if err := db.Users().Create(ctx, accmodel.User{
+		Name: "locked", PasswordHash: cheapHash, Status: accmodel.UserLocked,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -197,7 +197,7 @@ func newStatusFixture(
 		t.Fatal(err)
 	}
 	if err := db.Settings().Put(ctx, settings.SettingFolderDownload,
-		model.FolderDownloadSettings{Enabled: true}); err != nil {
+		artmodel.FolderDownloadSettings{Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
 	tokens, secrets := seedTokens(t, db)
@@ -230,13 +230,13 @@ func seedPermissions(t *testing.T, db *inmem.Store) {
 		Create(ctx, *repo.Defaults(&repo.Config{Key: "perm-local", Class: repo.Local})); err != nil {
 		t.Fatal(err)
 	}
-	libs := map[string]model.Target{"perm-local": {Include: []string{"**"}}}
+	libs := map[string]accmodel.Target{"perm-local": {Include: []string{"**"}}}
 	for _, name := range []string{
 		"st-del-v1", "st-del-v2", "st-del-access", "st-res-put", "st-res-patch", "st-res-del",
 	} {
-		if err := db.Permissions().Create(ctx, model.Permission{
+		if err := db.Permissions().Create(ctx, accmodel.Permission{
 			Name: name,
-			Resources: map[api.ResourceType]model.Resource{
+			Resources: map[api.ResourceType]accmodel.Resource{
 				api.ResourceArtifact: {Targets: libs},
 			},
 		}); err != nil {
@@ -246,10 +246,10 @@ func seedPermissions(t *testing.T, db *inmem.Store) {
 	for _, name := range []string{
 		"st-managed", "st-managed-put", "st-managed-del", "st-managed-grant", "st-managed-other",
 	} {
-		if err := db.Permissions().Create(ctx, model.Permission{
+		if err := db.Permissions().Create(ctx, accmodel.Permission{
 			Name: name,
-			Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-				Actions: model.Grants{Users: map[string]api.Actions{
+			Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
+				Actions: accmodel.Grants{Users: map[string]api.Actions{
 					"user": api.ActionRead | api.ActionManage,
 				}},
 				Targets: libs,
@@ -357,7 +357,7 @@ func seedTokens(t *testing.T, db harness.Store) (*token.Service, statusSecrets) 
 		t.Fatal(err)
 	}
 	now := time.Now().Truncate(time.Second)
-	for _, r := range []model.Token{
+	for _, r := range []accmodel.Token{
 		{ID: "admin-token", Subject: subjectOf(tokens, "admin"), Revocable: true},
 		{ID: "admin-token-2", Subject: subjectOf(tokens, "admin"), Revocable: true},
 		{ID: "user-token", Subject: subjectOf(tokens, "user"), Revocable: true},

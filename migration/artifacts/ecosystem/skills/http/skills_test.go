@@ -17,13 +17,13 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	skillsfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/skills"
 	skillshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/skills/http"
@@ -51,14 +51,14 @@ func newFixture(t *testing.T) *fixture {
 	if err := db.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Permissions().Create(t.Context(), model.Permission{
+	if err := db.Permissions().Create(t.Context(), accmodel.Permission{
 		Name: "skills-writer",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{
+		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
+			Actions: accmodel.Grants{Users: map[string]api.Actions{
 				"writer": api.ActionWrite,
 				"reader": api.ActionRead,
 			}},
-			Targets: map[string]model.Target{c.Key: {Include: []string{"**"}}},
+			Targets: map[string]accmodel.Target{c.Key: {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -74,7 +74,7 @@ func newFixture(t *testing.T) *fixture {
 	}))
 	pkgroute.Mount(router, pkgroute.Options{
 		Store: db, Items: func() *item.Service { return items },
-		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it model.Item) {
+		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it artmodel.Item) {
 			rc, _, err := blobs.Open(r.Context(), it.Actual.SHA256)
 			if err != nil {
 				t.Fatal(err)

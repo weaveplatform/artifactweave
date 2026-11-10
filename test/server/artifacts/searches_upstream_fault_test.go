@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
@@ -254,7 +254,7 @@ func TestAccSearchUpstreamConfiguredCacheNameStillFetches(t *testing.T) {
 	}
 	// Explicit cached item discovery still returns that artifact for remote=0.
 	_, err = u.db.Items().
-		Put(t.Context(), model.Item{RepoKey: "up", Cached: true, Path: "org/acme/lib/0.1", Name: "lib-0.1.jar"})
+		Put(t.Context(), artmodel.Item{RepoKey: "up", Cached: true, Path: "org/acme/lib/0.1", Name: "lib-0.1.jar"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -384,13 +384,13 @@ func TestAccSearchUpstreamGavcCurrentFileAuthority(t *testing.T) {
 			u.config(func(c *repo.Config) { c.StoreArtifactsLocally = ptr(!noStore) })
 			u.listing("org/acme/lib", "2.0/")
 			u.listing("org/acme/lib/2.0", "lib-2.0.jar", "lib-2.0-sources.jar", "lib-2.0.pom")
-			grant := model.Permission{
+			grant := accmodel.Permission{
 				Name: "search-file",
-				Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-					Actions: model.Grants{
+				Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
+					Actions: accmodel.Grants{
 						Users: map[string]api.Actions{"user": api.ActionRead},
 					},
-					Targets: map[string]model.Target{
+					Targets: map[string]accmodel.Target{
 						"up": {Include: []string{"org/acme/lib/2.0/lib-2.0.jar"}},
 					},
 				}},

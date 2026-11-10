@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
@@ -36,7 +36,7 @@ func seedTrash(
 	if err != nil {
 		t.Fatal(err)
 	}
-	it := model.Item{
+	it := artmodel.Item{
 		RepoKey: repoKey, Path: parent, Name: name, Depth: depth, Folder: folder,
 		Created: modified, Modified: modified, Updated: modified,
 	}
@@ -44,8 +44,8 @@ func seedTrash(
 		it.Size = int64(len(full))
 		it.Actual = kernel.Checksums{SHA1: sha1Hex(full), SHA256: sha256Hex(full)}
 	}
-	if _, err := db.Trash().Add(context.Background(), model.TrashEntry{
-		Record:    model.TrashRecord{Item: it, PackageType: "generic"},
+	if _, err := db.Trash().Add(context.Background(), artmodel.TrashEntry{
+		Record:    artmodel.TrashRecord{Item: it, PackageType: "generic"},
 		DeletedAt: deleted, DeletedBy: "admin",
 	}); err != nil {
 		t.Fatal(err)
@@ -207,14 +207,17 @@ func (f faultyTrash) List(
 	ctx context.Context,
 	repoKey, prefix string,
 	p kernel.Page,
-) ([]model.TrashEntry, string, error) {
+) ([]artmodel.TrashEntry, string, error) {
 	if f.fails("list") {
 		return nil, "", errBoom
 	}
 	return f.TrashStore.List(ctx, repoKey, prefix, p) //nolint:wrapcheck // test double
 }
 
-func (f faultyTrash) Find(ctx context.Context, repoKey, full string) ([]model.TrashEntry, error) {
+func (f faultyTrash) Find(
+	ctx context.Context,
+	repoKey, full string,
+) ([]artmodel.TrashEntry, error) {
 	if f.fails("find") {
 		return nil, errBoom
 	}
@@ -268,7 +271,7 @@ func (f faultySettings) Get(ctx context.Context, key string, into any) error {
 func setTrashcan(t *testing.T, db harness.Store, on bool) {
 	t.Helper()
 	if err := db.Settings().Put(context.Background(), settings.SettingTrashcan,
-		model.TrashcanSettings{Enabled: on, RetentionDays: 14}); err != nil {
+		artmodel.TrashcanSettings{Enabled: on, RetentionDays: 14}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -374,11 +377,11 @@ func TestAccTrashStorageViewsFiltered(t *testing.T) {
 	seedTrash(t, w.db, "libs-local", "a/one.txt", false, t0, t0)
 	seedTrash(t, w.db, "libs-local", "a/secret/two.txt", false, t0.Add(time.Hour), t0)
 	seedTrash(t, w.db, "other-local", "o/three.txt", false, t0.Add(2*time.Hour), t0)
-	if err := w.db.Permissions().Create(ctx, model.Permission{
+	if err := w.db.Permissions().Create(ctx, accmodel.Permission{
 		Name: "deploy-a",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{"user": api.ActionWrite}},
-			Targets: map[string]model.Target{
+		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
+			Actions: accmodel.Grants{Users: map[string]api.Actions{"user": api.ActionWrite}},
+			Targets: map[string]accmodel.Target{
 				"libs-local": {Include: []string{"a/**"}, Exclude: []string{"a/secret/**"}},
 			},
 		}},

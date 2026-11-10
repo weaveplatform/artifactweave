@@ -14,12 +14,12 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -123,11 +123,11 @@ func newKitFixture(t *testing.T, sources map[repo.Class]pkgroute.Source) *kitFix
 	}
 	grant := func(name, user, under string, a api.Actions) {
 		t.Helper()
-		if err := db.Permissions().Create(ctx, model.Permission{
+		if err := db.Permissions().Create(ctx, accmodel.Permission{
 			Name: name,
-			Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-				Actions: model.Grants{Users: map[string]api.Actions{user: a}},
-				Targets: map[string]model.Target{
+			Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
+				Actions: accmodel.Grants{Users: map[string]api.Actions{user: a}},
+				Targets: map[string]accmodel.Target{
 					local:     {Include: []string{under + "**"}},
 					federated: {Include: []string{under + "**"}},
 				},
@@ -151,7 +151,7 @@ func newKitFixture(t *testing.T, sources map[repo.Class]pkgroute.Source) *kitFix
 	o := pkgroute.Options{
 		Store: db,
 		Items: func() *item.Service { return f.items },
-		ServeItem: func(w http.ResponseWriter, _ *http.Request, c repo.Config, it model.Item) {
+		ServeItem: func(w http.ResponseWriter, _ *http.Request, c repo.Config, it artmodel.Item) {
 			f.served = append(f.served, c.Key+"/"+it.FullPath())
 			_, _ = io.WriteString(w, "served "+it.FullPath())
 		},
@@ -459,11 +459,11 @@ func TestAccSourceSeam(t *testing.T) {
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("remote without a grant: %d %s", rec.Code, rec.Body)
 	}
-	if err := f.db.Permissions().Create(context.Background(), model.Permission{
+	if err := f.db.Permissions().Create(context.Background(), accmodel.Permission{
 		Name: "remote-reader",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
-			Targets: map[string]model.Target{"gen-remote": {Include: []string{"**"}}},
+		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
+			Actions: accmodel.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
+			Targets: map[string]accmodel.Target{"gen-remote": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -562,8 +562,8 @@ func TestAccDeploy(t *testing.T) {
 // replaces a file.
 type failingItems struct{ port.ItemStore }
 
-func (failingItems) Get(context.Context, string, bool, string) (model.Item, error) {
-	return model.Item{}, errors.New("items down")
+func (failingItems) Get(context.Context, string, bool, string) (artmodel.Item, error) {
+	return artmodel.Item{}, errors.New("items down")
 }
 
 type failingStore struct{ *inmem.Store }
@@ -646,7 +646,7 @@ func TestAccEncodedSlash(t *testing.T) {
 // the path between validation and serving must not select the new blob.
 func TestAccServeFoundKeepsVerifiedSnapshot(t *testing.T) {
 	f := newKitFixture(t, nil)
-	var verified model.Item
+	var verified artmodel.Item
 	p := testFormat(nil)
 	p.Routes = func(r chi.Router, k *pkgroute.Kit) {
 		r.Get("/snapshot", func(w http.ResponseWriter, r *http.Request) {
@@ -660,7 +660,7 @@ func TestAccServeFoundKeepsVerifiedSnapshot(t *testing.T) {
 		})
 	}
 	o := f.o
-	o.ServeItem = func(w http.ResponseWriter, _ *http.Request, _ repo.Config, it model.Item) {
+	o.ServeItem = func(w http.ResponseWriter, _ *http.Request, _ repo.Config, it artmodel.Item) {
 		if it.Actual.SHA256 != verified.Actual.SHA256 {
 			t.Fatal("served replacement bytes")
 		}

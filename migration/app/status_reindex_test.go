@@ -8,11 +8,11 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 )
@@ -107,7 +107,7 @@ func createReindexRepos(t *testing.T, st *inmem.Store) {
 			for _, p := range []string{"charts", "charts/team", "charts/team/app-1.0.0.tgz"} {
 				parent, name := path.Split(p)
 				if _, err := st.Items().
-					Put(context.Background(), model.Item{RepoKey: c.Key, Path: strings.TrimSuffix(parent, "/"), Name: name, Folder: !strings.HasSuffix(p, ".tgz")}); err != nil {
+					Put(context.Background(), artmodel.Item{RepoKey: c.Key, Path: strings.TrimSuffix(parent, "/"), Name: name, Folder: !strings.HasSuffix(p, ".tgz")}); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -197,19 +197,19 @@ var reindexStatusPart = statusPart{
 		t.Helper()
 		ctx := context.Background()
 		createReindexRepos(t, db)
-		if err := db.Users().Create(ctx, model.User{
+		if err := db.Users().Create(ctx, accmodel.User{
 			Name: "reindexer", PasswordHash: cheapHash,
 		}); err != nil {
 			t.Fatal(err)
 		}
-		targets := map[string]model.Target{}
+		targets := map[string]accmodel.Target{}
 		for _, c := range reindexRepos {
-			targets[c.Key] = model.Target{Include: []string{"**"}}
+			targets[c.Key] = accmodel.Target{Include: []string{"**"}}
 		}
-		if err := db.Permissions().Create(ctx, model.Permission{
+		if err := db.Permissions().Create(ctx, accmodel.Permission{
 			Name: "reindex-manage",
-			Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-				Actions: model.Grants{Users: map[string]api.Actions{
+			Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
+				Actions: accmodel.Grants{Users: map[string]api.Actions{
 					"reindexer": api.ActionManage,
 				}},
 				Targets: targets,

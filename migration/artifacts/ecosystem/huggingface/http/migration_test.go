@@ -19,10 +19,10 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	hfformat "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -40,7 +40,7 @@ func migrationBody(kind, timestamp, revision, ref string, dry bool) []byte {
 	return b
 }
 
-func (f *fixture) legacyItem(path string, content []byte, props model.Properties) model.Item {
+func (f *fixture) legacyItem(path string, content []byte, props artmodel.Properties) artmodel.Item {
 	f.t.Helper()
 	upload, err := f.items.Blobs.BeginUpload(f.t.Context())
 	if err != nil {
@@ -53,7 +53,7 @@ func (f *fixture) legacyItem(path string, content []byte, props model.Properties
 	if err != nil {
 		f.t.Fatal(err)
 	}
-	it, err := f.db.Items().Put(f.t.Context(), model.Item{
+	it, err := f.db.Items().Put(f.t.Context(), artmodel.Item{
 		RepoKey: "hf", Name: path,
 		Size: info.Size, Created: time.Unix(1700000000, 0),
 		Actual: kernel.Checksums{
@@ -79,7 +79,7 @@ func (f *fixture) legacyRevision(kind, timestamp, revision string, large bool) m
 	}
 	prefix := kind + "/acme/demo/main/" + timestamp + "/"
 	f.legacyItem(prefix+".jfrog_huggingface_"+metadata+"_info.json", []byte(`{}`),
-		model.Properties{"huggingfaceml.generated.revision.sha1": {revision}})
+		artmodel.Properties{"huggingfaceml.generated.revision.sha1": {revision}})
 	files := map[string][]byte{
 		"config.json":        []byte(`{"model_type":"bert"}`),
 		"sub/tokenizer.json": []byte(`{"version":"` + timestamp + `"}`),
@@ -88,7 +88,7 @@ func (f *fixture) legacyRevision(kind, timestamp, revision string, large bool) m
 		files["weights.bin"] = bytes.Repeat([]byte("migration-weights"), 100000)
 	}
 	for name, content := range files {
-		f.legacyItem(prefix+name, content, model.Properties{"fixture": {"preserved"}})
+		f.legacyItem(prefix+name, content, artmodel.Properties{"fixture": {"preserved"}})
 	}
 	return files
 }
@@ -113,12 +113,12 @@ func TestAccLegacyMigrationPreservesRevisionsBytesPropertiesAndPolicy(t *testing
 			t.Run(string(class)+"/"+kind, func(t *testing.T) {
 				f := newFixture(t, class)
 				if err := f.db.Permissions().
-					Create(t.Context(), model.Permission{Name: "readers", Resources: map[api.ResourceType]model.Resource{
+					Create(t.Context(), accmodel.Permission{Name: "readers", Resources: map[api.ResourceType]accmodel.Resource{
 						api.ResourceArtifact: {
-							Actions: model.Grants{
+							Actions: accmodel.Grants{
 								Users: map[string]api.Actions{"reader": api.ActionRead},
 							},
-							Targets: map[string]model.Target{"hf": {Include: []string{"**"}}},
+							Targets: map[string]accmodel.Target{"hf": {Include: []string{"**"}}},
 						},
 					}}); err != nil {
 					t.Fatal(err)
@@ -307,7 +307,7 @@ func TestAccLegacyMigrationRollsBackInterruptedPublication(t *testing.T) {
 }
 
 func TestAccLegacyMigrationRefusesPermissionChanges(t *testing.T) {
-	for _, patterns := range []model.Target{
+	for _, patterns := range []accmodel.Target{
 		{Include: []string{"models/acme/demo/**"}},
 		{Include: []string{"models--acme--demo/**"}},
 		{Include: []string{"models--acme--demo/**"}, Exclude: []string{"", " "}},
@@ -319,12 +319,12 @@ func TestAccLegacyMigrationRefusesPermissionChanges(t *testing.T) {
 			f := newFixture(t, repo.Local)
 			f.legacyRevision("models", "1700000000", sha, false)
 			if err := f.db.Permissions().
-				Create(t.Context(), model.Permission{Name: "scoped", Resources: map[api.ResourceType]model.Resource{
+				Create(t.Context(), accmodel.Permission{Name: "scoped", Resources: map[api.ResourceType]accmodel.Resource{
 					api.ResourceArtifact: {
-						Actions: model.Grants{
+						Actions: accmodel.Grants{
 							Groups: map[string]api.Actions{"readers": api.ActionRead},
 						},
-						Targets: map[string]model.Target{api.TargetAnyLocal: patterns},
+						Targets: map[string]accmodel.Target{api.TargetAnyLocal: patterns},
 					},
 				}}); err != nil {
 				t.Fatal(err)
@@ -392,7 +392,7 @@ func TestAccLegacyMigrationRechecksChangesDuringVerification(t *testing.T) {
 						_, err = f.db.Items().Put(ctx, it)
 					case "source properties":
 						err = f.db.Items().
-							SetProperties(ctx, it.ID, model.Properties{"changed": {"true"}}, time.Now())
+							SetProperties(ctx, it.ID, artmodel.Properties{"changed": {"true"}}, time.Now())
 					case "source added":
 						it.ID, it.Name = 0, "unexpected.txt"
 						_, err = f.db.Items().Put(ctx, it)
@@ -401,14 +401,14 @@ func TestAccLegacyMigrationRechecksChangesDuringVerification(t *testing.T) {
 						_, err = f.db.Items().Put(ctx, it)
 					case "policy":
 						err = f.db.Permissions().
-							Create(ctx, model.Permission{Name: "late grant", Resources: map[api.ResourceType]model.Resource{
+							Create(ctx, accmodel.Permission{Name: "late grant", Resources: map[api.ResourceType]accmodel.Resource{
 								api.ResourceArtifact: {
-									Actions: model.Grants{
+									Actions: accmodel.Grants{
 										Users: map[string]api.Actions{
 											"intruder": api.ActionRead,
 										},
 									},
-									Targets: map[string]model.Target{
+									Targets: map[string]accmodel.Target{
 										"hf": {Include: []string{"models--acme--demo/**"}},
 									},
 								},
@@ -463,7 +463,7 @@ func TestAccLegacyMigrationBoundsAuthorityAndRerunConflicts(t *testing.T) {
 		f.legacyRevision("models", "1700000000", sha, false)
 		for n := 0; n < 1025; n++ {
 			if _, err := f.db.Items().
-				Put(t.Context(), model.Item{RepoKey: "hf", Name: fmt.Sprintf("models/acme/demo/main/1700000000/folder-%04d", n), Folder: true}); err != nil {
+				Put(t.Context(), artmodel.Item{RepoKey: "hf", Name: fmt.Sprintf("models/acme/demo/main/1700000000/folder-%04d", n), Folder: true}); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -474,7 +474,7 @@ func TestAccLegacyMigrationBoundsAuthorityAndRerunConflicts(t *testing.T) {
 		f.legacyRevision("models", "1700000000", sha, false)
 		for n := 0; n < 1025; n++ {
 			if err := f.db.Permissions().
-				Create(t.Context(), model.Permission{Name: fmt.Sprint(n)}); err != nil {
+				Create(t.Context(), accmodel.Permission{Name: fmt.Sprint(n)}); err != nil {
 				t.Fatal(err)
 			}
 		}

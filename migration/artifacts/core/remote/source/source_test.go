@@ -16,10 +16,10 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
@@ -34,9 +34,9 @@ func (f backend) Read(
 	return f(ctx, q, p)
 }
 
-func identity(context.Context, repo.Config) (model.SourceIdentity, error) {
-	return model.SourceIdentity{
-		Kind:       model.ExternalHTTP,
+func identity(context.Context, repo.Config) (artmodel.SourceIdentity, error) {
+	return artmodel.SourceIdentity{
+		Kind:       artmodel.ExternalHTTP,
 		Repository: "created-1",
 		ID:         "source-1",
 		Generation: "revision-1",
@@ -48,12 +48,12 @@ func request(t *testing.T, scope string) source.Request {
 	st := inmem.New()
 	ctx := t.Context()
 	if err := st.Permissions().
-		Create(ctx, model.Permission{Name: "read", Resources: map[accessapi.ResourceType]model.Resource{
+		Create(ctx, accmodel.Permission{Name: "read", Resources: map[accessapi.ResourceType]accmodel.Resource{
 			accessapi.ResourceArtifact: {
-				Actions: model.Grants{
+				Actions: accmodel.Grants{
 					Users: map[string]accessapi.Actions{"reader": accessapi.ActionRead},
 				},
-				Targets: map[string]model.Target{"up": {Include: []string{"**"}}},
+				Targets: map[string]accmodel.Target{"up": {Include: []string{"**"}}},
 			},
 		}}); err != nil {
 		t.Fatal(err)
@@ -107,7 +107,7 @@ func stream(b io.ReadCloser) source.Result {
 }
 
 func itemResult() source.Result {
-	return source.Result{Item: &model.Item{RepoKey: "up", Name: "a.pkg", Cached: true}}
+	return source.Result{Item: &artmodel.Item{RepoKey: "up", Name: "a.pkg", Cached: true}}
 }
 
 func TestUnitReadIntentsAndRepresentations(t *testing.T) {
@@ -185,9 +185,9 @@ func TestUnitRefusalsPrecedeSourceLookup(t *testing.T) {
 			q := request(t, "")
 			tc.change(&q)
 			s := source.Service{
-				Resolve: func(context.Context, repo.Config) (model.SourceIdentity, error) {
+				Resolve: func(context.Context, repo.Config) (artmodel.SourceIdentity, error) {
 					t.Fatal("unauthorized source lookup")
-					return model.SourceIdentity{}, nil
+					return artmodel.SourceIdentity{}, nil
 				},
 			}
 			if _, err := s.Read(t.Context(), q); err == nil {
@@ -215,16 +215,16 @@ func TestUnitUnsupportedAndUnresolvedSources(t *testing.T) {
 			t.Fatal("network from cache only")
 			return source.Result{}, nil
 		})}, true, kernel.ErrNotFound},
-		{"missing repo", source.Service{Resolve: func(context.Context, repo.Config) (model.SourceIdentity, error) {
-			return model.SourceIdentity{}, kernel.ErrNotFound
+		{"missing repo", source.Service{Resolve: func(context.Context, repo.Config) (artmodel.SourceIdentity, error) {
+			return artmodel.SourceIdentity{}, kernel.ErrNotFound
 		}}, false, kernel.ErrNotFound},
-		{"project source", source.Service{Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
+		{"project source", source.Service{Resolve: func(ctx context.Context, c repo.Config) (artmodel.SourceIdentity, error) {
 			id, _ := identity(ctx, c)
-			id.Kind = model.ProjectRepository
+			id.Kind = artmodel.ProjectRepository
 			return id, nil
 		}}, false, source.ErrUnsupported},
-		{"incomplete identity", source.Service{Resolve: func(context.Context, repo.Config) (model.SourceIdentity, error) {
-			return model.SourceIdentity{Kind: model.ExternalHTTP}, nil
+		{"incomplete identity", source.Service{Resolve: func(context.Context, repo.Config) (artmodel.SourceIdentity, error) {
+			return artmodel.SourceIdentity{Kind: artmodel.ExternalHTTP}, nil
 		}}, false, source.ErrUnavailable},
 		{"authorization revoked", source.Service{Resolve: identity, Revalidate: func(context.Context, source.Request, source.Permit) error { return source.ErrDenied }}, false, source.ErrDenied},
 	} {
@@ -251,10 +251,10 @@ func TestUnitResultValidationAndSafeErrors(t *testing.T) {
 	}{
 		{"neither", source.Result{}, nil, source.ErrInvalidResult},
 		{"both", source.Result{Item: itemResult().Item, Stream: stream(io.NopCloser(strings.NewReader("x"))).Stream}, nil, source.ErrInvalidResult},
-		{"other repository", source.Result{Item: &model.Item{RepoKey: "secret", Name: "a.pkg", Cached: true}}, nil, source.ErrInvalidResult},
-		{"wrong path", source.Result{Item: &model.Item{RepoKey: "up", Name: "b.pkg", Cached: true}}, nil, source.ErrInvalidResult},
-		{"not cached", source.Result{Item: &model.Item{RepoKey: "up", Name: "a.pkg"}}, nil, source.ErrInvalidResult},
-		{"folder", source.Result{Item: &model.Item{RepoKey: "up", Name: "a.pkg", Cached: true, Folder: true}}, nil, source.ErrInvalidResult},
+		{"other repository", source.Result{Item: &artmodel.Item{RepoKey: "secret", Name: "a.pkg", Cached: true}}, nil, source.ErrInvalidResult},
+		{"wrong path", source.Result{Item: &artmodel.Item{RepoKey: "up", Name: "b.pkg", Cached: true}}, nil, source.ErrInvalidResult},
+		{"not cached", source.Result{Item: &artmodel.Item{RepoKey: "up", Name: "a.pkg"}}, nil, source.ErrInvalidResult},
+		{"folder", source.Result{Item: &artmodel.Item{RepoKey: "up", Name: "a.pkg", Cached: true, Folder: true}}, nil, source.ErrInvalidResult},
 		{"nil body", source.Result{Stream: &source.Stream{Status: 200}}, nil, source.ErrInvalidResult},
 		{"bad size", source.Result{Stream: &source.Stream{Status: 200, Body: io.NopCloser(strings.NewReader("x")), Representation: source.Representation{Size: -2}}}, nil, source.ErrInvalidResult},
 		{"bad status", source.Result{Stream: &source.Stream{Status: 404, Body: io.NopCloser(strings.NewReader("x"))}}, nil, source.ErrInvalidResult},
@@ -322,7 +322,7 @@ func TestUnitStreamOwnershipAndLateFences(t *testing.T) {
 			b := &body{Reader: strings.NewReader("bytes"), closed: make(chan struct{})}
 			resolves, validates := 0, 0
 			s := source.Service{
-				Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
+				Resolve: func(ctx context.Context, c repo.Config) (artmodel.SourceIdentity, error) {
 					resolves++
 					id, _ := identity(ctx, c)
 					if resolves > 1 {
@@ -665,9 +665,9 @@ func TestUnitMetadataMIMEAlternativesRequireExplicitValidatedContract(t *testing
 		q.Resource.Validate = func(context.Context, io.ReadSeeker, int64) error { return nil }
 		change(&q.Resource)
 		s := source.Service{
-			Resolve: func(context.Context, repo.Config) (model.SourceIdentity, error) {
+			Resolve: func(context.Context, repo.Config) (artmodel.SourceIdentity, error) {
 				t.Fatal("invalid hint reached resolution")
-				return model.SourceIdentity{}, nil
+				return artmodel.SourceIdentity{}, nil
 			},
 		}
 		if _, err := s.Read(t.Context(), q); !errors.Is(err, source.ErrInvalidRequest) {
@@ -690,9 +690,9 @@ func TestUnitMetadataResponseValidatorRequiresExplicitContract(t *testing.T) {
 		q.Resource.ValidateMetadata = func(context.Context, io.ReadSeeker, int64, source.MetadataResponse) error { return nil }
 		change(&q.Resource)
 		s := source.Service{
-			Resolve: func(context.Context, repo.Config) (model.SourceIdentity, error) {
+			Resolve: func(context.Context, repo.Config) (artmodel.SourceIdentity, error) {
 				t.Fatal("invalid validator reached resolution")
-				return model.SourceIdentity{}, nil
+				return artmodel.SourceIdentity{}, nil
 			},
 		}
 		if _, err := s.Read(t.Context(), q); !errors.Is(err, source.ErrInvalidRequest) {
@@ -713,9 +713,9 @@ func TestUnitDestinationGuardRequiresExplicitAdapterContract(t *testing.T) {
 			q.Resource.Variant = ""
 		}
 		s := source.Service{
-			Resolve: func(context.Context, repo.Config) (model.SourceIdentity, error) {
+			Resolve: func(context.Context, repo.Config) (artmodel.SourceIdentity, error) {
 				t.Fatal("invalid guard reached resolution")
-				return model.SourceIdentity{}, nil
+				return artmodel.SourceIdentity{}, nil
 			},
 		}
 		if _, err := s.Read(t.Context(), q); !errors.Is(err, source.ErrInvalidRequest) {
@@ -743,9 +743,9 @@ func TestUnitModuleLocationRequiresValidatedMetadataGET(t *testing.T) {
 		q.Resource.ValidateMetadata = func(context.Context, io.ReadSeeker, int64, source.MetadataResponse) error { return nil }
 		change(&q.Resource)
 		s := source.Service{
-			Resolve: func(context.Context, repo.Config) (model.SourceIdentity, error) {
+			Resolve: func(context.Context, repo.Config) (artmodel.SourceIdentity, error) {
 				t.Fatal("invalid module location contract reached resolution")
-				return model.SourceIdentity{}, nil
+				return artmodel.SourceIdentity{}, nil
 			},
 		}
 		if _, err := s.Read(t.Context(), q); !errors.Is(err, source.ErrInvalidRequest) {
@@ -776,9 +776,9 @@ func TestUnitNuGetEmptyFeedRequiresExplicitMetadataContract(t *testing.T) {
 		}
 		change(&q.Resource)
 		svc := source.Service{
-			Resolve: func(context.Context, repo.Config) (model.SourceIdentity, error) {
+			Resolve: func(context.Context, repo.Config) (artmodel.SourceIdentity, error) {
 				t.Fatal("invalid projection reached source")
-				return model.SourceIdentity{}, nil
+				return artmodel.SourceIdentity{}, nil
 			},
 		}
 		if _, err := svc.Read(t.Context(), q); !errors.Is(err, source.ErrInvalidRequest) {

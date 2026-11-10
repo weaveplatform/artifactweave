@@ -9,12 +9,12 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
@@ -29,9 +29,9 @@ func TestAccCacheMaintenancePermissionsAndAliases(t *testing.T) {
 		t.Fatal(err)
 	}
 	svc := &item.Service{Store: w.db, Blobs: w.blobs, Formats: ecosystem.For}
-	entries := map[string]model.RemoteCacheEntry{}
-	for p, kind := range map[string]model.RemoteKind{"allowed/index": model.RemoteMetadata, "allowed/a.jar": model.RemoteUnique, "outside/index": model.RemoteMetadata} {
-		key := model.RemoteCacheKey{RepoKey: c.Key, Path: p}
+	entries := map[string]artmodel.RemoteCacheEntry{}
+	for p, kind := range map[string]artmodel.RemoteKind{"allowed/index": artmodel.RemoteMetadata, "allowed/a.jar": artmodel.RemoteUnique, "outside/index": artmodel.RemoteMetadata} {
+		key := artmodel.RemoteCacheKey{RepoKey: c.Key, Path: p}
 		token, err := w.db.RemoteCache().Begin(ctx, key)
 		if err != nil {
 			t.Fatal(err)
@@ -52,7 +52,7 @@ func TestAccCacheMaintenancePermissionsAndAliases(t *testing.T) {
 		entries[p] = out.Entry
 	}
 	if err = w.db.Permissions().
-		Create(ctx, model.Permission{Name: "cache-maintenance", Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {Actions: model.Grants{Users: map[string]api.Actions{"user": api.ActionManage}}, Targets: map[string]model.Target{"up": {Include: []string{"allowed/**"}}}}}}); err != nil {
+		Create(ctx, accmodel.Permission{Name: "cache-maintenance", Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]api.Actions{"user": api.ActionManage}}, Targets: map[string]accmodel.Target{"up": {Include: []string{"allowed/**"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {
@@ -85,7 +85,7 @@ func TestAccCacheMaintenancePermissionsAndAliases(t *testing.T) {
 	// Delete-only authorization is also sufficient, and a confirmed miss can
 	// be removed through either remote name without needing a stored item.
 	if err = w.db.Permissions().
-		Create(ctx, model.Permission{Name: "cache-delete", Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {Actions: model.Grants{Users: map[string]api.Actions{"deployer": api.ActionDelete}}, Targets: map[string]model.Target{"up": {Include: []string{"allowed/**"}}}}}}); err != nil {
+		Create(ctx, accmodel.Permission{Name: "cache-delete", Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]api.Actions{"deployer": api.ActionDelete}}, Targets: map[string]accmodel.Target{"up": {Include: []string{"allowed/**"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	wantStatus(
@@ -94,7 +94,7 @@ func TestAccCacheMaintenancePermissionsAndAliases(t *testing.T) {
 		http.StatusOK,
 	)
 	for _, alias := range []string{"up", "up-cache"} {
-		key := model.RemoteCacheKey{RepoKey: c.Key, Path: "allowed/missing"}
+		key := artmodel.RemoteCacheKey{RepoKey: c.Key, Path: "allowed/missing"}
 		token, err := w.db.RemoteCache().Begin(ctx, key)
 		if err != nil {
 			t.Fatal(err)
@@ -134,7 +134,7 @@ func TestAccCacheMaintenanceHTTPNegativeRediscovery(t *testing.T) {
 			},
 		}
 		c.RemoteSources = &source.Service{
-			Resolve: func(ctx context.Context, r repo.Config) (model.SourceIdentity, error) {
+			Resolve: func(ctx context.Context, r repo.Config) (artmodel.SourceIdentity, error) {
 				return c.Store.RemoteCache().Source(ctx, r.Key)
 			},
 			HTTP: policy, Cache: policy,

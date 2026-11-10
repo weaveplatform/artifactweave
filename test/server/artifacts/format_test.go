@@ -9,10 +9,10 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 )
 
@@ -30,7 +30,7 @@ func (f *followingFormat) Annotated(
 	_ context.Context,
 	_ format.Env,
 	_ repo.Config,
-	it model.Item,
+	it artmodel.Item,
 	a format.Annotation,
 ) error {
 	keys := make([]string, 0, len(a.Set))
@@ -214,11 +214,11 @@ func TestAccDownloadsResolveThroughTheFormat(t *testing.T) {
 	if m := f.resolved.Matrix; !m.Props.Has("tier", "gold") || !m.Mandatory["tier"] {
 		t.Errorf("matrix %+v", m)
 	}
-	if err := w.db.Permissions().Create(context.Background(), model.Permission{
+	if err := w.db.Permissions().Create(context.Background(), accmodel.Permission{
 		Name: "latest-only",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
-			Targets: map[string]model.Target{"libs-local": {Include: []string{"latest.txt"}}},
+		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
+			Actions: accmodel.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+			Targets: map[string]accmodel.Target{"libs-local": {Include: []string{"latest.txt"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)

@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/terraformtest"
 )
@@ -205,7 +205,7 @@ func TestAccProviderVisibilityAndPermissionRevocation(t *testing.T) {
 		t.Helper()
 		_ = f.db.Permissions().Delete(t.Context(), "providers")
 		err := f.db.Permissions().
-			Create(t.Context(), model.Permission{Name: "providers", Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {Actions: model.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}}, Targets: map[string]model.Target{"provider": {Include: paths}}}}})
+			Create(t.Context(), accmodel.Permission{Name: "providers", Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}}, Targets: map[string]accmodel.Target{"provider": {Include: paths}}}}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -315,7 +315,7 @@ type (
 )
 
 func (s *replacingStore) Items() port.ItemStore { return replacingItems{s.serverStore.Items(), s} }
-func (i replacingItems) GetByID(ctx context.Context, id int64) (model.Item, error) {
+func (i replacingItems) GetByID(ctx context.Context, id int64) (artmodel.Item, error) {
 	it, err := i.ItemStore.GetByID(ctx, id)
 	if err == nil && it.FullPath() == i.s.path && !i.s.replaced {
 		i.s.replaced = true
@@ -354,7 +354,10 @@ func (s staleMetaStore) Packages() port.PackageStore {
 	return staleMetaPackages{s.serverStore.Packages()}
 }
 
-func (p staleMetaPackages) Versions(ctx context.Context, id int64) ([]model.PackageVersion, error) {
+func (p staleMetaPackages) Versions(
+	ctx context.Context,
+	id int64,
+) ([]artmodel.PackageVersion, error) {
 	vs, err := p.PackageStore.Versions(ctx, id)
 	for i := range vs {
 		vs[i].Metadata = []byte(`{"archives":{}}`)

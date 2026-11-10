@@ -14,13 +14,13 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	golanghttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -62,11 +62,11 @@ func newPubFixture(t *testing.T) *pubFixture {
 		"deployer":   api.ActionRead | api.ActionWrite,
 		"maintainer": api.ActionRead | api.ActionWrite | api.ActionDelete,
 	} {
-		if err := db.Permissions().Create(ctx, model.Permission{
+		if err := db.Permissions().Create(ctx, accmodel.Permission{
 			Name: user,
-			Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-				Actions: model.Grants{Users: map[string]api.Actions{user: a}},
-				Targets: map[string]model.Target{goLocal: {Include: []string{"**"}}},
+			Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
+				Actions: accmodel.Grants{Users: map[string]api.Actions{user: a}},
+				Targets: map[string]accmodel.Target{goLocal: {Include: []string{"**"}}},
 			}},
 		}); err != nil {
 			t.Fatal(err)
@@ -102,7 +102,7 @@ func newPubFixture(t *testing.T) *pubFixture {
 			}
 			return err
 		},
-		Created: func(w http.ResponseWriter, _ *http.Request, it model.Item) {
+		Created: func(w http.ResponseWriter, _ *http.Request, it artmodel.Item) {
 			w.WriteHeader(http.StatusCreated)
 			_, _ = io.WriteString(w, it.FullPath())
 		},
@@ -125,7 +125,7 @@ func (f *pubFixture) put(path, user, body string, headers ...string) *httptest.R
 	return rec
 }
 
-func (f *pubFixture) item(t *testing.T, path string) model.Item {
+func (f *pubFixture) item(t *testing.T, path string) artmodel.Item {
 	t.Helper()
 	it, err := f.db.Items().Get(context.Background(), goLocal, false, path)
 	if err != nil {

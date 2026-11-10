@@ -12,13 +12,13 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -128,11 +128,11 @@ func TestAccMavenDurableCompanionAuthorityAndRetries(t *testing.T) {
 			w.permit.Identity, _ = w.db.RemoteCache().Source(t.Context(), w.c.Key)
 			hash := accesstest.HashPassword(t, "test-password")
 			if err := w.db.Users().
-				Create(t.Context(), model.User{Name: "reader", PasswordHash: hash}); err != nil {
+				Create(t.Context(), accmodel.User{Name: "reader", PasswordHash: hash}); err != nil {
 				t.Fatal(err)
 			}
 			if err := w.db.Permissions().
-				Create(t.Context(), model.Permission{Name: "read", Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {Targets: map[string]model.Target{w.c.Key: {}}, Actions: model.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}}}}}); err != nil {
+				Create(t.Context(), accmodel.Permission{Name: "read", Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {Targets: map[string]accmodel.Target{w.c.Key: {}}, Actions: accmodel.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}}}}}); err != nil {
 				t.Fatal(err)
 			}
 			api := accesstest.Over(t, w.db, accesstest.WithNow(w.clock.Now)).API()
@@ -146,7 +146,7 @@ func TestAccMavenDurableCompanionAuthorityAndRetries(t *testing.T) {
 					t.Fatal(parseErr)
 				}
 				if err = w.db.Tokens().
-					Create(t.Context(), model.Token{ID: "token", Subject: "jfac@test/users/reader", Scope: scope, ExpiresAt: w.clock.Now().Add(time.Hour)}); err != nil {
+					Create(t.Context(), accmodel.Token{ID: "token", Subject: "jfac@test/users/reader", Scope: scope, ExpiresAt: w.clock.Now().Add(time.Hour)}); err != nil {
 					t.Fatal(err)
 				}
 				p, err = api.Authenticator.Current(
@@ -160,7 +160,7 @@ func TestAccMavenDurableCompanionAuthorityAndRetries(t *testing.T) {
 			service := &source.Service{
 				HTTP:  m,
 				Cache: m,
-				Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
+				Resolve: func(ctx context.Context, c repo.Config) (artmodel.SourceIdentity, error) {
 					return w.db.RemoteCache().Source(ctx, c.Key)
 				},
 			}

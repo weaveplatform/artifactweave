@@ -16,13 +16,13 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -235,11 +235,11 @@ func cocoaPodsAuthorityFixture(t *testing.T) (*policyWorld, source.Request) {
 	q.Resource.Validate = func(ctx context.Context, body io.ReadSeeker, size int64) error {
 		return ValidateSourceArchive(ctx, body, size, ".tar.gz")
 	}
-	if err := w.db.Permissions().Create(t.Context(), model.Permission{
-		Name: "git-reader", Resources: map[accessapi.ResourceType]model.Resource{
+	if err := w.db.Permissions().Create(t.Context(), accmodel.Permission{
+		Name: "git-reader", Resources: map[accessapi.ResourceType]accmodel.Resource{
 			accessapi.ResourceArtifact: {
-				Targets: map[string]model.Target{w.c.Key: {}},
-				Actions: model.Grants{
+				Targets: map[string]accmodel.Target{w.c.Key: {}},
+				Actions: accmodel.Grants{
 					Users: map[string]accessapi.Actions{"git-reader": accessapi.ActionRead},
 				},
 			},
@@ -276,7 +276,7 @@ func cocoaPodsAuthorityFixture(t *testing.T) (*policyWorld, source.Request) {
 	return w, q
 }
 
-func cocoaPodsAuthorityIdentity(t *testing.T, w *policyWorld) model.SourceIdentity {
+func cocoaPodsAuthorityIdentity(t *testing.T, w *policyWorld) artmodel.SourceIdentity {
 	t.Helper()
 	identity, err := w.db.RemoteCache().Source(t.Context(), w.c.Key)
 	if err != nil {

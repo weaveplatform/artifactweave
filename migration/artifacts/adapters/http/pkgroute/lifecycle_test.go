@@ -10,11 +10,11 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -36,7 +36,7 @@ func changeFormat() pkgroute.Protocol {
 			r.Patch("/props/*", func(w http.ResponseWriter, r *http.Request) {
 				it, err := k.DB().Items().Get(r.Context(), local, false, path(r, "props/"))
 				if err == nil {
-					err = k.Annotate(r, it, model.Properties{"k": {"v"}}, nil)
+					err = k.Annotate(r, it, artmodel.Properties{"k": {"v"}}, nil)
 				}
 				if err != nil {
 					k.Error(w, r, err)
@@ -94,13 +94,13 @@ func TestAccAnnotateAndDelete(t *testing.T) {
 		t.Fatalf("not deleted: %v", err)
 	}
 	// Annotate needs its own grant.
-	if err := f.db.Permissions().Create(ctx, model.Permission{
+	if err := f.db.Permissions().Create(ctx, accmodel.Permission{
 		Name: "annotator",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{
+		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
+			Actions: accmodel.Grants{
 				Users: map[string]api.Actions{"annotator": api.ActionAnnotate},
 			},
-			Targets: map[string]model.Target{local: {Include: []string{"**"}}},
+			Targets: map[string]accmodel.Target{local: {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -140,6 +140,6 @@ func (s failingTrash) Trash() port.TrashStore { return failingTrashStore{s.Store
 
 type failingTrashStore struct{ port.TrashStore }
 
-func (failingTrashStore) Add(context.Context, model.TrashEntry) (model.TrashEntry, error) {
-	return model.TrashEntry{}, errors.New("trash down")
+func (failingTrashStore) Add(context.Context, artmodel.TrashEntry) (artmodel.TrashEntry, error) {
+	return artmodel.TrashEntry{}, errors.New("trash down")
 }

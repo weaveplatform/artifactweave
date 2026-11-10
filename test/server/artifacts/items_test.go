@@ -19,10 +19,10 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 )
@@ -444,7 +444,7 @@ func TestAccRepositoryClasses(t *testing.T) {
 	}
 
 	// A remote repository serves its cache; nothing is fetched upstream yet.
-	if _, err := w.db.Items().Put(ctx, model.Item{
+	if _, err := w.db.Items().Put(ctx, artmodel.Item{
 		RepoKey: "up",
 		Cached:  true,
 		Name:    "cached.txt",
@@ -628,13 +628,13 @@ func TestAccDeployIdenticalContent(t *testing.T) {
 
 	// Under server-generated-checksums the declaration is not checked, so
 	// only the stored bytes can show the content is the file's.
-	if err := w.db.Permissions().Create(ctx, model.Permission{
+	if err := w.db.Permissions().Create(ctx, accmodel.Permission{
 		Name: "deploy-server",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{
+		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
+			Actions: accmodel.Grants{Users: map[string]api.Actions{
 				"deployer": api.ActionRead | api.ActionWrite,
 			}},
-			Targets: map[string]model.Target{"server-local": {Include: []string{"**"}}},
+			Targets: map[string]accmodel.Target{"server-local": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -1030,12 +1030,12 @@ func TestAccSearchAQLSecondaryDomains(t *testing.T) {
 	}
 	x := w.item("libs-local", false, "x.jar")
 	at := time.Date(2026, 2, 3, 4, 5, 6, 0, time.UTC)
-	if err := w.db.Items().PutStats(ctx, x.ID, model.ItemStats{
+	if err := w.db.Items().PutStats(ctx, x.ID, artmodel.ItemStats{
 		DownloadCount: 3, LastDownloaded: at, LastDownloadedBy: "admin",
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := w.db.Items().SetProperties(ctx, x.ID, model.Properties{
+	if err := w.db.Items().SetProperties(ctx, x.ID, artmodel.Properties{
 		"keep": {"1"}, "drop": {"2"},
 	}, at); err != nil {
 		t.Fatal(err)
@@ -1085,7 +1085,7 @@ func TestAccSearchAQLRemoteAndVirtualKeys(t *testing.T) {
 		wantStatus(t, w.do("PUT", "/artifactory/"+p, "admin", p), http.StatusCreated)
 	}
 	// Nothing deploys into a cache, so the cached item is stored directly.
-	if _, err := w.db.Items().Put(ctx, model.Item{
+	if _, err := w.db.Items().Put(ctx, artmodel.Item{
 		RepoKey: "up", Cached: true, Path: kernel.RootPath, Name: "c.jar",
 	}); err != nil {
 		t.Fatal(err)

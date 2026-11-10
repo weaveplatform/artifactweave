@@ -12,9 +12,9 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/p2"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -188,11 +188,13 @@ func TestAccP2ExternalCompositeChildIsOwnedAndParentBound(t *testing.T) {
 	if childReads != 3 {
 		t.Fatalf("child fetch count %d, want 3", childReads)
 	}
-	if err := w.db.Permissions().Create(t.Context(), model.Permission{
-		Name: "p2-child-only", Resources: map[api.ResourceType]model.Resource{
+	if err := w.db.Permissions().Create(t.Context(), accmodel.Permission{
+		Name: "p2-child-only", Resources: map[api.ResourceType]accmodel.Resource{
 			api.ResourceArtifact: {
-				Actions: model.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
-				Targets: map[string]model.Target{"p2-external": {Include: []string{"__p2_ext/**"}}},
+				Actions: accmodel.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+				Targets: map[string]accmodel.Target{
+					"p2-external": {Include: []string{"__p2_ext/**"}},
+				},
 			},
 		},
 	}); err != nil {
@@ -479,10 +481,10 @@ func TestAccP2VirtualDoesNotLendExternalChildAuthority(t *testing.T) {
 	)
 	w := newItemWorld(t, false, func(c *Config) {
 		c.RemoteSources = &source.Service{
-			Resolve: func(_ context.Context, c repo.Config) (model.SourceIdentity, error) {
-				return model.SourceIdentity{
-					Kind:       model.ExternalHTTP,
-					Repository: model.RepositoryIncarnation(c.Key), ID: c.Key,
+			Resolve: func(_ context.Context, c repo.Config) (artmodel.SourceIdentity, error) {
+				return artmodel.SourceIdentity{
+					Kind:       artmodel.ExternalHTTP,
+					Repository: artmodel.RepositoryIncarnation(c.Key), ID: c.Key,
 					Generation: "v1",
 				}, nil
 			},

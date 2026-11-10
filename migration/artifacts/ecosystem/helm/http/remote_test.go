@@ -20,13 +20,13 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	helmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm"
@@ -62,7 +62,7 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 	}
 	for user, pattern := range map[string]string{"reader": "**", "partial": "visible/**"} {
 		err = f.db.Permissions().
-			Create(t.Context(), model.Permission{Name: "remote-" + user, Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {Actions: model.Grants{Users: map[string]api.Actions{user: api.ActionRead}}, Targets: map[string]model.Target{"remote": {Include: []string{pattern}}}}}})
+			Create(t.Context(), accmodel.Permission{Name: "remote-" + user, Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]api.Actions{user: api.ActionRead}}, Targets: map[string]accmodel.Target{"remote": {Include: []string{pattern}}}}}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -90,7 +90,7 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 	svc := &source.Service{
 		HTTP:  policy,
 		Cache: policy,
-		Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
+		Resolve: func(ctx context.Context, c repo.Config) (artmodel.SourceIdentity, error) {
 			return f.items.Store.RemoteCache().Source(ctx, c.Key)
 		},
 	}
@@ -116,7 +116,7 @@ func (f *remoteFixture) mount(t *testing.T, public string, relative bool) {
 		pkgroute.Options{
 			Store: f.db,
 			Items: func() *item.Service { return f.items },
-			ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it model.Item) {
+			ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it artmodel.Item) {
 				body, _, err := f.items.Blobs.Open(r.Context(), it.Actual.SHA256)
 				if err != nil {
 					t.Error(err)

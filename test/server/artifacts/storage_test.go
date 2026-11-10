@@ -14,8 +14,8 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
@@ -214,11 +214,11 @@ func TestAccStorageList(t *testing.T) {
 // grant gives user actions on a repository.
 func grant(t *testing.T, w *itemWorld, name, user, repoKey string, a accessapi.Actions) {
 	t.Helper()
-	if err := w.db.Permissions().Create(context.Background(), model.Permission{
+	if err := w.db.Permissions().Create(context.Background(), accmodel.Permission{
 		Name: name,
-		Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]accessapi.Actions{user: a}},
-			Targets: map[string]model.Target{repoKey: {Include: []string{"**"}}},
+		Resources: map[accessapi.ResourceType]accmodel.Resource{accessapi.ResourceArtifact: {
+			Actions: accmodel.Grants{Users: map[string]accessapi.Actions{user: a}},
+			Targets: map[string]accmodel.Target{repoKey: {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -485,12 +485,12 @@ func TestAccStorageRootProperties(t *testing.T) {
 // failingRoots fails every read and creation of a repository root's record.
 type failingRoots struct{ port.ItemStore }
 
-func (failingRoots) Root(context.Context, string, bool) (model.Item, error) {
-	return model.Item{}, errBoom
+func (failingRoots) Root(context.Context, string, bool) (artmodel.Item, error) {
+	return artmodel.Item{}, errBoom
 }
 
-func (failingRoots) EnsureRoot(context.Context, model.Item) (model.Item, error) {
-	return model.Item{}, errBoom
+func (failingRoots) EnsureRoot(context.Context, artmodel.Item) (artmodel.Item, error) {
+	return artmodel.Item{}, errBoom
 }
 
 type failingRootStore struct{ harness.Store }
@@ -517,7 +517,7 @@ func TestAccStorageRootStoreErrors(t *testing.T) {
 
 func TestAccStoragePropertiesOnRemoteCache(t *testing.T) {
 	w := storageWorld(t, false)
-	if _, err := w.db.Items().Put(context.Background(), model.Item{
+	if _, err := w.db.Items().Put(context.Background(), artmodel.Item{
 		RepoKey:  "up",
 		Cached:   true,
 		Name:     "cached.txt",
@@ -579,7 +579,7 @@ func TestAccMetadataPatch(t *testing.T) {
 	}
 	p, err := w.db.Items().
 		Properties(context.Background(), w.item("libs-local", false, "dir/a.txt").ID)
-	if err != nil || !reflect.DeepEqual(p, model.Properties{"c": {"new"}}) {
+	if err != nil || !reflect.DeepEqual(p, artmodel.Properties{"c": {"new"}}) {
 		t.Fatalf("properties %v, %v", p, err)
 	}
 	if c := patch(

@@ -23,12 +23,12 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	huggingfacehttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface/http"
@@ -75,7 +75,7 @@ func newFixture(t *testing.T, class repo.Class, setup ...func(*fixture) *source.
 	}
 	password := accesstest.HashPassword(t, "pw")
 	if err = db.Users().
-		Create(t.Context(), model.User{Name: "admin", Admin: true, PasswordHash: password}); err != nil {
+		Create(t.Context(), accmodel.User{Name: "admin", Admin: true, PasswordHash: password}); err != nil {
 		t.Fatal(err)
 	}
 	// The middleware's kit reads db, not the store a setup swaps in, so a
@@ -120,7 +120,7 @@ func newFixture(t *testing.T, class repo.Class, setup ...func(*fixture) *source.
 	pkgroute.Mount(r, pkgroute.Options{
 		Store: f.db, Items: func() *item.Service { return items },
 		ItemError: func(_ context.Context, _ string, e error) error { return e },
-		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it model.Item) {
+		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it artmodel.Item) {
 			rc, _, e := blobs.Open(r.Context(), it.Actual.SHA256)
 			if e != nil {
 				t.Error(e)

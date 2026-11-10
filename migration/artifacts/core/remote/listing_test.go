@@ -14,10 +14,10 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -43,7 +43,7 @@ func listingFixture(t *testing.T) (*policyWorld, *source.Service, source.Request
 		t.Fatal(err)
 	}
 	s := &source.Service{
-		Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
+		Resolve: func(ctx context.Context, c repo.Config) (artmodel.SourceIdentity, error) {
 			return w.db.RemoteCache().Source(ctx, c.Key)
 		},
 		HTTP: w.p, Cache: w.p,
@@ -122,12 +122,12 @@ func TestAccListingPermissionFilteringAndFinalRevocation(t *testing.T) {
 		),
 	)
 	if err := w.db.Permissions().
-		Create(t.Context(), model.Permission{Name: "narrow", Resources: map[accessapi.ResourceType]model.Resource{
+		Create(t.Context(), accmodel.Permission{Name: "narrow", Resources: map[accessapi.ResourceType]accmodel.Resource{
 			accessapi.ResourceArtifact: {
-				Actions: model.Grants{
+				Actions: accmodel.Grants{
 					Users: map[string]accessapi.Actions{"limited": accessapi.ActionRead},
 				},
-				Targets: map[string]model.Target{
+				Targets: map[string]accmodel.Target{
 					w.c.Key: {Include: []string{"public/allowed.txt"}},
 				},
 			},

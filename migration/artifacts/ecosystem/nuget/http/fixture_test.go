@@ -18,13 +18,13 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	nugetfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
@@ -105,12 +105,12 @@ func newFixtureOn(
 	}
 	permit := func(name, user, include string, actions api.Actions) {
 		t.Helper()
-		target := model.Target{Include: []string{include}}
-		if err := db.Permissions().Create(ctx, model.Permission{
+		target := accmodel.Target{Include: []string{include}}
+		if err := db.Permissions().Create(ctx, accmodel.Permission{
 			Name: name,
-			Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-				Actions: model.Grants{Users: map[string]api.Actions{user: actions}},
-				Targets: map[string]model.Target{"nuget-local": target, "nuget-forced": target},
+			Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
+				Actions: accmodel.Grants{Users: map[string]api.Actions{user: actions}},
+				Targets: map[string]accmodel.Target{"nuget-local": target, "nuget-forced": target},
 			}},
 		}); err != nil {
 			t.Fatal(err)
@@ -138,7 +138,7 @@ func newFixtureOn(
 		Store: backend,
 		Items: func() *item.Service { return f.items },
 		// The item routes' download, reduced to the content.
-		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it model.Item) {
+		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it artmodel.Item) {
 			rc, _, err := blobs.Open(r.Context(), it.Actual.SHA256)
 			if err != nil {
 				t.Errorf("open %s: %v", it.FullPath(), err)
@@ -201,7 +201,7 @@ func (f *fixture) now() time.Time {
 
 // deploy stores body at path in nuget-local through the item service, so
 // the NuGet format checks and indexes it.
-func (f *fixture) deploy(path string, body []byte) model.Item {
+func (f *fixture) deploy(path string, body []byte) artmodel.Item {
 	f.t.Helper()
 	ctx := context.Background()
 	c, err := f.db.Repos().Get(ctx, "nuget-local")
@@ -366,23 +366,23 @@ func (i failingItems) Get(
 	repoKey string,
 	cached bool,
 	path string,
-) (model.Item, error) {
+) (artmodel.Item, error) {
 	if i.failing == "item" {
-		return model.Item{}, errBroken
+		return artmodel.Item{}, errBroken
 	}
 	return i.ItemStore.Get(ctx, repoKey, cached, path) //nolint:wrapcheck // a test's pass-through
 }
 
-func (i failingItems) GetByID(ctx context.Context, id int64) (model.Item, error) {
+func (i failingItems) GetByID(ctx context.Context, id int64) (artmodel.Item, error) {
 	if i.failing == "byid" {
-		return model.Item{}, errBroken
+		return artmodel.Item{}, errBroken
 	}
 	return i.ItemStore.GetByID(ctx, id) //nolint:wrapcheck // a test's pass-through
 }
 
-func (i failingItems) Stats(ctx context.Context, id int64) (model.ItemStats, error) {
+func (i failingItems) Stats(ctx context.Context, id int64) (artmodel.ItemStats, error) {
 	if i.failing == "stats" {
-		return model.ItemStats{}, errBroken
+		return artmodel.ItemStats{}, errBroken
 	}
 	return i.ItemStore.Stats(ctx, id) //nolint:wrapcheck // a test's pass-through
 }
@@ -396,9 +396,9 @@ type failingPackages struct {
 	failing string
 }
 
-func (p failingPackages) Find(ctx context.Context, key, name string) (model.Package, error) {
+func (p failingPackages) Find(ctx context.Context, key, name string) (artmodel.Package, error) {
 	if p.failing == "find" {
-		return model.Package{}, errBroken
+		return artmodel.Package{}, errBroken
 	}
 	return p.PackageStore.Find(ctx, key, name) //nolint:wrapcheck // a test's pass-through
 }
@@ -407,14 +407,17 @@ func (p failingPackages) List(
 	ctx context.Context,
 	key string,
 	page kernel.Page,
-) ([]model.Package, string, error) {
+) ([]artmodel.Package, string, error) {
 	if p.failing == "list" {
 		return nil, "", errBroken
 	}
 	return p.PackageStore.List(ctx, key, page) //nolint:wrapcheck // a test's pass-through
 }
 
-func (p failingPackages) Versions(ctx context.Context, id int64) ([]model.PackageVersion, error) {
+func (p failingPackages) Versions(
+	ctx context.Context,
+	id int64,
+) ([]artmodel.PackageVersion, error) {
 	vs, err := p.PackageStore.Versions(ctx, id)
 	switch p.failing {
 	case "versions":
@@ -438,11 +441,11 @@ func (p failingPackages) Version(
 	ctx context.Context,
 	id int64,
 	version string,
-) (model.PackageVersion, error) {
+) (artmodel.PackageVersion, error) {
 	v, err := p.PackageStore.Version(ctx, id, version)
 	switch p.failing {
 	case "version":
-		return model.PackageVersion{}, errBroken
+		return artmodel.PackageVersion{}, errBroken
 	case "metadata":
 		v.Metadata = []byte("{")
 	}

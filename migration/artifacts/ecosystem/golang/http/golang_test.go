@@ -14,12 +14,12 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	golanghttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang/http"
@@ -80,11 +80,11 @@ func newFixtureOn(t *testing.T, seed *inmem.Store, serve pkgroute.Store) *fixtur
 	}
 	grant := func(user, include string) {
 		t.Helper()
-		if err := seed.Permissions().Create(ctx, model.Permission{
+		if err := seed.Permissions().Create(ctx, accmodel.Permission{
 			Name: user,
-			Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-				Actions: model.Grants{Users: map[string]api.Actions{user: api.ActionRead}},
-				Targets: map[string]model.Target{
+			Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
+				Actions: accmodel.Grants{Users: map[string]api.Actions{user: api.ActionRead}},
+				Targets: map[string]accmodel.Target{
 					local: {Include: []string{include}}, "go-fed": {Include: []string{include}},
 				},
 			}},
@@ -136,7 +136,7 @@ func newFixtureOn(t *testing.T, seed *inmem.Store, serve pkgroute.Store) *fixtur
 	o := pkgroute.Options{
 		Store: serve,
 		Items: func() *item.Service { return items },
-		ServeItem: func(w http.ResponseWriter, _ *http.Request, c repo.Config, it model.Item) {
+		ServeItem: func(w http.ResponseWriter, _ *http.Request, c repo.Config, it artmodel.Item) {
 			f.served = append(f.served, c.Key+"/"+it.FullPath())
 			_, _ = io.WriteString(w, "served "+it.FullPath())
 		},
@@ -642,9 +642,9 @@ func (f faultyItems) Get(
 	key string,
 	cached bool,
 	p string,
-) (model.Item, error) {
+) (artmodel.Item, error) {
 	if f.fail["Get"] {
-		return model.Item{}, errStore
+		return artmodel.Item{}, errStore
 	}
 	return f.ItemStore.Get(ctx, key, cached, p)
 }
@@ -656,7 +656,7 @@ func (f faultyItems) Children(
 	cached bool,
 	folder string,
 	p kernel.Page,
-) ([]model.Item, string, error) {
+) ([]artmodel.Item, string, error) {
 	if f.fail["Children"] {
 		return nil, "", errStore
 	}
@@ -672,15 +672,15 @@ type faultyPackages struct {
 }
 
 //nolint:wrapcheck // test double
-func (f faultyPackages) Find(ctx context.Context, key, name string) (model.Package, error) {
+func (f faultyPackages) Find(ctx context.Context, key, name string) (artmodel.Package, error) {
 	if f.fail["Find"] {
-		return model.Package{}, errStore
+		return artmodel.Package{}, errStore
 	}
 	return f.PackageStore.Find(ctx, key, name)
 }
 
 //nolint:wrapcheck // test double
-func (f faultyPackages) Versions(ctx context.Context, id int64) ([]model.PackageVersion, error) {
+func (f faultyPackages) Versions(ctx context.Context, id int64) ([]artmodel.PackageVersion, error) {
 	if f.fail["Versions"] {
 		return nil, errStore
 	}
@@ -692,9 +692,9 @@ func (f faultyPackages) Version(
 	ctx context.Context,
 	id int64,
 	v string,
-) (model.PackageVersion, error) {
+) (artmodel.PackageVersion, error) {
 	if f.fail["Version"] {
-		return model.PackageVersion{}, errStore
+		return artmodel.PackageVersion{}, errStore
 	}
 	return f.PackageStore.Version(ctx, id, v)
 }

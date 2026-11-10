@@ -11,12 +11,12 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
-	"github.com/weaveplatform/artifactweave/migration/access/core/port"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accport "github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artport "github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -31,24 +31,24 @@ type faultyStore struct {
 
 var errBoom = errors.New("boom")
 
-func (f faultyStore) Repos() port.RepoStore {
+func (f faultyStore) Repos() artport.RepoStore {
 	return faultyRepos{RepoStore: f.Store.Repos(), fail: f.fail}
 }
 
-func (f faultyStore) Permissions() port.PermissionStore {
+func (f faultyStore) Permissions() accport.PermissionStore {
 	if f.fail["permissions"] {
 		return failingPermissionStore{f.Store.Permissions()}
 	}
 	return f.Store.Permissions()
 }
 
-type failingPermissionStore struct{ port.PermissionStore }
+type failingPermissionStore struct{ accport.PermissionStore }
 
 func (failingPermissionStore) ForPrincipal(
 	context.Context,
 	string,
 	[]string,
-) ([]model.Permission, error) {
+) ([]accmodel.Permission, error) {
 	return nil, errBoom
 }
 
@@ -60,11 +60,11 @@ func (f faultyRepos) Including(ctx context.Context, key string) ([]string, error
 }
 
 type faultyRepos struct {
-	port.RepoStore
+	artport.RepoStore
 	fail map[string]bool
 }
 
-func (f faultyRepos) List(ctx context.Context, rf port.RepoFilter) ([]repo.Config, error) {
+func (f faultyRepos) List(ctx context.Context, rf artport.RepoFilter) ([]repo.Config, error) {
 	if f.fail["list"] {
 		return nil, errBoom
 	}
@@ -843,14 +843,14 @@ func seedContent(t *testing.T, db *inmem.Store, key string, cached bool) {
 		Ref(ctx, blob.Blob{Checksums: kernel.Checksums{SHA256: sha}, Size: 3}, 1); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Items().Put(ctx, model.Item{
+	if _, err := db.Items().Put(ctx, artmodel.Item{
 		RepoKey: key, Cached: cached, Name: "f.txt", Size: 3,
 		Actual: kernel.Checksums{SHA256: sha},
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Packages().
-		Ensure(ctx, model.Package{RepoKey: key, Type: repo.Generic, Name: "p"}); err != nil {
+		Ensure(ctx, artmodel.Package{RepoKey: key, Type: repo.Generic, Name: "p"}); err != nil {
 		t.Fatal(err)
 	}
 }

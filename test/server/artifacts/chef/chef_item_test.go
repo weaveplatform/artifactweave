@@ -8,16 +8,16 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 )
 
-func chefCachedDocument(t *testing.T, w *itemWorld, key string) model.Item {
+func chefCachedDocument(t *testing.T, w *itemWorld, key string) artmodel.Item {
 	t.Helper()
 	up, err := w.blobs.BeginUpload(t.Context())
 	if err != nil {
@@ -41,12 +41,12 @@ func chefCachedDocument(t *testing.T, w *itemWorld, key string) model.Item {
 			path, name = "api/v1", "cookbooks"
 		}
 		if _, err = w.db.Items().
-			Put(t.Context(), model.Item{RepoKey: key, Path: path, Name: name, Folder: true}); err != nil {
+			Put(t.Context(), artmodel.Item{RepoKey: key, Path: path, Name: name, Folder: true}); err != nil {
 			t.Fatal(err)
 		}
 	}
 	it, err := w.db.Items().
-		Put(t.Context(), model.Item{RepoKey: key, Path: "api/v1/cookbooks", Name: "private", Size: info.Size, Actual: kernel.Checksums{SHA256: info.Digests.SHA256}})
+		Put(t.Context(), artmodel.Item{RepoKey: key, Path: "api/v1/cookbooks", Name: "private", Size: info.Size, Actual: kernel.Checksums{SHA256: info.Digests.SHA256}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,14 +55,14 @@ func chefCachedDocument(t *testing.T, w *itemWorld, key string) model.Item {
 
 func chefMetadataPermission(t *testing.T, w *itemWorld, keys ...string) {
 	t.Helper()
-	targets := map[string]model.Target{}
+	targets := map[string]accmodel.Target{}
 	for _, key := range keys {
-		targets[key] = model.Target{Include: []string{"**"}, Exclude: []string{"**/*.tar.gz"}}
+		targets[key] = accmodel.Target{Include: []string{"**"}, Exclude: []string{"**/*.tar.gz"}}
 	}
 	if err := w.db.Permissions().
-		Create(t.Context(), model.Permission{Name: "chef-metadata", Resources: map[api.ResourceType]model.Resource{
+		Create(t.Context(), accmodel.Permission{Name: "chef-metadata", Resources: map[api.ResourceType]accmodel.Resource{
 			api.ResourceArtifact: {
-				Actions: model.Grants{
+				Actions: accmodel.Grants{
 					Users: map[string]api.Actions{
 						"user": api.ActionRead | api.ActionWrite | api.ActionDelete | api.ActionManage,
 					},
@@ -115,7 +115,7 @@ func TestAccChefCachedMetadataHasNoGenericDownloadBypass(t *testing.T) {
 		t.Fatalf("raw metadata request fetched upstream: %d", reads)
 	}
 	if err := w.db.Settings().
-		Put(t.Context(), settings.SettingFolderDownload, model.FolderDownloadSettings{Enabled: true}); err != nil {
+		Put(t.Context(), settings.SettingFolderDownload, artmodel.FolderDownloadSettings{Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
 	got := w.do(

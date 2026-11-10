@@ -8,10 +8,10 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
@@ -36,9 +36,9 @@ func (s sidecarGets) Get(
 	key string,
 	cached bool,
 	p string,
-) (model.Item, error) {
+) (artmodel.Item, error) {
 	if p == *s.path {
-		return model.Item{}, errBoom
+		return artmodel.Item{}, errBoom
 	}
 	return s.ItemStore.Get(ctx, key, cached, p)
 }
@@ -55,13 +55,13 @@ func sidecarWorld(t *testing.T) (*itemWorld, *string) {
 	if err := w.db.Repos().Create(ctx, c); err != nil {
 		t.Fatal(err)
 	}
-	if err := w.db.Permissions().Create(ctx, model.Permission{
+	if err := w.db.Permissions().Create(ctx, accmodel.Permission{
 		Name: "deploy-charts",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{
+		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
+			Actions: accmodel.Grants{Users: map[string]api.Actions{
 				"deployer": api.ActionRead | api.ActionWrite,
 			}},
-			Targets: map[string]model.Target{"charts": {Include: []string{"**"}}},
+			Targets: map[string]accmodel.Target{"charts": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)

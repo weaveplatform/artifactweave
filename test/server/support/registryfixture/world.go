@@ -10,10 +10,10 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
@@ -56,7 +56,7 @@ func New(t *testing.T, anonymous bool, tune ...harness.Tune) *World {
 	ctx := t.Context()
 	db := inmem.New()
 	support.Seed(t, db)
-	for _, user := range []model.User{
+	for _, user := range []accmodel.User{
 		{Name: "reader", PasswordHash: support.CheapHash, Groups: []string{authn.ReadersGroup}},
 		{Name: "deployer", PasswordHash: support.CheapHash},
 		{Name: "user", PasswordHash: support.CheapHash},
@@ -65,13 +65,13 @@ func New(t *testing.T, anonymous bool, tune ...harness.Tune) *World {
 			t.Fatal(err)
 		}
 	}
-	if err := db.Permissions().Create(ctx, model.Permission{
+	if err := db.Permissions().Create(ctx, accmodel.Permission{
 		Name: "deploy-libs",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{
+		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
+			Actions: accmodel.Grants{Users: map[string]api.Actions{
 				"deployer": api.ActionRead | api.ActionWrite,
 			}},
-			Targets: map[string]model.Target{"libs-local": {Include: []string{"**"}}},
+			Targets: map[string]accmodel.Target{"libs-local": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -80,13 +80,13 @@ func New(t *testing.T, anonymous bool, tune ...harness.Tune) *World {
 		if err := db.Settings().Put(ctx, settings.SettingAnonymousAccess, true); err != nil {
 			t.Fatal(err)
 		}
-		if err := db.Permissions().Create(ctx, model.Permission{
+		if err := db.Permissions().Create(ctx, accmodel.Permission{
 			Name: "anonymous-remotes",
-			Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-				Actions: model.Grants{Users: map[string]api.Actions{
+			Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
+				Actions: accmodel.Grants{Users: map[string]api.Actions{
 					kernel.AnonymousUser: api.ActionRead,
 				}},
-				Targets: map[string]model.Target{api.TargetAnyRemote: {Include: []string{"**"}}},
+				Targets: map[string]accmodel.Target{api.TargetAnyRemote: {Include: []string{"**"}}},
 			}},
 		}); err != nil {
 			t.Fatal(err)
@@ -153,7 +153,7 @@ func (w *World) Do(method, path, as, body string, headers ...string) *httptest.R
 // Item returns the item at path in the repository key, from its remote cache
 // when cached is true, and fails the test when the store has no such item or
 // cannot read it.
-func (w *World) Item(key string, cached bool, path string) model.Item {
+func (w *World) Item(key string, cached bool, path string) artmodel.Item {
 	w.T.Helper()
 	it, err := w.DB.Items().Get(w.T.Context(), key, cached, path)
 	if err != nil {

@@ -9,11 +9,11 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
@@ -125,19 +125,19 @@ func TestUnitDebianSnapshotPreservesCompletedAndClaimedTags(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			marker, err := st.Items().Put(ctx, model.Item{
+			marker, err := st.Items().Put(ctx, artmodel.Item{
 				RepoKey: "deb-target", Name: "snapshots/first", Folder: true,
 				Created: time.Now().UTC(), CreatedBy: "admin",
 			})
 			if err != nil {
 				t.Fatal(err)
 			}
-			props := model.Properties{
+			props := artmodel.Properties{
 				"deb.snapshot.pending.source":       {"deb-source"},
 				"deb.snapshot.pending.distribution": {"stable"},
 			}
 			if tc.complete {
-				props = model.Properties{
+				props = artmodel.Properties{
 					"deb.snapshot.source":       {"deb-source"},
 					"deb.snapshot.distribution": {"stable"},
 				}
@@ -185,17 +185,17 @@ func TestUnitDebianSnapshotWorkUsesCurrentPermissions(t *testing.T) {
 	}
 	for _, name := range []string{"dev", "other"} {
 		if err := st.Users().
-			Create(ctx, model.User{Name: name, PasswordHash: cheapHash}); err != nil {
+			Create(ctx, accmodel.User{Name: name, PasswordHash: cheapHash}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := st.Permissions().Create(ctx, model.Permission{
+	if err := st.Permissions().Create(ctx, accmodel.Permission{
 		Name: "snapshots",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{
+		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
+			Actions: accmodel.Grants{Users: map[string]api.Actions{
 				"dev": api.ActionRead | api.ActionWrite | api.ActionManage,
 			}},
-			Targets: map[string]model.Target{
+			Targets: map[string]accmodel.Target{
 				"deb-source": {Include: []string{"**"}},
 				"deb-target": {Include: []string{"**"}},
 			},
@@ -203,14 +203,14 @@ func TestUnitDebianSnapshotWorkUsesCurrentPermissions(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	marker, err := st.Items().Put(ctx, model.Item{
+	marker, err := st.Items().Put(ctx, artmodel.Item{
 		RepoKey: "deb-target", Name: "snapshots/first", Folder: true,
 		Created: time.Now().UTC(), CreatedBy: "dev",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := st.Items().SetProperties(ctx, marker.ID, model.Properties{
+	if err := st.Items().SetProperties(ctx, marker.ID, artmodel.Properties{
 		"deb.snapshot.source":       {"deb-source"},
 		"deb.snapshot.distribution": {"stable"},
 	}, time.Now().UTC()); err != nil {

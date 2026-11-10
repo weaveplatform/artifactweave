@@ -8,9 +8,9 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	hexfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/hex"
 	"github.com/weaveplatform/artifactweave/migration/platform/keymaterial"
@@ -158,8 +158,8 @@ func TestUnitHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 			}}, nil
 		},
 	)
-	identity := model.SourceIdentity{
-		Kind:       model.ExternalHTTP,
+	identity := artmodel.SourceIdentity{
+		Kind:       artmodel.ExternalHTTP,
 		Repository: "hex-r",
 		ID:         "upstream",
 		Generation: "rev-1",
@@ -167,7 +167,7 @@ func TestUnitHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 	w := newItemWorld(t, false, func(c *Config) {
 		c.RemoteSources = &source.Service{
 			HTTP:    backend,
-			Resolve: func(context.Context, repo.Config) (model.SourceIdentity, error) { return identity, nil },
+			Resolve: func(context.Context, repo.Config) (artmodel.SourceIdentity, error) { return identity, nil },
 			Revalidate: func(_ context.Context, q source.Request, _ source.Permit) error {
 				if denyAllDecimalCheck &&
 					(q.Resource.Path == "tarballs/decimal-2.0.0.tar" ||
@@ -200,14 +200,14 @@ func TestUnitHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := w.db.Users().
-		Create(t.Context(), model.User{Name: "partial", PasswordHash: cheapHash}); err != nil {
+		Create(t.Context(), accmodel.User{Name: "partial", PasswordHash: cheapHash}); err != nil {
 		t.Fatal(err)
 	}
-	if err := w.db.Permissions().Create(t.Context(), model.Permission{
+	if err := w.db.Permissions().Create(t.Context(), accmodel.Permission{
 		Name: "hex-one-version",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{"partial": api.ActionRead}},
-			Targets: map[string]model.Target{
+		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
+			Actions: accmodel.Grants{Users: map[string]api.Actions{"partial": api.ActionRead}},
+			Targets: map[string]accmodel.Target{
 				"hex-r": {Include: []string{
 					"tarballs/decimal-2.0.0.tar", "tarballs/ecto-3.12.5.tar",
 				}},

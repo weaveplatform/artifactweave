@@ -16,8 +16,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
@@ -311,13 +311,13 @@ func TestAccManifestUnknownShape(t *testing.T) {
 // (DV-035); writing one that is absent needs Deploy alone.
 func TestAccListPushStrictOverwriteCoversPlatformTags(t *testing.T) {
 	w := newBlobWorld(t)
-	if err := w.db.Permissions().Create(context.Background(), model.Permission{
+	if err := w.db.Permissions().Create(context.Background(), accmodel.Permission{
 		Name: "deployers",
-		Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]accessapi.Actions{
+		Resources: map[accessapi.ResourceType]accmodel.Resource{accessapi.ResourceArtifact: {
+			Actions: accmodel.Grants{Users: map[string]accessapi.Actions{
 				"deployer": accessapi.ActionRead | accessapi.ActionWrite,
 			}},
-			Targets: map[string]model.Target{"docker-local": {Include: []string{"**"}}},
+			Targets: map[string]accmodel.Target{"docker-local": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -464,15 +464,15 @@ func TestAccAFileWhereTheTagGoes(t *testing.T) {
 func TestAccManifestPermissions(t *testing.T) {
 	w := newBlobWorld(t)
 	ctx := context.Background()
-	if err := w.db.Permissions().Create(ctx, model.Permission{
+	if err := w.db.Permissions().Create(ctx, accmodel.Permission{
 		Name: "docker",
-		Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]accessapi.Actions{
+		Resources: map[accessapi.ResourceType]accmodel.Resource{accessapi.ResourceArtifact: {
+			Actions: accmodel.Grants{Users: map[string]accessapi.Actions{
 				"reader": accessapi.ActionRead,
 				"writer": accessapi.ActionRead | accessapi.ActionWrite,
 				"owner":  accessapi.ActionRead | accessapi.ActionWrite | accessapi.ActionDelete,
 			}},
-			Targets: map[string]model.Target{"docker-local": {Include: []string{"**"}}},
+			Targets: map[string]accmodel.Target{"docker-local": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -513,7 +513,7 @@ func TestAccManifestPermissions(t *testing.T) {
 // failingProperties fails reading properties.
 type failingProperties struct{ port.ItemStore }
 
-func (failingProperties) Properties(context.Context, int64) (model.Properties, error) {
+func (failingProperties) Properties(context.Context, int64) (artmodel.Properties, error) {
 	return nil, errBoom
 }
 
@@ -525,9 +525,9 @@ func (f failingGets) Get(
 	key string,
 	cached bool,
 	p string,
-) (model.Item, error) {
+) (artmodel.Item, error) {
 	if strings.Count(p, "/") >= 1 {
-		return model.Item{}, errBoom
+		return artmodel.Item{}, errBoom
 	}
 	return f.ItemStore.Get(ctx, key, cached, p) //nolint:wrapcheck // test double
 }
@@ -604,14 +604,14 @@ func TestAccAccepts(t *testing.T) {
 func TestAccManifestPushWithRegistryTokens(t *testing.T) {
 	w := newBlobWorld(t)
 	ctx := context.Background()
-	if err := w.db.Permissions().Create(ctx, model.Permission{
+	if err := w.db.Permissions().Create(ctx, accmodel.Permission{
 		Name: "docker",
-		Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]accessapi.Actions{
+		Resources: map[accessapi.ResourceType]accmodel.Resource{accessapi.ResourceArtifact: {
+			Actions: accmodel.Grants{Users: map[string]accessapi.Actions{
 				"owner":  accessapi.ActionRead | accessapi.ActionWrite | accessapi.ActionDelete,
 				"writer": accessapi.ActionRead | accessapi.ActionWrite,
 			}},
-			Targets: map[string]model.Target{"docker-local": {Include: []string{"**"}}},
+			Targets: map[string]accmodel.Target{"docker-local": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)

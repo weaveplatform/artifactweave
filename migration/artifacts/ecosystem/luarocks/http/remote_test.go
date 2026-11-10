@@ -9,14 +9,14 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	luarockshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/luarocks/http"
@@ -48,13 +48,13 @@ func newRemoteFixture(t *testing.T, tune ...func(*pkgroute.Options, *item.Servic
 			if err = items.Store.Repos().Update(t.Context(), c); err != nil {
 				t.Fatal(err)
 			}
-			if err = db.Permissions().Create(t.Context(), model.Permission{
+			if err = db.Permissions().Create(t.Context(), accmodel.Permission{
 				Name: "visible-only",
-				Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-					Actions: model.Grants{
+				Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
+					Actions: accmodel.Grants{
 						Users: map[string]api.Actions{"partial": api.ActionRead},
 					},
-					Targets: map[string]model.Target{"rocks": {Include: []string{"visible-*"}}},
+					Targets: map[string]accmodel.Target{"rocks": {Include: []string{"visible-*"}}},
 				}},
 			}); err != nil {
 				t.Fatal(err)
@@ -76,7 +76,7 @@ func newRemoteFixture(t *testing.T, tune ...func(*pkgroute.Options, *item.Servic
 			t.Cleanup(pool.Close)
 			svc := &source.Service{
 				HTTP: policy, Cache: policy,
-				Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
+				Resolve: func(ctx context.Context, c repo.Config) (artmodel.SourceIdentity, error) {
 					return items.Store.RemoteCache().Source(ctx, c.Key)
 				},
 			}

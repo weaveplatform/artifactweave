@@ -15,10 +15,10 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	condafmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conda"
@@ -58,7 +58,7 @@ func TestUnitCondaIndexReadFailureNeverServesMetadata(t *testing.T) {
 			if q.Resource.Path != "noarch/repodata.json" {
 				return source.Result{}, source.ErrInvalidRequest
 			}
-			return source.Result{Item: &model.Item{
+			return source.Result{Item: &artmodel.Item{
 				RepoKey: q.Repo.Key, Path: "noarch", Name: "repodata.json", Cached: true,
 				Size: int64(len(raw)), Actual: kernel.Checksums{SHA256: sha},
 			}}, nil
@@ -76,7 +76,7 @@ func TestUnitCondaIndexReadFailureNeverServesMetadata(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if _, err := w.db.Items().Put(t.Context(), model.Item{
+	if _, err := w.db.Items().Put(t.Context(), artmodel.Item{
 		RepoKey: "conda-unreadable-local", Path: "noarch", Name: "repodata.json",
 		Size: int64(len(raw)), Actual: kernel.Checksums{SHA256: sha},
 	}); err != nil {
@@ -148,11 +148,11 @@ func TestUnitCondaChannelRejectsUnsafeRequestsAndVirtualCycles(t *testing.T) {
 		wantStatus(t, w.do(http.MethodGet, tc.path, "admin", ""), tc.expected)
 	}
 	wantStatus(t, w.do(http.MethodGet, base+"repodata.json", "user", ""), http.StatusForbidden)
-	if err := w.db.Permissions().Create(t.Context(), model.Permission{
+	if err := w.db.Permissions().Create(t.Context(), accmodel.Permission{
 		Name: "conda-virtual-only",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
-			Targets: map[string]model.Target{"conda-empty-virtual": {Include: []string{"**"}}},
+		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
+			Actions: accmodel.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+			Targets: map[string]accmodel.Target{"conda-empty-virtual": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -277,7 +277,7 @@ func TestUnitCondaLocalIndexRejectsCorruptionAndIncompatibleMember(t *testing.T)
 		w.do(http.MethodPut, "/artifactory/other-local/bad-conda-index", "admin", bad),
 		http.StatusCreated,
 	)
-	_, err := w.db.Items().Put(t.Context(), model.Item{
+	_, err := w.db.Items().Put(t.Context(), artmodel.Item{
 		RepoKey: "conda-broken", Path: "noarch", Name: "repodata.json", Size: int64(len(bad)),
 		Actual: kernel.Checksums{SHA256: fmt.Sprintf("%x", sha256.Sum256([]byte(bad)))},
 	})
@@ -292,7 +292,7 @@ func TestUnitCondaLocalIndexRejectsCorruptionAndIncompatibleMember(t *testing.T)
 	); got.Code == http.StatusOK {
 		t.Fatal("corrupt stored channel metadata was served")
 	}
-	if _, err := w.db.Items().Put(t.Context(), model.Item{
+	if _, err := w.db.Items().Put(t.Context(), artmodel.Item{
 		RepoKey: "conda-missing-blob", Name: "noarch/repodata.json", Size: 1,
 		Actual: kernel.Checksums{SHA256: fmt.Sprintf("%064x", 0)},
 	}); err != nil {
@@ -307,7 +307,7 @@ func TestUnitCondaLocalIndexRejectsCorruptionAndIncompatibleMember(t *testing.T)
 		t.Fatal("missing index blob was silently replaced with an empty channel")
 	}
 	if _, err := w.db.Items().
-		Put(t.Context(), model.Item{RepoKey: "conda-folder-index", Name: "noarch/repodata.json", Folder: true}); err != nil {
+		Put(t.Context(), artmodel.Item{RepoKey: "conda-folder-index", Name: "noarch/repodata.json", Folder: true}); err != nil {
 		t.Fatal(err)
 	}
 	wantStatus(
@@ -359,7 +359,7 @@ func TestUnitCondaRemoteIndexAndArchiveTrustBoundary(t *testing.T) {
 					if mode == "missing-cached-index" {
 						sha = fmt.Sprintf("%064x", 0)
 					}
-					return source.Result{Item: &model.Item{
+					return source.Result{Item: &artmodel.Item{
 						RepoKey: "conda-remote",
 						Path:    "noarch",
 						Name:    "repodata.json",
@@ -629,7 +629,7 @@ func TestUnitCondaLocalAndVirtualNativeChannel(t *testing.T) {
 	if err := q.EnsureFresh(t.Context(), condafmt.KindIndex, "conda-local"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := w.db.Items().Put(t.Context(), model.Item{
+	if _, err := w.db.Items().Put(t.Context(), artmodel.Item{
 		RepoKey: "conda-folder-member", Name: "noarch/repodata.json", Folder: true,
 	}); err != nil {
 		t.Fatal(err)
@@ -647,11 +647,11 @@ func TestUnitCondaLocalAndVirtualNativeChannel(t *testing.T) {
 	if !bytes.Equal(fallbackArchive.Body.Bytes(), body) {
 		t.Fatal("virtual fallback changed package bytes")
 	}
-	if err := w.db.Permissions().Create(t.Context(), model.Permission{
+	if err := w.db.Permissions().Create(t.Context(), accmodel.Permission{
 		Name: "conda-index-only",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
-			Targets: map[string]model.Target{
+		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
+			Actions: accmodel.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+			Targets: map[string]accmodel.Target{
 				"conda-local":   {Include: []string{"**"}, Exclude: []string{"**/*.tar.bz2"}},
 				"conda-virtual": {Include: []string{"**"}, Exclude: []string{"**/*.tar.bz2"}},
 			},
@@ -802,7 +802,7 @@ func TestAccCondaShardsLocalFederatedVirtualLifecycleAndPermissions(t *testing.T
 		)
 	}
 	if err := w.db.Permissions().
-		Create(t.Context(), model.Permission{Name: "shard-view", Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {Actions: model.Grants{Users: map[string]api.Actions{"user": api.ActionRead}}, Targets: map[string]model.Target{"shard-local": {Include: []string{"**"}}, "shard-virtual": {Include: []string{"**"}, Exclude: []string{"**/*.tar.bz2"}}}}}}); err != nil {
+		Create(t.Context(), accmodel.Permission{Name: "shard-view", Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]api.Actions{"user": api.ActionRead}}, Targets: map[string]accmodel.Target{"shard-local": {Include: []string{"**"}}, "shard-virtual": {Include: []string{"**"}, Exclude: []string{"**/*.tar.bz2"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	hidden := w.do(
@@ -890,7 +890,7 @@ func TestAccCondaShardsGenericPathsCannotDiscloseUnfilteredMetadata(t *testing.T
 		},
 	)}
 	w := newCondaShardWorld(t, true, sources)
-	targets := map[string]model.Target{}
+	targets := map[string]accmodel.Target{}
 	for _, c := range []repo.Config{
 		{Key: "raw-shard-local", Class: repo.Local, PackageType: repo.Conda},
 		{Key: "raw-shard-fed", Class: repo.Federated, PackageType: repo.Conda},
@@ -900,12 +900,12 @@ func TestAccCondaShardsGenericPathsCannotDiscloseUnfilteredMetadata(t *testing.T
 		if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
 			t.Fatal(err)
 		}
-		targets[c.Key] = model.Target{Include: []string{"**"}, Exclude: []string{"**/*.tar.bz2"}}
+		targets[c.Key] = accmodel.Target{Include: []string{"**"}, Exclude: []string{"**/*.tar.bz2"}}
 	}
-	if err := w.db.Permissions().Create(t.Context(), model.Permission{
-		Name: "raw-shards-metadata-only", Resources: map[api.ResourceType]model.Resource{
+	if err := w.db.Permissions().Create(t.Context(), accmodel.Permission{
+		Name: "raw-shards-metadata-only", Resources: map[api.ResourceType]accmodel.Resource{
 			api.ResourceArtifact: {
-				Actions: model.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+				Actions: accmodel.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
 				Targets: targets,
 			},
 		},
@@ -953,7 +953,7 @@ func TestAccCondaShardsGenericPathsCannotDiscloseUnfilteredMetadata(t *testing.T
 		t.Fatalf("generic raw requests fetched %d upstream documents", upstreamReads)
 	}
 	if err := w.db.Settings().Put(t.Context(), settings.SettingFolderDownload,
-		model.FolderDownloadSettings{Enabled: true}); err != nil {
+		artmodel.FolderDownloadSettings{Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
 	for _, key := range []string{"raw-shard-local", "raw-shard-fed"} {
@@ -994,15 +994,15 @@ func TestAccCondaShardsCannotEscapeThroughTransfersOrChecksumReuse(t *testing.T)
 			if err := w.db.Repos().Create(t.Context(), c); err != nil {
 				t.Fatal(err)
 			}
-			if err := w.db.Permissions().Create(t.Context(), model.Permission{
-				Name: "shard-transfer", Resources: map[api.ResourceType]model.Resource{
+			if err := w.db.Permissions().Create(t.Context(), accmodel.Permission{
+				Name: "shard-transfer", Resources: map[api.ResourceType]accmodel.Resource{
 					api.ResourceArtifact: {
-						Actions: model.Grants{
+						Actions: accmodel.Grants{
 							Users: map[string]api.Actions{
 								"user": api.ActionRead | api.ActionWrite | api.ActionDelete,
 							},
 						},
-						Targets: map[string]model.Target{
+						Targets: map[string]accmodel.Target{
 							c.Key: {
 								Include: []string{"**"},
 								Exclude: []string{"**/*.tar.bz2"},
@@ -1114,13 +1114,13 @@ func TestAccCondaShardTrashRestorePreservesNativeBoundary(t *testing.T) {
 				{"restore-source-metadata", c.Key, api.ActionRead, []string{"**/*.tar.bz2"}},
 				{"restore-generic", "other-local", api.ActionManage | api.ActionRead, nil},
 			} {
-				if err := w.db.Permissions().Create(t.Context(), model.Permission{
+				if err := w.db.Permissions().Create(t.Context(), accmodel.Permission{
 					Name: grant.name,
-					Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-						Actions: model.Grants{
+					Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
+						Actions: accmodel.Grants{
 							Users: map[string]api.Actions{"user": grant.actions},
 						},
-						Targets: map[string]model.Target{
+						Targets: map[string]accmodel.Target{
 							grant.key: {Include: []string{"**"}, Exclude: grant.exclude},
 						},
 					}},

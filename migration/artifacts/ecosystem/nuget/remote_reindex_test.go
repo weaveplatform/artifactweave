@@ -18,12 +18,12 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/apptest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/reindexauth"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
@@ -32,7 +32,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
-func cacheReindexPackage(t *testing.T, w *world, path string, body []byte) model.Item {
+func cacheReindexPackage(t *testing.T, w *world, path string, body []byte) artmodel.Item {
 	t.Helper()
 	it, err := w.items.Deploy(
 		w.ctx,
@@ -53,7 +53,7 @@ func TestUnitRemoteReindexRejectsMalformedCacheAtomically(t *testing.T) {
 	good := cacheReindexPackage(t, w, "Good.1.0.0.nupkg", pkg("Good", "1.0.0", ""))
 	cacheReindexPackage(t, w, "Broken.1.0.0.nupkg", []byte("broken archive"))
 	if err := w.st.Items().
-		SetProperties(w.ctx, good.ID, model.Properties{nuget.PropID: {"needs repair"}}, w.now); err != nil {
+		SetProperties(w.ctx, good.ID, artmodel.Properties{nuget.PropID: {"needs repair"}}, w.now); err != nil {
 		t.Fatal(err)
 	}
 	if err := w.items.Reindex(w.ctx, w.c); !errors.Is(err, nuget.ErrNotPackage) {
@@ -91,7 +91,7 @@ func TestUnitRemoteReindexStores(t *testing.T) {
 				t.Fatal(err)
 			}
 			if err = w.st.Items().
-				SetProperties(w.ctx, it.ID, model.Properties{nuget.PropID: {"wrong"}, "keep": {"mine"}}, w.now); err != nil {
+				SetProperties(w.ctx, it.ID, artmodel.Properties{nuget.PropID: {"wrong"}, "keep": {"mine"}}, w.now); err != nil {
 				t.Fatal(err)
 			}
 			raw := cacheReindexRaw(t, w)
@@ -161,7 +161,7 @@ func TestUnitRemoteReindexStores(t *testing.T) {
 			// manufacturing package rows from the upstream version list.
 			empty := w.repo("empty", repo.Remote, nil)
 			if _, err = w.st.Packages().
-				Ensure(w.ctx, model.Package{RepoKey: empty.Key, Name: "orphan", Type: repo.NuGet, Created: w.now}); err != nil {
+				Ensure(w.ctx, artmodel.Package{RepoKey: empty.Key, Name: "orphan", Type: repo.NuGet, Created: w.now}); err != nil {
 				t.Fatal(err)
 			}
 			w.c = empty
@@ -176,10 +176,10 @@ func TestUnitRemoteReindexStores(t *testing.T) {
 	}
 }
 
-func cacheReindexRaw(t *testing.T, w *world) model.RemoteCacheEntry {
+func cacheReindexRaw(t *testing.T, w *world) artmodel.RemoteCacheEntry {
 	t.Helper()
 	token, err := w.st.RemoteCache().
-		Begin(w.ctx, model.RemoteCacheKey{RepoKey: w.c.Key, Path: ".upstream/versions", Variant: "raw"})
+		Begin(w.ctx, artmodel.RemoteCacheKey{RepoKey: w.c.Key, Path: ".upstream/versions", Variant: "raw"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,7 +189,7 @@ func cacheReindexRaw(t *testing.T, w *world) model.RemoteCacheEntry {
 		item.CacheUpload{
 			Repo:        w.c,
 			Token:       token,
-			Kind:        model.RemoteMetadata,
+			Kind:        artmodel.RemoteMetadata,
 			Body:        strings.NewReader(body),
 			Length:      int64(len(body)),
 			ContentType: "application/json",
@@ -331,7 +331,7 @@ func TestUnitRemoteReindexConcurrentChanges(t *testing.T) {
 					}
 					path := name + ".1.0.0.nupkg"
 					token, err := w.st.RemoteCache().
-						Begin(w.ctx, model.RemoteCacheKey{RepoKey: w.c.Key, Path: path, Variant: "test"})
+						Begin(w.ctx, artmodel.RemoteCacheKey{RepoKey: w.c.Key, Path: path, Variant: "test"})
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -341,7 +341,7 @@ func TestUnitRemoteReindexConcurrentChanges(t *testing.T) {
 						item.CacheUpload{
 							Repo:        w.c,
 							Token:       token,
-							Kind:        model.RemoteUnique,
+							Kind:        artmodel.RemoteUnique,
 							Body:        bytes.NewReader(body),
 							Length:      int64(len(body)),
 							ContentType: "application/zip",
@@ -367,7 +367,7 @@ func TestUnitRemoteReindexConcurrentChanges(t *testing.T) {
 					}
 				case "properties":
 					if err := w.st.Items().
-						SetProperties(w.ctx, it.ID, model.Properties{nuget.PropID: {"wrong"}, "concurrent": {"keep"}}, w.now.Add(time.Second)); err != nil {
+						SetProperties(w.ctx, it.ID, artmodel.Properties{nuget.PropID: {"wrong"}, "concurrent": {"keep"}}, w.now.Add(time.Second)); err != nil {
 						t.Fatal(err)
 					}
 				}
@@ -459,7 +459,7 @@ func TestUnitRemoteReindexStoreFaults(t *testing.T) {
 			w.c = w.repo("remote", repo.Remote, nil)
 			it := cacheReindexPackage(t, w, "Foo.1.0.0.nupkg", pkg("Foo", "1.0.0", ""))
 			if err := w.st.Items().
-				SetProperties(w.ctx, it.ID, model.Properties{nuget.PropID: {"wrong"}}, w.now); err != nil {
+				SetProperties(w.ctx, it.ID, artmodel.Properties{nuget.PropID: {"wrong"}}, w.now); err != nil {
 				t.Fatal(err)
 			}
 			p, _ := w.st.Packages().Find(w.ctx, w.c.Key, "foo")
@@ -497,7 +497,7 @@ func reindexCredential(t *testing.T, w *world) json.RawMessage {
 	if _, err := acc.Users().Get(w.ctx, "tester"); errors.Is(err, kernel.ErrNotFound) {
 		hash := accesstest.HashPassword(t, "pw")
 		if err = acc.Users().
-			Create(w.ctx, model.User{Name: "tester", PasswordHash: hash, Admin: true}); err != nil {
+			Create(w.ctx, accmodel.User{Name: "tester", PasswordHash: hash, Admin: true}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -532,7 +532,7 @@ func TestUnitRemoteReindexWorkerRevocation(t *testing.T) {
 					t.Fatal(err)
 				}
 				if err = acc.Permissions().
-					Create(w.ctx, model.Permission{Name: "manager", Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {Actions: model.Grants{Users: map[string]api.Actions{"tester": api.ActionManage}}, Targets: map[string]model.Target{w.c.Key: {Include: []string{"**"}}}}}}); err != nil {
+					Create(w.ctx, accmodel.Permission{Name: "manager", Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]api.Actions{"tester": api.ActionManage}}, Targets: map[string]accmodel.Target{w.c.Key: {Include: []string{"**"}}}}}}); err != nil {
 					t.Fatal(err)
 				}
 				queueRemoteReindex(t, w)
@@ -549,7 +549,7 @@ func TestUnitRemoteReindexWorkerRevocation(t *testing.T) {
 					t.Fatal(err)
 				}
 				if err = w.st.Items().
-					SetProperties(w.ctx, it.ID, model.Properties{nuget.PropID: {"wrong"}}, w.now); err != nil {
+					SetProperties(w.ctx, it.ID, artmodel.Properties{nuget.PropID: {"wrong"}}, w.now); err != nil {
 					t.Fatal(err)
 				}
 				change := func() {
@@ -564,7 +564,7 @@ func TestUnitRemoteReindexWorkerRevocation(t *testing.T) {
 							t.Fatal(err)
 						}
 						if revoke == "disabled" {
-							u.Status = model.UserDisabled
+							u.Status = accmodel.UserDisabled
 						} else {
 							u.PasswordHash = []byte("changed revision")
 						}

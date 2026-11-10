@@ -9,13 +9,13 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
-	"github.com/weaveplatform/artifactweave/migration/access/core/port"
+	accport "github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	artport "github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -60,7 +60,7 @@ func (w *world) advance(d time.Duration) { w.set(w.now().Add(d)) }
 // collector's Tokens option reaches, as the access module's binding does.
 type tokenStore interface {
 	gc.Store
-	Tokens() port.TokenStore
+	Tokens() accport.TokenStore
 }
 
 // collector builds a collector over st whose Tokens removes expired records
@@ -329,7 +329,7 @@ type failing struct {
 }
 
 func (f failing) Uploads() session.UploadStore { return failUploads{f.Store.Uploads(), f.stale} }
-func (f failing) Blobs() port.BlobIndex        { return failBlobs{f.Store.Blobs(), f.unreferenced} }
+func (f failing) Blobs() artport.BlobIndex     { return failBlobs{f.Store.Blobs(), f.unreferenced} }
 func (f failing) Leases() work.LeaseStore {
 	return failLeases{f.Store.Leases(), f.acquire, f.renewals, f.calls}
 }
@@ -347,7 +347,7 @@ func (f failUploads) Stale(ctx context.Context, before time.Time, n int) ([]sess
 }
 
 type failBlobs struct {
-	port.BlobIndex
+	artport.BlobIndex
 	err error
 }
 

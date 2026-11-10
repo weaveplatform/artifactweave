@@ -10,9 +10,9 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/p2"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -356,7 +356,7 @@ func TestAccP2ArchiveReadsCachedBlobAndRejectsMissingBlob(t *testing.T) {
 	if err := zw.Close(); err != nil {
 		t.Fatal(err)
 	}
-	var cached model.Item
+	var cached artmodel.Item
 	var used int
 	backend := sourceBackend(
 		func(_ context.Context, q source.Request, _ source.Permit) (source.Result, error) {
@@ -408,11 +408,11 @@ func TestAccP2VirtualFiltersMembersAndDeniesUnpermittedChild(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := w.db.Permissions().Create(t.Context(), model.Permission{
+	if err := w.db.Permissions().Create(t.Context(), accmodel.Permission{
 		Name: "p2-child-path-limited",
-		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-			Actions: model.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
-			Targets: map[string]model.Target{
+		Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {
+			Actions: accmodel.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+			Targets: map[string]accmodel.Target{
 				"p2-parent": {Include: []string{"**"}},
 				"p2-child":  {Include: []string{"plugins/**"}},
 			},

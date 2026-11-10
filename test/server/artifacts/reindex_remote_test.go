@@ -9,10 +9,10 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
@@ -40,7 +40,7 @@ func TestAccRemoteReindexRechecksCurrentAuthority(t *testing.T) {
 							t.Fatal(err)
 						}
 					} else {
-						u.Status = model.UserDisabled
+						u.Status = accmodel.UserDisabled
 					}
 					if err = st.Users().Update(ctx, u); err != nil {
 						t.Fatal(err)
@@ -87,7 +87,7 @@ func createRemoteReindexGrant(t *testing.T, w *itemWorld, target string) {
 		t.Fatal(err)
 	}
 	if err := w.db.Permissions().
-		Create(t.Context(), model.Permission{Name: "manage-remote", Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {Actions: model.Grants{Users: map[string]api.Actions{"deployer": api.ActionManage}}, Targets: map[string]model.Target{target: {Include: []string{"**"}}}}}}); err != nil {
+		Create(t.Context(), accmodel.Permission{Name: "manage-remote", Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]api.Actions{"deployer": api.ActionManage}}, Targets: map[string]accmodel.Target{target: {Include: []string{"**"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -107,7 +107,10 @@ type reindexSourceCache struct {
 	s *reindexSourceStore
 }
 
-func (c reindexSourceCache) Source(ctx context.Context, key string) (model.SourceIdentity, error) {
+func (c reindexSourceCache) Source(
+	ctx context.Context,
+	key string,
+) (artmodel.SourceIdentity, error) {
 	c.s.once.Do(func() { c.s.before(ctx) })
 	return c.RemoteCacheStore.Source(ctx, key) //nolint:wrapcheck // authority-change barrier
 }

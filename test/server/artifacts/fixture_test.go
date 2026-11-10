@@ -22,7 +22,7 @@ import (
 	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	artifactshttp "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http"
@@ -31,7 +31,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/search"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
@@ -126,7 +126,7 @@ func (w *itemWorld) do(
 	return w.world().Do(method, path, as, body, headers...)
 }
 
-func (w *itemWorld) item(key string, cached bool, p string) model.Item {
+func (w *itemWorld) item(key string, cached bool, p string) artmodel.Item {
 	w.t.Helper()
 	return w.world().Item(key, cached, p)
 }
@@ -298,11 +298,11 @@ func statusFixture(t *testing.T, anonymous bool, tune ...func(*Config)) http.Han
 	db := inmem.New()
 	cheapSeed(t, db)
 	if err := db.Users().
-		Create(ctx, model.User{Name: "user", PasswordHash: cheapHash}); err != nil {
+		Create(ctx, accmodel.User{Name: "user", PasswordHash: cheapHash}); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Users().Create(ctx, model.User{
-		Name: "locked", PasswordHash: cheapHash, Status: model.UserLocked,
+	if err := db.Users().Create(ctx, accmodel.User{
+		Name: "locked", PasswordHash: cheapHash, Status: accmodel.UserLocked,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -348,7 +348,7 @@ func statusFixture(t *testing.T, anonymous bool, tune ...func(*Config)) http.Han
 		t.Fatal(err)
 	}
 	if err := db.Settings().Put(ctx, settings.SettingFolderDownload,
-		model.FolderDownloadSettings{Enabled: true}); err != nil {
+		artmodel.FolderDownloadSettings{Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Instance().Init(ctx, instance.InstanceIdentity{
@@ -396,7 +396,7 @@ func newRepoWorld(t *testing.T) *repoWorld {
 	ctx := context.Background()
 	db := inmem.New()
 	cheapSeed(t, db)
-	reader := model.User{
+	reader := accmodel.User{
 		Name:         "reader",
 		PasswordHash: cheapHash,
 		Groups:       []string{authn.ReadersGroup},

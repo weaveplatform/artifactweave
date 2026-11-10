@@ -22,12 +22,12 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	pypifmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi"
 	pypihttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi/http"
@@ -89,11 +89,11 @@ func newFixture(
 	}
 	grant := func(user, include string, actions accessapi.Actions) {
 		t.Helper()
-		if err := db.Permissions().Create(ctx, model.Permission{
+		if err := db.Permissions().Create(ctx, accmodel.Permission{
 			Name: user,
-			Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {
-				Actions: model.Grants{Users: map[string]accessapi.Actions{user: actions}},
-				Targets: map[string]model.Target{
+			Resources: map[accessapi.ResourceType]accmodel.Resource{accessapi.ResourceArtifact: {
+				Actions: accmodel.Grants{Users: map[string]accessapi.Actions{user: actions}},
+				Targets: map[string]accmodel.Target{
 					"pypi-local": {Include: []string{include}},
 					"pypi-fed":   {Include: []string{include}},
 				},
@@ -123,7 +123,7 @@ func newFixture(
 	f.opts = pkgroute.Options{
 		Store: backend,
 		Items: func() *item.Service { return f.items },
-		ServeItem: func(w http.ResponseWriter, _ *http.Request, c repo.Config, it model.Item) {
+		ServeItem: func(w http.ResponseWriter, _ *http.Request, c repo.Config, it artmodel.Item) {
 			f.served = append(f.served, c.Key+"/"+it.FullPath())
 			_, _ = io.WriteString(w, "served "+c.Key+"/"+it.FullPath())
 		},
@@ -166,8 +166,8 @@ func (f *fixture) deploy(
 	t *testing.T,
 	key, path string,
 	body []byte,
-	props model.Properties,
-) model.Item {
+	props artmodel.Properties,
+) artmodel.Item {
 	t.Helper()
 	ctx := context.Background()
 	c, err := f.db.Repos().Get(ctx, key)

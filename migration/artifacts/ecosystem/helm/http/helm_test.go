@@ -17,13 +17,13 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	helmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm"
 	helmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm/http"
@@ -67,7 +67,7 @@ func newFixture(t *testing.T, relative bool) *fixture {
 	}
 	for user, pattern := range map[string]string{"reader": "**", "partial": "visible/**"} {
 		if err := db.Permissions().
-			Create(ctx, model.Permission{Name: user, Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {Actions: model.Grants{Users: map[string]api.Actions{user: api.ActionRead}}, Targets: map[string]model.Target{c.Key: {Include: []string{pattern}}}}}}); err != nil {
+			Create(ctx, accmodel.Permission{Name: user, Resources: map[api.ResourceType]accmodel.Resource{api.ResourceArtifact: {Actions: accmodel.Grants{Users: map[string]api.Actions{user: api.ActionRead}}, Targets: map[string]accmodel.Target{c.Key: {Include: []string{pattern}}}}}}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -87,7 +87,7 @@ func newFixture(t *testing.T, relative bool) *fixture {
 		pkgroute.Options{
 			Store: db,
 			Items: func() *item.Service { return items },
-			ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it model.Item) {
+			ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it artmodel.Item) {
 				rc, _, err := blobs.Open(r.Context(), it.Actual.SHA256)
 				if err != nil {
 					t.Fatal(err)
@@ -237,7 +237,7 @@ func TestAccIndexFailures(t *testing.T) {
 				}
 			} else if mode == "folder" {
 				if _, err := f.items.Store.Items().
-					Put(ctx, model.Item{RepoKey: f.c.Key, Name: "index.yaml", Folder: true}); err != nil {
+					Put(ctx, artmodel.Item{RepoKey: f.c.Key, Name: "index.yaml", Folder: true}); err != nil {
 					t.Fatal(err)
 				}
 			} else {

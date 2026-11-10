@@ -19,11 +19,11 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	accmodel "github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -207,7 +207,7 @@ func TestAccCatalogLifecycle(t *testing.T) {
 			t.Context(),
 			f.c,
 			it,
-			model.Properties{key: {"forged"}},
+			artmodel.Properties{key: {"forged"}},
 			nil,
 		); err == nil {
 			t.Fatalf("accepted forged %s", key)
@@ -217,7 +217,7 @@ func TestAccCatalogLifecycle(t *testing.T) {
 		t.Context(),
 		f.c,
 		it,
-		model.Properties{"box_provider": {"docker"}},
+		artmodel.Properties{"box_provider": {"docker"}},
 		nil,
 	); err != nil {
 		t.Fatal(err)
@@ -229,7 +229,7 @@ func TestAccCatalogLifecycle(t *testing.T) {
 		t.Context(),
 		f.c,
 		it,
-		model.Properties{
+		artmodel.Properties{
 			"box_provider": {"virtualbox"},
 			"box_name":     {"renamed"},
 			"box_version":  {"2.0.0"},
@@ -251,7 +251,7 @@ func TestAccCatalogLifecycle(t *testing.T) {
 		t.Context(),
 		f.c,
 		it,
-		model.Properties{"box_name": {"renamed"}},
+		artmodel.Properties{"box_name": {"renamed"}},
 		nil,
 	); err != nil {
 		t.Fatal(err)
@@ -309,7 +309,7 @@ func TestAccCatalogLifecycle(t *testing.T) {
 	if _, err := f.items.Restore(
 		t.Context(),
 		item.Target{Repo: f.c, Path: "restored.box"},
-		model.TrashRecord{Item: moved, Properties: props},
+		artmodel.TrashRecord{Item: moved, Properties: props},
 		"admin",
 	); err != nil {
 		t.Fatal(err)
@@ -321,12 +321,12 @@ func TestAccCatalogStatusAndPermissions(t *testing.T) {
 	f := newFixture(t, repo.Local)
 	f.publish("visible/a.box", "widget", "1.0", "virtualbox")
 	f.publish("hidden/a.box", "widget", "2.0", "docker")
-	permission := model.Permission{
+	permission := accmodel.Permission{
 		Name: "reader",
-		Resources: map[api.ResourceType]model.Resource{
+		Resources: map[api.ResourceType]accmodel.Resource{
 			api.ResourceArtifact: {
-				Actions: model.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
-				Targets: map[string]model.Target{"boxes": {Include: []string{"visible/**"}}},
+				Actions: accmodel.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
+				Targets: map[string]accmodel.Target{"boxes": {Include: []string{"visible/**"}}},
 			},
 		},
 	}
@@ -405,19 +405,19 @@ type faultPackages struct {
 	stage string
 }
 
-func (f faultPackages) Find(ctx context.Context, key, name string) (model.Package, error) {
+func (f faultPackages) Find(ctx context.Context, key, name string) (artmodel.Package, error) {
 	if f.stage == "find" {
-		return model.Package{}, errFault
+		return artmodel.Package{}, errFault
 	}
 	return f.PackageStore.Find(ctx, key, name)
 }
 
-func (f faultPackages) Versions(ctx context.Context, id int64) ([]model.PackageVersion, error) {
+func (f faultPackages) Versions(ctx context.Context, id int64) ([]artmodel.PackageVersion, error) {
 	if f.stage == "versions" {
 		return nil, errFault
 	}
 	if f.stage == "manyversions" {
-		return make([]model.PackageVersion, 10001), nil
+		return make([]artmodel.PackageVersion, 10001), nil
 	}
 	return f.PackageStore.Versions(ctx, id)
 }
@@ -437,17 +437,17 @@ type faultItems struct {
 	stage string
 }
 
-func (f faultItems) GetByID(ctx context.Context, id int64) (model.Item, error) {
+func (f faultItems) GetByID(ctx context.Context, id int64) (artmodel.Item, error) {
 	if f.stage == "item" {
-		return model.Item{}, errFault
+		return artmodel.Item{}, errFault
 	}
 	if f.stage == "missingitem" {
-		return model.Item{}, kernel.ErrNotFound
+		return artmodel.Item{}, kernel.ErrNotFound
 	}
 	return f.ItemStore.GetByID(ctx, id)
 }
 
-func (f faultItems) Properties(ctx context.Context, id int64) (model.Properties, error) {
+func (f faultItems) Properties(ctx context.Context, id int64) (artmodel.Properties, error) {
 	if f.stage == "properties" {
 		return nil, errFault
 	}
