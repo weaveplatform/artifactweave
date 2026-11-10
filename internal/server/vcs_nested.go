@@ -12,13 +12,18 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
-// vcsNested handles the path forms JFrog documents for GitLab subgroup
-// owners. The generated strict router owns the ordinary one-segment forms.
-// A separate wildcard is necessary because chi's {userOrg} captures only one
-// segment, while a GitLab group/subgroup is represented by several segments.
+// VCSNested serves GET /artifactory/api/vcs/* for the path forms JFrog
+// documents for GitLab subgroup owners: the tag, branch and ref listings
+// and the tag and branch archive and file downloads. The generated strict
+// router owns the ordinary one-segment forms. A separate wildcard is
+// necessary because chi's {userOrg} captures only one segment, while a
+// GitLab group/subgroup is represented by several segments. A form it does
+// not own, or a nested owner on a provider other than GitLab, answers 404;
+// an unsafe or invalid path answers 400; errors are written in the
+// artifactory profile.
 //
 //nolint:gocyclo // This bounded route grammar validates each documented subgroup form in one place.
-func (s vcsAPI) vcsNested(w http.ResponseWriter, r *http.Request) {
+func (s VCSAPI) VCSNested(w http.ResponseWriter, r *http.Request) {
 	const prefix = "/artifactory/api/vcs/"
 	rawPath := strings.ToLower(r.URL.RawPath)
 	if !strings.HasPrefix(r.URL.Path, prefix) || len(r.URL.Path) > 2048 ||

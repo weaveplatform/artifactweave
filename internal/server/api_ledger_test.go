@@ -242,7 +242,7 @@ func apiReviewHandlers(t *testing.T) map[string]apiReviewHandler {
 	// (composites.go); each receiver keys its handlers by its spec.
 	specOf := map[string]string{
 		"ArtifactoryAPI": "artifactory",
-		"vcsAPI":         "artifactory",
+		"VCSAPI":         "artifactory",
 		"npmAPI":         "artifactory",
 		"dockerAPI":      "artifactory",
 		"DebianAPI":      "artifactory",

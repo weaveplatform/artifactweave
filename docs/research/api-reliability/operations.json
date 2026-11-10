@@ -9978,7 +9978,7 @@
   {
     "route": "GET /artifactory/api/vcs/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.vcsAPI.vcsNested-fm",
+    "handler": "internal/server/server.go: internal/server.VCSAPI.VCSNested-fm",
     "review_family": "native-vcs",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -10000,7 +10000,7 @@
     "operation_id": "getVcsBranches",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_routes.go: vcsAPI.GetVcsBranches",
+    "handler": "internal/server/vcs_routes.go: VCSAPI.GetVcsBranches",
     "direct_calls": [
       "s.vcsRefs"
     ],
@@ -10028,7 +10028,7 @@
     "operation_id": "downloadVcsBranchAlternative",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_download.go: vcsAPI.DownloadVcsBranchAlternative",
+    "handler": "internal/server/vcs_download.go: VCSAPI.DownloadVcsBranchAlternative",
     "direct_calls": [
       "s.vcsArchive"
     ],
@@ -10053,7 +10053,7 @@
     "operation_id": "downloadVcsBranchFromSubgroupRepository",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_download.go: vcsAPI.DownloadVcsBranchFromSubgroupRepository",
+    "handler": "internal/server/vcs_download.go: VCSAPI.DownloadVcsBranchFromSubgroupRepository",
     "direct_calls": [
       "s.vcsArchive"
     ],
@@ -10078,7 +10078,7 @@
     "operation_id": "downloadVcsBranch",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_download.go: vcsAPI.DownloadVcsBranch",
+    "handler": "internal/server/vcs_download.go: VCSAPI.DownloadVcsBranch",
     "direct_calls": [
       "s.vcsArchive"
     ],
@@ -10103,7 +10103,7 @@
     "operation_id": "downloadFileWithinVcsBranchAlternative",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_download.go: vcsAPI.DownloadFileWithinVcsBranchAlternative",
+    "handler": "internal/server/vcs_download.go: VCSAPI.DownloadFileWithinVcsBranchAlternative",
     "direct_calls": [
       "s.vcsFile"
     ],
@@ -10128,7 +10128,7 @@
     "operation_id": "downloadFileInVcsBranchInSubgroupRepository",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_download.go: vcsAPI.DownloadFileInVcsBranchInSubgroupRepository",
+    "handler": "internal/server/vcs_download.go: VCSAPI.DownloadFileInVcsBranchInSubgroupRepository",
     "direct_calls": [
       "s.vcsFile"
     ],
@@ -10153,7 +10153,7 @@
     "operation_id": "downloadFileWithinVcsBranch",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_download.go: vcsAPI.DownloadFileWithinVcsBranch",
+    "handler": "internal/server/vcs_download.go: VCSAPI.DownloadFileWithinVcsBranch",
     "direct_calls": [
       "s.vcsFile"
     ],
@@ -10178,7 +10178,7 @@
     "operation_id": "downloadVcsCommit",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_download.go: vcsAPI.DownloadVcsCommit",
+    "handler": "internal/server/vcs_download.go: VCSAPI.DownloadVcsCommit",
     "direct_calls": [
       "s.vcsArchive"
     ],
@@ -10203,7 +10203,7 @@
     "operation_id": "downloadVcsRelease",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_download.go: vcsAPI.DownloadVcsRelease",
+    "handler": "internal/server/vcs_download.go: VCSAPI.DownloadVcsRelease",
     "direct_calls": [
       "s.vcsArchive"
     ],
@@ -10228,7 +10228,7 @@
     "operation_id": "downloadVcsTagFromSubgroupRepository",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_download.go: vcsAPI.DownloadVcsTagFromSubgroupRepository",
+    "handler": "internal/server/vcs_download.go: VCSAPI.DownloadVcsTagFromSubgroupRepository",
     "direct_calls": [
       "s.vcsArchive"
     ],
@@ -10253,7 +10253,7 @@
     "operation_id": "downloadVcsTag",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_download.go: vcsAPI.DownloadVcsTag",
+    "handler": "internal/server/vcs_download.go: VCSAPI.DownloadVcsTag",
     "direct_calls": [
       "s.vcsArchive"
     ],
@@ -10278,7 +10278,7 @@
     "operation_id": "downloadVcsTagAlternative",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_download.go: vcsAPI.DownloadVcsTagAlternative",
+    "handler": "internal/server/vcs_download.go: VCSAPI.DownloadVcsTagAlternative",
     "direct_calls": [
       "s.vcsArchive"
     ],
@@ -10303,7 +10303,7 @@
     "operation_id": "downloadFileInVcsTagInSubgroupRepository",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_download.go: vcsAPI.DownloadFileInVcsTagInSubgroupRepository",
+    "handler": "internal/server/vcs_download.go: VCSAPI.DownloadFileInVcsTagInSubgroupRepository",
     "direct_calls": [
       "s.vcsFile"
     ],
@@ -10328,7 +10328,7 @@
     "operation_id": "downloadFileWithinVcsTag",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_download.go: vcsAPI.DownloadFileWithinVcsTag",
+    "handler": "internal/server/vcs_download.go: VCSAPI.DownloadFileWithinVcsTag",
     "direct_calls": [
       "s.vcsFile"
     ],
@@ -10353,7 +10353,7 @@
     "operation_id": "downloadFileWithinVcsTagAlternative",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_download.go: vcsAPI.DownloadFileWithinVcsTagAlternative",
+    "handler": "internal/server/vcs_download.go: VCSAPI.DownloadFileWithinVcsTagAlternative",
     "direct_calls": [
       "s.vcsFile"
     ],
@@ -10378,7 +10378,7 @@
     "operation_id": "getVcsRefs",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_routes.go: vcsAPI.GetVcsRefs",
+    "handler": "internal/server/vcs_routes.go: VCSAPI.GetVcsRefs",
     "direct_calls": [
       "artgen.GetVcsRefs200JSONResponse",
       "b.String",
@@ -10406,7 +10406,7 @@
     "operation_id": "getVcsTags",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_routes.go: vcsAPI.GetVcsTags",
+    "handler": "internal/server/vcs_routes.go: VCSAPI.GetVcsTags",
     "direct_calls": [
       "s.vcsRefs"
     ],

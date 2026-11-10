@@ -21,10 +21,13 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// vcsAPI is the VCS ecosystem's partial strict server: the branch, tag and
+// VCSAPI is the VCS ecosystem's partial strict server: the branch, tag and
 // ref listings and the archive and file downloads of a VCS remote
-// repository, and the route for GitLab subgroup owners, over the item kit.
-type vcsAPI struct{ *itemkit.Kit }
+// repository, and the route for GitLab subgroup owners (VCSNested), over
+// the item kit. VCS repositories are remote only, so every operation reads
+// through the kit's remote sources, after the caller's read permission on
+// the project and reference paths.
+type VCSAPI struct{ *itemkit.Kit }
 
 type vcsAccess struct {
 	repo        repo.Config
@@ -33,7 +36,7 @@ type vcsAccess struct {
 	isCacheOnly bool
 }
 
-func (s vcsAPI) vcsRepository(
+func (s VCSAPI) vcsRepository(
 	ctx context.Context,
 	key, owner, name string,
 ) (vcsAccess, error) {
@@ -80,7 +83,7 @@ func (s vcsAPI) vcsRepository(
 	return vcsAccess{repo: c, principal: p, access: acc, isCacheOnly: cacheOnly}, nil
 }
 
-func (s vcsAPI) vcsRead(
+func (s VCSAPI) vcsRead(
 	ctx context.Context,
 	a vcsAccess,
 	resource source.Resource,
@@ -106,7 +109,7 @@ func (s vcsAPI) vcsRead(
 	return result, nil
 }
 
-func (s vcsAPI) vcsResultBytes(
+func (s VCSAPI) vcsResultBytes(
 	ctx context.Context,
 	result source.Result,
 	limit int64,
@@ -143,7 +146,7 @@ func (s vcsAPI) vcsResultBytes(
 	return data, nil
 }
 
-func (s vcsAPI) vcsRefs(
+func (s VCSAPI) vcsRefs(
 	ctx context.Context,
 	key, owner, name string,
 ) ([]vcshttp.Ref, vcsAccess, error) {
@@ -179,7 +182,7 @@ func (s vcsAPI) vcsRefs(
 	return filtered, a, nil
 }
 
-func (s vcsAPI) vcsReadRefs(
+func (s VCSAPI) vcsReadRefs(
 	ctx context.Context, a vcsAccess, owner, name string, endpoint vcshttp.RefEndpoint,
 ) ([]vcshttp.Ref, error) {
 	resource := source.Resource{
@@ -255,7 +258,7 @@ func (r vcsListResponse) VisitGetVcsBranchesResponse(w http.ResponseWriter) erro
 	return r.write(w)
 }
 
-func (s vcsAPI) GetVcsTags(
+func (s VCSAPI) GetVcsTags(
 	ctx context.Context,
 	req artgen.GetVcsTagsRequestObject,
 ) (artgen.GetVcsTagsResponseObject, error) {
@@ -272,7 +275,7 @@ func (s vcsAPI) GetVcsTags(
 	return out, nil
 }
 
-func (s vcsAPI) GetVcsBranches(
+func (s VCSAPI) GetVcsBranches(
 	ctx context.Context,
 	req artgen.GetVcsBranchesRequestObject,
 ) (artgen.GetVcsBranchesResponseObject, error) {
@@ -289,7 +292,7 @@ func (s vcsAPI) GetVcsBranches(
 	return out, nil
 }
 
-func (s vcsAPI) GetVcsRefs(
+func (s VCSAPI) GetVcsRefs(
 	ctx context.Context,
 	req artgen.GetVcsRefsRequestObject,
 ) (artgen.GetVcsRefsResponseObject, error) {

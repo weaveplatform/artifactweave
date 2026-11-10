@@ -385,7 +385,7 @@ func New(cfg Config) http.Handler {
 	// Every partial embeds the kit newArtifactoryAPI built, so the routes of
 	// the whole spec share one set of overlays and one redirect throttle.
 	kit := artAPI.Kit
-	vcsOps := vcsAPI{kit}
+	vcsOps := VCSAPI{kit}
 	npmOps := npmAPI{kit}
 	dockerOps := dockerAPI{kit}
 	debianOps := debianhttp.DebianAPI{Kit: kit}
@@ -505,7 +505,7 @@ func New(cfg Config) http.Handler {
 	mavenAPI{kit}.registerMavenRoutes(r)
 	// GitLab subgroup owners span path segments; the generated VCS routes
 	// handle the ordinary one-segment forms.
-	r.Get("/artifactory/api/vcs/*", vcsOps.vcsNested)
+	r.Get("/artifactory/api/vcs/*", vcsOps.VCSNested)
 	registry.Register(r)
 	terraformbackendhttp.Register(
 		r,
@@ -549,7 +549,7 @@ func New(cfg Config) http.Handler {
 				SecurityAPI:    accessHTTP.Security,
 				SystemAPI:      sysAPI,
 				ArtifactoryAPI: &artAPI,
-				vcsAPI:         &vcsOps,
+				VCSAPI:         &vcsOps,
 				npmAPI:         &npmOps,
 				dockerAPI:      &dockerOps,
 				DebianAPI:      &debianOps,

@@ -38,7 +38,7 @@ func (b *vcsBody) Read(p []byte) (int, error) {
 	return n, err //nolint:wrapcheck
 }
 
-func (s vcsAPI) vcsOpenResult(
+func (s VCSAPI) vcsOpenResult(
 	ctx context.Context,
 	result source.Result,
 ) (io.ReadCloser, int64, error) {
@@ -108,7 +108,7 @@ func vcsArchiveURLPolicy(
 	}
 }
 
-func (s vcsAPI) vcsArchive(
+func (s VCSAPI) vcsArchive(
 	ctx context.Context,
 	key, owner, name, kind, ref, ext, propertyFilter string,
 ) (io.ReadCloser, int64, error) {
@@ -187,7 +187,7 @@ func (s vcsAPI) vcsArchive(
 	return s.vcsOpenResult(ctx, result)
 }
 
-func (s vcsAPI) vcsMatchCachedProperties(
+func (s VCSAPI) vcsMatchCachedProperties(
 	ctx context.Context,
 	result source.Result,
 	filter map[string]string,
@@ -257,7 +257,7 @@ func vcsProperties(p *string) string {
 	return *p
 }
 
-func (s vcsAPI) DownloadVcsTag(
+func (s VCSAPI) DownloadVcsTag(
 	ctx context.Context,
 	req artgen.DownloadVcsTagRequestObject,
 ) (artgen.DownloadVcsTagResponseObject, error) {
@@ -280,7 +280,7 @@ func (s vcsAPI) DownloadVcsTag(
 	}, nil
 }
 
-func (s vcsAPI) DownloadVcsBranch(
+func (s VCSAPI) DownloadVcsBranch(
 	ctx context.Context,
 	req artgen.DownloadVcsBranchRequestObject,
 ) (artgen.DownloadVcsBranchResponseObject, error) {
@@ -303,7 +303,7 @@ func (s vcsAPI) DownloadVcsBranch(
 	}, nil
 }
 
-func (s vcsAPI) DownloadVcsCommit(
+func (s VCSAPI) DownloadVcsCommit(
 	ctx context.Context,
 	req artgen.DownloadVcsCommitRequestObject,
 ) (artgen.DownloadVcsCommitResponseObject, error) {
@@ -326,7 +326,7 @@ func (s vcsAPI) DownloadVcsCommit(
 	}, nil
 }
 
-func (s vcsAPI) DownloadVcsRelease(
+func (s VCSAPI) DownloadVcsRelease(
 	ctx context.Context,
 	req artgen.DownloadVcsReleaseRequestObject,
 ) (artgen.DownloadVcsReleaseResponseObject, error) {
@@ -349,7 +349,7 @@ func (s vcsAPI) DownloadVcsRelease(
 	}, nil
 }
 
-func (s vcsAPI) DownloadVcsTagAlternative(
+func (s VCSAPI) DownloadVcsTagAlternative(
 	ctx context.Context,
 	req artgen.DownloadVcsTagAlternativeRequestObject,
 ) (artgen.DownloadVcsTagAlternativeResponseObject, error) {
@@ -372,7 +372,7 @@ func (s vcsAPI) DownloadVcsTagAlternative(
 	}, nil
 }
 
-func (s vcsAPI) DownloadVcsBranchAlternative(
+func (s VCSAPI) DownloadVcsBranchAlternative(
 	ctx context.Context,
 	req artgen.DownloadVcsBranchAlternativeRequestObject,
 ) (artgen.DownloadVcsBranchAlternativeResponseObject, error) {
@@ -395,7 +395,7 @@ func (s vcsAPI) DownloadVcsBranchAlternative(
 	}, nil
 }
 
-func (s vcsAPI) DownloadVcsTagFromSubgroupRepository(
+func (s VCSAPI) DownloadVcsTagFromSubgroupRepository(
 	ctx context.Context,
 	req artgen.DownloadVcsTagFromSubgroupRepositoryRequestObject,
 ) (artgen.DownloadVcsTagFromSubgroupRepositoryResponseObject, error) {
@@ -418,7 +418,7 @@ func (s vcsAPI) DownloadVcsTagFromSubgroupRepository(
 	}, nil
 }
 
-func (s vcsAPI) DownloadVcsBranchFromSubgroupRepository(
+func (s VCSAPI) DownloadVcsBranchFromSubgroupRepository(
 	ctx context.Context,
 	req artgen.DownloadVcsBranchFromSubgroupRepositoryRequestObject,
 ) (artgen.DownloadVcsBranchFromSubgroupRepositoryResponseObject, error) {
@@ -441,7 +441,7 @@ func (s vcsAPI) DownloadVcsBranchFromSubgroupRepository(
 	}, nil
 }
 
-func (s vcsAPI) vcsFile(
+func (s VCSAPI) vcsFile(
 	ctx context.Context,
 	key, owner, name, kind, selector string,
 ) (io.Reader, int64, error) {
@@ -488,7 +488,7 @@ func (s vcsAPI) vcsFile(
 	return bytes.NewReader(data), int64(len(data)), nil
 }
 
-func (s vcsAPI) DownloadFileWithinVcsTag(
+func (s VCSAPI) DownloadFileWithinVcsTag(
 	ctx context.Context,
 	req artgen.DownloadFileWithinVcsTagRequestObject,
 ) (artgen.DownloadFileWithinVcsTagResponseObject, error) {
@@ -502,7 +502,7 @@ func (s vcsAPI) DownloadFileWithinVcsTag(
 	}, nil
 }
 
-func (s vcsAPI) DownloadFileWithinVcsBranch(
+func (s VCSAPI) DownloadFileWithinVcsBranch(
 	ctx context.Context,
 	req artgen.DownloadFileWithinVcsBranchRequestObject,
 ) (artgen.DownloadFileWithinVcsBranchResponseObject, error) {
@@ -516,7 +516,7 @@ func (s vcsAPI) DownloadFileWithinVcsBranch(
 	}, nil
 }
 
-func (s vcsAPI) DownloadFileWithinVcsTagAlternative(
+func (s VCSAPI) DownloadFileWithinVcsTagAlternative(
 	ctx context.Context,
 	req artgen.DownloadFileWithinVcsTagAlternativeRequestObject,
 ) (artgen.DownloadFileWithinVcsTagAlternativeResponseObject, error) {
@@ -530,7 +530,7 @@ func (s vcsAPI) DownloadFileWithinVcsTagAlternative(
 	}, nil
 }
 
-func (s vcsAPI) DownloadFileWithinVcsBranchAlternative(
+func (s VCSAPI) DownloadFileWithinVcsBranchAlternative(
 	ctx context.Context,
 	req artgen.DownloadFileWithinVcsBranchAlternativeRequestObject,
 ) (artgen.DownloadFileWithinVcsBranchAlternativeResponseObject, error) {
@@ -551,7 +551,7 @@ func (s vcsAPI) DownloadFileWithinVcsBranchAlternative(
 	}, nil
 }
 
-func (s vcsAPI) DownloadFileInVcsTagInSubgroupRepository(
+func (s VCSAPI) DownloadFileInVcsTagInSubgroupRepository(
 	ctx context.Context,
 	req artgen.DownloadFileInVcsTagInSubgroupRepositoryRequestObject,
 ) (artgen.DownloadFileInVcsTagInSubgroupRepositoryResponseObject, error) {
@@ -565,7 +565,7 @@ func (s vcsAPI) DownloadFileInVcsTagInSubgroupRepository(
 	}, nil
 }
 
-func (s vcsAPI) DownloadFileInVcsBranchInSubgroupRepository(
+func (s VCSAPI) DownloadFileInVcsBranchInSubgroupRepository(
 	ctx context.Context,
 	req artgen.DownloadFileInVcsBranchInSubgroupRepositoryRequestObject,
 ) (artgen.DownloadFileInVcsBranchInSubgroupRepositoryResponseObject, error) {

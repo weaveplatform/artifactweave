@@ -40,7 +40,7 @@ type artifactoryServer struct {
 	*accesshttp.SecurityAPI
 	*configurationhttp.SystemAPI
 	*artifactshttp.ArtifactoryAPI
-	*vcsAPI
+	*VCSAPI
 	*npmAPI
 	*dockerAPI
 	*debianhttp.DebianAPI
