@@ -1,4 +1,4 @@
-package server
+package rpmhttp
 
 import (
 	"bytes"
@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -163,7 +164,7 @@ func TestAccRPMVirtualMemberGraphRejectsCyclesWrongTypesAndUnavailableSources(t 
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := RPMAPI{newKit(Config{Store: w.db, Blobs: w.blobs})}
+	svc := RPMAPI{newKit(server.Config{Store: w.db, Blobs: w.blobs})}
 	for _, tc := range []struct {
 		key      string
 		expected error
@@ -259,7 +260,7 @@ func TestAccRPMVirtualSigningRejectsMissingAndInvalidKeys(t *testing.T) {
 		}
 	}
 	manifest, _, _ := rpmUpstreamFixture(t)
-	keys := withAccess(Config{Store: w.db}).Access.Keys
+	keys := withAccess(server.Config{Store: w.db}).Access.Keys
 	for _, tc := range []struct {
 		key      string
 		expected error
@@ -320,7 +321,7 @@ func TestAccRPMVirtualRemoteMemberRejectsUntrustedMetadata(t *testing.T) {
 			},
 		),
 	}
-	svc := RPMAPI{newKit(Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources})}
+	svc := RPMAPI{newKit(server.Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources})}
 	packages, err := svc.rpmMemberPackages(t.Context(), w.db, remote, "", p, acc)
 	if err != nil || len(packages) != 1 ||
 		packages[0].Path != "pool/artifactweave-alpha-1.0-1.fc42.noarch.rpm" {
@@ -448,7 +449,9 @@ func TestAccRPMRemoteMetadataClosesBodyWhenAuthorityIsRevoked(t *testing.T) {
 						},
 					),
 				}
-				svc := RPMAPI{newKit(Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources})}
+				svc := RPMAPI{
+					newKit(server.Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources}),
+				}
 				remote := *repo.Defaults(&repo.Config{
 					Key: "rpm-remote", Class: repo.Remote, PackageType: repo.RPM, URL: "https://up.example",
 				})
@@ -508,7 +511,7 @@ func TestAccRPMVirtualRemotePackagePinsIndexedSHA(t *testing.T) {
 			},
 		),
 	}
-	svc := RPMAPI{newKit(Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources})}
+	svc := RPMAPI{newKit(server.Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources})}
 	request := itemkit.ItemRequest{Path: path}
 	serve := func(s RPMAPI, wantSHA string) *httptest.ResponseRecorder {
 		t.Helper()
@@ -581,7 +584,7 @@ func TestAccRPMVirtualLocalMemberRejectsIncompleteAndDriftedContent(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := RPMAPI{newKit(Config{Store: w.db, Blobs: w.blobs})}
+	svc := RPMAPI{newKit(server.Config{Store: w.db, Blobs: w.blobs})}
 	if _, err := svc.rpmMemberPackages(
 		t.Context(),
 		w.db,

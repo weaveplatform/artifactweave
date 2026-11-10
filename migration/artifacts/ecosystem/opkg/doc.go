@@ -12,7 +12,7 @@
 // through the format hooks (decision 0032), so every write and delete in
 // an Opkg repository reaches it whichever API carried it, and it rebuilds
 // the feed metadata as queued work (decision 0033). The Opkg protocol is
-// still the root file internal/server/opkg.go, which builds a virtual
+// still the root file migration/artifacts/ecosystem/opkg/http/opkg.go, which builds a virtual
 // repository's signed feed and selects its IPKs with this package.
 //
 // # Inputs

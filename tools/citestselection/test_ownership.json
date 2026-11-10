@@ -31,9 +31,11 @@
     "migration/artifacts/ecosystem/nix/http": "nix",
     "migration/artifacts/ecosystem/npm/http": "npm",
     "migration/artifacts/ecosystem/nuget/http": "nuget",
+    "migration/artifacts/ecosystem/opkg/http": "opkg",
     "migration/artifacts/ecosystem/pub/http": "pub",
     "migration/artifacts/ecosystem/puppet/http": "puppet",
     "migration/artifacts/ecosystem/pypi/http": "pypi",
+    "migration/artifacts/ecosystem/rpm/http": "rpm",
     "migration/artifacts/ecosystem/skills/http": "skills",
     "migration/artifacts/ecosystem/swift/http": "swift",
     "migration/artifacts/ecosystem/terraform/http": "terraform",
@@ -120,7 +122,6 @@
       "npm_auth_paths_test.go",
       "npm_fixture_test.go",
       "oidc_status_test.go",
-      "opkg_internal_test.go",
       "p2_external_error_internal_test.go",
       "p2_external_helpers_test.go",
       "p2_internal_test.go",
@@ -128,7 +129,6 @@
       "registry_shared_test.go",
       "reindex_internal_test.go",
       "request_limits_test.go",
-      "rpm_internal_test.go",
       "searches_routes_test.go",
       "server_test.go",
       "spec_contract_test.go",
@@ -328,9 +328,6 @@
       "internal/app/nuget_reindex_test.go",
       "test/server/artifacts/repositories_test.go"
     ],
-    "opkg": [
-      "internal/server/opkg_internal_test.go"
-    ],
     "p2": [
       "internal/server/p2_external_error_internal_test.go",
       "internal/server/p2_external_helpers_test.go",
@@ -343,9 +340,6 @@
     "pypi": [
       "internal/server/reindex_internal_test.go",
       "test/server/artifacts/reindex_test.go"
-    ],
-    "rpm": [
-      "internal/server/rpm_internal_test.go"
     ],
     "terraform": [
       "test/server/access/keypairs_test.go",

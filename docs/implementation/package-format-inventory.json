@@ -17,7 +17,7 @@
       "owner_issue": 757,
       "evidence": "test/acceptance/features/alpine.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/alpine-linux-repositories",
-      "route_file": "internal/server/alpine.go",
+      "route_file": "migration/artifacts/ecosystem/alpine/http/alpine.go",
       "p9c": true
     },
     {
@@ -385,7 +385,7 @@
       "owner_issue": 760,
       "evidence": "test/acceptance/features/opkg.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/opkg-repositories",
-      "route_file": "internal/server/opkg.go",
+      "route_file": "migration/artifacts/ecosystem/opkg/http/opkg.go",
       "p9c": true
     },
     {

@@ -1,4 +1,4 @@
-package server
+package opkghttp
 
 import (
 	"bytes"
@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -164,7 +165,7 @@ func TestAccOpkgVirtualGraphAndRouteBoundaries(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := opkgItems{newKit(Config{Store: w.db, Blobs: w.blobs})}
+	svc := opkgItems{newKit(server.Config{Store: w.db, Blobs: w.blobs})}
 	for _, tc := range []struct {
 		key      string
 		expected error
@@ -288,7 +289,7 @@ func TestAccOpkgDirectRoutingRejectsUnsafeAndWrongClassRequests(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := opkgItems{newKit(Config{Store: w.db, Blobs: w.blobs})}
+	svc := opkgItems{newKit(server.Config{Store: w.db, Blobs: w.blobs})}
 	local := repo.Config{Key: "opkg-direct", Class: repo.Local, PackageType: repo.Opkg}
 	for _, tc := range []struct {
 		path, url string
@@ -389,7 +390,7 @@ func TestAccOpkgVirtualLocalPackageRejectsMissingAndDriftedBytes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := opkgItems{newKit(Config{Store: w.db, Blobs: w.blobs})}
+	svc := opkgItems{newKit(server.Config{Store: w.db, Blobs: w.blobs})}
 	view, err := svc.opkgMemberIndex(t.Context(), w.db, member, false, "feed/Packages", p, acc)
 	if err != nil || len(view.packages) != 2 {
 		t.Fatalf(
@@ -481,7 +482,7 @@ func TestAccOpkgRemoteIndexRejectsFaultsAndRevokedAuthority(t *testing.T) {
 			return backendResult, backendError
 		},
 	)}
-	svc := opkgItems{newKit(Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources})}
+	svc := opkgItems{newKit(server.Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources})}
 	read := func() (opkgIndexView, error) {
 		t.Helper()
 		return svc.opkgMemberIndex(t.Context(), w.db, remote, false, "feed/Packages", p, acc)
@@ -705,7 +706,7 @@ func TestAccOpkgRemotePackagePinsIndependentIndexAndCachedBytes(t *testing.T) {
 		},
 	)
 	sources := &source.Service{Resolve: sourceIdentity, HTTP: backend}
-	w := newItemWorld(t, false, func(c *Config) { c.RemoteSources = sources })
+	w := newItemWorld(t, false, func(c *server.Config) { c.RemoteSources = sources })
 	if err := w.db.Repos().Create(t.Context(), remote); err != nil {
 		t.Fatal(err)
 	}
@@ -768,7 +769,7 @@ func TestAccOpkgRemotePackagePinsIndependentIndexAndCachedBytes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := opkgItems{newKit(Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources})}
+	svc := opkgItems{newKit(server.Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources})}
 	r := httptest.NewRequest(http.MethodGet, "/artifactory/opkg-download/../bad.ipk", nil)
 	response := httptest.NewRecorder()
 	svc.serveRemoteOpkgPackage(

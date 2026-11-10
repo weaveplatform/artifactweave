@@ -1,4 +1,4 @@
-package server
+package alpinehttp
 
 import (
 	"bytes"

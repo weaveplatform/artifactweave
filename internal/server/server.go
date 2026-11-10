@@ -35,8 +35,11 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	alpinehttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/alpine/http"
 	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
 	luarockshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/luarocks/http"
+	opkghttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/opkg/http"
+	rpmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/rpm/http"
 	terraformbackendhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend/http"
 	configurationhttp "github.com/weaveplatform/artifactweave/migration/configuration/adapters/http"
 	configapi "github.com/weaveplatform/artifactweave/migration/configuration/api"
@@ -300,14 +303,14 @@ func withConfiguration(cfg Config) Config {
 // lookup, in their dispatch order (itemkit.Deps.Overlays).
 var overlays = []itemkit.Overlay{
 	tryAgentMarketplaceItem,
-	TryAlpineItem,
+	alpinehttp.TryAlpineItem,
 	artifactshttp.TryCondaItem,
 	artifactshttp.TryMachineLearningItem,
 	artifactshttp.TryChefItem,
 	tryCranItem,
 	tryDebianItem,
-	TryRPMItem,
-	TryOpkgItem,
+	rpmhttp.TryRPMItem,
+	opkghttp.TryOpkgItem,
 	tryP2Item,
 }
 
@@ -385,7 +388,7 @@ func New(cfg Config) http.Handler {
 	dockerOps := dockerAPI{kit}
 	debianOps := debianAPI{kit}
 	cranOps := cranAPI{Kit: kit, archiveMoverEnabled: cfg.CranArchiveMoverEnabled}
-	rpmOps := RPMAPI{kit}
+	rpmOps := rpmhttp.RPMAPI{kit}
 	sysAPI := configurationhttp.New(configurationhttp.Deps{
 		Store:         cfg.Store,
 		Blobs:         cfg.Blobs,

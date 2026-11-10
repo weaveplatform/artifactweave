@@ -11,7 +11,7 @@
 // service through the format hooks (decision 0032), so every write and
 // delete in an Alpine repository reaches it whichever API carried it, and
 // it rebuilds the indexes as queued work (decision 0033). The Alpine
-// protocol is still the root file internal/server/alpine.go, which builds
+// protocol is still the root file migration/artifacts/ecosystem/alpine/http/alpine.go, which builds
 // a virtual repository's signed index and selects its packages with this
 // package.
 //
