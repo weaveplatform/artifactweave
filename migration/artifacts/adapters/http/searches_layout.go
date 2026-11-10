@@ -60,15 +60,8 @@ func (s ArtifactoryAPI) SearchGavc(
 	if err != nil {
 		return nil, err
 	}
-	g, a, v, c := search.Wildcard(
-		p.G,
-	), search.Wildcard(
-		p.A,
-	), search.Wildcard(
-		p.V,
-	), search.Wildcard(
-		p.C,
-	)
+	g, a := search.Wildcard(p.G), search.Wildcard(p.A)
+	v, c := search.Wildcard(p.V), search.Wildcard(p.C)
 	d := detailOf(p.XResultDetail)
 	if specific {
 		d = resultDetail{}
@@ -87,13 +80,13 @@ func (s ArtifactoryAPI) SearchGavc(
 	if err != nil {
 		return nil, err
 	}
-	upstream := r.upstreamSearch(ls, p.Repos, p.G, p.A, remote)
+	upstream, routes := r.upstreamSearch(ls, p.Repos, p.G, p.A, remote)
 	if upstream != nil {
-		additional, err := upstream.gavc(ctx, p.V, p.C)
+		additional, err := upstream.Gavc(ctx, p.V, p.C)
 		if err != nil {
 			return nil, err
 		}
-		found = upstream.filterHits(found)
+		found = routes.filterHits(found)
 		seen := map[string]bool{}
 		for _, hit := range found {
 			seen[hit.Item.RepoKey+"/"+hit.Item.FullPath()] = true
@@ -134,7 +127,7 @@ func (s ArtifactoryAPI) SearchGavc(
 			key = f.Item.ReportedRepoKey()
 		}
 		if upstream != nil {
-			key = upstream.routeKey(f.Item.RepoKey, f.Item.FullPath(), false, f.Item.Cached)
+			key = routes.RouteKey(f.Item.RepoKey, f.Item.FullPath(), false, f.Item.Cached)
 		}
 		e := map[string]any{
 			"downloadUri": itemkit.DownloadURI(ctx, key, f.Item.FullPath()),
@@ -145,7 +138,7 @@ func (s ArtifactoryAPI) SearchGavc(
 		}
 		entries = append(entries, e)
 	}
-	if err = upstream.revalidate(ctx); err != nil {
+	if err = upstream.Revalidate(ctx); err != nil {
 		return nil, err
 	}
 	return answer(ctx, mediaGavcSearch, results(entries)), nil
@@ -165,9 +158,9 @@ const (
 )
 
 // moduleUpstream is u as search.ModuleVersions takes it: a nil
-// *upstreamSearch stored in the interface is not nil, and ModuleVersions
+// *UpstreamSearch stored in the interface is not nil, and ModuleVersions
 // would call into it, so no upstream search is an untyped nil.
-func moduleUpstream(u *upstreamSearch) search.Upstream {
+func moduleUpstream(u *UpstreamSearch) search.Upstream {
 	if u == nil {
 		return nil
 	}
@@ -196,7 +189,7 @@ func (s ArtifactoryAPI) SearchVersions(
 		return nil, err
 	}
 	v := httpkit.Deref(p.V)
-	upstream := r.upstreamSearch(ls, p.Repos, p.G, p.A, httpkit.Deref(p.Remote) == 1)
+	upstream, _ := r.upstreamSearch(ls, p.Repos, p.G, p.A, httpkit.Deref(p.Remote) == 1)
 	versions, err := search.ModuleVersions(
 		ctx, r.SearchRun, ls, p.G, p.A, v, false, moduleUpstream(upstream),
 	)
@@ -214,7 +207,7 @@ func (s ArtifactoryAPI) SearchVersions(
 		}
 		entries = append(entries, map[string]any{"version": x.V, "integration": x.IsIntegration})
 	}
-	if err = upstream.revalidate(ctx); err != nil {
+	if err = upstream.Revalidate(ctx); err != nil {
 		return nil, err
 	}
 	return answer(ctx, mediaVersionsSearch, results(entries)), nil
@@ -243,7 +236,7 @@ func (s ArtifactoryAPI) SearchLatestVersion(
 		return nil, err
 	}
 	v := httpkit.Deref(p.V)
-	upstream := r.upstreamSearch(ls, p.Repos, p.G, p.A, httpkit.Deref(p.Remote) == 1)
+	upstream, _ := r.upstreamSearch(ls, p.Repos, p.G, p.A, httpkit.Deref(p.Remote) == 1)
 	versions, err := search.ModuleVersions(
 		ctx, r.SearchRun, ls, p.G, p.A, v, true, moduleUpstream(upstream),
 	)
@@ -264,7 +257,7 @@ func (s ArtifactoryAPI) SearchLatestVersion(
 	if i < 0 {
 		return nil, apierror.New(http.StatusNotFound, missing)
 	}
-	if err = upstream.revalidate(ctx); err != nil {
+	if err = upstream.Revalidate(ctx); err != nil {
 		return nil, err
 	}
 	return artgen.SearchLatestVersion200TextResponse(versions[i].V), nil

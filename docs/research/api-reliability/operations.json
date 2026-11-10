@@ -7760,13 +7760,13 @@
       "r.UserLimit",
       "r.entries",
       "r.upstreamSearch",
+      "routes.RouteKey",
+      "routes.filterHits",
       "s.newSearch",
       "search.Matches",
       "search.Wildcard",
-      "upstream.filterHits",
-      "upstream.gavc",
-      "upstream.revalidate",
-      "upstream.routeKey"
+      "upstream.Gavc",
+      "upstream.Revalidate"
     ],
     "review_family": "search",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
@@ -7806,7 +7806,7 @@
       "search.ModuleVersions",
       "search.Wildcard",
       "slices.IndexFunc",
-      "upstream.revalidate"
+      "upstream.Revalidate"
     ],
     "review_family": "search",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
@@ -7974,7 +7974,7 @@
       "search.ModuleSearch",
       "search.ModuleVersions",
       "search.Wildcard",
-      "upstream.revalidate"
+      "upstream.Revalidate"
     ],
     "review_family": "search",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
