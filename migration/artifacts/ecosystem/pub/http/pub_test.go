@@ -32,7 +32,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -122,7 +121,7 @@ type metadataSource struct {
 
 func (metadataSource) Item(
 	context.Context,
-	store.Store,
+	pkgroute.Store,
 	repo.Config,
 	string,
 ) (pkgroute.Found, error) {

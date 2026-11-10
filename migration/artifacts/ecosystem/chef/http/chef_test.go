@@ -60,7 +60,7 @@ func newFixtureStore(
 	t *testing.T,
 	class repo.Class,
 	tune func(*pkgroute.Protocol),
-	wrap func(store.Store) store.Store,
+	wrap func(pkgroute.Store) pkgroute.Store,
 ) *fixture {
 	t.Helper()
 	db := inmem.New()
@@ -72,7 +72,7 @@ func newFixtureStore(
 	if err != nil {
 		t.Fatal(err)
 	}
-	var st store.Store = db
+	var st pkgroute.Store = db
 	if wrap != nil {
 		st = wrap(st)
 	}
@@ -143,7 +143,7 @@ type metadataSource struct {
 
 func (metadataSource) Item(
 	context.Context,
-	store.Store,
+	pkgroute.Store,
 	repo.Config,
 	string,
 ) (pkgroute.Found, error) {
@@ -552,7 +552,7 @@ func TestAccVirtualPriorityAndPermissionFiltering(t *testing.T) {
 }
 
 type faultStore struct {
-	store.Store
+	pkgroute.Store
 	find, versions, items, repos, list, huge bool
 }
 
@@ -641,7 +641,7 @@ func TestAccBrokenStoredIndexNeverAdvertisesCookbook(t *testing.T) {
 				t,
 				repo.Local,
 				nil,
-				func(s store.Store) store.Store { faults = &faultStore{Store: s}; return faults },
+				func(s pkgroute.Store) pkgroute.Store { faults = &faultStore{Store: s}; return faults },
 			)
 			f.deploy(f.c, "widget", "1.0.0", archive(t, "widget", "1.0.0"))
 			tc.tune(faults)
@@ -728,7 +728,7 @@ func TestAccVirtualMembersRetainPriorityAndCurrentPermissions(t *testing.T) {
 		t,
 		repo.Virtual,
 		nil,
-		func(s store.Store) store.Store { faults = &faultStore{Store: s}; return faults },
+		func(s pkgroute.Store) pkgroute.Store { faults = &faultStore{Store: s}; return faults },
 	)
 	for _, key := range []string{"first", "member"} {
 		c := *repo.Defaults(&repo.Config{Key: key, Class: repo.Local, PackageType: repo.Chef})

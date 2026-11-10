@@ -690,7 +690,7 @@ func (b *openFaultBlobs) Open(
 }
 
 type packageFaultStore struct {
-	store.Store
+	pkgroute.Store
 	find, version, list bool
 }
 

@@ -47,7 +47,7 @@ type Options struct {
 	Sources *source.Service
 	// Store resolves repositories. Nil serves no repository, for tests of
 	// the router alone.
-	Store store.Store
+	Store registry.Store
 	// SubdomainMatch turns on the subdomain method. BaseURL must then be
 	// set: its host is the parent the repository subdomains sit under.
 	SubdomainMatch bool
@@ -97,7 +97,7 @@ type Endpoint func(w http.ResponseWriter, r *http.Request, q Request)
 // Registry routes registry requests to the endpoints features register.
 type Registry struct {
 	sources       *source.Service
-	store         store.Store
+	store         registry.Store
 	authenticated bool
 	// parent is the lower-cased host repository subdomains sit under; empty
 	// when subdomain matching is off.
@@ -345,7 +345,7 @@ func (g *Registry) lookup(ctx context.Context, key string) (repo.Config, bool, e
 // compared without regard to case: keys are unique that way, and Docker
 // clients send references in lower case only (decision 0003). found is
 // false for a missing repository and for one of another package type.
-func Lookup(ctx context.Context, st store.Store, key string) (repo.Config, bool, error) {
+func Lookup(ctx context.Context, st format.Store, key string) (repo.Config, bool, error) {
 	c, err := st.Repos().Get(ctx, key)
 	if errors.Is(err, store.ErrNotFound) {
 		// The exact key failed; a case-insensitive match needs the list.

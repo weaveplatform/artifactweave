@@ -63,7 +63,7 @@ type fixture struct {
 	principal func(http.Handler) http.Handler
 }
 
-func newFixture(t *testing.T, wrap ...func(store.Store) store.Store) *fixture {
+func newFixture(t *testing.T, wrap ...func(pkgroute.Store) pkgroute.Store) *fixture {
 	t.Helper()
 	ctx := context.Background()
 	db := inmem.New()
@@ -99,7 +99,7 @@ func newFixture(t *testing.T, wrap ...func(store.Store) store.Store) *fixture {
 	}
 	f := &fixture{db: db, tick: time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC)}
 	f.items = &item.Service{Store: db, Blobs: blobs, Now: f.now, Formats: ecosystem.For}
-	var backend store.Store = db
+	var backend pkgroute.Store = db
 	for _, w := range wrap {
 		backend = w(backend)
 	}
@@ -756,7 +756,7 @@ func TestAccBrokenIndexIsAFault(t *testing.T) {
 // A store that fails is a fault, not a missing package.
 func TestAccStoreFailureIsAFault(t *testing.T) {
 	for _, failing := range []string{"find", "versions"} {
-		f := newFixture(t, func(st store.Store) store.Store {
+		f := newFixture(t, func(st pkgroute.Store) pkgroute.Store {
 			return failingStore{Store: st, failing: failing}
 		})
 		f.deployRich(t)
@@ -772,7 +772,7 @@ var errBroken = errors.New("broken store")
 
 // failingStore fails one of its package index's reads.
 type failingStore struct {
-	store.Store
+	pkgroute.Store
 	failing string
 }
 

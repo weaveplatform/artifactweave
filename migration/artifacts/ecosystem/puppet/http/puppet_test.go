@@ -62,7 +62,7 @@ func newFixtureStore(
 	t *testing.T,
 	class repo.Class,
 	tune func(*pkgroute.Protocol),
-	wrap func(store.Store) store.Store,
+	wrap func(pkgroute.Store) pkgroute.Store,
 ) *fixture {
 	t.Helper()
 	db := inmem.New()
@@ -74,7 +74,7 @@ func newFixtureStore(
 	if err != nil {
 		t.Fatal(err)
 	}
-	var st store.Store = db
+	var st pkgroute.Store = db
 	if wrap != nil {
 		st = wrap(st)
 	}
@@ -145,7 +145,7 @@ type metadataSource struct {
 
 func (metadataSource) Item(
 	context.Context,
-	store.Store,
+	pkgroute.Store,
 	repo.Config,
 	string,
 ) (pkgroute.Found, error) {
@@ -570,7 +570,7 @@ func TestAccMetadataPaginationAndLateAuthority(t *testing.T) {
 }
 
 type faultStore struct {
-	store.Store
+	pkgroute.Store
 	find     bool
 	versions bool
 	items    bool
@@ -649,7 +649,7 @@ func TestAccStoreFailuresDoNotAdvertiseModules(t *testing.T) {
 				t,
 				repo.Local,
 				nil,
-				func(s store.Store) store.Store { faults = &faultStore{Store: s}; return faults },
+				func(s pkgroute.Store) pkgroute.Store { faults = &faultStore{Store: s}; return faults },
 			)
 			f.deploy(f.c, fixtureArchive(t))
 			tc.tune(faults)
@@ -825,7 +825,7 @@ func TestAccVirtualMemberFailuresAndFiltering(t *testing.T) {
 				t,
 				repo.Virtual,
 				func(p *pkgroute.Protocol) { p.Sources[repo.Remote] = src },
-				func(s store.Store) store.Store { return &faultStore{Store: s, repos: tc.repoFault} },
+				func(s pkgroute.Store) pkgroute.Store { return &faultStore{Store: s, repos: tc.repoFault} },
 			)
 			member := *repo.Defaults(&repo.Config{Key: "member", Class: repo.Remote, PackageType: repo.Puppet, URL: "https://example.com/puppet/"})
 			if err := f.db.Repos().Create(t.Context(), member); err != nil {

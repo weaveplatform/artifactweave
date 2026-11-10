@@ -30,6 +30,12 @@
 //     fault recorder) and the Protocol: its name, package types, error
 //     profile, reserved operations, absent paths, key resolution, anonymous
 //     challenge, host routes, signed requests and handlers.
+//   - The store, a Store: the artifacts module's stores and transactions
+//     (artifacts/core/port), with the settings and configuration documents,
+//     the work queue and the lease table (platform/settings,
+//     platform/configdoc and platform/work), which handlers hand on through
+//     DB() to the item service, a format's Env and the package index. It
+//     holds no access store: permissions come from the request's decider.
 //   - The request's principal and decider in its context, which the
 //     server's authentication middleware put there.
 //   - Remote: a protocol's opt-in to the common remote source boundary,
@@ -38,6 +44,9 @@
 // # Outputs
 //
 //   - The mounted routes, and the Kit each handler receives.
+//   - Store, the store the kit resolves repositories and reads items in, and
+//     DB() returns. The metadata store's aggregate satisfies it, so the
+//     server passes the store it holds.
 //   - Permission helpers: Can, CanFolder, Require and RequireFolder.
 //   - Download helpers: Item, ResolveItem, ServeItem, ServeFound, Read,
 //     ServeResult, ServeStream and SourceError.
@@ -73,7 +82,8 @@
 //   - Plan: docs/implementation/plan.md#p7-npm-go-maven-locals and
 //     #p9d-modular-monolith-migration, epic WEB
 //     (https://github.com/weaveplatform/artifactweave/issues/944).
-//   - https://github.com/weaveplatform/artifactweave/issues/1074
+//   - https://github.com/weaveplatform/artifactweave/issues/1074 and
+//     https://github.com/weaveplatform/artifactweave/issues/1089
 //
 // # Status
 //
@@ -81,7 +91,8 @@
 // host-root routes, encoded repository keys and multipart uploads (pull
 // request 580) for PyPI, NuGet, Helm and Terraform; P9 the remote source
 // boundary (pull requests 644 and 654); P9b and P9c the protocols that
-// followed. Staged in P9d.
+// followed. Staged in P9d, which narrowed the kit's store to Store
+// (https://github.com/weaveplatform/artifactweave/issues/1089).
 //
 // # Testing
 //

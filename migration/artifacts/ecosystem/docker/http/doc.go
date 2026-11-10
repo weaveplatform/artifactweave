@@ -35,10 +35,12 @@
 //     DockerAPI in the artifactory spec's strict server; its operations
 //     (rest.go) check image names with ValidName and find repositories with
 //     Lookup.
-//   - Driven: the item store (store.Store), which resolves repositories and
-//     reads items; the registry's writes (artifacts/core/registry), which
+//   - Driven: the registry's store (Options.Store, a
+//     artifacts/core/registry Store), which resolves repositories and reads
+//     items, and over which the registry's writes (artifacts/core/registry)
 //     keep upload sessions and store blobs, mounts, manifests and deletes
-//     through the item service; the format package
+//     through the item service; Lookup reads only repositories, from any
+//     format.Store; the format package
 //     (artifacts/ecosystem/docker, imported as layout), which names paths,
 //     parses manifests and finds blobs, manifests, tags, images and
 //     referrers; the access module's API (access/api), whose decider each
@@ -131,8 +133,9 @@
 //     indexes and referrers),
 //     https://github.com/weaveplatform/artifactweave/issues/226 (listings and
 //     deletes), https://github.com/weaveplatform/artifactweave/issues/624
-//     (remote reads), https://github.com/weaveplatform/artifactweave/issues/1022
-//     and https://github.com/weaveplatform/artifactweave/issues/1086
+//     (remote reads), https://github.com/weaveplatform/artifactweave/issues/1022,
+//     https://github.com/weaveplatform/artifactweave/issues/1086 and
+//     https://github.com/weaveplatform/artifactweave/issues/1089
 //
 // # Status
 //

@@ -65,12 +65,16 @@ type fixture struct {
 	faults []error
 }
 
-func newFixture(t *testing.T, wrap ...func(store.Store) store.Store) *fixture {
+func newFixture(t *testing.T, wrap ...func(pkgroute.Store) pkgroute.Store) *fixture {
 	t.Helper()
 	return newFixtureOn(t, inmem.New(), wrap...)
 }
 
-func newFixtureOn(t *testing.T, db store.Store, wrap ...func(store.Store) store.Store) *fixture {
+func newFixtureOn(
+	t *testing.T,
+	db store.Store,
+	wrap ...func(pkgroute.Store) pkgroute.Store,
+) *fixture {
 	t.Helper()
 	ctx := context.Background()
 	force := true
@@ -114,7 +118,7 @@ func newFixtureOn(t *testing.T, db store.Store, wrap ...func(store.Store) store.
 	}
 	f := &fixture{t: t, db: db, blobs: blobs, tick: time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC)}
 	f.items = &item.Service{Store: db, Blobs: blobs, Now: f.now, Formats: ecosystem.For}
-	backend := db
+	var backend pkgroute.Store = db
 	for _, w := range wrap {
 		backend = w(backend)
 	}
@@ -312,7 +316,7 @@ var errBroken = errors.New("broken store")
 // failingStore fails one of its package index's reads, or returns
 // versions whose metadata does not decode.
 type failingStore struct {
-	store.Store
+	pkgroute.Store
 	failing string
 }
 

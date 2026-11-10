@@ -31,7 +31,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -41,10 +40,17 @@ const (
 	prefix   = "/artifactory/api/nix/local/"
 )
 
+// serverStore is the one store the router kit serves and the access API is
+// bound over, as a server binds both.
+type serverStore interface {
+	pkgroute.Store
+	accesstest.Store
+}
+
 type fixture struct {
 	t          *testing.T
 	db         *inmem.Store
-	st         store.Store
+	st         serverStore
 	items      *item.Service
 	c          repo.Config
 	h          http.Handler

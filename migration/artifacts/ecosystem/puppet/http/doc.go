@@ -25,9 +25,10 @@
 //     repository's reindex (POST {repoKey}/reindex) beside it. An archive is
 //     published through the generic item routes, not through this protocol;
 //     the format's Handler admits it there.
-//   - Driven: the router kit (pkgroute.Kit), which resolves the repository
-//     and the caller, checks permissions, reads the package index, items
-//     and blobs, and writes errors; the remote source service
+//   - Driven: the router kit (pkgroute.Kit), whose store (pkgroute.Store)
+//     the handlers also reach through DB(), and which resolves the
+//     repository and the caller, checks permissions, reads the package
+//     index, items and blobs, and writes errors; the remote source service
 //     (Options.RemoteSources), which fetches an upstream Forge's release
 //     pages and archives into the remote cache; the blob store
 //     (Options.Blobs), which opens cached release pages; and the format
@@ -92,8 +93,9 @@
 //     (https://github.com/weaveplatform/artifactweave/issues/943) and WEB
 //     (https://github.com/weaveplatform/artifactweave/issues/944).
 //   - https://github.com/weaveplatform/artifactweave/issues/784,
-//     https://github.com/weaveplatform/artifactweave/issues/1045 and
-//     https://github.com/weaveplatform/artifactweave/issues/1086
+//     https://github.com/weaveplatform/artifactweave/issues/1045,
+//     https://github.com/weaveplatform/artifactweave/issues/1086 and
+//     https://github.com/weaveplatform/artifactweave/issues/1089
 //
 // # Status
 //

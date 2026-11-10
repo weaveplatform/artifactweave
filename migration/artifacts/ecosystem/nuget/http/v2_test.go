@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
@@ -410,7 +411,7 @@ func TestAccV2StoreFailures(t *testing.T) {
 		t.Run(failure, func(t *testing.T) {
 			f := newFixture(
 				t,
-				func(s store.Store) store.Store { return failingStore{Store: s, failing: failure} },
+				func(s pkgroute.Store) pkgroute.Store { return failingStore{Store: s, failing: failure} },
 			)
 			f.push("Acme.Mixed", "1.0", "")
 			wantStatus(t, f.do(http.MethodGet, legacyV2+"/Packages()", "reader"), 500)
@@ -420,7 +421,7 @@ func TestAccV2StoreFailures(t *testing.T) {
 		t.Run("entry-"+failure, func(t *testing.T) {
 			f := newFixture(
 				t,
-				func(s store.Store) store.Store { return failingStore{Store: s, failing: failure} },
+				func(s pkgroute.Store) pkgroute.Store { return failingStore{Store: s, failing: failure} },
 			)
 			f.push("Acme.Mixed", "1.0", "")
 			wantStatus(

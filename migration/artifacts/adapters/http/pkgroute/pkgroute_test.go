@@ -353,7 +353,7 @@ func TestAccAbsent(t *testing.T) {
 
 func TestAccDB(t *testing.T) {
 	db := inmem.New()
-	var got store.Store
+	var got pkgroute.Store
 	r := chi.NewRouter()
 	pkgroute.Mount(r, pkgroute.Options{Store: db}, pkgroute.Protocol{
 		Name: "dbfmt", Types: []repo.PackageType{repo.Generic},
@@ -440,7 +440,7 @@ type failingSource struct{}
 
 func (failingSource) Item(
 	context.Context,
-	store.Store,
+	pkgroute.Store,
 	repo.Config,
 	string,
 ) (pkgroute.Found, error) {

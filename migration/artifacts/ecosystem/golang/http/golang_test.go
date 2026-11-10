@@ -50,7 +50,7 @@ var created = time.Date(2026, 10, 16, 12, 30, 45, 0, time.UTC)
 // zips reads only .zip files, infos only .info files, and nobody nothing.
 type fixture struct {
 	h      http.Handler
-	db     store.Store
+	db     pkgroute.Store
 	served []string
 	faults []error
 }
@@ -62,7 +62,7 @@ func newFixture(t *testing.T) *fixture {
 }
 
 // newFixtureOn seeds seed and serves from serve, which may wrap seed.
-func newFixtureOn(t *testing.T, seed *inmem.Store, serve store.Store) *fixture {
+func newFixtureOn(t *testing.T, seed *inmem.Store, serve pkgroute.Store) *fixture {
 	t.Helper()
 	ctx := context.Background()
 	for _, c := range []repo.Config{

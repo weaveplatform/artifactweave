@@ -24,11 +24,12 @@
 //     the Warehouse JSON operations they declare: GET and HEAD of the
 //     simple index, the core metadata files, the JSON API and the files;
 //     twine's upload POST; and a REST deploy's PUT.
-//   - Driven: the router kit (pkgroute.Kit), which resolves the repository
-//     and the caller, checks permissions, reads and writes items and writes
-//     errors; the format package (artifacts/ecosystem/pypi), whose index
-//     records and name rules the pages are built from; and the remote
-//     source service (Options.RemoteSources), which fetches upstream
+//   - Driven: the router kit (pkgroute.Kit), whose store (pkgroute.Store)
+//     the handlers also reach through DB(), and which resolves the
+//     repository and the caller, checks permissions, reads and writes items
+//     and writes errors; the format package (artifacts/ecosystem/pypi),
+//     whose index records and name rules the pages are built from; and the
+//     remote source service (Options.RemoteSources), which fetches upstream
 //     indexes, metadata and distributions into the remote cache. PypiAPI
 //     builds the second mount's Options from the item kit
 //     (artifacts/adapters/http/itemkit): its PyPI format settings and
@@ -80,8 +81,9 @@
 //     (https://github.com/weaveplatform/artifactweave/issues/944).
 //   - https://github.com/weaveplatform/artifactweave/issues/627 (remote
 //     Python repositories),
-//     https://github.com/weaveplatform/artifactweave/issues/1032 and
-//     https://github.com/weaveplatform/artifactweave/issues/1086
+//     https://github.com/weaveplatform/artifactweave/issues/1032,
+//     https://github.com/weaveplatform/artifactweave/issues/1086 and
+//     https://github.com/weaveplatform/artifactweave/issues/1089
 //
 // # Status
 //

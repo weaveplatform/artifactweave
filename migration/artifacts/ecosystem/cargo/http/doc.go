@@ -19,14 +19,15 @@
 //     (pkgroute) for repositories of package type cargo. JFrog's reindex
 //     operation, /api/cargo/{repoKey}/reindex, is served beside the
 //     protocol, not by it.
-//   - Driven: the router kit (pkgroute.Kit), which resolves the repository
-//     and the caller, checks permissions, reads items and their properties,
-//     stores a published crate through the item service, where the format's
-//     hooks admit it, annotates a yanked version, serves items and writes
-//     errors; the remote source service, which fetches a remote's upstream
-//     config.json, index files and crates into the remote cache; and the
-//     format package, whose rules check every name, version, path, crate
-//     and record.
+//   - Driven: the router kit (pkgroute.Kit), whose store (pkgroute.Store)
+//     the handlers also reach through DB(), and which resolves the
+//     repository and the caller, checks permissions, reads items and their
+//     properties, stores a published crate through the item service, where
+//     the format's hooks admit it, annotates a yanked version, serves items
+//     and writes errors; the remote source service, which fetches a
+//     remote's upstream config.json, index files and crates into the remote
+//     cache; and the format package, whose rules check every name, version,
+//     path, crate and record.
 //
 // # Outputs
 //
@@ -79,8 +80,9 @@
 //   - Plan: docs/implementation/plan.md#p30-language-package-repositories
 //     and #p9d-modular-monolith-migration, epic ECO
 //     (https://github.com/weaveplatform/artifactweave/issues/943).
-//   - https://github.com/weaveplatform/artifactweave/issues/762 and
-//     https://github.com/weaveplatform/artifactweave/issues/1047
+//   - https://github.com/weaveplatform/artifactweave/issues/762,
+//     https://github.com/weaveplatform/artifactweave/issues/1047 and
+//     https://github.com/weaveplatform/artifactweave/issues/1089
 //
 // # Status
 //

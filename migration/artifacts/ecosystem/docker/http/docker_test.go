@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -172,7 +173,7 @@ func TestAccAPIVersionHeader(t *testing.T) {
 
 // fixture is a store with one repository of each kind the router tells
 // apart.
-func fixture(t *testing.T) store.Store {
+func fixture(t *testing.T) *inmem.Store {
 	t.Helper()
 	db := inmem.New()
 	for _, c := range []repo.Config{
@@ -856,7 +857,7 @@ func (f faultyRepos) List(ctx context.Context, filter store.RepoFilter) ([]repo.
 }
 
 type faultyStore struct {
-	store.Store
+	registry.Store
 	repos faultyRepos
 }
 

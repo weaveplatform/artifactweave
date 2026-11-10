@@ -18,11 +18,12 @@
 //   - Driving: the server, which mounts Protocol through the router kit
 //     (pkgroute) for repositories of package type bazelmodules, local,
 //     federated, virtual or remote, with the remote source service.
-//   - Driven: the router kit (pkgroute.Kit), which resolves the repository
-//     and the caller, checks permissions, reads items and blobs, serves
-//     stored items and writes errors; the remote source service, which
-//     fetches upstream metadata, modules, source.json documents, archives
-//     and patches into the remote cache; the public base URL
+//   - Driven: the router kit (pkgroute.Kit), whose store (pkgroute.Store)
+//     the handlers also reach through DB(), and which resolves the
+//     repository and the caller, checks permissions, reads items and blobs,
+//     serves stored items and writes errors; the remote source service,
+//     which fetches upstream metadata, modules, source.json documents,
+//     archives and patches into the remote cache; the public base URL
 //     (platform/httpkit/baseurl), which a source.json's archive URL starts
 //     with; the external dependency patterns (kernel/antpath); the generic
 //     download policy (artifacts/ecosystem/generic); and the format
@@ -75,8 +76,9 @@
 //   - Plan: docs/implementation/plan.md#p31-native-build-and-plugin-repositories
 //     and #p9d-modular-monolith-migration, epic ECO
 //     (https://github.com/weaveplatform/artifactweave/issues/943).
-//   - https://github.com/weaveplatform/artifactweave/issues/772 and
-//     https://github.com/weaveplatform/artifactweave/issues/1040
+//   - https://github.com/weaveplatform/artifactweave/issues/772,
+//     https://github.com/weaveplatform/artifactweave/issues/1040 and
+//     https://github.com/weaveplatform/artifactweave/issues/1089
 //
 // # Status
 //

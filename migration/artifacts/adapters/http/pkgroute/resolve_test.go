@@ -271,7 +271,7 @@ func TestAccResolveFailures(t *testing.T) {
 		!strings.Contains(terraformError(t, rec.Body.Bytes()), "malformed repository key") {
 		t.Fatalf("malformed key: %d %s", rec.Code, rec.Body)
 	}
-	for name, st := range map[string]store.Store{
+	for name, st := range map[string]pkgroute.Store{
 		"get":  brokenRepos{f.db},
 		"list": unlistable{f.db},
 	} {
@@ -305,7 +305,7 @@ func (unlistableRepos) List(context.Context, store.RepoFilter) ([]repo.Config, e
 }
 
 // unlistable finds repositories by their exact key, and fails to list them.
-type unlistable struct{ store.Store }
+type unlistable struct{ pkgroute.Store }
 
 func (s unlistable) Repos() store.RepoStore { return unlistableRepos{s.Store.Repos()} }
 

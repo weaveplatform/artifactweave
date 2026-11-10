@@ -24,12 +24,14 @@
 //     challenges an anonymous caller first, and the repository's reindex
 //     ({repoKey}/reindex) is a JFrog operation beside the protocol, which
 //     the protocol reserves.
-//   - Driven: the router kit (pkgroute.Kit), which resolves the repository
-//     and the caller, checks permissions, reads, stores and deletes items
-//     and writes errors; the token contract in Options (access/api), which
-//     issues the token a password login is exchanged for; the remote
-//     source service (Options.RemoteSources), which fetches upstream
-//     metadata and files into the remote cache; and the format package.
+//   - Driven: the router kit (pkgroute.Kit), whose store (pkgroute.Store)
+//     the handlers also reach through DB(), and which resolves the
+//     repository and the caller, checks permissions, reads, stores and
+//     deletes items and writes errors; the token contract in Options
+//     (access/api), which issues the token a password login is exchanged
+//     for; the remote source service (Options.RemoteSources), which fetches
+//     upstream metadata and files into the remote cache; and the format
+//     package.
 //
 // # Outputs
 //
@@ -83,8 +85,9 @@
 //   - Plan: docs/implementation/plan.md#p31-native-build-and-plugin-repositories
 //     and #p9d-modular-monolith-migration, epic ECO
 //     (https://github.com/weaveplatform/artifactweave/issues/943).
-//   - https://github.com/weaveplatform/artifactweave/issues/770 and
-//     https://github.com/weaveplatform/artifactweave/issues/1038
+//   - https://github.com/weaveplatform/artifactweave/issues/770,
+//     https://github.com/weaveplatform/artifactweave/issues/1038 and
+//     https://github.com/weaveplatform/artifactweave/issues/1089
 //
 // # Status
 //

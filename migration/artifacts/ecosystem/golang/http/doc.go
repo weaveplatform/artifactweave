@@ -18,10 +18,11 @@
 //     (pkgroute) for repositories of package type go: GET and HEAD for
 //     @v/list, @latest, @v/latest.info and a version's .info, .mod and .zip,
 //     and PUT for the version files jf go-publish deploys.
-//   - Driven: the router kit (pkgroute.Kit), which resolves the repository
-//     and the caller, checks permissions, downloads and stores items and
-//     writes errors; and the format package, which parses paths, reads the
-//     package index and chooses versions.
+//   - Driven: the router kit (pkgroute.Kit), whose store (pkgroute.Store)
+//     the handlers also reach through DB(), and which resolves the
+//     repository and the caller, checks permissions, downloads and stores
+//     items and writes errors; and the format package, which parses paths,
+//     reads the package index and chooses versions.
 //
 // # Outputs
 //
@@ -59,7 +60,8 @@
 //   - Plan: docs/implementation/plan.md#p7-npm-go-maven-locals,
 //     #p9-remote-repositories and #p9d-modular-monolith-migration, epic ECO
 //     (https://github.com/weaveplatform/artifactweave/issues/943).
-//   - https://github.com/weaveplatform/artifactweave/issues/1014
+//   - https://github.com/weaveplatform/artifactweave/issues/1014 and
+//     https://github.com/weaveplatform/artifactweave/issues/1089
 //
 // # Status
 //

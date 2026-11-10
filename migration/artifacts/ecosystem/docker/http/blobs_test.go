@@ -18,12 +18,14 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -36,7 +38,7 @@ func digestOf(s string) string {
 // stores behind it.
 type blobWorld struct {
 	t     *testing.T
-	db    store.Store
+	db    *inmem.Store
 	blobs blob.Store
 	h     http.Handler
 }
@@ -435,7 +437,7 @@ func TestAccMount(t *testing.T) {
 
 // principalAs puts the principal name holds into each request, as the
 // authentication middleware would.
-func principalAs(t *testing.T, db store.Store, h http.Handler, name string) http.Handler {
+func principalAs(t *testing.T, db *inmem.Store, h http.Handler, name string) http.Handler {
 	t.Helper()
 	p := kernel.Principal{Name: name}
 	if name == kernel.AnonymousUser {
@@ -691,7 +693,7 @@ func (failingItems) Search(context.Context, *aql.Query, aql.Options) ([]aql.Hit,
 }
 
 type itemsFault struct {
-	store.Store
+	registry.Store
 	items store.ItemStore
 }
 

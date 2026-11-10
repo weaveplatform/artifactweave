@@ -16,20 +16,21 @@
 //
 //   - Driving: the server, which mounts Protocol through the router kit
 //     (pkgroute) for repositories of package type gitlfs.
-//   - Driven: the router kit (pkgroute.Kit), which resolves the repository
-//     and the caller, checks permissions, stages uploads and stores objects
-//     through the item service, where the format's hooks admit them, reads
-//     items, blobs and the store's Git LFS locks, builds a virtual
-//     repository's member requests, serves items and source results and
-//     writes errors; the remote source service, which reads an upstream's
-//     batch answers, objects and lock pages for a remote, with the caller's
-//     access subject and decider (access/api); the request's base URL
-//     (platform/httpkit/baseurl), onto which action URLs point; the caller's
-//     principal and the kernel's errors, which lock owners and statuses come
-//     from; the generic download rule (artifacts/ecosystem/generic), which
-//     every object read meets first, so a blacked-out repository or an
-//     excluded path answers 404; and the format package, whose ObjectPath
-//     checks every OID.
+//   - Driven: the router kit (pkgroute.Kit), whose store (pkgroute.Store)
+//     the handlers also reach through DB(), and which resolves the
+//     repository and the caller, checks permissions, stages uploads and
+//     stores objects through the item service, where the format's hooks
+//     admit them, reads items, blobs and the store's Git LFS locks, builds
+//     a virtual repository's member requests, serves items and source
+//     results and writes errors; the remote source service, which reads an
+//     upstream's batch answers, objects and lock pages for a remote, with
+//     the caller's access subject and decider (access/api); the request's
+//     base URL (platform/httpkit/baseurl), onto which action URLs point;
+//     the caller's principal and the kernel's errors, which lock owners and
+//     statuses come from; the generic download rule
+//     (artifacts/ecosystem/generic), which every object read meets first,
+//     so a blacked-out repository or an excluded path answers 404; and the
+//     format package, whose ObjectPath checks every OID.
 //
 // # Outputs
 //
@@ -110,8 +111,9 @@
 //   - Plan: docs/implementation/plan.md#p33-automation-and-source-repositories
 //     and #p9d-modular-monolith-migration, epic ECO
 //     (https://github.com/weaveplatform/artifactweave/issues/943).
-//   - https://github.com/weaveplatform/artifactweave/issues/787 and
-//     https://github.com/weaveplatform/artifactweave/issues/1052
+//   - https://github.com/weaveplatform/artifactweave/issues/787,
+//     https://github.com/weaveplatform/artifactweave/issues/1052 and
+//     https://github.com/weaveplatform/artifactweave/issues/1089
 //
 // # Status
 //

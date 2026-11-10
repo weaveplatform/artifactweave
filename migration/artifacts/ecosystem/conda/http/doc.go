@@ -18,11 +18,12 @@
 //     (pkgroute) for repositories of package type conda, local, federated,
 //     virtual or remote, with the remote source service and the format's
 //     Settings.
-//   - Driven: the router kit (pkgroute.Kit), which resolves the repository
-//     and the caller, checks permissions, reads items and blobs, serves
-//     stored items and writes errors; the remote source service, which
-//     fetches upstream repodata, shard indexes, shards and archives into
-//     the remote cache; the generic download policy
+//   - Driven: the router kit (pkgroute.Kit), whose store (pkgroute.Store)
+//     the handlers also reach through DB(), and which resolves the
+//     repository and the caller, checks permissions, reads items and blobs,
+//     serves stored items and writes errors; the remote source service,
+//     which fetches upstream repodata, shard indexes, shards and archives
+//     into the remote cache; the generic download policy
 //     (artifacts/ecosystem/generic); and the format package, whose rules
 //     parse every path and check every document.
 //
@@ -73,8 +74,9 @@
 //   - Plan: docs/implementation/plan.md#p32-data-and-model-repositories
 //     and #p9d-modular-monolith-migration, epic ECO
 //     (https://github.com/weaveplatform/artifactweave/issues/943).
-//   - https://github.com/weaveplatform/artifactweave/issues/777 and
-//     https://github.com/weaveplatform/artifactweave/issues/1039
+//   - https://github.com/weaveplatform/artifactweave/issues/777,
+//     https://github.com/weaveplatform/artifactweave/issues/1039 and
+//     https://github.com/weaveplatform/artifactweave/issues/1089
 //
 // # Status
 //

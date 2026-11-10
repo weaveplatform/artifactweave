@@ -23,15 +23,16 @@
 //     remote, virtual or federated; the Xet CAS routes and a signed LFS
 //     upload carry their own capability, so the router serves them without
 //     authenticating them.
-//   - Driven: the router kit (pkgroute.Kit), which resolves the repository
-//     and the caller, checks permissions, reads and writes items and writes
-//     errors; the access contracts in Options (access/api), which recheck
-//     the credential a Xet token or an LFS upload grant names and evaluate
-//     its permissions, and scan the permissions a legacy migration would
-//     change; the keyring (Options.Keys), from whose master key the
-//     capabilities are signed; the remote source service
-//     (Options.RemoteSources), which fetches upstream Hub metadata and files
-//     into the remote cache; and the format and xet packages.
+//   - Driven: the router kit (pkgroute.Kit), whose store (pkgroute.Store)
+//     the handlers also reach through DB(), and which resolves the
+//     repository and the caller, checks permissions, reads and writes items
+//     and writes errors; the access contracts in Options (access/api),
+//     which recheck the credential a Xet token or an LFS upload grant names
+//     and evaluate its permissions, and scan the permissions a legacy
+//     migration would change; the keyring (Options.Keys), from whose master
+//     key the capabilities are signed; the remote source service
+//     (Options.RemoteSources), which fetches upstream Hub metadata and
+//     files into the remote cache; and the format and xet packages.
 //
 // # Outputs
 //
@@ -85,8 +86,9 @@
 //   - Plan: docs/implementation/plan.md#p32-data-and-model-repositories
 //     and #p9d-modular-monolith-migration, epic ECO
 //     (https://github.com/weaveplatform/artifactweave/issues/943).
-//   - https://github.com/weaveplatform/artifactweave/issues/779 and
-//     https://github.com/weaveplatform/artifactweave/issues/1036
+//   - https://github.com/weaveplatform/artifactweave/issues/779,
+//     https://github.com/weaveplatform/artifactweave/issues/1036 and
+//     https://github.com/weaveplatform/artifactweave/issues/1089
 //
 // # Status
 //

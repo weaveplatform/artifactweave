@@ -19,7 +19,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -28,7 +28,7 @@ import (
 // annotates in all of docker-local, and anonymous reads pub/.
 type tokenWorld struct {
 	t  *testing.T
-	db store.Store
+	db *inmem.Store
 	// kit is the access module over db, with the token service the registry
 	// reaches through kit.API().
 	kit *accesstest.Kit
