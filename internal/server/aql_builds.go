@@ -88,7 +88,7 @@ func (s artifactoryService) searchBuildsAQL(
 			httpkit.WriteErr(w, r, s.InternalError(ctx, "aql permissions", err))
 			return
 		}
-		hits = slices.DeleteFunc(hits, func(h aql.BuildHit) bool { return !acc.readsRun(h.Build) })
+		hits = slices.DeleteFunc(hits, func(h aql.BuildHit) bool { return !readsRun(acc, h.Build) })
 		if run != q && len(hits) > q.Limit {
 			hits = hits[:q.Limit]
 		}
@@ -141,9 +141,9 @@ func buildScoped(sc types.Scope) bool {
 	})
 }
 
-// readsRun reports whether the caller may read run b: the build resource
-// on the build-info repository, at the run's document path.
-func (a Access) readsRun(b types.Build) bool {
+// readsRun reports whether a may read run b: the build resource on the
+// build-info repository, at the run's document path.
+func readsRun(a itemkit.Access, b types.Build) bool {
 	repoKey, path := b.DocumentItem()
 	return a.Decider.Allows(
 		types.ResourceBuild,

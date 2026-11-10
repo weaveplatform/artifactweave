@@ -20,7 +20,7 @@ import (
 // Reindex rebuilds the repository's Helm index from every chart archive in
 // it, a remote repository's from its cache, and queues its index.yaml.
 // Which repositories the JFrog reindex operation accepts is the API's rule,
-// not the index's (internal/server, reindexOps).
+// not the index's (the item kit's ReindexOps).
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	return reindex(ctx, env, c, "")
 }

@@ -234,9 +234,9 @@ func nesting(
 		return n, err
 	}
 	n.ItemVisible = func(it types.Item) bool {
-		return len(acc.rows(configs, []aql.Hit{{Item: it}}, 0)) == 1
+		return len(readableRows(acc, configs, []aql.Hit{{Item: it}}, 0)) == 1
 	}
-	n.RunVisible = acc.readsRun
+	n.RunVisible = func(b types.Build) bool { return readsRun(acc, b) }
 	return n, nil
 }
 
@@ -330,13 +330,14 @@ func readable(
 	if err != nil {
 		return nil, err
 	}
-	return acc.rows(configs, hits, 0), nil
+	return readableRows(acc, configs, hits, 0), nil
 }
 
-// rows keeps the hits the caller may read, and also act on with want when
-// it names any action, that their repository's include and exclude patterns
+// readableRows keeps the hits a may read, and also act on with want when it
+// names any action, that their repository's include and exclude patterns
 // accept.
-func (a Access) rows(
+func readableRows(
+	a itemkit.Access,
 	configs map[string]repo.Config,
 	hits []aql.Hit,
 	want types.Actions,

@@ -143,6 +143,16 @@ linters:
       # return them as they did while the checks were the server root's own
       # functions; a wrap would add text that no response or log shows.
       # Without these lines wrapcheck reports 236 returns in the server root.
+      #
+      # The item kit's answers (artifacts/adapters/http/itemkit): its error
+      # mapping, its 404s and 500s, the caller and repository checks, the
+      # path parsers and the reindex queue return apierror values, kernel
+      # sentinels or errors that already name the operation, and each remote
+      # source request returns the source boundary's sentinels, which its
+      # caller tests with errors.Is. The artifacts and ecosystem handlers
+      # return them as they did while the kit was the server root's own
+      # code; a wrap would change what the response or the log says.
+      # Without these lines wrapcheck reports 161 returns in the server root.
       extra-ignore-sigs:
         - apierror.New(
         - format.Rejectf(
@@ -164,6 +174,32 @@ linters:
         - httpkit.Principal(
         - httpkit.Denied(
         - httpkit.BadRequestf(
+        - itemkit.Kit).Content(
+        - itemkit.Kit).InternalError(
+        - itemkit.Kit).ItemError(
+        - itemkit.Kit).ItemCaller(
+        - itemkit.Kit).OperationRepo(
+        - itemkit.Kit).Reindex(
+        - itemkit.Kit).ReindexAs(
+        - itemkit.Kit).Enqueue(
+        - itemkit.Kit).Queue(
+        - itemkit.Kit).Await(
+        - itemkit.AccessFor(
+        - itemkit.NotFoundRepo(
+        - itemkit.ItemNotFound(
+        - itemkit.OverwriteRefusal(
+        - itemkit.ParseItemPath(
+        - itemkit.ParseEscapedItemPath(
+        - itemkit.SplitRepoPath(
+        - itemkit.ResolveRepo(
+        - itemkit.DeployTarget(
+        - itemkit.Lookup(
+        - itemkit.AlpineSourceRequest(
+        - itemkit.CranSourceRequest(
+        - itemkit.DebianSourceRequest(
+        - itemkit.OpkgSourceRequest(
+        - itemkit.P2SourceRequest(
+        - itemkit.RPMSourceRequest(
 
   # 4) Issue-filtering (not disabling analysis, just silencing reports)
   exclusions:

@@ -357,5 +357,5 @@ still redirects a HEAD is on #216.
 - Decisions [0004](0004-storage-sql-metadata-and-blobs.md) (the blob contract),
   [0027](0027-cloud-blob-backends.md) (the cloud backends) and
   [0028](0028-blob-mirroring.md) (the mirror).
-- `migration/artifacts/adapters/http/itemkit/redirect.go` and `internal/server/items.go` (`serveFile`).
+- `migration/artifacts/adapters/http/itemkit/redirect.go` and `migration/artifacts/adapters/http/itemkit/items.go` (`ServeFile`).
 - `github.com/aws/aws-sdk-go-v2/feature/cloudfront/sign@v1.12.5`.

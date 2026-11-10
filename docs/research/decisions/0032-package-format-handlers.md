@@ -68,9 +68,9 @@ its method; the Go interfaces are `Inspector`, `Admitter`, `Resolver`, `Annotato
 changes (`NpmMetadataInterceptor`, research 24 fact 1.2), and P7's npm dist-tags are
 properties.
 
-**Format errors.** A format refuses with `format.RejectionError{Status, Message}`. `itemError`
-maps it to that status, in the envelope of the surface the request arrived on. Formats still
-never import `internal/server`.
+**Format errors.** A format refuses with `format.RejectionError{Status, Message}`. The item
+kit's `ItemError` maps it to that status, in the envelope of the surface the request arrived
+on. Formats still never import `internal/server`.
 
 **Source transfer restrictions** (amended 2026-10-28, #777). The optional
 `TransferSourceGuard` belongs to the source format; target `Inspect` and `Admit`

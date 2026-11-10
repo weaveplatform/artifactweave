@@ -26,7 +26,8 @@ const withPrincipal = "WithPrincipal"
 // through accessapi.WithCaller or authn.WithAuthorized, which forwards to it. A
 // principal stored alone still compiles and reads back, but it has no decider:
 // the Docker registry refuses it, pkgroute and terraformbackend deny it, and
-// accessFor quietly evaluates its permissions again for every question.
+// itemkit.AccessFor quietly evaluates its permissions again for every
+// question.
 var withPrincipalSites = []string{
 	// The bridge's alias of kernel.WithPrincipal, which PRO-02 deletes.
 	"internal/auth/bridge_kernel.go",
@@ -35,7 +36,7 @@ var withPrincipalSites = []string{
 	// The remote reindex stores the caller it has just rechecked without a
 	// decider, so that the repository check that follows evaluates that
 	// caller's current permissions rather than the request's.
-	"migration/artifacts/adapters/http/itemkit/reindex.go",
+	root + "/artifacts/adapters/http/itemkit/reindex.go",
 }
 
 // withPrincipalRule ends every problem: what to use instead.

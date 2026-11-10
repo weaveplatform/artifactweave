@@ -779,7 +779,7 @@ func (s artifactoryService) editProperties(
 		}
 		if ok {
 			if err := apply(target); err != nil {
-				return err //nolint:wrapcheck // mapped by itemError
+				return err //nolint:wrapcheck // mapped by ItemError
 			}
 		}
 		if !recursive || !target.Folder {
@@ -822,7 +822,7 @@ func (s artifactoryService) editTarget(
 ) (types.Item, bool, error) {
 	if v.path != "" {
 		it, err := v.st.Items().Get(ctx, v.repo.Key, cached, v.path)
-		return it, err == nil, err //nolint:wrapcheck // mapped by itemError
+		return it, err == nil, err //nolint:wrapcheck // mapped by ItemError
 	}
 	if create {
 		it, err := s.Items(v.st).EnsureRoot(ctx, item.Target{Repo: v.repo, Cached: cached}, by)
@@ -832,7 +832,7 @@ func (s artifactoryService) editTarget(
 	if errors.Is(err, store.ErrNotFound) {
 		return types.RootItem(v.repo.Key, cached), false, nil
 	}
-	return it, err == nil, err //nolint:wrapcheck // mapped by itemError
+	return it, err == nil, err //nolint:wrapcheck // mapped by ItemError
 }
 
 // parseProperties parses the properties API's "k=v1,v2;k2=v3": ";" or "|"

@@ -166,6 +166,9 @@ func (s *Kit) formatRemoteSourceRequest(
 	return q, nil
 }
 
+// P2SourceRequest admits only the P2 resources p2.Classify names, without
+// a query or range, and validates their bytes before they are served or
+// cached; an index or metadata file is metadata to the source boundary.
 func P2SourceRequest(q source.Request) (source.Request, error) {
 	name := q.Resource.Path
 	kind := p2.Classify(name)
@@ -203,6 +206,10 @@ func P2SourceRequest(q source.Request) (source.Request, error) {
 	return q, nil
 }
 
+// ServeRemoteStream answers an item GET or HEAD from a remote source's
+// result: the stream itself, or the checksum sidecar of the file it
+// describes, once RemoteDeliveryAllowed admits it. A use is recorded only
+// for a complete response.
 func (s *Kit) ServeRemoteStream(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -264,6 +271,9 @@ func (s *Kit) ServeRemoteStream(
 	}
 }
 
+// RemoteDeliveryAllowed revalidates a result that asks for it before it is
+// delivered, and on a failure closes its stream, answers with the source
+// error and reports false.
 func (s *Kit) RemoteDeliveryAllowed(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -282,6 +292,9 @@ func (s *Kit) RemoteDeliveryAllowed(
 	return true
 }
 
+// RemoteResource is the source resource an item request for path names,
+// with the query the client sent less the controls that only this server
+// reads, which are never forwarded upstream.
 func RemoteResource(r *http.Request, path string) source.Resource {
 	escapedKey, _, _ := strings.Cut(strings.TrimPrefix(r.URL.EscapedPath(), "/artifactory/"), "/")
 	resource := pkgroute.Resource(
@@ -305,6 +318,8 @@ func RemoteResource(r *http.Request, path string) source.Resource {
 	return resource
 }
 
+// AlpineSourceRequest refuses a query on an Alpine package or index, and
+// validates a remote APKINDEX as metadata before it is served or cached.
 func AlpineSourceRequest(q source.Request) (source.Request, error) {
 	path := q.Resource.Path
 	if q.Resource.Query != "" &&
@@ -464,6 +479,9 @@ func DebianSourceRequest(q source.Request) (source.Request, error) {
 	return q, nil
 }
 
+// CranSourceRequest validates a remote CRAN index as metadata and a
+// package with the parser local uploads go through, refuses a query on
+// either, and answers the paths CRAN never serves remotely as not found.
 func CranSourceRequest(q source.Request) (source.Request, error) {
 	p := q.Resource.Path
 	if feed, _, ok := cran.IndexPath(p); ok {
@@ -520,6 +538,8 @@ func CranSourceRequest(q source.Request) (source.Request, error) {
 	return q, nil
 }
 
+// OpkgSourceRequest refuses a query on an opkg feed index or package, and
+// validates a remote feed index as metadata before it is served or cached.
 func OpkgSourceRequest(q source.Request) (source.Request, error) {
 	p := q.Resource.Path
 	if q.Resource.Query != "" && (opkg.IsIndex(p) || strings.HasSuffix(p, ".ipk")) {
@@ -586,6 +606,9 @@ func OpkgSourceRequest(q source.Request) (source.Request, error) {
 	return q, nil
 }
 
+// RPMSourceRequest refuses a query on an RPM package or repodata file, and
+// validates a remote package and the repodata files before they are served
+// or cached.
 func RPMSourceRequest(q source.Request) (source.Request, error) {
 	p := q.Resource.Path
 	if q.Resource.Query != "" && (strings.HasSuffix(p, ".rpm") ||
@@ -648,6 +671,8 @@ func RPMSourceRequest(q source.Request) (source.Request, error) {
 	return q, nil
 }
 
+// RPMSourceIntegrity is the integrity failure, a 502, that a remote RPM
+// file which fails validation answers.
 func RPMSourceIntegrity() error {
 	return &source.HTTPError{Status: http.StatusBadGateway, Kind: source.FailureKindIntegrity}
 }

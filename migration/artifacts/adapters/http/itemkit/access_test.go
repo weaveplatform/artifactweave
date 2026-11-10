@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -13,7 +14,10 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// TestUnitAccessForEvaluatesWithoutDecider: accessFor keeps the decider it is
+// errBoom is the failure the scripted authorizer returns.
+var errBoom = errors.New("boom")
+
+// TestUnitAccessForEvaluatesWithoutDecider: AccessFor keeps the decider it is
 // given and asks Authorizer.For only when it has none, returning For's error
 // unwrapped. Over the access module that evaluation reads the anonymous
 // access setting, which counts as off while it was never written, so the
@@ -58,7 +62,7 @@ func TestUnitAccessForEvaluatesWithoutDecider(t *testing.T) {
 	}
 	reads := func() bool {
 		t.Helper()
-		acc, err := AccessFor(ctx, authorizerOver(st), kernel.Anonymous, nil)
+		acc, err := AccessFor(ctx, accesstest.Over(t, st).API().Authorizer, kernel.Anonymous, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

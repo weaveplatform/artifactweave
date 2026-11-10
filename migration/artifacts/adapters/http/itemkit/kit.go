@@ -91,7 +91,7 @@ type Overlay func(
 ) bool
 
 // Kit holds the item helpers that the artifacts management handlers and the
-// ecosystem root handlers share. Build one with NewKit, which sets what the
+// ecosystem root handlers share. Build one with New, which sets what the
 // zero value lacks.
 type Kit struct {
 	Deps
@@ -100,8 +100,8 @@ type Kit struct {
 	signWarn *throttle
 }
 
-// NewKit returns a kit over d. It does no I/O.
-func NewKit(d Deps) *Kit {
+// New returns a kit over d. It does no I/O.
+func New(d Deps) *Kit {
 	if d.Private == nil {
 		d.Private = func(repo.Config, string) bool { return false }
 	}

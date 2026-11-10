@@ -129,7 +129,7 @@ func (s artifactoryService) cleanTrash(ctx context.Context, repoPath string) err
 			return trashRefusalf(p, "Only an administrator can clean trash of a deleted repository")
 		case err != nil:
 			return s.InternalError(ctx, "get repository", err)
-		case !acc.removes(c, rest):
+		case !removes(acc, c, rest):
 			return trashRefusalf(p, "Delete or manage permission on '%s' is required", key)
 		}
 	}
@@ -234,7 +234,7 @@ func (s artifactoryService) restoreTrash(
 			)
 		case err != nil:
 			return s.InternalError(ctx, "get repository", err)
-		case !acc.removes(origin, fromPath):
+		case !removes(acc, origin, fromPath):
 			return trashRefusalf(p, "Delete or manage permission on '%s' is required",
 				strings.Trim(from, "/"))
 		}
@@ -242,7 +242,7 @@ func (s artifactoryService) restoreTrash(
 		// lies below it, can still refuse an item the check above allowed.
 		relocated := toKey != fromKey || toPath != "" && toPath != fromPath
 		permit = func(it types.Item) bool {
-			if !acc.removes(origin, it.FullPath()) {
+			if !removes(acc, origin, it.FullPath()) {
 				return false
 			}
 			// Restored native metadata bytes must remain behind the native filtering route.
@@ -292,17 +292,17 @@ func (s artifactoryService) restoreTrash(
 	return nil
 }
 
-// removes reports whether the caller may take what lies at path in c out
-// of the trash can: delete or manage there. Manage is accepted on its own
-// because a permission can grant it without delete.
-func (a Access) removes(c repo.Config, path string) bool {
+// removes reports whether a may take what lies at path in c out of the
+// trash can: delete or manage there. Manage is accepted on its own because
+// a permission can grant it without delete.
+func removes(a itemkit.Access, c repo.Config, path string) bool {
 	return a.File(c, path, types.ActionDelete) || a.File(c, path, types.ActionManage)
 }
 
-// seesTrash reports whether the caller sees what was trashed from path in c:
-// deploy or manage there, not read, as 7.x shows the trash can. Manage is
-// accepted on its own because a permission can grant it without deploy.
-func (a Access) seesTrash(c repo.Config, path string, folder bool) bool {
+// seesTrash reports whether a sees what was trashed from path in c: deploy
+// or manage there, not read, as 7.x shows the trash can. Manage is accepted
+// on its own because a permission can grant it without deploy.
+func seesTrash(a itemkit.Access, c repo.Config, path string, folder bool) bool {
 	return a.Item(c, path, folder, types.ActionWrite) ||
 		a.Item(c, path, folder, types.ActionManage)
 }
@@ -627,14 +627,14 @@ func (s artifactoryService) trashSight(
 		byKey[c.Key] = c
 		// A folder shows when something below it does, so at the root this
 		// asks whether the caller sees anything in the repository at all.
-		allowed = allowed || acc.seesTrash(c, rest, true)
+		allowed = allowed || seesTrash(acc, c, rest, true)
 	}
 	if !allowed {
 		return p, nil, httpkit.Denied(p)
 	}
 	return p, func(it types.Item) bool {
 		c, ok := byKey[it.RepoKey]
-		return ok && acc.seesTrash(c, it.FullPath(), it.Folder)
+		return ok && seesTrash(acc, c, it.FullPath(), it.Folder)
 	}, nil
 }
 

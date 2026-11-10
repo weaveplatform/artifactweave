@@ -124,7 +124,7 @@ func TestUnitP2VirtualFailsClosedWhenMemberStoreFails(t *testing.T) {
 		t.Context(),
 		st,
 		c,
-		itemkit.Access{d},
+		itemkit.Access{Decider: d},
 		map[string]bool{},
 	); !errors.Is(
 		err,

@@ -167,6 +167,8 @@ func OverwriteRefusal(ctx context.Context, e *item.OverwriteDeniedError) error {
 // Artifactory's wording.
 func ItemNotFound() error { return apierror.New(http.StatusNotFound, "Could not find resource") }
 
+// Items returns the item service over st, with the kit's blobs, formats,
+// work queue and access keys, which every item write goes through.
 func (s *Kit) Items(st store.Store) *item.Service {
 	svc := &item.Service{
 		Store:            st,
@@ -623,11 +625,13 @@ type StatusWriter struct {
 	hasFailed bool
 }
 
+// WriteHeader records code before it writes it.
 func (s *StatusWriter) WriteHeader(code int) {
 	s.status = code
 	s.ResponseWriter.WriteHeader(code)
 }
 
+// Write counts what it writes, and records a failure to write.
 func (s *StatusWriter) Write(b []byte) (int, error) {
 	if s.status == 0 {
 		s.status = http.StatusOK

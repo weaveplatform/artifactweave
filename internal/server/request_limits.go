@@ -216,7 +216,7 @@ func (s artifactoryService) budgetResources(
 	if err != nil {
 		return fmt.Errorf("budget repository: %w", err)
 	}
-	if (itemkit.Access{d}).Visible(c) {
+	if (itemkit.Access{Decider: d}).Visible(c) {
 		scope.Repository = c.Key
 		// A query parameter cannot redirect a repository's project accounting.
 		scope.Project = c.ProjectKey

@@ -4488,6 +4488,7 @@
     "direct_calls": [
       "httpkit.PtrTo",
       "it.ReportedRepoKey",
+      "itemkit.NotFoundRepo",
       "s.buildCaller",
       "s.buildError",
       "svc.Artifacts"
@@ -6469,6 +6470,7 @@
       "artgen.GetNpmScopeAuth200TextResponse",
       "baseurl.From",
       "httpkit.BadRequestf",
+      "itemkit.ResolveRepo",
       "npmhttp.ScopeAuthLines",
       "npmhttp.ValidScope",
       "s.Content",
@@ -7618,6 +7620,7 @@
     "handler": "internal/server/searches.go: artifactoryService.SearchCreation",
     "direct_calls": [
       "httpkit.FormatTime",
+      "itemkit.NotFoundRepo",
       "r.collect",
       "r.repoScope",
       "r.uri",
@@ -7737,6 +7740,7 @@
       "hit.Item.FullPath",
       "httpkit.BadRequestf",
       "httpkit.Deref",
+      "itemkit.DownloadURI",
       "ls.find",
       "r.entries",
       "r.layoutScope",
@@ -8768,6 +8772,7 @@
       "a.Decider.System",
       "accessapi.DeciderFrom",
       "artgen.GetStorageSummaryInfo200JSONResponse",
+      "itemkit.AccessFor",
       "kernel.RequireAuthenticated",
       "s.Content",
       "s.InternalError",
@@ -9677,6 +9682,7 @@
     "direct_calls": [
       "errors.Is",
       "httpkit.BadRequestf",
+      "itemkit.View",
       "s.Content",
       "s.InternalError",
       "s.readerFor",
@@ -10438,7 +10444,7 @@
   {
     "route": "GET /artifactory/{repoKey:(?:[^a/][^/]*|a(?:[^p/][^/]*)?|ap(?:[^i/][^/]*)?|api[^/]+)}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.(*Kit).GetItem-fm",
+    "handler": "internal/server/server.go: migration/artifacts/adapters/http/itemkit.(*Kit).GetItem-fm",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -10457,7 +10463,7 @@
   {
     "route": "GET /artifactory/{repoKey:(?:[^a/][^/]*|a(?:[^p/][^/]*)?|ap(?:[^i/][^/]*)?|api[^/]+)}/{archivePath}!/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.(*Kit).GetItem-fm",
+    "handler": "internal/server/server.go: migration/artifacts/adapters/http/itemkit.(*Kit).GetItem-fm",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -10476,7 +10482,7 @@
   {
     "route": "GET /artifactory/{repoKey:(?:[^a/][^/]*|a(?:[^p/][^/]*)?|ap(?:[^i/][^/]*)?|api[^/]+)}/{archivePath}!/{entryPath}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.(*Kit).GetItem-fm",
+    "handler": "internal/server/server.go: migration/artifacts/adapters/http/itemkit.(*Kit).GetItem-fm",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -10495,7 +10501,7 @@
   {
     "route": "GET /artifactory/{repoKey:(?:[^a/][^/]*|a(?:[^p/][^/]*)?|ap(?:[^i/][^/]*)?|api[^/]+)}/{filePath}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.(*Kit).GetItem-fm",
+    "handler": "internal/server/server.go: migration/artifacts/adapters/http/itemkit.(*Kit).GetItem-fm",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12973,7 +12979,7 @@
   {
     "route": "HEAD /artifactory/{repoKey:(?:[^a/][^/]*|a(?:[^p/][^/]*)?|ap(?:[^i/][^/]*)?|api[^/]+)}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.(*Kit).GetItem-fm",
+    "handler": "internal/server/server.go: migration/artifacts/adapters/http/itemkit.(*Kit).GetItem-fm",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12992,7 +12998,7 @@
   {
     "route": "HEAD /artifactory/{repoKey:(?:[^a/][^/]*|a(?:[^p/][^/]*)?|ap(?:[^i/][^/]*)?|api[^/]+)}/{archivePath}!/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.(*Kit).GetItem-fm",
+    "handler": "internal/server/server.go: migration/artifacts/adapters/http/itemkit.(*Kit).GetItem-fm",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -13011,7 +13017,7 @@
   {
     "route": "HEAD /artifactory/{repoKey:(?:[^a/][^/]*|a(?:[^p/][^/]*)?|ap(?:[^i/][^/]*)?|api[^/]+)}/{archivePath}!/{entryPath}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.(*Kit).GetItem-fm",
+    "handler": "internal/server/server.go: migration/artifacts/adapters/http/itemkit.(*Kit).GetItem-fm",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -13030,7 +13036,7 @@
   {
     "route": "HEAD /artifactory/{repoKey:(?:[^a/][^/]*|a(?:[^p/][^/]*)?|ap(?:[^i/][^/]*)?|api[^/]+)}/{filePath}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.(*Kit).GetItem-fm",
+    "handler": "internal/server/server.go: migration/artifacts/adapters/http/itemkit.(*Kit).GetItem-fm",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -17252,6 +17258,7 @@
       "fmt.Sprintf",
       "httpkit.AdminOnly",
       "httpkit.BadRequestf",
+      "itemkit.NotFoundRepo",
       "json.Unmarshal",
       "repos.Merge",
       "s.Content",
@@ -17484,6 +17491,7 @@
       "httpkit.Deref",
       "it.FullPath",
       "it.ReportedRepoKey",
+      "itemkit.DownloadURI",
       "r.capped",
       "r.refsOf",
       "re.MatchString",
@@ -18964,6 +18972,7 @@
       "fmt.Sprintf",
       "httpkit.AdminOnly",
       "httpkit.BadRequestf",
+      "itemkit.NotFoundRepo",
       "json.Unmarshal",
       "repos.Merge",
       "s.Content",

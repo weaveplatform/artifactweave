@@ -181,6 +181,8 @@ func (s *Kit) Reindex(
 	return s.ReindexAs(ctx, t, key, path, wait, format.KindReindex)
 }
 
+// ReindexAs is Reindex with the work kind to queue, for the operations
+// that queue another kind than format.KindReindex.
 func (s *Kit) ReindexAs(
 	ctx context.Context,
 	t repo.PackageType,

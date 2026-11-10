@@ -483,7 +483,7 @@ func newKit(cfg Config) *itemkit.Kit {
 			return descriptor.DownloadRedirectMinSize(ctx, cfg.Store.Configs())
 		}
 	}
-	return itemkit.NewKit(d)
+	return itemkit.New(d)
 }
 
 // newArtifactoryService returns the artifacts service over cfg with its own

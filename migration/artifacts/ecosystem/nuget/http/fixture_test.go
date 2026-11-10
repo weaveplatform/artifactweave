@@ -164,7 +164,7 @@ func newFixtureOn(t *testing.T, db store.Store, wrap ...func(store.Store) store.
 	return f
 }
 
-// itemError maps the item service's refusals as the server's itemError
+// itemError maps the item service's refusals as the item kit's ItemError
 // does, for those these tests meet.
 func itemError(_ context.Context, _ string, err error) error {
 	var refused *format.RejectionError

@@ -41,7 +41,7 @@ func (s artifactoryService) aqlAction(
 		if err != nil {
 			return nil, err
 		}
-		hits = acc.rows(configs, hits, want)
+		hits = readableRows(acc, configs, hits, want)
 	}
 	kept := hits[:0]
 	for _, h := range hits {

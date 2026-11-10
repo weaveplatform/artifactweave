@@ -49,6 +49,10 @@ exclude:
     # paths on invalid setup, while the transport itself
     # (migration/artifacts/adapters/upstream) stays in the per-package gate.
     - ^migration/artifacts/adapters/upstream/upstreamtest/
+    # Item kit test fixture: its remaining branches are t.Fatal paths of a
+    # store or blob directory that fails to seed, while the kit itself
+    # (migration/artifacts/adapters/http/itemkit) stays in the per-package gate.
+    - ^migration/artifacts/adapters/http/itemkit/kittest/
     # Skips container tests where Docker cannot run Linux containers; its
     # branches are the skip paths of other platforms.
     - ^pkg/containertest/
