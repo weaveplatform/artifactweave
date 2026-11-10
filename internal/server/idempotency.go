@@ -15,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
+	"github.com/weaveplatform/artifactweave/migration/platform/idempotency"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
@@ -25,7 +26,7 @@ const (
 
 // Explicitly refuse a key on unsupported routes before any handler can mutate
 // state. In particular, token responses never enter a replay cache.
-func idempotencyRoutes(next http.Handler) http.Handler {
+func IdempotencyRoutes(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if values, present := r.Header["Idempotency-Key"]; present {
 			parts := strings.Split(
@@ -38,7 +39,7 @@ func idempotencyRoutes(next http.Handler) http.Handler {
 			if !supported || len(values) != 1 {
 				apierror.Write(
 					w,
-					errorProfileFor(r.URL.Path),
+					httpkit.ErrorProfile(r),
 					httpkit.BadRequestf("Idempotency-Key is supported only once, on build append"),
 				)
 				return
@@ -71,8 +72,8 @@ func appendReplayRequest(
 	raw string,
 	p kernel.Principal,
 	ap build.Append,
-) (store.ReplayRequest, error) {
-	var request store.ReplayRequest
+) (idempotency.ReplayRequest, error) {
+	var request idempotency.ReplayRequest
 	key, err := replayKey(raw)
 	if err != nil {
 		return request, err
@@ -92,13 +93,13 @@ func appendReplayRequest(
 		return request, fmt.Errorf("append replay scope: %w", err)
 	}
 	now := time.Now().UTC()
-	return store.ReplayRequest{
+	return idempotency.ReplayRequest{
 		Scope: digestReplay(scope), Key: key, Fingerprint: digestReplay(ap.Modules),
 		Now: now, Expires: now.Add(replayRetention),
 	}, nil
 }
 
-func (s artifactoryAPI) appendOnce(
+func (s ArtifactoryAPI) appendOnce(
 	ctx context.Context,
 	svc *build.Service,
 	p kernel.Principal,
@@ -132,7 +133,7 @@ func (s artifactoryAPI) appendOnce(
 		return buildAccess{a}, err
 	})
 	switch {
-	case errors.Is(err, store.ErrReplayMismatch):
+	case errors.Is(err, idempotency.ErrReplayMismatch):
 		return apierror.New(
 			http.StatusUnprocessableEntity,
 			"Idempotency-Key was used with different request bytes",

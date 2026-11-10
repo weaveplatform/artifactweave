@@ -122,7 +122,7 @@ func TestAccAPIConcurrencyCancellation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := newArtifactoryAPI(Config{Store: st, RequestLimits: limits})
+	s := requestLimiter{cfg: Config{Store: st, RequestLimits: limits}}
 	router := chi.NewRouter()
 	router.Use(s.limitIngress(newLimitOptions(limits)), s.limitPrincipal(newLimitOptions(limits)))
 	entered := make(chan string, 4)

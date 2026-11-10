@@ -5,8 +5,9 @@
 package server
 
 import (
-	"cmp"
+	"bytes"
 	"context"
+	"io"
 	"log/slog"
 	"maps"
 	"net/http"
@@ -24,7 +25,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
@@ -35,45 +35,14 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	agentpackageshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/agentpackages/http"
-	aieditorextensionshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/aieditorextensions/http"
-	ansiblehttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/ansible/http"
-	bazelmoduleshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bazelmodules/http"
-	bowerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bower/http"
-	cargohttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cargo/http"
-	chefhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/chef/http"
-	cocoapodshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods/http"
-	composerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/composer/http"
-	conanhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conan/http"
-	condahttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conda/http"
 	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
-	gemshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/gems/http"
-	gitlfshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/gitlfs/http"
-	golanghttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang/http"
-	helmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm/http"
-	hexhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/hex/http"
-	huggingfacehttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface/http"
-	jetbrainspluginshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/jetbrainsplugins/http"
 	luarockshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/luarocks/http"
-	machinelearninghttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/machinelearning/http"
-	nimmodelhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nimmodel/http"
-	nixhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nix/http"
-	npmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm/http"
-	nugethttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget/http"
-	pubhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pub/http"
-	puppethttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/puppet/http"
-	pypihttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi/http"
-	skillshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/skills/http"
-	swifthttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/swift/http"
-	terraformhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/http"
 	terraformbackendhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend/http"
-	vagranthttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/vagrant/http"
 	configapi "github.com/weaveplatform/artifactweave/migration/configuration/api"
 	"github.com/weaveplatform/artifactweave/migration/configuration/core/descriptor"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob/mirror"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
@@ -95,9 +64,13 @@ type Config struct {
 	// RequestLimits owns shared request rates and this process's concurrency
 	// permits. Nil disables limits for embedders; the application wires them.
 	RequestLimits *apilimit.Service
-	// RemoteHTTP owns repository-scoped connection pools. The application closes
-	// it after draining requests; source adapters resolve credentials per revision.
-	RemoteHTTP *upstream.Pool
+	// RemoteHTTP owns repository-scoped connection pools, of which the
+	// router needs only Remove, for a deleted repository. The application
+	// closes it after draining requests; source adapters resolve credentials
+	// per revision. Assign it only a pool that exists, or leave it nil: a nil
+	// *upstream.Pool stored in it is a non-nil interface, so a delete would
+	// call Remove on the nil pool, which panics on the pool's lock.
+	RemoteHTTP interface{ Remove(key string) }
 	// Keys derives the key for short-lived Terraform download URLs.
 	Keys *crypt.Keyring
 	// BaseURL is the operator-configured public base URL; empty means derive
@@ -216,136 +189,9 @@ type Config struct {
 	CranArchiveMoverEnabled bool
 	HuggingFaceXetEnabled   bool
 	// Protocols are mounted through the router kit after the built-in ones
-	// (protocols). Only tests set it, to mount a test-only protocol.
+	// (the Protocols function). Only tests set it, to mount a test-only
+	// protocol.
 	Protocols []pkgroute.Protocol
-}
-
-// protocols are the package protocols with routers of their own, mounted
-// through the router kit (decision 0032). A format with a protocol adds its
-// constructor here.
-var protocols = []func(Config) pkgroute.Protocol{
-	func(cfg Config) pkgroute.Protocol {
-		return nixhttp.Protocol(nixhttp.Options{
-			RemoteSources: cfg.RemoteSources,
-			Authorizer:    cfg.Access.Authorizer,
-			KeyPairs:      cfg.Access.Keys,
-		})
-	},
-	func(cfg Config) pkgroute.Protocol {
-		return puppethttp.Protocol(
-			puppethttp.Options{Blobs: cfg.Blobs, RemoteSources: cfg.RemoteSources},
-		)
-	},
-	func(cfg Config) pkgroute.Protocol { return bazelmoduleshttp.Protocol(cfg.RemoteSources) },
-	func(cfg Config) pkgroute.Protocol {
-		return bowerhttp.Protocol(bowerhttp.Options{RemoteSources: cfg.RemoteSources})
-	},
-	func(cfg Config) pkgroute.Protocol {
-		return condahttp.Protocol(cfg.RemoteSources, cfg.FormatSettings.Conda)
-	},
-	func(cfg Config) pkgroute.Protocol { return ansiblehttp.Protocol(cfg.RemoteSources) },
-	func(Config) pkgroute.Protocol { return machinelearninghttp.Protocol() },
-	func(cfg Config) pkgroute.Protocol { return chefhttp.Protocol(cfg.RemoteSources) },
-	func(cfg Config) pkgroute.Protocol { return aieditorextensionshttp.Protocol(cfg.RemoteSources) },
-	func(cfg Config) pkgroute.Protocol {
-		return huggingfacehttp.Protocol(huggingfacehttp.Options{
-			XetEnabled:    cfg.HuggingFaceXetEnabled,
-			Authenticator: cfg.Access.Authenticator,
-			Authorizer:    cfg.Access.Authorizer,
-			Grants:        cfg.Access.Grants,
-			RemoteSources: cfg.RemoteSources,
-			Keys:          cfg.Keys,
-		})
-	},
-	func(cfg Config) pkgroute.Protocol {
-		return gitlfshttp.Protocol(gitlfshttp.Options{RemoteSources: cfg.RemoteSources})
-	},
-	func(Config) pkgroute.Protocol { return agentpackageshttp.Protocol() },
-	func(cfg Config) pkgroute.Protocol {
-		return conanhttp.Protocol(conanhttp.Options{
-			RemoteSources: cfg.RemoteSources, Tokens: cfg.Access.Tokens,
-		})
-	},
-	func(cfg Config) pkgroute.Protocol {
-		return cocoapodshttp.Protocol(cocoapodshttp.Options{RemoteSources: cfg.RemoteSources})
-	},
-	func(cfg Config) pkgroute.Protocol {
-		return pypihttp.Protocol(
-			pypihttp.Options{Format: cfg.FormatSettings.PyPI, RemoteSources: cfg.RemoteSources},
-		)
-	},
-	func(cfg Config) pkgroute.Protocol {
-		return terraformhttp.Protocol(terraformhttp.Options{
-			Authenticator:   cfg.Access.Authenticator,
-			Authorizer:      cfg.Access.Authorizer,
-			KeyPairs:        cfg.Access.Keys,
-			Restrictions:    cfg.Access.Restrictions,
-			Identity:        cfg.Access.Identity,
-			AnonymousAccess: cfg.Access.AnonymousAccess,
-			RemoteSources:   cfg.RemoteSources,
-			Keys:            cfg.Keys,
-		})
-	},
-	func(cfg Config) pkgroute.Protocol {
-		return helmhttp.Protocol(
-			helmhttp.Options{Format: cfg.FormatSettings.Helm, RemoteSources: cfg.RemoteSources},
-		)
-	},
-	func(cfg Config) pkgroute.Protocol {
-		return hexhttp.Protocol(
-			hexhttp.Options{RemoteSources: cfg.RemoteSources, KeyPairs: cfg.Access.Keys},
-		)
-	},
-	func(cfg Config) pkgroute.Protocol {
-		return luarockshttp.Protocol(luarockshttp.Options{RemoteSources: cfg.RemoteSources})
-	},
-	func(cfg Config) pkgroute.Protocol { return cargohttp.Protocol(cfg.RemoteSources) },
-	func(cfg Config) pkgroute.Protocol {
-		return composerhttp.Protocol(
-			composerhttp.Options{Blobs: cfg.Blobs, RemoteSources: cfg.RemoteSources},
-		)
-	},
-	func(cfg Config) pkgroute.Protocol {
-		return nimmodelhttp.Protocol(cfg.RemoteSources)
-	},
-	func(cfg Config) pkgroute.Protocol {
-		return jetbrainspluginshttp.Protocol(cfg.RemoteSources)
-	},
-	func(Config) pkgroute.Protocol { return golanghttp.Protocol() },
-	func(cfg Config) pkgroute.Protocol {
-		return npmhttp.Protocol(npmhttp.Options{
-			RemoteSources:  cfg.RemoteSources,
-			Accounts:       npmAccounts(cfg),
-			MaxPublishSize: cfg.NPMMaxPublishSize,
-			Format:         cfg.FormatSettings.NPM,
-		})
-	},
-	func(cfg Config) pkgroute.Protocol { return nugethttp.V3(cfg.RemoteSources) },
-	func(cfg Config) pkgroute.Protocol { return nugethttp.V2(cfg.RemoteSources) },
-	func(cfg Config) pkgroute.Protocol {
-		return gemshttp.Protocol(gemshttp.Options{RemoteSources: cfg.RemoteSources})
-	},
-	func(cfg Config) pkgroute.Protocol {
-		return pubhttp.Protocol(pubhttp.Options{Blobs: cfg.Blobs, RemoteSources: cfg.RemoteSources})
-	},
-	func(Config) pkgroute.Protocol { return skillshttp.Protocol() },
-	func(Config) pkgroute.Protocol { return vagranthttp.Protocol() },
-	func(cfg Config) pkgroute.Protocol {
-		return swifthttp.Protocol(swifthttp.Options{RemoteSources: cfg.RemoteSources})
-	},
-}
-
-// npmAccounts is what npm's login and logout need from cfg: the access
-// module's authenticator and token service. An absent one must stay a nil
-// interface, which the npm handlers answer 501. cfg.Access holds nil
-// interfaces, never typed nils, and a nil interface converts to a nil one,
-// so they are assigned as they are.
-func npmAccounts(cfg Config) npmhttp.Accounts {
-	return npmhttp.Accounts{
-		Passwords:   cfg.Access.Authenticator,
-		Tokens:      cfg.Access.Tokens,
-		TokenExpiry: cfg.NPMLoginTokenExpiry,
-	}
 }
 
 // newRegistry is the Docker registry for cfg, with the access module's token
@@ -393,21 +239,6 @@ func newRegistry(cfg Config, kit *itemkit.Kit) *dockerhttp.Registry {
 		Identity: cfg.Access.Identity,
 	}
 	return dockerhttp.New(o)
-}
-
-// Mirrors is what the storage endpoints need from the runtime's blob
-// mirrors (#18).
-type Mirrors interface {
-	// Optimize asks every mirror for an immediate repair pass.
-	Optimize()
-	// Status returns each mirror's status.
-	Status(ctx context.Context) ([]MirrorStatus, error)
-}
-
-// MirrorStatus is one tier's mirror: "blob" or "cold_blob".
-type MirrorStatus struct {
-	Tier string
-	mirror.Status
 }
 
 // withAccess returns cfg with Access bound over its store and services by
@@ -469,9 +300,9 @@ func withConfiguration(cfg Config) Config {
 var overlays = []itemkit.Overlay{
 	tryAgentMarketplaceItem,
 	tryAlpineItem,
-	tryCondaItem,
-	tryMachineLearningItem,
-	tryChefItem,
+	TryCondaItem,
+	TryMachineLearningItem,
+	TryChefItem,
 	tryCranItem,
 	tryDebianItem,
 	tryRPMItem,
@@ -479,18 +310,11 @@ var overlays = []itemkit.Overlay{
 	tryP2Item,
 }
 
-// privateItem reports the paths that only a format's own protocol serves
-// (itemkit.Deps.Private): Hugging Face's Xet and Conda's shards, the
-// machine learning formats' private files and Chef's metadata.
-func privateItem(c repo.Config, p string) bool {
-	return protocolPrivateItem(c, p) || machineLearningPrivate(c, p) || chefMetadataItem(c, p)
-}
-
-// newKit returns the item kit over cfg, with the router's overlays and
-// private predicate. The descriptor's minimum redirect size comes from the
-// configuration API's System: the artifacts module may not import the
-// configuration module's core.
-func newKit(cfg Config) *itemkit.Kit {
+// kitDeps returns the item kit's dependencies from cfg, with the router's
+// overlays and the artifacts handlers' private predicate. The descriptor's
+// minimum redirect size comes from the configuration API's System: the
+// artifacts module may not import the configuration module's core.
+func kitDeps(cfg Config) itemkit.Deps {
 	d := itemkit.Deps{
 		Store:                          cfg.Store,
 		Blobs:                          cfg.Blobs,
@@ -498,7 +322,6 @@ func newKit(cfg Config) *itemkit.Kit {
 		Redirect:                       cfg.Redirect,
 		RemoteSources:                  cfg.RemoteSources,
 		RegistrySources:                cfg.RegistrySources,
-		RemoteHTTP:                     cfg.RemoteHTTP,
 		Work:                           cfg.Work,
 		Formats:                        cfg.Formats,
 		FormatSettings:                 cfg.FormatSettings,
@@ -506,33 +329,43 @@ func newKit(cfg Config) *itemkit.Kit {
 		EnforceIdenticalChecksumDeploy: cfg.EnforceIdenticalChecksumDeploy,
 		Logger:                         cfg.Logger,
 		Overlays:                       overlays,
-		Private:                        privateItem,
+		Private:                        PrivateItem,
 	}
 	if cfg.Configuration.System != nil {
 		d.DownloadRedirectMinSize = cfg.Configuration.System.DownloadRedirectMinSize
 	}
-	return itemkit.New(d)
+	return d
 }
 
-// newArtifactoryAPI returns the artifacts partial over cfg with its own item
-// kit, which New hands to the ecosystem partials as well. Every artifacts
-// partial is built here: a literal without a kit compiles and then panics
-// on its first kit call.
-func newArtifactoryAPI(cfg Config) artifactoryAPI {
-	return artifactoryAPI{
-		Kit: newKit(cfg),
-		cfg: cfg,
-		folderSlots: make(
-			chan struct{},
-			cmp.Or(cfg.FolderDownloadMaxConcurrent, defaultFolderSlots),
-		),
+// newKit returns the item kit over cfg (kitDeps), for the root's handlers
+// that need one without the artifacts partial.
+func newKit(cfg Config) *itemkit.Kit { return itemkit.New(kitDeps(cfg)) }
+
+// artifactsDeps returns the artifacts handlers' dependencies from cfg.
+func artifactsDeps(cfg Config) Deps {
+	return Deps{
+		Deps:                        kitDeps(cfg),
+		RemoteHTTP:                  cfg.RemoteHTTP,
+		RemoteStatus:                cfg.RemoteStatus,
+		GC:                          cfg.GC,
+		Multipart:                   cfg.Multipart,
+		Mirrors:                     cfg.Mirrors,
+		BlobLocation:                cfg.BlobLocation,
+		AQL:                         cfg.AQL,
+		Search:                      cfg.Search,
+		AllowDuplicateBuildEntries:  cfg.AllowDuplicateBuildEntries,
+		FolderDownloadMaxConcurrent: cfg.FolderDownloadMaxConcurrent,
+		HuggingFaceXetEnabled:       cfg.HuggingFaceXetEnabled,
+		NPMLoginTokenExpiry:         cfg.NPMLoginTokenExpiry,
+		NPMMaxPublishSize:           cfg.NPMMaxPublishSize,
 	}
 }
 
-// managementBodyLimit bounds JSON management requests. 64 MiB covers the
-// largest documented payloads (batch repository creation, build-info) with
-// room to spare; artifact uploads never pass through it.
-const managementBodyLimit = 64 << 20
+// newArtifactoryAPI returns the artifacts partial over cfg, whose item kit
+// New hands to the ecosystem partials as well.
+func newArtifactoryAPI(cfg Config) ArtifactoryAPI {
+	return NewArtifactoryAPI(artifactsDeps(cfg))
+}
 
 // New returns the fully wired handler.
 func New(cfg Config) http.Handler {
@@ -567,9 +400,8 @@ func New(cfg Config) http.Handler {
 		Log:           cfg.Logger,
 		Repositories:  repos.NewRepositories(cfg.Store, cfg.Access.Keys, cfg.Access.Projects),
 	})
-	// The repositories collection is the router's own; access adds the key
-	// pairs'.
-	slashes := maps.Clone(slashCollections)
+	// The artifacts repositories collection, and access's key pairs.
+	slashes := SlashCollections()
 	maps.Copy(slashes, accesshttp.SlashCollections())
 	// The registry exists before the middleware, whose challenge it writes.
 	registry := newRegistry(cfg, kit)
@@ -585,18 +417,15 @@ func New(cfg Config) http.Handler {
 		middleware.NormalizeContentType(keepContentType),
 		middleware.CollectionSlash(slashes),
 		accesshttp.PlusAsSpace,
-		idempotencyRoutes,
+		IdempotencyRoutes,
 		accesshttp.APIRecoveryContext,
 	)
 	limits := newLimitOptions(cfg.RequestLimits)
+	limiter := requestLimiter{cfg: cfg}
 	if cfg.RequestLimits != nil {
-		r.Use(artAPI.limitIngress(limits))
+		r.Use(limiter.limitIngress(limits))
 	}
-	mounted := make([]pkgroute.Protocol, 0, len(protocols)+len(cfg.Protocols))
-	for _, p := range protocols {
-		mounted = append(mounted, p(cfg))
-	}
-	mounted = append(mounted, cfg.Protocols...)
+	mounted := append(Protocols(artifactsDeps(cfg)), cfg.Protocols...)
 	if cfg.Auth != nil {
 		r.Use(
 			accesshttp.Authenticate(
@@ -612,14 +441,14 @@ func New(cfg Config) http.Handler {
 		)
 	}
 	// After authentication, which it needs, and ahead of routing, which
-	// cannot match it (helmPartialReindex).
+	// cannot match it (HelmPartialReindex).
 	if cfg.Store != nil {
 		r.Use(accessHTTP.CheckAPIRestriction(healthRequest, writeLimitError))
 	}
 	if cfg.RequestLimits != nil {
-		r.Use(artAPI.limitPrincipal(limits))
+		r.Use(limiter.limitPrincipal(limits))
 	}
-	r.Use(artAPI.helmPartialReindex)
+	r.Use(artAPI.HelmPartialReindex)
 	r.NotFound(notFound)
 	r.MethodNotAllowed(methodNotAllowed)
 
@@ -638,26 +467,26 @@ func New(cfg Config) http.Handler {
 	r.Get("/router/api/v1/system/readiness", sysAPI.readiness(systemAPI.probeArtifactory))
 	r.Get("/router/api/v1/system/liveness", liveness)
 	r.Get("/router/api/v1/system/health", sysAPI.routerHealth)
-	r.Get("/artifactory/api/artifactweave/remote-status/{repoKey}", artAPI.smartStatus)
-	r.With(middleware.BodyLimit(managementBodyLimit)).
-		Patch("/artifactory/api/system/configuration", artAPI.patchConfiguration)
+	r.Get("/artifactory/api/artifactweave/remote-status/{repoKey}", artAPI.SmartStatus)
+	r.With(middleware.BodyLimit(middleware.ManagementBodyLimit)).
+		Patch("/artifactory/api/system/configuration", sysAPI.patchConfiguration)
 	// The item routes and the handwritten routes beside them keep their
 	// original order (item paths, AQL, agent marketplace, CRAN uploads,
 	// transfer, Debian snapshots), and all run before
 	// registerHandwrittenStubs: each claims the pattern the spec derives,
 	// so it replaces the 501 stub registered under that pattern rather than
 	// sitting beside it (decision 0002).
-	artAPI.registerItemRoutes(r)
-	artAPI.registerAgentMarketplaceRoutes(r)
+	artAPI.RegisterItemRoutes(r)
+	agentPluginItems{kit}.registerAgentMarketplaceRoutes(r)
 	cranOps.registerCranRoutes(r)
-	artAPI.registerTransferRoutes(r)
+	artAPI.RegisterTransferRoutes(r)
 	debianOps.registerDebianSnapshotRoutes(r)
-	artAPI.registerStorageRoutes(r)
-	artAPI.registerTrashRoutes(r)
-	artAPI.registerMultipartRoutes(r)
-	r.With(middleware.BodyLimit(managementBodyLimit)).Group(accessHTTP.RegisterRoutes)
-	artAPI.registerSearchRoutes(r)
-	artAPI.registerMavenRoutes(r)
+	artAPI.RegisterStorageRoutes(r)
+	artAPI.RegisterTrashRoutes(r)
+	artAPI.RegisterMultipartRoutes(r)
+	r.With(middleware.BodyLimit(middleware.ManagementBodyLimit)).Group(accessHTTP.RegisterRoutes)
+	artAPI.RegisterSearchRoutes(r)
+	mavenAPI{kit}.registerMavenRoutes(r)
 	// GitLab subgroup owners span path segments; the generated VCS routes
 	// handle the ordinary one-segment forms.
 	r.Get("/artifactory/api/vcs/*", vcsOps.vcsNested)
@@ -674,7 +503,7 @@ func New(cfg Config) http.Handler {
 		},
 	)
 	for _, p := range mounted {
-		pkgroute.Mount(r, artAPI.protocolOptions(), p)
+		pkgroute.Mount(r, artAPI.ProtocolOptions(), p)
 	}
 
 	// Products artifactweave does not implement. 501 names the product;
@@ -691,7 +520,10 @@ func New(cfg Config) http.Handler {
 	// Generated strict servers, one per spec, each under its service prefix
 	// with the management body limit.
 	r.Group(func(g chi.Router) {
-		g.Use(middleware.BodyLimit(managementBodyLimit), requestDetails(newDetailOptions()))
+		g.Use(
+			middleware.BodyLimit(middleware.ManagementBodyLimit),
+			requestDetails(newDetailOptions()),
+		)
 		strictOpts := artgen.StrictHTTPServerOptions{
 			RequestErrorHandlerFunc:  middleware.BindingError(http.StatusBadRequest),
 			ResponseErrorHandlerFunc: middleware.BindingError(http.StatusInternalServerError),
@@ -700,7 +532,7 @@ func New(cfg Config) http.Handler {
 			artgen.NewStrictHandlerWithOptions(artifactoryServer{
 				SecurityAPI:    accessHTTP.Security,
 				systemAPI:      &sysAPI,
-				artifactoryAPI: &artAPI,
+				ArtifactoryAPI: &artAPI,
 				vcsAPI:         &vcsOps,
 				npmAPI:         &npmOps,
 				dockerAPI:      &dockerOps,
@@ -796,9 +628,9 @@ func New(cfg Config) http.Handler {
 		)
 	})
 
-	artAPI.registerPypiMetadataRoutes(r)
-	artAPI.registerPuppetMetadataRoutes(r)
-	artAPI.registerChefReindex(r)
+	pypiAPI{kit}.registerPypiMetadataRoutes(r, artAPI.ProtocolOptions())
+	puppetAPI{kit}.registerPuppetMetadataRoutes(r, artAPI.ProtocolOptions())
+	chefAPI{kit}.registerChefReindex(r)
 
 	// Last, so every real handler above has already claimed its pattern.
 	registerHandwrittenStubs(r, logger)
@@ -838,7 +670,7 @@ func newAuthnOptions(
 	return accesshttp.AuthnOptions{
 		Auth:               a,
 		Store:              st,
-		SelfAuthenticated:  selfAuthenticated,
+		SelfAuthenticated:  SelfAuthenticated(),
 		Skip:               append([]func(*http.Request) bool{npmUserRequest}, skip...),
 		RegistryPath:       dockerhttp.IsRegistryPath,
 		ChallengeAnonymous: dockerhttp.ChallengesAnonymous,
@@ -860,6 +692,54 @@ func newLimitOptions(limits *apilimit.Service) limitOptions {
 	}
 }
 
+// detailOptions name the requests whose details requestDetails keeps. Each
+// contribution is declared beside the handler that reads what it keeps.
+type detailOptions struct {
+	// SearchQuery reports the requests whose raw query is kept
+	// (httpkit.RawSearchQuery), for parameters the generated binding drops.
+	SearchQuery []func(*http.Request) bool
+	// Rewrite normalises a request's body before the generated binding
+	// decodes it, each in order; an error answers 400 as a binding error.
+	Rewrite []func(*http.Request) error
+	// RawBody reports the requests whose raw body is kept (httpkit.RawBody),
+	// for handlers that must tell what the decoded type cannot.
+	RawBody []func(*http.Request) bool
+}
+
+// requestDetails keeps what the strict handlers need beyond their decoded
+// request: the Accept header of every request, for media-type negotiation,
+// and the raw query, rewritten body and raw body of the requests o names.
+// It runs after middleware.BodyLimit, so the copy is bounded.
+func requestDetails(o detailOptions) func(http.Handler) http.Handler {
+	matches := func(preds []func(*http.Request) bool, r *http.Request) bool {
+		return slices.ContainsFunc(preds, func(p func(*http.Request) bool) bool { return p(r) })
+	}
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := httpkit.WithAccept(r.Context(), r.Header.Get("Accept"))
+			if matches(o.SearchQuery, r) {
+				ctx = httpkit.WithSearchQuery(ctx, r.URL.RawQuery)
+			}
+			for _, rewrite := range o.Rewrite {
+				if err := rewrite(r); err != nil {
+					middleware.BindingError(http.StatusBadRequest)(w, r, err)
+					return
+				}
+			}
+			if matches(o.RawBody, r) {
+				b, err := io.ReadAll(r.Body)
+				if err != nil {
+					middleware.BindingError(http.StatusBadRequest)(w, r, err)
+					return
+				}
+				r.Body = io.NopCloser(bytes.NewReader(b))
+				ctx = httpkit.WithRawBody(ctx, b)
+			}
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
 // newDetailOptions returns requestDetails' options as the router composes
 // them, from the contributions beside each handler, access's through
 // DetailRules: the property and GAVC searches' raw queries, the policy body
@@ -868,10 +748,10 @@ func newLimitOptions(limits *apilimit.Service) limitOptions {
 func newDetailOptions() detailOptions {
 	access := accesshttp.DetailRules()
 	return detailOptions{
-		SearchQuery: []func(*http.Request) bool{keepsSearchQuery},
+		SearchQuery: []func(*http.Request) bool{KeepsSearchQuery},
 		Rewrite:     access.Rewrite,
 		RawBody: append(
-			[]func(*http.Request) bool{keepsRepositoryBody, keepsBuildBody},
+			[]func(*http.Request) bool{KeepsRepositoryBody, KeepsBuildBody},
 			access.RawBody...,
 		),
 	}

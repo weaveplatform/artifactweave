@@ -17,12 +17,12 @@ import (
 
 // registerAgentMarketplaceRoutes serves the agent plugin marketplace
 // documents. HEAD shares the GET handler, as on the item paths.
-func (s artifactoryAPI) registerAgentMarketplaceRoutes(r chi.Router) {
+func (s agentPluginItems) registerAgentMarketplaceRoutes(r chi.Router) {
 	r.Get("/artifactory/api/agentplugins/{repoKey}/{marketplace}", s.getAgentMarketplace)
 	r.Head("/artifactory/api/agentplugins/{repoKey}/{marketplace}", s.getAgentMarketplace)
 }
 
-func (s artifactoryAPI) getAgentMarketplace(w http.ResponseWriter, r *http.Request) {
+func (s agentPluginItems) getAgentMarketplace(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	st, err := s.Content()
 	if err != nil {
@@ -45,7 +45,7 @@ func (s artifactoryAPI) getAgentMarketplace(w http.ResponseWriter, r *http.Reque
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
-	agentPluginItems{s.Kit}.serveAgentMarketplace(w, r, st, c, name, p, acc)
+	s.serveAgentMarketplace(w, r, st, c, name, p, acc)
 }
 
 // agentPluginItems serves the agent plugin marketplace documents over the

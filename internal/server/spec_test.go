@@ -156,7 +156,7 @@ func TestAccHandwrittenRoutesNotGenerated(t *testing.T) {
 				artgen.NewStrictHandler(artifactoryServer{
 					SecurityAPI:    &accesshttp.SecurityAPI{},
 					systemAPI:      &systemAPI{},
-					artifactoryAPI: &artifactoryAPI{},
+					ArtifactoryAPI: &ArtifactoryAPI{},
 				}, nil),
 				artgen.ChiServerOptions{BaseRouter: r},
 			)

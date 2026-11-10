@@ -14,16 +14,32 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/mirror"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// Mirrors is what the storage endpoints need from the runtime's blob
+// mirrors (#18).
+type Mirrors interface {
+	// Optimize asks every mirror for an immediate repair pass.
+	Optimize()
+	// Status returns each mirror's status.
+	Status(ctx context.Context) ([]MirrorStatus, error)
+}
+
+// MirrorStatus is one tier's mirror: "blob" or "cold_blob".
+type MirrorStatus struct {
+	Tier string
+	mirror.Status
+}
+
 // GetStorageSummaryInfo answers the storage summary to an administrator or
 // to a token scoped system:info/storage:r, as 7.x's getstoragesummaryinfo
 // page allows. It is computed on every request, so it never lags writes.
-func (s artifactoryAPI) GetStorageSummaryInfo(
+func (s ArtifactoryAPI) GetStorageSummaryInfo(
 	ctx context.Context,
 	_ artgen.GetStorageSummaryInfoRequestObject,
 ) (artgen.GetStorageSummaryInfoResponseObject, error) {
@@ -61,7 +77,7 @@ func (s artifactoryAPI) GetStorageSummaryInfo(
 // as Artifactory's optimize starts its sharding repair (7.104.5). Admin
 // only. The acknowledgement texts are artifactweave's: the spec documents
 // only a plain-text body.
-func (s artifactoryAPI) OptimizeSystemStorage(
+func (s ArtifactoryAPI) OptimizeSystemStorage(
 	ctx context.Context,
 	_ artgen.OptimizeSystemStorageRequestObject,
 ) (artgen.OptimizeSystemStorageResponseObject, error) {
@@ -141,7 +157,7 @@ func replicaTallies(counts []store.ReplicaCount) map[string]wire.ReplicaTally {
 
 // RefreshStorageSummaryInfo acknowledges a recalculation. The summary is
 // computed on every request, so there is nothing to wait for.
-func (artifactoryAPI) RefreshStorageSummaryInfo(
+func (ArtifactoryAPI) RefreshStorageSummaryInfo(
 	ctx context.Context,
 	_ artgen.RefreshStorageSummaryInfoRequestObject,
 ) (artgen.RefreshStorageSummaryInfoResponseObject, error) {

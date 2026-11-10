@@ -27,7 +27,7 @@ import (
 // generated stub.
 
 // CalculateBowerIndex rebuilds the native Bower version index from manifests.
-func (s artifactoryAPI) CalculateBowerIndex(
+func (s ArtifactoryAPI) CalculateBowerIndex(
 	ctx context.Context,
 	req artgen.CalculateBowerIndexRequestObject,
 ) (artgen.CalculateBowerIndexResponseObject, error) {
@@ -37,7 +37,7 @@ func (s artifactoryAPI) CalculateBowerIndex(
 
 // CalculateConanRepositoryMetadata rebuilds the index from completed
 // recipe/package revisions. Conan manifests are the commit markers.
-func (s artifactoryAPI) CalculateConanRepositoryMetadata(
+func (s ArtifactoryAPI) CalculateConanRepositoryMetadata(
 	ctx context.Context,
 	req artgen.CalculateConanRepositoryMetadataRequestObject,
 ) (artgen.CalculateConanRepositoryMetadataResponseObject, error) {
@@ -47,7 +47,7 @@ func (s artifactoryAPI) CalculateConanRepositoryMetadata(
 
 // CalculateCranRepositoryMetadata rebuilds the hosted PACKAGES indexes. The
 // documented default is synchronous; async=true only schedules the work.
-func (s artifactoryAPI) CalculateCranRepositoryMetadata(
+func (s ArtifactoryAPI) CalculateCranRepositoryMetadata(
 	ctx context.Context,
 	req artgen.CalculateCranRepositoryMetadataRequestObject,
 ) (artgen.CalculateCranRepositoryMetadataResponseObject, error) {
@@ -58,7 +58,7 @@ func (s artifactoryAPI) CalculateCranRepositoryMetadata(
 
 // CalculateAlpineRepositoryMetadata queues the documented asynchronous
 // APKINDEX rebuild from the current stored package tree.
-func (s artifactoryAPI) CalculateAlpineRepositoryMetadata(
+func (s ArtifactoryAPI) CalculateAlpineRepositoryMetadata(
 	ctx context.Context,
 	req artgen.CalculateAlpineRepositoryMetadataRequestObject,
 ) (artgen.CalculateAlpineRepositoryMetadataResponseObject, error) {
@@ -67,7 +67,7 @@ func (s artifactoryAPI) CalculateAlpineRepositoryMetadata(
 }
 
 // CalculateCargoRepositoryMetadata validates and rebuilds the hosted crate view.
-func (s artifactoryAPI) CalculateCargoRepositoryMetadata(
+func (s ArtifactoryAPI) CalculateCargoRepositoryMetadata(
 	ctx context.Context,
 	req artgen.CalculateCargoRepositoryMetadataRequestObject,
 ) (artgen.CalculateCargoRepositoryMetadataResponseObject, error) {
@@ -75,7 +75,7 @@ func (s artifactoryAPI) CalculateCargoRepositoryMetadata(
 	return artgen.CalculateCargoRepositoryMetadata200TextResponse(msg), err
 }
 
-func (s artifactoryAPI) CalculateRubyGemsIndex(
+func (s ArtifactoryAPI) CalculateRubyGemsIndex(
 	ctx context.Context, req artgen.CalculateRubyGemsIndexRequestObject,
 ) (artgen.CalculateRubyGemsIndexResponseObject, error) {
 	msg, err := s.Reindex(ctx, repo.Gems, req.RepoKey, "", true)
@@ -85,7 +85,7 @@ func (s artifactoryAPI) CalculateRubyGemsIndex(
 // CalculateOpkgRepositoryMetadata rebuilds Packages, Packages.gz and Release
 // from the current IPKs in each feed. The documented endpoint is synchronous
 // unless async=true is selected.
-func (s artifactoryAPI) CalculateOpkgRepositoryMetadata(
+func (s ArtifactoryAPI) CalculateOpkgRepositoryMetadata(
 	ctx context.Context,
 	req artgen.CalculateOpkgRepositoryMetadataRequestObject,
 ) (artgen.CalculateOpkgRepositoryMetadataResponseObject, error) {
@@ -101,7 +101,7 @@ func (s artifactoryAPI) CalculateOpkgRepositoryMetadata(
 // helmAPI prefixes Helm's routes and its JFrog operations.
 const helmAPI = "/artifactory/api/helm/"
 
-// helmPartialReindex serves Helm's partial reindex, POST
+// HelmPartialReindex serves Helm's partial reindex, POST
 // /artifactory/api/helm/{repoKey}/{pathForPartialReindex}/reindex, whose
 // path may span several segments: "a path containing multiple charts ... as
 // well as ... a specific chart archive" (kubernetes-helm-chart-repositories).
@@ -111,7 +111,7 @@ const helmAPI = "/artifactory/api/helm/"
 // (decision 0032), so the operation is matched before routing. It queues
 // the reindex of the path, with the Helm reindex's permission, classes and
 // answer [I]: no source states them for the partial one (#216).
-func (s artifactoryAPI) helmPartialReindex(next http.Handler) http.Handler {
+func (s ArtifactoryAPI) HelmPartialReindex(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		key, p, ok := helmPartialReindexPath(r)
 		if !ok {
@@ -149,7 +149,7 @@ func helmPartialReindexPath(r *http.Request) (string, string, bool) {
 
 // The generated reindex operations of the package types with a format.
 
-func (s artifactoryAPI) CalculatePubRepositoryMetadata(
+func (s ArtifactoryAPI) CalculatePubRepositoryMetadata(
 	ctx context.Context,
 	req artgen.CalculatePubRepositoryMetadataRequestObject,
 ) (artgen.CalculatePubRepositoryMetadataResponseObject, error) {
@@ -161,7 +161,7 @@ func (s artifactoryAPI) CalculatePubRepositoryMetadata(
 	return artgen.CalculatePubRepositoryMetadata200TextResponse(msg), nil
 }
 
-func (s artifactoryAPI) CalculateCocoaPodsIndex(
+func (s ArtifactoryAPI) CalculateCocoaPodsIndex(
 	ctx context.Context,
 	req artgen.CalculateCocoaPodsIndexRequestObject,
 ) (artgen.CalculateCocoaPodsIndexResponseObject, error) {
@@ -175,7 +175,7 @@ func (s artifactoryAPI) CalculateCocoaPodsIndex(
 // CalculateCondaRepositoryMetadata rebuilds hosted channel indexes from
 // stored package archives. The documented async query controls whether the
 // response waits for the persistent worker.
-func (s artifactoryAPI) CalculateCondaRepositoryMetadata(
+func (s ArtifactoryAPI) CalculateCondaRepositoryMetadata(
 	ctx context.Context,
 	req artgen.CalculateCondaRepositoryMetadataRequestObject,
 ) (artgen.CalculateCondaRepositoryMetadataResponseObject, error) {
@@ -187,7 +187,7 @@ func (s artifactoryAPI) CalculateCondaRepositoryMetadata(
 	return artgen.CalculateCondaRepositoryMetadata200TextResponse(msg), nil
 }
 
-func (s artifactoryAPI) CalculateHelmChartIndex(
+func (s ArtifactoryAPI) CalculateHelmChartIndex(
 	ctx context.Context,
 	req artgen.CalculateHelmChartIndexRequestObject,
 ) (artgen.CalculateHelmChartIndexResponseObject, error) {
@@ -198,7 +198,7 @@ func (s artifactoryAPI) CalculateHelmChartIndex(
 	return artgen.CalculateHelmChartIndex200TextResponse(msg), nil
 }
 
-func (s artifactoryAPI) CalculateNuGetRepositoryMetadata(
+func (s ArtifactoryAPI) CalculateNuGetRepositoryMetadata(
 	ctx context.Context,
 	req artgen.CalculateNuGetRepositoryMetadataRequestObject,
 ) (artgen.CalculateNuGetRepositoryMetadataResponseObject, error) {
@@ -213,7 +213,7 @@ func (s artifactoryAPI) CalculateNuGetRepositoryMetadata(
 // async is true: "The calculation can be synchronous (the default) or
 // asynchronous" (calculatepypirepositorymetadata), with async=1 or 0 in the
 // archived reference, which the boolean binding reads too.
-func (s artifactoryAPI) CalculatePypiRepositoryMetadata(
+func (s ArtifactoryAPI) CalculatePypiRepositoryMetadata(
 	ctx context.Context,
 	req artgen.CalculatePypiRepositoryMetadataRequestObject,
 ) (artgen.CalculatePypiRepositoryMetadataResponseObject, error) {
@@ -225,7 +225,7 @@ func (s artifactoryAPI) CalculatePypiRepositoryMetadata(
 	return artgen.CalculatePypiRepositoryMetadata200TextResponse(msg), nil
 }
 
-func (s artifactoryAPI) CalculateTerraformIndex(
+func (s ArtifactoryAPI) CalculateTerraformIndex(
 	ctx context.Context,
 	req artgen.CalculateTerraformIndexRequestObject,
 ) (artgen.CalculateTerraformIndexResponseObject, error) {
@@ -236,7 +236,7 @@ func (s artifactoryAPI) CalculateTerraformIndex(
 	return artgen.CalculateTerraformIndex200TextResponse(msg), nil
 }
 
-func (s artifactoryAPI) CalculateSwiftIndex(
+func (s ArtifactoryAPI) CalculateSwiftIndex(
 	ctx context.Context,
 	req artgen.CalculateSwiftIndexRequestObject,
 ) (artgen.CalculateSwiftIndexResponseObject, error) {

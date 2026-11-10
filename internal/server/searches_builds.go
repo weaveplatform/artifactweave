@@ -38,7 +38,7 @@ func (r searchResponse) VisitSearchBuildArtifactsResponse(w http.ResponseWriter)
 // SearchDependency answers the dependency search: the build numbers with a
 // run the caller may read that lists a dependency with the SHA-1, each
 // once, in the order their runs were published.
-func (s artifactoryAPI) SearchDependency(
+func (s ArtifactoryAPI) SearchDependency(
 	ctx context.Context,
 	req artgen.SearchDependencyRequestObject,
 ) (artgen.SearchDependencyResponseObject, error) {
@@ -90,7 +90,7 @@ func (s artifactoryAPI) SearchDependency(
 // the paths any mapping matches in full. It checks the body before the
 // caller, needs a named user, and answers 404 whenever it finds no file, as
 // Artifactory's BuildArtifactsSearchResource does.
-func (s artifactoryAPI) SearchBuildArtifacts(
+func (s ArtifactoryAPI) SearchBuildArtifacts(
 	ctx context.Context,
 	req artgen.SearchBuildArtifactsRequestObject,
 ) (artgen.SearchBuildArtifactsResponseObject, error) {

@@ -7,7 +7,6 @@ import (
 	"net/http"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -39,8 +38,6 @@ type Deps struct {
 	// repositories cache-only. RegistrySources is Docker's, OCI's and OCI
 	// Helm's.
 	RemoteSources, RegistrySources *source.Service
-	// RemoteHTTP owns the repository-scoped connection pools.
-	RemoteHTTP *upstream.Pool
 	// Work is the runtime's work queue; nil writes derived work to the
 	// store's queue directly (decision 0033).
 	Work *work.Queue

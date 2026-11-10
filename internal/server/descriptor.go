@@ -15,7 +15,7 @@ import (
 // patchConfiguration is PATCH /api/system/configuration: the YAML descriptor
 // as a patch (decision 0009). It is hand-written because the body is YAML,
 // which the generated strict servers do not decode.
-func (s artifactoryAPI) patchConfiguration(w http.ResponseWriter, r *http.Request) {
+func (s systemAPI) patchConfiguration(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	fail := func(err error) { httpkit.WriteErr(w, r, err) }
 	if err := httpkit.AdminOnly(ctx); err != nil {
@@ -24,7 +24,7 @@ func (s artifactoryAPI) patchConfiguration(w http.ResponseWriter, r *http.Reques
 	}
 	// Without a store there is no configuration to apply, and the router
 	// binds Configuration only over one.
-	if _, err := s.Content(); err != nil {
+	if _, err := s.content(); err != nil {
 		fail(err)
 		return
 	}
@@ -51,7 +51,7 @@ func (s artifactoryAPI) patchConfiguration(w http.ResponseWriter, r *http.Reques
 		fail(httpkit.BadRequestf("%s", err.Error()))
 		return
 	case err != nil:
-		fail(s.InternalError(ctx, "apply configuration", err))
+		fail(s.internalError(ctx, "apply configuration", err))
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")

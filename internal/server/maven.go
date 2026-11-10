@@ -34,10 +34,13 @@ const (
 const calculateMetadataActions = types.ActionManage | types.ActionDelete | types.ActionWrite |
 	types.ActionAnnotate | types.ActionRead
 
+// mavenAPI serves the Maven REST operations over the item kit.
+type mavenAPI struct{ *itemkit.Kit }
+
 // registerMavenRoutes serves the Maven REST operations, hand-written in
 // the spec, under the patterns httpkit.ChiPatterns derives so they replace the 501
 // stubs (decision 0036).
-func (s artifactoryAPI) registerMavenRoutes(r chi.Router) {
+func (s mavenAPI) registerMavenRoutes(r chi.Router) {
 	for _, p := range httpkit.ChiPatterns(mavenCalculatePrefix + "{repoKey}/{folderPath}") {
 		r.Post(p, s.calculateMavenMetadata)
 	}
@@ -61,7 +64,7 @@ type mavenTarget struct {
 // for a caller who holds want at that path. The answers are Artifactory's
 // (research 27 section 9): 404 for a missing path or a repository that is
 // not local, and 400 for a type outside the Maven group.
-func (s artifactoryAPI) mavenTargetOf(
+func (s mavenAPI) mavenTargetOf(
 	r *http.Request,
 	prefix string,
 	want types.Actions,
@@ -112,7 +115,7 @@ func (s artifactoryAPI) mavenTargetOf(
 // calculateMavenMetadata answers POST /api/maven/calculateMetadata: it
 // queues the metadata of the folder and, unless noneRecursive is true,
 // everything under it, and answers 200 with an empty body once it has.
-func (s artifactoryAPI) calculateMavenMetadata(w http.ResponseWriter, r *http.Request) {
+func (s mavenAPI) calculateMavenMetadata(w http.ResponseWriter, r *http.Request) {
 	recursive := true
 	if v := r.URL.Query().Get("noneRecursive"); v != "" {
 		none, err := strconv.ParseBool(v)
@@ -148,7 +151,7 @@ func (s artifactoryAPI) calculateMavenMetadata(w http.ResponseWriter, r *http.Re
 // when the POM is already there. The caller needs Read on the jar, whose
 // content the POM may come from, and Deploy where the POM goes, which is
 // what writing it by hand would take (decision 0036).
-func (s artifactoryAPI) generateMavenPom(w http.ResponseWriter, r *http.Request) {
+func (s mavenAPI) generateMavenPom(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	t, err := s.mavenTargetOf(r, mavenGeneratePrefix, types.ActionRead)
 	if err == nil && (t.path == "" || t.it.Folder) {
@@ -173,7 +176,7 @@ func (s artifactoryAPI) generateMavenPom(w http.ResponseWriter, r *http.Request)
 
 // writePom deploys body at p unless something is there, for a caller who
 // may deploy at p.
-func (s artifactoryAPI) writePom(
+func (s mavenAPI) writePom(
 	ctx context.Context,
 	svc *item.Service,
 	t mavenTarget,

@@ -78,18 +78,18 @@ func TestAccReadsContent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ok, err := readsContent(ctx, db, acc, sum, privateItem); ok || err != nil {
+	if ok, err := readsContent(ctx, db, acc, sum, PrivateItem); ok || err != nil {
 		t.Fatalf("files of a deleted repository: %v %v", ok, err)
 	}
 	put("libs-local", "late.bin")
-	if ok, err := readsContent(ctx, db, acc, sum, privateItem); !ok || err != nil {
+	if ok, err := readsContent(ctx, db, acc, sum, PrivateItem); !ok || err != nil {
 		t.Fatalf("a readable file on the second page: %v %v", ok, err)
 	}
 	for name, st := range map[string]store.Store{
 		"find": buildSearchFaults{Store: db, fail: "find"},
 		"repo": faultyStore{Store: db, fail: map[string]bool{"get": true}},
 	} {
-		if _, err := readsContent(ctx, st, acc, sum, privateItem); !errors.Is(err, errBoom) {
+		if _, err := readsContent(ctx, st, acc, sum, PrivateItem); !errors.Is(err, errBoom) {
 			t.Errorf("%s failing: %v", name, err)
 		}
 	}

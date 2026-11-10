@@ -47,7 +47,7 @@ func (b buildAccess) Item(c repo.Config, path string, want types.Actions) bool {
 }
 
 // buildCaller returns the build service, the caller and its permissions.
-func (s artifactoryAPI) buildCaller(
+func (s ArtifactoryAPI) buildCaller(
 	ctx context.Context,
 ) (*build.Service, kernel.Principal, buildAccess, error) {
 	st, err := s.Content()
@@ -60,7 +60,7 @@ func (s artifactoryAPI) buildCaller(
 
 // buildError maps the build service's errors onto statuses; missing is the
 // 404 message for a build or run that does not exist.
-func (s artifactoryAPI) buildError(
+func (s ArtifactoryAPI) buildError(
 	ctx context.Context,
 	p kernel.Principal,
 	project, missing string,
@@ -117,7 +117,7 @@ func buildURI(ctx context.Context, segments ...string) string {
 // GetAllBuilds lists the build names the caller may read. It answers 200
 // with an empty list when there are none (decision 0014). The uri of each
 // entry is the name as it is, not escaped, as the JFrog CLI reads it.
-func (s artifactoryAPI) GetAllBuilds(
+func (s ArtifactoryAPI) GetAllBuilds(
 	ctx context.Context,
 	req artgen.GetAllBuildsRequestObject,
 ) (artgen.GetAllBuildsResponseObject, error) {
@@ -147,7 +147,7 @@ func (s artifactoryAPI) GetAllBuilds(
 // does; the JFrog CLI accepts 200, 201 and 204. The handler reads the raw
 // body requestDetails kept rather than the decoded one, which would drop
 // the fields the spec does not list.
-func (s artifactoryAPI) UploadBuild(
+func (s ArtifactoryAPI) UploadBuild(
 	ctx context.Context,
 	req artgen.UploadBuildRequestObject,
 ) (artgen.UploadBuildResponseObject, error) {
@@ -188,7 +188,7 @@ func checkBuildRepo(project string, buildRepo *string) error {
 // GetBuildRuns lists a build's runs, a number once per run, newest first.
 // The uri of each is the number as it is: jf rt bp --overwrite counts the
 // runs of a number by comparing it with the uri less its slash.
-func (s artifactoryAPI) GetBuildRuns(
+func (s ArtifactoryAPI) GetBuildRuns(
 	ctx context.Context,
 	req artgen.GetBuildRunsRequestObject,
 ) (artgen.GetBuildRunsResponseObject, error) {
@@ -220,7 +220,7 @@ func (s artifactoryAPI) GetBuildRuns(
 // checked as Artifactory 6.20's BuildResource.getBuildInfo checks it, and
 // one that passes answers 501 rather than the run, which a client would
 // take for the comparison.
-func (s artifactoryAPI) GetBuildInfo(
+func (s ArtifactoryAPI) GetBuildInfo(
 	ctx context.Context,
 	req artgen.GetBuildInfoRequestObject,
 ) (artgen.GetBuildInfoResponseObject, error) {
@@ -286,7 +286,7 @@ func (r buildInfoResponse) VisitGetBuildInfoResponse(w http.ResponseWriter) erro
 
 // AppendBuild adds modules to a run. Like the published document, the
 // modules are read from the raw body, so their unlisted fields survive.
-func (s artifactoryAPI) AppendBuild(
+func (s ArtifactoryAPI) AppendBuild(
 	ctx context.Context,
 	req artgen.AppendBuildRequestObject,
 ) (artgen.AppendBuildResponseObject, error) {
@@ -318,7 +318,7 @@ func (s artifactoryAPI) AppendBuild(
 }
 
 // RenameBuild moves every run of a build to another name.
-func (s artifactoryAPI) RenameBuild(
+func (s ArtifactoryAPI) RenameBuild(
 	ctx context.Context,
 	req artgen.RenameBuildRequestObject,
 ) (artgen.RenameBuildResponseObject, error) {
@@ -343,7 +343,7 @@ func (s artifactoryAPI) RenameBuild(
 
 // DeleteBuilds deletes runs of a build named in the path. buildNumbers is
 // comma-separated, and a number listed twice deletes two runs.
-func (s artifactoryAPI) DeleteBuilds(
+func (s ArtifactoryAPI) DeleteBuilds(
 	ctx context.Context,
 	req artgen.DeleteBuildsRequestObject,
 ) (artgen.DeleteBuildsResponseObject, error) {
@@ -366,7 +366,7 @@ func (s artifactoryAPI) DeleteBuilds(
 
 // DeleteBuildsMultiple is the body form of DeleteBuilds, which jf rt bp
 // --overwrite sends with a number once per existing run.
-func (s artifactoryAPI) DeleteBuildsMultiple(
+func (s ArtifactoryAPI) DeleteBuildsMultiple(
 	ctx context.Context,
 	req artgen.DeleteBuildsMultipleRequestObject,
 ) (artgen.DeleteBuildsMultipleResponseObject, error) {
@@ -381,7 +381,7 @@ func (s artifactoryAPI) DeleteBuildsMultiple(
 	return artgen.DeleteBuildsMultiple200TextResponse(msg), nil
 }
 
-func (s artifactoryAPI) deleteBuilds(ctx context.Context, d build.Delete) (string, error) {
+func (s ArtifactoryAPI) deleteBuilds(ctx context.Context, d build.Delete) (string, error) {
 	svc, p, a, err := s.buildCaller(ctx)
 	if err != nil {
 		return "", err
@@ -403,7 +403,7 @@ func (s artifactoryAPI) deleteBuilds(ctx context.Context, d build.Delete) (strin
 // GetBuildArtifacts lists where the artifacts of a number's latest run are.
 // The JFrog CLI calls it before its AQL fallback, and reads only repo, path
 // and name (research 22 §3.1).
-func (s artifactoryAPI) GetBuildArtifacts(
+func (s ArtifactoryAPI) GetBuildArtifacts(
 	ctx context.Context,
 	req artgen.GetBuildArtifactsRequestObject,
 ) (artgen.GetBuildArtifactsResponseObject, error) {
@@ -436,7 +436,7 @@ func (s artifactoryAPI) GetBuildArtifacts(
 // promotion that met an error or a warning answers 400 with its report, as
 // Artifactory does; otherwise the report answers 200, even when files
 // failed.
-func (s artifactoryAPI) PromoteBuild(
+func (s ArtifactoryAPI) PromoteBuild(
 	ctx context.Context,
 	req artgen.PromoteBuildRequestObject,
 ) (artgen.PromoteBuildResponseObject, error) {
@@ -566,7 +566,7 @@ func promotionProperties(in map[string]any) (props types.Properties, bad string)
 // keep. With async it checks the request, answers, and discards in the
 // background, logging what goes wrong there. The CLI accepts only 204
 // (decision 0014).
-func (s artifactoryAPI) ControlBuildRetention(
+func (s ArtifactoryAPI) ControlBuildRetention(
 	ctx context.Context,
 	req artgen.ControlBuildRetentionRequestObject,
 ) (artgen.ControlBuildRetentionResponseObject, error) {
@@ -618,10 +618,10 @@ func buildInfoProject(repoKey string) (string, bool) {
 	return p, ok && p != ""
 }
 
-// keepsBuildBody reports a build-info publish or append, whose raw body
+// KeepsBuildBody reports a build-info publish or append, whose raw body
 // requestDetails keeps because the document is stored as published
 // (decision 0014).
-func keepsBuildBody(r *http.Request) bool {
+func KeepsBuildBody(r *http.Request) bool {
 	return r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, buildsPath+"/append/") ||
 		r.Method == http.MethodPut && r.URL.Path == buildsPath
 }

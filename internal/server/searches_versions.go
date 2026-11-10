@@ -24,7 +24,7 @@ const anyTarget = "_any"
 // spelling counts, as JFrog documents.
 const versionProperty = "version"
 
-func (s artifactoryAPI) registerSearchRoutes(r chi.Router) {
+func (s ArtifactoryAPI) RegisterSearchRoutes(r chi.Router) {
 	for _, p := range httpkit.ChiPatterns(versionsPrefix + "{repo}/{path}") {
 		r.Get(p, s.latestVersionByProperties)
 	}
@@ -36,7 +36,7 @@ func (s artifactoryAPI) registerSearchRoutes(r chi.Router) {
 // query parameter as a property, and with listFiles=1 the files that carry
 // it, by download URL. It needs a named user, and only files the caller may
 // read count.
-func (s artifactoryAPI) latestVersionByProperties(w http.ResponseWriter, req *http.Request) {
+func (s ArtifactoryAPI) latestVersionByProperties(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
 	r, err := s.newSearch(ctx, true)
 	if err != nil {

@@ -13,7 +13,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -24,23 +23,6 @@ import (
 // versionMediaType is the vendor type Artifactory advertises for the version
 // document; clients that send it in Accept get it back.
 const versionMediaType = "application/vnd.org.jfrog.artifactory.system.Version+json"
-
-// artifactoryAPI is the artifacts module's partial strict server: the
-// repository, build, search, trash, storage summary and reindex operations
-// of the artifactory spec, and the handwritten item, transfer, storage and
-// search routes. Handlers of an ecosystem without a partial of its own,
-// such as the agent marketplace, stay here until their files move. The
-// composite strict server (composites.go) adds the other partials and the
-// generated stubs.
-type artifactoryAPI struct {
-	// Kit is the item kit every partial shares; newArtifactoryAPI builds
-	// it, and a literal without one panics on its first kit call.
-	*itemkit.Kit
-	cfg Config
-	// folderSlots holds a token for each folder archive download running;
-	// nil, in services built only to reach the store, limits nothing.
-	folderSlots chan struct{}
-}
 
 // systemAPI implements the artifactory spec's system operations (version,
 // license, service id, readiness and liveness) and the reverse proxy
@@ -67,6 +49,16 @@ func (s systemAPI) log() *slog.Logger {
 		return slog.Default()
 	}
 	return s.cfg.Logger
+}
+
+// content returns the store. A router built without one (tests of the
+// routing alone) answers like an unimplemented operation, as the item
+// kit's Content does for the artifacts routes.
+func (s systemAPI) content() (store.Store, error) {
+	if s.cfg.Store == nil {
+		return nil, apierror.ErrNotImplemented
+	}
+	return s.cfg.Store, nil
 }
 
 func (s systemAPI) GetSystemVersion(

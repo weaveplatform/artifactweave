@@ -31,7 +31,7 @@ const aqlBuildsRestricted = "non-admin queries may use only the items domain; " 
 // the rows are the runs, or the promotions of runs, the build permission
 // lets the caller read on the run's document path, as the Builds API
 // checks it. The limit, scan factor and result cap work as for items.
-func (s artifactoryAPI) searchBuildsAQL(
+func (s ArtifactoryAPI) searchBuildsAQL(
 	w http.ResponseWriter,
 	r *http.Request,
 	st store.Store,
@@ -111,7 +111,7 @@ func (s artifactoryAPI) searchBuildsAQL(
 // nestBuilds finds the rows of the related domains q's include names, as
 // p may see them (nesting). The configured repositories are read only
 // then, for the items such an include reaches.
-func (s artifactoryAPI) nestBuilds(
+func (s ArtifactoryAPI) nestBuilds(
 	ctx context.Context,
 	st store.Store,
 	p kernel.Principal,

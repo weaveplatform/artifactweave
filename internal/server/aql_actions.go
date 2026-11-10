@@ -23,7 +23,7 @@ import (
 // them, or their repository's patterns reject them as they would for find.
 // The checks are the ones DELETE and set-properties make, so an action can
 // do nothing those would refuse.
-func (s artifactoryAPI) aqlAction(
+func (s ArtifactoryAPI) aqlAction(
 	ctx context.Context,
 	st store.Store,
 	p kernel.Principal,

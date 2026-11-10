@@ -121,6 +121,12 @@ func RecoverPanic(
 	}
 }
 
+// ManagementBodyLimit is the BodyLimit every JSON management group mounts, in
+// the router and in the handler packages that register their own groups, so
+// that one figure bounds them all. 64 MiB covers the largest documented
+// payloads (batch repository creation, build-info) with room to spare.
+const ManagementBodyLimit = 64 << 20
+
 // BodyLimit rejects management request bodies above limit. It is mounted only
 // on JSON management groups; artifact uploads are streamed and must never pass
 // through it. A declared Content-Length above the limit is refused up front;

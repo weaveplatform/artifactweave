@@ -15,7 +15,7 @@ import (
 
 // Cached metadata describes versions outside an individual caller's permission
 // patterns. Only the native API filters and rewrites those documents.
-func tryChefItem(
+func TryChefItem(
 	_ *itemkit.Kit, w http.ResponseWriter, r *http.Request, _ store.Store, c repo.Config,
 	_ bool, req itemkit.ItemRequest, _ kernel.Principal, _ itemkit.Access,
 ) bool {

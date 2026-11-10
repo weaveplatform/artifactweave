@@ -512,7 +512,7 @@ func TestAccProtocolErrorProfiles404(t *testing.T) {
 // p8Paths are a path of each P8 protocol, under a repository that does not
 // exist, and the catch-all's answer to it while the protocol is not
 // mounted: a 404 rendered with the protocol's error response profile.
-// Once the format's pull request adds the protocol to protocols, its router
+// Once the format's pull request adds the protocol to Protocols, its router
 // kit answers instead, with a 404 in the protocol's own envelope, and the
 // row checks that. So no format's pull request has to change a row here.
 var p8Paths = []struct {
@@ -553,8 +553,8 @@ var p8Paths = []struct {
 
 // mounted returns the built-in protocol named name, if it is mounted.
 func mounted(name string) (pkgroute.Protocol, bool) {
-	for _, p := range protocols {
-		if proto := p(Config{}); proto.Name == name {
+	for _, proto := range Protocols(Deps{}) {
+		if proto.Name == name {
 			return proto, true
 		}
 	}
@@ -644,5 +644,40 @@ func TestAccStrictBindingErrorThroughRouter(t *testing.T) {
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/artifactory/api/system/version", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status %d", rec.Code)
+	}
+}
+
+func TestAccRequestDetailsReadFailure(t *testing.T) {
+	h := requestDetails(
+		newDetailOptions(),
+	)(
+		http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			t.Fatal("reached the handler")
+		}),
+	)
+	req := httptest.NewRequest(
+		"POST",
+		"/artifactory/api/repositories/x",
+		io.NopCloser(failingReader{}),
+	)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status %d", rec.Code)
+	}
+	for path, want := range map[string]bool{
+		"/artifactory/api/repositories/x":          true,
+		"/artifactory/api/v2/repositories/batch":   true,
+		"/artifactory/api/repositories/":           false,
+		"/artifactory/api/repositories/x/y":        false,
+		"/artifactory/api/repositories/existence2": true,
+	} {
+		// The path rule is unexported in the artifacts handlers, so the
+		// table reaches it through their predicate, which applies it to a
+		// POST.
+		got := KeepsRepositoryBody(httptest.NewRequest(http.MethodPost, path, nil))
+		if got != want {
+			t.Errorf("%s: %v", path, got)
+		}
 	}
 }

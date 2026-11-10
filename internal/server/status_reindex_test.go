@@ -117,7 +117,7 @@ func createReindexRepos(t *testing.T, st store.Store) {
 // table. reindexer holds Manage on their repositories and nothing else,
 // which every operation but Terraform's needs.
 var reindexStatusPart = statusPart{
-	// The partial reindex is matched before routing (helmPartialReindex).
+	// The partial reindex is matched before routing (HelmPartialReindex).
 	handwritten: map[string]bool{reindexHelmPath: true},
 	generated:   map[string]bool{reindexPyPI: true, reindexHelm: true, reindexTerraform: true},
 	rows: func() []statusCase {

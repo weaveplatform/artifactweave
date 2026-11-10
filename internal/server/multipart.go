@@ -19,7 +19,7 @@ import (
 )
 
 // Multipart upload routes (migration/artifacts/core/multipart). create authenticates
-// as any request; the others authenticate themselves (selfAuthenticated).
+// as any request; the others authenticate themselves (SelfAuthenticated).
 const (
 	uploadsCreate   = "/artifactory/api/v1/uploads/create"
 	uploadsURLPart  = "/artifactory/api/v1/uploads/urlPart"
@@ -29,30 +29,38 @@ const (
 	uploadsAbort    = "/artifactory/api/v1/uploads/abort"
 )
 
-// selfAuthenticated routes verify their own credential, so the middleware
-// passes them untouched: the multipart upload calls carry the upload token
-// as a Bearer token, which only the multipart service can verify until
-// access tokens arrive (P4), and a part PUT carries a signed URL and no
-// credentials at all, as the CLI sends it.
-var selfAuthenticated = map[string]bool{
-	"POST " + uploadsURLPart:  true,
-	"PUT " + uploadsPart:      true,
-	"POST " + uploadsComplete: true,
-	"POST " + uploadsStatus:   true,
-	"POST " + uploadsAbort:    true,
+// SelfAuthenticated returns "METHOD path" of the routes that verify their
+// own credential, which the authentication middleware passes untouched
+// (AuthnOptions.SelfAuthenticated): the multipart upload calls carry the
+// upload token as a Bearer token, which only the multipart service can
+// verify until access tokens arrive (P4), and a part PUT carries a signed URL
+// and no credentials at all, as the CLI sends it.
+func SelfAuthenticated() map[string]bool {
+	return map[string]bool{
+		"POST " + uploadsURLPart:  true,
+		"PUT " + uploadsPart:      true,
+		"POST " + uploadsComplete: true,
+		"POST " + uploadsStatus:   true,
+		"POST " + uploadsAbort:    true,
+	}
 }
 
-func (s artifactoryAPI) registerMultipartRoutes(r chi.Router) {
-	r.With(middleware.BodyLimit(managementBodyLimit)).Post(uploadsCreate, s.createMultipart)
-	r.With(middleware.BodyLimit(managementBodyLimit)).Post(uploadsURLPart, s.multipartPartURL)
+func (s ArtifactoryAPI) RegisterMultipartRoutes(r chi.Router) {
+	r.With(middleware.BodyLimit(middleware.ManagementBodyLimit)).
+		Post(uploadsCreate, s.createMultipart)
+	r.With(middleware.BodyLimit(middleware.ManagementBodyLimit)).
+		Post(uploadsURLPart, s.multipartPartURL)
 	// A part is up to 5 GiB: no management body limit.
 	r.Put(uploadsPart, s.putMultipartPart)
-	r.With(middleware.BodyLimit(managementBodyLimit)).Post(uploadsComplete, s.completeMultipart)
-	r.With(middleware.BodyLimit(managementBodyLimit)).Post(uploadsStatus, s.multipartStatus)
-	r.With(middleware.BodyLimit(managementBodyLimit)).Post(uploadsAbort, s.abortMultipart)
+	r.With(middleware.BodyLimit(middleware.ManagementBodyLimit)).
+		Post(uploadsComplete, s.completeMultipart)
+	r.With(middleware.BodyLimit(middleware.ManagementBodyLimit)).
+		Post(uploadsStatus, s.multipartStatus)
+	r.With(middleware.BodyLimit(middleware.ManagementBodyLimit)).
+		Post(uploadsAbort, s.abortMultipart)
 }
 
-func (s artifactoryAPI) multipartService() (*multipart.Service, error) {
+func (s ArtifactoryAPI) multipartService() (*multipart.Service, error) {
 	// 501, as for an operation not built: config already answers supported
 	// false, so the CLI never gets here without a blob store.
 	if s.cfg.Multipart == nil {
@@ -62,7 +70,7 @@ func (s artifactoryAPI) multipartService() (*multipart.Service, error) {
 }
 
 // multipartError maps the service's errors onto statuses.
-func (s artifactoryAPI) multipartError(r *http.Request, op string, err error) error {
+func (s ArtifactoryAPI) multipartError(r *http.Request, op string, err error) error {
 	var api *apierror.Error
 	switch {
 	case errors.As(err, &api):
@@ -88,7 +96,7 @@ func bearer(r *http.Request) string {
 
 // createMultipart answers create: the caller needs deploy rights on the
 // repository, decided as for a deploy.
-func (s artifactoryAPI) createMultipart(w http.ResponseWriter, r *http.Request) {
+func (s ArtifactoryAPI) createMultipart(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	mp, err := s.multipartService()
 	if err != nil {
@@ -136,7 +144,7 @@ func (s artifactoryAPI) createMultipart(w http.ResponseWriter, r *http.Request) 
 	httpkit.WriteJSON(w, http.StatusOK, map[string]string{"token": token})
 }
 
-func (s artifactoryAPI) multipartPartURL(w http.ResponseWriter, r *http.Request) {
+func (s ArtifactoryAPI) multipartPartURL(w http.ResponseWriter, r *http.Request) {
 	mp, err := s.multipartService()
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
@@ -155,7 +163,7 @@ func (s artifactoryAPI) multipartPartURL(w http.ResponseWriter, r *http.Request)
 	httpkit.WriteJSON(w, http.StatusOK, map[string]string{"url": baseurl.From(r.Context()) + ref})
 }
 
-func (s artifactoryAPI) putMultipartPart(w http.ResponseWriter, r *http.Request) {
+func (s ArtifactoryAPI) putMultipartPart(w http.ResponseWriter, r *http.Request) {
 	mp, err := s.multipartService()
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
@@ -180,7 +188,7 @@ func (s artifactoryAPI) putMultipartPart(w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusOK)
 }
 
-func (s artifactoryAPI) completeMultipart(w http.ResponseWriter, r *http.Request) {
+func (s ArtifactoryAPI) completeMultipart(w http.ResponseWriter, r *http.Request) {
 	mp, err := s.multipartService()
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
@@ -193,7 +201,7 @@ func (s artifactoryAPI) completeMultipart(w http.ResponseWriter, r *http.Request
 	w.WriteHeader(http.StatusAccepted)
 }
 
-func (s artifactoryAPI) multipartStatus(w http.ResponseWriter, r *http.Request) {
+func (s ArtifactoryAPI) multipartStatus(w http.ResponseWriter, r *http.Request) {
 	mp, err := s.multipartService()
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
@@ -207,7 +215,7 @@ func (s artifactoryAPI) multipartStatus(w http.ResponseWriter, r *http.Request) 
 	httpkit.WriteJSON(w, http.StatusOK, st)
 }
 
-func (s artifactoryAPI) abortMultipart(w http.ResponseWriter, r *http.Request) {
+func (s ArtifactoryAPI) abortMultipart(w http.ResponseWriter, r *http.Request) {
 	mp, err := s.multipartService()
 	if err != nil {
 		httpkit.WriteErr(w, r, err)

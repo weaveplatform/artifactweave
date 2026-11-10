@@ -25,13 +25,13 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// registerItemRoutes serves the item paths (decision 0002) and the AQL
+// RegisterItemRoutes serves the item paths (decision 0002) and the AQL
 // search. They are registered under exactly the patterns
 // registerHandwrittenStubs derives from the spec, so they replace its 501
 // stubs rather than sitting beside them. HEAD is not in the spec; it shares
 // the GET handler. Item routes are outside the management body limit: an
 // upload is streamed, however large.
-func (s artifactoryAPI) registerItemRoutes(r chi.Router) {
+func (s ArtifactoryAPI) RegisterItemRoutes(r chi.Router) {
 	for _, p := range httpkit.ChiPatterns("/artifactory/{repoKey}/{filePath}") {
 		r.Put(p, s.deployItem)
 		r.Get(p, s.GetItem)
@@ -41,9 +41,17 @@ func (s artifactoryAPI) registerItemRoutes(r chi.Router) {
 	r.Post("/artifactory/api/search/aql", s.searchAQL)
 }
 
+// PrivateItem reports the paths that only a format's own protocol serves,
+// which the router passes to the item kit (itemkit.Deps.Private): Hugging
+// Face's Xet and Conda's shards, the machine learning formats' private
+// files and Chef's metadata.
+func PrivateItem(c repo.Config, p string) bool {
+	return protocolPrivateItem(c, p) || machineLearningPrivate(c, p) || chefMetadataItem(c, p)
+}
+
 // builds returns the service that writes items on behalf of builds, with
 // the same format hooks, and settings, as items.
-func (s artifactoryAPI) builds(st store.Store) *build.Service {
+func (s ArtifactoryAPI) builds(st store.Store) *build.Service {
 	svc := &build.Service{
 		Store: st, Blobs: s.cfg.Blobs, Formats: s.Format,
 		AllowDuplicateEntries: s.cfg.AllowDuplicateBuildEntries,
@@ -56,13 +64,13 @@ func (s artifactoryAPI) builds(st store.Store) *build.Service {
 
 // deployItem answers PUT on an item path: a file, a folder (trailing slash),
 // a checksum deploy, or a checksum sidecar for an existing file.
-func (s artifactoryAPI) deployItem(w http.ResponseWriter, r *http.Request) {
+func (s ArtifactoryAPI) deployItem(w http.ResponseWriter, r *http.Request) {
 	s.deployEscapedItem(w, r, strings.TrimPrefix(r.URL.EscapedPath(), "/artifactory/"))
 }
 
 // deployEscapedItem also serves package APIs that expose ordinary item PUTs.
 // Keeping the original request preserves its error envelope and base URL.
-func (s artifactoryAPI) deployEscapedItem(
+func (s ArtifactoryAPI) deployEscapedItem(
 	w http.ResponseWriter,
 	r *http.Request,
 	escaped string,
@@ -181,7 +189,7 @@ func answered(w http.ResponseWriter, err error) bool {
 	return true
 }
 
-func (artifactoryAPI) deployRequest(
+func (ArtifactoryAPI) deployRequest(
 	r *http.Request,
 	t item.Target,
 	req itemkit.ItemRequest,
@@ -199,7 +207,7 @@ func (artifactoryAPI) deployRequest(
 // fileDeploy is the deploy of one file. The format may store it under
 // another name (Maven's unique snapshots), and replacing a file there needs
 // the right to delete it, as at the path sent.
-func (s artifactoryAPI) fileDeploy(
+func (s ArtifactoryAPI) fileDeploy(
 	r *http.Request,
 	t item.Target,
 	req itemkit.ItemRequest,
@@ -217,7 +225,7 @@ func (s artifactoryAPI) fileDeploy(
 // file out of a repository it cannot read into one it can write. The
 // exception is token, the checksum token of the caller's own finished
 // multipart upload of the content, which no item holds until this deploy.
-func (s artifactoryAPI) reusable(
+func (s ArtifactoryAPI) reusable(
 	st store.Store,
 	p kernel.Principal,
 	acc itemkit.Access,
@@ -278,7 +286,7 @@ func readsContent(
 	}
 }
 
-func (artifactoryAPI) isFile(
+func (ArtifactoryAPI) isFile(
 	ctx context.Context,
 	st store.Store,
 	c repo.Config,
@@ -290,7 +298,7 @@ func (artifactoryAPI) isFile(
 
 // recordChecksum stores a checksum sidecar upload (Maven sends one after
 // each file) as the file's original checksum.
-func (s artifactoryAPI) recordChecksum(
+func (s ArtifactoryAPI) recordChecksum(
 	w http.ResponseWriter,
 	r *http.Request,
 	svc *item.Service,
@@ -323,7 +331,7 @@ func (s artifactoryAPI) recordChecksum(
 
 // deleteItem answers DELETE on an item path: the item and everything below
 // it, into the trash can for local repositories.
-func (s artifactoryAPI) deleteItem(w http.ResponseWriter, r *http.Request) {
+func (s ArtifactoryAPI) deleteItem(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	st, err := s.Content()
 	if err != nil {
@@ -387,7 +395,7 @@ func (s artifactoryAPI) deleteItem(w http.ResponseWriter, r *http.Request) {
 
 // GetUploadsConfig tells the JFrog CLI whether to upload large files in
 // parts (migration/artifacts/core/multipart) or in one request (research 09).
-func (s artifactoryAPI) GetUploadsConfig(
+func (s ArtifactoryAPI) GetUploadsConfig(
 	context.Context,
 	artgen.GetUploadsConfigRequestObject,
 ) (artgen.GetUploadsConfigResponseObject, error) {

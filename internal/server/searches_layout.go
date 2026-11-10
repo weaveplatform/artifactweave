@@ -219,7 +219,7 @@ func matches(re *regexp.Regexp, s string) bool { return re == nil || re.MatchStr
 // match each of g, a, v and c given. With specific, a virtual key in repos
 // searches its members, and each result names the download URL under the
 // key the search named, with the extension, version and classifier.
-func (s artifactoryAPI) SearchGavc(
+func (s ArtifactoryAPI) SearchGavc(
 	ctx context.Context,
 	req artgen.SearchGavcRequestObject,
 ) (artgen.SearchGavcResponseObject, error) {
@@ -443,7 +443,7 @@ func (r *searchRun) moduleScope(ctx context.Context, repos, g, a *string) (layou
 // an integration version, newest first in Mercury order. A v with wildcards
 // keeps the versions it matches; any other v lists the integration
 // versions of that module version. Nothing to list is a 404.
-func (s artifactoryAPI) SearchVersions(
+func (s ArtifactoryAPI) SearchVersions(
 	ctx context.Context,
 	req artgen.SearchVersionsRequestObject,
 ) (artgen.SearchVersionsResponseObject, error) {
@@ -488,7 +488,7 @@ func (s artifactoryAPI) SearchVersions(
 // first version of either kind it matches; with any other v the first
 // integration version of that module version. Each way of finding nothing
 // has Artifactory's own 404.
-func (s artifactoryAPI) SearchLatestVersion(
+func (s ArtifactoryAPI) SearchLatestVersion(
 	ctx context.Context,
 	req artgen.SearchLatestVersionRequestObject,
 ) (artgen.SearchLatestVersionResponseObject, error) {

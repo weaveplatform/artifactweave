@@ -26,12 +26,12 @@ import (
 // copyOrMoveType is the media type of a copy or move report.
 const copyOrMoveType = "application/vnd.org.jfrog.artifactory.storage.CopyOrMoveResult+json"
 
-// registerTransferRoutes serves copy, move, folder archive download and
+// RegisterTransferRoutes serves copy, move, folder archive download and
 // archive entries, all hand-written in the spec, under the patterns
 // httpkit.ChiPatterns derives so they replace the 501 stubs. An archive entry in a
 // nested folder does not fit the entry pattern (a chi parameter is one
 // segment) and reaches GetItem through the plain item route instead.
-func (s artifactoryAPI) registerTransferRoutes(r chi.Router) {
+func (s ArtifactoryAPI) RegisterTransferRoutes(r chi.Router) {
 	for _, p := range httpkit.ChiPatterns("/artifactory/api/copy/{srcRepoKey}/{srcFilePath}") {
 		r.Post(p, s.copyItem)
 	}
@@ -60,11 +60,11 @@ func flag01(q url.Values, name string, def bool) (bool, error) {
 	return b, nil
 }
 
-func (s artifactoryAPI) copyItem(w http.ResponseWriter, r *http.Request) {
+func (s ArtifactoryAPI) copyItem(w http.ResponseWriter, r *http.Request) {
 	s.transfer(w, r, false)
 }
 
-func (s artifactoryAPI) moveItem(w http.ResponseWriter, r *http.Request) {
+func (s ArtifactoryAPI) moveItem(w http.ResponseWriter, r *http.Request) {
 	s.transfer(w, r, true)
 }
 
@@ -73,7 +73,7 @@ func (s artifactoryAPI) moveItem(w http.ResponseWriter, r *http.Request) {
 // a report, as JFrog's copy and move pages list no 404; a caller without
 // the rights gets 401 or 403. Otherwise the answer is 200 with per-item
 // messages, even when items failed.
-func (s artifactoryAPI) transfer(w http.ResponseWriter, r *http.Request, move bool) {
+func (s ArtifactoryAPI) transfer(w http.ResponseWriter, r *http.Request, move bool) {
 	ctx := r.Context()
 	st, err := s.Content()
 	if err != nil {
@@ -212,7 +212,7 @@ type landing struct {
 // needs on the file (decision 0039): Read at the source, Delete there too
 // for a move, and Deploy where it lands. Without one the request is
 // refused, as for the file.
-func (s artifactoryAPI) overwriteRight(
+func (s ArtifactoryAPI) overwriteRight(
 	ctx context.Context,
 	st store.Store,
 	acc itemkit.Access,
@@ -285,7 +285,7 @@ const defaultFolderSlots = 10
 // bounded by that setting's file count and size, and refused with 400 while
 // the most folder downloads that may run at once are running, after every
 // other check as 6.20's FolderDownloadServiceImpl orders them.
-func (s artifactoryAPI) downloadFolderArchive(w http.ResponseWriter, r *http.Request) {
+func (s ArtifactoryAPI) downloadFolderArchive(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	st, err := s.Content()
 	if err != nil {
@@ -385,7 +385,7 @@ func (s artifactoryAPI) downloadFolderArchive(w http.ResponseWriter, r *http.Req
 // takeFolderSlot reserves a place among the folder downloads that may run
 // at once, false when every place is taken. It never waits: a client told to
 // try again later is better off than one held until another download ends.
-func (s artifactoryAPI) takeFolderSlot() bool {
+func (s ArtifactoryAPI) takeFolderSlot() bool {
 	if s.folderSlots == nil {
 		return true
 	}
@@ -397,7 +397,7 @@ func (s artifactoryAPI) takeFolderSlot() bool {
 	}
 }
 
-func (s artifactoryAPI) releaseFolderSlot() {
+func (s ArtifactoryAPI) releaseFolderSlot() {
 	if s.folderSlots != nil {
 		<-s.folderSlots
 	}

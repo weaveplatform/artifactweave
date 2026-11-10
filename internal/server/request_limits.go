@@ -54,9 +54,16 @@ type limitOptions struct {
 	Limits *apilimit.Service
 }
 
+// requestLimiter serves the request-limit middleware. It reads the router's
+// configuration rather than a handler partial's, because the resource
+// budgets charge projects and repositories of every module's routes.
+type requestLimiter struct {
+	cfg Config
+}
+
 // limitIngress admits each request to the process's concurrency and
 // authentication limits before authentication runs.
-func (s artifactoryAPI) limitIngress(o limitOptions) func(http.Handler) http.Handler {
+func (s requestLimiter) limitIngress(o limitOptions) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if o.Health(r) {
@@ -102,7 +109,7 @@ func (s artifactoryAPI) limitIngress(o limitOptions) func(http.Handler) http.Han
 
 // limitPrincipal admits an authenticated request to its principal's
 // budget and, for an expensive one, to the expensive lane.
-func (s artifactoryAPI) limitPrincipal(o limitOptions) func(http.Handler) http.Handler {
+func (s requestLimiter) limitPrincipal(o limitOptions) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if o.Health(r) || o.Recovery(r) {
@@ -175,7 +182,7 @@ func expensiveRequest(r *http.Request) bool {
 // Resource quotas are charged only for existing resources visible to this
 // authenticated principal. Invented query/path labels cannot allocate counters
 // or exhaust another account's repository quota.
-func (s artifactoryAPI) budgetResources(
+func (s requestLimiter) budgetResources(
 	r *http.Request,
 	p kernel.Principal,
 	scope *apilimit.Scope,

@@ -15,7 +15,7 @@ import (
 
 // Stored shards and CAS containers can span several read grants. Their native
 // routes construct the representation the current caller is allowed to read.
-func tryCondaItem(
+func TryCondaItem(
 	_ *itemkit.Kit, w http.ResponseWriter, r *http.Request, _ store.Store, c repo.Config,
 	_ bool, req itemkit.ItemRequest, _ kernel.Principal, _ itemkit.Access,
 ) bool {

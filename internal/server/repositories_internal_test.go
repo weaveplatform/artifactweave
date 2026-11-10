@@ -3,9 +3,7 @@ package server
 import (
 	"context"
 	"errors"
-	"io"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -33,37 +31,6 @@ func TestAccRepositoriesWithoutStore(t *testing.T) {
 	}
 	if _, err := svc.GetAllRepositoryConfigurations(ctx, artgenAllConfigs()); err == nil {
 		t.Fatal("configurations without a store")
-	}
-}
-
-func TestAccRequestDetailsReadFailure(t *testing.T) {
-	h := requestDetails(
-		newDetailOptions(),
-	)(
-		http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
-			t.Fatal("reached the handler")
-		}),
-	)
-	req := httptest.NewRequest(
-		"POST",
-		"/artifactory/api/repositories/x",
-		io.NopCloser(failingReader{}),
-	)
-	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, req)
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status %d", rec.Code)
-	}
-	for path, want := range map[string]bool{
-		"/artifactory/api/repositories/x":          true,
-		"/artifactory/api/v2/repositories/batch":   true,
-		"/artifactory/api/repositories/":           false,
-		"/artifactory/api/repositories/x/y":        false,
-		"/artifactory/api/repositories/existence2": true,
-	} {
-		if got := isRepositoryUpdate(path); got != want {
-			t.Errorf("%s: %v", path, got)
-		}
 	}
 }
 

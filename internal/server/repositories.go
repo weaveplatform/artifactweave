@@ -1,12 +1,10 @@
 package server
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"maps"
 	"net/http"
 	"slices"
@@ -23,7 +21,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/middleware"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -66,69 +63,23 @@ const (
 	msgBuildInfo  = "Deletion of Build Info repository %s is not allowed."
 )
 
-// slashCollections are the collection paths the Terraform provider calls
-// with a trailing slash, which chi would otherwise read as a member with an
-// empty key: it lists repositories at /api/repositories/ (research 08), and
-// access adds the key pairs' (SlashCollections). Only these exact paths are
-// rewritten, because a trailing slash elsewhere under /artifactory names a
-// folder.
-var slashCollections = map[string]string{
-	"/artifactory/api/repositories/": "/artifactory/api/repositories",
-}
-
-// detailOptions name the requests whose details requestDetails keeps. Each
-// contribution is declared beside the handler that reads what it keeps.
-type detailOptions struct {
-	// SearchQuery reports the requests whose raw query is kept
-	// (httpkit.RawSearchQuery), for parameters the generated binding drops.
-	SearchQuery []func(*http.Request) bool
-	// Rewrite normalises a request's body before the generated binding
-	// decodes it, each in order; an error answers 400 as a binding error.
-	Rewrite []func(*http.Request) error
-	// RawBody reports the requests whose raw body is kept (httpkit.RawBody),
-	// for handlers that must tell what the decoded type cannot.
-	RawBody []func(*http.Request) bool
-}
-
-// requestDetails keeps what the strict handlers need beyond their decoded
-// request: the Accept header of every request, for media-type negotiation,
-// and the raw query, rewritten body and raw body of the requests o names.
-// It runs after middleware.BodyLimit, so the copy is bounded.
-func requestDetails(o detailOptions) func(http.Handler) http.Handler {
-	matches := func(preds []func(*http.Request) bool, r *http.Request) bool {
-		return slices.ContainsFunc(preds, func(p func(*http.Request) bool) bool { return p(r) })
-	}
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := httpkit.WithAccept(r.Context(), r.Header.Get("Accept"))
-			if matches(o.SearchQuery, r) {
-				ctx = httpkit.WithSearchQuery(ctx, r.URL.RawQuery)
-			}
-			for _, rewrite := range o.Rewrite {
-				if err := rewrite(r); err != nil {
-					middleware.BindingError(http.StatusBadRequest)(w, r, err)
-					return
-				}
-			}
-			if matches(o.RawBody, r) {
-				b, err := io.ReadAll(r.Body)
-				if err != nil {
-					middleware.BindingError(http.StatusBadRequest)(w, r, err)
-					return
-				}
-				r.Body = io.NopCloser(bytes.NewReader(b))
-				ctx = httpkit.WithRawBody(ctx, b)
-			}
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
+// SlashCollections returns the artifacts collection that the Terraform
+// provider calls with a trailing slash, mapped to its path without one, for
+// the router's rewrite of collection paths: the provider lists repositories
+// at /api/repositories/ (research 08), which chi would otherwise read as a
+// member with an empty key. Only these exact paths are rewritten, because a
+// trailing slash elsewhere under /artifactory names a folder.
+func SlashCollections() map[string]string {
+	return map[string]string{
+		"/artifactory/api/repositories/": "/artifactory/api/repositories",
 	}
 }
 
-// keepsRepositoryBody reports a repository update, which keeps its raw
+// KeepsRepositoryBody reports a repository update, which keeps its raw
 // body: repo.Config cannot tell a field left out (keep the stored value)
 // from one sent as null (reset it to its default), and an update needs
 // both.
-func keepsRepositoryBody(r *http.Request) bool {
+func KeepsRepositoryBody(r *http.Request) bool {
 	return r.Method == http.MethodPost && isRepositoryUpdate(r.URL.Path)
 }
 
@@ -141,7 +92,7 @@ func isRepositoryUpdate(path string) bool {
 }
 
 // readerFor returns the principal of a read and what it may read.
-func (s artifactoryAPI) readerFor(
+func (s ArtifactoryAPI) readerFor(
 	ctx context.Context,
 	st store.Store,
 ) (kernel.Principal, func(repo.Config) bool, error) {
@@ -157,7 +108,7 @@ func (s artifactoryAPI) readerFor(
 	return p, acc.Visible, nil
 }
 
-func (s artifactoryAPI) GetRepositoriesByTypeAndProject(
+func (s ArtifactoryAPI) GetRepositoriesByTypeAndProject(
 	ctx context.Context,
 	req artgen.GetRepositoriesByTypeAndProjectRequestObject,
 ) (artgen.GetRepositoriesByTypeAndProjectResponseObject, error) {
@@ -215,7 +166,7 @@ func (s artifactoryAPI) GetRepositoriesByTypeAndProject(
 	return out, nil
 }
 
-func (s artifactoryAPI) GetAllRepositoryConfigurations(
+func (s ArtifactoryAPI) GetAllRepositoryConfigurations(
 	ctx context.Context,
 	req artgen.GetAllRepositoryConfigurationsRequestObject,
 ) (artgen.GetAllRepositoryConfigurationsResponseObject, error) {
@@ -282,7 +233,7 @@ func commaSet(v *string) set {
 
 func (s set) has(v string) bool { return len(s) == 0 || s[strings.ToLower(v)] }
 
-func (s artifactoryAPI) CheckIfRepositoryExists(
+func (s ArtifactoryAPI) CheckIfRepositoryExists(
 	ctx context.Context,
 	req artgen.CheckIfRepositoryExistsRequestObject,
 ) (artgen.CheckIfRepositoryExistsResponseObject, error) {
@@ -333,7 +284,7 @@ func (s artifactoryAPI) CheckIfRepositoryExists(
 }
 
 // readOne returns the configuration of key as p may see it.
-func (s artifactoryAPI) readOne(
+func (s ArtifactoryAPI) readOne(
 	ctx context.Context,
 	key string,
 ) (kernel.Principal, repo.Config, error) {
@@ -357,7 +308,7 @@ func (s artifactoryAPI) readOne(
 	return p, itemkit.View(p, c), nil
 }
 
-func (s artifactoryAPI) GetRepositoryConfiguration(
+func (s ArtifactoryAPI) GetRepositoryConfiguration(
 	ctx context.Context,
 	req artgen.GetRepositoryConfigurationRequestObject,
 ) (artgen.GetRepositoryConfigurationResponseObject, error) {
@@ -368,7 +319,7 @@ func (s artifactoryAPI) GetRepositoryConfiguration(
 	return configResponse(ctx, c), nil
 }
 
-func (s artifactoryAPI) GetRepositoryConfigurationV2(
+func (s ArtifactoryAPI) GetRepositoryConfigurationV2(
 	ctx context.Context,
 	req artgen.GetRepositoryConfigurationV2RequestObject,
 ) (artgen.GetRepositoryConfigurationV2ResponseObject, error) {
@@ -433,7 +384,7 @@ var sharedFields = []string{
 	"remoteRepoLayoutRef", "includesPattern", "excludesPattern",
 }
 
-func (s artifactoryAPI) GetRemoteRepositoryConfiguration(
+func (s ArtifactoryAPI) GetRemoteRepositoryConfiguration(
 	ctx context.Context,
 	req artgen.GetRemoteRepositoryConfigurationRequestObject,
 ) (artgen.GetRemoteRepositoryConfigurationResponseObject, error) {
@@ -497,7 +448,7 @@ func (r sharedRemoteResponse) VisitGetRemoteRepositoryConfigurationResponse(
 	return json.NewEncoder(w).Encode(r.fields) //nolint:wrapcheck // the strict server logs it
 }
 
-func (s artifactoryAPI) GetBatchOfRepositoriesByName(
+func (s ArtifactoryAPI) GetBatchOfRepositoriesByName(
 	ctx context.Context,
 	req artgen.GetBatchOfRepositoriesByNameRequestObject,
 ) (artgen.GetBatchOfRepositoriesByNameResponseObject, error) {
@@ -563,7 +514,7 @@ func requestConfigs(bodies ...*[]repo.Config) []repo.Config {
 	return nil
 }
 
-func (s artifactoryAPI) CreateRepository(
+func (s ArtifactoryAPI) CreateRepository(
 	ctx context.Context,
 	req artgen.CreateRepositoryRequestObject,
 ) (artgen.CreateRepositoryResponseObject, error) {
@@ -614,7 +565,7 @@ func (s artifactoryAPI) CreateRepository(
 	), nil
 }
 
-func (s artifactoryAPI) CreateMultipleRepositories(
+func (s ArtifactoryAPI) CreateMultipleRepositories(
 	ctx context.Context,
 	req artgen.CreateMultipleRepositoriesRequestObject,
 ) (artgen.CreateMultipleRepositoriesResponseObject, error) {
@@ -717,7 +668,7 @@ func updateBody(ctx context.Context, decoded any) ([]byte, error) {
 	return b, nil
 }
 
-func (s artifactoryAPI) UpdateRepositoryConfiguration(
+func (s ArtifactoryAPI) UpdateRepositoryConfiguration(
 	ctx context.Context,
 	req artgen.UpdateRepositoryConfigurationRequestObject,
 ) (artgen.UpdateRepositoryConfigurationResponseObject, error) {
@@ -769,7 +720,7 @@ func (s artifactoryAPI) UpdateRepositoryConfiguration(
 // same index, in one transaction, with the reindex an update owes its
 // repository (repos.OwesReindex), which is then asked for exactly when the
 // update commits.
-func (s artifactoryAPI) writeUpdates(
+func (s ArtifactoryAPI) writeUpdates(
 	ctx context.Context,
 	st store.Store,
 	stored, updated []repo.Config,
@@ -800,7 +751,7 @@ func (s artifactoryAPI) writeUpdates(
 // checkReferences rejects an updated configuration whose signing key
 // pairs, environments or (for a virtual repository) members do not exist,
 // and rewrites its environments to their stored spelling.
-func (s artifactoryAPI) checkReferences(
+func (s ArtifactoryAPI) checkReferences(
 	ctx context.Context,
 	st store.Store,
 	c *repo.Config,
@@ -824,7 +775,7 @@ func (s artifactoryAPI) checkReferences(
 	return nil
 }
 
-func (s artifactoryAPI) UpdateMultipleRepositories(
+func (s ArtifactoryAPI) UpdateMultipleRepositories(
 	ctx context.Context,
 	req artgen.UpdateMultipleRepositoriesRequestObject,
 ) (artgen.UpdateMultipleRepositoriesResponseObject, error) {
@@ -933,7 +884,7 @@ func failFast403(msg string) artgen.DeleteRepositories403JSONResponse {
 	return artgen.DeleteRepositories403JSONResponse(body)
 }
 
-func (s artifactoryAPI) DeleteRepository(
+func (s ArtifactoryAPI) DeleteRepository(
 	ctx context.Context,
 	req artgen.DeleteRepositoryRequestObject,
 ) (artgen.DeleteRepositoryResponseObject, error) {
@@ -975,7 +926,7 @@ func (s artifactoryAPI) DeleteRepository(
 	return artgen.DeleteRepository200JSONResponse(removed(key, files)), nil
 }
 
-func (s artifactoryAPI) DeleteRepositories(
+func (s ArtifactoryAPI) DeleteRepositories(
 	ctx context.Context,
 	req artgen.DeleteRepositoriesRequestObject,
 ) (artgen.DeleteRepositoriesResponseObject, error) {

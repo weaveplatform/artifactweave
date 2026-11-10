@@ -18,7 +18,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func (s artifactoryAPI) smartStatus(w http.ResponseWriter, r *http.Request) {
+func (s ArtifactoryAPI) SmartStatus(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	if err := httpkit.AdminOnly(ctx); err != nil {
