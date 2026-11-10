@@ -512,6 +512,8 @@
         {"from":"internal/sqlstore/sqlcommon/work_test.go","action":"move","to":"platform/store/sql","ticket":"STO-12"},
         {"from":"internal/sqlstore/sqlite/driver.go","action":"move","to":"platform/sql/sqlite","file":"sqlite.go","ticket":"STO-07"},
         {"from":"internal/sqlstore/sqltest/postgres.go","action":"move","to":"platform/sql/sqltest","ticket":"STO-08"},
+        {"from":"internal/sqlstore/sqltest/schema.go","action":"move","to":"platform/sql/sqltest","ticket":"STO-19"},
+        {"from":"internal/sqlstore/sqltest/schema_golden.go","action":"move","to":"platform/sql/sqltest","ticket":"STO-19"},
         {"from":"pkg/store/api_restriction.go","action":"move","to":"access/core/port","file":"api_restriction.go","ticket":"STO-10"},
         {"from":"pkg/store/aqlsource.go","action":"move","to":"artifacts/core/aql","file":"source.go","ticket":"ART-15"},
         {"from":"pkg/store/bower.go","action":"move","to":"artifacts/core/port","file":"bower.go","ticket":"STO-11"},
