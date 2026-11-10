@@ -14,7 +14,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	vcshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/vcs/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -40,7 +39,7 @@ func (s VCSAPI) vcsRepository(
 	ctx context.Context,
 	key, owner, name string,
 ) (vcsAccess, error) {
-	if !vcshttp.ValidProject(owner, name) {
+	if !ValidProject(owner, name) {
 		return vcsAccess{}, apierror.New(http.StatusBadRequest, "invalid VCS repository path")
 	}
 	st, err := s.Content()
@@ -149,27 +148,27 @@ func (s VCSAPI) vcsResultBytes(
 func (s VCSAPI) vcsRefs(
 	ctx context.Context,
 	key, owner, name string,
-) ([]vcshttp.Ref, vcsAccess, error) {
+) ([]Ref, vcsAccess, error) {
 	a, err := s.vcsRepository(ctx, key, owner, name)
 	if err != nil {
 		return nil, a, err
 	}
-	endpoints, err := vcshttp.RefEndpoints(a.repo, owner, name)
+	endpoints, err := RefEndpoints(a.repo, owner, name)
 	if err != nil {
 		return nil, a, apierror.New(http.StatusBadRequest, "invalid VCS upstream")
 	}
-	var refs []vcshttp.Ref
+	var refs []Ref
 	for _, endpoint := range endpoints {
 		found, err := s.vcsReadRefs(ctx, a, owner, name, endpoint)
 		if err != nil {
 			return nil, a, err
 		}
-		if len(found) > vcshttp.MaxRefs-len(refs) {
+		if len(found) > MaxRefs-len(refs) {
 			return nil, a, apierror.New(http.StatusBadGateway, "too many VCS references")
 		}
 		refs = append(refs, found...)
 	}
-	filtered := make([]vcshttp.Ref, 0, len(refs))
+	filtered := make([]Ref, 0, len(refs))
 	for _, ref := range refs {
 		kind := "tags"
 		if ref.Branch {
@@ -183,8 +182,8 @@ func (s VCSAPI) vcsRefs(
 }
 
 func (s VCSAPI) vcsReadRefs(
-	ctx context.Context, a vcsAccess, owner, name string, endpoint vcshttp.RefEndpoint,
-) ([]vcshttp.Ref, error) {
+	ctx context.Context, a vcsAccess, owner, name string, endpoint RefEndpoint,
+) ([]Ref, error) {
 	resource := source.Resource{
 		Kind:              source.ResourceKindVersions,
 		Path:              owner + "/" + name + "/refs",
@@ -196,10 +195,10 @@ func (s VCSAPI) vcsReadRefs(
 		PermissionPath:    owner + "/" + name,
 		Variant:           endpoint.Variant(),
 		ValidateMetadata: func(_ context.Context, r io.ReadSeeker, size int64, _ source.MetadataResponse) error {
-			if size <= 0 || size > vcshttp.MaxRefsBytes {
+			if size <= 0 || size > MaxRefsBytes {
 				return source.ErrInvalidResult
 			}
-			data, readErr := io.ReadAll(io.LimitReader(r, vcshttp.MaxRefsBytes+1))
+			data, readErr := io.ReadAll(io.LimitReader(r, MaxRefsBytes+1))
 			if readErr != nil || int64(len(data)) != size {
 				return source.ErrInvalidResult
 			}
@@ -213,7 +212,7 @@ func (s VCSAPI) vcsReadRefs(
 	if err != nil {
 		return nil, err
 	}
-	data, err := s.vcsResultBytes(ctx, result, vcshttp.MaxRefsBytes)
+	data, err := s.vcsResultBytes(ctx, result, MaxRefsBytes)
 	if err != nil {
 		return nil, s.ItemError(ctx, "VCS references", err)
 	}
@@ -258,6 +257,11 @@ func (r vcsListResponse) VisitGetVcsBranchesResponse(w http.ResponseWriter) erro
 	return r.write(w)
 }
 
+// GetVcsTags lists the project's tags that the caller may read, as JFrog's
+// JSON array of name, commitId and isBranch false. The references come from
+// the provider's listing, read through the remote source within
+// MaxRefsBytes and MaxRefs, and a reference the caller may not read is
+// left out.
 func (s VCSAPI) GetVcsTags(
 	ctx context.Context,
 	req artgen.GetVcsTagsRequestObject,
@@ -275,6 +279,9 @@ func (s VCSAPI) GetVcsTags(
 	return out, nil
 }
 
+// GetVcsBranches lists the project's branches that the caller may read, as
+// JFrog's JSON array of name, commitId and isBranch true, from the same
+// reference listing as GetVcsTags.
 func (s VCSAPI) GetVcsBranches(
 	ctx context.Context,
 	req artgen.GetVcsBranchesRequestObject,
@@ -292,6 +299,9 @@ func (s VCSAPI) GetVcsBranches(
 	return out, nil
 }
 
+// GetVcsRefs returns the references the caller may read in git's advertisement
+// form, one "<commit> refs/<heads|tags>/<name>" line each, as a JSON string,
+// from the same reference listing as GetVcsTags.
 func (s VCSAPI) GetVcsRefs(
 	ctx context.Context,
 	req artgen.GetVcsRefsRequestObject,

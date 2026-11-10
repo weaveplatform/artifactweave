@@ -13,7 +13,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	vcshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/vcs/http"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -112,14 +111,14 @@ func (s VCSAPI) vcsArchive(
 	ctx context.Context,
 	key, owner, name, kind, ref, ext, propertyFilter string,
 ) (io.ReadCloser, int64, error) {
-	if !vcshttp.ValidExtension(ext) || kind != "tags" && kind != "heads" && kind != "commits" {
+	if !ValidExtension(ext) || kind != "tags" && kind != "heads" && kind != "commits" {
 		return nil, 0, apierror.New(http.StatusBadRequest, "invalid VCS archive request")
 	}
 	a, err := s.vcsRepository(ctx, key, owner, name)
 	if err != nil {
 		return nil, 0, err
 	}
-	if !vcshttp.ValidRef(ref) || kind == "commits" && !vcshttp.ValidCommitID(ref) {
+	if !ValidRef(ref) || kind == "commits" && !ValidCommitID(ref) {
 		return nil, 0, apierror.New(http.StatusBadRequest, "invalid VCS reference")
 	}
 	commit := ref
@@ -147,7 +146,7 @@ func (s VCSAPI) vcsArchive(
 			pkgroute.SourceError(source.ErrDenied, a.principal.Anonymous),
 		)
 	}
-	target, err := vcshttp.ArchiveURL(a.repo, owner, name, commit, ext)
+	target, err := ArchiveURL(a.repo, owner, name, commit, ext)
 	if err != nil {
 		return nil, 0, apierror.New(http.StatusBadRequest, "invalid VCS archive source")
 	}
@@ -160,7 +159,7 @@ func (s VCSAPI) vcsArchive(
 		Method:            http.MethodGet,
 		Variant:           "vcs-archive-v2-" + ext,
 		Validate: func(ctx context.Context, body io.ReadSeeker, size int64) error {
-			if err := vcshttp.ValidateCommitArchive(ctx, body, size, ext, commit); err != nil {
+			if err := ValidateCommitArchive(ctx, body, size, ext, commit); err != nil {
 				return source.ErrInvalidResult
 			}
 			return nil
@@ -257,6 +256,11 @@ func vcsProperties(p *string) string {
 	return *p
 }
 
+// DownloadVcsTag serves the archive of a tag's commit in the ext format
+// (tar.gz by default). The tag resolves to its commit through the project's
+// reference listing, and the archive is fetched through the remote source and
+// checked against that commit before the cache admits it. A tag the listing
+// does not name answers 404.
 func (s VCSAPI) DownloadVcsTag(
 	ctx context.Context,
 	req artgen.DownloadVcsTagRequestObject,
@@ -280,6 +284,10 @@ func (s VCSAPI) DownloadVcsTag(
 	}, nil
 }
 
+// DownloadVcsBranch serves the archive of a branch's commit, as DownloadVcsTag
+// does for a tag. A properties filter selects only an already cached archive
+// whose properties match, and never fetches one to create a match; none
+// matching answers 404.
 func (s VCSAPI) DownloadVcsBranch(
 	ctx context.Context,
 	req artgen.DownloadVcsBranchRequestObject,
@@ -303,6 +311,8 @@ func (s VCSAPI) DownloadVcsBranch(
 	}, nil
 }
 
+// DownloadVcsCommit serves the archive of a commit named by its ID, which
+// needs no reference listing; an invalid commit ID answers 400.
 func (s VCSAPI) DownloadVcsCommit(
 	ctx context.Context,
 	req artgen.DownloadVcsCommitRequestObject,
@@ -326,6 +336,8 @@ func (s VCSAPI) DownloadVcsCommit(
 	}, nil
 }
 
+// DownloadVcsRelease serves the archive of a release, which resolves as the
+// tag of the same name (DownloadVcsTag).
 func (s VCSAPI) DownloadVcsRelease(
 	ctx context.Context,
 	req artgen.DownloadVcsReleaseRequestObject,
@@ -349,6 +361,8 @@ func (s VCSAPI) DownloadVcsRelease(
 	}, nil
 }
 
+// DownloadVcsTagAlternative serves a tag's archive for JFrog's short form,
+// whose one userOrg segment names both the owner and the project.
 func (s VCSAPI) DownloadVcsTagAlternative(
 	ctx context.Context,
 	req artgen.DownloadVcsTagAlternativeRequestObject,
@@ -372,6 +386,8 @@ func (s VCSAPI) DownloadVcsTagAlternative(
 	}, nil
 }
 
+// DownloadVcsBranchAlternative serves a branch's archive for JFrog's short
+// form, whose one userOrg segment names both the owner and the project.
 func (s VCSAPI) DownloadVcsBranchAlternative(
 	ctx context.Context,
 	req artgen.DownloadVcsBranchAlternativeRequestObject,
@@ -395,6 +411,9 @@ func (s VCSAPI) DownloadVcsBranchAlternative(
 	}, nil
 }
 
+// DownloadVcsTagFromSubgroupRepository serves a tag's archive for the
+// /archive/refs/ form, with the properties filter DownloadVcsBranch takes.
+// VCSNested serves the same form when the owner spans several segments.
 func (s VCSAPI) DownloadVcsTagFromSubgroupRepository(
 	ctx context.Context,
 	req artgen.DownloadVcsTagFromSubgroupRepositoryRequestObject,
@@ -418,6 +437,9 @@ func (s VCSAPI) DownloadVcsTagFromSubgroupRepository(
 	}, nil
 }
 
+// DownloadVcsBranchFromSubgroupRepository serves a branch's archive for the
+// /archive/refs/ form, with the properties filter DownloadVcsBranch takes.
+// VCSNested serves the same form when the owner spans several segments.
 func (s VCSAPI) DownloadVcsBranchFromSubgroupRepository(
 	ctx context.Context,
 	req artgen.DownloadVcsBranchFromSubgroupRepositoryRequestObject,
@@ -446,7 +468,7 @@ func (s VCSAPI) vcsFile(
 	key, owner, name, kind, selector string,
 ) (io.Reader, int64, error) {
 	ref, filename, ok := strings.Cut(selector, "!")
-	if !ok || !vcshttp.ValidRef(ref) || !vcshttp.ValidFilePath(filename) {
+	if !ok || !ValidRef(ref) || !ValidFilePath(filename) {
 		return nil, 0, apierror.New(http.StatusBadRequest, "invalid VCS file path")
 	}
 	a, err := s.vcsRepository(ctx, key, owner, name)
@@ -466,20 +488,20 @@ func (s VCSAPI) vcsFile(
 	if err != nil {
 		return nil, 0, err
 	}
-	archive, err := io.ReadAll(io.LimitReader(body, vcshttp.MaxArchiveBytes+1))
+	archive, err := io.ReadAll(io.LimitReader(body, MaxArchiveBytes+1))
 	closeErr := body.Close()
-	if err != nil || closeErr != nil || len(archive) > vcshttp.MaxArchiveBytes {
+	if err != nil || closeErr != nil || len(archive) > MaxArchiveBytes {
 		return nil, 0, apierror.New(http.StatusBadGateway, "invalid VCS archive")
 	}
-	selectFile := vcshttp.WrappedFileZIP
+	selectFile := WrappedFileZIP
 	switch a.repo.VCSGitProvider {
 	case repo.Stash, repo.OldStash:
-		selectFile = vcshttp.FileZIP
+		selectFile = FileZIP
 	case repo.CustomVCS:
-		selectFile = vcshttp.CustomFileZIP
+		selectFile = CustomFileZIP
 	}
 	data, err := selectFile(ctx, archive, "tar.gz", filename)
-	if errors.Is(err, vcshttp.ErrInvalidPath) {
+	if errors.Is(err, ErrInvalidPath) {
 		return nil, 0, apierror.New(http.StatusNotFound, "VCS file not found")
 	}
 	if err != nil {
@@ -488,6 +510,11 @@ func (s VCSAPI) vcsFile(
 	return bytes.NewReader(data), int64(len(data)), nil
 }
 
+// DownloadFileWithinVcsTag serves one file of a tag, selected as <tag>!<path>,
+// as a ZIP that holds the file at its repository-relative path. A peer
+// Artifactory VCS repository is asked for the file; for any other provider
+// the tag's tar.gz archive is fetched and the file selected from it. A path
+// the archive does not hold answers 404.
 func (s VCSAPI) DownloadFileWithinVcsTag(
 	ctx context.Context,
 	req artgen.DownloadFileWithinVcsTagRequestObject,
@@ -502,6 +529,8 @@ func (s VCSAPI) DownloadFileWithinVcsTag(
 	}, nil
 }
 
+// DownloadFileWithinVcsBranch serves one file of a branch, selected as
+// <branch>!<path>, as DownloadFileWithinVcsTag does for a tag.
 func (s VCSAPI) DownloadFileWithinVcsBranch(
 	ctx context.Context,
 	req artgen.DownloadFileWithinVcsBranchRequestObject,
@@ -516,6 +545,9 @@ func (s VCSAPI) DownloadFileWithinVcsBranch(
 	}, nil
 }
 
+// DownloadFileWithinVcsTagAlternative serves one file of a tag
+// (DownloadFileWithinVcsTag) for JFrog's short form, whose one userOrg segment
+// names both the owner and the project.
 func (s VCSAPI) DownloadFileWithinVcsTagAlternative(
 	ctx context.Context,
 	req artgen.DownloadFileWithinVcsTagAlternativeRequestObject,
@@ -530,6 +562,9 @@ func (s VCSAPI) DownloadFileWithinVcsTagAlternative(
 	}, nil
 }
 
+// DownloadFileWithinVcsBranchAlternative serves one file of a branch
+// (DownloadFileWithinVcsBranch) for JFrog's short form, whose one userOrg
+// segment names both the owner and the project.
 func (s VCSAPI) DownloadFileWithinVcsBranchAlternative(
 	ctx context.Context,
 	req artgen.DownloadFileWithinVcsBranchAlternativeRequestObject,
@@ -551,6 +586,9 @@ func (s VCSAPI) DownloadFileWithinVcsBranchAlternative(
 	}, nil
 }
 
+// DownloadFileInVcsTagInSubgroupRepository serves one file of a tag
+// (DownloadFileWithinVcsTag) for the /archive/refs/ form. VCSNested serves the
+// same form when the owner spans several segments.
 func (s VCSAPI) DownloadFileInVcsTagInSubgroupRepository(
 	ctx context.Context,
 	req artgen.DownloadFileInVcsTagInSubgroupRepositoryRequestObject,
@@ -565,6 +603,9 @@ func (s VCSAPI) DownloadFileInVcsTagInSubgroupRepository(
 	}, nil
 }
 
+// DownloadFileInVcsBranchInSubgroupRepository serves one file of a branch
+// (DownloadFileWithinVcsBranch) for the /archive/refs/ form. VCSNested serves
+// the same form when the owner spans several segments.
 func (s VCSAPI) DownloadFileInVcsBranchInSubgroupRepository(
 	ctx context.Context,
 	req artgen.DownloadFileInVcsBranchInSubgroupRepositoryRequestObject,

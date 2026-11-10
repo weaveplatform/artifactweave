@@ -44,7 +44,6 @@ import (
 	p2http "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/p2/http"
 	rpmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/rpm/http"
 	terraformbackendhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend/http"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/vcs/http"
 	vcshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/vcs/http"
 	configurationhttp "github.com/weaveplatform/artifactweave/migration/configuration/adapters/http"
 	configapi "github.com/weaveplatform/artifactweave/migration/configuration/api"
@@ -387,7 +386,7 @@ func New(cfg Config) http.Handler {
 	// Every partial embeds the kit newArtifactoryAPI built, so the routes of
 	// the whole spec share one set of overlays and one redirect throttle.
 	kit := artAPI.Kit
-	vcsOps := vcshttp.VCSAPI{kit}
+	vcsOps := vcshttp.VCSAPI{Kit: kit}
 	npmOps := npmAPI{kit}
 	dockerOps := dockerAPI{kit}
 	debianOps := debianhttp.DebianAPI{Kit: kit}
