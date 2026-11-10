@@ -6,7 +6,7 @@
   ".github/workflows/quality-gate.yml": "e35a059998a0357ae6cc349edcfa0062b4a9b1e7ed6e53c8922dfcb1127c0fe6",
   "deploy/check.sh": "264837052199f1e4d93e080aebf8e747ff6f8a12823fb75100e5312cb1b03285",
   "docs/research/39-vcs-legacy.md": "80f1ab4297ddb503ba6d08a26ff30229528c931f734f450111c7d58c29d82777",
-  "go.mod": "2993b4c1c9d9bc43cbd699052c4453034ac7e573c916f53dbc96cb9d2c162923",
+  "go.mod": "63ced0ab775ec8f54809e80e6c032db83ab3769cfa57212fd2e5b9c759c9ef73",
   "migration/access/adapters/http/authn_middleware.go": "96fc9bec3b46e94aba09b495135852cba900dcfa6dff1086bd8a55fa4ad19571",
   "migration/access/core/authn/token.go": "babe0157048fb63ffe7758df90769a88538e07364c54783f57c3f25559aab4a3",
   "migration/access/core/authn/token_test.go": "2d7c3c2cb63e8b2a9a0e89ec474d1f86c88c86318973be7f835659f28cb8820e",
