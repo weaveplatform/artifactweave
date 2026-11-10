@@ -42,7 +42,7 @@
 //     lookup or backend call; a Request without a decider is refused.
 //   - A Permit only narrows: no hop borrows a more privileged flight's
 //     result, and a cache-only read never reaches the network.
-//   - A backend failure leaves as a safe failure, store.ErrNotFound, the
+//   - A backend failure leaves as a safe failure, kernel.ErrNotFound, the
 //     context's error or an HTTPError with a bounded status and
 //     Retry-After; upstream bodies, URLs, headers and credentials are never
 //     error messages.

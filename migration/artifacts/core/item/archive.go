@@ -58,7 +58,7 @@ type OverwriteDeniedError struct {
 	// Path is the file's path in it, where the format stored the write,
 	// which for a Maven unique snapshot is not the path sent.
 	Path string
-	// User is the caller's name: auth.AnonymousUser for an anonymous one.
+	// User is the caller's name: kernel.AnonymousUser for an anonymous one.
 	User string
 }
 

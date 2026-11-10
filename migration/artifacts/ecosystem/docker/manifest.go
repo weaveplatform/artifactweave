@@ -400,7 +400,7 @@ func IsDigestFolder(folder string) bool { return strings.HasPrefix(folder, diges
 
 // FindManifest returns the stored manifest whose SHA-256 is hex in one of
 // the image name's own folders, a tag folder or a digest folder, each a
-// direct child of name, as FindBlob finds blobs. store.ErrNotFound when
+// direct child of name, as FindBlob finds blobs. kernel.ErrNotFound when
 // there is none.
 func FindManifest(
 	ctx context.Context,

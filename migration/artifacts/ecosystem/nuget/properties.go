@@ -54,7 +54,7 @@ var propertyKeys = []string{
 
 // properties are the nuget.* properties of the package n describes, stored
 // as it. An element n lacks, or leaves empty, gives no property, and each
-// value is cut as the store would cut it (types.PropertyValueMax), so a
+// value is cut as the store would cut it (model.PropertyValueMax), so a
 // comparison with what the store holds sees no change where there is none.
 func properties(n *Nuspec, it model.Item) model.Properties {
 	out := model.Properties{}

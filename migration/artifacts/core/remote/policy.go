@@ -123,7 +123,7 @@ func (p *Policy) Acquire(ctx context.Context, repoKey string) (func(), error) {
 // upstream network access, an offline repository and a derived resource
 // read the cache alone. With an Interceptor installed, a read that WithSmart
 // has not marked goes to it first. Errors: source.ErrUnavailable when the
-// hooks a fetch needs are not installed, store.ErrNotFound for a fresh
+// hooks a fetch needs are not installed, kernel.ErrNotFound for a fresh
 // negative entry, source.ErrSuperseded when the credential revision moved
 // on, and PolicyError's mapping of upstream and capacity failures. A
 // successful result's Revalidate repeats Check before disclosure.
@@ -379,7 +379,7 @@ func (p *Policy) kind(q source.Request) model.RemoteKind {
 
 // ReadEntry returns the remote cache entry stored under key for the
 // permit's source identity: an entry recorded under another identity
-// answers store.ErrNotFound, as a missing one does, so a source that
+// answers kernel.ErrNotFound, as a missing one does, so a source that
 // changed never reads its predecessor's state. A store error comes back
 // wrapped.
 func (p *Policy) ReadEntry(
@@ -543,7 +543,7 @@ func TransportRequest(q source.Request, e model.RemoteCacheEntry) Request {
 // PolicyError classifies a failure of the policy's own work for the source
 // service: an error that already carries a *source.HTTPError keeps it; the
 // sentinels a caller tests (source.ErrDenied, source.ErrSuperseded,
-// store.ErrNotFound and context.Canceled) pass through, a store conflict
+// kernel.ErrNotFound and context.Canceled) pass through, a store conflict
 // reading as superseded; a timeout becomes a 504, a busy pool a 503, a
 // security, connection or integrity failure a 502 of that kind, and
 // anything else a 502 protocol failure. Format rules in the ecosystem

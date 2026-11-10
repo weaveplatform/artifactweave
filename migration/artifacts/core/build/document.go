@@ -184,7 +184,7 @@ func (f file) build() model.BuildFile {
 // properties converts a document's properties to the store's: a string is
 // its value, null is no value, and anything else is kept as its JSON text,
 // so a number keeps the digits the client sent. A key longer than
-// types.PropertyKeyMax is ErrInvalid.
+// model.PropertyKeyMax is ErrInvalid.
 func properties(in map[string]json.RawMessage) (model.Properties, error) {
 	out := model.Properties{}
 	for k, raw := range in {

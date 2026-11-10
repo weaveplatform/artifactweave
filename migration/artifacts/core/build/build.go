@@ -62,7 +62,7 @@ type Service struct {
 	// Now supplies the time; nil means time.Now.
 	Now func() time.Time
 	// Page bounds the store pages a listing reads; zero means
-	// store.MaxLimit.
+	// kernel.MaxLimit.
 	Page int
 	// Formats and Work reach the item service's format hooks (decision
 	// 0032); nil means the generic handler and the store's queue.

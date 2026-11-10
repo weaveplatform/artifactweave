@@ -13,7 +13,7 @@ import (
 // RemoveTag does with nothing else: its files go to the trash can when it
 // is on and the package index follows (decisions 0018 and 0031). The
 // manifest stays readable by digest from any other folder holding it.
-// store.ErrNotFound when the folder holds no manifest.
+// kernel.ErrNotFound when the folder holds no manifest.
 func (s *Service) DeleteTag(ctx context.Context, o Owner, tag string) error {
 	return s.RemoveTag(ctx, o, tag, Removal{})
 }
@@ -22,7 +22,7 @@ func (s *Service) DeleteTag(ctx context.Context, o Owner, tag string) error {
 // manifest whose SHA-256 is hex, its tag folders and its digest folder, in
 // one transaction, so that neither the digest nor a tag that named it
 // answers afterwards. An index's platform manifests stay: they are
-// manifests of their own. store.ErrNotFound when no folder holds it.
+// manifests of their own. kernel.ErrNotFound when no folder holds it.
 func (s *Service) DeleteManifest(ctx context.Context, o Owner, hex string) error {
 	folders, err := layout.ManifestFolders(ctx, s.Store.Items(), o.Repo.Key, o.Name, hex)
 	if err != nil {

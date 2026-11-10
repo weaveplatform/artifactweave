@@ -6,7 +6,7 @@
 // A package is groupId:artifactId, from the layout's organisation and
 // module; a version is the name of its version folder, so every unique
 // build of 1.0-SNAPSHOT is a file of that one version; and versions order
-// by types.CompareMercury, as Artifactory's metadata and searches do.
+// by model.CompareMercury, as Artifactory's metadata and searches do.
 //
 // # Role
 //

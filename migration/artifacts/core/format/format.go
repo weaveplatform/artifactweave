@@ -287,7 +287,7 @@ type Annotation struct {
 	Removed []string
 	// At is when the change was made. A hook that writes properties in
 	// turn writes them at At, so they read as part of the same change
-	// (types.Item.PropertiesModified) rather than a later one.
+	// (model.Item.PropertiesModified) rather than a later one.
 	At time.Time
 }
 

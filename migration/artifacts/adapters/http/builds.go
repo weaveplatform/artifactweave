@@ -609,7 +609,7 @@ func (s ArtifactoryAPI) ControlBuildRetention(
 }
 
 // buildInfoProject is the project whose build-info repository key is
-// repoKey (types.BuildInfoRepo).
+// repoKey (model.BuildInfoRepo).
 func buildInfoProject(repoKey string) (string, bool) {
 	if repoKey == accessapi.BuildInfoRepository {
 		return "", true

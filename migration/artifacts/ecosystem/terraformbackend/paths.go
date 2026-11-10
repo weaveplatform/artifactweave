@@ -41,7 +41,7 @@ var ErrInvalidName = errors.New("terraformbackend: invalid workspace name")
 
 // CheckName refuses a workspace name that is not one path segment go-tfe
 // would send: empty, "." or "..", or holding a slash, white space, or a
-// character no item name may hold (types.SplitItemPath). TFE's narrower
+// character no item name may hold (kernel.SplitItemPath). TFE's narrower
 // rule (letters, digits, "-" and "_") is not applied, so a name that works
 // on 7.x keeps working (decision 0041, "Identifiers").
 func CheckName(name string) error {

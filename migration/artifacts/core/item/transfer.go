@@ -32,7 +32,7 @@ const (
 var ErrInvalidTransfer = errors.New("item: invalid copy or move")
 
 // ErrNoSource is a copy or move whose source does not exist (400 with a
-// report). It wraps store.ErrNotFound, so a caller that tests for that,
+// report). It wraps kernel.ErrNotFound, so a caller that tests for that,
 // such as a promotion whose file went in the meantime, still sees a miss.
 var ErrNoSource = fmt.Errorf("item: no source: %w", kernel.ErrNotFound)
 

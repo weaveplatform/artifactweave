@@ -147,9 +147,9 @@ func (c *compiler) relColumn(alias string, r rel, f string) string {
 	col := alias + "."
 	switch {
 	case r == relBuild && f == "repo":
-		// types.BuildInfoRepo, whose encoding leaves a valid project key
-		// (types.ValidateProjectKey: lowercase letters, digits and
-		// hyphens) alone.
+		// model.BuildInfoRepo, whose encoding leaves a valid project key
+		// (ValidateProjectKey in access/core/model: lowercase letters,
+		// digits and hyphens) alone.
 		return "(CASE WHEN " + col + "project_key = '' OR " + col +
 			"project_key = 'default' THEN 'artifactory-build-info' ELSE " + col +
 			"project_key || '-build-info' END)"

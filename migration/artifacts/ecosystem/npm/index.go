@@ -116,7 +116,7 @@ func setProperties(
 
 // keywordsValue is npm.keywords for keywords: a JSON array, of as many of
 // them as fit in a property value, or "" for none. The store would cut a
-// longer value (types.PropertyValueMax) to text that is no longer JSON;
+// longer value (model.PropertyValueMax) to text that is no longer JSON;
 // the description it may cut, and setProperties cuts it the same way, so
 // that it compares what the store holds. Metadata keeps both whole.
 func keywordsValue(keywords []string) string {

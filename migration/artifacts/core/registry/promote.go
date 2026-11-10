@@ -36,7 +36,7 @@ type Promotion struct {
 }
 
 // PromotedTags returns the tags a promotion of o's image takes: tag alone,
-// or every tag of the image when tag is empty. store.ErrNotFound when the
+// or every tag of the image when tag is empty. kernel.ErrNotFound when the
 // image holds no tag, or tag names no folder holding a manifest.
 func (s *Service) PromotedTags(ctx context.Context, o Owner, tag string) ([]string, error) {
 	if tag == "" {
@@ -55,7 +55,7 @@ func (s *Service) PromotedTags(ctx context.Context, o Owner, tag string) ([]stri
 	return []string{tag}, nil
 }
 
-// TagManifest is the manifest file tag holds in o's image; store.ErrNotFound
+// TagManifest is the manifest file tag holds in o's image; kernel.ErrNotFound
 // for a reserved name, a digest folder or a folder holding none.
 func (s *Service) TagManifest(ctx context.Context, o Owner, tag string) (model.Item, error) {
 	if layout.ReservedTag(tag) || layout.IsDigestFolder(tag) {
@@ -308,7 +308,7 @@ type Parent struct {
 // that name the manifest tag holds (decision 0031), each once with the tags
 // it sits under, ordered by digest. A push stores a list only where its
 // platforms already are, so the image is all there is to search.
-// store.ErrNotFound when tag holds no manifest.
+// kernel.ErrNotFound when tag holds no manifest.
 func (s *Service) ParentManifests(ctx context.Context, o Owner, tag string) ([]Parent, error) {
 	child, err := s.TagManifest(ctx, o, tag)
 	if err != nil {

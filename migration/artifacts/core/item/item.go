@@ -658,7 +658,7 @@ func (s *Service) MakeFolder(
 
 // EnsureRoot returns the record of the root of t's repository, or of its
 // cache when t.Cached, creating it when absent. The record holds the
-// properties set on the repository itself (store.ItemStore).
+// properties set on the repository itself (port.ItemStore).
 func (s *Service) EnsureRoot(ctx context.Context, t Target, by string) (model.Item, error) {
 	now := s.now()
 	it, err := s.Store.Items().EnsureRoot(ctx, model.Item{
@@ -784,7 +784,7 @@ func (a Algorithm) set(c *kernel.Checksums, v string) {
 
 // SidecarError is a checksum sidecar upload refused for its file, with
 // Artifactory's answer (UploadServiceImpl.validatePathAndUploadChecksum):
-// Err is store.ErrNotFound for a missing file, ErrConflict for a folder and
+// Err is kernel.ErrNotFound for a missing file, ErrConflict for a folder and
 // ErrChecksumMismatch for a value the client-checksums policy refuses.
 type SidecarError struct {
 	Err     error

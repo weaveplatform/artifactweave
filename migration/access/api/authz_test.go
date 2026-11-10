@@ -9,9 +9,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
-// The expected subjects are what auth.SubjectOf returned before it moved
-// here: the evaluator starts from them, so a change would change every
-// permission answer.
+// The expected subjects are fixed: the evaluator starts from them, so a
+// change would change every permission answer.
 func TestUnitSubjectOf(t *testing.T) {
 	user := kernel.UserScope()
 	groups := kernel.Scope{Entries: []kernel.ScopeEntry{

@@ -194,7 +194,7 @@ func Versions(
 		return nil, nil, fmt.Errorf("maven: package %s: %w", name, err)
 	}
 	// The store orders versions by the package type's comparator, Mercury
-	// for the Maven group (types.ComparatorFor).
+	// for the Maven group (model.ComparatorFor).
 	vs, err := st.Packages().Versions(ctx, p.ID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("maven: versions of %s: %w", name, err)

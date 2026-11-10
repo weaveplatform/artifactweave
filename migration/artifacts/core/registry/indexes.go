@@ -132,7 +132,7 @@ func (s *Service) unreferenced(
 // names, in one transaction, sending them to the trash can when it is on
 // (decision 0010), by o.By: 7.x deletes the tag "with all of their
 // sub-architectures". It returns the folders removed, the tag first;
-// store.ErrNotFound when the image has no such tag. The caller has checked
+// kernel.ErrNotFound when the image has no such tag. The caller has checked
 // Delete on the image, which covers its digest folders. DELETE
 // /artifactory/api/docker/<repo>/v2/delete (#226) calls it.
 func (s *Service) DeleteMultiArch(ctx context.Context, o Owner, tag string) ([]string, error) {

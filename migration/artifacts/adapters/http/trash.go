@@ -417,7 +417,7 @@ func (v trashView) uri(p string) string {
 // target finds what the trash can holds at the path, with what it holds
 // directly below: the root, which is always there, a trashed item, or a
 // folder holding what the caller sees was trashed below it. Anything else is
-// store.ErrNotFound.
+// kernel.ErrNotFound.
 func (v trashView) target(ctx context.Context) (trash.Node, []trash.Node, error) {
 	n := trash.Node{Path: v.dir, Folder: true}
 	children, err := v.svc.Below(ctx, v.dir, false, v.sees)

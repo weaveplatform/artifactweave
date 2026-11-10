@@ -36,7 +36,7 @@ type Removal struct {
 // (decision 0018) drops the version in the same transaction, so a caller
 // keeps nothing in step itself. A manifest DELETE by tag removes with no
 // Removal, the multi-architecture delete with Platforms, and Max Unique
-// Tags with all three. store.ErrNotFound when the image has no such tag.
+// Tags with all three. kernel.ErrNotFound when the image has no such tag.
 func (s *Service) RemoveTag(ctx context.Context, o Owner, tag string, r Removal) error {
 	items := s.items()
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {

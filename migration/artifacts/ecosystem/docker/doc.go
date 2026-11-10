@@ -38,7 +38,7 @@
 //   - Driven: the format hooks' environment (format.Env), through which
 //     Handler reads stored manifests and chart configs and keeps the
 //     package index (artifacts/core/pkgindex); the item store's AQL search
-//     (store.ItemStore, artifacts/core/aql), through which the lookups find
+//     (port.ItemStore, artifacts/core/aql), through which the lookups find
 //     blobs, manifests, tags, images and referrers; and core remote: the
 //     shared policy (remote.Policy), through which RegistryContent checks,
 //     reads and caches child manifests and configs and opens what the cache

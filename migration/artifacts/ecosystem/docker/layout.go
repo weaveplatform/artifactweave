@@ -41,7 +41,7 @@ func UploadPath(name, hex string) string {
 // own folders: a tag folder, a digest folder or _uploads, each a direct
 // child of name (decision 0031). A blob only in a deeper folder belongs to
 // another image whose name begins with this one, and is not found: the
-// depth puts the file exactly two levels below name. store.ErrNotFound
+// depth puts the file exactly two levels below name. kernel.ErrNotFound
 // when there is none.
 func FindBlob(
 	ctx context.Context,

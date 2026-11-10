@@ -14,7 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 )
 
-// Errors the API maps onto statuses. The three that wrap store.ErrNotFound
+// Errors the API maps onto statuses. The three that wrap kernel.ErrNotFound
 // answer 404.
 var (
 	// ErrNoRepository is a key that names no local terraformbackend

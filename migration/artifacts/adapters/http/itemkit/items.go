@@ -513,7 +513,7 @@ func (s *Kit) GetItem(w http.ResponseWriter, r *http.Request) {
 	s.ServeFile(w, r, st, f, p)
 }
 
-// matchesMatrix applies download matrix parameters (types.Matrix.Matches).
+// matchesMatrix applies download matrix parameters (model.Matrix.Matches).
 func matchesMatrix(
 	ctx context.Context,
 	st Store,

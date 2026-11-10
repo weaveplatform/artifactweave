@@ -237,7 +237,7 @@ func (p Protocol) signed(r *http.Request) bool {
 // Source reads a repository's items for a protocol.
 type Source interface {
 	// Item returns the file or folder at path as c's class finds it, with
-	// the repository it lives in, or an error wrapping store.ErrNotFound.
+	// the repository it lives in, or an error wrapping kernel.ErrNotFound.
 	Item(ctx context.Context, st Store, c repo.Config, path string) (Found, error)
 }
 
@@ -481,7 +481,7 @@ func (k *Kit) resolve(next http.Handler) http.Handler {
 // lookup returns the repository the first of keys names, and that key. A
 // Resolve's candidates also match a key in another case, which needs the
 // list of repositories: it is read once, and only when an exact key
-// misses. Nothing found is an error wrapping store.ErrNotFound.
+// misses. Nothing found is an error wrapping kernel.ErrNotFound.
 func (k *Kit) lookup(ctx context.Context, keys []Key) (repo.Config, Key, error) {
 	repos := k.o.Store.Repos()
 	var all []repo.Config

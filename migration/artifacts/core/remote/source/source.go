@@ -705,7 +705,7 @@ const (
 )
 
 // HTTPError preserves an approved status without its upstream body, URL or
-// authentication challenge. Confirmed 404 uses store.ErrNotFound; other failures
+// authentication challenge. Confirmed 404 uses kernel.ErrNotFound; other failures
 // must never be recorded as negative cache entries.
 type HTTPError struct {
 	Kind       FailureKind

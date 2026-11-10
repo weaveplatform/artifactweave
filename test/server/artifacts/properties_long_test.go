@@ -72,7 +72,7 @@ func propertyServer(t *testing.T, db harness.Store) http.Handler {
 	return New(Config{BaseURL: "https://reg.example", Store: db, Blobs: blobs, Auth: a})
 }
 
-// testLongPropertyValues sets property values of types.PropertyValueMax
+// testLongPropertyValues sets property values of model.PropertyValueMax
 // characters through matrix parameters and the properties API, and one past
 // it: every request succeeds, and the longer value reads back cut.
 func testLongPropertyValues(t *testing.T, db harness.Store) {
@@ -132,7 +132,7 @@ func TestAccLongPropertyKeys(t *testing.T) { testLongPropertyKeys(t, inmem.New()
 
 func TestAccLongPropertyKeysOnPostgres(t *testing.T) { testLongPropertyKeys(t, openPostgres(t)) }
 
-// testLongPropertyKeys sets keys of types.PropertyKeyMax characters through
+// testLongPropertyKeys sets keys of model.PropertyKeyMax characters through
 // every route that sets properties, and refuses one more character on each
 // with a 400 that leaves everything as it was. "é" is two bytes of UTF-8,
 // so the limit counts characters, not bytes.

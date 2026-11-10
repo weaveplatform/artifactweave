@@ -80,9 +80,10 @@ func ValidateStored(c *Config) error {
 }
 
 // buildInfoKey is the key of the build-info repository the server seeds.
-// It must match types.BuildInfoRepository, which migration/artifacts/api/repo
-// cannot import because pkg/types imports migration/artifacts/api/repo;
-// migration/artifacts/core/repos tests the two agree.
+// It must match BuildInfoRepository in migration/access/api, which this
+// package may not import (a module's api imports only the kernel,
+// platform/outbox and its own api); migration/artifacts/core/repos tests the
+// two agree.
 const buildInfoKey = "artifactory-build-info"
 
 //nolint:gocyclo // One pass applies every independent field rule, so a client sees all its errors at once.

@@ -215,7 +215,7 @@ func TestUnitDeployIndexes(t *testing.T) {
 }
 
 // Values taken from package.json are cut as the store cuts every property
-// value (types.PropertyValueMax), and keywords that do not fit are left out
+// value (model.PropertyValueMax), and keywords that do not fit are left out
 // of npm.keywords so it stays JSON; Metadata keeps all of them.
 func TestUnitLongPropertyValues(t *testing.T) {
 	w := newWorld(t)

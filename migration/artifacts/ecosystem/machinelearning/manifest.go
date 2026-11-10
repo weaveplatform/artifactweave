@@ -186,7 +186,7 @@ func Verify(
 }
 
 // Missing reports whether err, from Read or Verify, means an item is not
-// stored (store.ErrNotFound): the version has no manifest or has lost a
+// stored (kernel.ErrNotFound): the version has no manifest or has lost a
 // declared file, so it is unpublished or withdrawn rather than broken.
 func Missing(err error) bool { return errors.Is(err, kernel.ErrNotFound) }
 
