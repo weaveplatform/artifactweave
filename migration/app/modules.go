@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/configuration"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
+	"github.com/weaveplatform/artifactweave/migration/platform/instance"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
@@ -85,4 +87,21 @@ func buildModules(cfg config.Config, d moduleDeps) (modules, error) {
 		return modules{}, fmt.Errorf("configuration: %w", err)
 	}
 	return modules{access: acc, artifacts: art, configuration: conf}, nil
+}
+
+// tokenKeyBits is the access-token RSA key size; zero means the production
+// size. Tests set a small one so every runtime they open stays cheap.
+var tokenKeyBits int
+
+// openTokens creates the instance identity when missing and the token
+// service over it, which creates the first signing key.
+func openTokens(ctx context.Context, st store.Store) (*token.Service, error) {
+	if err := instance.EnsureInstance(ctx, st); err != nil {
+		return nil, err //nolint:wrapcheck // EnsureInstance's errors start "instance identity:"
+	}
+	tokens, err := token.New(ctx, st, token.Options{KeyBits: tokenKeyBits})
+	if err != nil {
+		return nil, fmt.Errorf("access tokens: %w", err)
+	}
+	return tokens, nil
 }

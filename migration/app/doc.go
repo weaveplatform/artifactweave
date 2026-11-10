@@ -72,17 +72,23 @@
 // # Status
 //
 // Implemented P0 to P9c. Staged in P9d (WEB-18); WEB-19 added the module
-// settings and WEB-20 the module constructors, which took over the remote
-// wiring and the garbage collection loop. The file split and the router
-// follow in WEB-21 and WEB-22.
+// settings, WEB-20 the module constructors, which took over the remote
+// wiring and the garbage collection loop, and WEB-21 gave each file one
+// job: run.go serves, platform.go opens what the modules share, modules.go
+// builds the modules, bootstrap.go and seed.go prepare the first start,
+// runtime.go holds the runtime and serverlog.go the HTTP server's error log.
+// The router follows in WEB-22.
 //
 // # Testing
 //
-// The tests start the runtime from a configuration as serve would:
-// app_test.go, runtime_test.go and store_test.go cover Run, openRuntime,
-// Migrate and RotateKeys; modules_test.go buildModules; blob_test.go,
-// mirrors_test.go and gc_test.go the blob tiers; seed_test.go and
-// descriptor_test.go the first start and config apply; the *_remote_test.go
-// suites remote repositories through the composed runtime. make conan-accept runs conan_client_test.go. hash_test.go
-// lowers the password hashing cost and the token key size for all of them.
+// The tests start the runtime from a configuration as serve would, each
+// beside the file it tests: run_test.go covers Run; runtime_test.go
+// openRuntime, its loops and close; platform_test.go Keyring, OpenStore,
+// Migrate, RotateKeys, the blob tiers and their mirrors; modules_test.go
+// buildModules and the token service; seed_test.go and bootstrap_test.go
+// the first start and config apply; serverlog_test.go the HTTP server's
+// error log; the *_remote_test.go suites remote repositories through the
+// composed runtime. make conan-accept runs conan_client_test.go.
+// hash_test.go lowers the password hashing cost and the token key size for
+// all of them.
 package app

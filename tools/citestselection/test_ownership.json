@@ -132,7 +132,6 @@
       "conan_remote_test.go",
       "conda_remote_test.go",
       "hash_test.go",
-      "instance_test.go",
       "mapped_remote_test.go",
       "maven_remote_test.go",
       "modules_test.go",
