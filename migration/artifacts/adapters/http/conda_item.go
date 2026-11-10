@@ -13,8 +13,11 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
-// Stored shards and CAS containers can span several read grants. Their native
-// routes construct the representation the current caller is allowed to read.
+// TryCondaItem is the item overlay (itemkit.Overlay) that answers 404 for
+// the paths PrivateItem names: stored shards and CAS containers can span
+// several read grants, so only their native routes construct the
+// representation the current caller is allowed to read. It writes nothing
+// and returns false for every other path.
 func TryCondaItem(
 	_ *itemkit.Kit, w http.ResponseWriter, r *http.Request, _ store.Store, c repo.Config,
 	_ bool, req itemkit.ItemRequest, _ kernel.Principal, _ itemkit.Access,

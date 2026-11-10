@@ -3,7 +3,6 @@ package artifactshttp
 import (
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -16,11 +15,11 @@ func TestAccConfiguredCollector(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := newArtifactoryAPI(server.Config{Store: db, GC: c})
+	s := newArtifactoryAPI(Config{Store: db, GC: c})
 	if got, err := s.collector(); err != nil || got != c {
 		t.Fatalf("collector %p, %v", got, err)
 	}
-	if _, err := newArtifactoryAPI(server.Config{}).collector(); err == nil {
+	if _, err := newArtifactoryAPI(Config{}).collector(); err == nil {
 		t.Fatal("no store, no collector")
 	}
 }

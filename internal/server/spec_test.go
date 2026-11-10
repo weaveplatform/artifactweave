@@ -15,7 +15,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/api"
 	accesshttp "github.com/weaveplatform/artifactweave/migration/access/adapters/http"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http"
 	artifactshttp "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"

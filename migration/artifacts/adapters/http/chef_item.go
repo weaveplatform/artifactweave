@@ -13,8 +13,11 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
-// Cached metadata describes versions outside an individual caller's permission
-// patterns. Only the native API filters and rewrites those documents.
+// TryChefItem is the item overlay (itemkit.Overlay) that answers 404 for a
+// Chef repository's metadata documents, which only the native API serves:
+// cached metadata describes versions outside an individual caller's
+// permission patterns, and only the native API filters and rewrites those
+// documents. It writes nothing and returns false for every other path.
 func TryChefItem(
 	_ *itemkit.Kit, w http.ResponseWriter, r *http.Request, _ store.Store, c repo.Config,
 	_ bool, req itemkit.ItemRequest, _ kernel.Principal, _ itemkit.Access,

@@ -562,7 +562,7 @@ binary's actual discovery document rather than constructing its service URLs.
   build and match no path (research 03).
 - **[S]** `internal/server/stubs.go:23-24` already answers errors under
   `/artifactory/api/terraform/` with `{"errors":["..."]}` (`apierror.ProfileTerraformRegistry`).
-- **[S]** `POST /api/terraform/{repoKey}/reindex` is served (`internal/server/reindex.go:221`).
+- **[S]** `POST /api/terraform/{repoKey}/reindex` is served (`migration/artifacts/adapters/http/reindex.go:228`).
 - **[S]** No Terraform format exists: `format.For` answers the generic handler, which keeps
   no index, and nothing is served at `/.well-known/terraform.json`.
 - **[S]** `types.ComparatorFor(repo.Terraform)` is `CompareSemver` (`pkg/types/version.go:48`).

@@ -24,6 +24,10 @@ const anyTarget = "_any"
 // spelling counts, as JFrog documents.
 const versionProperty = "version"
 
+// RegisterSearchRoutes serves the latest version by properties search,
+// GET /api/versions/{repo}/{path}, whose path spans segments, which a
+// generated route cannot take. Registered before the router's stubs of the
+// hand-written operations, it replaces the 501 stub.
 func (s ArtifactoryAPI) RegisterSearchRoutes(r chi.Router) {
 	for _, p := range httpkit.ChiPatterns(versionsPrefix + "{repo}/{path}") {
 		r.Get(p, s.latestVersionByProperties)

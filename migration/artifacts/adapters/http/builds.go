@@ -145,8 +145,8 @@ func (s ArtifactoryAPI) GetAllBuilds(
 // UploadBuild publishes a build-info document and answers 204, as 7.x
 // documents (uploadbuild-1) and Artifactory 6.20's BuildResource.addBuild
 // does; the JFrog CLI accepts 200, 201 and 204. The handler reads the raw
-// body requestDetails kept rather than the decoded one, which would drop
-// the fields the spec does not list.
+// body the router's request details kept rather than the decoded one, which
+// would drop the fields the spec does not list.
 func (s ArtifactoryAPI) UploadBuild(
 	ctx context.Context,
 	req artgen.UploadBuildRequestObject,
@@ -618,9 +618,9 @@ func buildInfoProject(repoKey string) (string, bool) {
 	return p, ok && p != ""
 }
 
-// KeepsBuildBody reports a build-info publish or append, whose raw body
-// requestDetails keeps because the document is stored as published
-// (decision 0014).
+// KeepsBuildBody reports a build-info publish or append, whose raw body the
+// router's request details keep because the document is stored as
+// published (decision 0014).
 func KeepsBuildBody(r *http.Request) bool {
 	return r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, buildsPath+"/append/") ||
 		r.Method == http.MethodPut && r.URL.Path == buildsPath

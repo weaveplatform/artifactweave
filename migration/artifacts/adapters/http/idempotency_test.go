@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
@@ -71,7 +70,7 @@ func TestAccAppendIdempotencyRecheckDeadline(t *testing.T) {
 	// users that time out.
 	access := accesstest.Over(t, w.db).API()
 	access.Authenticator = accesstest.Over(t, replayDeadlineStore{w.db}).API().Authenticator
-	svc := newArtifactoryAPI(server.Config{Store: w.db, Blobs: w.blobs, Access: access})
+	svc := newArtifactoryAPI(Config{Store: w.db, Blobs: w.blobs, Access: access})
 	err = svc.appendOnce(
 		t.Context(),
 		svc.builds(w.db),
@@ -104,7 +103,7 @@ func TestAccAppendIdempotencyReplayEvaluatesCurrentPermissions(t *testing.T) {
 		t.Fatalf("request decider: %v", err)
 	}
 	ctx := accessapi.WithCaller(t.Context(), p, decider)
-	svc := newArtifactoryAPI(server.Config{Store: w.db, Blobs: w.blobs, Access: access})
+	svc := newArtifactoryAPI(Config{Store: w.db, Blobs: w.blobs, Access: access})
 	appendOnce := func() error {
 		return svc.appendOnce(
 			ctx,

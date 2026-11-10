@@ -108,6 +108,10 @@ func (s ArtifactoryAPI) readerFor(
 	return p, acc.Visible, nil
 }
 
+// GetRepositoriesByTypeAndProject lists the repositories the caller may
+// see, narrowed by class, package type and project. The distribution class
+// lists nothing, because no distribution repository is served here, and the
+// list takes the details-list vendor media type when the client asks for it.
 func (s ArtifactoryAPI) GetRepositoriesByTypeAndProject(
 	ctx context.Context,
 	req artgen.GetRepositoriesByTypeAndProjectRequestObject,
@@ -166,6 +170,9 @@ func (s ArtifactoryAPI) GetRepositoriesByTypeAndProject(
 	return out, nil
 }
 
+// GetAllRepositoryConfigurations returns every repository's configuration,
+// secrets masked, grouped by class and narrowed by the comma-separated
+// package type and class filters. It is for administrators only.
 func (s ArtifactoryAPI) GetAllRepositoryConfigurations(
 	ctx context.Context,
 	req artgen.GetAllRepositoryConfigurationsRequestObject,
@@ -233,6 +240,9 @@ func commaSet(v *string) set {
 
 func (s set) has(v string) bool { return len(s) == 0 || s[strings.ToLower(v)] }
 
+// CheckIfRepositoryExists reports whether a repository of any asked class
+// exists, of any class when none is asked, within the project when one is
+// named. It is for administrators only.
 func (s ArtifactoryAPI) CheckIfRepositoryExists(
 	ctx context.Context,
 	req artgen.CheckIfRepositoryExistsRequestObject,
@@ -308,6 +318,10 @@ func (s ArtifactoryAPI) readOne(
 	return p, itemkit.View(p, c), nil
 }
 
+// GetRepositoryConfiguration returns a repository's configuration as the
+// caller may see it (itemkit.View), in the class's vendor media type when
+// the client asks for it. A missing key answers 404, and a key the caller
+// may not see is refused as httpkit.Denied refuses a read.
 func (s ArtifactoryAPI) GetRepositoryConfiguration(
 	ctx context.Context,
 	req artgen.GetRepositoryConfigurationRequestObject,
@@ -319,6 +333,9 @@ func (s ArtifactoryAPI) GetRepositoryConfiguration(
 	return configResponse(ctx, c), nil
 }
 
+// GetRepositoryConfigurationV2 is the v2 form of GetRepositoryConfiguration,
+// which leaves out the fields the repository's class and package type do
+// not use (repo.Relevant).
 func (s ArtifactoryAPI) GetRepositoryConfigurationV2(
 	ctx context.Context,
 	req artgen.GetRepositoryConfigurationV2RequestObject,
@@ -384,6 +401,11 @@ var sharedFields = []string{
 	"remoteRepoLayoutRef", "includesPattern", "excludesPattern",
 }
 
+// GetRemoteRepositoryConfiguration returns a remote repository's
+// configuration, secrets masked: all of it to an administrator, the
+// sharedFields subset to another signed-in user when the repository shares
+// its configuration, and nothing to an anonymous caller. A key that is
+// missing or names another class answers 404.
 func (s ArtifactoryAPI) GetRemoteRepositoryConfiguration(
 	ctx context.Context,
 	req artgen.GetRemoteRepositoryConfigurationRequestObject,
@@ -448,6 +470,10 @@ func (r sharedRemoteResponse) VisitGetRemoteRepositoryConfigurationResponse(
 	return json.NewEncoder(w).Encode(r.fields) //nolint:wrapcheck // the strict server logs it
 }
 
+// GetBatchOfRepositoriesByName returns, keyed by name, the configurations
+// of up to repoBatchLimit named repositories as the caller may see them. A
+// name that does not exist or that the caller may not see is left out
+// rather than refused.
 func (s ArtifactoryAPI) GetBatchOfRepositoriesByName(
 	ctx context.Context,
 	req artgen.GetBatchOfRepositoriesByNameRequestObject,
@@ -514,6 +540,10 @@ func requestConfigs(bodies ...*[]repo.Config) []repo.Config {
 	return nil
 }
 
+// CreateRepository creates one repository, for administrators only. Its
+// configuration gets its defaults and is checked, together with the
+// members, signing key pairs and environments it names, before anything is
+// stored; a key already taken answers 400.
 func (s ArtifactoryAPI) CreateRepository(
 	ctx context.Context,
 	req artgen.CreateRepositoryRequestObject,
@@ -565,6 +595,9 @@ func (s ArtifactoryAPI) CreateRepository(
 	), nil
 }
 
+// CreateMultipleRepositories creates a batch of up to repoBatchLimit
+// repositories, all or none, for administrators only. A key already taken
+// answers 409, where CreateRepository answers 400.
 func (s ArtifactoryAPI) CreateMultipleRepositories(
 	ctx context.Context,
 	req artgen.CreateMultipleRepositoriesRequestObject,
@@ -668,6 +701,11 @@ func updateBody(ctx context.Context, decoded any) ([]byte, error) {
 	return b, nil
 }
 
+// UpdateRepositoryConfiguration merges a partial configuration into a
+// stored repository (repos.Merge), for administrators only: a field left
+// out keeps its stored value and one sent as null returns to its default.
+// The reindex an update owes the repository (repos.OwesReindex) is queued
+// in the same transaction.
 func (s ArtifactoryAPI) UpdateRepositoryConfiguration(
 	ctx context.Context,
 	req artgen.UpdateRepositoryConfigurationRequestObject,
@@ -775,6 +813,10 @@ func (s ArtifactoryAPI) checkReferences(
 	return nil
 }
 
+// UpdateMultipleRepositories applies UpdateRepositoryConfiguration's merge
+// to a batch of up to repoBatchLimit repositories, each named by its key
+// field, all in one transaction, for administrators only. An entry without
+// a key or naming a missing repository refuses the whole batch.
 func (s ArtifactoryAPI) UpdateMultipleRepositories(
 	ctx context.Context,
 	req artgen.UpdateMultipleRepositoriesRequestObject,
@@ -884,6 +926,11 @@ func failFast403(msg string) artgen.DeleteRepositories403JSONResponse {
 	return artgen.DeleteRepositories403JSONResponse(body)
 }
 
+// DeleteRepository deletes a repository and everything in it, for
+// administrators only, and answers with JFrog's removal report even when it
+// refuses: 403 for a signed-in user without the right and for the
+// build-info repository, 400 for a protected key and 404 for a missing one.
+// Only an anonymous caller gets the ordinary 401.
 func (s ArtifactoryAPI) DeleteRepository(
 	ctx context.Context,
 	req artgen.DeleteRepositoryRequestObject,
@@ -926,6 +973,10 @@ func (s ArtifactoryAPI) DeleteRepository(
 	return artgen.DeleteRepository200JSONResponse(removed(key, files)), nil
 }
 
+// DeleteRepositories deletes a list of repositories, for administrators
+// only, and answers with a report per key: 200 when every key was removed
+// (a missing key counts as removed), 207 when some failed and 500 when all
+// did. A refused key refuses the whole list before anything is deleted.
 func (s ArtifactoryAPI) DeleteRepositories(
 	ctx context.Context,
 	req artgen.DeleteRepositoriesRequestObject,

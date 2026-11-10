@@ -26,7 +26,8 @@ type npmAPI struct{ *itemkit.Kit }
 // Calculate npm Repository Metadata) and queues its work on the persistent
 // work queue, keyed by the repository (decision 0033), as 7.x schedules
 // them rather than running them before it answers. The reindex is every
-// format's (reindex.go); the conversion is the npm format's own work.
+// format's (the item kit's reindex.go); the conversion is the npm format's
+// own work.
 
 // npmOperation resolves the repository an npm operation names and checks
 // it as the reindex does: 404 when there is none, 401 or 403 to a caller

@@ -75,6 +75,8 @@ func (s ArtifactoryAPI) CalculateCargoRepositoryMetadata(
 	return artgen.CalculateCargoRepositoryMetadata200TextResponse(msg), err
 }
 
+// CalculateRubyGemsIndex rebuilds a RubyGems repository's specs indexes
+// from its stored gems before it answers.
 func (s ArtifactoryAPI) CalculateRubyGemsIndex(
 	ctx context.Context, req artgen.CalculateRubyGemsIndexRequestObject,
 ) (artgen.CalculateRubyGemsIndexResponseObject, error) {
@@ -149,6 +151,8 @@ func helmPartialReindexPath(r *http.Request) (string, string, bool) {
 
 // The generated reindex operations of the package types with a format.
 
+// CalculatePubRepositoryMetadata rebuilds a Pub repository's package index,
+// before it answers unless async is true.
 func (s ArtifactoryAPI) CalculatePubRepositoryMetadata(
 	ctx context.Context,
 	req artgen.CalculatePubRepositoryMetadataRequestObject,
@@ -161,6 +165,8 @@ func (s ArtifactoryAPI) CalculatePubRepositoryMetadata(
 	return artgen.CalculatePubRepositoryMetadata200TextResponse(msg), nil
 }
 
+// CalculateCocoaPodsIndex queues the rebuild of a CocoaPods repository's
+// spec index and answers once it is queued.
 func (s ArtifactoryAPI) CalculateCocoaPodsIndex(
 	ctx context.Context,
 	req artgen.CalculateCocoaPodsIndexRequestObject,
@@ -187,6 +193,9 @@ func (s ArtifactoryAPI) CalculateCondaRepositoryMetadata(
 	return artgen.CalculateCondaRepositoryMetadata200TextResponse(msg), nil
 }
 
+// CalculateHelmChartIndex queues the rebuild of a Helm repository's
+// index.yaml and answers once it is queued; HelmPartialReindex serves the
+// reindex of one path.
 func (s ArtifactoryAPI) CalculateHelmChartIndex(
 	ctx context.Context,
 	req artgen.CalculateHelmChartIndexRequestObject,
@@ -198,6 +207,8 @@ func (s ArtifactoryAPI) CalculateHelmChartIndex(
 	return artgen.CalculateHelmChartIndex200TextResponse(msg), nil
 }
 
+// CalculateNuGetRepositoryMetadata queues the rebuild of a NuGet
+// repository's feed metadata and answers once it is queued.
 func (s ArtifactoryAPI) CalculateNuGetRepositoryMetadata(
 	ctx context.Context,
 	req artgen.CalculateNuGetRepositoryMetadataRequestObject,
@@ -225,6 +236,8 @@ func (s ArtifactoryAPI) CalculatePypiRepositoryMetadata(
 	return artgen.CalculatePypiRepositoryMetadata200TextResponse(msg), nil
 }
 
+// CalculateTerraformIndex queues the rebuild of a Terraform repository's
+// module and provider indexes and answers once it is queued.
 func (s ArtifactoryAPI) CalculateTerraformIndex(
 	ctx context.Context,
 	req artgen.CalculateTerraformIndexRequestObject,
@@ -236,6 +249,8 @@ func (s ArtifactoryAPI) CalculateTerraformIndex(
 	return artgen.CalculateTerraformIndex200TextResponse(msg), nil
 }
 
+// CalculateSwiftIndex queues the rebuild of a Swift repository's package
+// index and answers once it is queued.
 func (s ArtifactoryAPI) CalculateSwiftIndex(
 	ctx context.Context,
 	req artgen.CalculateSwiftIndexRequestObject,

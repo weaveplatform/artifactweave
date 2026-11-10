@@ -7,7 +7,6 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/server"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
@@ -39,7 +38,7 @@ func TestUnitStoragePermissionsRenderGrants(t *testing.T) {
 		return users, map[string]accessapi.Actions{"readers": types.ActionRead}, nil
 	}}
 	v := storageView{
-		s:   newArtifactoryAPI(server.Config{Access: accessapi.API{Grants: grants}}),
+		s:   newArtifactoryAPI(Config{Access: accessapi.API{Grants: grants}}),
 		key: "libs",
 	}
 	item := types.Item{RepoKey: "libs", Path: "dir", Name: "a.txt"}

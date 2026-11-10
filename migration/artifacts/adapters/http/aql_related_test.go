@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -42,7 +41,7 @@ func compactAQL(
 // cancelled and answered with 408 (#411), the streamed timeout applying to
 // a stream: true request.
 func TestAccSearchAQLTimeout(t *testing.T) {
-	h, _ := buildsAQLWorld(t, func(c *server.Config) {
+	h, _ := buildsAQLWorld(t, func(c *Config) {
 		c.AQL.Timeout = time.Nanosecond
 		c.Store = deadlineStore{c.Store}
 	})
@@ -58,7 +57,7 @@ func TestAccSearchAQLTimeout(t *testing.T) {
 			t.Errorf("%s streamed: %d %s", query, code, body)
 		}
 	}
-	h, _ = buildsAQLWorld(t, func(c *server.Config) {
+	h, _ = buildsAQLWorld(t, func(c *Config) {
 		c.AQL.StreamTimeout = time.Nanosecond
 		c.Store = deadlineStore{c.Store}
 	})
@@ -71,7 +70,7 @@ func TestAccSearchAQLTimeout(t *testing.T) {
 	}
 	// The nesting of related rows fails the same ways: on the timeout, and
 	// on an include that reaches too many related rows.
-	s := newArtifactoryAPI(server.Config{})
+	s := newArtifactoryAPI(Config{})
 	ctx := context.Background()
 	var api *apierror.Error
 	late := context.DeadlineExceeded

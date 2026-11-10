@@ -912,6 +912,19 @@ func md5Hex(s string) string {
 
 const aqlURL = "/artifactory/api/search/aql"
 
+// The artifacts handlers' paths that the root's tests and guard tables name,
+// spelled as artifactshttp spells them, so that a change there fails a test
+// here.
+const (
+	buildsPath      = "/artifactory/api/build"
+	uploadsCreate   = "/artifactory/api/v1/uploads/create"
+	uploadsURLPart  = "/artifactory/api/v1/uploads/urlPart"
+	uploadsPart     = "/artifactory/api/v1/uploads/part"
+	uploadsComplete = "/artifactory/api/v1/uploads/complete"
+	uploadsStatus   = "/artifactory/api/v1/uploads/status"
+	uploadsAbort    = "/artifactory/api/v1/uploads/abort"
+)
+
 func decodeObject(t *testing.T, body string) map[string]any {
 	t.Helper()
 	var m map[string]any

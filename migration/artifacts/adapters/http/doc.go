@@ -10,24 +10,30 @@
 //
 // # Role
 //
-// artifacts module, HTTP adapter layer (management REST). The server root's
-// router composes it with the other partials until the router itself moves
-// (WEB-22). It embeds the item kit (itemkit), which the ecosystem partials
-// share, and builds the ecosystem HTTP packages' protocols (Protocols). It
-// never imports the server root. It reaches the access module only through
-// access/api and the kernel's principal helpers, and the configuration
-// module not at all: the descriptor's minimum redirect size reaches the kit
-// as a function in its Deps.
+// artifacts module, HTTP adapter layer (management REST). The composition
+// root mounts what this package exports beside the other partials. The
+// package imports no server or router package: the router hands it what it
+// needs as Deps. It embeds the item kit (itemkit), which the ecosystem
+// partials share, and builds the ecosystem HTTP packages' protocols
+// (Protocols). It reaches the access module only through access/api and the
+// kernel's principal helpers, and the configuration module not at all: the
+// descriptor's minimum redirect size reaches the kit as a function in its
+// Deps.
 //
 // # Inputs
 //
-//   - Deps: the item kit's dependencies (the stores, the remote sources,
-//     the work queue, the formats and their settings, the access module's
-//     API, the redirect policy, the logger, the overlays and the private
-//     predicate) and the handlers' own: the remote connection pools, the
-//     remote status diagnostics, the garbage collector, the multipart upload
-//     service, the blob mirrors and location, the AQL and search limits, and
-//     the build, folder download, Hugging Face and npm settings.
+//   - Driving: the router, which embeds ArtifactoryAPI in the generated
+//     strict server beside the other partials and the stubs, mounts the
+//     registrars, SmartStatus and Protocols, and installs IdempotencyRoutes
+//     and HelmPartialReindex as middleware.
+//   - Deps, from the composition root: the item kit's dependencies (the
+//     stores, the remote sources, the work queue, the formats and their
+//     settings, the access module's API, the redirect policy, the logger,
+//     the overlays and the private predicate) and the handlers' own: the
+//     remote connection pools, the remote status diagnostics, the garbage
+//     collector, the multipart upload service, the blob mirrors and
+//     location, the AQL and search limits, and the build, folder download,
+//     Hugging Face and npm settings.
 //   - The request's principal and decider in its context, which the
 //     authentication middleware put there, and the raw query and body that
 //     the router's request details keep for the operations that read them
@@ -61,8 +67,8 @@
 //     overlays answer the paths PrivateItem names 404 on an item GET, a
 //     checksum deploy never reuses their content, and trash and transfer
 //     relocate or skip them by each format's own rule.
-//   - Routes, statuses, error texts, log lines and metrics are those the
-//     server root served before the move.
+//   - Statuses, envelopes and error, log and metric text are what JFrog's
+//     clients and the operators' logs read, so they stay byte-identical.
 //
 // # References
 //
@@ -95,10 +101,11 @@
 // # Testing
 //
 // The tests here call the partial and its helpers without the router, over
-// in-memory stores and the access module of accesstest: the storage
-// summary and its formatting, the storage view's permissions, the
-// repository operations, the idempotency keys and replays, the transitive
-// AQL peer rows and bounds, the AQL timeouts behind a router of the item
-// routes alone, and the upstream search disclosures. The route suites under
+// in-memory stores and the access module of accesstest, which the package's
+// test fixture binds as the router would: the storage summary and its
+// formatting, the storage view's permissions, the repository operations,
+// the idempotency keys and replays, the transitive AQL peer rows and
+// bounds, the AQL timeouts behind a router of the item routes alone, and
+// the upstream search disclosures. The route suites under
 // test/server/artifacts reach the rest through the router.
 package artifactshttp

@@ -223,7 +223,11 @@ func apiReviewHandlers(t *testing.T) map[string]apiReviewHandler {
 	// adapters, named by their paths from the repository root.
 	root := repopath.Root(t)
 	var files []string
-	for _, dir := range []string{"internal/server", "migration/access/adapters/http"} {
+	for _, dir := range []string{
+		"internal/server",
+		"migration/access/adapters/http",
+		"migration/artifacts/adapters/http",
+	} {
 		found, err := filepath.Glob(filepath.Join(root, dir, "*.go"))
 		if err != nil {
 			t.Fatal(err)

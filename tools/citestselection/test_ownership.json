@@ -125,7 +125,6 @@
       "p2_external_helpers_test.go",
       "p2_internal_test.go",
       "permissions_status_test.go",
-      "properties_long_internal_test.go",
       "registry_shared_test.go",
       "reindex_internal_test.go",
       "request_limits_test.go",
@@ -165,6 +164,7 @@
       "aql_related_test.go",
       "aql_transitive_peer_test.go",
       "aql_transitive_test.go",
+      "fixture_test.go",
       "idempotency_test.go",
       "items_test.go",
       "repositories_test.go",
@@ -176,6 +176,7 @@
     ],
     "migration/artifacts/adapters/http/itemkit": [
       "access_test.go",
+      "items_test.go",
       "kit_test.go",
       "redirect_test.go"
     ],

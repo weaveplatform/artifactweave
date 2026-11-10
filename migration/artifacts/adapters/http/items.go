@@ -26,11 +26,13 @@ import (
 )
 
 // RegisterItemRoutes serves the item paths (decision 0002) and the AQL
-// search. They are registered under exactly the patterns
-// registerHandwrittenStubs derives from the spec, so they replace its 501
-// stubs rather than sitting beside them. HEAD is not in the spec; it shares
-// the GET handler. Item routes are outside the management body limit: an
-// upload is streamed, however large.
+// search on r. Like every registrar here, it must run before the router
+// stubs the spec's hand-written operations: the routes take exactly the
+// methods and patterns the spec derives (httpkit.ChiPatterns), and a stub
+// is registered only where no handler claimed one, so each route replaces
+// its 501 stub rather than sitting beside it. HEAD is not in the spec; it
+// shares the GET handler. Item routes are outside the management body
+// limit: an upload is streamed, however large.
 func (s ArtifactoryAPI) RegisterItemRoutes(r chi.Router) {
 	for _, p := range httpkit.ChiPatterns("/artifactory/{repoKey}/{filePath}") {
 		r.Put(p, s.deployItem)

@@ -31,10 +31,10 @@ const (
 
 // SelfAuthenticated returns "METHOD path" of the routes that verify their
 // own credential, which the authentication middleware passes untouched
-// (AuthnOptions.SelfAuthenticated): the multipart upload calls carry the
-// upload token as a Bearer token, which only the multipart service can
-// verify until access tokens arrive (P4), and a part PUT carries a signed URL
-// and no credentials at all, as the CLI sends it.
+// (accesshttp.AuthnOptions.SelfAuthenticated): the multipart upload calls
+// carry the upload token as a Bearer token, which only the multipart service
+// can verify until access tokens arrive (P4), and a part PUT carries a
+// signed URL and no credentials at all, as the CLI sends it.
 func SelfAuthenticated() map[string]bool {
 	return map[string]bool{
 		"POST " + uploadsURLPart:  true,
@@ -45,6 +45,12 @@ func SelfAuthenticated() map[string]bool {
 	}
 }
 
+// RegisterMultipartRoutes serves the JFrog CLI's multipart upload protocol
+// on r. Its routes are the spec's, so, registered before the router's stubs
+// of the hand-written operations, they replace the 501 stubs; and the
+// authentication middleware must pass the calls SelfAuthenticated names to
+// them untouched. Every call but a part PUT, which carries up to 5 GiB, is
+// under the management body limit.
 func (s ArtifactoryAPI) RegisterMultipartRoutes(r chi.Router) {
 	r.With(middleware.BodyLimit(middleware.ManagementBodyLimit)).
 		Post(uploadsCreate, s.createMultipart)

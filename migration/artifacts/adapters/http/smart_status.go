@@ -18,6 +18,12 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// SmartStatus serves GET
+// /artifactory/api/artifactweave/remote-status/{repoKey}?path=, the
+// artifactweave-only Smart Remote diagnostics of one canonical path of a
+// remote repository, to administrators: 400 for any other query, 501
+// without Deps.RemoteStatus, 404 for a repository that is no remote one.
+// It is no spec operation, so the router mounts it as a plain route.
 func (s ArtifactoryAPI) SmartStatus(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()

@@ -190,7 +190,7 @@ type Config struct {
 	CranArchiveMoverEnabled bool
 	HuggingFaceXetEnabled   bool
 	// Protocols are mounted through the router kit after the built-in ones
-	// (the Protocols function). Only tests set it, to mount a test-only
+	// (artifactshttp.Protocols). Only tests set it, to mount a test-only
 	// protocol.
 	Protocols []pkgroute.Protocol
 }
@@ -365,7 +365,7 @@ func artifactsDeps(cfg Config) artifactshttp.Deps {
 // newArtifactoryAPI returns the artifacts partial over cfg, whose item kit
 // New hands to the ecosystem partials as well.
 func newArtifactoryAPI(cfg Config) artifactshttp.ArtifactoryAPI {
-	return artifactshttp.NewArtifactoryAPI(artifactsDeps(cfg))
+	return artifactshttp.New(artifactsDeps(cfg))
 }
 
 // New returns the fully wired handler.

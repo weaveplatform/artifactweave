@@ -24,8 +24,11 @@ const (
 	replayWait      = 30 * time.Second
 )
 
-// Explicitly refuse a key on unsupported routes before any handler can mutate
-// state. In particular, token responses never enter a replay cache.
+// IdempotencyRoutes is router middleware that answers 400 to a request
+// carrying Idempotency-Key unless it is a build append that carries exactly
+// one, before any handler can mutate state, so that no other response, a
+// token response in particular, ever enters a replay cache (decision 0043).
+// The router runs it ahead of authentication.
 func IdempotencyRoutes(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if values, present := r.Header["Idempotency-Key"]; present {

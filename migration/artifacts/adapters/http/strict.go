@@ -18,8 +18,8 @@ import (
 // search routes that its registrars mount. The router's composite strict
 // server adds the other partials and the generated stubs.
 type ArtifactoryAPI struct {
-	// Kit is the item kit every partial shares; NewArtifactoryAPI builds
-	// it, and a literal without one panics on its first kit call.
+	// Kit is the item kit every partial shares; New builds it, and a
+	// literal without one panics on its first kit call.
 	*itemkit.Kit
 	cfg Deps
 	// folderSlots holds a token for each folder archive download running;
@@ -28,7 +28,7 @@ type ArtifactoryAPI struct {
 }
 
 // Deps is what the artifacts handlers need: the item kit's dependencies,
-// over which NewArtifactoryAPI builds the kit, and the handlers' own.
+// over which New builds the kit, and the handlers' own.
 type Deps struct {
 	// Deps are the item kit's: the stores, the access module's API, the
 	// remote sources, the formats, and the overlays and private predicate
@@ -79,12 +79,12 @@ type Deps struct {
 	NPMMaxPublishSize int64
 }
 
-// NewArtifactoryAPI returns the artifacts partial over d with its own item
-// kit, which the router hands to the ecosystem partials as well, so that the
-// routes of the whole spec share one set of overlays and one redirect
-// throttle. Every artifacts partial is built here: a literal without a kit
-// compiles and then panics on its first kit call.
-func NewArtifactoryAPI(d Deps) ArtifactoryAPI {
+// New returns the artifacts partial over d with its own item kit, which the
+// router hands to the ecosystem partials as well, so that the routes of the
+// whole spec share one set of overlays and one redirect throttle. Every
+// artifacts partial is built here: a literal without a kit compiles and then
+// panics on its first kit call.
+func New(d Deps) ArtifactoryAPI {
 	return ArtifactoryAPI{
 		Kit: itemkit.New(d.Deps),
 		cfg: d,

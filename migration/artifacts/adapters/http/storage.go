@@ -52,10 +52,11 @@ func noProperties() error {
 }
 
 // RegisterStorageRoutes serves the storage API (/api/storage) and the
-// partial property update (/api/metadata) under the patterns httpkit.ChiPatterns
-// derives from the spec, replacing their 501 stubs. The bare /{repoKey}
-// form adds the repository root, which the spec addresses with an empty
-// item path.
+// partial property update (/api/metadata) under the patterns
+// httpkit.ChiPatterns derives from the spec, so, registered before the
+// router's stubs of the hand-written operations, they replace their 501
+// stubs. The bare /{repoKey} form adds the repository root, which the spec
+// addresses with an empty item path.
 func (s ArtifactoryAPI) RegisterStorageRoutes(r chi.Router) {
 	for _, p := range append(httpkit.ChiPatterns(storagePrefix+"{repoKey}/{itemPath}"), storagePrefix+"{repoKey}") {
 		r.Get(p, s.getStorage)

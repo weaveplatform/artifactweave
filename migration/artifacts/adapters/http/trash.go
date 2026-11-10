@@ -37,7 +37,8 @@ const restoredMessage = "Successfully restored trash items"
 // that span segments (the generated clean and restore routes match one
 // segment, and answer that case with the same functions), the trash can's
 // storage listing under its auto-trashcan key, and zap. The patterns are the
-// ones registerHandwrittenStubs derives, so they replace its stubs.
+// ones the spec derives, so, registered before the router's stubs of the
+// hand-written operations, they replace them.
 func (s ArtifactoryAPI) RegisterTrashRoutes(r chi.Router) {
 	r.Delete("/artifactory/api/trash/clean/*", s.cleanTrashPath)
 	r.Post("/artifactory/api/trash/restore/*", s.restoreTrashPath)

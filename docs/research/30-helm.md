@@ -310,7 +310,7 @@ the package search. A claim no 7.x source shows is **[I]** and on the live-compa
 | `maxUniqueTags` and `dockerTagRetention` are applied to `helmoci` as to Docker, counting tags only; the defaults and the v2 read keep them for `helmoci` | [S] `internal/service/registry/retention.go` (`retain`, `replace`); `pkg/repo/defaults.go`, `pkg/repo/views.go` |
 | A tag's previous manifest is kept by Tag Retention in its digest folder unless that folder already exists "because the manifest was also pushed by digest"; a kept manifest is found by its `docker.manifest` naming the tag, so a Helm 3.18 digest folder, which names itself, is neither counted nor removed by Max Unique Tags or Tag Retention | [S] `internal/service/registry/retention.go` (`replace`), `internal/format/docker/retention.go` (`Retained`) |
 | Strict Tag Overwrite (DV-035), the tags list, the referrers API, the catalog, Docker promotion of Helm OCI images and download redirects already apply | [S] decision 0031; `api/artifactory.openapi.yaml` (promote: "Helm charts in helmoci repositories are promoted the same way") |
-| The recursive property edit `jf helm push` sends is served by the storage API | [S] `internal/server/storage.go` (`editProperties`, `recursive`) |
+| The recursive property edit `jf helm push` sends is served by the storage API | [S] `migration/artifacts/adapters/http/storage.go` (`editProperties`, `recursive`) |
 | What a chart still lacks: anything that reads the chart's version from its config (the tag holds `_` for `+`), and an answer for the digest folder of Helm 3.18's two pushes | [I] |
 
 ## 7. Repository creation and the Terraform provider
@@ -362,7 +362,7 @@ the package search. A claim no 7.x source shows is **[I]** and on the live-compa
 | Fact | Basis |
 |---|---|
 | No Helm format exists: `formats.For(repo.Helm)` is the generic handler, which keeps no index | [S] `internal/format/formats/formats.go` |
-| `POST /api/helm/{repoKey}/reindex` is generated and answers 501 until the format is a `Reindexer`, then needs an administrator and runs before it answers; #516 moves it to Manage and the queue | [S] `internal/server/reindex.go` (`reindex`, `CalculateHelmChartIndex`) |
+| `POST /api/helm/{repoKey}/reindex` is generated and answers 501 until the format is a `Reindexer`, then needs an administrator and runs before it answers; #516 moves it to Manage and the queue | [S] `migration/artifacts/adapters/http/reindex.go` (`CalculateHelmChartIndex`), `migration/artifacts/adapters/http/itemkit/reindex.go` (`Reindex`) |
 | `pkg/repo.Config` has `forceMetadataNameVersion` and `forceNonDuplicateChart`, `false` by default on local and federated repositories, and the v2 read keeps them for `helm` only; nothing stops an update from changing them | [S] `pkg/repo/repo.go`, `defaults.go`, `views.go` |
 | `types.ComparatorFor(repo.Helm)` is `CompareSemver`, and Helm OCI's is push order | [S] `pkg/types/version.go` |
 | `format.SidecarOwner` means that uploads named as checksum sidecars (`.sha1` and the like) are checksums of their file; only Maven implements it | [S] `internal/format/format.go` (`SidecarOwner`) |

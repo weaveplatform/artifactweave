@@ -54,7 +54,8 @@ const (
 
 const (
 	// propertySearchPath is the one search whose parameters are not fixed:
-	// requestDetails keeps its raw query, which the generated binding drops.
+	// the router's request details keep its raw query, which the generated
+	// binding drops.
 	propertySearchPath = "/artifactory/api/search/prop"
 	// badChecksumCap is the documented ceiling of the bad checksum search,
 	// which the user query limit does not apply to.
@@ -841,10 +842,10 @@ func (s ArtifactoryAPI) SearchPattern(
 	}), nil
 }
 
-// KeepsSearchQuery reports the searches whose raw query requestDetails
-// keeps: the property search, whose parameters are property keys, and the
-// GAVC search, whose older callers send remote=0/1 (gavcRemote). The
-// generated binding drops both.
+// KeepsSearchQuery reports the searches whose raw query the router's
+// request details keep: the property search, whose parameters are property
+// keys, and the GAVC search, whose older callers send remote=0/1
+// (gavcRemote). The generated binding drops both.
 func KeepsSearchQuery(r *http.Request) bool {
 	return r.URL.Path == propertySearchPath || r.URL.Path == "/artifactory/api/search/gavc"
 }

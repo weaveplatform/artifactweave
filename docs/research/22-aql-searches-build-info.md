@@ -605,8 +605,9 @@ Two 7.x changes back the repository-pattern rule:
 only documented switch, `artifactory.aql.queries.limit.enabled`, has defaulted to `false`
 since 7.84.16 ([aql-performance](https://docs.jfrog.com/artifactory/docs/aql-performance.md),
 "How Do I Configure AQL Rate Limiting?"), so a default instance may answer no 429 at all.
-artifactweave sets no concurrency limit (`internal/server/aql.go`). The default is to verify
-against a live Artifactory ([#216](https://github.com/weaveplatform/artifactweave/issues/216)).
+artifactweave sets no concurrency limit (`migration/artifacts/adapters/http/aql.go`). The
+default is to verify against a live Artifactory
+([#216](https://github.com/weaveplatform/artifactweave/issues/216)).
 
 **Where artifactweave differed.** The audit of 2026-10-18 found code that differed from the
 pages above: the size limit's message, the query timeout, the long relative-time units,
