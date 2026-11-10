@@ -18,8 +18,8 @@
 // logging and the upstream search's route and disclosure policy; it hands
 // this package what it knows through Access, Upstream, Routes,
 // UpstreamDeps, the layouts function and SearchRun.Internal. The package
-// never imports the module's adapters, an ecosystem http package or the
-// store aggregate: Store names the two accessors a search reads.
+// never imports the module's adapters, an ecosystem http package or a
+// composite store: Store names the two accessors a search reads.
 //
 // # Inputs
 //

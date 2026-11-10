@@ -10,11 +10,10 @@
 // unit of work) over a shared dialect.Store, on SQLite and PostgreSQL
 // alike. Module registers the releases stream (adapters/sql/migrations),
 // seventh in the canonical module order, with no sealed column. The
-// metadata store's SQL store builds one Store over its own dialect store,
-// delegates Bundles and Distribution to it and names Module in its module
-// list; STO-19 moves that composition into app. The package imports the
-// standard library, the kernel, the platform, the module's core and its
-// stream only.
+// composite SQL store in app/adapters/sql builds one Store over its own
+// dialect store, delegates Bundles and Distribution to it and names
+// Module in its module list. The package imports the standard library,
+// the kernel, the platform, the module's core and its stream only.
 //
 // # Inputs
 //

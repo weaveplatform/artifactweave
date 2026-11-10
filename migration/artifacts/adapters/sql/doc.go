@@ -12,13 +12,12 @@
 // its remote cache and layout fence are the storekit code it shares with
 // the in-memory adapter. Module registers the artifacts stream
 // (adapters/sql/migrations), its two sealed columns and the repository
-// header backfill, second in the canonical module order. The metadata
-// store's SQL store builds one Store over its own dialect store, delegates
-// every artifacts accessor to it, registers its LayoutWatch with the
-// platform's config store and names Module in its module list; STO-19
-// moves that composition into app. The package imports the standard
-// library, the kernel, the platform, the module's core and api, storekit
-// and its stream only.
+// header backfill, second in the canonical module order. The composite SQL
+// store in app/adapters/sql builds one Store over its own dialect store,
+// delegates every artifacts accessor to it, registers its LayoutWatch with
+// the platform's config store and names Module in its module list. The
+// package imports the standard library, the kernel, the platform, the
+// module's core and api, storekit and its stream only.
 //
 // # Inputs
 //

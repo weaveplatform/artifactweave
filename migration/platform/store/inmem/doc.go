@@ -9,14 +9,14 @@
 // platform's ports (work.WorkQueue, work.LeaseStore,
 // settings.SettingsStore, configdoc.ConfigStore, instance.InstanceStore,
 // outbox.OutboxStore, session.UploadStore, idempotency.ReplayStore and
-// apilimit.RequestBudgetStore) over a shared memtx.Store. The metadata
-// store's in-memory store builds one Store over its own memtx.Store,
-// delegates its nine platform accessors to it and registers the layout
-// fence as a watch; STO-19 moves that composition into app. Tests that need
-// only a platform store, such as the work queue's, the upload sessions',
-// the cloud blob backends' and the request limiter's, build it alone over
-// memtx.New(). The package imports the standard library, the kernel and
-// platform packages only.
+// apilimit.RequestBudgetStore) over a shared memtx.Store. The composite
+// in-memory store in app/adapters/inmem builds one Store over its own
+// memtx.Store, delegates its nine platform accessors to it and registers
+// the layout fence as a watch. Tests that need only a platform store,
+// such as the work queue's, the upload sessions', the cloud blob
+// backends' and the request limiter's, build it alone over memtx.New().
+// The package imports the standard library, the kernel and platform
+// packages only.
 //
 // # Inputs
 //

@@ -33,7 +33,7 @@
 // package (decision 0044, dependency rule 8), and never the store, which
 // imports this package for the signatures of its searches: that is why
 // AQLSource takes the two lookups it reads, BuildRuns and ItemSearch,
-// rather than the store aggregate.
+// rather than a store.
 //
 // # Inputs
 //

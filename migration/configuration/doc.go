@@ -14,7 +14,7 @@
 // Deps, which app passes New:
 //
 //   - Store, required: the unit of work a descriptor is applied in and the
-//     configuration documents. App passes its store aggregate, which
+//     configuration documents. App passes its composite store, which
 //     satisfies it.
 //   - Repositories and Layouts, from the artifacts module's API, and Access,
 //     the access module's API, whose AnonymousAccess the security section

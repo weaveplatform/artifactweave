@@ -59,9 +59,9 @@ func Settings(
 // Store is what the trash can reads and writes: its entries, the items
 // they were taken from, the trash can settings and the blob references an
 // entry holds. Every call joins the transaction ctx carries; the service
-// runs its own transactions through Tx, a batch of entries at a time. The
-// metadata store's aggregate (pkg/store) is a Store, and so is the item
-// service's store.
+// runs its own transactions through Tx, a batch of entries at a time.
+// Each composite store in app is a Store, and so is the item service's
+// store.
 type Store interface {
 	tx.Runner
 	Trash() port.TrashStore

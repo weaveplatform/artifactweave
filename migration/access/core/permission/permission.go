@@ -68,8 +68,8 @@ func ValidResourceType(rt accessapi.ResourceType) bool { return slices.Contains(
 
 // Store is what the permission service reads and writes: the access
 // module's stores, of which it uses the permission, user and group stores,
-// and their unit of work (port.Store's Tx). The application passes its store
-// aggregate, which satisfies it. Store holds no repository store: the
+// and their unit of work (port.Store's Tx). The application passes its
+// composite store, which satisfies it. Store holds no repository store: the
 // repositories a permission names belong to the artifacts module, which the
 // service reaches only through Service.Repositories.
 type Store interface {

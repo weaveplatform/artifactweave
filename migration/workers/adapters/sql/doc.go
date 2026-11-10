@@ -8,12 +8,12 @@
 // port.Store (port.WorkerStore over the shared unit of work) over a shared
 // dialect.Store, on SQLite and PostgreSQL alike. Module registers the
 // workers stream (adapters/sql/migrations) and the sealed column
-// worker_secrets.value, last in the canonical module order. The metadata
-// store's SQL store builds one Store over its own dialect store, delegates
-// Workers to it and names Module in its module list; STO-19 moves that
-// composition into app. The package imports the standard library, the
-// kernel, the platform, the module's core and its stream only, and
-// artifacts/api/repo, which the workers model's filter names.
+// worker_secrets.value, last in the canonical module order. The composite
+// SQL store in app/adapters/sql builds one Store over its own dialect
+// store, delegates Workers to it and names Module in its module list. The
+// package imports the standard library, the kernel, the platform, the
+// module's core and its stream only, and artifacts/api/repo, which the
+// workers model's filter names.
 //
 // # Inputs
 //

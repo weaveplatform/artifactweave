@@ -39,8 +39,8 @@ var (
 
 // Store is what registry uploads read and write: the item service's store,
 // which every manifest and blob write goes through (item.Store), with the
-// upload sessions a chunked upload keeps between requests. The metadata
-// store's aggregate (pkg/store) is a Store.
+// upload sessions a chunked upload keeps between requests. Each composite
+// store in app is a Store.
 type Store interface {
 	item.Store
 	Uploads() session.UploadStore

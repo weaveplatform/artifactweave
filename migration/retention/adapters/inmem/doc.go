@@ -5,10 +5,10 @@
 //
 // retention module, adapter layer (in-memory): the reference
 // implementation of the module's port.Store over a shared memtx.Store. The
-// metadata store's in-memory store builds one Store over its own
-// memtx.Store and delegates Cleanup and Archive to it; STO-19 moves that
-// composition into app. The package imports the standard library, the
-// kernel, the platform and the module's core and api only.
+// composite in-memory store in app/adapters/inmem builds one Store over
+// its own memtx.Store and delegates Cleanup and Archive to it. The package
+// imports the standard library, the kernel, the platform and the module's
+// core and api only.
 //
 // # Inputs
 //

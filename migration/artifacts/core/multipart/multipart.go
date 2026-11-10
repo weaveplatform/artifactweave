@@ -96,7 +96,7 @@ type session struct {
 
 // Store is what multipart uploads keep in the metadata store: the upload
 // sessions, and the blob index that takes the assembled content's
-// reference. The metadata store's aggregate (pkg/store) is a Store.
+// reference. Each composite store in app is a Store.
 type Store interface {
 	Uploads() blobsession.UploadStore
 	Blobs() port.BlobIndex

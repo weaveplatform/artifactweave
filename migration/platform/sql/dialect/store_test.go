@@ -12,7 +12,7 @@ import (
 )
 
 // The dialect store is the SQL implementation of tx.Runner: the SQL stores
-// take Tx and AfterCommit from it to satisfy the aggregate, which embeds
+// take Tx and AfterCommit from it to satisfy their ports, which embed
 // Runner. A test file holds the check because the dialect package imports
 // nothing of the module but the kernel and the keyring.
 var _ tx.Runner = (*dialect.Store)(nil)

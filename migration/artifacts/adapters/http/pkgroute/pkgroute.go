@@ -33,8 +33,8 @@ import (
 // documents, the work queue and the lease table, so a handler can hand DB()
 // on to the item service's, a format's and the package index's code
 // (item.Store, format.Store and pkgindex.Store). It names no access store:
-// protocols reach the access module through access/api. The metadata
-// store's aggregate (pkg/store) is a Store.
+// protocols reach the access module through access/api. Each composite
+// store in app is a Store.
 type Store interface {
 	port.Store
 	Settings() settings.SettingsStore

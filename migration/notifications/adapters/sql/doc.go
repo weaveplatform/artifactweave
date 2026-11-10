@@ -8,11 +8,11 @@
 // port.Store (port.WebhookStore over the shared unit of work) over a shared
 // dialect.Store, on SQLite and PostgreSQL alike. Module registers the
 // notifications stream (adapters/sql/migrations) and the sealed column
-// webhook_secrets.value, fourth in the canonical module order. The metadata
-// store's SQL store builds one Store over its own dialect store, delegates
-// Webhooks to it and names Module in its module list; STO-19 moves that
-// composition into app. The package imports the standard library, the
-// kernel, the platform, the module's core and its stream only.
+// webhook_secrets.value, fourth in the canonical module order. The
+// composite SQL store in app/adapters/sql builds one Store over its own
+// dialect store, delegates Webhooks to it and names Module in its module
+// list. The package imports the standard library, the kernel, the platform,
+// the module's core and its stream only.
 //
 // # Inputs
 //

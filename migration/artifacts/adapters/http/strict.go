@@ -36,8 +36,8 @@ type ArtifactoryAPI struct {
 // (build.Store), so that one value serves the kit, the handlers, the
 // searches and the build, trash, repository and usage services they build.
 // It names no access or configuration-module store: the handlers reach the
-// access module through Deps.Access. The metadata store's aggregate
-// (pkg/store) is a Store.
+// access module through Deps.Access. Each composite store in app is a
+// Store.
 type Store interface {
 	itemkit.Store
 	pkgroute.Store

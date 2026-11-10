@@ -47,8 +47,7 @@ type Access interface {
 // store, through which build-info documents and promotions write items
 // (item.Store), with the build records and the replay records that let a
 // retried request append once (decision 0014). Every call joins the
-// transaction ctx carries. The metadata store's aggregate (pkg/store) is a
-// Store.
+// transaction ctx carries. Each composite store in app is a Store.
 type Store interface {
 	item.Store
 	Builds() port.BuildStore

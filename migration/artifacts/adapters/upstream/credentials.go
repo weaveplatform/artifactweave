@@ -52,8 +52,8 @@ type ResolverOptions struct {
 
 // ResolverStore is what Resolver reads: the stored repository (its sealed
 // credentials, headers and security settings, which the store unseals on
-// read) and the proxy configuration documents. The metadata store's
-// aggregate (pkg/store) is a ResolverStore.
+// read) and the proxy configuration documents. Each composite store in
+// app is a ResolverStore.
 type ResolverStore interface {
 	Repos() port.RepoStore
 	Configs() configdoc.ConfigStore

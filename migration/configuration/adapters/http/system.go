@@ -34,8 +34,9 @@ type Deps struct {
 	// Store holds the instance identity, which the probes read to show the
 	// database answers and the service id reports. Nil leaves the probes
 	// nothing to probe and answers the descriptor PATCH 501, as a router
-	// built to test routing alone answers. A nil store aggregate converts to
-	// a nil Store; a typed nil pointer would not.
+	// built to test routing alone answers. The router's store is an
+	// interface, so a nil one converts to a nil Store; a typed nil pointer
+	// would not.
 	Store instance.Store
 	// Blobs is the hot binary store, which Artifactory's probes ask for one
 	// blob; nil skips that probe.

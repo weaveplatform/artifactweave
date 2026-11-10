@@ -35,8 +35,8 @@ const (
 
 // SeedStore is what the seed writes: the users, the group and the
 // permissions it creates, the settings that hold the seeded marker, and the
-// transaction they are created in. The application passes its store
-// aggregate. Every call joins the transaction ctx carries.
+// transaction they are created in. The application passes its composite
+// store. Every call joins the transaction ctx carries.
 type SeedStore interface {
 	tx.Runner
 	// Users holds the admin and anonymous users the seed creates.

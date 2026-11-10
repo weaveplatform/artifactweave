@@ -45,8 +45,8 @@
 //
 //   - The mounted routes, and the Kit each handler receives.
 //   - Store, the store the kit resolves repositories and reads items in, and
-//     DB() returns. The metadata store's aggregate satisfies it, so the
-//     server passes the store it holds.
+//     DB() returns. Each composite store in app satisfies it, so the server
+//     passes the store it holds.
 //   - Permission helpers: Can, CanFolder, Require and RequireFolder.
 //   - Download helpers: Item, ResolveItem, ServeItem, ServeFound, Read,
 //     ServeResult, ServeStream and SourceError.

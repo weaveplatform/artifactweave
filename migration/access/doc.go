@@ -17,7 +17,7 @@
 //   - Store, required: the access ports (users, groups, permissions,
 //     tokens, keys, projects and API restrictions, with their transactions)
 //     and the settings, which the bindings read and write. App passes its
-//     store aggregate, which satisfies it.
+//     composite store, which satisfies it.
 //   - Authenticator and Tokens, the authenticator and token service app
 //     built over the same store; either may be nil.
 //   - Settings, the access options published with the API.

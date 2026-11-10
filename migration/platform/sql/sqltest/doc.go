@@ -26,8 +26,9 @@
 //   - ARTIFACTWEAVE_TEST_POSTGRES_DSN, a PostgreSQL server to use in place of
 //     a container.
 //   - Driving: the module store suites from STO-12 to STO-18, and their fault
-//     tests; until STO-19, the composite store's suites, which reach
-//     PostgresDSN and Reset through the legacy harness.
+//     tests; the composite store's suites in app, which call PostgresDSN,
+//     Schema and SchemaGolden, and reach Reset through app/storetest's Reset
+//     over the composite's module list.
 //
 // # Outputs
 //
@@ -86,8 +87,8 @@
 //     testcontainers, skipped where Docker cannot run Linux containers).
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md
 //     ("Persistence": module suites run through RunModule, and the PostgreSQL
-//     composite runs stay legacy until STO-19; "Names the migration
-//     introduces"; "Dependency rules").
+//     composite runs stay in the composite's packages in app; "Names the
+//     migration introduces"; "Dependency rules").
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     line 586 (platform/sql/sqltest: RunModule on each dialect), lines 631
 //     to 633 (RunModule runs any module's store suite against every dialect,

@@ -9,11 +9,11 @@
 // artifacts module, adapter layer (in-memory): the reference implementation
 // of the module's port.Store, over a shared memtx.Store; its remote cache
 // and layout fence are the storekit code it shares with the SQL adapter.
-// The metadata store's in-memory store builds one Store over its own
-// memtx.Store, delegates every artifacts accessor to it and registers its
-// LayoutWatch with the platform's config store; STO-19 moves that
-// composition into app. The package imports the standard library, the
-// kernel, the platform, the module's core and api and storekit only.
+// The composite in-memory store in app/adapters/inmem builds one Store over
+// its own memtx.Store, delegates every artifacts accessor to it and
+// registers its LayoutWatch with the platform's config store. The package
+// imports the standard library, the kernel, the platform, the module's core
+// and api and storekit only.
 //
 // # Inputs
 //

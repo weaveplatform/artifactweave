@@ -44,8 +44,8 @@ type Registry func(t repo.PackageType) Handler
 // remote cache. Every call joins the transaction ctx carries; inside a hook,
 // Tx joins the operation's transaction rather than starting one of its own
 // (tx.Runner). It has no blob index: a format reads content only through
-// Env.Blobs (decision 0004). The metadata store's aggregate (pkg/store) is
-// a Store, so every builder of Env keeps the value it passes.
+// Env.Blobs (decision 0004). Each composite store in app is a Store, so
+// every builder of Env keeps the value it passes.
 type Store interface {
 	tx.Runner
 	Repos() port.RepoStore

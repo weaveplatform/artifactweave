@@ -29,8 +29,8 @@ type ItemSearch interface {
 // reaches (Query.Nest): runs by the checksum of their files, files by
 // checksum, runs by ID and their promotions. It reads through the store's
 // own lookups, builds and items, so every backend nests the same rows. It
-// takes those two rather than the store aggregate because the store imports
-// this package: a store parameter would be an import cycle.
+// takes those two rather than a store because the store imports this
+// package: a store parameter would be an import cycle.
 func AQLSource(builds BuildRuns, items ItemSearch) Source {
 	return aqlSource{builds: builds, items: items}
 }

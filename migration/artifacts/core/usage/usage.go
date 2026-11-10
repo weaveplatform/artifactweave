@@ -71,8 +71,8 @@ type Summary struct {
 }
 
 // Store is what the summary reads: the blob index's totals, the
-// repositories, the items' usage and the trash can's entries. The metadata
-// store's aggregate (pkg/store) is a Store.
+// repositories, the items' usage and the trash can's entries. Each
+// composite store in app is a Store.
 type Store interface {
 	Blobs() port.BlobIndex
 	Repos() port.RepoStore

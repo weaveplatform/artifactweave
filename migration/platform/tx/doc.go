@@ -12,9 +12,9 @@
 // standard library. Each family of stores implements it with a unit of work
 // of its own, because the families differ on purpose in one case (see
 // Invariants): platform/tx/memtx for the in-memory stores, and
-// platform/sql/dialect for the SQL stores, over database/sql. The metadata
-// store's aggregate embeds Runner, so its in-memory, SQLite and PostgreSQL
-// stores implement it.
+// platform/sql/dialect for the SQL stores, over database/sql. Every
+// module's port Store embeds Runner, so the composite in-memory, SQLite and
+// PostgreSQL stores implement it.
 //
 // # Inputs
 //
@@ -69,7 +69,8 @@
 //
 // Implemented P2: Tx and AfterCommit as methods of the metadata store, with
 // its in-memory, SQLite and PostgreSQL units of work (pull request 3).
-// Staged in P9d: the contract is declared here, and the aggregate embeds it.
+// Staged in P9d: the contract is declared here, and every module's port
+// Store embeds it.
 //
 // # Testing
 //

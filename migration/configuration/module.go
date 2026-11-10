@@ -16,8 +16,8 @@ import (
 // Store is what the module applies descriptors through on the metadata
 // store: the unit of work Apply writes in, and the configuration documents
 // (the proxies, property sets, layouts and the downloadRedirectConfig
-// section). The metadata store's aggregate satisfies it. Every call joins
-// the transaction ctx carries.
+// section). Each composite store in app satisfies it. Every call joins the
+// transaction ctx carries.
 type Store interface {
 	tx.Runner
 	Configs() configdoc.ConfigStore

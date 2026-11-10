@@ -19,11 +19,11 @@ import (
 
 // Store is what the access handlers read and write: the access ports, the
 // settings and OIDC configuration documents they serve, and the transaction
-// a key pair delete runs in. The application passes its store aggregate,
+// a key pair delete runs in. The application passes its composite store,
 // and every call joins the transaction ctx carries. The adapter declares
 // its own rather than taking the module root's access.Store, because a
-// module package never imports a module root, and because the handlers
-// also serve the OIDC configuration documents, which no binding reads.
+// module package never imports a module root, and because the handlers also
+// serve the OIDC configuration documents, which no binding reads.
 type Store interface {
 	port.Store
 	// Settings holds the security policies, the basic authentication
@@ -42,9 +42,9 @@ type Deps struct {
 	API accessapi.API
 	// Store holds the users, groups, permissions, key pairs, certificates,
 	// tokens, API restrictions, settings and OIDC documents the handlers
-	// read and write. A nil store aggregate converts to a nil Store; a
-	// typed nil pointer would not, and the operations would call it instead
-	// of answering 501.
+	// read and write. The router's store is an interface, so a nil one
+	// converts to a nil Store; a typed nil pointer would not, and the
+	// operations would call it instead of answering 501.
 	Store Store
 	// Authenticator forgets its cached password policies when the security
 	// API changes them, and recognises the expired access token a legacy

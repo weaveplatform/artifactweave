@@ -81,10 +81,10 @@
 //     registered twice.
 //   - A store that embeds *Store gets its methods promoted, and a method the
 //     store declares under the same name hides the promoted one without a
-//     compile error. So Store exports no method named like an accessor of the
-//     metadata store's aggregate (Keys, Items, Repos, ...) other than Tx,
-//     AfterCommit and Close, or like a method an embedding store declares,
-//     such as Reseal, which is why the layer's Reseal is a function.
+//     compile error. So Store exports no method named like an accessor of a
+//     composite store (Keys, Items, Repos, ...) other than Tx, AfterCommit
+//     and Close, or like a method an embedding store declares, such as
+//     Reseal, which is why the layer's Reseal is a function.
 //     TestUnitDialectStoreShadowsNoAccessor checks it.
 //   - Every SQL adapter keeps the schema conventions of research 15, section
 //     4. Times are BIGINT Unix microseconds, NULL for a zero time (Micros),

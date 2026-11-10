@@ -55,8 +55,9 @@
 //     ("Metadata": SQLite through modernc.org/sqlite, CGO-free, with WAL and
 //     one writer).
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md
-//     ("Persistence": the platform drivers open the engines, and the composite
-//     open stays legacy until STO-19; "Names the migration introduces").
+//     ("Persistence": the platform drivers open the engines, and
+//     app/adapters/sql/sqlite opens the composite store over them; "Names the
+//     migration introduces").
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     lines 132 and 133 (platform/sql/sqlite, the driver open, pragmas and
 //     IMMEDIATE transactions, and platform/sql/postgres), line 584 (open and

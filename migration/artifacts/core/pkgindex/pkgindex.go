@@ -16,7 +16,7 @@ import (
 // Store is the one store the index functions use: the package index. Its
 // calls join the transaction ctx carries, so a format's hooks link, prune
 // and reconcile as part of the operation that changed the item. A
-// format.Store is a Store, and so is the metadata store's aggregate.
+// format.Store is a Store, and so is each composite store in app.
 type Store interface {
 	Packages() port.PackageStore
 }

@@ -13,11 +13,11 @@
 // dialect.Store, on SQLite and PostgreSQL alike. Module registers the access
 // stream (adapters/sql/migrations), its six sealed columns and the
 // identity-search backfill, third in the canonical module order. The
-// metadata store's SQL store builds one Store over its own dialect store,
-// delegates Users, Groups, Permissions, Tokens, Keys, Projects and
-// APIRestrictions to it and names Module in its module list; STO-19 moves
-// that composition into app. The package imports the standard library, the
-// kernel, the platform, the module's core and api and its stream only.
+// composite SQL store in app/adapters/sql builds one Store over its own
+// dialect store, delegates Users, Groups, Permissions, Tokens, Keys,
+// Projects and APIRestrictions to it and names Module in its module list.
+// The package imports the standard library, the kernel, the platform, the
+// module's core and api and its stream only.
 //
 // # Inputs
 //

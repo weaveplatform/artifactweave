@@ -13,12 +13,11 @@
 // PostgreSQL alike, so it serves every table of the platform stream. Module
 // registers the platform stream (platform/store/sql/migrations) and the
 // platform's sealed columns, first in the canonical module order. The
-// metadata store's SQL store builds one Store over its own dialect store,
-// delegates its nine platform accessors to it, registers the layout fence as
-// a watch and names Module first in its module list; STO-19 moves that
-// composition into app. The package imports the standard library, the
-// kernel and platform packages only: the ports, the dialect layer and the
-// stream.
+// composite SQL store in app/adapters/sql builds one Store over its own
+// dialect store, delegates its nine platform accessors to it, registers the
+// layout fence as a watch and names Module first in its module list. The
+// package imports the standard library, the kernel and platform packages
+// only: the ports, the dialect layer and the stream.
 //
 // # Inputs
 //

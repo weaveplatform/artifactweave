@@ -11,13 +11,13 @@
 // and port.PlatformStore over the shared unit of work) over a shared
 // dialect.Store, on SQLite and PostgreSQL alike. Module registers the
 // federation stream (adapters/sql/migrations) and the sealed column
-// replications.password, sixth in the canonical module order. The metadata
-// store's SQL store builds one Store over its own dialect store, delegates
-// Replications, Peers, Federation and Platform to it and names Module in
-// its module list; STO-19 moves that composition into app. The package
-// imports the standard library, the kernel, the platform, the module's core
-// and its stream only, and retention/api, whose run statuses a full sync
-// records; through the model, artifacts/api/repo.
+// replications.password, sixth in the canonical module order. The composite
+// SQL store in app/adapters/sql builds one Store over its own dialect
+// store, delegates Replications, Peers, Federation and Platform to it and
+// names Module in its module list. The package imports the standard
+// library, the kernel, the platform, the module's core and its stream only,
+// and retention/api, whose run statuses a full sync records; through the
+// model, artifacts/api/repo.
 //
 // # Inputs
 //

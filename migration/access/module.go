@@ -14,7 +14,7 @@ import (
 
 // Store is the access data the bindings read and write: the access ports
 // and the settings that hold the anonymous access switch. The application
-// passes its store aggregate. Every call joins the transaction ctx carries.
+// passes its composite store. Every call joins the transaction ctx carries.
 type Store interface {
 	port.Store
 	// Settings holds the anonymous access switch, which AnonymousAccess

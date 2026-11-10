@@ -21,7 +21,7 @@ var _ artifactsapi.Repositories = repositories{}
 // configurations, the work queue a reindex request goes to, and what Remove
 // deletes with a repository, its items and package index, and the trash can
 // its content moves to (trash.Store). Every call joins the transaction ctx
-// carries. The metadata store's aggregate (pkg/store) is a Store.
+// carries. Each composite store in app is a Store.
 type Store interface {
 	trash.Store
 	Repos() port.RepoStore

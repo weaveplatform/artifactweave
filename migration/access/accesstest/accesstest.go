@@ -49,8 +49,8 @@ var ErrLoginSuspended = authn.ErrLoginSuspended
 
 // Store is what the kit builds the access module over: the module's Store
 // plus the instance identity its token service names as its issuer. The
-// in-memory store New makes satisfies it, as does a test's own store
-// aggregate; every call joins the transaction ctx carries.
+// in-memory store New makes satisfies it, as does the composite store a
+// test holds; every call joins the transaction ctx carries.
 type Store interface {
 	access.Store
 	// Instance holds the instance identity, which WithTokens stores when

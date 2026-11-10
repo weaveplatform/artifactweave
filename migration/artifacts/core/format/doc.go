@@ -45,9 +45,9 @@
 //
 // # Outputs
 //
-//   - Store, the store a format reads and writes through Env.Store. The
-//     item service's store and the metadata store's aggregate satisfy it, so
-//     each builder of Env passes the store it holds.
+//   - Store, the store a format reads and writes through Env.Store. The item
+//     service's store and each composite store in app satisfy it, so each
+//     builder of Env passes the store it holds.
 //   - Registry, the function from a package type to its Handler. The
 //     application builds one from the format registry's Settings.For
 //     (artifacts/ecosystem) and gives it to the item, build and registry

@@ -27,7 +27,7 @@ import (
 // and awaits derived work, with the upload sessions, which the Docker REST
 // operations' registry service keeps (registry.Store). It names no access
 // or configuration-module store: the kit reaches the access module through
-// Deps.Access. The metadata store's aggregate (pkg/store) is a Store.
+// Deps.Access. Each composite store in app is a Store.
 type Store interface {
 	item.Store
 	Uploads() session.UploadStore

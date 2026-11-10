@@ -32,7 +32,7 @@ var ErrExists = errors.New("identity: already exists")
 // Store is what the identity service reads and writes: the access module's
 // stores, of which it uses the user, group, permission and token stores,
 // their unit of work (port.Store's Tx), and the settings that hold the
-// account policies. The application passes its store aggregate, which
+// account policies. The application passes its composite store, which
 // satisfies it.
 type Store interface {
 	port.Store

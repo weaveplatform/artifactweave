@@ -34,8 +34,7 @@ import (
 // Smart and Maven companion queues on it, so work they enqueue exists
 // exactly when the change that needs it commits (decision 0033).
 // CheckCurrent is handed it. It names no access store: credentials reach
-// the policy through Options. The metadata store's aggregate (pkg/store)
-// is a Store.
+// the policy through Options. Each composite store in app is a Store.
 type Store interface {
 	tx.Runner
 	RemoteCache() port.RemoteCacheStore

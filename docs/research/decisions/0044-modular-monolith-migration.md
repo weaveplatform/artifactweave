@@ -106,22 +106,23 @@ the work.
 - **Engine drivers.** `platform/sql/sqlite` and `platform/sql/postgres` open a pool for
   their engine (`OpenDB`) and describe it as a `dialect.Dialect`, with no store,
   migration or keyring knowledge. Opening the composite store (the driver's pool, migrated
-  and wrapped in the SQL store) stays legacy, in the `Open` of `internal/sqlstore/sqlite`
-  and `internal/sqlstore/postgres`, with its signature, options and error texts, until
-  STO-19 moves it into `app`.
+  and wrapped in the SQL store) is the `Open` of `app/adapters/sql/sqlite` and
+  `app/adapters/sql/postgres`, with the signature, options and error texts it had in
+  `internal/sqlstore`.
 - **The composite store** (every module store over the one unit of work) lives in
-  `app/adapters/{sql,inmem}`, with its contract suite in `app/storetest` and test openers
-  in `app/apptest`. Module tests reach it only through those test-support packages, and
-  `formattest.Run` takes its backends as a parameter, so artifacts core never imports
-  `app`.
+  `app/adapters/{sql,inmem}`, with its contract suite, its SQL suites and the test
+  openers in `app/storetest` and the format contract's backends in `app/apptest`. Module
+  tests reach it only through those test-support packages, and `formattest.Run` takes its
+  backends as a parameter, so artifacts core never imports `app`. Nothing aggregates the
+  stores in its place: the router takes `app.RouterStore`, the union of the store types
+  its handlers declare, and every other user names a narrow store or a composite.
 - **Contract suites.** Module SQL contract suites run on SQLite through
   `platform/sql/sqltest`'s `RunModule`, which gives every store a fresh database migrated
   with the module's streams alone, and they share their assertions through
-  `platform/testkit/storekit`. PostgreSQL runs stay in the composite packages, with one
-  container per test process, and stay legacy, in `internal/sqlstore/postgres` and the
-  composite suites of `internal/sqlstore/sqltest`, until STO-19. A module suite that asks
-  for a PostgreSQL run (`WithPostgres`) gets a scratch schema of its own on the shared
-  server for each store.
+  `platform/testkit/storekit`. PostgreSQL runs stay in the composite packages
+  (`app/adapters/sql/postgres`, with the composite suites of `app/storetest`), with one
+  container per test process. A module suite that asks for a PostgreSQL run
+  (`WithPostgres`) gets a scratch schema of its own on the shared server for each store.
 - **Ownership of shared models.**
   - `PackageType` and the version comparators stay out of the kernel. They live in
     `artifacts/api/repo` and `artifacts/core/model`.
@@ -366,6 +367,14 @@ change that adds a name appends its row; the change column gives the ticket of t
 | `Runtime`, `RuntimeOptions`, `OpenRuntime`, `Runtime.Close` | `app` | What serve holds open, exported so that test support builds the router over the stores and modules serve uses: the runtime with the fields `Store`, `Blobs`, `Auth`, `Tokens`, `Keys`, `Work` and `Artifacts` (the artifacts module, whose accessors give its remote sources and remote HTTP pool); the options that set the password hash cost and the signing key size, whose zero value is production's; the function that opens it and the method that releases it. The target document does not name the runtime | TST-07 |
 | `App`, `AppConfig`, `AppOptions` | `test/server/support/harness` | The application runtime opened as serve opens it, for the suites that left `migration/app`: the default configuration with a temporary data directory, a cheap password hash and the smallest signing key, closed when the test ends | TST-07 |
 | `RemoteWorld`, `NewRemoteWorld`, `RemoteWorld.Request`, `RemoteWorld.Update` | `test/server/support/harness` | The remote world of app's remote suites: the router over an `App` runtime with the generic remote repository `remote` in front of a fake upstream, the users `reader` and `denied` and the `remote-read` permission; a request as one of those users, and a save of the changed remote | TST-07 |
+| `RouterStore` | `app` | The store `RouterConfig.Store` takes: the union of the store types of the handlers, middleware and bindings that `NewRouter` builds (`artifacts/adapters/http`'s `Store`, `registry.Store`, `repos.Store`, `access.Store`, the access HTTP adapter's `Store` and `instance.Store`), derived from the router's consumers rather than declared as a new aggregate, so a handler that reads one more accessor makes it grow. Both composite stores satisfy it, asserted beside it for the SQL one and in a test for the in-memory one, which production code never imports. The target document does not name the router's store | STO-19 |
+| `Store` | `app/storetest` | What the composite contract's `Factory` returns: the platform's `Store` with the seven module port stores. Both composite stores satisfy it, which the package asserts at compile time in place of the aggregate's assertions | STO-19 |
+| `SQLStore`, `Options`, `SQLiteOptions`, `PostgresOptions`, `OpenSQLite`, `OpenPostgres` | `app/storetest` | The composite SQL store's type and options, and openers with the signatures, behaviour and error texts of `app/adapters/sql/sqlite.Open` and `app/adapters/sql/postgres.Open`, for the tests of modules, which may import test support from app and nothing else (dependency rule 1) | STO-19 |
+| `FormatBackends` | `app/apptest` | The format contract's three backends, in memory, SQLite on disk and PostgreSQL after `Reset` (skipped where no server answers), in that order and with those names, which every external caller of `formattest.Run` passes | STO-19 |
+| `Run(t, f, backends)` | `artifacts/core/formattest` | The format contract takes its backends from its caller and fails the test when it is given none; `Backends()` is gone, so artifacts core opens no composite store | STO-19 |
+| `Store` | `test/server/support/harness` | An alias of `app.RouterStore`, the type of the harness `Config.Store`, so that a suite's fake can embed it and keep the `Store:` key in its literals | STO-19 |
+| `SeedStore` | `test/server/support` | What `Seed`, `Repositories` and `SeedHelmCharter` read and write: the seed's principals (`authn.SeedStore`), the repositories (`repos.Store`) and the access module's store (`access.Store`). The SQL composite, the router's store and fakes reach them as well as the in-memory composite | STO-19 |
+| `sql`, `sqlite`, `postgres`, `inmem`, `storetest`, `apptest` | `app/adapters/sql`, `app/adapters/sql/sqlite`, `app/adapters/sql/postgres`, `app/adapters/inmem`, `app/storetest`, `app/apptest` | The packages of the composite stores, which the target document does not map because it has no composite: the SQL composite with its `Open`, module list and layout watch registration, its two dialect openers, the in-memory composite, the composite contract and SQL suites with the test openers, and the format contract's backends | STO-19 |
 
 ### Placeholders
 

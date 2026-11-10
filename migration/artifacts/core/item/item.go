@@ -53,8 +53,8 @@ var (
 // configuration documents, the work queue and the lease table. Every call
 // joins the transaction ctx carries, and the service runs each operation as
 // one transaction through Tx, so the blob references, the trash entries and
-// the work a write queues commit or roll back with the item. The metadata
-// store's aggregate (pkg/store) is a Store.
+// the work a write queues commit or roll back with the item. Each composite
+// store in app is a Store.
 type Store interface {
 	format.Store
 	Blobs() port.BlobIndex

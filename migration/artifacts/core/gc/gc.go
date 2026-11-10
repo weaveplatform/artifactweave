@@ -88,7 +88,7 @@ type Options struct {
 // Store is what a collection pass reads and writes: the trash can's store,
 // whose expired entries a pass purges (trash.Store), with the upload
 // sessions it expires and the lease table that keeps one pass running
-// across the nodes. The metadata store's aggregate (pkg/store) is a Store.
+// across the nodes. Each composite store in app is a Store.
 type Store interface {
 	trash.Store
 	Uploads() session.UploadStore

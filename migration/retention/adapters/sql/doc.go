@@ -8,13 +8,13 @@
 // port.Store (port.CleanupStore and port.ArchiveStore over the shared unit
 // of work) over a shared dialect.Store, on SQLite and PostgreSQL alike.
 // Module registers the retention stream (adapters/sql/migrations), fifth in
-// the canonical module order. The metadata store's SQL store builds one
-// Store over its own dialect store, delegates Cleanup and Archive to it and
-// names Module in its module list; STO-19 moves that composition into app.
-// The archived items and the cold indexes that archive executions act on
-// are artifacts' records and stay with the artifacts stores. The package
-// imports the standard library, the kernel, the platform, the module's
-// core and api and its stream only.
+// the canonical module order. The composite SQL store in app/adapters/sql
+// builds one Store over its own dialect store, delegates Cleanup and
+// Archive to it and names Module in its module list. The archived items and
+// the cold indexes that archive executions act on are artifacts' records
+// and stay with the artifacts stores. The package imports the standard
+// library, the kernel, the platform, the module's core and api and its
+// stream only.
 //
 // # Inputs
 //

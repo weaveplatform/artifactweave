@@ -38,7 +38,7 @@ const DefaultGlobalEnvironmentLimit = 10
 // Store is what the roles service reads and writes: the access module's
 // stores, the project store among them, which holds the stored global roles
 // and environments and the project assignments, and their unit of work
-// (port.Store's Tx). The application passes its store aggregate, which
+// (port.Store's Tx). The application passes its composite store, which
 // satisfies it. Store holds no repository store: repository configurations
 // belong to the artifacts module, which the service reaches only through
 // Service.Repositories.
