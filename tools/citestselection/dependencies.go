@@ -187,7 +187,6 @@ func carriesChange(pkg, owner string) bool {
 func formatPackageOwner(pkg string) string {
 	for _, prefix := range []string{
 		modulePath + "/internal/format/",
-		modulePath + "/internal/server/",
 		modulePath + "/migration/artifacts/ecosystem/",
 		modulePath + "/internal/artifacts/ecosystem/",
 	} {

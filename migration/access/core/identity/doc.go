@@ -8,12 +8,11 @@
 //
 // access module, core layer: the identity service. The legacy security API
 // handlers (/artifactory/api/security/users, groups, locks and policies) and
-// the Access v2 user and group handlers in internal/server build a Service
-// over the configured store and call it; other modules reach users and
-// groups only through access/api. The package imports the standard
-// library, the kernel, platform/settings, and the module's core/authn (the
-// password hash and the lock and expiration policy reads), core/model and
-// core/port.
+// the Access v2 user and group handlers in access/adapters/http build a
+// Service over the configured store and call it; other modules reach users and
+// groups only through access/api. The package imports the standard library,
+// the kernel, platform/settings, and the module's core/authn (the password
+// hash and the lock and expiration policy reads), core/model and core/port.
 //
 // # Inputs
 //

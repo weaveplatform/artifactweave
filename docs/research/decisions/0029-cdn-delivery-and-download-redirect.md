@@ -324,7 +324,7 @@ still redirects a HEAD is on #216.
 
 ## Verification
 
-- `internal/server` tests for every policy rule:
+- `test/server/artifacts` tests for every policy rule:
   - the threshold, from the configuration and from the descriptor;
   - the CDN's size limit;
   - a manifest redirected with its media type, its HEAD answered locally;

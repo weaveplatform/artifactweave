@@ -9,13 +9,12 @@
 //
 // # Role
 //
-// artifacts module, ecosystem debian, HTTP layer: the Debian slice's
-// protocol handlers and its snapshot work, beside the format rules of
+// artifacts module, ecosystem debian, HTTP layer: the Debian slice's protocol
+// handlers and its snapshot work, beside the format rules of
 // artifacts/ecosystem/debian. It is named debianhttp so that it does not
-// shadow net/http. Outside tests, only its own http subtree, the module's
-// http adapters and app may import it (decision 0044, dependency rule 9);
-// app does so to register the snapshot work, and the server root counts as
-// app until it moves there.
+// shadow net/http. Outside tests, only its own http subtree, the module's http
+// adapters and app may import it (decision 0044, dependency rule 9); app does
+// so to mount it and to register the snapshot work.
 //
 // # Inputs
 //

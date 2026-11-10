@@ -1,12 +1,11 @@
 package artifacts_test
 
-// This file holds the artifacts management suites' fixtures: adapters,
-// under the names the tests had in internal/server, over
+// This file holds the artifacts management suites' fixtures: adapters, under
+// the names of the router guards' fixtures in migration/app, over
 // test/server/support/harness and test/server/support, and copies of the
-// worlds and helpers that root files staying in internal/server define,
-// which the root keeps for its own tests and guard tables. Every router here
-// is harness.Router, so a change to the router's assembly reaches these
-// tests without an edit here.
+// worlds and helpers those fixtures define, which app keeps for its guard
+// tables. Every router here is harness.Router, so a change to the router's
+// assembly reaches these tests without an edit here.
 
 import (
 	"bytes"
@@ -196,8 +195,8 @@ func target(c repo.Config) accessapi.Repo {
 }
 
 // The router's paths, media types, limits and messages that the tests name,
-// spelled as internal/server spells them, so that a change there fails a
-// test here.
+// spelled as the router and its handlers spell them, so that a change there
+// fails a test here.
 const (
 	buildsPath = "/artifactory/api/build"
 	aqlTrimmed = "AQL query reached the search hard limit, results are trimmed. " +

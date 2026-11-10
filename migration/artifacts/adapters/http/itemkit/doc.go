@@ -1,9 +1,8 @@
 // Package itemkit is the item kit: the item helpers that the artifacts
-// management handlers and the ecosystem root handlers both call, in one
-// package that each can import, so that either can leave the server root
-// without the other. It resolves repositories and callers, looks items up
-// through local, remote and virtual repositories, serves files through the
-// download redirect, reads remote repositories through the source
+// management handlers and the ecosystem HTTP handlers both call, in one
+// package that both can import. It resolves repositories and callers, looks
+// items up through local, remote and virtual repositories, serves files
+// through the download redirect, reads remote repositories through the source
 // boundary, queues and awaits reindexes, and maps the item service's errors
 // onto statuses. The composition builds a Kit from Deps and supplies the
 // format overlays and the private-path predicate.
@@ -11,11 +10,11 @@
 // # Role
 //
 // artifacts module, HTTP adapter layer: the shared item kit. The artifacts
-// HTTP adapter and the ecosystem HTTP packages (ecosystem/<type>/http), and
-// the server root until it is split, embed or call it. It never imports the
-// server root or an ecosystem HTTP package. It reaches the access module
-// only through access/api, and the configuration module not at all: the
-// descriptor's minimum redirect size reaches it as a function in Deps.
+// HTTP adapter, the ecosystem HTTP packages (ecosystem/<type>/http) and the
+// router in app embed or call it. It never imports app or an ecosystem HTTP
+// package. It reaches the access module only through access/api, and the
+// configuration module not at all: the descriptor's minimum redirect size
+// reaches it as a function in Deps.
 //
 // # Inputs
 //
@@ -93,10 +92,9 @@
 // # Testing
 //
 // kit_test.go tests the kit over the in-memory world of kittest, without a
-// router: the overlay order, the private-path default, the error mapping
-// and the lookup through a virtual repository. access_test.go tests
-// AccessFor, and redirect_test.go the signing-failure throttle and the
-// descriptor's minimum redirect size. The route suites under
-// test/server/artifacts and the server root's tables reach the rest through
-// the router.
+// router: the overlay order, the private-path default, the error mapping and
+// the lookup through a virtual repository. access_test.go tests AccessFor, and
+// redirect_test.go the signing-failure throttle and the descriptor's minimum
+// redirect size. The route suites under test/server/artifacts and the router's
+// guards in app reach the rest through the router.
 package itemkit

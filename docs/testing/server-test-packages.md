@@ -6,13 +6,13 @@ suites live in a separate Go package under `test/server/artifacts/<type>`, and
 each module's suites under `test/server/<module>`. This makes the test package,
 rather than a test-name regular expression, the unit that CI can select.
 A package builds the router through `test/server/support/harness`, with
-`harness.Router` and a `harness.Config`, and does not import `internal/server`
+`harness.Router` and a `harness.Config`, and does not import `migration/app`
 itself; fixtures used by that package live with it.
 
 `test/server/support` owns reproducible authentication seeds, request helpers,
 NuGet package bytes, npm tarballs and Artifactory error decoding used by more
 than one suite. It also holds shared OCI manifest and digest fixtures plus the
-Docker route inventory. It imports no server package, so both `internal/server` tests and independent
+Docker route inventory. It imports no server package, so both the root tests in `migration/app` and independent
 server-assembly packages can use it without an import cycle. Production code
 must not import it. Server configuration and storage setup stay with each suite
 because their repository and permission models differ.
@@ -23,10 +23,10 @@ function, `Mirrors`, `MirrorStatus`, `SearchLimits` and `DefaultRedirectTTL`
 alias the configuration types and the default that suites name, and `Router`
 builds the production handler, so a change of router edits the harness and no
 suite. The harness also exports the item world of the
-root `internal/server` tests (`NewItemWorld`, with `Do`, `Item` and
+root tests in `migration/app` (`NewItemWorld`, with `Do`, `Item` and
 `WantStatus`) for the route suites that move out of that package, and
 `RepoFile`, which resolves a root-relative fixture path. Because the harness
-imports `internal/server`, `test/server/support` must never import it, and the
+imports `migration/app`, `test/server/support` must never import it, and the
 root tests keep their in-package `newItemWorld`, which must build the same
 world. For the suites that left `migration/app`, the harness opens the
 application runtime as serve does (`App`, over `AppConfig` and `AppOptions`)
@@ -137,8 +137,9 @@ go test ./test/server/artifacts/generic
 `go test ./test/server/artifacts/...` runs the management API suite and every
 ecosystem suite at once.
 
-The root `internal/server` package still contains shared cross-format and
-private server helper tests. NuGet-only, npm-only, Go-only, Maven-only, PyPI-only,
+The root package, now `migration/app` beside the router, still contains
+shared cross-format and private server helper tests. NuGet-only, npm-only,
+Go-only, Maven-only, PyPI-only,
 classic Helm-only, Docker-only, Helm OCI-only, Terraform registry-only,
 Terraform backend-only, Agent Packages-only and Agent Plugins-only route
 assertions no longer run from it, nor do the router-level access,

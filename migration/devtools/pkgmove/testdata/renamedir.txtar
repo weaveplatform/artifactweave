@@ -4,11 +4,11 @@
 # name as its import name, so goimports, which make fmt runs next, has no
 # second import of the same path to add beside net/http's.
 ok move -ticket ECO-01 -dry-run
-stdout ^  rewrite internal/server/server\.go: 1 import, 1 qualifier, 1 import name$
-stdout ^  rewrite internal/server/zeta/zeta_test\.go \(at migration/artifacts/ecosystem/zeta/http/zeta_test\.go\): 1 import, 1 qualifier, 1 import name, 1 package clause$
+stdout ^  rewrite internal/web/server\.go: 1 import, 1 qualifier, 1 import name$
+stdout ^  rewrite internal/web/zeta/zeta_test\.go \(at migration/artifacts/ecosystem/zeta/http/zeta_test\.go\): 1 import, 1 qualifier, 1 import name, 1 package clause$
 ok move -ticket ECO-01
 runs make fmt
-cmp internal/server/server.go want/server.go
+cmp internal/web/server.go want/server.go
 cmp migration/artifacts/ecosystem/zeta/http/zeta.go want/zeta.go
 cmp migration/artifacts/ecosystem/zeta/http/zeta_test.go want/zeta_test.go
 go vet ./...
@@ -24,24 +24,24 @@ go $GOVERSION
     "staging_root": "migration",
     "final_root": "internal",
     "packages": [
-        {"from":"internal/server/zeta","action":"move","to":"artifacts/ecosystem/zeta/http","name":"zetahttp","ticket":"ECO-01"}
+        {"from":"internal/web/zeta","action":"move","to":"artifacts/ecosystem/zeta/http","name":"zetahttp","ticket":"ECO-01"}
     ],
     "files": [],
     "placeholders": []
 }
--- internal/server/server.go --
+-- internal/web/server.go --
 // Package server mounts zeta.
 package server
 
 import (
 	"net/http"
 
-	"github.com/weaveplatform/artifactweave/internal/server/zeta"
+	"github.com/weaveplatform/artifactweave/internal/web/zeta"
 )
 
 // Mount serves zeta at /zeta.
 func Mount(m *http.ServeMux) { m.Handle("/zeta", zeta.Handler()) }
--- internal/server/zeta/zeta.go --
+-- internal/web/zeta/zeta.go --
 // Package zeta serves zeta.
 package zeta
 
@@ -53,7 +53,7 @@ func Handler() http.Handler {
 		w.WriteHeader(http.StatusNoContent)
 	})
 }
--- internal/server/zeta/zeta_test.go --
+-- internal/web/zeta/zeta_test.go --
 package zeta_test
 
 import (
@@ -61,7 +61,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/server/zeta"
+	"github.com/weaveplatform/artifactweave/internal/web/zeta"
 )
 
 func TestZeta(t *testing.T) {

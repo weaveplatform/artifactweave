@@ -24,9 +24,9 @@ decision 0003, the token challenge, the protocol handlers and the error envelope
 before the generated servers (decision
 [0002](0002-spec-first-flat-crud-handwritten-item-paths.md)). The storage layout, manifest
 parsing and validation, the properties set on manifests and the package-index hooks are
-`migration/artifacts/ecosystem/docker`, which never imports `internal/server`. Upload
-sessions and the items they finish are `migration/artifacts/core/registry`: they store
-items through the item service, which imports `migration/artifacts/core/format`, so a
+`migration/artifacts/ecosystem/docker`, which never imports the router in `migration/app`.
+Upload sessions and the items they finish are `migration/artifacts/core/registry`: they
+store items through the item service, which imports `migration/artifacts/core/format`, so a
 format package cannot hold them without an import cycle. One code path serves the `docker`,
 `oci` and `helmoci` package types.
 

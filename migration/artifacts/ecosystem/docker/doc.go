@@ -73,9 +73,9 @@
 //
 // # Invariants
 //
-//   - This package never imports internal/server or its own http package
-//     (decision 0031). The item service calls its hooks and never imports
-//     it; the remote rules use only the item package's cache upload
+//   - This package never imports the router (migration/app) or its own http
+//     package (decision 0031). The item service calls its hooks and never
+//     imports it; the remote rules use only the item package's cache upload
 //     contract and its errors.
 //   - An image is a package while it holds any manifest, tagged or not; a
 //     tag folder holding one is a version whose files are the folder's

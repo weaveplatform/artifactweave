@@ -27,6 +27,6 @@
 //
 // # Status
 //
-// Implemented P9b, which also moved the tests here from internal/server
-// (issue 673).
+// Implemented P9b, which also moved the tests here from the server root (issue
+// 673).
 package agentpackages

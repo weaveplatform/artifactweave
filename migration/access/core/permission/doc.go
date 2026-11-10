@@ -6,15 +6,15 @@
 //
 // # Role
 //
-// access module, core layer: the permission service. The permission target
-// and Access permission handlers in internal/server build a Service over the
-// configured store and the artifacts module's repositories, and call it;
-// the evaluator in core/authz reads the stored documents through the
-// permission store, not through this package. The package imports the
-// standard library, the kernel, access/api (resource types, targets and
-// actions), core/model and core/port, artifacts/api (Repositories and
-// repo), and pkg/types for ResolveRepoKey alone, which artifacts' core
-// model declares and access core may not import.
+// access module, core layer: the permission service. The permission target and
+// Access permission handlers in access/adapters/http build a Service over the
+// configured store and the artifacts module's repositories, and call it; the
+// evaluator in core/authz reads the stored documents through the permission
+// store, not through this package. The package imports the standard library,
+// the kernel, access/api (resource types, targets and actions), core/model and
+// core/port, artifacts/api (Repositories and repo), and pkg/types for
+// ResolveRepoKey alone, which artifacts' core model declares and access core
+// may not import.
 //
 // # Inputs
 //

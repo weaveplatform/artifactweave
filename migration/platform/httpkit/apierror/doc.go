@@ -23,11 +23,11 @@
 //     with an OCI or Access code, a Detail, NoChallenge or RetryAfterSeconds;
 //     an error that wraps an *Error, which Write finds with errors.As; or any
 //     other error.
-//   - The Profile of the route, which the caller chooses by request path:
-//     the server's ordered rules (errorProfileRules in internal/server,
-//     read through httpkit.ErrorProfile and httpkit.ProfileFor) map path
-//     prefixes to profiles, unclaimed paths included, and each format's
-//     routes name their own.
+//   - The Profile of the route, which the caller chooses by request path: the
+//     server's ordered rules (errorProfileRules in app's router, read through
+//     httpkit.ErrorProfile and httpkit.ProfileFor) map path prefixes to
+//     profiles, unclaimed paths included, and each format's routes name their
+//     own.
 //   - The response headers a handler set before the error: Write keeps a
 //     WWW-Authenticate challenge that is already there.
 //

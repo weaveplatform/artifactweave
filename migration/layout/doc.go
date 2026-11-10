@@ -80,10 +80,9 @@
 //     TestUnitAccessInternalsRuleDetectsViolations: outside access, no test
 //     imports a package of access core, such as the evaluator, other than
 //     test support, or the legacy internal/auth and internal/auth/token,
-//     which hold only bridges. Only the server root, migration/app and the
-//     test/server harnesses may import the authenticator, the token service
-//     and the roles service: the server root and the harnesses until TST-04
-//     to TST-06 and WEB-22 remove the reason, app's own tests for good. An
-//     allowlist entry that no file uses fails; the second proves each rule
-//     can fail.
+//     which hold only bridges. Only migration/app's tests and the
+//     test/server suites, which wire the router's authenticator and token
+//     service themselves, may import the authenticator, the token service
+//     and the roles and OIDC services. An allowlist entry that no file uses
+//     fails; the second proves each rule can fail.
 package layout

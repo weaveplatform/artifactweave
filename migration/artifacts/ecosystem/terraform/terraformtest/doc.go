@@ -15,9 +15,9 @@
 // # Inputs
 //
 //   - Driving: the tests of the Terraform slice's format and protocol
-//     packages, of the server root, of the guard suite
-//     test/server/artifacts/terraform and of the acceptance steps; and the
-//     Debian, opkg, RPM and PyPI tests that need a GPG key pair (NewKey).
+//     packages, of the guard suite test/server/artifacts/terraform and of the
+//     acceptance steps; and the Debian, opkg, RPM and PyPI tests that need a
+//     GPG key pair (NewKey).
 //   - Driven: OpenPGP (github.com/ProtonMail/go-crypto) and the standard
 //     library; nothing of the module.
 //

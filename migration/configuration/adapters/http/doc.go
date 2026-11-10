@@ -76,7 +76,7 @@
 //
 // The unit tests here call the handlers directly over in-memory stores,
 // without the router. The route suite test/server/configuration drives the
-// probes, the service id and the descriptor PATCH through the router, and
-// the server root's status, principal and ledger tables reach the system
-// operations there too.
+// probes, the service id and the descriptor PATCH through the router, and the
+// router's guards in app (its status, principal and ledger tables) reach the
+// system operations there too.
 package configurationhttp

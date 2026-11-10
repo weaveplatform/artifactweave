@@ -89,7 +89,7 @@ func TestUnitOwnershipMovesRootTests(t *testing.T) {
 		{
 			name: "an inventory without packages or shared files",
 			src:  `{"version":2,"format_dependencies":{}}`,
-			move: fileMove{"internal/server/a_test.go", "test/server/x/a_test.go"},
+			move: fileMove{"internal/web/a_test.go", "test/server/x/a_test.go"},
 			want: `{"version":2,"packages":{"test/server/x":"shared"},` +
 				`"shared_files":{"test/server/x":["a_test.go"]},"format_dependencies":{}}`,
 		},
@@ -104,15 +104,15 @@ func TestUnitOwnershipMovesRootTests(t *testing.T) {
 		},
 		{
 			name: "a test that leaves the owned directories drops its dependencies",
-			src: `{"version":2,"packages":{"internal/server":"shared"},` +
-				`"shared_files":{"internal/server":["a_test.go","b_test.go"]},` +
-				`"format_dependencies":{"maven":["internal/server/a_test.go","internal/server/b_test.go"]}}`,
-			move:      fileMove{"internal/server/a_test.go", "migration/platform/x/a_test.go"},
+			src: `{"version":2,"packages":{"internal/web":"shared"},` +
+				`"shared_files":{"internal/web":["a_test.go","b_test.go"]},` +
+				`"format_dependencies":{"maven":["internal/web/a_test.go","internal/web/b_test.go"]}}`,
+			move:      fileMove{"internal/web/a_test.go", "migration/platform/x/a_test.go"},
 			testsLeft: true,
-			want: `{"version":2,"packages":{"internal/server":"shared"},` +
-				`"shared_files":{"internal/server":["b_test.go"]},` +
-				`"format_dependencies":{"maven":["internal/server/b_test.go"]}}`,
-			notices: []string{dropped + "internal/server/a_test.go from the format dependencies of maven, " +
+			want: `{"version":2,"packages":{"internal/web":"shared"},` +
+				`"shared_files":{"internal/web":["b_test.go"]},` +
+				`"format_dependencies":{"maven":["internal/web/b_test.go"]}}`,
+			notices: []string{dropped + "internal/web/a_test.go from the format dependencies of maven, " +
 				"since migration/platform/x is not a directory whose tests need an owner"},
 		},
 		{

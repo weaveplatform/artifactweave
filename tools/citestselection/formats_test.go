@@ -1,7 +1,6 @@
 package main
 
 import (
-	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -37,7 +36,7 @@ func TestUnitAffectedPlanChoosesOnlyOwnedChanges(t *testing.T) {
 		{"shared server", []change{{status: "M", path: "migration/app/router.go"}}, "full", ""},
 		{"shared fixture", []change{{status: "M", path: "test/server/support/support.go"}}, "full", ""},
 		{"new server test", []change{{status: "A", path: "test/server/artifacts/npm/new_test.go"}}, "full", ""},
-		{"unknown root test", []change{{status: "M", path: "internal/server/unknown_test.go"}}, "full", ""},
+		{"unknown root test", []change{{status: "M", path: "migration/app/unknown_test.go"}}, "full", ""},
 		{"unknown format", []change{{status: "M", path: "migration/artifacts/ecosystem/newformat/handler.go"}}, "full", ""},
 		{"shared format code", []change{{status: "M", path: "migration/artifacts/ecosystem/registry.go"}}, "full", ""},
 		{"format and deployment", []change{{status: "M", path: "migration/artifacts/ecosystem/npm/handler.go"}, {status: "M", path: "deploy/check.sh"}}, "full", ""},
@@ -58,7 +57,7 @@ func TestUnitAffectedPlanChoosesOnlyOwnedChanges(t *testing.T) {
 	npm := proposeAffected(
 		[]change{{status: "M", path: "migration/artifacts/ecosystem/npm/handler.go"}},
 	)
-	for _, pkg := range []string{"./migration/artifacts/ecosystem/npm/...", "./migration/artifacts/ecosystem/npm/http", "./test/server/artifacts/npm", "./internal/server"} {
+	for _, pkg := range []string{"./migration/artifacts/ecosystem/npm/...", "./migration/artifacts/ecosystem/npm/http", "./test/server/artifacts/npm", "./migration/app"} {
 		if !slices.Contains(npm.units, pkg) {
 			t.Errorf("npm plan omitted %s", pkg)
 		}
@@ -266,57 +265,4 @@ func TestUnitFormatSourceOwnerStagedLayouts(t *testing.T) {
 	if !slices.Contains(staged.units, "./migration/app") || !staged.hasSharedTests {
 		t.Errorf("staged npm plan omitted its shared app dependency: %+v", staged)
 	}
-}
-
-// legacyCoverPackages is the cover list version 1 built from the owner's
-// name, kept only to prove the derived list drops nothing that exists.
-func legacyCoverPackages(owner string, conf formatImpact, inventory testOwnership) []string {
-	var coverPackages []string
-	if conf.unitRoot != "" {
-		coverPackages = append(coverPackages, modulePath+"/internal/format/"+owner+"/...")
-	}
-	if _, ok := inventory.Packages["internal/server/"+owner]; ok {
-		coverPackages = append(coverPackages, modulePath+"/internal/server/"+owner+"/...")
-	}
-	if len(coverPackages) == 0 {
-		coverPackages = append(coverPackages, modulePath+"/internal/server/docker/...")
-	}
-	return coverPackages
-}
-
-func TestUnitCoverPackagesUnchangedForCurrentInventory(t *testing.T) {
-	inventory, err := loadTestOwnership()
-	if err != nil {
-		t.Fatal(err)
-	}
-	root := filepath.Clean("../..")
-	exists := func(pattern string) bool {
-		dir := strings.TrimSuffix(strings.TrimPrefix(pattern, modulePath+"/"), "/...")
-		info, err := os.Stat(filepath.Join(root, filepath.FromSlash(dir)))
-		return err == nil && info.IsDir()
-	}
-	dropped, added := map[string]bool{}, map[string]bool{}
-	for owner, conf := range formats {
-		derived := ownerCoverPackages(owner, conf, inventory)
-		legacy := legacyCoverPackages(owner, conf, inventory)
-		for _, pkg := range legacy {
-			if slices.Contains(derived, pkg) {
-				continue
-			}
-			if exists(pkg) {
-				t.Errorf("%s: derived cover list drops existing %s", owner, pkg)
-			}
-			dropped[owner+" "+pkg] = true
-		}
-		for _, pkg := range derived {
-			if !exists(pkg) {
-				t.Errorf("%s: derived cover list names missing %s", owner, pkg)
-			}
-			if !slices.Contains(legacy, pkg) {
-				added[owner+" "+pkg] = true
-			}
-		}
-	}
-	t.Logf("dropped (directory missing): %q", slices.Sorted(maps.Keys(dropped)))
-	t.Logf("added (owner's existing packages): %q", slices.Sorted(maps.Keys(added)))
 }

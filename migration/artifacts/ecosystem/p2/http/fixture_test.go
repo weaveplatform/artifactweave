@@ -1,10 +1,9 @@
 package p2http
 
 // This file holds the fixtures of the tests that call the protocol's code
-// without the router, under the names the tests had in internal/server. A
-// test here cannot build the router, which imports this package, so the
-// item world is a kittest world, and the access module is accesstest's,
-// over the world's store.
+// without the router. A test here cannot build the router, which imports this
+// package, so the item world is a kittest world, and the access module is
+// accesstest's, over the world's store.
 
 import (
 	"context"

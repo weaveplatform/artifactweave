@@ -50,7 +50,7 @@
 // # Status
 //
 // Implemented P9c (the plan's P31 group). P9d moved the router-level tests
-// here from internal/server (TST-06), and the tests that call the
-// protocol's unexported code moved with it to
-// migration/artifacts/ecosystem/p2/http (WEB-15).
+// here from the server root (TST-06), and the tests that call the protocol's
+// unexported code moved with it to migration/artifacts/ecosystem/p2/http
+// (WEB-15).
 package p2

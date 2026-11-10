@@ -100,7 +100,7 @@
 //   - remote_unit_test.go: the checks of an upstream config.json and index
 //     file.
 //
-// The root suite's TestAccCargoNativeSpecRoutes (internal/server) and the
-// @cargo acceptance scenarios, with the native Cargo client, drive it
-// through the whole server.
+// The router's guard TestAccCargoNativeSpecRoutes (migration/app) and the
+// @cargo acceptance scenarios, with the native Cargo client, drive it through
+// the whole server.
 package cargohttp

@@ -96,12 +96,12 @@
 //
 // # Testing
 //
-//   - protocol_test.go (external, machinelearninghttp_test, importing the
-//     internal/server root): the publication lifecycle and transaction
-//     validation.
-//   - fault_test.go (external, importing the internal/server root): a
-//     commit rolled back on storage failure, and start and replay storage
-//     failures.
+//   - protocol_test.go (external, machinelearninghttp_test, building the
+//     router through the server test harness): the publication lifecycle and
+//     transaction validation.
+//   - fault_test.go (external, building the router through the server test
+//     harness): a commit rolled back on storage failure, and start and replay
+//     storage failures.
 //   - authority_test.go (external): model file permissions and transaction
 //     ownership, a commit that rechecks every destination, and model
 //     identity with immutable commits.

@@ -158,10 +158,10 @@ func TestUnitStatusDerivesFromTree(t *testing.T) {
 func TestUnitStatusReportsEntriesInLedgerOrder(t *testing.T) {
 	l := sample()
 	root := makeTree(t,
-		"migration/app/router.go",
-		"internal/server/handlers.go",
-		"internal/server/npm_test.go",
-		"internal/server/testdata/npm/package.json",
+		"internal/web/server.go",
+		"internal/web/handlers.go",
+		"internal/web/npm_test.go",
+		"internal/web/testdata/npm/package.json",
 		"migration/artifacts/ecosystem/npm/http/npm.go",
 		"migration/artifacts/ecosystem/registry.go",
 		"internal/layout/layout_test.go",

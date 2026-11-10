@@ -8,8 +8,9 @@
 //
 // # Inputs
 //
-//   - The production router from internal/server, an in-memory store and a
-//     file-system blob store, and the seeding of test/server/support.
+//   - The production router from test/server/support/harness (app.NewRouter),
+//     an in-memory store and a file-system blob store, and the seeding of
+//     test/server/support.
 //
 // # Outputs
 //

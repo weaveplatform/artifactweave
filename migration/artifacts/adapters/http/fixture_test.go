@@ -1,11 +1,10 @@
 package artifactshttp
 
 // This file holds the fixtures of the tests that call the partial and its
-// helpers without the router, under the names they had in internal/server.
-// A test here cannot build the router, which imports this package, so the
-// worlds are the stores the router's worlds hold, and the access module is
-// accesstest's over them. The route suites under test/server/artifacts
-// reach the rest through the router.
+// helpers without the router. A test here cannot build the router, which
+// imports this package, so the worlds are the stores the router's worlds hold,
+// and the access module is accesstest's over them. The route suites under
+// test/server/artifacts reach the rest through the router.
 
 import (
 	"context"

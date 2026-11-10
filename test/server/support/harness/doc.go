@@ -5,17 +5,18 @@
 // # Role
 //
 // Test support, outside the modules, for the server-assembly suites under
-// test/server. It is the one place those suites build the router from, so
-// the change that replaces the router (WEB-22) edits this package and no
-// suite. Production code never imports it.
+// test/server. It is the one place those suites build the router from, so a
+// change to how the router is built edits this package and no suite.
+// Production code never imports it.
 //
 // # Inputs
 //
 //   - Config values from the suites, and Tune functions that adjust one
 //     before the router is built.
-//   - The router and its configuration from internal/server; the seeding,
-//     password hashes and request helpers of test/server/support; an
-//     in-memory store and a file-system blob store.
+//   - The router and its configuration from migration/app (app.NewRouter
+//     and app.RouterConfig); the seeding, password hashes and request
+//     helpers of test/server/support; an in-memory store and a file-system
+//     blob store.
 //   - The application runtime from migration/app (app.OpenRuntime) with the
 //     default configuration of migration/app/config, and a fake upstream
 //     from the artifacts module's fakeupstream.
@@ -27,7 +28,8 @@
 //   - Router: the production http.Handler built from a Config.
 //   - Mirrors, MirrorStatus, SearchLimits and DefaultRedirectTTL: the types
 //     and the default of the Config fields that suites name, as aliases of
-//     the router's own, so that a suite never imports internal/server.
+//     those the artifacts module's HTTP adapter declares, so that a suite
+//     names them through this package alone.
 //   - ItemWorld, from NewItemWorld: the router over a store seeded with the
 //     users reader, deployer and user, the deploy-libs permission, anonymous
 //     read of every remote repository when asked for (AnonymousRemotes) and
@@ -46,14 +48,15 @@
 //
 // # Invariants
 //
-//   - test/server/support never imports this package. The in-package tests
-//     of internal/server import support, and this package imports
-//     internal/server, so the import would close a cycle.
+//   - test/server/support never imports this package. migration/app's
+//     in-package tests import support, and this package imports
+//     migration/app, so the import would close a cycle.
 //   - migration/app's in-package tests never import this package: it imports
 //     migration/app, so the import would close a cycle.
 //   - NewItemWorld builds the same world as newItemWorld, the in-package
-//     fixture of the internal/server tests, which keep their own copy because
-//     they cannot import this package. A change to one is made to the other.
+//     fixture of the router's guards in migration/app (fixtures_test.go),
+//     which keep their own copy because they cannot import this package. A
+//     change to one is made to the other.
 //
 // # References
 //
@@ -69,10 +72,12 @@
 //   - https://github.com/weaveplatform/artifactweave/issues/997
 //   - https://github.com/weaveplatform/artifactweave/issues/1096 (App and
 //     RemoteWorld, for the suites that left migration/app).
+//   - https://github.com/weaveplatform/artifactweave/issues/1097 (the router
+//     built through app.NewRouter).
 //
 // # Status
 //
-// Implemented P9d (issues 997 and 1096).
+// Implemented P9d (issues 997, 1096 and 1097).
 //
 // # Testing
 //

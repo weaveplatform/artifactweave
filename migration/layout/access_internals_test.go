@@ -25,12 +25,12 @@ import (
 var accessInternals = []string{"internal/auth", "internal/auth/token"}
 
 // allowlistedInternals are the access internals that an allowlisted file may
-// import: the authenticator and the token service, which the server root,
-// the composition root and the server harnesses wire themselves, and the
-// roles and OIDC services, which the server root's route and principal
+// import: the authenticator and the token service, which the composition
+// root and the server harnesses wire into the router themselves, and the
+// roles and OIDC services, with which the router's route and principal
 // matrix creates its principals' environments, roles, providers and
-// mappings with, and whose errors the root's role handler test maps. The
-// evaluator is never one, and neither is a legacy path of them.
+// mappings. The evaluator is never one, and neither is a legacy path of
+// them.
 var allowlistedInternals = []string{
 	root + "/access/core/authn",
 	root + "/access/core/token",
@@ -51,17 +51,15 @@ type accessAllowance struct {
 // accessInternalsAllowlist only shrinks: an entry that no importing file
 // uses fails TestUnitTestsAvoidAccessInternals.
 var accessInternalsAllowlist = []accessAllowance{
-	// The server root holds the access handlers and the router: TST-04 to
-	// TST-06 move its suites out, and WEB-22 deletes it.
-	{"internal/server/*_test.go", "TST-04, TST-05, TST-06, WEB-22"},
 	// The composition root builds the authenticator and the token service,
 	// and its own tests set the password hash cost, check the seeded
-	// principals and issue a token with them. TST-07 moved the remote suites
-	// out; no ticket removes these.
+	// principals and issue a token with them; the router's guards beside it
+	// fill RouterConfig.Auth and Tokens and create the matrix's roles and
+	// OIDC providers. No ticket removes these.
 	{"migration/app/*_test.go", "none: app's own tests"},
-	// The server-assembly harnesses fill server.RouterConfig.Auth and
-	// Tokens until WEB-22 composes the router from the access module.
-	{"test/server/**", "WEB-22"},
+	// The server suites and their harnesses fill app.RouterConfig.Auth and
+	// Tokens, the fields through which the router takes them.
+	{"test/server/**", "none: RouterConfig takes Auth and Tokens"},
 }
 
 // accessInternalsRule follows the failures: what a test uses instead.
@@ -180,6 +178,8 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 		b.WriteString(")\n")
 		return b.String()
 	}
+	// internal/web is made up, outside every ledger entry, so that no move
+	// rewrites this data.
 	l := &ledger.Ledger{
 		Module:      modulePath,
 		StagingRoot: root,
@@ -190,7 +190,7 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 				To:     "access/core/accounts",
 			},
 			{
-				From:   "internal/server/xyz",
+				From:   "internal/web/xyz",
 				Action: ledger.ActionMove,
 				To:     "artifacts/ecosystem/npm/http",
 			},
@@ -198,7 +198,7 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 		},
 	}
 	allow := []accessAllowance{
-		{"internal/server/*_test.go", "TST-04"},
+		{"internal/web/*_test.go", "TST-04"},
 		{"migration/app/*_test.go", "TST-07"},
 		{"test/server/**", "WEB-22"},
 	}
@@ -209,7 +209,7 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 		"go.mod": "module " + modulePath + "\n",
 		// Each allowlisted root uses its entry; a file under test/ is a
 		// test even without the _test.go suffix.
-		"migration/app/server_test.go":    file(authenticator, tokens),
+		"internal/web/server_test.go":     file(authenticator, tokens),
 		"migration/app/run_test.go":       file(tokens),
 		"test/server/access/auth_test.go": file(authenticator),
 		"test/server/support/assemble.go": file(tokens),
@@ -219,7 +219,7 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 		"internal/auth/bridge_kernel_test.go":        file(evaluator, authenticator, legacy),
 		"internal/service/accounts/accounts_test.go": file(evaluator, tokens),
 		// The published contracts and access test support, staged and legacy.
-		"internal/server/xyz/npm_test.go": file(
+		"internal/web/xyz/npm_test.go": file(
 			root+"/access",
 			root+"/access/api",
 			root+"/access/accesstest",
@@ -229,13 +229,13 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 		),
 		// Production code is the import tiers' to judge, as are the files
 		// of skipped directories.
-		"internal/server/xyz/npm.go":                  file(evaluator),
-		"internal/server/xyz/testdata/x_test.go":      file(evaluator),
-		".worktrees/copy/internal/server/x/x_test.go": file(evaluator),
-		"internal/nested/go.mod":                      "module example.com/nested\n",
-		"internal/nested/n_test.go":                   file(evaluator),
+		"internal/web/xyz/npm.go":                  file(evaluator),
+		"internal/web/xyz/testdata/x_test.go":      file(evaluator),
+		".worktrees/copy/internal/web/x/x_test.go": file(evaluator),
+		"internal/nested/go.mod":                   "module example.com/nested\n",
+		"internal/nested/n_test.go":                file(evaluator),
 	}
-	const protocol = "internal/server/xyz/x_test.go"
+	const protocol = "internal/web/xyz/x_test.go"
 
 	for _, tc := range []struct {
 		name  string
@@ -267,9 +267,9 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 		},
 		{
 			name: "root test importing a legacy access package",
-			file: "internal/server/x_test.go",
+			file: "internal/web/x_test.go",
 			src:  file(accessInternals[1]),
-			want: "internal/server/x_test.go imports " + accessInternals[1],
+			want: "internal/web/x_test.go imports " + accessInternals[1],
 		},
 		{
 			name: "staged artifacts test importing access core",
@@ -284,9 +284,9 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 		},
 		{
 			name: "root test importing the evaluator",
-			file: "internal/server/x_test.go",
+			file: "internal/web/x_test.go",
 			src:  file(evaluator),
-			want: "internal/server/x_test.go imports " + evaluator,
+			want: "internal/web/x_test.go imports " + evaluator,
 		},
 		{
 			name: "harness outside test/server",
@@ -303,8 +303,8 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 			// The entry names npm_test.go, which imports only what is open
 			// to every test.
 			name:  "stale allowlist entry",
-			extra: "internal/server/xyz/*_test.go",
-			want: "allowlist entry internal/server/xyz/*_test.go (ECO-06) matches no file " +
+			extra: "internal/web/xyz/*_test.go",
+			want: "allowlist entry internal/web/xyz/*_test.go (ECO-06) matches no file " +
 				"that imports " + strings.Join(allowlistedInternals, ", ") + "; remove it",
 		},
 	} {

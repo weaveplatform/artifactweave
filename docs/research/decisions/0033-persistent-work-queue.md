@@ -224,8 +224,9 @@ These assignments describe planned work, not current runtime support.
 - `migration/platform/work/work_test.go`: the worker pool, retries, parking, panics,
   heartbeats, lost leases, shutdown, `EnsureFresh`, `WaitIdle` and the metrics;
   `periodic_test.go`: periodic kinds, their timer and `RunDue`.
-- `migration/artifacts/ecosystem/npm/work_test.go` and `internal/server/npm_operations_test.go`:
-  npm's queued reindex and conversion, a conversion that fails and is parked, and its resume.
+- `migration/artifacts/ecosystem/npm/work_test.go` and
+  `test/server/artifacts/npm/npm_operations_test.go`: npm's queued reindex and conversion, a
+  conversion that fails and is parked, and its resume.
 - `migration/artifacts/core/item/work_test.go`: the reindex kinds, through any format, of a
   whole repository and of a path. `test/server/artifacts/reindex_test.go` and
   `migration/app/reindex_internal_test.go`: each P8 reindex operation's permission, classes,

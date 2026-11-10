@@ -1,9 +1,8 @@
 package npmhttp
 
 // This file holds the fixtures of the tests that call NPMAPI's operations
-// without the router, under the names the tests had in internal/server. A
-// test here cannot build the router, which imports this package, so the
-// access module is accesstest's over the test's store.
+// without the router. A test here cannot build the router, which imports this
+// package, so the access module is accesstest's over the test's store.
 
 import (
 	"context"

@@ -11,12 +11,11 @@
 //
 // # Role
 //
-// artifacts module, ecosystem layer: the native npm registry protocol of
-// the npm slice, and its HTTP layer for the JFrog operations beside it. It
-// is named npmhttp so that it does not shadow net/http. Outside tests, only
-// its own http subtree, the module's http adapters and app may import it
-// (decision 0044, dependency rule 9); the server root counts as app until
-// it moves there.
+// artifacts module, ecosystem layer: the native npm registry protocol of the
+// npm slice, and its HTTP layer for the JFrog operations beside it. It is
+// named npmhttp so that it does not shadow net/http. Outside tests, only its
+// own http subtree, the module's http adapters and app may import it (decision
+// 0044, dependency rule 9).
 //
 // # Inputs
 //

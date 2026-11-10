@@ -8,13 +8,12 @@ import (
 )
 
 // searchCases are the query shapes the GET searches build in code
-// (internal/server/searches*.go), where the backends could part ways:
+// (artifacts/adapters/http/searches*.go), where the backends could part ways:
 // criteria without the implicit type=file, a repos parameter as an $or of
-// repository keys that resolve to a remote's cache and a virtual
-// repository's members, inclusive time windows,
-// a statistic that is NULL or before an instant, depth with globs on path
-// and name, a layout's path prefix, and pages of offset and limit that
-// include properties or statistics.
+// repository keys that resolve to a remote's cache and a virtual repository's
+// members, inclusive time windows, a statistic that is NULL or before an
+// instant, depth with globs on path and name, a layout's path prefix, and
+// pages of offset and limit that include properties or statistics.
 func searchCases() []Case {
 	file := &aql.FieldCriterion{Field: aql.FieldType, Op: aql.OpEq, Text: "file"}
 	repos := func(keys ...string) aql.Or {

@@ -1,11 +1,11 @@
 package access_test
 
-// This file holds the access suites' fixtures: adapters, under the names the
-// tests had in internal/server, over test/server/support/harness and
-// test/server/support, and copies of the seeding the root's fixtures do,
-// which the root keeps for its own guard tables. Every router here is
-// harness.Router, so a change to the router's assembly reaches these tests
-// without an edit here.
+// This file holds the access suites' fixtures: adapters, under the names of
+// the router guards' fixtures in migration/app, over
+// test/server/support/harness and test/server/support, and copies of the
+// seeding those fixtures do, which app keeps for its guard tables. Every
+// router here is harness.Router, so a change to the router's assembly reaches
+// these tests without an edit here.
 
 import (
 	"archive/zip"
@@ -90,8 +90,8 @@ func (w *itemWorld) do(
 	return world.Do(method, path, as, body, headers...)
 }
 
-// The router's paths and limits that the tests name, spelled as
-// internal/server spells them, so that a change there fails a test here.
+// The router's paths and limits that the tests name, spelled as the router and
+// its handlers spell them, so that a change there fails a test here.
 const (
 	apiRestrictionPath      = "/artifactory/api/artifactweave/api-restrictions/"
 	apiRestrictionAuditPath = "/artifactory/api/artifactweave/api-restriction-audit"
@@ -418,8 +418,8 @@ func seedTokens(t *testing.T, db store.Store) (*token.Service, statusSecrets) {
 	return tokens, secrets
 }
 
-// subjectOf is the subject of name's tokens, as internal/server writes it,
-// so that the seeded token records belong to the users the tests name.
+// subjectOf is the subject of name's tokens, as the token API writes it, so
+// that the seeded token records belong to the users the tests name.
 func subjectOf(svc *token.Service, name string) string {
 	return svc.Issuer() + "/users/" + name
 }

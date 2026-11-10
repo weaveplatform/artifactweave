@@ -2,13 +2,12 @@
 
 `tools/citestselection/test_ownership.json` is the machine-checked package inventory
 for the selective CI planner in #673. Version 2 keys everything by directory, so
-tests can leave `internal/server` and `migration/app` over many changes without a
-new schema:
+tests can leave `migration/app` over many changes without a new schema:
 
 - `packages` maps every directory with server tests to its owner: a format, or
   `shared`.
 - `shared_files` lists, by file name, every test file in a shared directory whose
-  files are reviewed one by one. Today these are `internal/server`,
+  files are reviewed one by one. Today these are
   `migration/app` and the module suites `test/server/access`,
   `test/server/artifacts` and `test/server/configuration`.
 - `format_dependencies` maps a format to the repository paths of the shared test
@@ -27,21 +26,20 @@ owner, when it lies in one of these directories. `<root>` is `migration` or
 `internal`, because staged code under `migration/` becomes `internal/` at the end
 of P9d:
 
-- `internal/server` and everything below it;
 - `test/server` and everything below it, including `test/server/artifacts/<type>`;
 - `<root>/app`;
 - `<root>/artifacts/ecosystem/<type>/http` and everything below it;
 - `<root>/<module>/adapters/http` and everything below it.
 
 Every `packages` key must be one of these directories. A test in a format's
-directory (`internal/server/<type>`, `test/server/artifacts/<type>` or
+directory (`test/server/artifacts/<type>` or
 `<root>/artifacts/ecosystem/<type>/http`) counts as that format's code on a
 narrow PR only when its package owner is that format; any other owner, `shared`
 included, selects full CI.
 
 ## Moving a root test
 
-When a test file leaves a shared directory such as `internal/server`:
+When a test file leaves a shared directory such as `migration/app`:
 
 1. Remove its name from that directory's `shared_files` list. When the list is
    empty and no tests remain there, remove the key and its `packages` entry.
@@ -89,7 +87,7 @@ When a test file leaves a shared directory such as `internal/server`:
 | Terraform registry | `migration/artifacts/ecosystem/terraform/http`, `test/server/artifacts/terraform` |
 | Terraform backend | `migration/artifacts/ecosystem/terraformbackend/http`, `test/server/artifacts/terraformbackend` |
 | VCS | `migration/artifacts/ecosystem/vcs/http`, `test/server/artifacts/vcs` |
-| Shared | `internal/server`, `migration/artifacts/adapters/http/pkgroute`, `test/server/access`, `test/server/artifacts`, `test/server/artifacts/generic`, `test/server/configuration` |
+| Shared | `migration/app`, `migration/artifacts/adapters/http/pkgroute`, `test/server/access`, `test/server/artifacts`, `test/server/artifacts/generic`, `test/server/configuration` |
 
 `test/server/support` and the packages under it (`harness`, `agentcommon` and
 `registryfixture`) contain fixtures and helpers, not test suites. A change
@@ -109,7 +107,7 @@ A new direct root test cannot be treated as format-owned without review.
 
 Some shared API tests use a format-specific fixture. The inventory's
 `format_dependencies` records the link from a format to such a test as the
-test's repository path (`internal/server/<file>`, or `test/server/access/<file>`
+test's repository path (`migration/app/<file>`, or `test/server/access/<file>`
 and `test/server/artifacts/<file>` for the module suites') so #673 can include
 those tests when that format changes:
 
@@ -145,8 +143,8 @@ test file under `shared_files`, so a change to one selects full CI.
 
 ## Comparison and local timings
 
-Immediately after #793, `go test -list . ./internal/server` listed 374 root
-tests. After the Terraform registry, Terraform backend, Agent Packages and
+Immediately after #793, `go test -list .` over the server root listed 374
+root tests. After the Terraform registry, Terraform backend, Agent Packages and
 Agent Plugins moves, it lists 367. The seven removed names all appear in
 their corresponding new packages: `TestAccJFTerraformPublish`,
 `TestAccTerraformModuleInit`, `TestAccTerraformProviderInstall`,

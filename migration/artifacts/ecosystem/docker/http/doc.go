@@ -19,11 +19,11 @@
 // # Role
 //
 // artifacts module, ecosystem layer: the registry protocol of the registry
-// slice, /v2 with registry tokens and subdomain routing, one protocol for
-// the package types docker, oci and helmoci. It is named dockerhttp so that
-// it does not shadow net/http. Outside tests, only its own http subtree, the
-// module's http adapters and app may import it (decision 0044, dependency
-// rule 9); the server root counts as app until it moves there.
+// slice, /v2 with registry tokens and subdomain routing, one protocol for the
+// package types docker, oci and helmoci. It is named dockerhttp so that it
+// does not shadow net/http. Outside tests, only its own http subtree, the
+// module's http adapters and app may import it (decision 0044, dependency rule
+// 9).
 //
 // # Inputs
 //
@@ -77,7 +77,8 @@
 //
 // # Invariants
 //
-//   - This package never imports internal/server (decision 0031).
+//   - This package never imports the router (migration/app) that mounts it
+//     (decision 0031).
 //   - Every registry response carries Docker-Distribution-API-Version, the
 //     401 included, and every 401 under a registry path carries the Bearer
 //     challenge Docker clients follow to the token endpoint (decision

@@ -35,10 +35,10 @@ permissions, tokens, roles, environments, projects, webhooks, cleanup policies a
 **Hand-written handlers for item paths.** Operations with multi-segment path parameters or
 mode-switch responses (artifact deploy and download, storage item info, properties, copy,
 move, zap, archive download, trash, replication status, Docker and the other package
-protocols, metadata PATCH) are chi handlers in `internal/server/items` and
-`internal/format/*`, mounted before the generated mux. They stay in the spec for
-documentation with the extension `x-handwritten: true`; a test asserts that the generated
-router never claims a path marked that way.
+protocols, metadata PATCH) are chi handlers in `migration/artifacts/adapters/http` and
+`migration/artifacts/ecosystem/*`, mounted before the generated mux. They stay in the spec
+for documentation with the extension `x-handwritten: true`; a test asserts that the
+generated router never claims a path marked that way.
 
 **Content-type normalisation.** Middleware rewrites `application/vnd.org.jfrog.artifactory.*+json`
 to `application/json` before the strict decoder, and accepts `application/yaml` on the
@@ -151,8 +151,8 @@ spec preserves one documented contract.
 
 ## Verification
 
-- `internal/server` tests start `httptest.NewServer` and drive every flat operation through
-  `pkg/client`.
+- Server-assembly tests (`migration/app` and `test/server`) start `httptest.NewServer` and
+  drive every flat operation through `pkg/client`.
 - A test walks `api/*.openapi.yaml` and asserts every `x-handwritten` path is absent from
   the generated router and present in the hand-written one.
 - A table-driven status-code test over the research inventory.

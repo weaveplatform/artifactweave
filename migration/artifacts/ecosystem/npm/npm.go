@@ -201,8 +201,8 @@ func nonEmpty(values []string) []string {
 
 // Reindex rebuilds the repository's npm index from its tarballs and their
 // properties, a remote repository's from its cache. Which repositories the
-// JFrog reindex operation accepts is the API's rule, not the index's:
-// decision 0034's local-only 400 is answered in internal/server.
+// JFrog reindex operation accepts is the API's rule, not the index's: decision
+// 0034's local-only 400 is answered in artifacts/adapters/http.
 func (h Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	return h.reindex(ctx, env, c)
 }

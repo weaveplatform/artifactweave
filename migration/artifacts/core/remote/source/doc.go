@@ -14,9 +14,9 @@
 // # Inputs
 //
 //   - Driving: the routes and format slices that read a remote repository
-//     (internal/server, pkgroute and the ecosystem slices), and core
-//     remote's discovery and listings, through Service.Read with the
-//     Request and Resource they build.
+//     (artifacts/adapters/http, pkgroute and the ecosystem slices), and core
+//     remote's discovery and listings, through Service.Read with the Request
+//     and Resource they build.
 //   - Driven: the Backends the application installs for the HTTP and
 //     cache-only reads (core remote's Policy, or a format backend over it
 //     such as Maven's or Docker's), Resolve for the source identity,

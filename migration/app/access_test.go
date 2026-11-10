@@ -7,7 +7,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/server"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
@@ -19,10 +18,10 @@ import (
 // settings, and gives the same API to the router and to the Debian snapshot
 // work.
 func TestAccRuntimeAccessModule(t *testing.T) {
-	var router server.RouterConfig
+	var router RouterConfig
 	var snapshot *itemkit.Kit
 	origHandler, origSnapshot := newHandler, registerDebianSnapshotWork
-	newHandler = func(c server.RouterConfig) http.Handler {
+	newHandler = func(c RouterConfig) http.Handler {
 		router = c
 		return http.NotFoundHandler()
 	}

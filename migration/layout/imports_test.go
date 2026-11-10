@@ -573,11 +573,13 @@ func TestUnitImportRulesDetectViolations(t *testing.T) {
 				m+"migration/artifacts/core/item", m+"internal/fixture", m+"pkg/types",
 			),
 			// Each import below would break a row if the walk reached it.
-			"migration/kernel/testdata/x.go":     src(m + "migration/app"),
-			"migration/kernel/.cache/x.go":       src(m + "migration/app"),
-			"migration/kernel/nested/go.mod":     "module example.com/nested\n",
-			"migration/kernel/nested/x.go":       src(m + "migration/app"),
-			"migration/app/router.go":            src(m + "test/server/support"),
+			"migration/kernel/testdata/x.go": src(m + "migration/app"),
+			"migration/kernel/.cache/x.go":   src(m + "migration/app"),
+			"migration/kernel/nested/go.mod": "module example.com/nested\n",
+			"migration/kernel/nested/x.go":   src(m + "migration/app"),
+			// A legacy file, made up outside every ledger entry so that no
+			// move rewrites it.
+			"internal/web/router.go":             src(m + "test/server/support"),
 			"pkg/client/artifactory/client.go":   src(m+"internal/repomodel", m+"pkg/types"),
 			"pkg/containertest/containertest.go": src(m + "migration/platform/blob"),
 		})

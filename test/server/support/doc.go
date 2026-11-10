@@ -5,7 +5,7 @@
 // # Role
 //
 // Test support, outside the modules, for the server-assembly suites under
-// test/server and for the route tests that remain in internal/server.
+// test/server and for the router's guards in migration/app.
 //
 // # Inputs
 //
@@ -17,8 +17,8 @@
 //   - The route inventory of each format (DockerRoutes, GoRoutes, HelmRoutes,
 //     MavenRoutes, NPMRoutes, NuGetRoutes, PyPIRoutes, TerraformRoutes,
 //     TerraformBackendRoutes). Each format's suite holds its status and
-//     principal tables to its inventory, and the guards in internal/server
-//     count those routes as covered; DockerHandwrittenRoutes and
+//     principal tables to its inventory, and the router's guards in
+//     migration/app count those routes as covered; DockerHandwrittenRoutes and
 //     NPMGeneratedRoutes give those guards the parts they treat apart.
 //   - Request helpers (Do, Basic, Bearer, ArtifactoryError) and seeding
 //     (Seed, with the fast TestHash and CheapHash, the hash of the shared

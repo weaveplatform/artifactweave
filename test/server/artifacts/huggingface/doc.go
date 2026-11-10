@@ -50,6 +50,6 @@
 //
 // # Status
 //
-// Implemented P9c (the plan's P32 group). P9d moved the tests here from
-// internal/server (TST-06).
+// Implemented P9c (the plan's P32 group). P9d moved the tests here from the
+// server root (TST-06).
 package huggingface

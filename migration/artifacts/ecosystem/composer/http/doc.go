@@ -100,7 +100,7 @@
 //     without a registry URL, source failures, and a virtual repository
 //     that selects a remote's archive.
 //
-// The root suite's TestAccNativeComposerRoutesAvoidHandwrittenStubs
-// (internal/server) and the @composer acceptance scenarios, with the native
+// The router's guard TestAccNativeComposerRoutesAvoidHandwrittenStubs
+// (migration/app) and the @composer acceptance scenarios, with the native
 // Composer client, drive it through the whole server.
 package composerhttp

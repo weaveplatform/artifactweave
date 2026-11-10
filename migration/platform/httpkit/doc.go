@@ -85,11 +85,10 @@
 //
 // # Testing
 //
-// The server's route suites (internal/server and test/server) reach these
-// helpers through the router; TestAccP8ErrorProfiles and
-// TestAccStubsAndEnvelopes check the profiles the rules choose. The unit
-// tests here cover the branches those suites do not reach: rule order and
-// the default, a request without rules, the context values on a bare
-// context, the pointers' nil cases, the route patterns and each caller
-// check's answers.
+// The router's guards in app and the route suites under test/server reach
+// these helpers through the router; TestAccP8ErrorProfiles and
+// TestAccStubsAndEnvelopes check the profiles the rules choose. The unit tests
+// here cover the branches those suites do not reach: rule order and the
+// default, a request without rules, the context values on a bare context, the
+// pointers' nil cases, the route patterns and each caller check's answers.
 package httpkit

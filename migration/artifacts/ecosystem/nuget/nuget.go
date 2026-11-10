@@ -186,13 +186,12 @@ func (Handler) Deleted(
 	return nil
 }
 
-// Reindex rebuilds the repository's NuGet index from its .nupkg and
-// .snupkg files, a remote repository's from its cache, and sets each
-// package's nuget.* properties from its nuspec again, as 7.x "re-annotate[s]
-// the NuGet properties for each NuGet package according to its internal
-// nuspec file" (calculatenugetrepositorymetadata). Which repositories the
-// JFrog reindex operation accepts is the API's rule, answered in
-// internal/server.
+// Reindex rebuilds the repository's NuGet index from its .nupkg and .snupkg
+// files, a remote repository's from its cache, and sets each package's nuget.*
+// properties from its nuspec again, as 7.x "re-annotate[s] the NuGet
+// properties for each NuGet package according to its internal nuspec file"
+// (calculatenugetrepositorymetadata). Which repositories the JFrog reindex
+// operation accepts is the API's rule, answered in artifacts/adapters/http.
 func (h Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	return reindex(ctx, env, c)
 }

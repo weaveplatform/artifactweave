@@ -238,7 +238,7 @@ deps-sync: client-recipes
 
 ## api-ledger: refresh the reviewed operation inventory after reviewing API/routing changes
 api-ledger:
-	ARTIFACTWEAVE_UPDATE_API_LEDGER=1 $(GO) test ./internal/server -run '^TestAccAPIReliabilityLedger$$' -count=1
+	ARTIFACTWEAVE_UPDATE_API_LEDGER=1 $(GO) test ./migration/app -run '^TestAccAPIReliabilityLedger$$' -count=1
 
 ## bundle: merge api/src/<service>/*.yaml fragments into api/<service>.openapi.yaml
 # Authors edit fragments (one per API family) so families can be written in

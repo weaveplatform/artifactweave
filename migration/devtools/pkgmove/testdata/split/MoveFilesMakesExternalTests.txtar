@@ -21,34 +21,34 @@ go $GOVERSION
     "staging_root": "migration",
     "final_root": "internal",
     "packages": [
-        {"from":"internal/server","action":"split","ticket":"WEB-01"}
+        {"from":"internal/web","action":"split","ticket":"WEB-01"}
     ],
     "files": [
-        {"from":"internal/server/ext_test.go","action":"move","to":"test/server/npm","scope":"repo","ticket":"WEB-11"},
-        {"from":"internal/server/helper_test.go","action":"move","to":"platform/kit","ticket":"WEB-11"},
-        {"from":"internal/server/root_test.go","action":"move","to":"test/server/npm","scope":"repo","ticket":"WEB-11"}
+        {"from":"internal/web/ext_test.go","action":"move","to":"test/server/npm","scope":"repo","ticket":"WEB-11"},
+        {"from":"internal/web/helper_test.go","action":"move","to":"platform/kit","ticket":"WEB-11"},
+        {"from":"internal/web/root_test.go","action":"move","to":"test/server/npm","scope":"repo","ticket":"WEB-11"}
     ],
     "placeholders": []
 }
--- internal/server/server.go --
+-- internal/web/server.go --
 // Package server serves.
 package server
 
 // Serve serves.
 func Serve() string { return "served" }
--- internal/server/root_test.go --
+-- internal/web/root_test.go --
 package server
 
 import "testing"
 
 func TestUnitRoot(t *testing.T) {}
--- internal/server/ext_test.go --
+-- internal/web/ext_test.go --
 package server_test
 
 import "testing"
 
 func TestUnitExt(t *testing.T) {}
--- internal/server/helper_test.go --
+-- internal/web/helper_test.go --
 package server
 
 import "testing"
@@ -73,15 +73,15 @@ import "testing"
 
 func TestUnitKit(t *testing.T) {}
 -- want/plan --
-move file internal/server/ext_test.go -> test/server/npm/ext_test.go [WEB-11]
-move file internal/server/helper_test.go -> migration/platform/kit/helper_test.go [WEB-11]
-move file internal/server/root_test.go -> test/server/npm/root_test.go [WEB-11]
-  git mv internal/server/ext_test.go test/server/npm/ext_test.go
-  git mv internal/server/helper_test.go migration/platform/kit/helper_test.go
-  git mv internal/server/root_test.go test/server/npm/root_test.go
-  rewrite internal/server/ext_test.go (at test/server/npm/ext_test.go): 1 package clause
-  rewrite internal/server/helper_test.go (at migration/platform/kit/helper_test.go): 1 package clause
-  rewrite internal/server/root_test.go (at test/server/npm/root_test.go): 1 package clause
+move file internal/web/ext_test.go -> test/server/npm/ext_test.go [WEB-11]
+move file internal/web/helper_test.go -> migration/platform/kit/helper_test.go [WEB-11]
+move file internal/web/root_test.go -> test/server/npm/root_test.go [WEB-11]
+  git mv internal/web/ext_test.go test/server/npm/ext_test.go
+  git mv internal/web/helper_test.go migration/platform/kit/helper_test.go
+  git mv internal/web/root_test.go test/server/npm/root_test.go
+  rewrite internal/web/ext_test.go (at test/server/npm/ext_test.go): 1 package clause
+  rewrite internal/web/helper_test.go (at migration/platform/kit/helper_test.go): 1 package clause
+  rewrite internal/web/root_test.go (at test/server/npm/root_test.go): 1 package clause
 note: test/server/npm/root_test.go is now an external test (package npm_test), as every test in test/server/npm is
 regenerate: make fmt (format the changed files)
 dry run: nothing changed

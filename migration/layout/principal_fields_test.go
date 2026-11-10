@@ -71,15 +71,15 @@ func v(p auth.Principal, ref kernel.CredentialReference, r [32]byte) {
 		"internal/nested/go.mod":           "module example.com/nested\n",
 		"internal/nested/n.go":             uses,
 		".worktrees/copy/internal/x/x.go":  uses,
-		"internal/server/unrelated/u.go":   "package u\n",
+		"internal/web/unrelated/u.go":      "package u\n",
 		"migration/artifacts/ecosystem/huggingface/http/xet.go": file(
 			`	_ = []auth.DownloadCredential{{Kind: "password", PasswordRevision: r}}`,
 		),
-		"internal/server/queue/queue_test.go": file(
+		"internal/web/queue/queue_test.go": file(
 			`	_ = map[string]kernel.CredentialReference{"a": {PasswordRevision: r}}`,
 		),
 	}
-	const v = "internal/server/v/v.go"
+	const v = "internal/web/v/v.go"
 
 	for _, tc := range []struct {
 		name string

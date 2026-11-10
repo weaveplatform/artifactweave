@@ -606,7 +606,7 @@ type mirrorTier struct {
 	trigger chan struct{}
 }
 
-// mirrorsAdmin returns the mirrors for server.RouterConfig, or a nil
+// mirrorsAdmin returns the mirrors for RouterConfig, or a nil
 // interface when no tier is a mirror (a nil *mirrorAdmin in the interface
 // would not be nil).
 func (rt *Runtime) mirrorsAdmin() artifactshttp.Mirrors {

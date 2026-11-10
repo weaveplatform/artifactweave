@@ -1,12 +1,11 @@
 package opkghttp
 
 // This file holds the fixtures of the tests that call the overlay and its
-// helpers, under the names the tests had in internal/server. A test here
-// cannot build the router, which imports this package, so the item world
-// is a kittest world, and do serves a request through the kit's item GET
-// with TryOpkgItem as its overlay, as the router's item route does once it
-// has authenticated the caller. The access module is accesstest's, over
-// the world's store.
+// helpers without the router. A test here cannot build the router, which
+// imports this package, so the item world is a kittest world, and do serves a
+// request through the kit's item GET with TryOpkgItem as its overlay, as the
+// router's item route does once it has authenticated the caller. The access
+// module is accesstest's, over the world's store.
 
 import (
 	"context"

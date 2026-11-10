@@ -11,7 +11,10 @@ import (
 )
 
 // sample returns a small ledger that validates and uses every kind of entry,
-// action and scope. Each call returns a fresh copy for a test to change.
+// action and scope. Each call returns a fresh copy for a test to change. Its
+// split package, internal/web, is made up, outside every entry of the
+// repository's ledger, so that no move rewrites it and pkgmove check never
+// reports it.
 func sample() *Ledger {
 	return &Ledger{
 		Schema:      schemaVersion,
@@ -19,9 +22,9 @@ func sample() *Ledger {
 		StagingRoot: stagingRoot,
 		FinalRoot:   finalRoot,
 		Packages: []Package{
-			{From: "internal/server", Action: ActionSplit, Ticket: "WEB-22"},
+			{From: "internal/web", Action: ActionSplit, Ticket: "WEB-22"},
 			{
-				From: "internal/server/xyz", Action: ActionMove, To: "artifacts/ecosystem/npm/http",
+				From: "internal/web/xyz", Action: ActionMove, To: "artifacts/ecosystem/npm/http",
 				Name: "npmhttp", Ticket: "ECO-06",
 			},
 			{
@@ -41,17 +44,17 @@ func sample() *Ledger {
 		},
 		Files: []File{
 			{
-				From: "internal/server/npm_test.go", Action: ActionMove, Scope: ScopeRepo,
+				From: "internal/web/npm_test.go", Action: ActionMove, Scope: ScopeRepo,
 				To: "test/server/artifacts/npm", Ticket: "TST-05",
 			},
 			{
-				From:   "internal/server/testdata/npm/",
+				From:   "internal/web/testdata/npm/",
 				Action: ActionMove,
 				To:     "artifacts/ecosystem/npm/http/testdata",
 				Ticket: "ECO-06",
 			},
 			{
-				From:   "internal/server/handlers.go",
+				From:   "internal/web/handlers.go",
 				Action: ActionSplit,
 				Targets: []string{
 					"artifacts/adapters/http",
@@ -59,7 +62,7 @@ func sample() *Ledger {
 				},
 				Ticket: "WEB-03",
 			},
-			{From: "internal/server/legacy.go", Action: ActionDelete, Ticket: "WEB-22"},
+			{From: "internal/web/legacy.go", Action: ActionDelete, Ticket: "WEB-22"},
 		},
 		Placeholders: []Placeholder{
 			{To: "artifacts/core/virtual", Phases: []string{"P10"}},
@@ -126,15 +129,15 @@ func TestUnitTranslate(t *testing.T) {
 		importPath, target, action string
 		ok                         bool
 	}{
-		{module + "/internal/server/xyz", module + "/migration/artifacts/ecosystem/npm/http", ActionMove, true},
+		{module + "/internal/web/xyz", module + "/migration/artifacts/ecosystem/npm/http", ActionMove, true},
 		{module + "/internal/formatregistry", module + "/migration/artifacts/ecosystem", ActionMove, true},
 		{module + "/internal/a", module + "/migration/platform/ab", ActionMerge, true},
 		{module + "/internal/fakeserver", module + "/test/server/support/fake", ActionMove, true},
-		{module + "/internal/server", "", ActionSplit, true},
+		{module + "/internal/web", "", ActionSplit, true},
 		{module + "/internal/layout", "", ActionDelete, true},
 		{module + "/internal/nothing", "", "", false},
 		{module + "/migration/artifacts/ecosystem", "", "", false},
-		{"internal/server/xyz", "", "", false},
+		{"internal/web/xyz", "", "", false},
 		{"net/http", "", "", false},
 	} {
 		target, action, ok := l.Translate(tc.importPath)

@@ -302,8 +302,6 @@ func formatSourceOwner(file string) (string, bool) {
 		owner = parts[3]
 	case parts[0] == "internal" && parts[1] == "format":
 		owner = parts[2]
-	case parts[0] == "internal" && parts[1] == "server":
-		owner = parts[2]
 	case parts[0] == "test" && parts[1] == "server":
 		owner = parts[2]
 	default:

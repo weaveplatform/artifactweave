@@ -59,10 +59,10 @@ exists migration/platform/k/keep_test.go
 cmp docs/m.md want/m-after-file.md
 commit
 ok move -ticket PLT-64
-grep tools/citestselection/test_ownership.json "internal/server": "shared"
+grep tools/citestselection/test_ownership.json "internal/web": "shared"
 commit
 ok move -ticket PLT-65
-! grep tools/citestselection/test_ownership.json internal/server
+! grep tools/citestselection/test_ownership.json internal/web
 grep tools/citestselection/test_ownership.json "a_test\.go",
 go vet ./...
 
@@ -89,7 +89,7 @@ fuzz:
         {"from":"internal/later","action":"move","to":"platform/later","name":"latter","ticket":"PLT-60"},
         {"from":"internal/m","action":"move","to":"platform/m","ticket":"PLT-62"},
         {"from":"internal/pk","action":"move","to":"platform/pk","name":"pkx","ticket":"PLT-49"},
-        {"from":"internal/server","action":"split","ticket":"PLT-55"},
+        {"from":"internal/web","action":"split","ticket":"PLT-55"},
         {"from":"internal/z","action":"split","ticket":"PLT-55"}
     ],
     "files": [
@@ -112,8 +112,8 @@ fuzz:
         {"from":"internal/f3/three_test.go","action":"move","to":"platform/f3","ticket":"PLT-54"},
         {"from":"internal/f3/testdata/fuzz/FuzzThree/","action":"move","to":"platform/f3/testdata/fuzz","ticket":"PLT-54"},
         {"from":"internal/m/keep_test.go","action":"move","to":"platform/k","ticket":"PLT-63"},
-        {"from":"internal/server/a_test.go","action":"move","to":"test/server/x","scope":"repo","ticket":"PLT-64"},
-        {"from":"internal/server/b_test.go","action":"move","to":"test/server/x","scope":"repo","ticket":"PLT-65"}
+        {"from":"internal/web/a_test.go","action":"move","to":"test/server/x","scope":"repo","ticket":"PLT-64"},
+        {"from":"internal/web/b_test.go","action":"move","to":"test/server/x","scope":"repo","ticket":"PLT-65"}
     ],
     "placeholders": []
 }
@@ -238,16 +238,16 @@ import "testing"
 func TestUnitKeep(t *testing.T) {}
 -- docs/m.md --
 internal/m/m.go moves with its package; internal/m/keep_test.go by its own entry.
--- internal/server/server.go --
+-- internal/web/server.go --
 // Package server serves.
 package server
--- internal/server/a_test.go --
+-- internal/web/a_test.go --
 package server
 
 import "testing"
 
 func TestUnitA(t *testing.T) {}
--- internal/server/b_test.go --
+-- internal/web/b_test.go --
 package server
 
 import "testing"
@@ -257,7 +257,7 @@ func TestUnitB(t *testing.T) {}
 {
   "version": 2,
   "packages": {
-    "internal/server": "shared"
+    "internal/web": "shared"
   },
   "shared_files": {},
   "format_dependencies": {}

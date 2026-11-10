@@ -1,11 +1,11 @@
 package configuration_test
 
 // This file holds the configuration suites' fixtures: adapters, under the
-// names the tests had in internal/server, over test/server/support/harness
-// and test/server/support, and copies of the world and helpers that root
-// files staying in internal/server define, which the root keeps for its
-// own tests. Every router here is harness.Router, so a change to the
-// router's assembly reaches these tests without an edit here.
+// names of the router guards' fixtures in migration/app, over
+// test/server/support/harness and test/server/support, and copies of the world
+// and helpers those fixtures define, which app keeps for its guard tables.
+// Every router here is harness.Router, so a change to the router's assembly
+// reaches these tests without an edit here.
 
 import (
 	"context"

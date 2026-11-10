@@ -22,12 +22,12 @@ go $GOVERSION
     "staging_root": "migration",
     "final_root": "internal",
     "packages": [
-        {"from":"internal/server","action":"split","ticket":"WEB-01"}
+        {"from":"internal/web","action":"split","ticket":"WEB-01"}
     ],
     "files": [
-        {"from":"internal/server/maven_root_test.go","action":"move","to":"test/server/artifacts/maven","scope":"repo","ticket":"WEB-12"},
-        {"from":"internal/server/mixed_test.go","action":"move","to":"test/server/artifacts/npm","scope":"repo","ticket":"WEB-12"},
-        {"from":"internal/server/npm_root_test.go","action":"move","to":"test/server/npm","scope":"repo","ticket":"WEB-12"}
+        {"from":"internal/web/maven_root_test.go","action":"move","to":"test/server/artifacts/maven","scope":"repo","ticket":"WEB-12"},
+        {"from":"internal/web/mixed_test.go","action":"move","to":"test/server/artifacts/npm","scope":"repo","ticket":"WEB-12"},
+        {"from":"internal/web/npm_root_test.go","action":"move","to":"test/server/npm","scope":"repo","ticket":"WEB-12"}
     ],
     "placeholders": []
 }
@@ -35,11 +35,11 @@ go $GOVERSION
 {
   "version": 2,
   "packages": {
-    "internal/server": "shared",
+    "internal/web": "shared",
     "test/server/npm": "npm"
   },
   "shared_files": {
-    "internal/server": [
+    "internal/web": [
       "maven_root_test.go",
       "mixed_test.go",
       "npm_root_test.go",
@@ -48,37 +48,37 @@ go $GOVERSION
   },
   "format_dependencies": {
     "maven": [
-      "internal/server/maven_root_test.go",
-      "internal/server/mixed_test.go"
+      "internal/web/maven_root_test.go",
+      "internal/web/mixed_test.go"
     ],
     "npm": [
-      "internal/server/mixed_test.go",
-      "internal/server/npm_root_test.go"
+      "internal/web/mixed_test.go",
+      "internal/web/npm_root_test.go"
     ]
   }
 }
--- internal/server/server.go --
+-- internal/web/server.go --
 // Package server serves.
 package server
--- internal/server/stay_test.go --
+-- internal/web/stay_test.go --
 package server
 
 import "testing"
 
 func TestUnitStay(t *testing.T) {}
--- internal/server/maven_root_test.go --
+-- internal/web/maven_root_test.go --
 package server
 
 import "testing"
 
 func TestUnitMavenRoot(t *testing.T) {}
--- internal/server/mixed_test.go --
+-- internal/web/mixed_test.go --
 package server
 
 import "testing"
 
 func TestUnitMixed(t *testing.T) {}
--- internal/server/npm_root_test.go --
+-- internal/web/npm_root_test.go --
 package server
 
 import "testing"
@@ -91,15 +91,15 @@ import "testing"
 
 func TestUnitNpm(t *testing.T) {}
 -- want/plan --
-move file internal/server/maven_root_test.go -> test/server/artifacts/maven/maven_root_test.go [WEB-12]
-move file internal/server/mixed_test.go -> test/server/artifacts/npm/mixed_test.go [WEB-12]
-move file internal/server/npm_root_test.go -> test/server/npm/npm_root_test.go [WEB-12]
-  git mv internal/server/maven_root_test.go test/server/artifacts/maven/maven_root_test.go
-  git mv internal/server/mixed_test.go test/server/artifacts/npm/mixed_test.go
-  git mv internal/server/npm_root_test.go test/server/npm/npm_root_test.go
-  rewrite internal/server/maven_root_test.go (at test/server/artifacts/maven/maven_root_test.go): 1 package clause
-  rewrite internal/server/mixed_test.go (at test/server/artifacts/npm/mixed_test.go): 1 package clause
-  rewrite internal/server/npm_root_test.go (at test/server/npm/npm_root_test.go): 1 package clause
+move file internal/web/maven_root_test.go -> test/server/artifacts/maven/maven_root_test.go [WEB-12]
+move file internal/web/mixed_test.go -> test/server/artifacts/npm/mixed_test.go [WEB-12]
+move file internal/web/npm_root_test.go -> test/server/npm/npm_root_test.go [WEB-12]
+  git mv internal/web/maven_root_test.go test/server/artifacts/maven/maven_root_test.go
+  git mv internal/web/mixed_test.go test/server/artifacts/npm/mixed_test.go
+  git mv internal/web/npm_root_test.go test/server/npm/npm_root_test.go
+  rewrite internal/web/maven_root_test.go (at test/server/artifacts/maven/maven_root_test.go): 1 package clause
+  rewrite internal/web/mixed_test.go (at test/server/artifacts/npm/mixed_test.go): 1 package clause
+  rewrite internal/web/npm_root_test.go (at test/server/npm/npm_root_test.go): 1 package clause
   rewrite tools/citestselection/test_ownership.json
 note: test/server/npm/npm_root_test.go is now an external test (package npm_test), as every test in test/server/npm is
 note: tools/citestselection/test_ownership.json: test/server/artifacts/npm is recorded as shared, so every change below it runs full CI; give it its format as owner once its tests are reviewed
@@ -109,13 +109,13 @@ dry run: nothing changed
 {
   "version": 2,
   "packages": {
-    "internal/server": "shared",
+    "internal/web": "shared",
     "test/server/artifacts/maven": "maven",
     "test/server/artifacts/npm": "shared",
     "test/server/npm": "npm"
   },
   "shared_files": {
-    "internal/server": [
+    "internal/web": [
       "stay_test.go"
     ],
     "test/server/artifacts/npm": [

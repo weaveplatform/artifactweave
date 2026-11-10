@@ -71,8 +71,7 @@
 // middleware_test.go checks request ID reuse and minting, the access log's
 // fields, level and cause, panic recovery in two envelopes, the body limit
 // with declared and undeclared lengths, content-type normalisation and the
-// binding errors, each with its hooks passed explicitly. The server root
-// keeps TestAccStrictBindingErrorThroughRouter, which builds the router,
-// and TestAccRegistryKeepsContentType, which checks its Docker keep
-// predicate.
+// binding errors, each with its hooks passed explicitly. The router's guards
+// in app hold TestAccStrictBindingErrorThroughRouter, which builds the router,
+// and TestAccRegistryKeepsContentType, which checks its Docker keep predicate.
 package middleware

@@ -150,7 +150,7 @@ func TestAccAPIReliabilityLedger(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			if strings.Contains(rel, "migration/platform/gen/") {
+			if strings.Contains(filepath.ToSlash(rel), "migration/platform/gen/") {
 				return fmt.Errorf("generated route missing from specs: %s", route)
 			}
 			entries[route] = apiReviewOperation{
@@ -220,13 +220,12 @@ func sortedReview(in []string) []string { sort.Strings(in); return slices.Compac
 
 func apiReviewHandlers(t *testing.T) map[string]apiReviewHandler {
 	t.Helper()
-	// The handlers live in the server root, in the modules' HTTP adapters
-	// and in the ecosystems' http packages, named by their paths from the
-	// repository root.
+	// The operations' handler methods live in the modules' HTTP adapters and
+	// in the ecosystems' http packages, named by their paths from the
+	// repository root; the router declares none, it only mounts them.
 	root := repopath.Root(t)
 	var files []string
 	for _, dir := range []string{
-		"internal/server",
 		"migration/access/adapters/http",
 		"migration/artifacts/adapters/http",
 		"migration/artifacts/ecosystem/*/http",

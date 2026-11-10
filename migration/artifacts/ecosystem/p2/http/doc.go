@@ -6,11 +6,10 @@
 // # Role
 //
 // artifacts module, ecosystem p2, HTTP layer: the P2 slice's protocol
-// handlers, beside the path and bound rules of artifacts/ecosystem/p2. It
-// is named p2http so that it does not shadow net/http. Outside tests, only
-// its own http subtree, the module's http adapters and app may import it
-// (decision 0044, dependency rule 9); the server root counts as app until
-// it moves there.
+// handlers, beside the path and bound rules of artifacts/ecosystem/p2. It is
+// named p2http so that it does not shadow net/http. Outside tests, only its
+// own http subtree, the module's http adapters and app may import it (decision
+// 0044, dependency rule 9).
 //
 // # Inputs
 //

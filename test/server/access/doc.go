@@ -18,14 +18,14 @@
 //     in-memory store seeded by test/server/support: the admin user, whose
 //     password is "pw", and the anonymous access setting, which a case turns
 //     on.
-//   - The worlds of fixture_test.go, which keep the names the tests had in
-//     internal/server: the harness's item world (newItemWorld); the root
-//     status fixture's users, repositories, key pairs, permissions, items
-//     and tokens (statusFixture), without what only the format, build,
-//     search, overwrite and multipart rows need; the token fixture
-//     (tokenFixture); and the identity world (newIdentityWorld). The
+//   - The worlds of fixture_test.go, which keep the names of the router
+//     guards' fixtures in migration/app: the harness's item world
+//     (newItemWorld); the guards' status fixture's users, repositories, key
+//     pairs, permissions, items and tokens (statusFixture), without what only
+//     the format, build, search, overwrite and multipart rows need; the token
+//     fixture (tokenFixture); and the identity world (newIdentityWorld). The
 //     router's paths and limits that the tests name are constants there,
-//     spelled as internal/server spells them.
+//     spelled as the router and its handlers spell them.
 //
 // # Outputs
 //
@@ -75,6 +75,6 @@
 //
 // Implemented P3 (authentication) and P4 (tokens, users and groups,
 // permissions, roles and environments, key pairs, OIDC), with the API
-// restrictions of decision 0043 in P9c. P9b moved the authentication tests
-// out of internal/server (issue 673), and P9d the rest (TST-04).
+// restrictions of decision 0043 in P9c. P9b moved the authentication tests out
+// of the server root (issue 673), and P9d the rest (TST-04).
 package access

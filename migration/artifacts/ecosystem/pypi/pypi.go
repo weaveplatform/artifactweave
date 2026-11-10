@@ -232,7 +232,7 @@ func reyank(
 
 // Reindex rebuilds the repository's PyPI index from its files and their
 // properties, a remote repository's from its cache. Which repositories the
-// JFrog reindex operation accepts is the API's rule (internal/server).
+// JFrog reindex operation accepts is the API's rule (artifacts/adapters/http).
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	return reindex(ctx, env, c)
 }

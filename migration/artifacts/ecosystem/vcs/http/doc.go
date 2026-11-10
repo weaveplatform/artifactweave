@@ -16,12 +16,11 @@
 //
 // artifacts module, ecosystem vcs, HTTP layer: the VCS slice's protocol
 // handlers, with its archive, file, reference and peer rules; the slice is
-// remote only. It is named vcshttp so that it does not shadow net/http.
-// The slice has no format package, so the item service gives VCS
-// repositories the generic hooks (decision 0032). Outside tests, only its
-// own http subtree, the module's http adapters and app may import it
-// (decision 0044, dependency rule 9); the server root counts as app until
-// it moves there.
+// remote only. It is named vcshttp so that it does not shadow net/http. The
+// slice has no format package, so the item service gives VCS repositories the
+// generic hooks (decision 0032). Outside tests, only its own http subtree, the
+// module's http adapters and app may import it (decision 0044, dependency rule
+// 9).
 //
 // # Inputs
 //

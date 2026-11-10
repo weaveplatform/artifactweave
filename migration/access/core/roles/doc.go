@@ -8,10 +8,10 @@
 // # Role
 //
 // access module, core layer: the roles service. The roles and environments
-// handlers in internal/server build a Service over the configured store and
-// the artifacts module's repositories, and call it. The package imports the
-// standard library, the kernel, core/model and core/port, and artifacts/api
-// for the repository configurations that name an environment.
+// handlers in access/adapters/http build a Service over the configured store
+// and the artifacts module's repositories, and call it. The package imports
+// the standard library, the kernel, core/model and core/port, and
+// artifacts/api for the repository configurations that name an environment.
 //
 // # Inputs
 //

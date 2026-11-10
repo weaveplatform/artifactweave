@@ -1,8 +1,7 @@
 package accesshttp
 
 // This file holds the fixtures of the tests that call the middleware and the
-// partials without the router, under the names they had in internal/server,
-// over test/server/support.
+// partials without the router, over test/server/support.
 
 import (
 	"context"
@@ -46,10 +45,10 @@ func basic(user, password string) map[string]string {
 	return support.Basic(user, password)
 }
 
-// testAuthnOptions are the router's options for Authenticate
-// (newAuthnOptions in internal/server) as far as the tests' requests reach
-// them: the system ping is a public route beside Access's, no path is the
-// registry's or challenges anonymous requests, and skip are the caller's.
+// testAuthnOptions are the router's options for Authenticate (newAuthnOptions
+// in app's router) as far as the tests' requests reach them: the system ping
+// is a public route beside Access's, no path is the registry's or challenges
+// anonymous requests, and skip are the caller's.
 func testAuthnOptions(
 	a *authn.Authenticator,
 	st Store,

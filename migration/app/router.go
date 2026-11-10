@@ -1,7 +1,3 @@
-// Package app builds the single chi router that serves every JFrog path
-// prefix: /artifactory, /access, /event, /router, /jfconnect and /v2. Flat
-// CRUD families come from the generated strict servers; item paths and
-// protocol handlers are hand-written and mounted first (decision 0002).
 package app
 
 import (
@@ -79,7 +75,12 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// RouterConfig is what the router needs from the application configuration.
+// RouterConfig is what NewRouter needs: the stores, the services app opens
+// over them and the settings it reads from the application configuration.
+// The content routes need Store and Blobs; a nil service turns off what it
+// serves, as each field says, and the zero value of a setting is
+// Artifactory 7.x's default. The caller owns every store and service here
+// and closes them only after the handler has drained.
 type RouterConfig struct {
 	// RequestLimits owns shared request rates and this process's concurrency
 	// permits. Nil disables limits for embedders; the application wires them.
@@ -387,7 +388,15 @@ func newArtifactoryAPI(cfg RouterConfig) artifactshttp.ArtifactoryAPI {
 	return artifactshttp.New(artifactsDeps(cfg))
 }
 
-// NewRouter returns the fully wired handler.
+// NewRouter returns the handler for every JFrog path prefix over cfg:
+// /artifactory, /access, /event, /router, /jfconnect and /v2; /distribution,
+// /worker, /pfed and /grid, whose specified operations answer 501 until they
+// are built; and the products artifactweave does not implement, which answer
+// 501 naming the product (Mission Control 404). Flat CRUD families come from
+// the generated strict servers, and the item paths, protocols and other
+// hand-written routes are mounted ahead of them. When cfg sets a Store but no
+// Access or Configuration contract, NewRouter binds them over it first, as
+// RouterConfig.Access and RouterConfig.Configuration describe.
 func NewRouter(cfg RouterConfig) http.Handler {
 	cfg = withConfiguration(withAccess(cfg))
 	logger := cfg.Logger

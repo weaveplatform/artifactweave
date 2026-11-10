@@ -85,6 +85,6 @@
 // The unit tests here call the middleware and the partials directly over
 // in-memory stores, without the router; TestUnitDeleteKeyPairIsOneTransaction
 // checks the key pair transaction. The route suites under test/server/access
-// and the server root's status, principal and ledger tables reach the
-// handlers through the router.
+// and the router's guards in app (its status, principal and ledger tables)
+// reach the handlers through the router.
 package accesshttp

@@ -1,9 +1,9 @@
 package p2_test
 
 // This file holds the P2 suite's fixtures: adapters over
-// test/server/support/harness and test/server/support under the names the
-// tests had in internal/server. The router is the harness's, so a change to
-// its assembly reaches these tests without an edit here.
+// test/server/support/harness and test/server/support. The router is the
+// harness's, so a change to its assembly reaches these tests without an edit
+// here.
 
 import (
 	"context"

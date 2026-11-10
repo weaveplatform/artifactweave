@@ -7,14 +7,13 @@
 //
 // # Role
 //
-// access module, core layer: the token service. The access module's binding
-// of the access/api Tokens, the token API handlers in internal/server and
-// the OIDC exchange call it, and the authenticator verifies tokens through
-// it as its authn.TokenVerifier; other modules reach it only through
-// access/api. The package imports the standard library, the kernel,
-// platform/instance, platform/settings and platform/tx, and the module's
-// api, core/authn (ErrInvalidToken and the API restriction check),
-// core/model and core/port.
+// access module, core layer: the token service. The access module's binding of
+// the access/api Tokens, the token API handlers in access/adapters/http and
+// the OIDC exchange call it, and the authenticator verifies tokens through it
+// as its authn.TokenVerifier; other modules reach it only through access/api.
+// The package imports the standard library, the kernel, platform/instance,
+// platform/settings and platform/tx, and the module's api, core/authn
+// (ErrInvalidToken and the API restriction check), core/model and core/port.
 //
 // # Inputs
 //

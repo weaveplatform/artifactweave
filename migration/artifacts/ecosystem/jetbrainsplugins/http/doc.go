@@ -11,12 +11,11 @@
 //
 // # Role
 //
-// artifacts module, ecosystem layer: the native JetBrains Marketplace
-// protocol of the JetBrains plugins slice, which is remote only and has no
-// format package. It is named jetbrainspluginshttp so that it does not
-// shadow net/http. Outside tests, only its own http subtree, the module's
-// http adapters and app may import it (decision 0044, dependency rules);
-// the server root does until the router composition moves.
+// artifacts module, ecosystem layer: the native JetBrains Marketplace protocol
+// of the JetBrains plugins slice, which is remote only and has no format
+// package. It is named jetbrainspluginshttp so that it does not shadow
+// net/http. Outside tests, only its own http subtree, the module's http
+// adapters and app may import it (decision 0044, dependency rules).
 //
 // # Inputs
 //

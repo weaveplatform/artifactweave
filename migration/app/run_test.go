@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/app/config"
 )
 
@@ -29,7 +28,7 @@ func testConfig(t *testing.T) config.Config {
 func fakeHandler(t *testing.T, body string) {
 	t.Helper()
 	orig := newHandler
-	newHandler = func(server.RouterConfig) http.Handler {
+	newHandler = func(RouterConfig) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			_, _ = io.WriteString(w, body)
 		})
@@ -114,7 +113,7 @@ func TestAccRunDrainsInflightRequest(t *testing.T) {
 	var served atomic.Bool
 	release := make(chan struct{})
 	orig := newHandler
-	newHandler = func(server.RouterConfig) http.Handler {
+	newHandler = func(RouterConfig) http.Handler {
 		// Like a real handler, it gives up when its request context ends, so
 		// the request survives the signal only if the drain protects it.
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -192,7 +191,7 @@ func TestAccRunServeFailure(t *testing.T) {
 func TestAccRunShutdownTimeout(t *testing.T) {
 	release := make(chan struct{})
 	orig := newHandler
-	newHandler = func(server.RouterConfig) http.Handler {
+	newHandler = func(RouterConfig) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			<-release
 			_, _ = io.WriteString(w, "late")
@@ -227,7 +226,7 @@ func TestAccRunCancelsRequestsAfterDrain(t *testing.T) {
 	entered := make(chan struct{}, 1)
 	cancelled := make(chan time.Time, 1)
 	orig := newHandler
-	newHandler = func(server.RouterConfig) http.Handler {
+	newHandler = func(RouterConfig) http.Handler {
 		return http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 			entered <- struct{}{}
 			<-r.Context().Done()
@@ -291,8 +290,8 @@ func TestAccRunCancelsRequestsAfterDrain(t *testing.T) {
 
 func TestAccDefaultHandlerIsWired(t *testing.T) {
 	// The real constructor must build without panicking; routing itself is
-	// tested in internal/server.
-	h := newHandler(server.RouterConfig{})
+	// tested by the router's guard suites beside it.
+	h := newHandler(RouterConfig{})
 	if h == nil {
 		t.Fatal("nil handler")
 	}

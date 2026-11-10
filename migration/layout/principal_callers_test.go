@@ -74,12 +74,12 @@ func v(ctx context.Context, p kernel.Principal) {
 		"internal/auth/bridge_kernel.go":  uses,
 		"migration/access/api/context.go": uses,
 		"migration/artifacts/adapters/http/itemkit/reindex.go": uses,
-		"internal/server/handler_test.go":                      uses,
+		"internal/web/handler_test.go":                         uses,
 		"migration/kernel/context_test.go":                     uses,
-		"internal/server/testdata/x.go":                        uses,
+		"internal/web/testdata/x.go":                           uses,
 		"internal/nested/go.mod":                               "module example.com/nested\n",
 		"internal/nested/n.go":                                 uses,
-		".worktrees/copy/internal/server/x/x.go":               uses,
+		".worktrees/copy/internal/web/x/x.go":                  uses,
 		// The declaration itself is no use, nor is a comment that names it.
 		"migration/kernel/context.go": `package kernel
 
@@ -89,7 +89,7 @@ import "context"
 func WithPrincipal(ctx context.Context, p any) context.Context { return ctx }
 `,
 	}
-	const v = "internal/server/v/v.go"
+	const v = "internal/web/v/v.go"
 
 	for _, tc := range []struct {
 		name string
@@ -139,9 +139,9 @@ func WithPrincipal(ctx context.Context, p any) context.Context { return ctx }
 		},
 		{
 			name: "an alias of it",
-			file: "internal/server/bridge.go",
-			src:  "package server\n\nimport \"github.com/weaveplatform/artifactweave/migration/kernel\"\n\nvar WithPrincipal = kernel.WithPrincipal\n",
-			want: "internal/server/bridge.go:5: names WithPrincipal",
+			file: "internal/web/bridge.go",
+			src:  "package web\n\nimport \"github.com/weaveplatform/artifactweave/migration/kernel\"\n\nvar WithPrincipal = kernel.WithPrincipal\n",
+			want: "internal/web/bridge.go:5: names WithPrincipal",
 		},
 		{
 			name: "unparsable file",

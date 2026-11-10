@@ -47,7 +47,6 @@
 //
 // # Status
 //
-// Implemented P6; P9b moved the tests here from internal/server (issue 673),
-// and P9d the registry remote suites from migration/app (TST-07, issue
-// 1096).
+// Implemented P6; P9b moved the tests here from the server root (issue 673),
+// and P9d the registry remote suites from migration/app (TST-07, issue 1096).
 package docker

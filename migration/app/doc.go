@@ -1,15 +1,16 @@
-// Package app wires configuration, the stores and the HTTP server together.
-// cmd/artifactweave stays a thin cobra shim that calls Run and the other
-// commands' functions; tests drive Run with a fake handler.
+// Package app wires configuration, the stores, the modules and the HTTP
+// router together. cmd/artifactweave stays a thin cobra shim that calls Run
+// and the other commands' functions; tests drive Run with a fake handler.
 //
 // # Role
 //
 // app: the composition root. It opens what the modules share (the metadata
 // store, the blob tiers and their mirrors, the keyring and the work queue),
 // builds the access, artifacts and configuration modules over them in
-// buildModules, has the artifacts module open its remote sources, and hands
-// everything to the server root, which builds the router. It may import any
-// package, and only cmd/artifactweave and the server test harness
+// buildModules, has the artifacts module open its remote sources, and
+// builds over all of it the single chi router that serves every JFrog path
+// prefix (NewRouter). It may import any package, and only
+// cmd/artifactweave and the server test harness
 // (test/server/support/harness) import it.
 //
 // # Inputs
@@ -35,6 +36,11 @@
 //     OpenStore, the configured metadata store.
 //   - InitialPasswordFile: the file under the data directory where the first
 //     start writes a generated admin password.
+//   - RouterConfig and NewRouter: the HTTP handler that serves /artifactory,
+//     /access, /event, /router, /jfconnect, /v2 and the other specified
+//     service prefixes over the stores, services and settings a
+//     RouterConfig names. Run serves it; the server test harness builds it
+//     for the suites under test/server.
 //   - Runtime, RuntimeOptions and OpenRuntime: what serve holds open, with
 //     the costs it is opened with, exported so that the server test harness
 //     builds the router over the stores and modules serve uses.
@@ -56,9 +62,31 @@
 //     accepts a request.
 //   - Requests run on a context that the shutdown signal does not cancel, so
 //     the drain lets them finish; they are cancelled only once it expires.
+//   - NewRouter installs its middleware in one order: the error profiles,
+//     the request ID, panic recovery, the access log, the base URL, the
+//     Smart Remote trace, the Docker API version header and registry
+//     challenge, content type normalisation, collection slashes, plus as
+//     space, the idempotent routes and the API recovery context; then, each
+//     only when configured, the ingress request limits, authentication, the
+//     API restrictions and the principal request limits; then the Helm
+//     partial reindex. The ingress limits count a request before anyone is
+//     authenticated and the principal limits charge the caller after
+//     (decision 0043).
+//   - Hand-written routes are mounted before the generated strict servers,
+//     and the 501 stubs of hand-written operations last, so each
+//     hand-written route claims the pattern its spec derives instead of the
+//     generated handler or the stub (decision 0002). Each spec's strict
+//     server embeds the modules' partials at depth one and the generated
+//     501 stubs at depth two, so an implemented operation shadows its stub
+//     and two partials claiming one operation fail to compile.
 //
 // # References
 //
+//   - Decision 0001: docs/research/decisions/0001-mirror-the-jfrog-api-surface.md
+//     (the routes, statuses and envelopes the router serves).
+//   - Decision 0002: docs/research/decisions/0002-spec-first-flat-crud-handwritten-item-paths.md
+//     (one strict server per spec, and hand-written item paths mounted
+//     first).
 //   - Decision 0009: docs/research/decisions/0009-configuration-as-code.md
 //     (the application configuration that Run and the commands take, and
 //     config apply).
@@ -66,13 +94,18 @@
 //     (the structured log, which the HTTP server's error log joins).
 //   - Decision 0033: docs/research/decisions/0033-persistent-work-queue.md
 //     (the work queue that OpenRuntime starts).
+//   - Decision 0043: docs/research/decisions/0043-api-reliability.md
+//     (the request limits and their place in the middleware chain).
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md
 //     (app is the composition root and may import any package).
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
-//     lines 746 to 805 (the composition root).
+//     lines 746 to 805 (the composition root, router.go at lines 748 to
+//     762), 389 to 409 (where the server root's files went) and 819 to 834
+//     (the router's strict servers composed by embedding).
 //   - https://github.com/weaveplatform/artifactweave/issues/1092,
-//     https://github.com/weaveplatform/artifactweave/issues/1094 and
-//     https://github.com/weaveplatform/artifactweave/issues/1096
+//     https://github.com/weaveplatform/artifactweave/issues/1094,
+//     https://github.com/weaveplatform/artifactweave/issues/1096 and
+//     https://github.com/weaveplatform/artifactweave/issues/1097
 //
 // # Status
 //
@@ -83,7 +116,8 @@
 // builds the modules, bootstrap.go and seed.go prepare the first start,
 // runtime.go holds the runtime and serverlog.go the HTTP server's error log.
 // TST-07 exported the runtime and moved the remote suites to
-// test/server/artifacts. The router follows in WEB-22.
+// test/server/artifacts. WEB-22 brought the router here: router.go builds
+// it and limits.go holds the request limits.
 //
 // # Testing
 //
@@ -97,4 +131,13 @@
 // size for all of them. The suites that read remote content through the
 // composed runtime run from test/server/artifacts/<type>, over the harness's
 // App and RemoteWorld.
+//
+// The whole-router guards run beside NewRouter over fixtures_test.go: the
+// status tables (status_test.go and status_<x>_test.go), the route and
+// principal matrices (matrix_test.go), the spec checks (spec_test.go,
+// spec_contract_test.go), the 501 stubs (stub_test.go), the error profiles
+// (error_profiles_p8_test.go), the request limits (limits_test.go) and the
+// API reliability ledger (api_ledger_test.go, which make api-ledger runs to
+// regenerate docs/research/api-reliability/operations.json). They must not
+// import the harness, which imports app.
 package app

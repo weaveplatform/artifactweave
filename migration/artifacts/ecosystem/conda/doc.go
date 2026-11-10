@@ -16,13 +16,13 @@
 //
 // # Inputs
 //
-//   - Driving: the format registry (artifacts/ecosystem), which hands the
-//     item service's hooks for conda repositories to Handler, and the work
-//     queue, which runs the channel metadata rebuild (Work) and every
-//     format's reindex through it; the protocol, which parses paths and
-//     decodes and encodes repodata and shards for each request; and the
-//     server root's item routes, which keep stored shards off the generic
-//     item API (ParseMetadataPath, IsShardFilename).
+//   - Driving: the format registry (artifacts/ecosystem), which hands the item
+//     service's hooks for conda repositories to Handler, and the work queue,
+//     which runs the channel metadata rebuild (Work) and every format's
+//     reindex through it; the protocol, which parses paths and decodes and
+//     encodes repodata and shards for each request; and the item routes of
+//     artifacts/adapters/http, which keep stored shards off the generic item
+//     API (ParseMetadataPath, IsShardFilename).
 //   - Driven: the format hooks' environment (format.Env): its blobs, from
 //     which archives are read; its store, through which Handler sets item
 //     properties, lists a repository's files and keeps the package index

@@ -10,9 +10,9 @@
 //
 // # Inputs
 //
-//   - The production router from internal/server, built over an in-memory
-//     store and a file-system blob store, with the request and seed helpers
-//     of test/server/support.
+//   - The production router from test/server/support/harness (app.NewRouter),
+//     built over an in-memory store and a file-system blob store, with the
+//     request and seed helpers of test/server/support.
 //   - migration/artifacts/adapters/upstream/fakeupstream, which stands in
 //     for the remote repositories' upstream.
 //

@@ -60,7 +60,8 @@ func TestUnitParseAndGenerate(t *testing.T) {
 		}
 	}
 	// The stub must type-check against the fixture package: that is the
-	// "compiles" half of the proof; the 501 half lives in internal/server.
+	// "compiles" half of the proof; the 501 half is app's
+	// TestAccUnimplementedOperationsAnswer501.
 	fset := token.NewFileSet()
 	files := []*fileSrc{{"server.gen.go", fixture}, {"unimplemented.gen.go", src}}
 	var asts []*ast.File

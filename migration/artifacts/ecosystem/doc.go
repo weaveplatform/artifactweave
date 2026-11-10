@@ -5,17 +5,16 @@
 // # Role
 //
 // artifacts module, ecosystem layer: the registry of the format slices, one
-// slice per package type (decision 0032). Only the composition builds it:
-// the artifacts module's New takes Settings from the module's settings,
-// which app/config's Artifacts accessor derives from the configuration, and
-// adds the keyring; the server that app starts takes them from the module
-// and hands Settings.For to the item, build and registry services it
-// builds. The registry is apart from the
-// format contract, artifacts/core/format, so that a slice can implement
-// that contract without an import cycle. For the same reason core never
-// imports this package: every slice it lists imports core, so core takes
-// the registry as a format.Registry value (decision 0044, "Artifacts and
-// remote").
+// slice per package type (decision 0032). Only the composition builds it: the
+// artifacts module's New takes Settings from the module's settings, which
+// app/config's Artifacts accessor derives from the configuration, and adds the
+// keyring; app hands them to the router it builds
+// (RouterConfig.FormatSettings), which hands Settings.For to the item, build
+// and registry services it builds. The registry is apart from the format
+// contract, artifacts/core/format, so that a slice can implement that contract
+// without an import cycle. For the same reason core never imports this
+// package: every slice it lists imports core, so core takes the registry as a
+// format.Registry value (decision 0044, "Artifacts and remote").
 //
 // # Inputs
 //
@@ -34,7 +33,7 @@
 //   - Settings.For, a package type's format with s applied: the
 //     format.Registry of the work queue's item service, which the artifacts
 //     module builds, and of the item, build and registry services that the
-//     server builds.
+//     router (app.NewRouter) builds.
 //   - For, the same with every format's default settings. The Docker
 //     registry and registry upload expiry take it as their format.Registry,
 //     since they reach only docker, oci and helmoci repositories, whose

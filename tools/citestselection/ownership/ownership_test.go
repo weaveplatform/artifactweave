@@ -8,8 +8,6 @@ func TestUnitOwnedTestDirAcceptsLegacyAndStagedLayouts(t *testing.T) {
 	// migration/app, which pkgmove's stale check reports until promotion
 	// moves the composition root back there.
 	for dir, want := range map[string]bool{
-		"internal/server":                            true,
-		"internal/server/xyz":                        true,
 		"test/server":                                true,
 		"test/server/access":                         true,
 		"test/server/artifacts/npm":                  true,
@@ -30,12 +28,12 @@ func TestUnitOwnedTestDirAcceptsLegacyAndStagedLayouts(t *testing.T) {
 		"migration/artifacts/core/item":              false,
 		"migration":                                  false,
 		"internal/legacy/xyz":                        false,
-		"internal/serverx":                           false,
+		"migration/appx":                             false,
 		"test/serverx":                               false,
 		"test/acceptance":                            false,
 		"pkg/app":                                    false,
 		"tools/app":                                  false,
-		"internal/server/":                           false,
+		"migration/app/":                             false,
 		"test/server/../server/npm":                  false,
 		"":                                           false,
 	} {

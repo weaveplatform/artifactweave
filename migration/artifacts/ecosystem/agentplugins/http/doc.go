@@ -10,8 +10,8 @@
 // slice's protocol handlers, beside the bundle and marketplace rules of
 // artifacts/ecosystem/agentplugins. It is named agentpluginshttp so that it
 // does not shadow net/http. Outside tests, only its own http subtree, the
-// module's http adapters and app may import it (decision 0044, dependency
-// rule 9); the server root counts as app until it moves there.
+// module's http adapters and app may import it (decision 0044, dependency rule
+// 9).
 //
 // # Inputs
 //

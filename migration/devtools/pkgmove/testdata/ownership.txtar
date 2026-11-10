@@ -5,7 +5,7 @@
 # loses its keys and its dependencies, with a notice, and a list that empties
 # loses its key.
 ok move -ticket ECO-01
-stdout ^note: tools/citestselection/test_ownership\.json: dropped internal/server/eta, since migration/platform/eta is not a directory whose tests need an owner$
+stdout ^note: tools/citestselection/test_ownership\.json: dropped internal/web/eta, since migration/platform/eta is not a directory whose tests need an owner$
 stdout ^check: no stale paths \(2 old paths checked\)$
 cmp tools/citestselection/test_ownership.json want/test_ownership.json
 exists migration/artifacts/ecosystem/zeta/http/protocol_test.go
@@ -21,19 +21,19 @@ go $GOVERSION
     "staging_root": "migration",
     "final_root": "internal",
     "packages": [
-        {"from":"internal/server/eta","action":"move","to":"platform/eta","ticket":"ECO-01"},
-        {"from":"internal/server/zeta","action":"move","to":"artifacts/ecosystem/zeta/http","name":"zetahttp","rename":{"zeta_test.go":"protocol_test.go"},"ticket":"ECO-01"}
+        {"from":"internal/web/eta","action":"move","to":"platform/eta","ticket":"ECO-01"},
+        {"from":"internal/web/zeta","action":"move","to":"artifacts/ecosystem/zeta/http","name":"zetahttp","rename":{"zeta_test.go":"protocol_test.go"},"ticket":"ECO-01"}
     ],
     "files": [],
     "placeholders": []
 }
--- internal/server/eta/eta.go --
+-- internal/web/eta/eta.go --
 // Package eta is shared.
 package eta
 
 // Eta is shared.
 const Eta = "eta"
--- internal/server/eta/eta_test.go --
+-- internal/web/eta/eta_test.go --
 package eta
 
 import "testing"
@@ -43,13 +43,13 @@ func TestEta(t *testing.T) {
 		t.Fatal("empty")
 	}
 }
--- internal/server/zeta/zeta.go --
+-- internal/web/zeta/zeta.go --
 // Package zeta serves zeta.
 package zeta
 
 // Zeta is served.
 const Zeta = "zeta"
--- internal/server/zeta/zeta_test.go --
+-- internal/web/zeta/zeta_test.go --
 package zeta
 
 import "testing"
@@ -63,15 +63,15 @@ func TestZeta(t *testing.T) {
 {
   "version": 2,
   "packages": {
-    "internal/server/eta": "shared",
-    "internal/server/zeta": "shared",
+    "internal/web/eta": "shared",
+    "internal/web/zeta": "shared",
     "test/server": "shared"
   },
   "shared_files": {
-    "internal/server/eta": [
+    "internal/web/eta": [
       "eta_test.go"
     ],
-    "internal/server/zeta": [
+    "internal/web/zeta": [
       "zeta_test.go"
     ],
     "test/server": [
@@ -80,12 +80,12 @@ func TestZeta(t *testing.T) {
   },
   "format_dependencies": {
     "npm": [
-      "internal/server/eta/eta_test.go",
-      "internal/server/zeta/zeta_test.go",
+      "internal/web/eta/eta_test.go",
+      "internal/web/zeta/zeta_test.go",
       "test/server/server_test.go"
     ],
     "pypi": [
-      "internal/server/eta/eta_test.go"
+      "internal/web/eta/eta_test.go"
     ]
   }
 }

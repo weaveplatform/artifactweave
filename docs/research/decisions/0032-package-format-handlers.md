@@ -70,7 +70,7 @@ properties.
 
 **Format errors.** A format refuses with `format.RejectionError{Status, Message}`. The item
 kit's `ItemError` maps it to that status, in the envelope of the surface the request arrived
-on. Formats still never import `internal/server`.
+on. Formats still never import the router in `migration/app`.
 
 **Source transfer restrictions** (amended 2026-10-28, #777). The optional
 `TransferSourceGuard` belongs to the source format; target `Inspect` and `Admit`
@@ -228,8 +228,9 @@ expose SHA-512 only where Artifactory's do. No SHA-3 is added: no client or Arti
 uses one.
 
 **The protocol router kit.** Formats with a protocol of their own (npm and Go in P7, then
-PyPI, NuGet, Helm and Terraform) mount through one kit in `internal/server`, as Docker's
-registry does today (decision 0031):
+PyPI, NuGet, Helm and Terraform) mount through one kit,
+`migration/artifacts/adapters/http/pkgroute`, as Docker's registry does today (decision
+0031):
 - `Mount` claims `/artifactory/api/<type>/{repoKey}/...` before the generated servers, and
   leaves the JFrog operations at fixed literals beside it (such as `.../reindex`) to them.
 - Repository lookup by package type, with a class gate through a `Source` seam. The `Source`
@@ -355,7 +356,7 @@ These assignments describe planned work, not current runtime support.
 - Unit and fault tests for each optional interface, `Derive` and the `RejectionError` mapping
   (#267).
 - A test-only format exercises every part of the router kit (#269).
-- `internal/server`'s `TestAccP8ProtocolPaths` holds a path of each P8 protocol to the
+- `migration/app`'s `TestAccP8ProtocolPaths` holds a path of each P8 protocol to the
   catch-all's 404 until the format mounts the protocol, and then to the kit's 404 in the
   protocol's own envelope, so no format's pull request edits it (#533).
 - Every read path refuses a blacked-out repository and an excluded path, in unit tests and

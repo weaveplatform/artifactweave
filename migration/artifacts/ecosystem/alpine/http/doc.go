@@ -6,12 +6,11 @@
 //
 // # Role
 //
-// artifacts module, ecosystem alpine, HTTP layer: the Alpine slice's
-// protocol handlers, beside the format rules of artifacts/ecosystem/alpine.
-// It is named alpinehttp so that it does not shadow net/http. Outside
-// tests, only its own http subtree, the module's http adapters and app may
-// import it (decision 0044, dependency rule 9); the server root counts as
-// app until it moves there.
+// artifacts module, ecosystem alpine, HTTP layer: the Alpine slice's protocol
+// handlers, beside the format rules of artifacts/ecosystem/alpine. It is named
+// alpinehttp so that it does not shadow net/http. Outside tests, only its own
+// http subtree, the module's http adapters and app may import it (decision
+// 0044, dependency rule 9).
 //
 // # Inputs
 //

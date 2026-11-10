@@ -14,16 +14,16 @@ func TestUnitSelectKindsKeepsMixedPackagesAndBuildTaggedTests(t *testing.T) {
 	for path, source := range map[string]string{
 		// The format plan below reads the repository's own inventory, which
 		// lists this root file as a Cargo dependency.
-		"migration/app/spec_test.go": `package server
+		"migration/app/spec_test.go": `package app
 func TestUnitRead() {}
 func TestAccPublish() {}
 func TestAccess() {}
 `,
-		"internal/server/unrelated_test.go": `package server
+		"migration/app/unrelated_test.go": `package app
 func TestAccUnrelated() {}
 `,
-		"internal/server/windows_test.go": `//go:build windows
-package server
+		"migration/app/windows_test.go": `//go:build windows
+package app
 func TestUnitWindows() {}
 `,
 		"migration/artifacts/ecosystem/demo/format_test.go": `package demo
@@ -58,9 +58,9 @@ func TestAccCloud() {}
 	}
 	if !slices.Equal(
 		full.Unit,
-		[]string{"./internal/server", "./migration/artifacts/ecosystem/demo"},
+		[]string{"./migration/app", "./migration/artifacts/ecosystem/demo"},
 	) ||
-		!slices.Equal(full.Acc, []string{"./internal/server"}) ||
+		!slices.Equal(full.Acc, []string{"./migration/app"}) ||
 		!slices.Equal(full.Fuzz, []string{"./pkg"}) {
 		t.Fatalf("full test kinds: %+v", full)
 	}
@@ -70,7 +70,7 @@ func TestAccCloud() {}
 			t.Errorf("selected unclassified or independently owned test: %+v", entry)
 		}
 		if entry.Name == "TestUnitWindows" &&
-			entry.Source == "internal/server/windows_test.go" {
+			entry.Source == "migration/app/windows_test.go" {
 			buildTagged = true
 		}
 	}
@@ -79,7 +79,7 @@ func TestAccCloud() {}
 	}
 	format, err := scanKinds(root, plan{profile: "format", candidate: affectedPlan{
 		owner: "cargo",
-		units: []string{"./internal/server", "./migration/artifacts/ecosystem/demo/..."},
+		units: []string{"./migration/app", "./migration/artifacts/ecosystem/demo/..."},
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -211,10 +211,10 @@ func TestUnitAffectedFormatSelectsOwnedMixedPackageEntries(t *testing.T) {
 		allowed[file] = true
 	}
 	// Maven's shared dependencies are upstream search suites of the
-	// artifacts management package; the root must add none of its own.
+	// artifacts management package; the router's guards in app add none.
 	sharedEntries := 0
 	for _, entry := range selection.Selected {
-		if entry.Package != "./internal/server" && entry.Package != "./test/server/artifacts" {
+		if entry.Package != "./migration/app" && entry.Package != "./test/server/artifacts" {
 			continue
 		}
 		sharedEntries++
@@ -225,14 +225,10 @@ func TestUnitAffectedFormatSelectsOwnedMixedPackageEntries(t *testing.T) {
 	if sharedEntries == 0 || !slices.Contains(selection.Acc, "./test/server/artifacts/maven") {
 		t.Fatalf("Maven acceptance dependencies omitted: %+v", selection)
 	}
-	// The Maven remote suite left the application package for Maven's own
-	// package (TST-07), so the plan runs it there and no application test.
+	// The Maven remote suite runs from Maven's own package.
 	remoteEntries := 0
 	for _, entry := range selection.Selected {
-		switch {
-		case entry.Package == "./migration/app":
-			t.Errorf("unrelated app suite selected: %+v", entry)
-		case entry.Source == "test/server/artifacts/maven/maven_remote_test.go":
+		if entry.Source == "test/server/artifacts/maven/maven_remote_test.go" {
 			remoteEntries++
 		}
 	}
@@ -255,20 +251,25 @@ func TestUnitFormatAppDependenciesSelectOnlyOwnedFiles(t *testing.T) {
 			candidate := proposeAffected([]change{{
 				status: "M", path: "internal/format/" + owner + "/handler.go",
 			}})
-			// The suite left the application package for the owner's own
-			// package (TST-07), which the plan runs whole, without app.
+			// The remote suite runs from the owner's own package, which the
+			// plan runs whole; of app's tests, only the router guards the
+			// inventory lists for the owner run.
 			pkg := "./test/server/artifacts/" + owner
-			if candidate.profile != "format" || !slices.Contains(candidate.units, pkg) ||
-				slices.Contains(candidate.units, "./migration/app") {
-				t.Fatalf("owned package omitted or app selected: %+v", candidate)
+			if candidate.profile != "format" || !slices.Contains(candidate.units, pkg) {
+				t.Fatalf("owned package omitted: %+v", candidate)
 			}
 			selection, err := scanKinds(root, plan{profile: "format", candidate: candidate})
 			if err != nil {
 				t.Fatal(err)
 			}
+			inventory, err := loadTestOwnership()
+			if err != nil {
+				t.Fatal(err)
+			}
 			found := false
 			for _, entry := range selection.Selected {
-				if entry.Package == "./migration/app" {
+				if entry.Package == "./migration/app" &&
+					!slices.Contains(inventory.FormatDependencies[owner], entry.Source) {
 					t.Errorf("unowned app test selected: %+v", entry)
 				}
 				if entry.Source != "test/server/artifacts/"+owner+"/"+file {

@@ -82,6 +82,6 @@
 //   - path_test.go: the stored layout's recipe and package paths, and the
 //     components and file names it refuses.
 //
-// The hooks are also tested end to end through the protocol, from the
-// server root's Conan suites and migration/app's (docs/testing/conan.md).
+// The hooks are also tested end to end through the protocol, from the Conan
+// suites in test/server/artifacts/conan (docs/testing/conan.md).
 package conan

@@ -11,9 +11,9 @@
 //
 // # Inputs
 //
-//   - The production router from internal/server, built over an in-memory
-//     store and a file-system blob store, with the request and seed helpers
-//     of test/server/support.
+//   - The production router from test/server/support/harness (app.NewRouter),
+//     built over an in-memory store and a file-system blob store, with the
+//     request and seed helpers of test/server/support.
 //   - support.NPMRoutes, the route inventory, with support.NPMPublishBody and
 //     support.NPMTarballOf.
 //
@@ -33,5 +33,5 @@
 //
 // # Status
 //
-// Implemented P7; P9b moved the tests here from internal/server (issue 673).
+// Implemented P7; P9b moved the tests here from the server root (issue 673).
 package npm

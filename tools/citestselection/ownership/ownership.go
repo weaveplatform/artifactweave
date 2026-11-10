@@ -18,8 +18,7 @@ func OwnedTestDir(dir string) bool {
 	if dir != path.Clean(dir) {
 		return false
 	}
-	if dir == "internal/server" || strings.HasPrefix(dir, "internal/server/") ||
-		dir == "test/server" || strings.HasPrefix(dir, "test/server/") {
+	if dir == "test/server" || strings.HasPrefix(dir, "test/server/") {
 		return true
 	}
 	parts := strings.Split(dir, "/")

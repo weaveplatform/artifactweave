@@ -1,9 +1,8 @@
 package vcshttp
 
 // This file holds the fixtures of the tests that call the partial's code
-// without the router, under the names the tests had in internal/server. A
-// test here cannot build the router, which imports this package, so the
-// store and blob store are a kittest world's.
+// without the router. A test here cannot build the router, which imports this
+// package, so the store and blob store are a kittest world's.
 
 import (
 	"testing"

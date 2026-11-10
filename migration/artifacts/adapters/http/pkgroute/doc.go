@@ -16,12 +16,12 @@
 // # Role
 //
 // artifacts module, HTTP adapter layer: the router kit for native package
-// protocols. The server root and the ecosystem protocol packages
-// (ecosystem/<type>/http) mount their protocols through it. It never
-// imports the server root, which hands it what it needs through Options,
-// and it reaches the access module only through access/api: the caller is
-// the kernel principal, and permissions are checked with the request's
-// accessapi.Decider on accessapi.Repo values.
+// protocols. The router in app and the ecosystem protocol packages
+// (ecosystem/<type>/http) mount their protocols through it. It never imports
+// app, whose router hands it what it needs through Options, and it reaches the
+// access module only through access/api: the caller is the kernel principal,
+// and permissions are checked with the request's accessapi.Decider on
+// accessapi.Repo values.
 //
 // # Inputs
 //

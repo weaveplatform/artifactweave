@@ -18,8 +18,9 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// The repositories API's tests in internal/server cover the ordinary paths;
-// these cover the failures a store can only produce on purpose.
+// The repositories API's route suites in test/server/artifacts cover the
+// ordinary paths; these cover the failures a store can only produce on
+// purpose.
 
 func TestUnitMergeRefusesMalformedUpdates(t *testing.T) {
 	stored := *repo.Defaults(&repo.Config{Key: "k", Class: repo.Local})

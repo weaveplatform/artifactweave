@@ -43,8 +43,8 @@ lane executes `^TestAcc`; native feature partitions execute the exact
 The full core native job runs the other acceptance-harness `TestAcc` entry
 points once. The package selector uses reviewed ownership and the reverse
 import graph. In a shared directory of the [ownership inventory](server-test-ownership.md)
-(a `shared_files` key; today the mixed `internal/server` and `migration/app`
-packages), a narrow PR selects only entry points in the files that
+(a `shared_files` key; today the mixed `migration/app` package among them),
+a narrow PR selects only entry points in the files that
 `format_dependencies` lists for the changed format. The impact job retains the exact
 selected test names as a `test-selection` artifact and reports selected and
 skipped lane reasons in its summary.
@@ -253,7 +253,7 @@ token through a TLS reverse proxy and trusts only that scenario's certificate,
 as current APM rejects credentials over HTTP. Locally it skips
 when that binary is unset; set `ARTIFACTWEAVE_APM_BIN` to the pinned release
 binary to run it. The local and federated protocol, permission, fault and
-lifecycle cases also run in `internal/server` unit tests.
+lifecycle cases also run in the `test/server/artifacts/agentpackages` suite.
 
 ### Planned jobs
 
