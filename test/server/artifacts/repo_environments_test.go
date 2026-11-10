@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 )
 
 // TestAccRepositoryEnvironments checks Artifactory's rule for a repository's

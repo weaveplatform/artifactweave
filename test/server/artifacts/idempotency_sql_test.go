@@ -13,14 +13,14 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	appsql "github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
-	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql/postgres"
-	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql/sqlite"
-	appstoretest "github.com/weaveplatform/artifactweave/migration/app/storetest"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	pgdrv "github.com/weaveplatform/artifactweave/migration/platform/sql/postgres"
-	platsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
+	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
+	appsql "github.com/weaveplatform/artifactweave/internal/app/adapters/sql"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/sql/postgres"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/sql/sqlite"
+	appstoretest "github.com/weaveplatform/artifactweave/internal/app/storetest"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob/fs"
+	pgdrv "github.com/weaveplatform/artifactweave/internal/platform/sql/postgres"
+	platsqltest "github.com/weaveplatform/artifactweave/internal/platform/sql/sqltest"
 	artclient "github.com/weaveplatform/artifactweave/pkg/client/artifactory"
 )
 

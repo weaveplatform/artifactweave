@@ -18,7 +18,7 @@
 //   - support.MavenRoutes, the route inventory.
 //   - The application runtime and the production router from
 //     test/server/support/harness, through the harness's remote world under
-//     the name the tests had in migration/app (fixture_test.go,
+//     the name the tests had in internal/app (fixture_test.go,
 //     newRemoteWorld): the generic remote repository remote over a fake
 //     upstream, the users reader and denied and the remote-read permission,
 //     beside which the tests retype the remote or add the repositories they
@@ -54,5 +54,5 @@
 // # Status
 //
 // Implemented P7; P9b moved the tests here from the server root (issue 673),
-// and P9d the remote suites from migration/app (TST-07, issue 1096).
+// and P9d the remote suites from internal/app (TST-07, issue 1096).
 package maven

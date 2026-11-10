@@ -39,13 +39,13 @@ distinguish absence from failures and cannot silently contact a VCS or public pr
 
 ## Evidence and remaining work
 
-`migration/artifacts/ecosystem/golang/remote*_test.go` fetches every endpoint
+`internal/artifacts/ecosystem/golang/remote*_test.go` fetches every endpoint
 through the real source and cache policy against controlled HTTP upstreams. It covers
 escaped identities, exact bytes/digests, pseudo-versions, mutable metadata, immutable
 files, negative TTL, 404/410 versus failure, private credentials, repository
 isolation, permission and credential fencing, cancellation, interrupted/invalid
 content and warm/offline reads. The existing
-`migration/artifacts/ecosystem/golang/http` class-gate test continues to require 501
+`internal/artifacts/ecosystem/golang/http` class-gate test continues to require 501
 for a direct native remote or virtual route. P9 source completion does not open those
 routes.
 

@@ -1,6 +1,6 @@
 # Configuration reference
 
-Status: current through P8. The strict app YAML schema in `migration/app/config` is the source
+Status: current through P8. The strict app YAML schema in `internal/app/config` is the source
 of truth and `artifactweave config validate` rejects unknown keys. Planned settings are
 listed separately below and are not accepted by the current schema.
 

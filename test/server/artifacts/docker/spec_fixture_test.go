@@ -7,7 +7,7 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 
-	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
+	"github.com/weaveplatform/artifactweave/internal/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 

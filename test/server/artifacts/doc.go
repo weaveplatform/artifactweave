@@ -19,7 +19,7 @@
 //     stores seeded by test/server/support: the admin user, whose password is
 //     "pw", and the users, permissions and repositories each world adds.
 //   - The worlds of fixture_test.go, which keep the names of the router
-//     guards' fixtures in migration/app: the harness's item world
+//     guards' fixtures in internal/app: the harness's item world
 //     (newItemWorld); the guards' status fixture's users, repositories and
 //     fixture files, with a token service and the multipart upload service
 //     (statusFixture), without what only the guards' format, build, search,
@@ -34,7 +34,7 @@
 //     server (searches_upstream_test.go), reindex with a recording format
 //     (reindex_test.go) and remote sources over stub backends
 //     (source_test.go).
-//   - PostgreSQL through migration/app/storetest for the cases that run on
+//   - PostgreSQL through internal/app/storetest for the cases that run on
 //     it too (idempotency_sql_test.go, properties_long_test.go); they skip
 //     without Docker.
 //
@@ -99,5 +99,5 @@
 // maintenance and upstream searches), with the idempotent build appends of
 // decision 0043 in P9c. P9d moved the router-level tests out of the server
 // root (TST-05); the tests that call unexported router code stay beside the
-// router in migration/app as <name>_internal_test.go.
+// router in internal/app as <name>_internal_test.go.
 package artifacts

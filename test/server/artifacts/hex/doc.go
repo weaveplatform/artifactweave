@@ -17,7 +17,7 @@
 //     permission and eight local, remote and virtual repositories, with the
 //     request and seed helpers of test/server/support.
 //   - The decimal and ecto tarballs in
-//     migration/artifacts/ecosystem/hex/testdata, read root-relative through
+//     internal/artifacts/ecosystem/hex/testdata, read root-relative through
 //     repopath, and an RSA key pair generated once per test binary
 //     (testKeys).
 //

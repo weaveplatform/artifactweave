@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/platform/blob/mirror"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob/mirror"
 )
 
 type fakeMirrors struct {

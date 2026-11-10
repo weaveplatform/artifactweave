@@ -1,0 +1,25 @@
+package access
+
+import (
+	"context"
+
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/access/core/port"
+)
+
+var _ accessapi.Keys = keys{}
+
+// keys reads key pairs and certificates from the key store, which unseals
+// them. Errors are the store's, unwrapped, so errors.Is(err,
+// kernel.ErrNotFound) and each caller's own wrap still apply.
+type keys struct{ st port.Store }
+
+func (b keys) Keypair(ctx context.Context, name string) (accessapi.Keypair, error) {
+	//nolint:wrapcheck // the store's errors are the contract's
+	return b.st.Keys().Keypair(ctx, name)
+}
+
+func (b keys) Certificate(ctx context.Context, alias string) (accessapi.Certificate, error) {
+	//nolint:wrapcheck // the store's errors are the contract's
+	return b.st.Keys().Certificate(ctx, alias)
+}

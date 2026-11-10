@@ -14,8 +14,8 @@ import (
 
 	"github.com/cucumber/godog"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
-	gemfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/gems"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
+	gemfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/gems"
 )
 
 func (w *world) registerGems(sc *godog.ScenarioContext) {
@@ -31,7 +31,7 @@ func (w *world) copyPinnedGem() error {
 		return err
 	}
 	b, err := os.ReadFile(
-		filepath.Join(repoRoot, "migration/artifacts/ecosystem/gems/testdata/rake-12.3.1.gem"),
+		filepath.Join(repoRoot, "internal/artifacts/ecosystem/gems/testdata/rake-12.3.1.gem"),
 	)
 	if err != nil {
 		return err

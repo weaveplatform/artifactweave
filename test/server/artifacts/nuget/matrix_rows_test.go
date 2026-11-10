@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
 )
 
 // nugetMatrixPart is NuGet's share of the route × principal matrix, which

@@ -48,7 +48,7 @@ a repository's `environments` field follows Artifactory's project rule.
   "Environment 'X' does not exist", is our choice; no source documents Artifactory's.
 
 **Global roles and environments** (`/access/api/v1/roles`, `/access/api/v1/environments`,
-issue #77, `migration/access/core/roles`):
+issue #77, `internal/access/core/roles`):
 - **Built-ins:** their defaults are defined in code (`types.BuiltinGlobalRoles`,
   `types.BuiltinEnvironments`).
   - The roles are "Project Admin" (`ADMIN`, the whole global vocabulary on DEV and PROD)

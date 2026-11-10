@@ -41,12 +41,12 @@ func TestUnitClassify(t *testing.T) {
 		{"deleted docs", []change{{status: "D", path: "docs/old.md"}}, "docs"},
 		{
 			"source rename into docs",
-			[]change{{status: "R100", old: "migration/app/x.go", path: "docs/x.md"}},
+			[]change{{status: "R100", old: "internal/app/x.go", path: "docs/x.md"}},
 			"full",
 		},
 		{
 			"docs rename into source",
-			[]change{{status: "R100", old: "docs/x.md", path: "migration/app/x.go"}},
+			[]change{{status: "R100", old: "docs/x.md", path: "internal/app/x.go"}},
 			"full",
 		},
 		{"evidence json", []change{{status: "A", path: "docs/testing/evidence/run.json"}}, "docs"},

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
 )
 
 // helmMatrixPart is Helm's share of the route × principal matrix (#548): a

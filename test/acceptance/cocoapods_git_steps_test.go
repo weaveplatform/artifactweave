@@ -7,8 +7,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
-	podfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
+	podfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/cocoapods"
 )
 
 // These smart-HTTP responses contain packs produced by the native Git CLI,

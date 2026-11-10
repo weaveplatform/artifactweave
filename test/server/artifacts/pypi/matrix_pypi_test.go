@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
 )
 
 // Pages require some Read grant in the repository and then filter files;

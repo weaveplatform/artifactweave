@@ -50,7 +50,7 @@ native connection recipe.
 Use your own token; the examples contain no reusable administrator credential.
 For Basic-only clients, artifactweave accepts an access/reference token as the
 password **when the username matches the token's subject**. Bearer clients use
-the token directly. This is enforced by [the authenticator](../../migration/access/core/authn/token.go).
+the token directly. This is enforced by [the authenticator](../../internal/access/core/authn/token.go).
 Client-specific API-key, host-matching or credential-store rules still apply.
 
 A token never creates repository permissions. The subject must have read access

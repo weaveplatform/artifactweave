@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
-	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 )
 
 // TestAccStorageSummaryAccess: an administrator, or a token scoped

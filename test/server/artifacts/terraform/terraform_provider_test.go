@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/terraformtest"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/terraform/terraformtest"
 )
 
 func TestAccTerraformProviderInstall(t *testing.T) {

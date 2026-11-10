@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
 // PyPI's reindex runs the PyPI format (#537): it rebuilds a repository's

@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
-	"github.com/weaveplatform/artifactweave/migration/access/core/token"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
-	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/core/token"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	layout "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
 func TestAccRegistryRemoteForeignLayers(t *testing.T) {

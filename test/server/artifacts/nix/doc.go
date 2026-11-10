@@ -14,10 +14,10 @@
 //
 //   - The application runtime and the production router from
 //     test/server/support/harness, through the harness's remote world under
-//     the name the tests had in migration/app (fixture_test.go,
+//     the name the tests had in internal/app (fixture_test.go,
 //     newRemoteWorld): the generic remote repository remote over a fake
 //     upstream, the users reader and denied and the remote-read permission.
-//   - The binary cache fixtures in migration/artifacts/ecosystem/nix/testdata,
+//   - The binary cache fixtures in internal/artifacts/ecosystem/nix/testdata,
 //     read root-relative through repopath.
 //
 // # Outputs
@@ -44,5 +44,5 @@
 //
 // # Status
 //
-// Implemented P9c. P9d moved the tests here from migration/app (TST-07).
+// Implemented P9c. P9d moved the tests here from internal/app (TST-07).
 package nix

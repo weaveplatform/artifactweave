@@ -3,7 +3,7 @@
 # here so the generated mux never claims a path a hand-written handler serves
 # (decision 0002).
 package: worker
-output: migration/platform/gen/worker/server.gen.go
+output: internal/platform/gen/worker/server.gen.go
 generate:
   models: true
   chi-server: true

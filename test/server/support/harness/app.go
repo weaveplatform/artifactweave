@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/app"
-	"github.com/weaveplatform/artifactweave/migration/app/config"
+	"github.com/weaveplatform/artifactweave/internal/app"
+	"github.com/weaveplatform/artifactweave/internal/app/config"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 

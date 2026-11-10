@@ -29,7 +29,7 @@ prints the complete inventory. `make test`, `make accept-go` and `make accept`
 run the guard. The `Select CI tests` job runs it before planning any profile.
 
 Go reserves `TestMain` for a package hook. Its four reviewed owners are
-`migration/access/core/authn` and `migration/devtools/pkgmove` (three-OS Go matrix; the
+`internal/access/core/authn` and `internal/devtools/pkgmove` (three-OS Go matrix; the
 pkgmove hook runs the test binary as a failing `git` for its fixture scripts),
 `test/acceptance` (Linux native acceptance), and `test/platform` (real-cloud
 platform scenarios). The four
@@ -45,7 +45,7 @@ points once. The package selector uses reviewed ownership and the reverse
 import graph. In a shared directory of the [ownership inventory](server-test-ownership.md),
 one that is a `shared_files` key, a narrow PR selects only the entry points in
 the files that `format_dependencies` lists for the changed format. Today those
-files lie in `migration/app`, beside the router, and in the module suites
+files lie in `internal/app`, beside the router, and in the module suites
 `test/server/access` and `test/server/artifacts`. The impact job retains the exact
 selected test names as a `test-selection` artifact and reports selected and
 skipped lane reasons in its summary.
@@ -444,7 +444,7 @@ artifacts and join the required quality gate.
 
 ## Controlled upstream tests
 
-P9's [`migration/artifacts/adapters/upstream/fakeupstream`](../../migration/artifacts/adapters/upstream/fakeupstream/README.md)
+P9's [`internal/artifacts/adapters/upstream/fakeupstream`](../../internal/artifacts/adapters/upstream/fakeupstream/README.md)
 supplies chi HTTP/HTTPS fixtures for transport, cache and adapter tests. Its self-checks are
 `TestAcc` tests, so they run in the Go acceptance job (`make accept-go`, without the
 race detector or shuffle); the package remains in the normal merged coverage gate,
@@ -503,7 +503,7 @@ continues to exercise an image index. An `ubuntu-latest` runner update from Ubun
 scenarios; the explicit flags keep the client proof stable on either runner.
 
 The cross-cloud blob mirror scenario (`TestAccCrossCloud` in
-`migration/platform/blob/mirror`) is one of those unit suites. It runs MinIO,
+`internal/platform/blob/mirror`) is one of those unit suites. It runs MinIO,
 fake-gcs-server and Azurite side by side in the Linux unit job and skips on macOS and
 Windows; the emulator images are pinned in `pkg/containertest`.
 
@@ -802,7 +802,7 @@ Two failures came from the runners rather than the code, and each needed a manua
 
 | Failure | Response |
 |---|---|
-| `create container: reaper: … wait for reaper …: context deadline exceeded` | `quality-gate.yml` sets `TESTCONTAINERS_RYUK_DISABLED=true`, so testcontainers-go never starts its reaper (Ryuk). Hosted runners are discarded after each job, so nothing is left behind. The emulators terminate at the end of each test through `testcontainers.CleanupContainer`. The PostgreSQL container that `migration/platform/sql/sqltest` shares across a test binary stays up until the runner goes. Local runs keep the reaper, which removes that container when the binary exits |
+| `create container: reaper: … wait for reaper …: context deadline exceeded` | `quality-gate.yml` sets `TESTCONTAINERS_RYUK_DISABLED=true`, so testcontainers-go never starts its reaper (Ryuk). Hosted runners are discarded after each job, so nothing is left behind. The emulators terminate at the end of each test through `testcontainers.CleanupContainer`. The PostgreSQL container that `internal/platform/sql/sqltest` shares across a test binary stays up until the runner goes. Local runs keep the reaper, which removes that container when the binary exits |
 | `read "https://proxy.golang.org/…": stream error: … INTERNAL_ERROR` | Every Go job runs `.github/actions/go-mod-download` straight after `actions/setup-go`. It runs `go mod download`, retrying twice with 15 s and 30 s pauses, so lint, tests, `go tool` and golangci-lint then read the module cache and never fetch. Only the download is retried: a failing test or lint step still fails |
 
 ## Real-cloud conformance (manual)
@@ -849,17 +849,17 @@ make gcp-conformance     # or, by hand, after make gcp-credentials (writes .loca
 ARTIFACTWEAVE_TEST_GCS_BUCKET=$(terraform -chdir=deploy/platform/terraform/gcp/single-bucket output -raw bucket) \
 ARTIFACTWEAVE_TEST_GCS_ACCESS_ID=$(terraform -chdir=deploy/platform/terraform/gcp/single-bucket output -raw service_account) \
 GOOGLE_APPLICATION_CREDENTIALS=deploy/platform/terraform/gcp/single-bucket/.local/gcp-credentials.json \
-  go test -count=1 -v -run 'TestAccContractOnRealGCS|TestAccRealGCSProbes' ./migration/platform/blob/gcs/
+  go test -count=1 -v -run 'TestAccContractOnRealGCS|TestAccRealGCSProbes' ./internal/platform/blob/gcs/
 
 make aws-conformance     # or, by hand, after aws login:
 ARTIFACTWEAVE_TEST_S3_BUCKET=$(terraform -chdir=deploy/platform/terraform/aws/single-bucket output -raw bucket) \
 ARTIFACTWEAVE_TEST_S3_REGION=eu-west-2 \
-  go test -count=1 -v -run 'TestAccContractOnRealS3|TestAccRealS3Probes' ./migration/platform/blob/s3/
+  go test -count=1 -v -run 'TestAccContractOnRealS3|TestAccRealS3Probes' ./internal/platform/blob/s3/
 
 make azure-conformance   # or, by hand, after az login:
 ARTIFACTWEAVE_TEST_AZURE_ACCOUNT=$(terraform -chdir=deploy/platform/terraform/azure/single-bucket output -raw account) \
 ARTIFACTWEAVE_TEST_AZURE_CONTAINER=artifactweave \
-  go test -count=1 -v -run 'TestAccContractOnRealAzure|TestAccRealAzureProbes' ./migration/platform/blob/azure/
+  go test -count=1 -v -run 'TestAccContractOnRealAzure|TestAccRealAzureProbes' ./internal/platform/blob/azure/
 ```
 
 The GCS run acts as the conformance service account through the impersonated credentials
@@ -1258,7 +1258,7 @@ scenario starts from a copy of one that passes, and its README from
 
 ## AQL fixtures from the JFrog CLI
 
-`migration/artifacts/core/aql/aqltest/testdata` holds the AQL the pinned `jf` sends, one
+`internal/artifacts/core/aql/aqltest/testdata` holds the AQL the pinned `jf` sends, one
 file per command shape. With `ARTIFACTWEAVE_JF_BIN` pointing at the pinned binary,
 `make capture-aql`:
 1. runs the acceptance scenario "the query shapes the fixtures capture", with the server
@@ -1267,7 +1267,7 @@ file per command shape. With `ARTIFACTWEAVE_JF_BIN` pointing at the pinned binar
 2. copies each query over its fixture.
 
 Run it whenever the pinned `jf` changes, then check that the expected rows in
-`migration/artifacts/core/aql/aqltest` still hold.
+`internal/artifacts/core/aql/aqltest` still hold.
 
 ## Releases
 
@@ -1282,7 +1282,7 @@ mode on the existing release (#507):
 
 - `artifactweave` for linux, darwin and windows on amd64 and arm64, built as `make build`
   builds it: `CGO_ENABLED=0`, `GOWORK=off`, `-trimpath`, the `disable_grpc_modules` tag, and
-  `migration/platform/buildinfo`'s version, commit and date stamped with `-X`;
+  `internal/platform/buildinfo`'s version, commit and date stamped with `-X`;
 - a `tar.gz` archive per platform (`zip` for Windows), a SHA-256 checksum file, and an SPDX
   SBOM per archive (syft);
 - a keyless cosign signature over the checksum file, in a Sigstore bundle. The

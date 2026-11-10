@@ -4,10 +4,10 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/app"
-	artifactshttp "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
-	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
+	"github.com/weaveplatform/artifactweave/internal/app"
+	artifactshttp "github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
+	"github.com/weaveplatform/artifactweave/internal/platform/testkit/repopath"
 )
 
 // Config is the configuration the production router is built from: the

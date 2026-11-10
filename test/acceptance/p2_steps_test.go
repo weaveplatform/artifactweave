@@ -26,7 +26,7 @@ import (
 
 	"github.com/cucumber/godog"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
 )
 
 var publishedP2Files = map[string]string{
@@ -188,7 +188,7 @@ func (w *world) p2ArchiveUpstream() error {
 }
 
 func p2PublishedFile(name string) ([]byte, error) {
-	return os.ReadFile(filepath.Join(repoRoot, "migration/artifacts/ecosystem/p2/testdata", name))
+	return os.ReadFile(filepath.Join(repoRoot, "internal/artifacts/ecosystem/p2/testdata", name))
 }
 
 func (w *world) p2Upstream() error {

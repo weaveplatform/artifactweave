@@ -7,13 +7,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	nixfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nix"
-	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
+	nixfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/nix"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/testkit/repopath"
 )
 
 func TestAccNixRawRoutesCannotBypassNativeValidation(t *testing.T) {
@@ -24,14 +24,14 @@ func TestAccNixRawRoutesCannotBypassNativeValidation(t *testing.T) {
 			w.c.StoreArtifactsLocally = &cache
 			w.update()
 			const path = "fyli4q2yj6vh01bs0jxqbvj5hir5zvqc.narinfo"
-			metadata := repopath.Read(t, "migration/artifacts/ecosystem/nix/testdata/cache/"+path)
+			metadata := repopath.Read(t, "internal/artifacts/ecosystem/nix/testdata/cache/"+path)
 			info, err := nixfmt.Parse(metadata, path)
 			if err != nil {
 				t.Fatal(err)
 			}
 			archive := repopath.Read(
 				t,
-				"migration/artifacts/ecosystem/nix/testdata/cache/"+info.URL,
+				"internal/artifacts/ecosystem/nix/testdata/cache/"+info.URL,
 			)
 			w.up.Set("/"+path, fakeupstream.Resource{Body: metadata})
 			w.up.Set("/"+info.URL, fakeupstream.Resource{Body: []byte("corrupt")})

@@ -14,19 +14,19 @@ func TestUnitSelectKindsKeepsMixedPackagesAndBuildTaggedTests(t *testing.T) {
 	for path, source := range map[string]string{
 		// The format plan below reads the repository's own inventory, which
 		// lists this root file as a Cargo dependency.
-		"migration/app/spec_test.go": `package app
+		"internal/app/spec_test.go": `package app
 func TestUnitRead() {}
 func TestAccPublish() {}
 func TestAccess() {}
 `,
-		"migration/app/unrelated_test.go": `package app
+		"internal/app/unrelated_test.go": `package app
 func TestAccUnrelated() {}
 `,
-		"migration/app/windows_test.go": `//go:build windows
+		"internal/app/windows_test.go": `//go:build windows
 package app
 func TestUnitWindows() {}
 `,
-		"migration/artifacts/ecosystem/demo/format_test.go": `package demo
+		"internal/artifacts/ecosystem/demo/format_test.go": `package demo
 func TestUnitFormat() {}
 `,
 		"pkg/seed_test.go": `package pkg
@@ -58,9 +58,9 @@ func TestAccCloud() {}
 	}
 	if !slices.Equal(
 		full.Unit,
-		[]string{"./migration/app", "./migration/artifacts/ecosystem/demo"},
+		[]string{"./internal/app", "./internal/artifacts/ecosystem/demo"},
 	) ||
-		!slices.Equal(full.Acc, []string{"./migration/app"}) ||
+		!slices.Equal(full.Acc, []string{"./internal/app"}) ||
 		!slices.Equal(full.Fuzz, []string{"./pkg"}) {
 		t.Fatalf("full test kinds: %+v", full)
 	}
@@ -70,7 +70,7 @@ func TestAccCloud() {}
 			t.Errorf("selected unclassified or independently owned test: %+v", entry)
 		}
 		if entry.Name == "TestUnitWindows" &&
-			entry.Source == "migration/app/windows_test.go" {
+			entry.Source == "internal/app/windows_test.go" {
 			buildTagged = true
 		}
 	}
@@ -79,7 +79,7 @@ func TestAccCloud() {}
 	}
 	format, err := scanKinds(root, plan{profile: "format", candidate: affectedPlan{
 		owner: "cargo",
-		units: []string{"./migration/app", "./migration/artifacts/ecosystem/demo/..."},
+		units: []string{"./internal/app", "./internal/artifacts/ecosystem/demo/..."},
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -131,7 +131,7 @@ func TestUnitAcceptanceOnlyOwnersKeepNarrowSelection(t *testing.T) {
 	}
 	for _, path := range []string{
 		"test/server/artifacts/helmoci/helmoci_test.go",
-		"migration/artifacts/ecosystem/nimmodel/http/nimmodel.go",
+		"internal/artifacts/ecosystem/nimmodel/http/nimmodel.go",
 	} {
 		candidate := proposeAffected([]change{{status: "M", path: path}})
 		if candidate.profile != "format" {
@@ -189,7 +189,7 @@ func TestUnitTerraformPathsSelectOnlyTheirAffectedLane(t *testing.T) {
 
 func TestUnitAffectedFormatSelectsOwnedMixedPackageEntries(t *testing.T) {
 	candidate := proposeAffected(
-		[]change{{status: "M", path: "migration/artifacts/ecosystem/maven/maven.go"}},
+		[]change{{status: "M", path: "internal/artifacts/ecosystem/maven/maven.go"}},
 	)
 	if candidate.profile != "format" || candidate.owner != "maven" {
 		t.Fatalf("Maven impact: %+v", candidate)
@@ -214,7 +214,7 @@ func TestUnitAffectedFormatSelectsOwnedMixedPackageEntries(t *testing.T) {
 	// artifacts management package; the router's guards in app add none.
 	sharedEntries := 0
 	for _, entry := range selection.Selected {
-		if entry.Package != "./migration/app" && entry.Package != "./test/server/artifacts" {
+		if entry.Package != "./internal/app" && entry.Package != "./test/server/artifacts" {
 			continue
 		}
 		sharedEntries++
@@ -268,7 +268,7 @@ func TestUnitFormatAppDependenciesSelectOnlyOwnedFiles(t *testing.T) {
 			}
 			found := false
 			for _, entry := range selection.Selected {
-				if entry.Package == "./migration/app" &&
+				if entry.Package == "./internal/app" &&
 					!slices.Contains(inventory.FormatDependencies[owner], entry.Source) {
 					t.Errorf("unowned app test selected: %+v", entry)
 				}

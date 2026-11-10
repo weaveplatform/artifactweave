@@ -16,7 +16,7 @@ client checks this record relies on.
 
 ## Decision
 
-**Endpoints.** `migration/artifacts/core/build` implements the Builds API in research 22 §3.1, with
+**Endpoints.** `internal/artifacts/core/build` implements the Builds API in research 22 §3.1, with
 the status codes and headers the CLI checks:
 - **`PUT /api/build`** accepts the `application/vnd.org.jfrog.artifactory+json` content type,
   answers 204 with no body, and sets `X-Checksum-Sha256` to the stored document's SHA-256,

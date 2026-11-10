@@ -1,0 +1,167 @@
+package storetest
+
+import (
+	"context"
+	"fmt"
+	"testing"
+
+	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/testkit/storekit"
+	"github.com/weaveplatform/artifactweave/internal/retention/core/model"
+	"github.com/weaveplatform/artifactweave/internal/retention/core/port"
+)
+
+// runArchive covers archive policies and executions (decision 0024).
+func runArchive(t *testing.T, newStore Factory) {
+	t.Run("ArchivePolicies", func(t *testing.T) { testArchivePolicies(t, newStore(t)) })
+	t.Run("ArchiveExecutions", func(t *testing.T) { testArchiveExecutions(t, newStore(t)) })
+}
+
+// fxPolicy builds an archive policy.
+func fxPolicy(key string, family model.ArchiveFamily) model.ArchivePolicy {
+	return model.ArchivePolicy{
+		Key:              key,
+		Family:           family,
+		Description:      "archive " + key,
+		Enabled:          true,
+		CronExp:          "0 0 2 * * ?",
+		ProjectKey:       "p1",
+		DurationMinutes:  60,
+		ExpirationMonths: 24,
+		SkipTrashcan:     true,
+		Criteria:         []byte(`{"repos":["libs-release"],"createdBeforeInMonths":12}`),
+		Created:          storekit.At(1),
+		Updated:          storekit.At(2),
+	}
+}
+
+func testArchivePolicies(t *testing.T, s port.Store) {
+	ctx := context.Background()
+	as := s.Archive()
+	p := fxPolicy("old-jars", model.ArchiveRetentionV1)
+	storekit.Must(t, as.CreatePolicy(ctx, p))
+	storekit.Same(t, "Policy", p, storekit.Get[model.ArchivePolicy](t)(as.Policy(ctx, "old-jars")))
+	storekit.WantErr(t, as.CreatePolicy(ctx, p), kernel.ErrConflict)
+	_, err := as.Policy(ctx, "nope")
+	storekit.WantErr(t, err, kernel.ErrNotFound)
+
+	p.Enabled, p.Criteria, p.Updated = false, nil, storekit.At(9)
+	storekit.Must(t, as.UpdatePolicy(ctx, p))
+	storekit.Same(
+		t,
+		"Policy after update",
+		p,
+		storekit.Get[model.ArchivePolicy](t)(as.Policy(ctx, "old-jars")),
+	)
+	storekit.WantErr(
+		t,
+		as.UpdatePolicy(ctx, fxPolicy("nope", model.ArchiveSmartV2)),
+		kernel.ErrNotFound,
+	)
+
+	storekit.Must(t, as.CreatePolicy(ctx, fxPolicy("Smart", model.ArchiveSmartV2)))
+	storekit.Must(t, as.CreatePolicy(ctx, fxPolicy("docker", model.ArchiveSmartV2)))
+	keys := func(f model.ArchiveFamily) []string {
+		policies := storekit.Get[[]model.ArchivePolicy](t)(as.Policies(ctx, f))
+		out := make([]string, 0, len(policies))
+		for _, v := range policies {
+			out = append(out, v.Key)
+		}
+		return out
+	}
+	storekit.Same(t, "Policies", []string{"Smart", "docker", "old-jars"}, keys(""))
+	storekit.Same(t, "Policies(v2)", []string{"Smart", "docker"}, keys(model.ArchiveSmartV2))
+
+	storekit.Must(t, as.DeletePolicy(ctx, "docker"))
+	_, err = as.Policy(ctx, "docker")
+	storekit.WantErr(t, err, kernel.ErrNotFound)
+	storekit.WantErr(t, as.DeletePolicy(ctx, "docker"), kernel.ErrNotFound)
+}
+
+func testArchiveExecutions(t *testing.T, s port.Store) {
+	ctx := context.Background()
+	as := s.Archive()
+	var created []model.ArchiveExecution
+	for i := 1; i <= 5; i++ {
+		e := model.ArchiveExecution{
+			PolicyKey:   []string{"a", "b"}[i%2],
+			Kind:        []model.ExecutionKind{model.ExecutionArchive, model.ExecutionRestore}[i/4],
+			State:       model.ExecutionInProgress,
+			Started:     storekit.At(i),
+			Total:       int64(10 * i),
+			Completed:   int64(i),
+			TotalBytes:  int64(1000 * i),
+			TriggeredBy: "scheduler",
+			Destination: []byte(fmt.Sprintf(`{"tier":"cold-%d"}`, i)),
+		}
+		got := storekit.Get[model.ArchiveExecution](t)(as.CreateExecution(ctx, e))
+		if got.ID <= 0 || (len(created) > 0 && got.ID <= created[len(created)-1].ID) {
+			t.Fatalf("execution ID %d not increasing", got.ID)
+		}
+		e.ID = got.ID
+		storekit.Same(t, "CreateExecution", e, got)
+		created = append(created, e)
+	}
+	storekit.Same(
+		t,
+		"Execution",
+		created[2],
+		storekit.Get[model.ArchiveExecution](t)(as.Execution(ctx, created[2].ID)),
+	)
+	_, err := as.Execution(ctx, created[4].ID+100)
+	storekit.WantErr(t, err, kernel.ErrNotFound)
+
+	done := created[2]
+	done.State, done.Finished, done.Completed, done.Failed = model.ExecutionCompleteWithErrors, storekit.At(
+		20,
+	), 28, 2
+	done.SuccessBytes, done.FailureBytes, done.Destination = 2900, 100, nil
+	storekit.Must(t, as.UpdateExecution(ctx, done))
+	storekit.Same(
+		t,
+		"Execution after update",
+		done,
+		storekit.Get[model.ArchiveExecution](t)(as.Execution(ctx, done.ID)),
+	)
+	missing := done
+	missing.ID = created[4].ID + 100
+	storekit.WantErr(t, as.UpdateExecution(ctx, missing), kernel.ErrNotFound)
+
+	ids := func(f port.ExecutionFilter) []int64 {
+		executions := storekit.Pages(
+			t,
+			2,
+			func(p kernel.Page) ([]model.ArchiveExecution, string, error) {
+				return as.Executions(ctx, f, p)
+			},
+		)
+		out := make([]int64, 0, len(executions))
+		for _, v := range executions {
+			out = append(out, v.ID)
+		}
+		return out
+	}
+	id := func(i int) int64 { return created[i-1].ID }
+	storekit.Same(
+		t,
+		"Executions",
+		[]int64{id(5), id(4), id(3), id(2), id(1)},
+		ids(port.ExecutionFilter{}),
+	)
+	storekit.Same(
+		t,
+		"Executions(policy b)",
+		[]int64{id(5), id(3), id(1)},
+		ids(port.ExecutionFilter{PolicyKey: "b"}),
+	)
+	storekit.Same(
+		t,
+		"Executions(restore)",
+		[]int64{id(5), id(4)},
+		ids(port.ExecutionFilter{Kind: model.ExecutionRestore}),
+	)
+	_, _, err = as.Executions(ctx, port.ExecutionFilter{}, kernel.Page{After: kernel.Cursor("x")})
+	storekit.WantErr(t, err, kernel.ErrInvalidCursor)
+	_, _, err = as.Executions(ctx, port.ExecutionFilter{}, kernel.Page{After: "%%%"})
+	storekit.WantErr(t, err, kernel.ErrInvalidCursor)
+}

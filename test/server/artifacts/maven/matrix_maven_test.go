@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
 )
 
 // The Maven calculateMetadata route requires all content actions on the

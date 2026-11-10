@@ -3,10 +3,10 @@ package npm_test
 import (
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	npmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
+	npmfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/npm"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 

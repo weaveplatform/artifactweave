@@ -13,10 +13,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	vcshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/vcs/http"
-	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	vcshttp "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/vcs/http"
+	"github.com/weaveplatform/artifactweave/internal/platform/testkit/repopath"
 )
 
 const vcsLegacyOID = "81305b86f97f1361e68f51397943eff6dd635520"
@@ -172,9 +172,9 @@ func testVCSLegacyProvider(t *testing.T, provider repo.VCSGitProvider) {
 					t.Fatal(err)
 				}
 			} else {
-				filename := "migration/artifacts/ecosystem/vcs/http/testdata/legacy-vcs-archive.tar.gz"
+				filename := "internal/artifacts/ecosystem/vcs/http/testdata/legacy-vcs-archive.tar.gz"
 				if q.Resource.Mutable {
-					filename = "migration/artifacts/ecosystem/vcs/http/testdata/legacy-vcs-readme.zip"
+					filename = "internal/artifacts/ecosystem/vcs/http/testdata/legacy-vcs-readme.zip"
 				}
 				data, err = os.ReadFile(repopath.Path(t, filename))
 				if err != nil {

@@ -41,24 +41,24 @@ version is not the introduction date of these fields.
 
 The source inspection for this design is against the P8 baseline:
 
-- **[S]** [repo.Config](../../migration/artifacts/api/repo/repo.go) has none of the three new
-  fields; [validation](../../migration/artifacts/api/repo/validate.go) requires `url` for every
+- **[S]** [repo.Config](../../internal/artifacts/api/repo/repo.go) has none of the three new
+  fields; [validation](../../internal/artifacts/api/repo/validate.go) requires `url` for every
   remote. JSON decoding ignores unknown fields, including through
-  [partial updates](../../migration/artifacts/core/repos/repos.go), so a successful ordinary URL-based
+  [partial updates](../../internal/artifacts/core/repos/repos.go), so a successful ordinary URL-based
   create/update does not prove these fields took effect. The
-  [descriptor parser](../../migration/configuration/core/descriptor/parse.go) rejects
+  [descriptor parser](../../internal/configuration/core/descriptor/parse.go) rejects
   unknown repository fields. This design changes neither behavior.
 - **[S]** [parity-baseline.json](../../api/parity-baseline.json) retains the three field
   gaps across create/update/read/batch/list shapes and both missing admin operations.
   Those operations have no authored routes; do not describe them as implemented or as
   deliberate successful empty lists.
-- **[S]** [ProjectStore](../../migration/access/core/port/projects.go) and
-  [RepositoryAssignment](../../migration/access/core/model/project.go) already hold ownership, environments,
+- **[S]** [ProjectStore](../../internal/access/core/port/projects.go) and
+  [RepositoryAssignment](../../internal/access/core/model/project.go) already hold ownership, environments,
   shares and a read-only flag. They do not model project-aware sharing mode, connection
-  identity or a monotonic authorization revision. [authz](../../migration/access/core/authz/authz.go)
+  identity or a monotonic authorization revision. [authz](../../internal/access/core/authz/authz.go)
   evaluates current identity/permission/token rules; that is not proof of P11 sharing
   administration or project-aware read enforcement.
-- **[S]** [pkgroute.Source](../../migration/artifacts/adapters/http/pkgroute/pkgroute.go) returns persisted
+- **[S]** [pkgroute.Source](../../internal/artifacts/adapters/http/pkgroute/pkgroute.go) returns persisted
   items. #616 extends that seam for remote metadata, queries and streams without importing
   server packages into formats. Ordinary item and Docker routes must use the same source
   policy even though their routing adapters differ.

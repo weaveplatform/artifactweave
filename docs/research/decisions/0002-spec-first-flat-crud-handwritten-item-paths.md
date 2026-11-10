@@ -27,7 +27,7 @@ service, bundled from `api/src/<service>/`: `api/artifactory.openapi.yaml`,
 `api/access.openapi.yaml` and `api/event.openapi.yaml`, and since P1b
 `api/distribution.openapi.yaml`, `api/pfed.openapi.yaml`, `api/grid.openapi.yaml` and
 `api/worker.openapi.yaml`. Each generates an oapi-codegen v2.8 strict chi server into
-`migration/platform/gen/<service>` and a Go client into `pkg/client/<service>`. The strict
+`internal/platform/gen/<service>` and a Go client into `pkg/client/<service>`. The strict
 servers cover the families whose operations have single-segment parameters and one
 response shape: repositories, the legacy security shims, Access v2 users, groups and
 permissions, tokens, roles, environments, projects, webhooks, cleanup policies and system.
@@ -35,8 +35,8 @@ permissions, tokens, roles, environments, projects, webhooks, cleanup policies a
 **Hand-written handlers for item paths.** Operations with multi-segment path parameters or
 mode-switch responses (artifact deploy and download, storage item info, properties, copy,
 move, zap, archive download, trash, replication status, Docker and the other package
-protocols, metadata PATCH) are chi handlers in `migration/artifacts/adapters/http` and
-`migration/artifacts/ecosystem/*`, mounted before the generated mux. They stay in the spec
+protocols, metadata PATCH) are chi handlers in `internal/artifacts/adapters/http` and
+`internal/artifacts/ecosystem/*`, mounted before the generated mux. They stay in the spec
 for documentation with the extension `x-handwritten: true`; a test asserts that the
 generated router never claims a path marked that way.
 
@@ -48,7 +48,7 @@ configuration PATCH.
 taken from the JFrog docs and from the JFrog CLI and Terraform provider sources. Handlers
 take their codes from that table, not from convention.
 
-**Error response profiles.** One table in `migration/platform/httpkit/apierror`, keyed by
+**Error response profiles.** One table in `internal/platform/httpkit/apierror`, keyed by
 profile. A profile selects the error envelope, response media type, and default
 authentication challenge. Several API surfaces can share a profile; JFrog Distribution and
 OCI registries have distinct profiles.
@@ -79,7 +79,7 @@ the import and export row the one their pages document, `errors[]` beside `error
 **Base URL resolver.** Embedded absolute URLs (npm `dist.tarball`, Helm `urls`, NuGet
 `@id`, Terraform `download_url`, Docker `Location` and `WWW-Authenticate` realm,
 file-info `uri` and `downloadUri`, repository `url`) come from one resolver in
-`migration/platform/httpkit/baseurl` with Artifactory's precedence (OSS 6.20
+`internal/platform/httpkit/baseurl` with Artifactory's precedence (OSS 6.20
 `HttpUtils.getServletContextUrl`, research 17; the 7.x
 [HTTP settings](https://docs.jfrog.com/installation/docs/http-settings) page documents the
 `X-JFrog-Override-Base-Url` header and the Custom Base URL but not their precedence, so the
@@ -100,7 +100,7 @@ used as written rather than with the request's scheme (DV-038).
 
 **Wire models and the linter.** JFrog's JSON mixes camelCase, snake_case and kebab-case,
 sometimes inside one struct, so per-package case rules cannot express it. The wire models
-live only in `migration/artifacts/api/repo` and `migration/kernel/wire`, and those
+live only in `internal/artifacts/api/repo` and `internal/kernel/wire`, and those
 packages are excluded from `tagliatelle`; everything else keeps the template rule.
 
 ```yaml
@@ -112,9 +112,9 @@ linters:
           json: snake
           yaml: snake
         overrides:
-          - pkg: migration/artifacts/api/repo
+          - pkg: internal/artifacts/api/repo
             ignore: true
-          - pkg: migration/kernel/wire
+          - pkg: internal/kernel/wire
             ignore: true
 ```
 
@@ -151,7 +151,7 @@ spec preserves one documented contract.
 
 ## Verification
 
-- Server-assembly tests (`migration/app` and `test/server`) start `httptest.NewServer` and
+- Server-assembly tests (`internal/app` and `test/server`) start `httptest.NewServer` and
   drive every flat operation through `pkg/client`.
 - A test walks `api/*.openapi.yaml` and asserts every `x-handwritten` path is absent from
   the generated router and present in the hand-written one.

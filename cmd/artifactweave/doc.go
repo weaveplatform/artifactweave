@@ -10,21 +10,21 @@
 // # Inputs
 //
 //   - Configuration from the file that --config names, the environment and
-//     the flags, with flag over environment over file; migration/app/config
+//     the flags, with flag over environment over file; internal/app/config
 //     rejects unknown keys. Secrets have no flags, so they stay out of shell
 //     history.
 //   - The subcommand and its arguments: serve; migrate up, down and version,
 //     which --module limits to one module's migration stream; config
 //     validate and apply; keys rotate; version.
 //   - The version, commit and build date stamped into
-//     migration/platform/buildinfo at link time (the -X flags in the Makefile
+//     internal/platform/buildinfo at link time (the -X flags in the Makefile
 //     and the release build).
 //
 // # Outputs
 //
 //   - The running server, schema migrations, a validated or applied
 //     configuration descriptor and a rotated master key, each done by
-//     migration/app.
+//     internal/app.
 //   - Logs through log/slog in the configured level and format. A failed
 //     command prints "error: " and the error on standard error and exits 1.
 //

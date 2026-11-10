@@ -13,24 +13,24 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
-	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/migration/platform/settings"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/registry"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
+	layout "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker"
+	dockerhttp "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker/http"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
+	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // The registry's own routing is tested in
-// migration/artifacts/ecosystem/docker/http; these rows and tests cover
+// internal/artifacts/ecosystem/docker/http; these rows and tests cover
 // what the server adds: authentication in front of it, the version header
 // on the middleware's answers, the mounting under both prefixes and the
 // reverse proxy read (#220).
@@ -45,7 +45,7 @@ const (
 )
 
 // The blob routes (#222), on the repository path; the router tests in
-// migration/artifacts/ecosystem/docker/http cover the other addressing
+// internal/artifacts/ecosystem/docker/http cover the other addressing
 // forms.
 const (
 	blobRoute    = "/v2/{repo}/{name}/blobs/{digest}"

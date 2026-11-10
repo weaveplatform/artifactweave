@@ -80,4 +80,4 @@ These are the pinned client definitions and executable evidence from which this 
 - Client pin: [test/acceptance/clients/hex.Dockerfile](../../test/acceptance/clients/hex.Dockerfile).
 - Evidence: [test/acceptance/features/hex.feature](../../test/acceptance/features/hex.feature).
 - Evidence: [test/acceptance/hex_steps_test.go](../../test/acceptance/hex_steps_test.go).
-- Evidence: [migration/access/core/authn/token.go](../../migration/access/core/authn/token.go).
+- Evidence: [internal/access/core/authn/token.go](../../internal/access/core/authn/token.go).

@@ -3,8 +3,8 @@ package terraformbackend_test
 import (
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/terraformstate"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/terraformstate"
 )
 
 // tfbeMatrixPart is the Terraform backend's share of the route × principal

@@ -8,11 +8,11 @@ import (
 
 	"github.com/cucumber/godog"
 
-	appsql "github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
-	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql/sqlite"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
+	appsql "github.com/weaveplatform/artifactweave/internal/app/adapters/sql"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/sql/sqlite"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob/fs"
 )
 
 func (w *world) registerCache(sc *godog.ScenarioContext) {

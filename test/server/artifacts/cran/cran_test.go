@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
-	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/platform/testkit/repopath"
 )
 
 func TestUnitCRANVirtualIndexFiltersUnreadablePackage(t *testing.T) {
@@ -26,7 +26,7 @@ func TestUnitCRANVirtualIndexFiltersUnreadablePackage(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	body := repopath.Read(t, "migration/artifacts/ecosystem/cran/testdata/assertthat_0.2.1.tar.gz")
+	body := repopath.Read(t, "internal/artifacts/ecosystem/cran/testdata/assertthat_0.2.1.tar.gz")
 	wantStatus(t, w.do("POST", "/artifactory/api/cran/cran-member/sources", "admin", string(body)),
 		http.StatusCreated)
 	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
@@ -71,7 +71,7 @@ func TestUnitCRANNativePOSTAndReindex(t *testing.T) {
 	if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
 		t.Fatal(err)
 	}
-	base := repopath.Path(t, "migration/artifacts/ecosystem/cran/testdata")
+	base := repopath.Path(t, "internal/artifacts/ecosystem/cran/testdata")
 	for _, tc := range []struct {
 		file, endpoint, path, index string
 	}{

@@ -1,53 +1,53 @@
 {
   "version": 2,
   "packages": {
-    "migration/access/adapters/http": "shared",
-    "migration/app": "shared",
-    "migration/artifacts/adapters/http": "shared",
-    "migration/artifacts/adapters/http/itemkit": "shared",
-    "migration/artifacts/adapters/http/pkgroute": "shared",
-    "migration/artifacts/ecosystem/agentplugins/http": "agentplugins",
-    "migration/artifacts/ecosystem/aieditorextensions/http": "aieditorextensions",
-    "migration/artifacts/ecosystem/alpine/http": "alpine",
-    "migration/artifacts/ecosystem/ansible/http": "ansible",
-    "migration/artifacts/ecosystem/bazelmodules/http": "bazelmodules",
-    "migration/artifacts/ecosystem/bower/http": "bower",
-    "migration/artifacts/ecosystem/cargo/http": "cargo",
-    "migration/artifacts/ecosystem/chef/http": "chef",
-    "migration/artifacts/ecosystem/cocoapods/http": "cocoapods",
-    "migration/artifacts/ecosystem/composer/http": "composer",
-    "migration/artifacts/ecosystem/conan/http": "conan",
-    "migration/artifacts/ecosystem/conda/http": "conda",
-    "migration/artifacts/ecosystem/cran/http": "cran",
-    "migration/artifacts/ecosystem/debian/http": "debian",
-    "migration/artifacts/ecosystem/docker/http": "docker",
-    "migration/artifacts/ecosystem/gems/http": "gems",
-    "migration/artifacts/ecosystem/gitlfs/http": "gitlfs",
-    "migration/artifacts/ecosystem/golang/http": "golang",
-    "migration/artifacts/ecosystem/helm/http": "helm",
-    "migration/artifacts/ecosystem/hex/http": "hex",
-    "migration/artifacts/ecosystem/huggingface/http": "huggingface",
-    "migration/artifacts/ecosystem/jetbrainsplugins/http": "jetbrainsplugins",
-    "migration/artifacts/ecosystem/luarocks/http": "luarocks",
-    "migration/artifacts/ecosystem/machinelearning/http": "machinelearning",
-    "migration/artifacts/ecosystem/maven/http": "maven",
-    "migration/artifacts/ecosystem/nimmodel/http": "nimmodel",
-    "migration/artifacts/ecosystem/nix/http": "nix",
-    "migration/artifacts/ecosystem/npm/http": "npm",
-    "migration/artifacts/ecosystem/nuget/http": "nuget",
-    "migration/artifacts/ecosystem/opkg/http": "opkg",
-    "migration/artifacts/ecosystem/p2/http": "p2",
-    "migration/artifacts/ecosystem/pub/http": "pub",
-    "migration/artifacts/ecosystem/puppet/http": "puppet",
-    "migration/artifacts/ecosystem/pypi/http": "pypi",
-    "migration/artifacts/ecosystem/rpm/http": "rpm",
-    "migration/artifacts/ecosystem/skills/http": "skills",
-    "migration/artifacts/ecosystem/swift/http": "swift",
-    "migration/artifacts/ecosystem/terraform/http": "terraform",
-    "migration/artifacts/ecosystem/terraformbackend/http": "terraformbackend",
-    "migration/artifacts/ecosystem/vagrant/http": "vagrant",
-    "migration/artifacts/ecosystem/vcs/http": "vcs",
-    "migration/configuration/adapters/http": "shared",
+    "internal/access/adapters/http": "shared",
+    "internal/app": "shared",
+    "internal/artifacts/adapters/http": "shared",
+    "internal/artifacts/adapters/http/itemkit": "shared",
+    "internal/artifacts/adapters/http/pkgroute": "shared",
+    "internal/artifacts/ecosystem/agentplugins/http": "agentplugins",
+    "internal/artifacts/ecosystem/aieditorextensions/http": "aieditorextensions",
+    "internal/artifacts/ecosystem/alpine/http": "alpine",
+    "internal/artifacts/ecosystem/ansible/http": "ansible",
+    "internal/artifacts/ecosystem/bazelmodules/http": "bazelmodules",
+    "internal/artifacts/ecosystem/bower/http": "bower",
+    "internal/artifacts/ecosystem/cargo/http": "cargo",
+    "internal/artifacts/ecosystem/chef/http": "chef",
+    "internal/artifacts/ecosystem/cocoapods/http": "cocoapods",
+    "internal/artifacts/ecosystem/composer/http": "composer",
+    "internal/artifacts/ecosystem/conan/http": "conan",
+    "internal/artifacts/ecosystem/conda/http": "conda",
+    "internal/artifacts/ecosystem/cran/http": "cran",
+    "internal/artifacts/ecosystem/debian/http": "debian",
+    "internal/artifacts/ecosystem/docker/http": "docker",
+    "internal/artifacts/ecosystem/gems/http": "gems",
+    "internal/artifacts/ecosystem/gitlfs/http": "gitlfs",
+    "internal/artifacts/ecosystem/golang/http": "golang",
+    "internal/artifacts/ecosystem/helm/http": "helm",
+    "internal/artifacts/ecosystem/hex/http": "hex",
+    "internal/artifacts/ecosystem/huggingface/http": "huggingface",
+    "internal/artifacts/ecosystem/jetbrainsplugins/http": "jetbrainsplugins",
+    "internal/artifacts/ecosystem/luarocks/http": "luarocks",
+    "internal/artifacts/ecosystem/machinelearning/http": "machinelearning",
+    "internal/artifacts/ecosystem/maven/http": "maven",
+    "internal/artifacts/ecosystem/nimmodel/http": "nimmodel",
+    "internal/artifacts/ecosystem/nix/http": "nix",
+    "internal/artifacts/ecosystem/npm/http": "npm",
+    "internal/artifacts/ecosystem/nuget/http": "nuget",
+    "internal/artifacts/ecosystem/opkg/http": "opkg",
+    "internal/artifacts/ecosystem/p2/http": "p2",
+    "internal/artifacts/ecosystem/pub/http": "pub",
+    "internal/artifacts/ecosystem/puppet/http": "puppet",
+    "internal/artifacts/ecosystem/pypi/http": "pypi",
+    "internal/artifacts/ecosystem/rpm/http": "rpm",
+    "internal/artifacts/ecosystem/skills/http": "skills",
+    "internal/artifacts/ecosystem/swift/http": "swift",
+    "internal/artifacts/ecosystem/terraform/http": "terraform",
+    "internal/artifacts/ecosystem/terraformbackend/http": "terraformbackend",
+    "internal/artifacts/ecosystem/vagrant/http": "vagrant",
+    "internal/artifacts/ecosystem/vcs/http": "vcs",
+    "internal/configuration/adapters/http": "shared",
     "test/server/access": "shared",
     "test/server/artifacts": "shared",
     "test/server/artifacts/agentpackages": "agentpackages",
@@ -80,7 +80,7 @@
     "test/server/configuration": "shared"
   },
   "shared_files": {
-    "migration/access/adapters/http": [
+    "internal/access/adapters/http": [
       "access_identity_internal_test.go",
       "authn_middleware_test.go",
       "fixture_test.go",
@@ -89,7 +89,7 @@
       "roles_internal_test.go",
       "tokens_internal_test.go"
     ],
-    "migration/app": [
+    "internal/app": [
       "access_api_test.go",
       "access_identity_status_test.go",
       "access_test.go",
@@ -135,7 +135,7 @@
       "tokens_status_test.go",
       "vcs_tables_test.go"
     ],
-    "migration/artifacts/adapters/http": [
+    "internal/artifacts/adapters/http": [
       "aql_related_test.go",
       "aql_transitive_peer_test.go",
       "aql_transitive_test.go",
@@ -148,13 +148,13 @@
       "storageinfo_test.go",
       "trash_handlers_test.go"
     ],
-    "migration/artifacts/adapters/http/itemkit": [
+    "internal/artifacts/adapters/http/itemkit": [
       "access_test.go",
       "items_test.go",
       "kit_test.go",
       "redirect_test.go"
     ],
-    "migration/configuration/adapters/http": [
+    "internal/configuration/adapters/http": [
       "descriptor_test.go",
       "reverseproxy_test.go",
       "service_id_test.go",
@@ -243,22 +243,22 @@
       "test/server/artifacts/repositories_format_class_test.go"
     ],
     "cargo": [
-      "migration/app/spec_test.go"
+      "internal/app/spec_test.go"
     ],
     "chef": [
-      "migration/app/status_chef_test.go"
+      "internal/app/status_chef_test.go"
     ],
     "composer": [
-      "migration/app/server_test.go"
+      "internal/app/server_test.go"
     ],
     "cran": [
-      "migration/app/status_cran_archive_test.go"
+      "internal/app/status_cran_archive_test.go"
     ],
     "docker": [
-      "migration/app/registry_shared_test.go"
+      "internal/app/registry_shared_test.go"
     ],
     "helm": [
-      "migration/app/reindex_internal_test.go",
+      "internal/app/reindex_internal_test.go",
       "test/server/artifacts/reindex_test.go",
       "test/server/artifacts/sidecar_rights_test.go"
     ],
@@ -266,13 +266,13 @@
       "test/server/artifacts/repositories_format_class_test.go"
     ],
     "huggingface": [
-      "migration/app/status_huggingface_xet_test.go"
+      "internal/app/status_huggingface_xet_test.go"
     ],
     "luarocks": [
       "test/server/artifacts/repositories_format_class_test.go"
     ],
     "machinelearning": [
-      "migration/app/status_machinelearning_test.go"
+      "internal/app/status_machinelearning_test.go"
     ],
     "maven": [
       "test/server/artifacts/searches_upstream_mapped_test.go",
@@ -282,19 +282,19 @@
       "test/server/artifacts/repositories_format_class_test.go"
     ],
     "nix": [
-      "migration/app/status_nix_test.go"
+      "internal/app/status_nix_test.go"
     ],
     "npm": [
-      "migration/app/error_profiles_p8_test.go"
+      "internal/app/error_profiles_p8_test.go"
     ],
     "nuget": [
       "test/server/artifacts/repositories_test.go"
     ],
     "puppet": [
-      "migration/app/status_puppet_test.go"
+      "internal/app/status_puppet_test.go"
     ],
     "pypi": [
-      "migration/app/reindex_internal_test.go",
+      "internal/app/reindex_internal_test.go",
       "test/server/artifacts/reindex_test.go"
     ],
     "terraform": [
@@ -303,7 +303,7 @@
       "test/server/artifacts/storage_list_test.go"
     ],
     "vcs": [
-      "migration/app/vcs_tables_test.go"
+      "internal/app/vcs_tables_test.go"
     ]
   }
 }

@@ -106,7 +106,7 @@
       ]
     },
     {
-      "path": "migration/artifacts/ecosystem/vcs/http/archive_git_test.go",
+      "path": "internal/artifacts/ecosystem/vcs/http/archive_git_test.go",
       "contains": [
         "TestUnitVCSRealGitArchivesValidateCommitAndRootlessPaths",
         "TestUnitVCSGlobalPAXMetadataCannotChangeEntryIdentity",
@@ -114,7 +114,7 @@
       ]
     },
     {
-      "path": "migration/artifacts/ecosystem/vcs/http/testdata/git-archives.json",
+      "path": "internal/artifacts/ecosystem/vcs/http/testdata/git-archives.json",
       "contains": [
         "git version 2.55.0",
         "81305b86f97f1361e68f51397943eff6dd635520",

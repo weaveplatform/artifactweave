@@ -24,7 +24,7 @@ env:
   # github.com/testcontainers/testcontainers-go/internal/config/config.go
   # and then skips connectReaper (docker.go). The emulators still terminate
   # through testcontainers.CleanupContainer at the end of each test; the one
-  # PostgreSQL container per test binary (migration/platform/sql/sqltest)
+  # PostgreSQL container per test binary (internal/platform/sql/sqltest)
   # lives until the runner is discarded. Local runs keep the reaper.
   TESTCONTAINERS_RYUK_DISABLED: 'true'
 
@@ -717,13 +717,13 @@ jobs:
           ARTIFACTWEAVE_SWIFT_IMAGE: artifactweave-accept-swift
         run: |
           timeout 10m bash -c 'until docker image inspect artifactweave-accept-swift >/dev/null 2>&1; do sleep 5; done'
-          go test ./migration/artifacts/ecosystem/swift/http -run '^TestAccSwiftPM' -count=1 -v
+          go test ./internal/artifacts/ecosystem/swift/http -run '^TestAccSwiftPM' -count=1 -v
 
       - name: Hugging Face Hub, Xet and legacy migration native acceptance
         if: needs.impact.outputs.profile == 'full' || needs.impact.outputs.owner == 'huggingface'
         run: |
           HF_CLIENT_PYTHON="$RUNNER_TEMP/huggingface-hub/bin/python" \
-            go test ./migration/artifacts/ecosystem/huggingface/http -run '^TestAccPinnedClient' -count=1 -timeout=5m -v
+            go test ./internal/artifacts/ecosystem/huggingface/http -run '^TestAccPinnedClient' -count=1 -timeout=5m -v
           HF_XET_PYTHON="$RUNNER_TEMP/huggingface-hub/bin/python" \
             go test ./test/server/artifacts/huggingface -run '^TestAccHuggingFaceNativeXet$' -count=1 -timeout=5m -v
 
@@ -739,7 +739,7 @@ jobs:
         if: needs.impact.outputs.profile == 'full' || contains(format(',{0},', needs.impact.outputs.clients), ',bazel,')
         env:
           ARTIFACTWEAVE_BAZEL_CLIENT: '1'
-        run: go test ./migration/artifacts/ecosystem/bazelmodules/http -run '^TestAccBazelClient$' -count=1 -timeout=7m -v
+        run: go test ./internal/artifacts/ecosystem/bazelmodules/http -run '^TestAccBazelClient$' -count=1 -timeout=7m -v
 
       - name: Record native client image identities
         if: always()

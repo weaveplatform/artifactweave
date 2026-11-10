@@ -62,5 +62,5 @@ These are the pinned client definitions and executable evidence from which this 
 - Evidence: [test/acceptance/features/huggingface.feature](../../test/acceptance/features/huggingface.feature).
 - Evidence: [test/acceptance/huggingface_steps_test.go](../../test/acceptance/huggingface_steps_test.go).
 - Evidence: [test/acceptance/features/huggingface_xet.feature](../../test/acceptance/features/huggingface_xet.feature).
-- Evidence: [migration/artifacts/ecosystem/huggingface/http/migration_test.go](../../migration/artifacts/ecosystem/huggingface/http/migration_test.go).
-- Evidence: [migration/artifacts/ecosystem/huggingface/http/migration_scope_test.go](../../migration/artifacts/ecosystem/huggingface/http/migration_scope_test.go).
+- Evidence: [internal/artifacts/ecosystem/huggingface/http/migration_test.go](../../internal/artifacts/ecosystem/huggingface/http/migration_test.go).
+- Evidence: [internal/artifacts/ecosystem/huggingface/http/migration_scope_test.go](../../internal/artifacts/ecosystem/huggingface/http/migration_scope_test.go).

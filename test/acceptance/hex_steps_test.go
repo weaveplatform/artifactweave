@@ -11,8 +11,8 @@ import (
 
 	"github.com/cucumber/godog"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
-	hexfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/hex"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
+	hexfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/hex"
 )
 
 func (w *world) registerHex(sc *godog.ScenarioContext) {
@@ -44,7 +44,7 @@ func (w *world) hexProjectPackage(repoKey, name, version string, files ...string
 	}
 	for _, file := range files {
 		fixture, err := os.ReadFile(
-			filepath.Join(repoRoot, "migration/artifacts/ecosystem/hex/testdata", file),
+			filepath.Join(repoRoot, "internal/artifacts/ecosystem/hex/testdata", file),
 		)
 		if err != nil {
 			return err
@@ -108,7 +108,7 @@ func (w *world) hexUpstreamPackagesWithLegacy(legacy bool, files ...string) erro
 	var decimalFixture []byte
 	for _, file := range files {
 		fixture, err := os.ReadFile(
-			filepath.Join(repoRoot, "migration/artifacts/ecosystem/hex/testdata", file),
+			filepath.Join(repoRoot, "internal/artifacts/ecosystem/hex/testdata", file),
 		)
 		if err != nil {
 			return err

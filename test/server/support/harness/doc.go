@@ -13,12 +13,12 @@
 //
 //   - Config values from the suites, and Tune functions that adjust one
 //     before the router is built.
-//   - The router and its configuration from migration/app (app.NewRouter
+//   - The router and its configuration from internal/app (app.NewRouter
 //     and app.RouterConfig); the seeding, password hashes and request
 //     helpers of test/server/support; an in-memory store and a file-system
 //     blob store.
-//   - The application runtime from migration/app (app.OpenRuntime) with the
-//     default configuration of migration/app/config, and a fake upstream
+//   - The application runtime from internal/app (app.OpenRuntime) with the
+//     default configuration of internal/app/config, and a fake upstream
 //     from the artifacts module's fakeupstream.
 //   - Root-relative fixture paths, which RepoFile resolves through
 //     platform/testkit/repopath.
@@ -50,13 +50,13 @@
 //
 // # Invariants
 //
-//   - test/server/support never imports this package. migration/app's
+//   - test/server/support never imports this package. internal/app's
 //     in-package tests import support, and this package imports
-//     migration/app, so the import would close a cycle.
-//   - migration/app's in-package tests never import this package: it imports
-//     migration/app, so the import would close a cycle.
+//     internal/app, so the import would close a cycle.
+//   - internal/app's in-package tests never import this package: it imports
+//     internal/app, so the import would close a cycle.
 //   - NewItemWorld builds the same world as newItemWorld, the in-package
-//     fixture of the router's guards in migration/app (fixtures_test.go),
+//     fixture of the router's guards in internal/app (fixtures_test.go),
 //     which keep their own copy because they cannot import this package. A
 //     change to one is made to the other.
 //
@@ -73,7 +73,7 @@
 //     TST (https://github.com/weaveplatform/artifactweave/issues/945).
 //   - https://github.com/weaveplatform/artifactweave/issues/997
 //   - https://github.com/weaveplatform/artifactweave/issues/1096 (App and
-//     RemoteWorld, for the suites that left migration/app).
+//     RemoteWorld, for the suites that left internal/app).
 //   - https://github.com/weaveplatform/artifactweave/issues/1097 (the router
 //     built through app.NewRouter).
 //

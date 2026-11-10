@@ -15,10 +15,10 @@ import (
 	"github.com/cucumber/godog"
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
-	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/kernel/wire"
 )
 
 // This controlled HTTP peer qualifies artifactweave behavior. Its replies are

@@ -11,11 +11,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
-	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	apmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/agentpackages"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
+	apmfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/agentpackages"
 	"github.com/weaveplatform/artifactweave/test/server/support/agentcommon"
 )
 

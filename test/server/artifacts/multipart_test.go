@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
-	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
-	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
+	accessmodule "github.com/weaveplatform/artifactweave/internal/access"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 

@@ -11,7 +11,7 @@ import (
 
 	"github.com/cucumber/godog"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
 )
 
 func (w *world) registerCRAN(sc *godog.ScenarioContext) {
@@ -39,7 +39,7 @@ func (w *world) cranRedirectArchive() error {
 }
 
 func cranTestdata(name string) string {
-	return filepath.Join(repoRoot, "migration/artifacts/ecosystem/cran/testdata", name)
+	return filepath.Join(repoRoot, "internal/artifacts/ecosystem/cran/testdata", name)
 }
 
 func (w *world) cranFixture(folder string) error {

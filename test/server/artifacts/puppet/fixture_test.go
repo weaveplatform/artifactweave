@@ -2,7 +2,7 @@ package puppet_test
 
 // This file holds the Puppet suite's fixtures: adapters over
 // test/server/support/harness under the names the tests had in
-// migration/app. The runtime and the router are the harness's, so a change
+// internal/app. The runtime and the router are the harness's, so a change
 // to their assembly reaches these tests without an edit here.
 
 import (
@@ -10,14 +10,14 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/app"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/app"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // remoteWorld is the harness's remote world under the fields the tests had
-// in migration/app: a test changes c and saves it with update, or replaces h
+// in internal/app: a test changes c and saves it with update, or replaces h
 // with a router built with other options.
 type remoteWorld struct {
 	t  *testing.T

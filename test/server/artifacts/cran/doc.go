@@ -16,7 +16,7 @@
 //     permission and eight local, remote and virtual repositories, with the
 //     request and seed helpers of test/server/support.
 //   - The CRAN assertthat fixtures in
-//     migration/artifacts/ecosystem/cran/testdata, read root-relative
+//     internal/artifacts/ecosystem/cran/testdata, read root-relative
 //     through repopath, remote sources over stub backends (sourceIdentity,
 //     sourceBackend), and archives from support.TarGz (conanTestArchive).
 //
@@ -49,6 +49,6 @@
 //
 // Implemented P9c (the plan's P32 group). P9d moved the router-level tests
 // here from the server root (TST-06), and the tests that call the protocol's
-// unexported code moved with it to migration/artifacts/ecosystem/cran/http
+// unexported code moved with it to internal/artifacts/ecosystem/cran/http
 // (WEB-15).
 package cran

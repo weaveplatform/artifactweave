@@ -13,7 +13,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/weaveplatform/artifactweave/migration/devtools/specoracle"
+	"github.com/weaveplatform/artifactweave/internal/devtools/specoracle"
 )
 
 // Indexes are the llms.txt files of every API family in scope (research 01).

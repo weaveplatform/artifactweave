@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
-	"github.com/weaveplatform/artifactweave/migration/access/api"
-	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 )
 
 const promotionType = "application/vnd.org.jfrog.artifactory.build.PromotionRequest+json"

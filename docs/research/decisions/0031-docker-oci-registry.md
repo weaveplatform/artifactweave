@@ -19,14 +19,14 @@ holds the facts, and its section numbers are cited below as R23.
 
 ### Packages and protocol version
 
-The registry's HTTP layer is `migration/artifacts/ecosystem/docker/http`: the routes of
+The registry's HTTP layer is `internal/artifacts/ecosystem/docker/http`: the routes of
 decision 0003, the token challenge, the protocol handlers and the error envelope, mounted
 before the generated servers (decision
 [0002](0002-spec-first-flat-crud-handwritten-item-paths.md)). The storage layout, manifest
 parsing and validation, the properties set on manifests and the package-index hooks are
-`migration/artifacts/ecosystem/docker`, which never imports the router in `migration/app`.
-Upload sessions and the items they finish are `migration/artifacts/core/registry`: they
-store items through the item service, which imports `migration/artifacts/core/format`, so a
+`internal/artifacts/ecosystem/docker`, which never imports the router in `internal/app`.
+Upload sessions and the items they finish are `internal/artifacts/core/registry`: they
+store items through the item service, which imports `internal/artifacts/core/format`, so a
 format package cannot hold them without an import cycle. One code path serves the `docker`,
 `oci` and `helmoci` package types.
 
@@ -109,7 +109,7 @@ operations under `/artifactory/api/docker/<repo>/v2/` that are not registry oper
   the download redirect policy of decision [0029](0029-cdn-delivery-and-download-redirect.md),
   which Artifactory applies to Docker too (research 19). `HEAD` never redirects. Both send
   `Docker-Content-Digest`, `Content-Length` and `Accept-Ranges: bytes`.
-- **Uploads.** `POST .../blobs/uploads/` opens a session in `migration/platform/blob/session`
+- **Uploads.** `POST .../blobs/uploads/` opens a session in `internal/platform/blob/session`
   recorded in the `uploads` store, and answers 202 with an absolute `Location` from the
   base-URL resolver, `Range: 0-0` and `Docker-Upload-UUID`. `OCI-Chunk-Min-Length` is sent
   only when the blob backend needs a minimum part size. With `?digest=` and a body the upload

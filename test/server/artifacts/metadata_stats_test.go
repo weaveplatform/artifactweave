@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 )
 
 // PATCH /api/metadata takes props, stats or both, and refuses a body with

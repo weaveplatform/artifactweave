@@ -85,11 +85,11 @@ func TestUnitServerTestChangesFailClosed(t *testing.T) {
 		change change
 		reason string
 	}{
-		{"new root test", change{status: "A", path: "migration/app/new_test.go"}, "New, removed or moved"},
+		{"new root test", change{status: "A", path: "internal/app/new_test.go"}, "New, removed or moved"},
 		{"new format test", change{status: "A", path: "test/server/artifacts/npm/new_test.go"}, "New, removed or moved"},
-		{"unknown root test", change{status: "M", path: "migration/app/unknown_test.go"}, "Unmapped"},
+		{"unknown root test", change{status: "M", path: "internal/app/unknown_test.go"}, "Unmapped"},
 		{"unknown package", change{status: "M", path: "test/server/newformat/routes_test.go"}, "Unmapped"},
-		{"moved test", change{status: "R100", old: "migration/app/status_test.go", path: "test/server/artifacts/npm/status_test.go"}, "New, removed or moved"},
+		{"moved test", change{status: "R100", old: "internal/app/status_test.go", path: "test/server/artifacts/npm/status_test.go"}, "New, removed or moved"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got := classify([]change{tc.change})
@@ -104,7 +104,7 @@ func TestUnitServerTestChangesFailClosed(t *testing.T) {
 		owner != "agentpackages" {
 		t.Fatalf("agent package ownership = %q, %v", owner, ok)
 	}
-	if owner, ok := serverTestOwner("migration/app/status_test.go"); !ok || owner != "shared" {
+	if owner, ok := serverTestOwner("internal/app/status_test.go"); !ok || owner != "shared" {
 		t.Fatalf("root status ownership = %q, %v", owner, ok)
 	}
 }
@@ -114,20 +114,20 @@ func TestUnitOwnershipV2RejectsInvalidInventories(t *testing.T) {
 		return testOwnership{
 			Version: 2,
 			Packages: map[string]string{
-				"migration/access/adapters/http":         "shared",
-				"migration/app":                          "shared",
-				"migration/artifacts/ecosystem/npm/http": "npm",
-				"test/server/artifacts/npm":              "npm",
-				"test/server/artifacts/widget":           "widget",
+				"internal/access/adapters/http":         "shared",
+				"internal/app":                          "shared",
+				"internal/artifacts/ecosystem/npm/http": "npm",
+				"test/server/artifacts/npm":             "npm",
+				"test/server/artifacts/widget":          "widget",
 			},
 			SharedFiles: map[string][]string{
-				"migration/app": {"npm_paths_test.go", "router_test.go", "status_test.go"},
+				"internal/app": {"npm_paths_test.go", "router_test.go", "status_test.go"},
 			},
 			FormatDependencies: map[string][]string{
-				"npm": {"migration/app/npm_paths_test.go", "migration/app/router_test.go"},
+				"npm": {"internal/app/npm_paths_test.go", "internal/app/router_test.go"},
 				// A non-shared package owner may hold dependencies before the
 				// formats map knows it.
-				"widget": {"migration/app/router_test.go"},
+				"widget": {"internal/app/router_test.go"},
 			},
 		}
 	}
@@ -153,10 +153,10 @@ func TestUnitOwnershipV2RejectsInvalidInventories(t *testing.T) {
 			o.Packages["internal/legacy/xyz"] = "npm"
 		}, "invalid test package owner"},
 		{"staged ecosystem package outside http", func(o *testOwnership) {
-			o.Packages["migration/artifacts/ecosystem/npm"] = "npm"
+			o.Packages["internal/artifacts/ecosystem/npm"] = "npm"
 		}, "invalid test package owner"},
 		{"app subdirectory", func(o *testOwnership) {
-			o.Packages["migration/app/apptest"] = "shared"
+			o.Packages["internal/app/apptest"] = "shared"
 		}, "invalid test package owner"},
 		{"unclean package key", func(o *testOwnership) {
 			o.Packages["test/server/artifacts/npm/"] = "npm"
@@ -167,7 +167,7 @@ func TestUnitOwnershipV2RejectsInvalidInventories(t *testing.T) {
 		{"shared files without a package", func(o *testOwnership) {
 			// The final root's app directory, which valid does not list, in
 			// two parts: written whole, it is also the legacy path that
-			// WEB-18 moved to migration/app, which pkgmove's stale check
+			// WEB-18 moved to internal/app, which pkgmove's stale check
 			// reports until promotion moves the composition root back there.
 			o.SharedFiles["internal"+"/app"] = []string{"app_test.go"}
 		}, "invalid shared test directory"},
@@ -175,25 +175,25 @@ func TestUnitOwnershipV2RejectsInvalidInventories(t *testing.T) {
 			o.SharedFiles["test/server/artifacts/npm"] = []string{"publish_test.go"}
 		}, "invalid shared test directory"},
 		{"empty shared files", func(o *testOwnership) {
-			o.SharedFiles["migration/access/adapters/http"] = []string{}
+			o.SharedFiles["internal/access/adapters/http"] = []string{}
 		}, "invalid shared test directory"},
 		{"shared file with a directory", func(o *testOwnership) {
-			o.SharedFiles["migration/app"] = append(o.SharedFiles["migration/app"], "npm/x_test.go")
+			o.SharedFiles["internal/app"] = append(o.SharedFiles["internal/app"], "npm/x_test.go")
 		}, "invalid shared test file"},
 		{"shared file that is not a test", func(o *testOwnership) {
-			o.SharedFiles["migration/app"] = append(o.SharedFiles["migration/app"], "router.go")
+			o.SharedFiles["internal/app"] = append(o.SharedFiles["internal/app"], "router.go")
 		}, "invalid shared test file"},
 		{"empty shared file name", func(o *testOwnership) {
-			o.SharedFiles["migration/app"] = append(o.SharedFiles["migration/app"], "")
+			o.SharedFiles["internal/app"] = append(o.SharedFiles["internal/app"], "")
 		}, "invalid shared test file"},
 		{"duplicate shared file", func(o *testOwnership) {
-			o.SharedFiles["migration/app"] = append(o.SharedFiles["migration/app"], "status_test.go")
+			o.SharedFiles["internal/app"] = append(o.SharedFiles["internal/app"], "status_test.go")
 		}, "invalid shared test file"},
 		{"shared dependency owner", func(o *testOwnership) {
-			o.FormatDependencies["shared"] = []string{"migration/app/status_test.go"}
+			o.FormatDependencies["shared"] = []string{"internal/app/status_test.go"}
 		}, "invalid format dependency owner"},
 		{"unknown dependency owner", func(o *testOwnership) {
-			o.FormatDependencies["newformat"] = []string{"migration/app/status_test.go"}
+			o.FormatDependencies["newformat"] = []string{"internal/app/status_test.go"}
 		}, "invalid format dependency owner"},
 		{"empty dependencies", func(o *testOwnership) {
 			o.FormatDependencies["npm"] = []string{}
@@ -202,15 +202,15 @@ func TestUnitOwnershipV2RejectsInvalidInventories(t *testing.T) {
 			o.FormatDependencies["npm"] = []string{"test/server/artifacts/npm/publish_test.go"}
 		}, "is not a listed shared test"},
 		{"unlisted dependency", func(o *testOwnership) {
-			o.FormatDependencies["npm"] = []string{"migration/app/unknown_test.go"}
+			o.FormatDependencies["npm"] = []string{"internal/app/unknown_test.go"}
 		}, "is not a listed shared test"},
 		{"bare dependency name", func(o *testOwnership) {
 			o.FormatDependencies["npm"] = []string{"npm_paths_test.go"}
 		}, "is not a listed shared test"},
 		{"duplicate dependency", func(o *testOwnership) {
 			o.FormatDependencies["npm"] = []string{
-				"migration/app/npm_paths_test.go",
-				"migration/app/npm_paths_test.go",
+				"internal/app/npm_paths_test.go",
+				"internal/app/npm_paths_test.go",
 			}
 		}, "duplicate format dependency"},
 	} {
@@ -224,7 +224,7 @@ func TestUnitOwnershipV2RejectsInvalidInventories(t *testing.T) {
 		})
 	}
 	for name, data := range map[string]string{
-		"version 1 file": `{"version": 1, "packages": {"migration/app": "shared"},
+		"version 1 file": `{"version": 1, "packages": {"internal/app": "shared"},
 			"root_files": ["status_test.go"], "root_format_dependencies": {},
 			"app_format_dependencies": {}}`,
 		"version 1 key beside version 2": `{"version": 2, "packages": {}, "root_files": []}`,
@@ -258,9 +258,9 @@ func useTestOwnership(t *testing.T, inventory testOwnership) {
 func TestUnitSharedFilesFollowRootTestMoves(t *testing.T) {
 	root := t.TempDir()
 	for file, source := range map[string]string{
-		"migration/app/status_test.go":                      "package app\nfunc TestAccStatus() {}\n",
-		"migration/app/registry_shared_test.go":             "package app\nfunc TestAccRegistryShared() {}\n",
-		"migration/artifacts/ecosystem/npm/tarball_test.go": "package npm\nfunc TestUnitTarball() {}\n",
+		"internal/app/status_test.go":                      "package app\nfunc TestAccStatus() {}\n",
+		"internal/app/registry_shared_test.go":             "package app\nfunc TestAccRegistryShared() {}\n",
+		"internal/artifacts/ecosystem/npm/tarball_test.go": "package npm\nfunc TestUnitTarball() {}\n",
 		"test/server/artifacts/npm/npm_paths_test.go": "package npm\n" +
 			"func TestUnitNPMAuthPaths() {}\nfunc TestAccNPMAuthPaths() {}\n",
 	} {
@@ -274,23 +274,23 @@ func TestUnitSharedFilesFollowRootTestMoves(t *testing.T) {
 	}
 	useTestOwnership(t, testOwnership{
 		Version:  2,
-		Packages: map[string]string{"migration/app": "shared"},
-		SharedFiles: map[string][]string{"migration/app": {
+		Packages: map[string]string{"internal/app": "shared"},
+		SharedFiles: map[string][]string{"internal/app": {
 			"npm_paths_test.go", "registry_shared_test.go", "status_test.go",
 		}},
 		FormatDependencies: map[string][]string{
-			"docker": {"migration/app/registry_shared_test.go"},
-			"npm":    {"migration/app/npm_paths_test.go"},
+			"docker": {"internal/app/registry_shared_test.go"},
+			"npm":    {"internal/app/npm_paths_test.go"},
 		},
 	})
-	owner, ok := serverTestOwner("migration/app/npm_paths_test.go")
+	owner, ok := serverTestOwner("internal/app/npm_paths_test.go")
 	if !ok || owner != "shared" {
 		t.Fatalf("root test before the move = %q, %t", owner, ok)
 	}
 	before := proposeAffected(
-		[]change{{status: "M", path: "migration/artifacts/ecosystem/npm/tarball.go"}},
+		[]change{{status: "M", path: "internal/artifacts/ecosystem/npm/tarball.go"}},
 	)
-	if !before.hasSharedTests || !slices.Contains(before.units, "./migration/app") {
+	if !before.hasSharedTests || !slices.Contains(before.units, "./internal/app") {
 		t.Fatalf("npm plan before the move omitted its root dependency: %+v", before)
 	}
 	// The move: the name leaves shared_files, its directory gains a package
@@ -298,32 +298,32 @@ func TestUnitSharedFilesFollowRootTestMoves(t *testing.T) {
 	useTestOwnership(t, testOwnership{
 		Version: 2,
 		Packages: map[string]string{
-			"migration/app":             "shared",
+			"internal/app":              "shared",
 			"test/server/artifacts/npm": "npm",
 		},
-		SharedFiles: map[string][]string{"migration/app": {
+		SharedFiles: map[string][]string{"internal/app": {
 			"registry_shared_test.go", "status_test.go",
 		}},
 		FormatDependencies: map[string][]string{
-			"docker": {"migration/app/registry_shared_test.go"},
+			"docker": {"internal/app/registry_shared_test.go"},
 		},
 	})
 	for file, want := range map[string]string{
 		"test/server/artifacts/npm/npm_paths_test.go": "npm",
-		"migration/app/status_test.go":                "shared",
-		"migration/app/registry_shared_test.go":       "shared",
+		"internal/app/status_test.go":                 "shared",
+		"internal/app/registry_shared_test.go":        "shared",
 	} {
 		if owner, ok := serverTestOwner(file); !ok || owner != want {
 			t.Errorf("%s owner = %q, %t; want %q", file, owner, ok, want)
 		}
 	}
-	if _, ok := serverTestOwner("migration/app/npm_paths_test.go"); ok {
+	if _, ok := serverTestOwner("internal/app/npm_paths_test.go"); ok {
 		t.Error("a test recreated under its old root name is classified without review")
 	}
 	for _, c := range []change{
-		{status: "M", path: "migration/app/npm_paths_test.go"},
+		{status: "M", path: "internal/app/npm_paths_test.go"},
 		{status: "A", path: "test/server/artifacts/npm/new_test.go"},
-		{status: "R100", old: "migration/app/status_test.go", path: "test/server/artifacts/npm/status_test.go"},
+		{status: "R100", old: "internal/app/status_test.go", path: "test/server/artifacts/npm/status_test.go"},
 	} {
 		if got := classify([]change{c}); got.profile != "full" {
 			t.Errorf("%+v selected %+v", c, got)
@@ -336,7 +336,7 @@ func TestUnitSharedFilesFollowRootTestMoves(t *testing.T) {
 	npm := proposeAffected([]change{moved})
 	if npm.profile != "format" || npm.owner != "npm" || npm.hasSharedTests ||
 		!slices.Contains(npm.units, "./test/server/artifacts/npm") ||
-		slices.Contains(npm.units, "./migration/app") {
+		slices.Contains(npm.units, "./internal/app") {
 		t.Fatalf("npm plan after the move: %+v", npm)
 	}
 	selection, err := scanKinds(root, plan{profile: "format", candidate: npm})
@@ -348,21 +348,21 @@ func TestUnitSharedFilesFollowRootTestMoves(t *testing.T) {
 		names = append(names, entry.Package+" "+entry.Name)
 	}
 	if want := []string{
-		"./migration/artifacts/ecosystem/npm TestUnitTarball",
+		"./internal/artifacts/ecosystem/npm TestUnitTarball",
 		"./test/server/artifacts/npm TestAccNPMAuthPaths",
 		"./test/server/artifacts/npm TestUnitNPMAuthPaths",
 	}; !slices.Equal(names, want) {
 		t.Fatalf("npm selection after the move = %q, want %q", names, want)
 	}
 	docker := proposeAffected(
-		[]change{{status: "M", path: "migration/artifacts/ecosystem/docker/handler.go"}},
+		[]change{{status: "M", path: "internal/artifacts/ecosystem/docker/handler.go"}},
 	)
 	selection, err = scanKinds(root, plan{profile: "format", candidate: docker})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !docker.hasSharedTests || len(selection.Selected) != 1 ||
-		selection.Selected[0].Source != "migration/app/registry_shared_test.go" {
+		selection.Selected[0].Source != "internal/app/registry_shared_test.go" {
 		t.Fatalf("the remaining root dependency is not selected alone: %+v, %+v", docker, selection)
 	}
 }

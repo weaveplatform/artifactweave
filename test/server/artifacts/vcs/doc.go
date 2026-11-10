@@ -17,7 +17,7 @@
 //     permission and eight local, remote and virtual repositories, with the
 //     request and seed helpers of test/server/support.
 //   - Remote sources over stub backends (sourceIdentity, sourceBackend) and
-//     the archives in migration/artifacts/ecosystem/vcs/http/testdata, read
+//     the archives in internal/artifacts/ecosystem/vcs/http/testdata, read
 //     root-relative through repopath; vcsTableCases, a copy of the root's
 //     route table.
 //   - curl, when present: TestAccVCSRemoteRESTAndSubgroup sends its native
@@ -56,6 +56,6 @@
 //
 // Implemented P9c (the plan's P33 group). P9d moved the router-level tests
 // here from the server root (TST-06), and the tests that call the protocol's
-// unexported code moved with it to migration/artifacts/ecosystem/vcs/http
+// unexported code moved with it to internal/artifacts/ecosystem/vcs/http
 // (WEB-16).
 package vcs

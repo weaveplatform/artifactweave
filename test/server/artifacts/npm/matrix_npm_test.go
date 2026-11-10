@@ -3,8 +3,8 @@ package npm_test
 import (
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/access/api"
-	npmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	npmfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/npm"
 )
 
 // npmMatrixPart is npm's share of the route × principal matrix, which

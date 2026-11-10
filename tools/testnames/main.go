@@ -24,17 +24,17 @@ var roots = []string{"api", "internal", "migration", "pkg", "test", "tools"}
 // Go reserves TestMain and Fuzz names. They are reviewed exceptions with
 // explicit CI owners; new hooks or fuzz targets require a policy update.
 var testMainOwners = map[string]string{
-	"migration/access/core/authn/auth_test.go:TestMain":   "three-OS Go test matrix",
-	"migration/devtools/pkgmove/pkgmove_test.go:TestMain": "three-OS Go test matrix",
-	"test/acceptance/acceptance_test.go:TestMain":         "Linux native acceptance",
-	"test/platform/harness_test.go:TestMain":              "real-cloud platform scenarios",
+	"internal/access/core/authn/auth_test.go:TestMain":   "three-OS Go test matrix",
+	"internal/devtools/pkgmove/pkgmove_test.go:TestMain": "three-OS Go test matrix",
+	"test/acceptance/acceptance_test.go:TestMain":        "Linux native acceptance",
+	"test/platform/harness_test.go:TestMain":             "real-cloud platform scenarios",
 }
 
 var fuzzOwners = map[string]string{
-	"migration/artifacts/ecosystem/huggingface/xet/codec_test.go:FuzzXetWireParsing": "three-OS Go test matrix (seed corpus)",
-	"migration/artifacts/ecosystem/nuget/pdb_test.go:FuzzPDBKey":                     "three-OS Go test matrix (seed corpus)",
-	"migration/kernel/antpath/pattern_test.go:FuzzPatternMatch":                      "three-OS Go test matrix (seed corpus)",
-	"migration/kernel/scope_test.go:FuzzParseScope":                                  "three-OS Go test matrix (seed corpus)",
+	"internal/artifacts/ecosystem/huggingface/xet/codec_test.go:FuzzXetWireParsing": "three-OS Go test matrix (seed corpus)",
+	"internal/artifacts/ecosystem/nuget/pdb_test.go:FuzzPDBKey":                     "three-OS Go test matrix (seed corpus)",
+	"internal/kernel/antpath/pattern_test.go:FuzzPatternMatch":                      "three-OS Go test matrix (seed corpus)",
+	"internal/kernel/scope_test.go:FuzzParseScope":                                  "three-OS Go test matrix (seed corpus)",
 }
 
 type testEntry struct {

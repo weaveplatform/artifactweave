@@ -17,8 +17,8 @@ import (
 
 	"github.com/cucumber/godog"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
-	condafmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conda"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
+	condafmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/conda"
 )
 
 const condaFixtureName = "artifactweave-conda-fixture-1.0.0-0.tar.bz2"
@@ -48,7 +48,7 @@ func (w *world) copyModernCondaPackage(folder string) error {
 	}
 	const name = "ca-certificates-2026.7.22-hbd8a1cb_0.conda"
 	body, err := os.ReadFile(
-		filepath.Join(repoRoot, "migration/artifacts/ecosystem/conda/testdata", name),
+		filepath.Join(repoRoot, "internal/artifacts/ecosystem/conda/testdata", name),
 	)
 	if err != nil {
 		return err
@@ -65,7 +65,7 @@ func (w *world) copyModernCondaPackage(folder string) error {
 
 func condaFixture() ([]byte, error) {
 	return os.ReadFile(
-		filepath.Join(repoRoot, "migration/artifacts/ecosystem/conda/testdata", condaFixtureName),
+		filepath.Join(repoRoot, "internal/artifacts/ecosystem/conda/testdata", condaFixtureName),
 	)
 }
 
@@ -185,7 +185,7 @@ func (w *world) condaUpstreamAddsModern() error {
 		return err
 	}
 	modernBody, err := os.ReadFile(
-		filepath.Join(repoRoot, "migration/artifacts/ecosystem/conda/testdata", modern),
+		filepath.Join(repoRoot, "internal/artifacts/ecosystem/conda/testdata", modern),
 	)
 	if err != nil {
 		return err

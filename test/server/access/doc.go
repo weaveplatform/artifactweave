@@ -19,7 +19,7 @@
 //     password is "pw", and the anonymous access setting, which a case turns
 //     on.
 //   - The worlds of fixture_test.go, which keep the names of the router
-//     guards' fixtures in migration/app: the harness's item world
+//     guards' fixtures in internal/app: the harness's item world
 //     (newItemWorld); the guards' status fixture's users, repositories, key
 //     pairs, permissions, items and tokens (statusFixture), without what only
 //     the format, build, search, overwrite and multipart rows need; the token

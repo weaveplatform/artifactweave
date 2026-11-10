@@ -136,7 +136,7 @@ this is not a claim that every child resource has been individually charged.
 
 Management mutations, search, build operations, archive/import/export, VCS, trash,
 legacy full repository/identity collections, reindex and deep file lists receive
-the expensive classification in `migration/app/limits.go`. They have
+the expensive classification in `internal/app/limits.go`. They have
 shared limits of 6000 requests per minute globally and 600 per principal, plus
 32 concurrent requests per process and 16 per principal. These defaults allow
 normal provider provisioning batches, including Terraform's ten concurrent

@@ -70,7 +70,7 @@ properties.
 
 **Format errors.** A format refuses with `format.RejectionError{Status, Message}`. The item
 kit's `ItemError` maps it to that status, in the envelope of the surface the request arrived
-on. Formats still never import the router in `migration/app`.
+on. Formats still never import the router in `internal/app`.
 
 **Source transfer restrictions** (amended 2026-10-28, #777). The optional
 `TransferSourceGuard` belongs to the source format; target `Inspect` and `Admit`
@@ -179,7 +179,7 @@ option. CDN metadata remains the authoritative package index. The
 and cold/offline native-client evidence.
 
 Native archive admission validates the physical ZIP entry layout as well as its
-central directory through `migration/platform/archivecheck`, so the server and client
+central directory through `internal/platform/archivecheck`, so the server and client
 extractors cannot see different filenames or hidden entries. Tar limits count
 the full decompressed stream, including PAX/GNU metadata that `tar.Reader` consumes
 internally. These checks apply to both uploaded and remotely cached pod content.
@@ -229,7 +229,7 @@ uses one.
 
 **The protocol router kit.** Formats with a protocol of their own (npm and Go in P7, then
 PyPI, NuGet, Helm and Terraform) mount through one kit,
-`migration/artifacts/adapters/http/pkgroute`, as Docker's registry does today (decision
+`internal/artifacts/adapters/http/pkgroute`, as Docker's registry does today (decision
 0031):
 - `Mount` claims `/artifactory/api/<type>/{repoKey}/...` before the generated servers, and
   leaves the JFrog operations at fixed literals beside it (such as `.../reindex`) to them.
@@ -332,7 +332,7 @@ These assignments describe planned work, not current runtime support.
 
 ## Verification
 
-- `migration/artifacts/core/formattest` runs every format against the same contract on the
+- `internal/artifacts/core/formattest` runs every format against the same contract on the
   in-memory, SQLite and PostgreSQL stores: the index is right after deploy, overwrite, delete, copy,
   move and restore, and a reindex reproduces it (#268). Two options of the fixture cover P8
   (#533):
@@ -350,13 +350,13 @@ These assignments describe planned work, not current runtime support.
   The suite's own tests run a test format with each option and with both, and show that it
   catches a format that keys per-repository work by package, forgets it on a move, leaves a
   sidecar behind, or links one.
-- `migration/artifacts/core/item` and `migration/artifacts/core/trash` test `SidecarKeeper`
+- `internal/artifacts/core/item` and `internal/artifacts/core/trash` test `SidecarKeeper`
   through each write, with store faults, and a sidecar that cannot land holding its owner
   back (#533).
 - Unit and fault tests for each optional interface, `Derive` and the `RejectionError` mapping
   (#267).
 - A test-only format exercises every part of the router kit (#269).
-- `migration/app`'s `TestAccP8ProtocolPaths` holds a path of each P8 protocol to the
+- `internal/app`'s `TestAccP8ProtocolPaths` holds a path of each P8 protocol to the
   catch-all's 404 until the format mounts the protocol, and then to the kit's 404 in the
   protocol's own envelope, so no format's pull request edits it (#533).
 - Every read path refuses a blacked-out repository and an excluded path, in unit tests and

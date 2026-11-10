@@ -10,16 +10,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
-	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
-	artport "github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
-	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	artport "github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
+	artgen "github.com/weaveplatform/artifactweave/internal/platform/gen/artifactory"
 )
 
 // faultyStore fails the repository operations named in fail with errBoom.
@@ -622,7 +622,7 @@ func TestAccUpdateKeepsTheKey(t *testing.T) {
 }
 
 // The package type enumerations the OpenAPI document gives each class are
-// the types migration/artifacts/api/repo accepts for it, in its order.
+// the types internal/artifacts/api/repo accepts for it, in its order.
 func TestAccPackageTypeEnumsMatchTheAcceptedTypes(t *testing.T) {
 	doc := loadSpec(t, "artifactory.openapi.yaml")
 	for class, name := range map[repo.Class]string{

@@ -15,8 +15,8 @@ import (
 	"time"
 
 	"github.com/oapi-codegen/runtime"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/kernel/wire"
 )
 
 // Defines values for ArchiveCriterionOperator.

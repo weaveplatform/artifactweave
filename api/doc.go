@@ -5,7 +5,7 @@
 // # Role
 //
 // Public API specification, outside the modules: the documents are the
-// source of the generated strict servers in migration/platform/gen and of the
+// source of the generated strict servers in internal/platform/gen and of the
 // public clients in pkg/client, and the package keeps its path through the
 // modular-monolith migration.
 //
@@ -25,7 +25,7 @@
 //     register a 501 route for every hand-written operation that has no
 //     handler yet. The generated strict servers get that from stubgen;
 //     hand-written routes need the spec itself.
-//   - The documents that make generate turns into migration/platform/gen and
+//   - The documents that make generate turns into internal/platform/gen and
 //     pkg/client; make verify-generate fails while those are out of date.
 //
 // # References

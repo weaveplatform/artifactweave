@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/access/api"
-	registryroute "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
-	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	registryroute "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker/http"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 

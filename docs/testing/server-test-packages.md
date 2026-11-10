@@ -45,7 +45,7 @@ publish bodies, Helm charts, OCI manifests with `PushImage`, Terraform
 repositories and keys, and archives. Its route inventories (`NuGetRoutes`,
 `NPMRoutes`, `GoRoutes`, `MavenRoutes`, `PyPIRoutes`, `HelmRoutes`,
 `DockerRoutes`, `TerraformRoutes` and `TerraformBackendRoutes`) let the guards
-in `migration/app` and the format suites check every implemented pattern.
+in `internal/app` and the format suites check every implemented pattern.
 
 Two packages below it build a world that several suites share.
 `test/server/support/registryfixture` assembles the router with the registry's
@@ -56,11 +56,11 @@ Agent Plugins. Like the harness they build the router.
 The import rules follow from where the router lives:
 
 - `test/server/support` imports no router package, so the in-package tests of
-  `migration/app` can use it.
-- The harness, `registryfixture` and `agentcommon` import `migration/app`, so
-  neither `test/server/support` nor the in-package tests of `migration/app`
+  `internal/app` can use it.
+- The harness, `registryfixture` and `agentcommon` import `internal/app`, so
+  neither `test/server/support` nor the in-package tests of `internal/app`
   import them. Those tests keep their own item world (`newItemWorld` in
-  `migration/app/fixtures_test.go`), which builds the same world as
+  `internal/app/fixtures_test.go`), which builds the same world as
   `harness.NewItemWorld`; a change to one is made to the other.
 - Production code never imports `test/server/support` or anything below it.
 
@@ -105,7 +105,7 @@ The import rules follow from where the router lives:
 
 Two kinds of server test live outside `test/server`:
 
-- The whole-router guards live in `migration/app`, beside the router: the status
+- The whole-router guards live in `internal/app`, beside the router: the status
   tables (`status_test.go`, with format rows in files such as
   `status_chef_test.go`), the route and principal matrices (`matrix_test.go`,
   `matrix_pkgtest_test.go` and `matrix_reindex_test.go`), the specification
@@ -115,8 +115,8 @@ Two kinds of server test live outside `test/server`:
   app code, such as `reindex_internal_test.go`. They import `test/server/support`
   and never the harness.
 - Handler tests sit beside their code, in `<module>/adapters/http` (for example
-  `migration/access/adapters/http`) and in
-  `migration/artifacts/ecosystem/<type>/http`.
+  `internal/access/adapters/http`) and in
+  `internal/artifacts/ecosystem/<type>/http`.
 
 ## Running them
 
@@ -160,7 +160,7 @@ go test ./test/server/support/registryfixture
 ```
 
 The four support packages hold no tests, so `go test` reports none for them.
-The guards run with `go test ./migration/app`. CI's full profile runs every
+The guards run with `go test ./internal/app`. CI's full profile runs every
 package's `TestUnit` and `TestAcc` entry points under the coverage gate, and a
 narrow profile runs the packages that the
 [server test ownership](server-test-ownership.md) inventory gives one format;

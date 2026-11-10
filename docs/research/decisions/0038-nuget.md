@@ -420,7 +420,7 @@ and the setting is on NuGet local repositories in the UI and the Terraform provi
   keyed by the lower-cased id, in the deploy's transaction.
 - **The job** is the periodic job of #512 (`work.Queue.HandleEvery`), run every
   `nuget.snapshot_cleanup_interval`, five minutes by default and at least one second, a new
-  key in `migration/app/config/nuget.go`, as 7.x runs its cleanup every five minutes (KB
+  key in `internal/app/config/nuget.go`, as 7.x runs its cleanup every five minutes (KB
   000005403).
 - **The rule.** Per release, while more pre-release versions remain than
   `format.UniqueSnapshots(c)` (at least two), the one deployed first goes, a tie broken by
@@ -638,7 +638,7 @@ These assignments describe planned work, not current runtime support.
 
 ## Verification
 
-- **Unit tests** in `migration/artifacts/ecosystem/nuget` for nuspec parsing (namespaces,
+- **Unit tests** in `internal/artifacts/ecosystem/nuget` for nuspec parsing (namespaces,
   casing, missing elements), normalisation tables from Microsoft's and JFrog's examples, the
   canonical name, duplicate refusal by every route, overwrite at the version's own path,
   symbols linking, the `nuget.*` properties, PDB v7/Portable PDB keys, malformed offsets and

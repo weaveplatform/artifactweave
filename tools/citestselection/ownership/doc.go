@@ -7,7 +7,7 @@
 // Library of the repository tooling under tools/: not part of the server
 // binary, and it keeps its path through the modular-monolith migration.
 // tools/citestselection validates the inventory with it, and
-// migration/devtools/pkgmove drops an inventory key whose package moves to a
+// internal/devtools/pkgmove drops an inventory key whose package moves to a
 // directory the rule does not own.
 //
 // # Inputs

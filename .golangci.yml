@@ -76,7 +76,7 @@ linters:
       # Only these two rules run: a rules list replaces revive's defaults.
       # The stuttering check is off because the migration renames nothing, and
       # checkPublicInterface stays off (decision 0044).
-      # TestUnitLintScopeListsEveryLinter (migration/layout) pins this list.
+      # TestUnitLintScopeListsEveryLinter (internal/layout) pins this list.
       rules:
         - name: exported
           arguments:
@@ -96,9 +96,9 @@ linters:
         # package path relative to the module root: a full import path
         # matches nothing, and tagliatelle then reports every JFrog name.
         overrides:
-          - pkg: migration/artifacts/api/repo
+          - pkg: internal/artifacts/api/repo
             ignore: true
-          - pkg: migration/kernel/wire
+          - pkg: internal/kernel/wire
             ignore: true
     wrapcheck:
       # Constructors of new errors with an HTTP status, this project's

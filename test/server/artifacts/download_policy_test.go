@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 )
 
 // patchRepo changes a repository's configuration in place, as an

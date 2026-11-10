@@ -14,7 +14,7 @@
 //
 //   - The application runtime and the production router from
 //     test/server/support/harness, through the harness's remote world under
-//     the name the tests had in migration/app (fixture_test.go,
+//     the name the tests had in internal/app (fixture_test.go,
 //     newRemoteWorld): the generic remote repository remote, which the
 //     tests retype, the users reader and denied and the remote-read
 //     permission.
@@ -44,5 +44,5 @@
 //
 // # Status
 //
-// Implemented P9c. P9d moved the tests here from migration/app (TST-07).
+// Implemented P9c. P9d moved the tests here from internal/app (TST-07).
 package puppet

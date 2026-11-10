@@ -28,9 +28,9 @@ import (
 
 	"github.com/cucumber/godog"
 
-	"github.com/weaveplatform/artifactweave/migration/access/core/idtoken/idtokentest"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
-	"github.com/weaveplatform/artifactweave/migration/platform/cdn/cdntest"
+	"github.com/weaveplatform/artifactweave/internal/access/core/idtoken/idtokentest"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
+	"github.com/weaveplatform/artifactweave/internal/platform/cdn/cdntest"
 )
 
 // testMasterKey is a fixed key so scenarios are reproducible; it protects
@@ -43,7 +43,7 @@ const testAdminPassword = "acceptance-admin"
 // aqlCapture, when set, is a directory that receives every AQL query the
 // server is sent, one file per query named after its scenario, so the JFrog
 // CLI's real queries can refresh
-// migration/artifacts/core/aql/aqltest/testdata (make capture-aql).
+// internal/artifacts/core/aql/aqltest/testdata (make capture-aql).
 var aqlCapture = os.Getenv("ARTIFACTWEAVE_AQL_CAPTURE")
 
 // world is one scenario's state.

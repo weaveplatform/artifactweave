@@ -18,7 +18,7 @@
 //     permission and eight local, remote and virtual repositories, with the
 //     request and seed helpers of test/server/support.
 //   - The Xet fixtures in
-//     migration/artifacts/ecosystem/huggingface/xet/testdata, read
+//     internal/artifacts/ecosystem/huggingface/xet/testdata, read
 //     root-relative through repopath.
 //   - A Python with the pinned huggingface_hub and hf_xet named by
 //     HF_XET_PYTHON; TestAccHuggingFaceNativeXet skips without it, and the

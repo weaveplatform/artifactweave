@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/weaveplatform/artifactweave/migration/devtools/pkgmove"
+	"github.com/weaveplatform/artifactweave/internal/devtools/pkgmove"
 )
 
 func main() {

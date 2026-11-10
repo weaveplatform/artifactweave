@@ -30,10 +30,10 @@ qualification at its exit gate. Tooling details are in
 | Terraform deployment | `make deploy-check` verifies fmt, validate, tflint, trivy, mocked `terraform test` and documentation drift for deployment roots |
 | Coverage | The merged total stays at or above 95% and no package drops below 90%, enforced by `make cover` with `.testcoverage.yml`. Generated server/client packages, `cmd/`, `tools/` and the named test harnesses are excluded as listed there. New packages aim for 95% |
 | Contracts | Changes to stores, blob backends or format handlers run the matching suite: `storetest`, `blobtest` or `formattest` with the format's fixture. P9 adds the remote fetcher and its `fakeupstream` fault matrix |
-| Status codes | A handler's response codes come from [research 02](../research/02-artifactory-core-api-inventory.md), [05](../research/05-platform-identity-and-security-apis.md), or the protocol's research and decision record. The table-driven status tests (`migration/app/status*_test.go`) cover every new route; `TestAccStatusTableCoversImplemented` fails while an implemented route has no row |
-| Spec drift | `make verify-generate` produces no diff in bundled `api/*.openapi.yaml`, `migration/platform/gen/` or `pkg/client/` |
+| Status codes | A handler's response codes come from [research 02](../research/02-artifactory-core-api-inventory.md), [05](../research/05-platform-identity-and-security-apis.md), or the protocol's research and decision record. The table-driven status tests (`internal/app/status*_test.go`) cover every new route; `TestAccStatusTableCoversImplemented` fails while an implemented route has no row |
+| Spec drift | `make verify-generate` produces no diff in bundled `api/*.openapi.yaml`, `internal/platform/gen/` or `pkg/client/` |
 | Acceptance | Every required Linux native-client partition passes within its configured job and test deadlines. A feature that changes client-visible behaviour adds or updates a `.feature` file |
-| Security | `gosec` (through golangci) and `govulncheck` are clean. Stored secrets use `migration/platform/crypt` sealed columns; encrypted Terraform state uses sealed blobs. Nothing logs a credential |
+| Security | `gosec` (through golangci) and `govulncheck` are clean. Stored secrets use `internal/platform/crypt` sealed columns; encrypted Terraform state uses sealed blobs. Nothing logs a credential |
 | Docs | Behaviour changes update the matching decision record in place and the relevant research or operations page. A new decision gets a new numbered record |
 | Capability ownership | Every new or deferred capability is mapped in the [capability roadmap](capability-roadmap.md), with an owning phase and acceptance criterion. Only evidenced supersession permits exclusion; P20 adds automated inventory enforcement |
 | PR title | Conventional-commit title, checked by `pr-title-validation.yml`, so release-please can generate the changelog |
@@ -55,7 +55,7 @@ A phase is complete when:
 ## Coverage rules
 
 - 95% is a floor. Test through the public surface of each package and use fakes at external boundaries: the blob store, the upstream fetcher, the clock, the SQL store.
-- Streaming handlers reach the floor through `migration/platform/testkit/fault`: client disconnect mid-stream, blob write failure after headers were sent, upstream 5xx, slow and wrong content type. These paths are tested, not excluded.
+- Streaming handlers reach the floor through `internal/platform/testkit/fault`: client disconnect mid-stream, blob write failure after headers were sent, upstream 5xx, slow and wrong content type. These paths are tested, not excluded.
 - Code reachable only with Docker (PostgreSQL, MinIO, the container-backed clients) is covered by the Linux jobs. The macOS and Windows unit runs cover the same packages through fakes.
 - Unreachable defensive branches are removed instead of being marked as excluded.
 

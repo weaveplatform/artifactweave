@@ -4,7 +4,7 @@
   "name": "Bazel Bzlmod registries",
   "client": "Bazel from the pinned linux/amd64 image (runtime version recorded by native CI)",
   "version_sources": [
-    "migration/artifacts/ecosystem/bazelmodules/http/bazelmodules_test.go"
+    "internal/artifacts/ecosystem/bazelmodules/http/bazelmodules_test.go"
   ],
   "endpoint": "${AW_URL}/artifactory/api/bazelmodules/${AW_REPO}",
   "auth": "The documented native read recipe requires anonymous access enabled plus an explicit READ permission for the selected repository. Anonymous access remains denied without both. Only use this for content intended for public read access. Publishing still requires an access/reference token with deploy permission. Private-registry credential-helper configuration is outside this recipe.",
@@ -60,7 +60,7 @@
   ],
   "evidence": [
     {
-      "path": "migration/artifacts/ecosystem/bazelmodules/http/bazelmodules_test.go",
+      "path": "internal/artifacts/ecosystem/bazelmodules/http/bazelmodules_test.go",
       "contains": [
         "Bazel Bzlmod build passed via",
         "with verified fixture archive delivery",

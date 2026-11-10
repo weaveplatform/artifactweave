@@ -14,19 +14,19 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
-	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	condafmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conda"
-	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/migration/platform/settings"
-	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
-	"github.com/weaveplatform/artifactweave/migration/platform/work"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
+	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
+	condafmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/conda"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
+	"github.com/weaveplatform/artifactweave/internal/platform/settings"
+	"github.com/weaveplatform/artifactweave/internal/platform/testkit/repopath"
+	"github.com/weaveplatform/artifactweave/internal/platform/work"
 )
 
 type condaUnreadableBlob struct {
@@ -104,7 +104,7 @@ func condaFixture(t *testing.T) []byte {
 	t.Helper()
 	return repopath.Read(
 		t,
-		"migration/artifacts/ecosystem/conda/testdata/artifactweave-conda-fixture-1.0.0-0.tar.bz2",
+		"internal/artifacts/ecosystem/conda/testdata/artifactweave-conda-fixture-1.0.0-0.tar.bz2",
 	)
 }
 
@@ -182,7 +182,7 @@ func TestUnitCondaChannelRejectsUnsafeRequestsAndVirtualCycles(t *testing.T) {
 
 func TestUnitCondaRemoteModernPackageIsFilteredByCurrentSourceAuthority(t *testing.T) {
 	const name = "ca-certificates-2026.7.22-hbd8a1cb_0.conda"
-	body := repopath.Read(t, "migration/artifacts/ecosystem/conda/testdata/"+name)
+	body := repopath.Read(t, "internal/artifacts/ecosystem/conda/testdata/"+name)
 	id, _ := condafmt.ParsePackagePath("noarch/" + name)
 	rec, err := condafmt.ReadPackage(t.Context(), bytes.NewReader(body), int64(len(body)), id)
 	if err != nil {
@@ -671,7 +671,7 @@ func TestUnitCondaLocalAndVirtualNativeChannel(t *testing.T) {
 		"/artifactory/api/conda/conda-virtual/noarch/"+filename, "user", ""),
 		http.StatusForbidden)
 	const modernName = "ca-certificates-2026.7.22-hbd8a1cb_0.conda"
-	modern := repopath.Read(t, "migration/artifacts/ecosystem/conda/testdata/"+modernName)
+	modern := repopath.Read(t, "internal/artifacts/ecosystem/conda/testdata/"+modernName)
 	wantStatus(t, w.do(http.MethodPut, "/artifactory/conda-fed/noarch/"+modernName,
 		"admin", string(modern)), http.StatusCreated)
 	if err := q.EnsureFresh(t.Context(), condafmt.KindIndex, "conda-fed"); err != nil {

@@ -115,7 +115,7 @@ These assignments describe planned work, not current runtime support.
 - Docker: tag order after overwrites, `maxUniqueTags` and `dockerTagRetention` after a push,
   and a multi-architecture tag removed as one unit.
 - npm, Go, Maven, PyPI, NuGet, Helm and Terraform: the shared format contract suite
-  (`migration/artifacts/core/formattest`) on the in-memory, SQLite and PostgreSQL stores.
+  (`internal/artifacts/core/formattest`) on the in-memory, SQLite and PostgreSQL stores.
 - `package_wiring.feature`: protocol-visible content after REST deploy, copy, delete,
   trash restore and reindex for the P8 formats.
 

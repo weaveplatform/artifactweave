@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 )
 
 // These are configuration contracts. Each format adapter's status and

@@ -20,11 +20,11 @@ func TestUnitAffectedPlanChoosesOnlyOwnedChanges(t *testing.T) {
 		profile string
 		owner   string
 	}{
-		{"npm implementation", []change{{status: "M", path: "migration/artifacts/ecosystem/npm/handler.go"}}, "format", "npm"},
-		{"npm implementation and docs", []change{{status: "M", path: "migration/artifacts/ecosystem/npm/handler.go"}, {status: "M", path: "docs/testing/ci.md"}}, "format", "npm"},
-		{"new npm implementation", []change{{status: "A", path: "migration/artifacts/ecosystem/npm/new.go"}}, "format", "npm"},
-		{"Terraform fixture", []change{{status: "M", path: "migration/artifacts/ecosystem/terraform/terraformtest/fixture.go"}}, "format", "terraform"},
-		{"agent packages server adapter", []change{{status: "M", path: "migration/artifacts/ecosystem/agentpackages/http/handler.go"}}, "format", "agentpackages"},
+		{"npm implementation", []change{{status: "M", path: "internal/artifacts/ecosystem/npm/handler.go"}}, "format", "npm"},
+		{"npm implementation and docs", []change{{status: "M", path: "internal/artifacts/ecosystem/npm/handler.go"}, {status: "M", path: "docs/testing/ci.md"}}, "format", "npm"},
+		{"new npm implementation", []change{{status: "A", path: "internal/artifacts/ecosystem/npm/new.go"}}, "format", "npm"},
+		{"Terraform fixture", []change{{status: "M", path: "internal/artifacts/ecosystem/terraform/terraformtest/fixture.go"}}, "format", "terraform"},
+		{"agent packages server adapter", []change{{status: "M", path: "internal/artifacts/ecosystem/agentpackages/http/handler.go"}}, "format", "agentpackages"},
 		{"Helm OCI test", []change{{status: "M", path: "test/server/artifacts/helmoci/push_test.go"}}, "format", "helmoci"},
 		{"deployment only", []change{{status: "M", path: "deploy/check.sh"}}, "deployment", ""},
 		{"docs only", []change{{status: "M", path: "README.md"}}, "docs", ""},
@@ -32,19 +32,19 @@ func TestUnitAffectedPlanChoosesOnlyOwnedChanges(t *testing.T) {
 		{"deployment guide and code", []change{{status: "M", path: "deploy/platform/terraform/aws/cdn/README.md"}, {status: "M", path: "deploy/check.sh"}}, "deployment", ""},
 		{"deployment template", []change{{status: "M", path: "deploy/platform/SCENARIO-TEMPLATE.md"}}, "deployment", ""},
 		{"fixture readme", []change{{status: "M", path: "test/acceptance/testdata/upstreams/README.md"}}, "full", ""},
-		{"shared auth", []change{{status: "M", path: "migration/access/core/authn/auth.go"}}, "full", ""},
-		{"shared server", []change{{status: "M", path: "migration/app/router.go"}}, "full", ""},
+		{"shared auth", []change{{status: "M", path: "internal/access/core/authn/auth.go"}}, "full", ""},
+		{"shared server", []change{{status: "M", path: "internal/app/router.go"}}, "full", ""},
 		{"shared fixture", []change{{status: "M", path: "test/server/support/support.go"}}, "full", ""},
 		{"new server test", []change{{status: "A", path: "test/server/artifacts/npm/new_test.go"}}, "full", ""},
-		{"unknown root test", []change{{status: "M", path: "migration/app/unknown_test.go"}}, "full", ""},
-		{"unknown format", []change{{status: "M", path: "migration/artifacts/ecosystem/newformat/handler.go"}}, "full", ""},
-		{"shared format code", []change{{status: "M", path: "migration/artifacts/ecosystem/registry.go"}}, "full", ""},
-		{"format and deployment", []change{{status: "M", path: "migration/artifacts/ecosystem/npm/handler.go"}, {status: "M", path: "deploy/check.sh"}}, "full", ""},
-		{"two formats", []change{{status: "M", path: "migration/artifacts/ecosystem/npm/handler.go"}, {status: "M", path: "migration/artifacts/ecosystem/maven/handler.go"}}, "full", ""},
-		{"deleted source", []change{{status: "D", path: "migration/artifacts/ecosystem/npm/handler.go"}}, "full", ""},
-		{"renamed source", []change{{status: "R100", old: "migration/artifacts/ecosystem/npm/old.go", path: "migration/artifacts/ecosystem/npm/new.go"}}, "full", ""},
+		{"unknown root test", []change{{status: "M", path: "internal/app/unknown_test.go"}}, "full", ""},
+		{"unknown format", []change{{status: "M", path: "internal/artifacts/ecosystem/newformat/handler.go"}}, "full", ""},
+		{"shared format code", []change{{status: "M", path: "internal/artifacts/ecosystem/registry.go"}}, "full", ""},
+		{"format and deployment", []change{{status: "M", path: "internal/artifacts/ecosystem/npm/handler.go"}, {status: "M", path: "deploy/check.sh"}}, "full", ""},
+		{"two formats", []change{{status: "M", path: "internal/artifacts/ecosystem/npm/handler.go"}, {status: "M", path: "internal/artifacts/ecosystem/maven/handler.go"}}, "full", ""},
+		{"deleted source", []change{{status: "D", path: "internal/artifacts/ecosystem/npm/handler.go"}}, "full", ""},
+		{"renamed source", []change{{status: "R100", old: "internal/artifacts/ecosystem/npm/old.go", path: "internal/artifacts/ecosystem/npm/new.go"}}, "full", ""},
 		{"acceptance feature", []change{{status: "M", path: "test/acceptance/features/npm.feature"}}, "full", ""},
-		{"format fixture", []change{{status: "M", path: "migration/artifacts/ecosystem/npm/testdata/metadata.json"}}, "full", ""},
+		{"format fixture", []change{{status: "M", path: "internal/artifacts/ecosystem/npm/testdata/metadata.json"}}, "full", ""},
 		{"dependencies", []change{{status: "M", path: "go.mod"}}, "full", ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -55,45 +55,45 @@ func TestUnitAffectedPlanChoosesOnlyOwnedChanges(t *testing.T) {
 		})
 	}
 	npm := proposeAffected(
-		[]change{{status: "M", path: "migration/artifacts/ecosystem/npm/handler.go"}},
+		[]change{{status: "M", path: "internal/artifacts/ecosystem/npm/handler.go"}},
 	)
-	for _, pkg := range []string{"./migration/artifacts/ecosystem/npm/...", "./migration/artifacts/ecosystem/npm/http", "./test/server/artifacts/npm", "./migration/app"} {
+	for _, pkg := range []string{"./internal/artifacts/ecosystem/npm/...", "./internal/artifacts/ecosystem/npm/http", "./test/server/artifacts/npm", "./internal/app"} {
 		if !slices.Contains(npm.units, pkg) {
 			t.Errorf("npm plan omitted %s", pkg)
 		}
 	}
 	conan := proposeAffected(
-		[]change{{status: "M", path: "migration/artifacts/ecosystem/conan/http/remote.go"}},
+		[]change{{status: "M", path: "internal/artifacts/ecosystem/conan/http/remote.go"}},
 	)
 	if conan.profile != "format" || conan.owner != "conan" {
 		t.Fatalf("Conan source selection = %+v", conan)
 	}
-	for _, pkg := range []string{"./migration/artifacts/ecosystem/conan/...", "./migration/artifacts/ecosystem/conan/http", "./test/server/artifacts/conan"} {
+	for _, pkg := range []string{"./internal/artifacts/ecosystem/conan/...", "./internal/artifacts/ecosystem/conan/http", "./test/server/artifacts/conan"} {
 		if !slices.Contains(conan.units, pkg) {
 			t.Errorf("Conan plan omitted %s", pkg)
 		}
 	}
-	for _, pkg := range []string{"migration/artifacts/ecosystem/conan/...", "migration/artifacts/ecosystem/conan/http/..."} {
+	for _, pkg := range []string{"internal/artifacts/ecosystem/conan/...", "internal/artifacts/ecosystem/conan/http/..."} {
 		if !strings.Contains(conan.coverpkg, pkg) {
 			t.Errorf("Conan plan did not instrument %s", pkg)
 		}
 	}
 	docker := proposeAffected(
-		[]change{{status: "M", path: "migration/artifacts/ecosystem/docker/handler.go"}},
+		[]change{{status: "M", path: "internal/artifacts/ecosystem/docker/handler.go"}},
 	)
-	for _, pkg := range []string{"./test/server/artifacts/docker", "./test/server/artifacts/helmoci", "./migration/artifacts/ecosystem/nimmodel/http"} {
+	for _, pkg := range []string{"./test/server/artifacts/docker", "./test/server/artifacts/helmoci", "./internal/artifacts/ecosystem/nimmodel/http"} {
 		if !slices.Contains(docker.units, pkg) {
 			t.Errorf("Docker plan omitted dependent package %s", pkg)
 		}
 	}
 	agent := proposeAffected(
 		[]change{
-			{status: "M", path: "migration/artifacts/ecosystem/agentpackages/http/handler.go"},
+			{status: "M", path: "internal/artifacts/ecosystem/agentpackages/http/handler.go"},
 		},
 	)
 	if !strings.Contains(
 		agent.coverpkg,
-		"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/agentpackages/http",
+		"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/agentpackages/http",
 	) {
 		t.Fatalf("changed production package is not instrumented: %+v", agent)
 	}
@@ -197,47 +197,47 @@ func TestUnitFormatSourceOwnerStagedLayouts(t *testing.T) {
 	useTestOwnership(t, testOwnership{
 		Version: 2,
 		Packages: map[string]string{
-			"internal/artifacts/ecosystem/npm/http":  "npm",
-			"migration/app":                          "shared",
-			"migration/artifacts/adapters/http":      "shared",
-			"migration/artifacts/ecosystem/npm/http": "npm",
-			"test/server/artifacts":                  "shared",
-			"test/server/artifacts/helm":             "shared",
-			"test/server/artifacts/npm":              "npm",
+			"internal/artifacts/ecosystem/npm/http": "npm",
+			"internal/app":                          "shared",
+			"internal/artifacts/adapters/http":      "shared",
+			"internal/artifacts/ecosystem/npm/http": "npm",
+			"test/server/artifacts":                 "shared",
+			"test/server/artifacts/helm":            "shared",
+			"test/server/artifacts/npm":             "npm",
 			// No ecosystem suite lives directly under test/server, but
 			// formatSourceOwner still maps a format directory there.
 			"test/server/cargo": "cargo",
 		},
 		SharedFiles: map[string][]string{
-			"migration/app":         {"router_test.go"},
+			"internal/app":          {"router_test.go"},
 			"test/server/artifacts": {"items_test.go"},
 		},
-		FormatDependencies: map[string][]string{"npm": {"migration/app/router_test.go"}},
+		FormatDependencies: map[string][]string{"npm": {"internal/app/router_test.go"}},
 	})
 	for file, want := range map[string]string{
-		"migration/artifacts/ecosystem/npm/tarball.go":           "npm",
-		"migration/artifacts/ecosystem/npm/tarball_test.go":      "npm",
-		"internal/artifacts/ecosystem/npm/tarball.go":            "npm",
-		"migration/artifacts/ecosystem/npm/http/routes.go":       "npm",
-		"migration/artifacts/ecosystem/npm/http/routes_test.go":  "npm",
-		"internal/artifacts/ecosystem/npm/http/routes_test.go":   "npm",
-		"test/server/artifacts/npm/publish_test.go":              "npm",
-		"test/server/artifacts/npm/fixture.go":                   "npm",
-		"migration/artifacts/ecosystem/npm/handler.go":           "npm",
-		"test/server/cargo/publish_test.go":                      "cargo",
-		"migration/artifacts/ecosystem/pypi/http/routes_test.go": "",
-		"internal/artifacts/ecosystem/pypi/http/routes_test.go":  "",
-		"test/server/artifacts/helm/push_test.go":                "",
-		"test/server/artifacts/items_test.go":                    "",
-		"test/server/artifacts/fixture.go":                       "",
-		"migration/artifacts/ecosystem/newformat/handler.go":     "",
-		"migration/artifacts/ecosystem/npm.go":                   "",
-		"migration/artifacts/core/item/item.go":                  "",
-		"migration/artifacts/adapters/http/items.go":             "",
-		"migration/app/router_test.go":                           "",
-		"migration/app/run.go":                                   "",
-		"pkg/artifacts/ecosystem/npm/handler.go":                 "",
-		"migration/artifacts/ecosystem/npm/http/README.md":       "",
+		"internal/artifacts/ecosystem/npm/tarball.go":           "npm",
+		"internal/artifacts/ecosystem/npm/tarball_test.go":      "npm",
+		"internal/artifacts/ecosystem/npm/tarball.go":           "npm",
+		"internal/artifacts/ecosystem/npm/http/routes.go":       "npm",
+		"internal/artifacts/ecosystem/npm/http/routes_test.go":  "npm",
+		"internal/artifacts/ecosystem/npm/http/routes_test.go":  "npm",
+		"test/server/artifacts/npm/publish_test.go":             "npm",
+		"test/server/artifacts/npm/fixture.go":                  "npm",
+		"internal/artifacts/ecosystem/npm/handler.go":           "npm",
+		"test/server/cargo/publish_test.go":                     "cargo",
+		"internal/artifacts/ecosystem/pypi/http/routes_test.go": "",
+		"internal/artifacts/ecosystem/pypi/http/routes_test.go": "",
+		"test/server/artifacts/helm/push_test.go":               "",
+		"test/server/artifacts/items_test.go":                   "",
+		"test/server/artifacts/fixture.go":                      "",
+		"internal/artifacts/ecosystem/newformat/handler.go":     "",
+		"internal/artifacts/ecosystem/npm.go":                   "",
+		"internal/artifacts/core/item/item.go":                  "",
+		"internal/artifacts/adapters/http/items.go":             "",
+		"internal/app/router_test.go":                           "",
+		"internal/app/run.go":                                   "",
+		"pkg/artifacts/ecosystem/npm/handler.go":                "",
+		"internal/artifacts/ecosystem/npm/http/README.md":       "",
 	} {
 		owner, ok := formatSourceOwner(file)
 		if owner != want || ok != (want != "") {
@@ -245,8 +245,8 @@ func TestUnitFormatSourceOwnerStagedLayouts(t *testing.T) {
 		}
 	}
 	staged := proposeAffected([]change{
-		{status: "M", path: "migration/artifacts/ecosystem/npm/tarball.go"},
-		{status: "A", path: "migration/artifacts/ecosystem/npm/http/routes.go"},
+		{status: "M", path: "internal/artifacts/ecosystem/npm/tarball.go"},
+		{status: "A", path: "internal/artifacts/ecosystem/npm/http/routes.go"},
 		{status: "M", path: "test/server/artifacts/npm/fixture.go"},
 	})
 	want := []string{
@@ -262,7 +262,7 @@ func TestUnitFormatSourceOwnerStagedLayouts(t *testing.T) {
 			t.Errorf("staged npm plan does not instrument %s: %s", pkg, staged.coverpkg)
 		}
 	}
-	if !slices.Contains(staged.units, "./migration/app") || !staged.hasSharedTests {
+	if !slices.Contains(staged.units, "./internal/app") || !staged.hasSharedTests {
 		t.Errorf("staged npm plan omitted its shared app dependency: %+v", staged)
 	}
 }

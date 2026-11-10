@@ -213,15 +213,15 @@ Decisions: [0001](../research/decisions/0001-mirror-the-jfrog-api-surface.md),
 
 **Tasks**
 1. `make init NAME=artifactweave`; this documentation set; `CODEOWNERS`.
-2. `migration/artifacts/api/repo`: the `Config` model with every field in [research 03](../research/03-repository-configuration-model.md), JSON round-trip that accepts the string-typed booleans JFrog documents per rclass and writes booleans, validation (key syntax, rclass and packageType sets, virtual members exist, `defaultDeploymentRepo` is a member, `projectKey` implies `environments`).
-3. `migration/artifacts/core/layout`: pattern engine for `repoLayoutRef` tokens with the bundled layouts and the Maven-2 integration-revision regexes.
-4. `migration/app/config`: strict app YAML, flag > env > file precedence, unknown keys rejected, `config validate`.
-5. `migration/app/router.go`: chi router, request id, slog access log, recovery, body limits, the per-surface errors table, the base-URL resolver middleware, content-type normalisation for `+json` vendor types and `application/yaml`.
+2. `internal/artifacts/api/repo`: the `Config` model with every field in [research 03](../research/03-repository-configuration-model.md), JSON round-trip that accepts the string-typed booleans JFrog documents per rclass and writes booleans, validation (key syntax, rclass and packageType sets, virtual members exist, `defaultDeploymentRepo` is a member, `projectKey` implies `environments`).
+3. `internal/artifacts/core/layout`: pattern engine for `repoLayoutRef` tokens with the bundled layouts and the Maven-2 integration-revision regexes.
+4. `internal/app/config`: strict app YAML, flag > env > file precedence, unknown keys rejected, `config validate`.
+5. `internal/app/router.go`: chi router, request id, slog access log, recovery, body limits, the per-surface errors table, the base-URL resolver middleware, content-type normalisation for `+json` vendor types and `application/yaml`.
 6. `api/*.openapi.yaml` skeletons with `GET /artifactory/api/system/{ping,version,license}`, `GET /artifactory/api/v1/system/{readiness,liveness}`, `GET /access/api/v1/system/{ping,version}`, `GET /router/api/v1/system/health`, `POST /artifactory/api/system/usage`, `POST /jfconnect/api/v1/backoffice/metrics/log`; `make generate` and the drift check; `TestAccOpenAPIFieldDescriptions`; `TestAccHandwrittenRoutesNotGenerated`.
-7. `migration/layout` import-tier test.
+7. `internal/layout` import-tier test.
 8. `test/acceptance` skeleton: godog, `-cover` binary, pinned tool binaries (`jf`, `terraform`), the Linux `acceptance` job added to the coverage and gate `needs`; `test/terraform` with a pre-populated provider mirror.
 9. `docs/security/threat-model.md` skeleton (done), `docs/operations/*` skeletons (done).
-10. Parity oracle: `migration/devtools/specoracle` and `tools/specoracle` cache JFrog's embedded OpenAPI blocks under the gitignored `.specoracle/`, compare them with `api/*.openapi.yaml`, and `TestAccSpecParity` holds `api/parity-baseline.json` as the accepted-gap list; the `parity` CI job runs it ([research 01](../research/01-jfrog-api-landscape.md#parity-oracle)).
+10. Parity oracle: `internal/devtools/specoracle` and `tools/specoracle` cache JFrog's embedded OpenAPI blocks under the gitignored `.specoracle/`, compare them with `api/*.openapi.yaml`, and `TestAccSpecParity` holds `api/parity-baseline.json` as the accepted-gap list; the `parity` CI job runs it ([research 01](../research/01-jfrog-api-landscape.md#parity-oracle)).
 
 **Exit criteria**
 - `make gate` green on the three OS runners plus the Linux acceptance job.
@@ -248,8 +248,8 @@ features before any store is written.
 2. [Research 15, data model](../research/15-data-model.md) and
    [decision 0020](../research/decisions/0020-domain-model.md): wire entities per
    family, identity and mutability, server-owned fields, relationships, and the derived
-   storage model that P2 implements. Contradictions with `migration/artifacts/api/repo` are fixed in
-   `migration/artifacts/api/repo`.
+   storage model that P2 implements. Contradictions with `internal/artifacts/api/repo` are fixed in
+   `internal/artifacts/api/repo`.
 3. Spec tooling: `specoracle scaffold` (draft fragments from the cache with
    `TODO(author)` descriptions and `x-oracle-source` links), `openapi-bundle`
    (per-family fragments under `api/src/<service>/` merged into the three bundled
@@ -270,7 +270,7 @@ features before any store is written.
    representation per entity with converters to the legacy, Access and YAML wire
    forms. Binding is right only where the wire and internal shapes coincide, which is
    the repository configuration (`RepositoryConfiguration` is bound to `repo.Config`).
-   The generated wire models in `migration/platform/gen` and `pkg/client` are the P1
+   The generated wire models in `internal/platform/gen` and `pkg/client` are the P1
    deliverable; the internal domain types are designed with the store contracts at the
    start of P2, before any SQL, so the model still precedes the database.
 
@@ -306,7 +306,7 @@ features before any store is written.
   report nondeterministic; the spec models those as one route each, with the
   `/checksum` documentation alias marked `x-not-routed`; item routes exclude the
   reserved repository key `api`; union-typed query parameters are typed as strings
-  because the generator cannot bind them; `migration/artifacts/api/repo` gained `UnmarshalJSON`, the
+  because the generator cannot bind them; `internal/artifacts/api/repo` gained `UnmarshalJSON`, the
   federated `priorityResolution` boolean, and class checks for `terraformType` and
   proxy fields; research 15 gained the `leases` and `vault_configs` tables; task 5
   moved to P2 (above).
@@ -370,13 +370,13 @@ Decisions: [0004](../research/decisions/0004-storage-sql-metadata-and-blobs.md),
 **Tasks**
 0. Domain types (each module's `core/model`): the internal domain types for every entity
    in [research 15](../research/15-data-model.md) section 2, with converters to and from
-   the generated wire models (`migration/platform/gen`) and table-driven round-trip tests
+   the generated wire models (`internal/platform/gen`) and table-driven round-trip tests
    per wire form (legacy, Access, YAML descriptor). Written and reviewed before task 1
    so the store contracts are expressed in these types.
-1. Store contracts in each module's `core/port` (`Repos`, `Items`, `Properties`, `Stats`, `Principals`, `Groups`, `Permissions`, `Tokens`, `Projects`, `Webhooks`, `Policies`, `Runs`, `Packages`) with `Tx`, sentinel errors and keyset cursors; `migration/app/adapters/inmem`.
-2. `migration/app/adapters/sql` dialect layer; `sqlite` (modernc, WAL, single writer) and `postgres` (pgx stdlib); embedded migrations; `artifactweave migrate up|down|version`.
-3. `migration/platform/blob` contract: `BeginUpload / Append / Commit(digest) / Abort`, `Open` returning `io.ReadSeekCloser`, `PresignGet`, `Delete`, `Stat`; `fs` backend (temp dir per upload id, rename on commit) and `s3` backend (multipart upload id persisted through the store, path-style option for MinIO); checksum index by sha256, sha1 and md5.
-4. `migration/platform/crypt`: keyring, sealed columns with purpose and row AAD, `artifactweave keys rotate`.
+1. Store contracts in each module's `core/port` (`Repos`, `Items`, `Properties`, `Stats`, `Principals`, `Groups`, `Permissions`, `Tokens`, `Projects`, `Webhooks`, `Policies`, `Runs`, `Packages`) with `Tx`, sentinel errors and keyset cursors; `internal/app/adapters/inmem`.
+2. `internal/app/adapters/sql` dialect layer; `sqlite` (modernc, WAL, single writer) and `postgres` (pgx stdlib); embedded migrations; `artifactweave migrate up|down|version`.
+3. `internal/platform/blob` contract: `BeginUpload / Append / Commit(digest) / Abort`, `Open` returning `io.ReadSeekCloser`, `PresignGet`, `Delete`, `Stat`; `fs` backend (temp dir per upload id, rename on commit) and `s3` backend (multipart upload id persisted through the store, path-style option for MinIO); checksum index by sha256, sha1 and md5.
+4. `internal/platform/crypt`: keyring, sealed columns with purpose and row AAD, `artifactweave keys rotate`.
 5. `storetest` and `blobtest` contract suites.
 
 **Exit criteria**
@@ -389,10 +389,10 @@ Decisions: [0004](../research/decisions/0004-storage-sql-metadata-and-blobs.md),
   operations, peers and federation, enterprise products) over the domain types (each module's
   `core/model`), with `Tx`, `AfterCommit`, sentinel errors and keyset cursors; `kernel.Normalise`
   defines what a stored value reads back as (UTC microseconds, millisecond durations).
-- `migration/app/adapters/inmem` (reference), `migration/app/adapters/sql` with `sqlite` (modernc, WAL,
+- `internal/app/adapters/inmem` (reference), `internal/app/adapters/sql` with `sqlite` (modernc, WAL,
   immediate transactions; file and in-memory) and `postgres` (pgx); 71 tables, identical in both
   dialects. Differences from research 15's table list are recorded in its section 4.1.
-- `migration/app/storetest`: 62 contract subtests passing on inmem, SQLite file, SQLite memory and
+- `internal/app/storetest`: 62 contract subtests passing on inmem, SQLite file, SQLite memory and
   PostgreSQL 17 (testcontainers, skipped without Docker), plus SQLite fault-injection tests per
   group. Every PostgreSQL contract run rolls all migrations back and applies them again.
 - Sealed columns: one registry drives `Store.Reseal`; `artifactweave keys rotate` re-seals under
@@ -422,15 +422,15 @@ across clouds and regions in parallel. The work is tracked as GitHub issues, one
 - Epic #21, cloud backends:
   - research and decision (#7);
   - a shared upload-session layer with per-instance upload rows (#8);
-  - `migration/platform/blob/gcs` (#9);
-  - `migration/platform/blob/azure` (#10);
+  - `internal/platform/blob/gcs` (#9);
+  - `internal/platform/blob/azure` (#10);
   - configuration (#11);
   - an opt-in real-cloud conformance workflow (#12).
 - Epic #22, mirroring:
   - decision (#13);
   - named stores and mirror configuration (#14);
   - the `blob_replicas` index (#15);
-  - `migration/platform/blob/mirror` with quorum writes and failover reads (#16);
+  - `internal/platform/blob/mirror` with quorum writes and failover reads (#16);
   - the repair worker (#17);
   - per-member administration once P3 serves the storage endpoints (#18);
   - a cross-cloud scenario on Linux CI (#19).
@@ -452,7 +452,7 @@ Decisions: [0003](../research/decisions/0003-repository-model.md),
 2. Items: deploy with checksum headers and matrix properties, checksum deploy, explode archive, folder create, download with `Range` and `Accept-Ranges`, delete, file and folder info, `?list`, `?stats`, `?lastModified`, `?properties`, `?permissions`, set, delete and PATCH properties, copy and move with `dry` and `suppressLayouts`, archive entry download, folder archive download, `zap`, `storageinfo`, trash can and restore, GC (including reaping stale upload sessions found through `UploadStore.Stale`, deferred from P2), `.sha1/.md5/.sha256` sidecars served from metadata and validated per `checksumPolicyType`, matrix-param resolution on GET.
 3. `GET /api/v1/uploads/config`. It answered `{"supported":false}` until the JFrog CLI multipart protocol landed (#91) and now answers `true`.
 4. Package-index skeleton and the `generic` format handler.
-5. `migration/artifacts/core/aql` limited to the CLI's query shape (`items.find` with `$or`/`$and`, `$match`, `$ne`, `@prop`, `type`, `include`, `sort`, `offset`, `transitive`, `limit`), with fixtures captured from `jf rt s/dl/del/cp/mv/sp` and run on both dialects.
+5. `internal/artifacts/core/aql` limited to the CLI's query shape (`items.find` with `$or`/`$and`, `$match`, `$ne`, `@prop`, `type`, `include`, `sort`, `offset`, `transitive`, `limit`), with fixtures captured from `jf rt s/dl/del/cp/mv/sp` and run on both dialects.
 6. Minimal admin Basic auth and the seeded `admin`, `anonymous`, `readers`, `Anything`, `Any Remote` principals and targets; `artifactory-build-info` repo.
 7. YAML descriptor PATCH for `localRepositories`, `remoteRepositories`, `virtualRepositories`, `federatedRepositories`, `proxies`, `propertySets`, `repoLayouts` with null deletes; `artifactweave config apply`.
 
@@ -471,7 +471,7 @@ Decisions: [0003](../research/decisions/0003-repository-model.md),
 **Exit criteria**
 - `jf rt u/dl/s/cp/mv/del/sp` round-trip a tree, including a checksum-deploy hit for a file over 10 KiB and a split download. Met: `round_trip.feature` (#51).
 - Moved to P4 (#69): `artifactory_local_generic_repository` and `artifactory_item_properties` apply, plan clean, destroy. The provider authenticates only with a Bearer access token, which P4 issues. Met in P4 (#69).
-- The status-code table test covers every route in this phase. Met: the guard in `migration/app/status_test.go` fails while an implemented route has no row.
+- The status-code table test covers every route in this phase. Met: the guard in `internal/app/status_test.go` fails while an implemented route has no row.
 
 ## P4: Identity and authorization
 
@@ -601,7 +601,7 @@ Decisions: [0012](../research/decisions/0012-search-and-aql.md),
 14. The exit checks: AQL fixtures on both dialects and the JFrog CLI build commands (#171).
 
 **Exit criteria**
-- AQL fixtures (CLI-captured plus hand-written per operator) produce identical ordered output on SQLite and PostgreSQL. Met: the cases in `migration/artifacts/core/aql/aqltest` run on the reference evaluator (`migration/artifacts/core/aql/cases_test.go`) and through `storetest` on the in-memory store, SQLite and PostgreSQL, comparing ordered rows (#171). The CLI-captured fixtures come from jf 2.126.0 through `make capture-aql`, now including `jf rt s --build` and `jf rt dl --build`; the hand-written cases cover every operator on `items`, `builds` and `build.promotions`, the relation paths, `$msp`, the include rules, the actions and the result cap.
+- AQL fixtures (CLI-captured plus hand-written per operator) produce identical ordered output on SQLite and PostgreSQL. Met: the cases in `internal/artifacts/core/aql/aqltest` run on the reference evaluator (`internal/artifacts/core/aql/cases_test.go`) and through `storetest` on the in-memory store, SQLite and PostgreSQL, comparing ordered rows (#171). The CLI-captured fixtures come from jf 2.126.0 through `make capture-aql`, now including `jf rt s --build` and `jf rt dl --build`; the hand-written cases cover every operator on `items`, `builds` and `build.promotions`, the relation paths, `$msp`, the include rules, the actions and the result cap.
 - `jf rt u --build-name --build-number`, `jf rt bp` and `jf rt build-promote` work. Met: `builds.feature` (#165, #166, #171) runs them with the real `jf`, with `bp --overwrite`, `s --build`, `dl --build`, `bpr` with copy, status, properties and a move, `bdi`, and `ba` followed by `bp`. The promotion is read back through AQL `build.promotions`.
 
 ## P6: Docker/OCI
@@ -926,12 +926,12 @@ JFrog search/download are covered; precise current-vendor wire mapping remains
 [I]/#216. Configurable member limits stay P12 and package virtual delivery stays P10.
 
 **Tasks**
-1. `migration/artifacts/core/remote` fetcher with the full remote field set, the retrieval decision table, negative caching, offline and hard-fail modes, assumed-offline tripping, HEAD-before-GET, singleflight, client TLS, custom headers, Docker Hub token auth.
+1. `internal/artifacts/core/remote` fetcher with the full remote field set, the retrieval decision table, negative caching, offline and hard-fail modes, assumed-offline tripping, HEAD-before-GET, singleflight, client TLS, custom headers, Docker Hub token auth.
 2. Implemented by #621/#622: cache-only `-cache` reads, metadata-only `zap`, deletion
    and persistent unused-cache cleanup; generation checks prevent stale in-flight
    publication. Native adapters must reuse these operations and prove their format rules.
 3. Per-format upstream adapters with metadata rewriting through the base-URL resolver.
-4. `migration/artifacts/adapters/upstream/fakeupstream` with fault modes; the scheduled/manual
+4. `internal/artifacts/adapters/upstream/fakeupstream` with fault modes; the scheduled/manual
    `-tags e2e` public upstream matrix is implemented by #638. Its first full dispatch passed
    14/15 families; a successful complete rerun on merged main is required before
    completion. See [CI scope and evidence](../testing/ci.md#public-upstream-conformance-p9).

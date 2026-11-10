@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
 )
 
 // allowBasicTokens turns token.allow_basic_auth on, for a fixture whose

@@ -16,7 +16,7 @@
 //     in-memory store seeded by test/server/support: the admin user, whose
 //     password is "pw", and the local repository libs-local (fixture_test.go,
 //     statusFixture, which keeps the name of the router guards' fixture in
-//     migration/app).
+//     internal/app).
 //   - The X-Forwarded-Host, X-Forwarded-Proto and X-Forwarded-Port headers a
 //     case sends, and the configured base URL a case sets.
 //   - For the probes, a store and a binary store that fail on demand

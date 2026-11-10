@@ -17,7 +17,7 @@
 //     permission and eight local, remote and virtual repositories, with the
 //     request and seed helpers of test/server/support.
 //   - The Eclipse GLSP update site files in
-//     migration/artifacts/ecosystem/p2/testdata, read root-relative through
+//     internal/artifacts/ecosystem/p2/testdata, read root-relative through
 //     repopath, and remote sources over stub backends (sourceIdentity,
 //     sourceBackend).
 //
@@ -51,6 +51,6 @@
 //
 // Implemented P9c (the plan's P31 group). P9d moved the router-level tests
 // here from the server root (TST-06), and the tests that call the protocol's
-// unexported code moved with it to migration/artifacts/ecosystem/p2/http
+// unexported code moved with it to internal/artifacts/ecosystem/p2/http
 // (WEB-15).
 package p2

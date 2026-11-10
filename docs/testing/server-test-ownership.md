@@ -20,11 +20,11 @@ key, and anything after the object.
   format, or `shared`.
 - `shared_files` lists, for a shared directory whose files are reviewed one by
   one, the bare name of every test file in it. A test file in such a directory
-  that the list leaves out has no owner. The keys today are `migration/app`; the
-  HTTP adapters `migration/access/adapters/http`,
-  `migration/artifacts/adapters/http`,
-  `migration/artifacts/adapters/http/itemkit` and
-  `migration/configuration/adapters/http`; and the module suites
+  that the list leaves out has no owner. The keys today are `internal/app`; the
+  HTTP adapters `internal/access/adapters/http`,
+  `internal/artifacts/adapters/http`,
+  `internal/artifacts/adapters/http/itemkit` and
+  `internal/configuration/adapters/http`; and the module suites
   `test/server/access`, `test/server/artifacts` and `test/server/configuration`.
 - `format_dependencies` maps a format to the repository paths of the shared
   test files that exercise it. Each path must name a file that its directory's
@@ -61,54 +61,54 @@ The owners and their test packages, as `packages` records them:
 | Owner | Test packages |
 | --- | --- |
 | `agentpackages` | `test/server/artifacts/agentpackages` |
-| `agentplugins` | `migration/artifacts/ecosystem/agentplugins/http`, `test/server/artifacts/agentplugins` |
-| `aieditorextensions` | `migration/artifacts/ecosystem/aieditorextensions/http` |
-| `alpine` | `migration/artifacts/ecosystem/alpine/http` |
-| `ansible` | `migration/artifacts/ecosystem/ansible/http` |
-| `bazelmodules` | `migration/artifacts/ecosystem/bazelmodules/http` |
-| `bower` | `migration/artifacts/ecosystem/bower/http` |
-| `cargo` | `migration/artifacts/ecosystem/cargo/http` |
-| `chef` | `migration/artifacts/ecosystem/chef/http`, `test/server/artifacts/chef` |
-| `cocoapods` | `migration/artifacts/ecosystem/cocoapods/http` |
-| `composer` | `migration/artifacts/ecosystem/composer/http` |
-| `conan` | `migration/artifacts/ecosystem/conan/http`, `test/server/artifacts/conan` |
-| `conda` | `migration/artifacts/ecosystem/conda/http`, `test/server/artifacts/conda` |
-| `cran` | `migration/artifacts/ecosystem/cran/http`, `test/server/artifacts/cran` |
-| `debian` | `migration/artifacts/ecosystem/debian/http`, `test/server/artifacts/debian` |
-| `docker` | `migration/artifacts/ecosystem/docker/http`, `test/server/artifacts/docker` |
-| `gems` | `migration/artifacts/ecosystem/gems/http`, `test/server/artifacts/gems` |
-| `gitlfs` | `migration/artifacts/ecosystem/gitlfs/http` |
-| `golang` | `migration/artifacts/ecosystem/golang/http`, `test/server/artifacts/golang` |
-| `helm` | `migration/artifacts/ecosystem/helm/http`, `test/server/artifacts/helm` |
+| `agentplugins` | `internal/artifacts/ecosystem/agentplugins/http`, `test/server/artifacts/agentplugins` |
+| `aieditorextensions` | `internal/artifacts/ecosystem/aieditorextensions/http` |
+| `alpine` | `internal/artifacts/ecosystem/alpine/http` |
+| `ansible` | `internal/artifacts/ecosystem/ansible/http` |
+| `bazelmodules` | `internal/artifacts/ecosystem/bazelmodules/http` |
+| `bower` | `internal/artifacts/ecosystem/bower/http` |
+| `cargo` | `internal/artifacts/ecosystem/cargo/http` |
+| `chef` | `internal/artifacts/ecosystem/chef/http`, `test/server/artifacts/chef` |
+| `cocoapods` | `internal/artifacts/ecosystem/cocoapods/http` |
+| `composer` | `internal/artifacts/ecosystem/composer/http` |
+| `conan` | `internal/artifacts/ecosystem/conan/http`, `test/server/artifacts/conan` |
+| `conda` | `internal/artifacts/ecosystem/conda/http`, `test/server/artifacts/conda` |
+| `cran` | `internal/artifacts/ecosystem/cran/http`, `test/server/artifacts/cran` |
+| `debian` | `internal/artifacts/ecosystem/debian/http`, `test/server/artifacts/debian` |
+| `docker` | `internal/artifacts/ecosystem/docker/http`, `test/server/artifacts/docker` |
+| `gems` | `internal/artifacts/ecosystem/gems/http`, `test/server/artifacts/gems` |
+| `gitlfs` | `internal/artifacts/ecosystem/gitlfs/http` |
+| `golang` | `internal/artifacts/ecosystem/golang/http`, `test/server/artifacts/golang` |
+| `helm` | `internal/artifacts/ecosystem/helm/http`, `test/server/artifacts/helm` |
 | `helmoci` | `test/server/artifacts/helmoci` |
-| `hex` | `migration/artifacts/ecosystem/hex/http`, `test/server/artifacts/hex` |
-| `huggingface` | `migration/artifacts/ecosystem/huggingface/http`, `test/server/artifacts/huggingface` |
-| `jetbrainsplugins` | `migration/artifacts/ecosystem/jetbrainsplugins/http` |
-| `luarocks` | `migration/artifacts/ecosystem/luarocks/http` |
-| `machinelearning` | `migration/artifacts/ecosystem/machinelearning/http` |
-| `maven` | `migration/artifacts/ecosystem/maven/http`, `test/server/artifacts/maven` |
-| `nimmodel` | `migration/artifacts/ecosystem/nimmodel/http` |
-| `nix` | `migration/artifacts/ecosystem/nix/http`, `test/server/artifacts/nix` |
-| `npm` | `migration/artifacts/ecosystem/npm/http`, `test/server/artifacts/npm` |
-| `nuget` | `migration/artifacts/ecosystem/nuget/http`, `test/server/artifacts/nuget` |
-| `opkg` | `migration/artifacts/ecosystem/opkg/http`, `test/server/artifacts/opkg` |
-| `p2` | `migration/artifacts/ecosystem/p2/http`, `test/server/artifacts/p2` |
-| `pub` | `migration/artifacts/ecosystem/pub/http` |
-| `puppet` | `migration/artifacts/ecosystem/puppet/http`, `test/server/artifacts/puppet` |
-| `pypi` | `migration/artifacts/ecosystem/pypi/http`, `test/server/artifacts/pypi` |
-| `rpm` | `migration/artifacts/ecosystem/rpm/http`, `test/server/artifacts/rpm` |
-| `skills` | `migration/artifacts/ecosystem/skills/http` |
-| `swift` | `migration/artifacts/ecosystem/swift/http` |
-| `terraform` | `migration/artifacts/ecosystem/terraform/http`, `test/server/artifacts/terraform` |
-| `terraformbackend` | `migration/artifacts/ecosystem/terraformbackend/http`, `test/server/artifacts/terraformbackend` |
-| `vagrant` | `migration/artifacts/ecosystem/vagrant/http` |
-| `vcs` | `migration/artifacts/ecosystem/vcs/http`, `test/server/artifacts/vcs` |
-| `shared` | `migration/access/adapters/http`, `migration/app`, `migration/artifacts/adapters/http`, `migration/artifacts/adapters/http/itemkit`, `migration/artifacts/adapters/http/pkgroute`, `migration/configuration/adapters/http`, `test/server/access`, `test/server/artifacts`, `test/server/artifacts/generic`, `test/server/configuration` |
+| `hex` | `internal/artifacts/ecosystem/hex/http`, `test/server/artifacts/hex` |
+| `huggingface` | `internal/artifacts/ecosystem/huggingface/http`, `test/server/artifacts/huggingface` |
+| `jetbrainsplugins` | `internal/artifacts/ecosystem/jetbrainsplugins/http` |
+| `luarocks` | `internal/artifacts/ecosystem/luarocks/http` |
+| `machinelearning` | `internal/artifacts/ecosystem/machinelearning/http` |
+| `maven` | `internal/artifacts/ecosystem/maven/http`, `test/server/artifacts/maven` |
+| `nimmodel` | `internal/artifacts/ecosystem/nimmodel/http` |
+| `nix` | `internal/artifacts/ecosystem/nix/http`, `test/server/artifacts/nix` |
+| `npm` | `internal/artifacts/ecosystem/npm/http`, `test/server/artifacts/npm` |
+| `nuget` | `internal/artifacts/ecosystem/nuget/http`, `test/server/artifacts/nuget` |
+| `opkg` | `internal/artifacts/ecosystem/opkg/http`, `test/server/artifacts/opkg` |
+| `p2` | `internal/artifacts/ecosystem/p2/http`, `test/server/artifacts/p2` |
+| `pub` | `internal/artifacts/ecosystem/pub/http` |
+| `puppet` | `internal/artifacts/ecosystem/puppet/http`, `test/server/artifacts/puppet` |
+| `pypi` | `internal/artifacts/ecosystem/pypi/http`, `test/server/artifacts/pypi` |
+| `rpm` | `internal/artifacts/ecosystem/rpm/http`, `test/server/artifacts/rpm` |
+| `skills` | `internal/artifacts/ecosystem/skills/http` |
+| `swift` | `internal/artifacts/ecosystem/swift/http` |
+| `terraform` | `internal/artifacts/ecosystem/terraform/http`, `test/server/artifacts/terraform` |
+| `terraformbackend` | `internal/artifacts/ecosystem/terraformbackend/http`, `test/server/artifacts/terraformbackend` |
+| `vagrant` | `internal/artifacts/ecosystem/vagrant/http` |
+| `vcs` | `internal/artifacts/ecosystem/vcs/http`, `test/server/artifacts/vcs` |
+| `shared` | `internal/access/adapters/http`, `internal/app`, `internal/artifacts/adapters/http`, `internal/artifacts/adapters/http/itemkit`, `internal/artifacts/adapters/http/pkgroute`, `internal/configuration/adapters/http`, `test/server/access`, `test/server/artifacts`, `test/server/artifacts/generic`, `test/server/configuration` |
 
 A narrow PR for a format runs the owner's packages, the packages of the format's
 code that the selector's format table names, and the shared tests that
 `format_dependencies` lists for it. Docker's also runs
-`test/server/artifacts/helmoci` and `migration/artifacts/ecosystem/nimmodel/http`,
+`test/server/artifacts/helmoci` and `internal/artifacts/ecosystem/nimmodel/http`,
 which exercise the same registry protocol stack. No format owns the generic
 remote repository, so `test/server/artifacts/generic` is shared and runs in the
 full profile only.
@@ -121,7 +121,7 @@ shared server code, authentication, routing, stores or registrations.
 ## Shared guard dependencies
 
 Some tests in shared directories exercise one format's code: whole-router guards
-in `migration/app` that hold a format's rows or call its rules, and module suites
+in `internal/app` that hold a format's rows or call its rules, and module suites
 that use a format's fixtures. `format_dependencies` lists them by repository
 path, and in each shared directory a narrow PR runs only the `TestUnit` and
 `TestAcc` entry points of the files listed for its format:
@@ -129,22 +129,22 @@ path, and in each shared directory a narrow PR runs only the `TestUnit` and
 | Format | Listed shared tests | What they cover |
 | --- | --- | --- |
 | `agentpackages`, `agentplugins`, `hex`, `luarocks`, `nimmodel` | `test/server/artifacts/repositories_format_class_test.go` | The repository classes each of these formats accepts |
-| `cargo` | `migration/app/spec_test.go` | The specification checks, among them that every Cargo operation the package router owns is served |
-| `chef` | `migration/app/status_chef_test.go` | Chef's rows of the status table and route matrix |
-| `composer` | `migration/app/server_test.go` | The whole-router checks, among them that the native Composer routes avoid the handwritten stubs |
-| `cran` | `migration/app/status_cran_archive_test.go` | The CRAN archive rows of the status table and route matrix |
-| `docker` | `migration/app/registry_shared_test.go` | The registry's refusal of a request without a permission decider, and the content type that the shared middleware keeps |
-| `helm` | `migration/app/reindex_internal_test.go`, `test/server/artifacts/reindex_test.go`, `test/server/artifacts/sidecar_rights_test.go` | Reindex and its refusals, and the rights a copy of a chart's sidecar needs |
-| `huggingface` | `migration/app/status_huggingface_xet_test.go` | The statuses of the Xet routes |
-| `machinelearning` | `migration/app/status_machinelearning_test.go` | The machine learning rows of the status table and route matrix |
+| `cargo` | `internal/app/spec_test.go` | The specification checks, among them that every Cargo operation the package router owns is served |
+| `chef` | `internal/app/status_chef_test.go` | Chef's rows of the status table and route matrix |
+| `composer` | `internal/app/server_test.go` | The whole-router checks, among them that the native Composer routes avoid the handwritten stubs |
+| `cran` | `internal/app/status_cran_archive_test.go` | The CRAN archive rows of the status table and route matrix |
+| `docker` | `internal/app/registry_shared_test.go` | The registry's refusal of a request without a permission decider, and the content type that the shared middleware keeps |
+| `helm` | `internal/app/reindex_internal_test.go`, `test/server/artifacts/reindex_test.go`, `test/server/artifacts/sidecar_rights_test.go` | Reindex and its refusals, and the rights a copy of a chart's sidecar needs |
+| `huggingface` | `internal/app/status_huggingface_xet_test.go` | The statuses of the Xet routes |
+| `machinelearning` | `internal/app/status_machinelearning_test.go` | The machine learning rows of the status table and route matrix |
 | `maven` | `test/server/artifacts/searches_upstream_test.go`, `test/server/artifacts/searches_upstream_mapped_test.go` | Upstream search and cache mapping with Maven coordinates |
-| `nix` | `migration/app/status_nix_test.go` | Nix's rows of the status table and route matrix |
-| `npm` | `migration/app/error_profiles_p8_test.go` | Error envelope selection, whose rules call npm's path predicates |
+| `nix` | `internal/app/status_nix_test.go` | Nix's rows of the status table and route matrix |
+| `npm` | `internal/app/error_profiles_p8_test.go` | Error envelope selection, whose rules call npm's path predicates |
 | `nuget` | `test/server/artifacts/repositories_test.go` | Repository configuration, with NuGet contexts |
-| `puppet` | `migration/app/status_puppet_test.go` | Puppet's rows of the status table and route matrix |
-| `pypi` | `migration/app/reindex_internal_test.go`, `test/server/artifacts/reindex_test.go` | Reindex and its refusals |
+| `puppet` | `internal/app/status_puppet_test.go` | Puppet's rows of the status table and route matrix |
+| `pypi` | `internal/app/reindex_internal_test.go`, `test/server/artifacts/reindex_test.go` | Reindex and its refusals |
 | `terraform` | `test/server/access/keypairs_test.go`, `test/server/access/permissions_test.go`, `test/server/artifacts/storage_list_test.go` | The key pair, permission and storage list APIs with Terraform fixtures |
-| `vcs` | `migration/app/vcs_tables_test.go` | The VCS REST rows of the status table and route matrix |
+| `vcs` | `internal/app/vcs_tables_test.go` | The VCS REST rows of the status table and route matrix |
 
 Six of these files hold only a format's rows: `status_chef_test.go`,
 `status_cran_archive_test.go`, `status_machinelearning_test.go`,
@@ -160,7 +160,7 @@ in the inventory.
 
 ## Moving a root test
 
-When a test file leaves a shared directory such as `migration/app` on its own:
+When a test file leaves a shared directory such as `internal/app` on its own:
 
 1. Remove its name from that directory's `shared_files` list. When the list is
    empty and no tests remain there, remove the key and its `packages` entry.

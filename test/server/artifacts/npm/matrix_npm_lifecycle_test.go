@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
-	npmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	npmfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/npm"
 )
 
 // npmLifecycleMatrixPart is the matrix's share for npm dist-tag, deprecate

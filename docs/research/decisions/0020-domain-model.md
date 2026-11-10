@@ -33,9 +33,9 @@ and external integration contracts. Existing tables alone do not prove a service
 - **One internal representation per entity.** Each entity has one Go type in the
   `core/model` package of the module that owns it (domain) that carries every field any
   wire form needs, in the type the server reasons with (booleans as `bool`, sizes as
-  `int64`, times as `time.Time`). Wire forms live only in `migration/kernel/wire` and are
+  `int64`, times as `time.Time`). Wire forms live only in `internal/kernel/wire` and are
   produced and consumed by converters; no handler or store touches a wire struct directly.
-  `migration/artifacts/api/repo` is the existing instance of this rule for repositories
+  `internal/artifacts/api/repo` is the existing instance of this rule for repositories
   and stays the model for that entity.
 - **Wire quirks are preserved by the converters, never by the domain.** Booleans
   accepted as strings, `size` as a decimal string, `lastDownloaded` as epoch

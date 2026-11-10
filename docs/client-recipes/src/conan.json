@@ -63,7 +63,7 @@
       ]
     },
     {
-      "path": "migration/access/core/authn/token.go",
+      "path": "internal/access/core/authn/token.go",
       "contains": [
         "A Basic user name must name the token's subject",
         "password of a Basic credential"

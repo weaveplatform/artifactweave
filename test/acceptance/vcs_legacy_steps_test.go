@@ -13,7 +13,7 @@ import (
 
 	"github.com/cucumber/godog"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
 )
 
 func (w *world) registerVCSLegacy(sc *godog.ScenarioContext) {
@@ -121,7 +121,7 @@ func (w *world) vcsLegacyUpstream(provider, visibility, marker string) error {
 }
 
 func (w *world) vcsLegacyContent(marker string) error {
-	root := filepath.Join(repoRoot, "migration/artifacts/ecosystem/vcs/http/testdata")
+	root := filepath.Join(repoRoot, "internal/artifacts/ecosystem/vcs/http/testdata")
 	manifest, err := os.ReadFile(filepath.Join(root, "git-archives.json"))
 	if err != nil {
 		return err
@@ -202,7 +202,7 @@ func (w *world) vcsLegacyFault(kind, fault string) error {
 		data, err := os.ReadFile(
 			filepath.Join(
 				repoRoot,
-				"migration/artifacts/ecosystem/vcs/http/testdata/refreshed-vcs-archive.tar.gz",
+				"internal/artifacts/ecosystem/vcs/http/testdata/refreshed-vcs-archive.tar.gz",
 			),
 		)
 		if err != nil {

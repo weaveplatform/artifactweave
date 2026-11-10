@@ -8,18 +8,18 @@
 # Golden XML, such as Maven metadata, is compared byte for byte on every OS.
 *.xml text eol=lf
 # PyPI HTML goldens assert the exact response bytes on every OS.
-migration/artifacts/ecosystem/pypi/http/testdata/*.html text eol=lf
+internal/artifacts/ecosystem/pypi/http/testdata/*.html text eol=lf
 # Schema goldens are compared with the migrated schema byte for byte on every OS.
-migration/app/adapters/sql/sqlite/testdata/schema.golden text eol=lf
-migration/app/adapters/sql/postgres/testdata/schema.golden text eol=lf
+internal/app/adapters/sql/sqlite/testdata/schema.golden text eol=lf
+internal/app/adapters/sql/postgres/testdata/schema.golden text eol=lf
 # The config validate goldens are compared with Config.String byte for byte on
 # every OS.
-migration/app/config/testdata/*.golden.yaml text eol=lf
+internal/app/config/testdata/*.golden.yaml text eol=lf
 # Opkg Packages records require a blank line after the final stanza.
-migration/artifacts/ecosystem/opkg/testdata/openwrt-Packages text eol=lf whitespace=-blank-at-eof
+internal/artifacts/ecosystem/opkg/testdata/openwrt-Packages text eol=lf whitespace=-blank-at-eof
 # Nix cache text is native protocol data; CRLF is not a valid field delimiter.
 *.narinfo text eol=lf
-migration/artifacts/ecosystem/nix/testdata/cache/nix-cache-info text eol=lf
+internal/artifacts/ecosystem/nix/testdata/cache/nix-cache-info text eol=lf
 # txtar fixture archives: a file marker line that ends in CRLF is not a
 # marker, so a CRLF checkout on Windows would parse as an archive with no files.
 *.txtar text eol=lf

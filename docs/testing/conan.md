@@ -53,8 +53,8 @@ source policy. Local and remote/virtual protocol, uncommitted revision and
 generic-upload boundary tests are in
 `test/server/artifacts/conan/conan_test.go`. Unit
 tests for paths, manifests, metadata and archive safety live in
-`migration/artifacts/ecosystem/conan` and
-`migration/artifacts/ecosystem/conan/http`. The production source/cache test
+`internal/artifacts/ecosystem/conan` and
+`internal/artifacts/ecosystem/conan/http`. The production source/cache test
 in `test/server/artifacts/conan/conan_remote_test.go` covers remote fetch, cache-only reads,
 offline reads, integrity failures, cache exclusion and same-origin redirects.
 

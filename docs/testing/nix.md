@@ -89,7 +89,7 @@ Manage; virtual reindex is rejected. Normal item reindex APIs also apply.
 store. They verify signatures, reject an incorrect trusted key, resolve an
 ordered V, and substitute R again after the origin stops with offline enabled.
 The committed NAR fixture was produced by the same pinned native client; its
-[provenance](../../migration/artifacts/ecosystem/nix/testdata/README.md) records the command.
+[provenance](../../internal/artifacts/ecosystem/nix/testdata/README.md) records the command.
 Unit and package acceptance tests exercise malformed metadata and NARs, hashes,
 signing failures, source failures, authority changes, permission denials,
 virtual routing, generic admission and lifecycle contracts across store backends.

@@ -20,12 +20,12 @@ func TestUnitReverseClosureIncludesTransitiveProductionConsumers(t *testing.T) {
 		base + "format/maven": nil,
 	}
 	got := reverseClosure(graph, []string{staged + "npm"}, "npm")
-	for _, want := range []string{"./migration/artifacts/ecosystem/npm", "./migration/artifacts/ecosystem/npm/http", "./migration/app"} {
+	for _, want := range []string{"./internal/artifacts/ecosystem/npm", "./internal/artifacts/ecosystem/npm/http", "./internal/app"} {
 		if !slices.Contains(got, want) {
 			t.Errorf("reverse closure omitted %s: %v", want, got)
 		}
 	}
-	if slices.Contains(got, "./migration/artifacts/ecosystem/maven") {
+	if slices.Contains(got, "./internal/artifacts/ecosystem/maven") {
 		t.Fatal("unrelated format selected")
 	}
 }
@@ -45,9 +45,9 @@ func TestUnitReverseClosureCarriesFormatChangesThroughAppConfig(t *testing.T) {
 	}
 	got := reverseClosure(graph, []string{staged + "npm"}, "npm")
 	want := []string{
-		"./migration/app",
-		"./migration/app/config",
-		"./migration/artifacts/ecosystem/npm",
+		"./internal/app",
+		"./internal/app/config",
+		"./internal/artifacts/ecosystem/npm",
 	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("reverse closure = %v, want %v", got, want)
@@ -78,7 +78,7 @@ func TestUnitActualNPMReverseDependencies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"./migration/artifacts/ecosystem/npm", "./migration/artifacts/ecosystem/npm/http", "./migration/app"} {
+	for _, want := range []string{"./internal/artifacts/ecosystem/npm", "./internal/artifacts/ecosystem/npm/http", "./internal/app"} {
 		if !slices.Contains(got, want) {
 			t.Errorf("actual import graph omitted %s: %v", want, got)
 		}
@@ -104,17 +104,17 @@ func TestUnitImportGraphIncludesStagedPackages(t *testing.T) {
 		}
 		return source
 	}
-	write("migration/artifacts/ecosystem/npm/npm.go", imports("npm"))
-	write("migration/artifacts/ecosystem/npm/http/routes.go",
-		imports("npmhttp", "migration/artifacts/ecosystem/npm"))
+	write("internal/artifacts/ecosystem/npm/npm.go", imports("npm"))
+	write("internal/artifacts/ecosystem/npm/http/routes.go",
+		imports("npmhttp", "internal/artifacts/ecosystem/npm"))
 	write("internal/artifacts/ecosystem/npm/npm.go",
-		imports("npm", "migration/artifacts/ecosystem/npm"))
-	write("migration/app/router.go", imports("app", "migration/artifacts/ecosystem/npm/http"))
-	write("cmd/artifactweave/main.go", imports("main", "migration/app"))
-	write("migration/artifacts/ecosystem/pypi/pypi.go", imports("pypi"))
+		imports("npm", "internal/artifacts/ecosystem/npm"))
+	write("internal/app/router.go", imports("app", "internal/artifacts/ecosystem/npm/http"))
+	write("cmd/artifactweave/main.go", imports("main", "internal/app"))
+	write("internal/artifacts/ecosystem/pypi/pypi.go", imports("pypi"))
 	// The go command builds neither of these, so their imports are not edges.
 	write("migration/.staging/stale.go", imports("stale", "migration/missing"))
-	write("migration/artifacts/ecosystem/npm/testdata/fixture.go",
+	write("internal/artifacts/ecosystem/npm/testdata/fixture.go",
 		imports("fixture", "migration/missing"))
 	graph, err := sourceImportGraph(root)
 	if err != nil {
@@ -125,7 +125,7 @@ func TestUnitImportGraphIncludesStagedPackages(t *testing.T) {
 	) {
 		t.Fatalf("composition root's staged import was not recorded: %q", got)
 	}
-	for _, pkg := range []string{"migration/.staging", "migration/artifacts/ecosystem/npm/testdata"} {
+	for _, pkg := range []string{"migration/.staging", "internal/artifacts/ecosystem/npm/testdata"} {
 		if _, ok := graph[modulePath+"/"+pkg]; ok {
 			t.Errorf("graph includes unbuilt package %s", pkg)
 		}
@@ -133,18 +133,18 @@ func TestUnitImportGraphIncludesStagedPackages(t *testing.T) {
 	got := reverseClosure(graph, []string{modulePath + "/migration/artifacts/ecosystem/npm"}, "npm")
 	want := []string{
 		"./internal/artifacts/ecosystem/npm",
-		"./migration/app",
-		"./migration/artifacts/ecosystem/npm",
-		"./migration/artifacts/ecosystem/npm/http",
+		"./internal/app",
+		"./internal/artifacts/ecosystem/npm",
+		"./internal/artifacts/ecosystem/npm/http",
 	}
-	// migration/app imports an npm package but belongs to no format, so the
+	// internal/app imports an npm package but belongs to no format, so the
 	// closure stops there and never reaches cmd.
 	if !slices.Equal(got, want) {
 		t.Fatalf("staged reverse closure = %q, want %q", got, want)
 	}
-	write("migration/app/missing.go", imports("app", "migration/artifacts/missing"))
+	write("internal/app/missing.go", imports("app", "internal/artifacts/missing"))
 	if _, err := sourceImportGraph(root); err == nil ||
-		!strings.Contains(err.Error(), "migration/artifacts/missing") {
+		!strings.Contains(err.Error(), "internal/artifacts/missing") {
 		t.Fatalf("missing staged import did not fail closed: %v", err)
 	}
 }

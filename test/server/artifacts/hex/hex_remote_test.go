@@ -7,14 +7,14 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
-	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	artmodel "github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	hexfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/hex"
-	"github.com/weaveplatform/artifactweave/migration/platform/keymaterial"
-	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	hexfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/hex"
+	"github.com/weaveplatform/artifactweave/internal/platform/keymaterial"
+	"github.com/weaveplatform/artifactweave/internal/platform/testkit/repopath"
 )
 
 type hexSource func(context.Context, source.Request, source.Permit) (source.Result, error)
@@ -51,7 +51,7 @@ func TestUnitHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 		Repository: "hexpm",
 		Releases:   []hexfmt.Package{pkg, denied},
 	}
-	ectoArchive := repopath.Read(t, "migration/artifacts/ecosystem/hex/testdata/ecto-3.12.5.tar")
+	ectoArchive := repopath.Read(t, "internal/artifacts/ecosystem/hex/testdata/ecto-3.12.5.tar")
 	ecto, err := hexfmt.InspectTarball(bytes.NewReader(ectoArchive))
 	if err != nil {
 		t.Fatal(err)
@@ -448,5 +448,5 @@ func TestUnitHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 
 func mustReadHexFixture(t *testing.T) []byte {
 	t.Helper()
-	return repopath.Read(t, "migration/artifacts/ecosystem/hex/testdata/decimal-2.0.0.tar")
+	return repopath.Read(t, "internal/artifacts/ecosystem/hex/testdata/decimal-2.0.0.tar")
 }

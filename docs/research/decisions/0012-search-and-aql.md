@@ -23,7 +23,7 @@ queries. P19/P41 retain the live-comparison obligations.
 
 ## Decision
 
-`migration/artifacts/core/aql` is a parser for the AQL grammar in
+`internal/artifacts/core/aql` is a parser for the AQL grammar in
 [02-artifactory-core-api-inventory](../02-artifactory-core-api-inventory.md) and a
 compiler to SQL per dialect.
 
@@ -331,7 +331,7 @@ store's search, and render their documented response shapes (research 22 §2), i
   since these responses have no `range` to report it.
 
 **Layout searches.** GAVC, versions and latest version read Maven coordinates from each
-file's path through its repository's layout (`migration/artifacts/core/layout`), so Maven, Gradle,
+file's path through its repository's layout (`internal/artifacts/core/layout`), so Maven, Gradle,
 Ivy, sbt and custom layouts follow one rule.
 - **Which files.** Files only, descriptors such as POMs included, in repositories whose layout
   defines the organisation, module and base revision tokens. A layout that does not compile
@@ -666,7 +666,7 @@ live Artifactory ([#216](https://github.com/weaveplatform/artifactweave/issues/2
 - CLI-generated queries captured as fixtures and replayed, including `download_remote` for
   a remote's cache, and shared cases for remote, cache, nested and cyclic virtual keys
   under every operator.
-- Shared build fixtures (`migration/artifacts/core/aql/aqltest`) for every relation path
+- Shared build fixtures (`internal/artifacts/core/aql/aqltest`) for every relation path
   in both directions, the CLI's `--build` query shapes, and the `builds` and
   `build.promotions` domains, with identical ordered rows from the reference evaluator,
   the in-memory store, SQLite and PostgreSQL.
@@ -677,13 +677,13 @@ live Artifactory ([#216](https://github.com/weaveplatform/artifactweave/issues/2
   and `jf rt del` pass it over.
 - Shared cases for `@` and `@*`, of an item (`aqltest.Cases`) and of related rows and runs
   (`aqltest.RelatedCases`), on the reference evaluator and every store, beside a sort and
-  beside an `@<key>` include, and `migration/artifacts/core/aql` and server tests that an
+  beside an `@<key>` include, and `internal/artifacts/core/aql` and server tests that an
   item's statistics record without the included values renders no `stats`
   ([#506](https://github.com/weaveplatform/artifactweave/issues/506)).
 - Shared related-include cases (`aqltest.RelatedCases`) whose nested rows, loaded from each
   store through `aql.AQLSource`, render as the reference corpus's, the properties and
   statistics of related rows and a run's own properties included;
-  `migration/artifacts/core/aql` tests pin the nesting, the criteria it shares, the
+  `internal/artifacts/core/aql` tests pin the nesting, the criteria it shares, the
   folding, the key filter, visibility and the budget, and server tests the properties
   and statistics a non-admin and a build-scoped token see.
 - Parser tests for the criteria list, the relative-time units and `item.infos`; server

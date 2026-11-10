@@ -3,7 +3,7 @@ package helm_test
 import (
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
 )
 
 var helmProtocolMatrixPart = matrixPart{

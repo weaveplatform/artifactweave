@@ -7,14 +7,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
-	hexfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/hex"
-	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	hexfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/hex"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
+	"github.com/weaveplatform/artifactweave/internal/platform/testkit/repopath"
 )
 
 func TestUnitHexLocalAndVirtualSignedRegistry(t *testing.T) {
@@ -34,7 +34,7 @@ func TestUnitHexLocalAndVirtualSignedRegistry(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	fixture := repopath.Read(t, "migration/artifacts/ecosystem/hex/testdata/decimal-2.0.0.tar")
+	fixture := repopath.Read(t, "internal/artifacts/ecosystem/hex/testdata/decimal-2.0.0.tar")
 	put := w.do(
 		http.MethodPut,
 		"/artifactory/hex-local/tarballs/decimal-2.0.0.tar",
@@ -158,7 +158,7 @@ func TestUnitHexLocalAndVirtualSignedRegistry(t *testing.T) {
 	}
 	// Registry indexes must reflect the readable packages after lifecycle
 	// operations, with duplicate virtual releases resolved by member order.
-	ecto := repopath.Read(t, "migration/artifacts/ecosystem/hex/testdata/ecto-3.12.5.tar")
+	ecto := repopath.Read(t, "internal/artifacts/ecosystem/hex/testdata/ecto-3.12.5.tar")
 	if put := w.do(http.MethodPut, "/artifactory/hex-local/tarballs/ecto-3.12.5.tar",
 		"admin", string(ecto)); put.Code != http.StatusCreated {
 		t.Fatalf("deploy Ecto %d: %s", put.Code, put.Body)
@@ -269,7 +269,7 @@ func TestUnitHexInvalidRoutesAndRepositoryConfigurationFailClosed(t *testing.T) 
 	}); err != nil {
 		t.Fatal(err)
 	}
-	fixture := repopath.Read(t, "migration/artifacts/ecosystem/hex/testdata/decimal-2.0.0.tar")
+	fixture := repopath.Read(t, "internal/artifacts/ecosystem/hex/testdata/decimal-2.0.0.tar")
 	upload, err := w.blobs.BeginUpload(t.Context())
 	if err != nil {
 		t.Fatal(err)
@@ -334,7 +334,7 @@ func TestUnitHexFederatedClassRefused(t *testing.T) {
 	if got.Code != http.StatusNotImplemented {
 		t.Fatalf("federated route %d: %s", got.Code, got.Body)
 	}
-	fixture := repopath.Read(t, "migration/artifacts/ecosystem/hex/testdata/decimal-2.0.0.tar")
+	fixture := repopath.Read(t, "internal/artifacts/ecosystem/hex/testdata/decimal-2.0.0.tar")
 	write := w.do(http.MethodPut, "/artifactory/hex-federated/tarballs/decimal-2.0.0.tar",
 		"admin", string(fixture))
 	if write.Code != http.StatusBadRequest {

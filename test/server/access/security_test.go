@@ -386,7 +386,7 @@ func TestAccAccessLockPolicyIsTheArtifactoryPolicies(t *testing.T) {
 // works. The base delay is raised from its default second so that a slow
 // run cannot outlast it, and the wait read back may have fallen by up to
 // nine seconds, so a loaded -race run does not fail on the clock;
-// migration/access/core/authn checks the delays themselves against a fake one.
+// internal/access/core/authn checks the delays themselves against a fake one.
 func TestAccLoginSuspension(t *testing.T) {
 	h := statusFixture(t, false)
 	if rec := do(t, h, http.MethodPut, "/access/api/v1/config/security/user_lock_policy",

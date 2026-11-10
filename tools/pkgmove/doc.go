@@ -17,7 +17,7 @@
 // # Role
 //
 // Command, with the repository tooling under tools/: not part of the server
-// binary. A thin main over migration/devtools/pkgmove, which holds the logic
+// binary. A thin main over internal/devtools/pkgmove, which holds the logic
 // and its tests. The impact job of the quality gate runs check.
 //
 // # Inputs
@@ -27,7 +27,7 @@
 //
 // # Outputs
 //
-//   - What migration/devtools/pkgmove writes, and its exit status.
+//   - What internal/devtools/pkgmove writes, and its exit status.
 //
 // # References
 //

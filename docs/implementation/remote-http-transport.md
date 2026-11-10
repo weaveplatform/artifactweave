@@ -1,6 +1,6 @@
 # Remote HTTP transport
 
-The shared HTTP client for P9 lives in `migration/artifacts/adapters/upstream`, the
+The shared HTTP client for P9 lives in `internal/artifacts/adapters/upstream`, the
 transport adapter behind core remote's `Upstream` port. It implements the transport
 portion of [#617](https://github.com/weaveplatform/artifactweave/issues/617); source
 authorization, durable cache decisions and native adapters remain separate layers.

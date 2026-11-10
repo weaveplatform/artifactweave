@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/app"
-	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/app"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
@@ -58,7 +58,7 @@ func artifactoryError(t *testing.T, rec *httptest.ResponseRecorder) (int, string
 }
 
 // remoteWorld is the harness's remote world under the fields the tests had
-// in migration/app: a test changes c and saves it with update, or replaces h
+// in internal/app: a test changes c and saves it with update, or replaces h
 // with a router built with other options.
 type remoteWorld struct {
 	t  *testing.T
