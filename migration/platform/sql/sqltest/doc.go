@@ -2,8 +2,8 @@
 // each dialect: RunModule hands the suite fresh databases, on SQLite in
 // memory and in a file and, when asked, on PostgreSQL, each migrated with the
 // module's streams alone. It also starts the one PostgreSQL server that a
-// test process shares, and holds the statements and checks that the SQL
-// fault tests share.
+// test process shares, holds the statements and checks that the SQL fault
+// tests share, and describes a database's schema for the golden files.
 //
 // # Role
 //
@@ -12,7 +12,8 @@
 // its SQLite runs, and its PostgreSQL run when it asks for one. Test files in
 // any module may import it (dependency rule 1); production code never does.
 // It imports the dialect layer, the SQLite and PostgreSQL drivers,
-// platform/crypt, testcontainers' PostgreSQL module and pkg/containertest.
+// platform/crypt, testcontainers' PostgreSQL module, pkg/containertest and
+// go-cmp.
 //
 // # Inputs
 //
@@ -20,7 +21,8 @@
 //     canonical module order; open, which builds the module's store over a
 //     dialect.Store; the suite; and the options WithPostgres and WithKeyring.
 //   - For OpenSQLite: the modules. For Reset: a database, its dialect and the
-//     modules whose tables to empty.
+//     modules whose tables to empty. For Schema: a database and its
+//     dialect's name; for SchemaGolden, also the golden file.
 //   - ARTIFACTWEAVE_TEST_POSTGRES_DSN, a PostgreSQL server to use in place of
 //     a container.
 //   - Driving: the module store suites from STO-12 to STO-18, and their fault
@@ -38,6 +40,11 @@
 //   - Reset: the tables of the given modules emptied.
 //   - Exec, Fails, Err, Err3, FailTrigger and DropTable: the fault-test
 //     helpers.
+//   - Schema, a description of every table, index, constraint and sequence
+//     and the row count of every table that holds rows, with
+//     ErrUnknownDialect; SchemaGolden, which compares it with a golden file,
+//     rewrites the file when asked, and proves that an added table changes
+//     the description.
 //
 // # Invariants
 //
@@ -67,6 +74,10 @@
 //     dropped, or a hook that fails, fails that test.
 //   - The fault statements are SQLite's: a PostgreSQL trigger runs a separate
 //     trigger function, so the fault tests that use FailTrigger run on SQLite.
+//   - Schema leaves out schema_migrations, whose shape the module streams
+//     change, and everything that differs between runs or hosts (object ids,
+//     SQLite root pages, the database's default collation), so two databases
+//     built by the same streams describe as the same string.
 //
 // # References
 //
@@ -90,7 +101,8 @@
 //
 // Implemented P2: the PostgreSQL server that the contract runs share, and
 // Reset (pull request 3). Staged in P9d: RunModule, OpenSQLite, ScratchDSN,
-// Reset over any modules and the fault-test helpers (issue 996).
+// Reset over any modules and the fault-test helpers (issue 996), and Schema
+// and SchemaGolden (issues 960 and 1098).
 //
 // # Testing
 //
@@ -106,4 +118,8 @@
 //     TestAccFaultHelpers cover the fault-test helpers.
 //   - The composite store's PostgreSQL runs, TestAccContract and
 //     TestAccKeyRotation among them, use PostgresDSN and Reset.
+//   - Schema and SchemaGolden are exercised by the composite store's
+//     TestAccSchemaGolden on SQLite and PostgreSQL, TestAccMigrationsUpDownUp
+//     and TestAccStreamsMigrateAlone, against the schema goldens beside the
+//     composite's dialect packages.
 package sqltest

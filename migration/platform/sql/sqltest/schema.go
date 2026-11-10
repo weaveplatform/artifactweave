@@ -23,7 +23,7 @@ const historyTable = "schema_migrations"
 // that holds rows. It leaves out every catalog object of schema_migrations,
 // whose shape the per-module migration streams change.
 //
-// dialect is a sqlcommon.Dialect name, "sqlite" or "postgres"; any other
+// dialect is the Name of a dialect.Dialect, "sqlite" or "postgres"; any other
 // name returns ErrUnknownDialect. The description holds nothing that differs
 // between runs or hosts, such as object ids, SQLite root pages or the
 // database's default collation, so two databases built by the same schema
