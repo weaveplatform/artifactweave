@@ -15,7 +15,7 @@
 // Its Handler plugs into the item service through the format hooks
 // (decision 0032), so every write, download and delete in a repository of
 // the Maven group reaches it whichever API carried it. The Maven protocol
-// is still the root file internal/server/maven.go, which serves the
+// is still the root file migration/artifacts/ecosystem/maven/http/maven.go, which serves the
 // calculateMetadata and generatePom operations with this package. Its
 // upstream rules make a remote repository of the Maven group retrieve,
 // check and cache format-aware over core remote's shared retrieval and

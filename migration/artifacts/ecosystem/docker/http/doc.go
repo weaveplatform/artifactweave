@@ -30,7 +30,7 @@
 //     Challenge as middleware, and asks IsRegistryPath and
 //     ChallengesAnonymous while it authenticates, normalises content types
 //     and answers unimplemented operations; and the Docker REST endpoints
-//     (internal/server/docker_rest.go), which check image names with
+//     (migration/artifacts/ecosystem/docker/http/rest.go), which check image names with
 //     ValidName and find repositories with Lookup.
 //   - Driven: the item store (store.Store), which resolves repositories and
 //     reads items; the registry's writes (artifacts/core/registry), which

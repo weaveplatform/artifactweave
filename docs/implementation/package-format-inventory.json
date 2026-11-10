@@ -289,7 +289,7 @@
       "owner_issue": 0,
       "evidence": "test/acceptance/features/system_recipes.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
-      "route_file": "internal/server/maven.go",
+      "route_file": "migration/artifacts/ecosystem/maven/http/maven.go",
       "p9c": false
     },
     {
@@ -305,7 +305,7 @@
       "owner_issue": 0,
       "evidence": "test/acceptance/features/system_recipes.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
-      "route_file": "internal/server/maven.go",
+      "route_file": "migration/artifacts/ecosystem/maven/http/maven.go",
       "p9c": false
     },
     {
@@ -321,7 +321,7 @@
       "owner_issue": 0,
       "evidence": "test/acceptance/features/maven.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
-      "route_file": "internal/server/maven.go",
+      "route_file": "migration/artifacts/ecosystem/maven/http/maven.go",
       "p9c": false
     },
     {
@@ -465,7 +465,7 @@
       "owner_issue": 0,
       "evidence": "test/acceptance/features/sbt.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
-      "route_file": "internal/server/maven.go",
+      "route_file": "migration/artifacts/ecosystem/maven/http/maven.go",
       "p9c": false
     },
     {
@@ -770,7 +770,7 @@
       "owner_issue": 0,
       "evidence": "test/acceptance/features/agent_plugins_clients.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
-      "route_file": "internal/server/agentplugins.go",
+      "route_file": "migration/artifacts/ecosystem/agentplugins/http/agentplugins.go",
       "p9c": false
     },
     {

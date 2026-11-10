@@ -1,4 +1,4 @@
-package server
+package agentpluginshttp
 
 import (
 	"net/http"

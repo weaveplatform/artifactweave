@@ -13,7 +13,7 @@
 // manifest index and marketplace files of the Agent Plugins slice. Its
 // Handler plugs into the item service through the format hooks (decision
 // 0032). The slice has no protocol package yet: the root file
-// internal/server/agentplugins.go serves the marketplace files with
+// migration/artifacts/ecosystem/agentplugins/http/agentplugins.go serves the marketplace files with
 // Marketplace.
 //
 // # Inputs

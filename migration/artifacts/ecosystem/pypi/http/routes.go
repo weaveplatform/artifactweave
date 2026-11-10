@@ -1,4 +1,4 @@
-package server
+package pypihttp
 
 import (
 	"context"

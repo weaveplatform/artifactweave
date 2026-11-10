@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
+	npmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm/http"
 	terraformhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/http"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -20,7 +21,7 @@ var errorProfileRules = []httpkit.ProfileRule{
 	{Match: pathPrefix("/xray/"), Profile: apierror.ProfileXray},
 	{
 		Match: func(path string) bool {
-			return NPMOperation(path) || IsNPMReindex(path) ||
+			return npmhttp.NPMOperation(path) || npmhttp.IsNPMReindex(path) ||
 				terraformhttp.IsTerraformReindex(path)
 		},
 		Profile: apierror.ProfileArtifactory,

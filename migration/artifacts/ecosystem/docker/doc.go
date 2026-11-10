@@ -28,7 +28,7 @@
 //     which name upload paths and digest folders, find blobs, manifests and
 //     referrers, set a stored manifest's properties and apply Max Unique
 //     Tags and Tag Retention (Retained, Manifests); the Docker REST
-//     endpoints (internal/server/docker_rest.go), which check a promotion's
+//     endpoints (migration/artifacts/ecosystem/docker/http/rest.go), which check a promotion's
 //     tag; the registry source service the application builds over the
 //     shared policy of registry remotes, whose upstream fetches and cache
 //     uploads RegistryContent serves once installed, and whose reads it

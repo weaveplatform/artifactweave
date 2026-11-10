@@ -127,7 +127,10 @@ func TestUnitOwnershipV2RejectsInvalidInventories(t *testing.T) {
 				"migration/app":   {"router_test.go"},
 			},
 			FormatDependencies: map[string][]string{
-				"npm": {"internal/server/npm_auth_paths_test.go", "migration/app/router_test.go"},
+				"npm": {
+					"migration/artifacts/ecosystem/npm/http/login_test.go",
+					"migration/app/router_test.go",
+				},
 				// A non-shared package owner may hold dependencies before the
 				// formats map knows it.
 				"widget": {"migration/app/router_test.go"},
@@ -208,8 +211,8 @@ func TestUnitOwnershipV2RejectsInvalidInventories(t *testing.T) {
 		}, "is not a listed shared test"},
 		{"duplicate dependency", func(o *testOwnership) {
 			o.FormatDependencies["npm"] = []string{
-				"internal/server/npm_auth_paths_test.go",
-				"internal/server/npm_auth_paths_test.go",
+				"migration/artifacts/ecosystem/npm/http/login_test.go",
+				"migration/artifacts/ecosystem/npm/http/login_test.go",
 			}
 		}, "duplicate format dependency"},
 	} {
@@ -279,10 +282,10 @@ func TestUnitSharedFilesFollowRootTestMoves(t *testing.T) {
 		}},
 		FormatDependencies: map[string][]string{
 			"docker": {"internal/server/registry_shared_test.go"},
-			"npm":    {"internal/server/npm_auth_paths_test.go"},
+			"npm":    {"migration/artifacts/ecosystem/npm/http/login_test.go"},
 		},
 	})
-	owner, ok := serverTestOwner("internal/server/npm_auth_paths_test.go")
+	owner, ok := serverTestOwner("migration/artifacts/ecosystem/npm/http/login_test.go")
 	if !ok || owner != "shared" {
 		t.Fatalf("root test before the move = %q, %t", owner, ok)
 	}
@@ -316,11 +319,11 @@ func TestUnitSharedFilesFollowRootTestMoves(t *testing.T) {
 			t.Errorf("%s owner = %q, %t; want %q", file, owner, ok, want)
 		}
 	}
-	if _, ok := serverTestOwner("internal/server/npm_auth_paths_test.go"); ok {
+	if _, ok := serverTestOwner("migration/artifacts/ecosystem/npm/http/login_test.go"); ok {
 		t.Error("a test recreated under its old root name is classified without review")
 	}
 	for _, c := range []change{
-		{status: "M", path: "internal/server/npm_auth_paths_test.go"},
+		{status: "M", path: "migration/artifacts/ecosystem/npm/http/login_test.go"},
 		{status: "A", path: "test/server/artifacts/npm/new_test.go"},
 		{status: "R100", old: "internal/server/status_test.go", path: "test/server/artifacts/npm/status_test.go"},
 	} {

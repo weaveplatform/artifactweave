@@ -1,4 +1,4 @@
-package server
+package chefhttp
 
 import (
 	"net/http"
