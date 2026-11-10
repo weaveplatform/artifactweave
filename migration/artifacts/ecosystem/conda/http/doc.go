@@ -92,5 +92,5 @@
 //     bounds.
 //
 // The routes are also tested end to end from test/server/artifacts/conda
-// (conda_test.go) and from internal/app (conda_remote_test.go).
+// (conda_test.go) and from migration/app (conda_remote_test.go).
 package condahttp

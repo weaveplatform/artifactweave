@@ -9,7 +9,7 @@ import (
 // relative to the repository root, need a reviewed owner: server assembly
 // tests, the application tests and the HTTP adapter tests. P9d builds the
 // target tree under migration/ and then renames it to internal/ (decision
-// 0044), so each staged pattern accepts both roots; internal/app is the
+// 0044), so each staged pattern accepts both roots; migration/app is the
 // internal form of <root>/app. A directory that is not in clean form, such as
 // "test/server/artifacts/npm/", is never owned.
 func OwnedTestDir(dir string) bool {

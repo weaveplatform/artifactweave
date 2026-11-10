@@ -158,7 +158,7 @@
 //     and its boundaries, descriptor integrity and the foreign layer
 //     policy; remote_path_test.go: the parser's name grammar against the
 //     transport's.
-//   - internal/app's registry remote tests drive the remote rules through
+//   - migration/app's registry remote tests drive the remote rules through
 //     the application's wiring, and core remote's smart_registry_test.go
 //     gives Smart Remote this package's parser.
 //   - The registry protocol's tests (ecosystem/docker/http) and the guard

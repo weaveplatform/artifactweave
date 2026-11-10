@@ -130,7 +130,7 @@
 //     and access/api).
 //   - seed_test.go: TestUnitSeedInMemory, TestAccSeedSQLite,
 //     TestAccSeedPostgres, TestUnitSeedLosesARace and TestUnitSeedErrors,
-//     with a stand-in for the artifacts Repositories (internal/app's seed
+//     with a stand-in for the artifacts Repositories (migration/app's seed
 //     tests check the real one). The two acceptance tests seed the
 //     metadata store's SQLite and PostgreSQL stores; the PostgreSQL test
 //     needs Docker and skips without it.

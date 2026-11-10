@@ -211,7 +211,7 @@ func (t *tree) pathMap() []byte {
 
 // checkPromoted runs the stale check after promotion: every legacy path and
 // every staged path must be gone, except a legacy path that the promoted tree
-// holds again, as internal/app and internal/layout are both legacy and final
+// holds again, as migration/app and internal/layout are both legacy and final
 // paths.
 func (e *env) checkPromoted(t *tree) error {
 	if err := t.scan(); err != nil {

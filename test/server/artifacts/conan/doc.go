@@ -22,7 +22,7 @@
 //   - The Conan 2 and Conan 1 binaries named by ARTIFACTWEAVE_CONAN2_BIN and
 //     ARTIFACTWEAVE_CONAN1_BIN; TestAccConanClients skips a generation whose
 //     variable is unset. make conan-accept runs the TestAccConan tests here
-//     and in internal/app with coverage.
+//     and in migration/app with coverage.
 //
 // # Outputs
 //

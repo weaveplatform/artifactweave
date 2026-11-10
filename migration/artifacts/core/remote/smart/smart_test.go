@@ -865,7 +865,7 @@ func TestAccSmartStatusOmitsRepresentationsWithoutTheirItem(t *testing.T) {
 }
 
 // The application serves registry remotes with a second Smart whose jobs
-// carry the kind remote.smart.registry (internal/app), so Status reads a
+// carry the kind remote.smart.registry (migration/app), so Status reads a
 // registry remote's work under that kind.
 func TestAccSmartStatusFindsRegistryWorkUnderItsKind(t *testing.T) {
 	w := smartFixture(t)

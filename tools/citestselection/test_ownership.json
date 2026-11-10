@@ -1,9 +1,9 @@
 {
   "version": 2,
   "packages": {
-    "internal/app": "shared",
     "internal/server": "shared",
     "migration/access/adapters/http": "shared",
+    "migration/app": "shared",
     "migration/artifacts/adapters/http": "shared",
     "migration/artifacts/adapters/http/itemkit": "shared",
     "migration/artifacts/adapters/http/pkgroute": "shared",
@@ -76,33 +76,6 @@
     "test/server/configuration": "shared"
   },
   "shared_files": {
-    "internal/app": [
-      "access_test.go",
-      "app_test.go",
-      "blob_test.go",
-      "conan_client_test.go",
-      "conan_remote_test.go",
-      "conda_remote_test.go",
-      "descriptor_test.go",
-      "gc_test.go",
-      "hash_test.go",
-      "instance_test.go",
-      "mapped_remote_test.go",
-      "maven_remote_test.go",
-      "mirrors_test.go",
-      "nix_remote_test.go",
-      "nuget_reindex_test.go",
-      "puppet_remote_test.go",
-      "registry_remote_fault_test.go",
-      "registry_remote_test.go",
-      "remote_test.go",
-      "remote_wiring_test.go",
-      "runtime_test.go",
-      "seed_test.go",
-      "serverlog_test.go",
-      "state_test.go",
-      "store_test.go"
-    ],
     "internal/server": [
       "access_api_test.go",
       "access_identity_status_test.go",
@@ -149,6 +122,33 @@
       "permissions_fault_test.go",
       "roles_internal_test.go",
       "tokens_internal_test.go"
+    ],
+    "migration/app": [
+      "access_test.go",
+      "app_test.go",
+      "blob_test.go",
+      "conan_client_test.go",
+      "conan_remote_test.go",
+      "conda_remote_test.go",
+      "descriptor_test.go",
+      "gc_test.go",
+      "hash_test.go",
+      "instance_test.go",
+      "mapped_remote_test.go",
+      "maven_remote_test.go",
+      "mirrors_test.go",
+      "nix_remote_test.go",
+      "nuget_reindex_test.go",
+      "puppet_remote_test.go",
+      "registry_remote_fault_test.go",
+      "registry_remote_test.go",
+      "remote_test.go",
+      "remote_wiring_test.go",
+      "runtime_test.go",
+      "seed_test.go",
+      "serverlog_test.go",
+      "state_test.go",
+      "store_test.go"
     ],
     "migration/artifacts/adapters/http": [
       "aql_related_test.go",
@@ -267,14 +267,14 @@
       "internal/server/server_test.go"
     ],
     "conda": [
-      "internal/app/conda_remote_test.go"
+      "migration/app/conda_remote_test.go"
     ],
     "cran": [
       "internal/server/status_cran_archive_test.go"
     ],
     "docker": [
-      "internal/app/registry_remote_test.go",
-      "internal/server/registry_shared_test.go"
+      "internal/server/registry_shared_test.go",
+      "migration/app/registry_remote_test.go"
     ],
     "helm": [
       "internal/server/reindex_internal_test.go",
@@ -294,7 +294,7 @@
       "internal/server/status_machinelearning_test.go"
     ],
     "maven": [
-      "internal/app/maven_remote_test.go",
+      "migration/app/maven_remote_test.go",
       "test/server/artifacts/searches_upstream_mapped_test.go",
       "test/server/artifacts/searches_upstream_test.go"
     ],
@@ -302,19 +302,19 @@
       "test/server/artifacts/repositories_format_class_test.go"
     ],
     "nix": [
-      "internal/app/nix_remote_test.go",
-      "internal/server/status_nix_test.go"
+      "internal/server/status_nix_test.go",
+      "migration/app/nix_remote_test.go"
     ],
     "npm": [
       "internal/server/error_profiles_p8_test.go"
     ],
     "nuget": [
-      "internal/app/nuget_reindex_test.go",
+      "migration/app/nuget_reindex_test.go",
       "test/server/artifacts/repositories_test.go"
     ],
     "puppet": [
-      "internal/app/puppet_remote_test.go",
-      "internal/server/status_puppet_test.go"
+      "internal/server/status_puppet_test.go",
+      "migration/app/puppet_remote_test.go"
     ],
     "pypi": [
       "internal/server/reindex_internal_test.go",

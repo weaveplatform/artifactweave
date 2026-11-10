@@ -168,7 +168,7 @@ func TestUnitOwnershipV2RejectsInvalidInventories(t *testing.T) {
 			o.Packages["test/server/artifacts/npm"] = ""
 		}, "invalid test package owner"},
 		{"shared files without a package", func(o *testOwnership) {
-			o.SharedFiles["internal/app"] = []string{"app_test.go"}
+			o.SharedFiles["migration/app"] = []string{"app_test.go"}
 		}, "invalid shared test directory"},
 		{"shared files in a format package", func(o *testOwnership) {
 			o.SharedFiles["test/server/artifacts/npm"] = []string{"publish_test.go"}

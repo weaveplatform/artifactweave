@@ -19,7 +19,7 @@ func TestUnitReverseClosureIncludesTransitiveProductionConsumers(t *testing.T) {
 		base + "format/maven": nil,
 	}
 	got := reverseClosure(graph, []string{staged + "npm"}, "npm")
-	for _, want := range []string{"./migration/artifacts/ecosystem/npm", "./migration/artifacts/ecosystem/npm/http", "./internal/server", "./internal/app"} {
+	for _, want := range []string{"./migration/artifacts/ecosystem/npm", "./migration/artifacts/ecosystem/npm/http", "./internal/server", "./migration/app"} {
 		if !slices.Contains(got, want) {
 			t.Errorf("reverse closure omitted %s: %v", want, got)
 		}
@@ -53,7 +53,7 @@ func TestUnitActualNPMReverseDependencies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"./migration/artifacts/ecosystem/npm", "./migration/artifacts/ecosystem/npm/http", "./internal/server", "./internal/app"} {
+	for _, want := range []string{"./migration/artifacts/ecosystem/npm", "./migration/artifacts/ecosystem/npm/http", "./internal/server", "./migration/app"} {
 		if !slices.Contains(got, want) {
 			t.Errorf("actual import graph omitted %s: %v", want, got)
 		}
