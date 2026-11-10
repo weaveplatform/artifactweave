@@ -15,7 +15,7 @@ import (
 // suite sets. It is an alias, not a copy, so a suite's composite literals and
 // Tune functions name the type the router takes; WEB-22 points it at
 // app.RouterConfig.
-type Config = server.Config
+type Config = server.RouterConfig
 
 // Tune adjusts a Config before the router is built from it, for a suite that
 // needs another blob store, a logger it can read or an option turned on. It is
@@ -42,7 +42,7 @@ const DefaultRedirectTTL = itemkit.DefaultRedirectTTL
 // route, authentication and the middleware the server runs. Suites build the
 // router only through Router, so WEB-22 re-points this one call at
 // app.NewRouter.
-func Router(c Config) http.Handler { return server.New(c) }
+func Router(c Config) http.Handler { return server.NewRouter(c) }
 
 // RepoFile returns the absolute path of rel, a slash-separated path relative to
 // the repository root such as "api/access.openapi.yaml", and fails tb when rel

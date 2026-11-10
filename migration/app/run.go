@@ -30,7 +30,7 @@ const (
 
 // newHandler builds the HTTP handler. It is a variable so tests can run the
 // server lifecycle without the real router.
-var newHandler = server.New
+var newHandler = server.NewRouter
 
 // listen and drain are variables so tests can inject a broken listener and a
 // short drain without waiting ten seconds for a timeout.
@@ -89,7 +89,7 @@ func serve(
 	accessAPI, artifactsSettings := rt.modules.access.API(), cfg.Artifacts()
 	art := rt.modules.artifacts
 	srv := &http.Server{
-		Handler: newHandler(server.Config{
+		Handler: newHandler(server.RouterConfig{
 			RequestLimits: limits,
 			Keys:          rt.Keys,
 			BaseURL:       cfg.BaseURL,

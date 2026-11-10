@@ -15,5 +15,5 @@ var pkgtestMatrixPart = matrixPart{
 				holds("libs-local", "work/pkgtest.txt", types.ActionWrite), 201),
 		}
 	},
-	tune: func(c *Config) { c.Protocols = append(c.Protocols, pkgtestProtocol()) },
+	tune: func(c *RouterConfig) { c.Protocols = append(c.Protocols, pkgtestProtocol()) },
 }

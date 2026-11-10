@@ -22,12 +22,12 @@ var cranArchiveMatrixPart = matrixPart{
 			t.Fatal(err)
 		}
 	},
-	tune: func(c *Config) { c.CranArchiveMoverEnabled = true },
+	tune: func(c *RouterConfig) { c.CranArchiveMoverEnabled = true },
 }
 
 var cranArchiveStatusPart = statusPart{
 	generated: map[string]bool{cranArchiveRoute: true},
-	tune:      func(c *Config) { c.CranArchiveMoverEnabled = true },
+	tune:      func(c *RouterConfig) { c.CranArchiveMoverEnabled = true },
 	rows: func() []statusCase {
 		const base = "/artifactory/api/cran/"
 		const suffix = "/move-archives"

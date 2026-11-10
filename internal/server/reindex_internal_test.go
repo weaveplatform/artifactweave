@@ -92,7 +92,7 @@ func reindexWorld(
 ) (*itemWorld, *work.Queue) {
 	t.Helper()
 	var q *work.Queue
-	w := newItemWorld(t, false, func(cfg *Config) {
+	w := newItemWorld(t, false, func(cfg *RouterConfig) {
 		cfg.Formats = pick
 		if !queue {
 			return

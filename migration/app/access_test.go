@@ -19,10 +19,10 @@ import (
 // settings, and gives the same API to the router and to the Debian snapshot
 // work.
 func TestAccRuntimeAccessModule(t *testing.T) {
-	var router server.Config
+	var router server.RouterConfig
 	var snapshot *itemkit.Kit
 	origHandler, origSnapshot := newHandler, registerDebianSnapshotWork
-	newHandler = func(c server.Config) http.Handler {
+	newHandler = func(c server.RouterConfig) http.Handler {
 		router = c
 		return http.NotFoundHandler()
 	}

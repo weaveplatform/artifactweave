@@ -82,5 +82,5 @@ var pkgtestStatusPart = statusPart{
 			{pkgtestPut, pkgtestBase + "libs-local/files/pkgtest/bad;=v", "admin", "content", 400},
 		}
 	},
-	tune: func(c *Config) { c.Protocols = append(c.Protocols, pkgtestProtocol()) },
+	tune: func(c *RouterConfig) { c.Protocols = append(c.Protocols, pkgtestProtocol()) },
 }

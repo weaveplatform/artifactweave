@@ -18,7 +18,7 @@ import (
 
 func TestAccAPIRequestRates(t *testing.T) {
 	now := time.Date(2026, 10, 28, 12, 0, 15, 0, time.UTC)
-	w := newItemWorld(t, false, func(c *Config) {
+	w := newItemWorld(t, false, func(c *RouterConfig) {
 		o := apilimit.Default()
 		o.PrincipalPerMinute, o.GlobalPerMinute = 2, 3
 		var err error
@@ -60,7 +60,7 @@ func TestAccAPIRequestRates(t *testing.T) {
 }
 
 func TestAccAPIUnauthenticatedBudget(t *testing.T) {
-	w := newItemWorld(t, false, func(c *Config) {
+	w := newItemWorld(t, false, func(c *RouterConfig) {
 		o := apilimit.Default()
 		o.AuthenticationPerMinute = 1
 		var err error
@@ -95,7 +95,7 @@ func (unavailableBudget) Take(context.Context, store.BudgetRequest) (store.Budge
 }
 
 func TestAccAPIBudgetBackendFailure(t *testing.T) {
-	w := newItemWorld(t, false, func(c *Config) {
+	w := newItemWorld(t, false, func(c *RouterConfig) {
 		var err error
 		c.RequestLimits, err = apilimit.New(
 			unavailableBudgetStore{c.Store},
@@ -122,7 +122,7 @@ func TestAccAPIConcurrencyCancellation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := requestLimiter{cfg: Config{Store: st, RequestLimits: limits}}
+	s := requestLimiter{cfg: RouterConfig{Store: st, RequestLimits: limits}}
 	router := chi.NewRouter()
 	router.Use(s.limitIngress(newLimitOptions(limits)), s.limitPrincipal(newLimitOptions(limits)))
 	entered := make(chan string, 4)

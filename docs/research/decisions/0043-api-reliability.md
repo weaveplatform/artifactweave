@@ -115,7 +115,7 @@ and offset APIs retain their existing envelopes and complete result semantics.
 
 The application enables admission controls by default. They apply to the HTTP
 boundary, including native protocols and generated stubs. Embedders opt in with
-`server.Config.RequestLimits`. `api.enabled=false` disables request budgeting,
+`server.RouterConfig.RequestLimits`. `api.enabled=false` disables request budgeting,
 not administrative restrictions. Health probes bypass admission. The existing
 request-body, upload, archive, AQL and outgoing-source limits remain in force.
 

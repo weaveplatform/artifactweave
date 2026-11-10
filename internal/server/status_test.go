@@ -265,7 +265,7 @@ func sinkStatusRows() []statusCase {
 // "pw"), and the repositories the rows use.
 // Each row that changes state uses keys no other row touches, so the rows
 // run in any order against one store.
-func statusFixture(t *testing.T, anonymous bool, tune ...func(*Config)) http.Handler {
+func statusFixture(t *testing.T, anonymous bool, tune ...func(*RouterConfig)) http.Handler {
 	t.Helper()
 	h, _ := newStatusFixture(t, anonymous, tune...)
 	return h
@@ -276,7 +276,7 @@ func statusFixture(t *testing.T, anonymous bool, tune ...func(*Config)) http.Han
 func newStatusFixture(
 	t *testing.T,
 	anonymous bool,
-	tune ...func(*Config),
+	tune ...func(*RouterConfig),
 ) (http.Handler, statusSecrets) {
 	t.Helper()
 	ctx := context.Background()
@@ -354,7 +354,7 @@ func newStatusFixture(
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := Config{
+	cfg := RouterConfig{
 		CompatVersion: "7.155.0", Store: db, Blobs: blobs, Auth: a, PasswordHash: testHash,
 		Keys:   support.TerraformBackendKeys(t),
 		Tokens: tokens,
@@ -370,7 +370,7 @@ func newStatusFixture(
 	for _, f := range tune {
 		f(&cfg)
 	}
-	return New(cfg), secrets
+	return NewRouter(cfg), secrets
 }
 
 // multipartStatusRows covers the JFrog CLI multipart upload routes. Only

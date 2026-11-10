@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -23,6 +22,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 type fixture struct {
@@ -33,7 +33,7 @@ type fixture struct {
 	server *httptest.Server
 }
 
-func newFixture(t *testing.T, class repo.Class, configure ...func(*server.Config)) *fixture {
+func newFixture(t *testing.T, class repo.Class, configure ...func(*harness.Config)) *fixture {
 	t.Helper()
 	db := inmem.New()
 	b, err := fs.New(t.TempDir())
@@ -50,11 +50,11 @@ func newFixture(t *testing.T, class repo.Class, configure ...func(*server.Config
 		c:     c,
 		items: &item.Service{Store: db, Blobs: b, Formats: ecosystem.For},
 	}
-	config := server.Config{Store: db, Blobs: b}
+	config := harness.Config{Store: db, Blobs: b}
 	for _, apply := range configure {
 		apply(&config)
 	}
-	h := server.New(config)
+	h := harness.Router(config)
 	authorize := accesstest.Over(t, db).Middleware(t, true, func(r *http.Request) kernel.Principal {
 		name := r.Header.Get("X-User")
 		if name == "" {

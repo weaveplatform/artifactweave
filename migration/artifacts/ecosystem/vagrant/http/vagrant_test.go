@@ -17,7 +17,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -27,6 +26,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 const base = "/artifactory/api/vagrant/boxes/"
@@ -63,8 +63,8 @@ func newFixture(t *testing.T, class repo.Class) *fixture {
 	if err := db.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
-	router := server.New(
-		server.Config{
+	router := harness.Router(
+		harness.Config{
 			Store:   faults,
 			Blobs:   blobs,
 			BaseURL: "https://public.example",

@@ -80,7 +80,7 @@ func (reindexFake) ReindexPath(context.Context, format.Env, repo.Config, string)
 
 // withReindexFakes gives each P8 package type whose format is still the
 // generic one reindexFake. A type whose own format has landed keeps it.
-func withReindexFakes(c *Config) {
+func withReindexFakes(c *RouterConfig) {
 	next := c.Formats
 	if next == nil {
 		next = c.FormatSettings.For

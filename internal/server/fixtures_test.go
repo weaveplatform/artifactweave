@@ -96,7 +96,7 @@ const anonymousRemotes = "anonymous-remotes"
 
 // newItemWorld builds the world; tune adjusts the router's configuration,
 // for tests that need another blob store or a logger they can read.
-func newItemWorld(t *testing.T, anonymous bool, tune ...func(*Config)) *itemWorld {
+func newItemWorld(t *testing.T, anonymous bool, tune ...func(*RouterConfig)) *itemWorld {
 	t.Helper()
 	ctx := context.Background()
 	db := inmem.New()
@@ -165,7 +165,7 @@ func newItemWorld(t *testing.T, anonymous bool, tune ...func(*Config)) *itemWorl
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := Config{
+	cfg := RouterConfig{
 		BaseURL: "https://reg.example", CompatVersion: "7.155.0",
 		Store: db, Blobs: storageSigner(fsBlobs), Auth: a,
 	}
@@ -173,7 +173,7 @@ func newItemWorld(t *testing.T, anonymous bool, tune ...func(*Config)) *itemWorl
 		f(&cfg)
 	}
 	w := &itemWorld{t: t, db: db, blobs: cfg.Blobs}
-	w.h = New(cfg)
+	w.h = NewRouter(cfg)
 	return w
 }
 
@@ -256,7 +256,7 @@ func newRepoWorld(t *testing.T) *repoWorld {
 	w := &repoWorld{t: t, db: db, fail: map[string]bool{}}
 	w.remoteHTTP = new(upstream.Pool)
 	t.Cleanup(w.remoteHTTP.Close)
-	w.h = New(Config{
+	w.h = NewRouter(RouterConfig{
 		BaseURL: "https://reg.example", CompatVersion: "7.155.0",
 		Store: faultyStore{Store: db, fail: w.fail}, Auth: a,
 		RemoteHTTP: w.remoteHTTP,
@@ -330,7 +330,9 @@ func newIdentityWorld(t *testing.T) identityWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := New(Config{CompatVersion: "7.155.0", Store: db, Auth: a, PasswordHash: testHash})
+	h := NewRouter(
+		RouterConfig{CompatVersion: "7.155.0", Store: db, Auth: a, PasswordHash: testHash},
+	)
 	return identityWorld{h: h, db: db, tokens: tokens}
 }
 
@@ -382,10 +384,10 @@ func (w identityWorld) bearer(t *testing.T, user string, scope string) map[strin
 
 var admin = basic("admin", "pw")
 
-// authorizerOver is the access module's Authorizer over st, as New binds it
-// for a Config whose Access is unset.
+// authorizerOver is the access module's Authorizer over st, as NewRouter
+// binds it for a RouterConfig whose Access is unset.
 func authorizerOver(st store.Store) accessapi.Authorizer {
-	return withAccess(Config{Store: st}).Access.Authorizer
+	return withAccess(RouterConfig{Store: st}).Access.Authorizer
 }
 
 func bearerAuth(token string) map[string]string {
@@ -1072,7 +1074,7 @@ func bearerFor(t *testing.T, tokens *token.Service, scope string) map[string]str
 // buildsAQLWorld is a router over a store with runs app/1, app/2 and
 // tool/1, each producing libs-local/app.jar, and a promotion of app/1. dev
 // may read libs-local and the builds under app/**; tokens can be issued.
-func buildsAQLWorld(t *testing.T, tune ...func(*Config)) (http.Handler, *token.Service) {
+func buildsAQLWorld(t *testing.T, tune ...func(*RouterConfig)) (http.Handler, *token.Service) {
 	t.Helper()
 	ctx := context.Background()
 	db := inmem.New()
@@ -1147,14 +1149,14 @@ func buildsAQLWorld(t *testing.T, tune ...func(*Config)) (http.Handler, *token.S
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := Config{
+	cfg := RouterConfig{
 		CompatVersion: "7.155.0", Store: db, Blobs: blobs, Auth: a, PasswordHash: testHash,
 		Tokens: tokens,
 	}
 	for _, f := range tune {
 		f(&cfg)
 	}
-	return New(cfg), tokens
+	return NewRouter(cfg), tokens
 }
 
 // searchWorld is an item world holding:
@@ -1166,7 +1168,7 @@ func buildsAQLWorld(t *testing.T, tune ...func(*Config)) (http.Handler, *token.S
 //   - up's cache cached.txt, created an hour ago and never downloaded.
 //
 // deployer reads libs-local only; anonymous, when on, reads up's cache.
-func searchWorld(t *testing.T, anonymous bool, tune ...func(*Config)) *itemWorld {
+func searchWorld(t *testing.T, anonymous bool, tune ...func(*RouterConfig)) *itemWorld {
 	t.Helper()
 	w := newItemWorld(t, anonymous, tune...)
 	w.put("/artifactory/other-local/org/b/lib-2.0.jar;team=edge", "jar")
@@ -1613,7 +1615,7 @@ func newXetWorld(t *testing.T) *itemWorld {
 	w := newItemWorld(
 		t,
 		false,
-		func(c *Config) { c.HuggingFaceXetEnabled = true; c.Keys = support.TerraformBackendKeys(t) },
+		func(c *RouterConfig) { c.HuggingFaceXetEnabled = true; c.Keys = support.TerraformBackendKeys(t) },
 	)
 	for _, c := range []repo.Config{{Key: "hf", Class: repo.Local, PackageType: repo.HuggingFaceML}, {Key: "hf-f", Class: repo.Federated, PackageType: repo.HuggingFaceML}, {Key: "hf-v", Class: repo.Virtual, PackageType: repo.HuggingFaceML, Repositories: []string{"hf"}, DefaultDeploymentRepo: "hf"}} {
 		if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {

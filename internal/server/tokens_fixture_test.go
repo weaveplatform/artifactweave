@@ -13,16 +13,16 @@ import (
 // Token lifecycle tests need real identities, permissions, signing keys and one
 // readable artifact. The route-status fixture also writes every package format,
 // which needlessly repeats archive/signature and filesystem sync work here.
-func tokenFixture(t *testing.T, tune ...func(*Config)) http.Handler {
+func tokenFixture(t *testing.T, tune ...func(*RouterConfig)) http.Handler {
 	t.Helper()
 	h, _ := newTokenFixture(t, tune...)
 	return h
 }
 
-func newTokenFixture(t *testing.T, tune ...func(*Config)) (http.Handler, statusSecrets) {
+func newTokenFixture(t *testing.T, tune ...func(*RouterConfig)) (http.Handler, statusSecrets) {
 	t.Helper()
 	var secrets statusSecrets
-	options := []func(*Config){func(c *Config) {
+	options := []func(*RouterConfig){func(c *RouterConfig) {
 		c.Tokens, secrets = seedTokens(t, c.Store)
 		var err error
 		c.Auth, err = authn.NewAuthenticator(c.Store.Users(), c.Store.Settings(), authn.Options{

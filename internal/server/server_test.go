@@ -27,8 +27,8 @@ import (
 const versionMediaType = "application/vnd.org.jfrog.artifactory.system.Version+json"
 
 func testHandler() http.Handler {
-	return New(
-		Config{
+	return NewRouter(
+		RouterConfig{
 			BaseURL:       "https://cfg.example.com",
 			CompatVersion: "7.155.0",
 			Revision:      "v0.1.0-3-gabc",
@@ -578,7 +578,7 @@ func errorProfileContentType(s apierror.Profile) string {
 
 func TestAccP8ProtocolPaths(t *testing.T) {
 	// A store with no repositories, so a mounted protocol finds none.
-	h := New(Config{CompatVersion: "7.155.0", Store: inmem.New()})
+	h := NewRouter(RouterConfig{CompatVersion: "7.155.0", Store: inmem.New()})
 	for _, c := range p8Paths {
 		t.Run(c.protocol, func(t *testing.T) {
 			rec := do(t, h, http.MethodGet, c.path, nil, "")
@@ -605,7 +605,7 @@ func TestAccP8ProtocolPaths(t *testing.T) {
 }
 
 func TestAccNativeComposerRoutesAvoidHandwrittenStubs(t *testing.T) {
-	h := New(Config{CompatVersion: "7.155.0", Store: inmem.New()})
+	h := NewRouter(RouterConfig{CompatVersion: "7.155.0", Store: inmem.New()})
 	for _, tc := range []struct{ method, path string }{
 		{http.MethodGet, "/artifactory/api/composer/missing/packages.json"},
 		{http.MethodGet, "/artifactory/api/composer/missing/p2/acme/widget.json"},
@@ -627,7 +627,7 @@ func TestAccNativeComposerRoutesAvoidHandwrittenStubs(t *testing.T) {
 
 func TestAccNewUsesConfiguredLogger(t *testing.T) {
 	var buf bytes.Buffer
-	h := New(Config{
+	h := NewRouter(RouterConfig{
 		CompatVersion: "7.155.0",
 		Logger:        slog.New(slog.NewJSONHandler(&buf, nil)),
 	})

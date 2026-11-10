@@ -72,7 +72,7 @@ func TestAccAPIReliabilityLedger(t *testing.T) {
 				switch {
 				case handwritten:
 					e.State = "partial: native dispatch; supported modes follow the contract"
-					e.Handler = "internal/server/server.go: New -> protocol/handwritten route"
+					e.Handler = "internal/server/server.go: NewRouter -> protocol/handwritten route"
 				case implemented[route] && hasHandler:
 					e.State, e.Handler, e.Calls = "implemented", h.Source, h.Calls
 					if apiReviewPartial(op) {
@@ -131,7 +131,7 @@ func TestAccAPIReliabilityLedger(t *testing.T) {
 	}
 	// Include every production alias/dispatch route, including native protocols
 	// absent from the seven generated contracts. Do not mount test-only pkgtest.
-	router := New(Config{}).(chi.Routes)
+	router := NewRouter(RouterConfig{}).(chi.Routes)
 	err := chi.Walk(
 		router,
 		func(method, path string, handler http.Handler, _ ...func(http.Handler) http.Handler) error {

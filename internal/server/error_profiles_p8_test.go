@@ -127,7 +127,7 @@ func TestAccHostRouteAuthentication(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := New(Config{
+	h := NewRouter(RouterConfig{
 		CompatVersion: "7.155.0", Store: db, Auth: a,
 		Protocols: []pkgroute.Protocol{hostFormat()},
 	})

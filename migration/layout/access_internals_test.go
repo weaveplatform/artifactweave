@@ -59,8 +59,8 @@ var accessInternalsAllowlist = []accessAllowance{
 	// principals and issue a token with them. TST-07 moved the remote suites
 	// out; no ticket removes these.
 	{"migration/app/*_test.go", "none: app's own tests"},
-	// The server-assembly harnesses fill server.Config.Auth and Tokens until
-	// WEB-22 composes the router from the access module.
+	// The server-assembly harnesses fill server.RouterConfig.Auth and
+	// Tokens until WEB-22 composes the router from the access module.
 	{"test/server/**", "WEB-22"},
 }
 

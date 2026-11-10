@@ -31,7 +31,7 @@ type limitOptions struct {
 	// instead of the shared limits, so that an administrator can still reach
 	// it when those are exhausted.
 	Recovery func(*http.Request) bool
-	// Limits is the request-limit service (Config.RequestLimits).
+	// Limits is the request-limit service (RouterConfig.RequestLimits).
 	Limits *apilimit.Service
 }
 
@@ -39,7 +39,7 @@ type limitOptions struct {
 // configuration rather than a handler partial's, because the resource
 // budgets charge projects and repositories of every module's routes.
 type requestLimiter struct {
-	cfg Config
+	cfg RouterConfig
 }
 
 // limitIngress admits each request to the process's concurrency and

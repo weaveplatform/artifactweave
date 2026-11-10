@@ -79,8 +79,8 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// Config is what the router needs from the application configuration.
-type Config struct {
+// RouterConfig is what the router needs from the application configuration.
+type RouterConfig struct {
 	// RequestLimits owns shared request rates and this process's concurrency
 	// permits. Nil disables limits for embedders; the application wires them.
 	RequestLimits *apilimit.Service
@@ -137,17 +137,17 @@ type Config struct {
 	// nil answers that API 501.
 	Tokens *token.Service
 	// Access is the access module's API, which app builds over Store, Auth
-	// and Tokens. When every contract in it is nil and Store is set, New
-	// binds one over those fields, with AllowBasicAuthTokens and
-	// GlobalEnvironmentLimit as its settings, so a Config built by hand, as
-	// tests build it, answers as the application's does. Without a store it
-	// stays zero.
+	// and Tokens. When every contract in it is nil and Store is set,
+	// NewRouter binds one over those fields, with AllowBasicAuthTokens and
+	// GlobalEnvironmentLimit as its settings, so a RouterConfig built by
+	// hand, as tests build it, answers as the application's does. Without a
+	// store it stays zero.
 	Access accessapi.API
 	// Configuration is the configuration module's API, through which PATCH
 	// /api/system/configuration applies the descriptor and the item routes
 	// read its minimum redirect size. When both its contracts are nil and
-	// Store is set, New binds one over Store and Access with the descriptor
-	// core, as it binds Access. Without a store it stays zero.
+	// Store is set, NewRouter binds one over Store and Access with the
+	// descriptor core, as it binds Access. Without a store it stays zero.
 	Configuration configapi.API
 	// AllowBasicAuthTokens lets a password sent with Basic create tokens
 	// through POST /access/api/v1/tokens (token.allow_basic_auth); the zero
@@ -218,7 +218,7 @@ type Config struct {
 // interface, which would leave the token endpoint registered with nothing to
 // sign: cfg.Access holds nil interfaces, never typed nils, and a nil
 // interface converts to a nil one, so they are assigned as they are.
-func newRegistry(cfg Config, kit *itemkit.Kit) *dockerhttp.Registry {
+func newRegistry(cfg RouterConfig, kit *itemkit.Kit) *dockerhttp.Registry {
 	o := dockerhttp.Options{
 		Sources:        cfg.RegistrySources,
 		Store:          cfg.Store,
@@ -262,8 +262,8 @@ func newRegistry(cfg Config, kit *itemkit.Kit) *dockerhttp.Registry {
 
 // withAccess returns cfg with Access bound over its store and services by
 // the access module when cfg sets a store and no contract of Access (see
-// Config.Access).
-func withAccess(cfg Config) Config {
+// RouterConfig.Access).
+func withAccess(cfg RouterConfig) RouterConfig {
 	if cfg.Store == nil || !accessUnset(cfg.Access) {
 		return cfg
 	}
@@ -299,7 +299,7 @@ func accessUnset(a accessapi.API) bool {
 // Configuration. It runs after withAccess: the descriptor checks the key
 // pairs and environments that repository entries name, and writes the
 // anonymous access setting, through cfg.Access.
-func withConfiguration(cfg Config) Config {
+func withConfiguration(cfg RouterConfig) RouterConfig {
 	if cfg.Store == nil || cfg.Configuration.Descriptor != nil ||
 		cfg.Configuration.System != nil {
 		return cfg
@@ -333,7 +333,7 @@ var overlays = []itemkit.Overlay{
 // overlays and the artifacts handlers' private predicate. The descriptor's
 // minimum redirect size comes from the configuration API's System: the
 // artifacts module may not import the configuration module's core.
-func kitDeps(cfg Config) itemkit.Deps {
+func kitDeps(cfg RouterConfig) itemkit.Deps {
 	d := itemkit.Deps{
 		Store:                          cfg.Store,
 		Blobs:                          cfg.Blobs,
@@ -358,10 +358,10 @@ func kitDeps(cfg Config) itemkit.Deps {
 
 // newKit returns the item kit over cfg (kitDeps), for the root's handlers
 // that need one without the artifacts partial.
-func newKit(cfg Config) *itemkit.Kit { return itemkit.New(kitDeps(cfg)) }
+func newKit(cfg RouterConfig) *itemkit.Kit { return itemkit.New(kitDeps(cfg)) }
 
 // artifactsDeps returns the artifacts handlers' dependencies from cfg.
-func artifactsDeps(cfg Config) artifactshttp.Deps {
+func artifactsDeps(cfg RouterConfig) artifactshttp.Deps {
 	return artifactshttp.Deps{
 		Deps:                        kitDeps(cfg),
 		Store:                       cfg.Store,
@@ -382,13 +382,13 @@ func artifactsDeps(cfg Config) artifactshttp.Deps {
 }
 
 // newArtifactoryAPI returns the artifacts partial over cfg, whose item kit
-// New hands to the ecosystem partials as well.
-func newArtifactoryAPI(cfg Config) artifactshttp.ArtifactoryAPI {
+// NewRouter hands to the ecosystem partials as well.
+func newArtifactoryAPI(cfg RouterConfig) artifactshttp.ArtifactoryAPI {
 	return artifactshttp.New(artifactsDeps(cfg))
 }
 
-// New returns the fully wired handler.
-func New(cfg Config) http.Handler {
+// NewRouter returns the fully wired handler.
+func NewRouter(cfg RouterConfig) http.Handler {
 	cfg = withConfiguration(withAccess(cfg))
 	logger := cfg.Logger
 	if logger == nil {

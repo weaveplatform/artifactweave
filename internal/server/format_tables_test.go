@@ -29,7 +29,7 @@ type statusPart struct {
 	// seed adds what the rows act on to the status fixture.
 	seed func(t *testing.T, db store.Store, blobs blob.Store)
 	// tune adjusts the fixture server's configuration.
-	tune func(*Config)
+	tune func(*RouterConfig)
 }
 
 // statusParts are the formats' shares of the status table.
@@ -50,7 +50,7 @@ type matrixPart struct {
 	// seed adds what the rows act on to each matrix fixture; a row's own
 	// seeder adds what it acts on for one principal.
 	seed func(t *testing.T, f *matrixFixture)
-	tune func(*Config)
+	tune func(*RouterConfig)
 }
 
 // matrixParts are the formats' shares of the matrix.

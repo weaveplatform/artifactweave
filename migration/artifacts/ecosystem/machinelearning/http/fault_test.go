@@ -7,11 +7,11 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 var errInjected = errors.New("injected model publication failure")
@@ -103,8 +103,8 @@ func (s faultyBlobs) Stat(ctx context.Context, hash string) (blob.Info, error) {
 	return s.Store.Stat(ctx, hash)
 }
 
-func withFault(f *fault) func(*server.Config) {
-	return func(c *server.Config) { c.Store = faultyStore{c.Store, f}; c.Blobs = faultyBlobs{c.Blobs, f} }
+func withFault(f *fault) func(*harness.Config) {
+	return func(c *harness.Config) { c.Store = faultyStore{c.Store, f}; c.Blobs = faultyBlobs{c.Blobs, f} }
 }
 
 func TestAccModelPublicationRollbackOnStorageFailure(t *testing.T) {

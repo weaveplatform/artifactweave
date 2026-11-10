@@ -19,19 +19,20 @@ type uncomparable struct {
 	f func()
 }
 
-// TestUnitWithAccess: New begins by binding the access module over a Config's
-// store and services when the caller set no contract of Access. A caller's
-// Access is kept as it is, and a Config without a store keeps a zero one.
+// TestUnitWithAccess: NewRouter begins by binding the access module over a
+// RouterConfig's store and services when the caller set no contract of
+// Access. A caller's Access is kept as it is, and a RouterConfig without a
+// store keeps a zero one.
 func TestUnitWithAccess(t *testing.T) {
 	ctx := t.Context()
-	empty := withAccess(Config{}).Access
+	empty := withAccess(RouterConfig{}).Access
 	if !accessUnset(empty) || empty.Settings != (accessapi.Settings{}) {
 		t.Errorf("without a store, Access = %+v; want it zero", empty)
 	}
 
 	st := inmem.New()
 	settings := accessapi.Settings{AllowBasicAuthTokens: true, GlobalEnvironmentLimit: 7}
-	bare := withAccess(Config{
+	bare := withAccess(RouterConfig{
 		Store: st, AllowBasicAuthTokens: true, GlobalEnvironmentLimit: 7,
 	}).Access
 	if bare.Authenticator != nil || bare.Tokens != nil {
@@ -67,7 +68,7 @@ func TestUnitWithAccess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	full := withAccess(Config{Store: st, Auth: a, Tokens: tokens}).Access
+	full := withAccess(RouterConfig{Store: st, Auth: a, Tokens: tokens}).Access
 	v := reflect.ValueOf(full)
 	for i := range v.NumField() {
 		f, name := v.Field(i), v.Type().Field(i).Name
@@ -85,12 +86,17 @@ func TestUnitWithAccess(t *testing.T) {
 		if accessUnset(one) {
 			t.Errorf("accessUnset ignores %s", name)
 		}
-		if got := withAccess(Config{Store: st, Access: one}).Access; !reflect.DeepEqual(got, one) {
+		if got := withAccess(
+			RouterConfig{Store: st, Access: one},
+		).Access; !reflect.DeepEqual(
+			got,
+			one,
+		) {
 			t.Errorf("withAccess replaced an Access that sets only %s", name)
 		}
 	}
 
-	kept := withAccess(Config{Store: st, Access: accessapi.API{
+	kept := withAccess(RouterConfig{Store: st, Access: accessapi.API{
 		Grants: uncomparable{Grants: &accessapitest.Grants{}},
 	}}).Access
 	if _, ok := kept.Grants.(uncomparable); !ok || kept.Authorizer != nil {

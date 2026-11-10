@@ -1665,7 +1665,7 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 		Hash: testHash, Tokens: tokens,
 	})
 	must(err)
-	cfg := Config{
+	cfg := RouterConfig{
 		CompatVersion: "7.155.0", Store: db, Blobs: blobs, Auth: a, PasswordHash: testHash,
 		Keys:   support.TerraformBackendKeys(t),
 		Tokens: tokens,
@@ -1679,7 +1679,7 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 			p.tune(&cfg)
 		}
 	}
-	f.h = New(cfg)
+	f.h = NewRouter(cfg)
 	f.secrets = secrets
 	return f
 }
