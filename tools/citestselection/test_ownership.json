@@ -8,6 +8,7 @@
     "migration/artifacts/adapters/http/itemkit": "shared",
     "migration/artifacts/adapters/http/pkgroute": "shared",
     "migration/artifacts/ecosystem/aieditorextensions/http": "aieditorextensions",
+    "migration/artifacts/ecosystem/alpine/http": "alpine",
     "migration/artifacts/ecosystem/ansible/http": "ansible",
     "migration/artifacts/ecosystem/bazelmodules/http": "bazelmodules",
     "migration/artifacts/ecosystem/bower/http": "bower",

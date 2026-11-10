@@ -143,6 +143,32 @@
 //     artifactory strict handler with the Debian partial alone.
 //   - debian_source_test.go: the kit's Debian source request checks a
 //     remote's packages and metadata.
+//   - debian_index_test.go: Packages and Sources indexes refused with a
+//     query, in a blacked-out repository or to a caller who may not read
+//     them; repositories that have no index; local index content that is a
+//     folder, unreadable or malformed; and remote indexes streamed, cached,
+//     over the size bound, or listing a package the source refuses or
+//     cannot check.
+//   - debian_virtual_test.go: virtual metadata refused, merged from the
+//     readable members, and failing closed on store faults, wrong member
+//     types and unusable signing keys; a remote member's Release and
+//     Packages through its source; and virtual packages served from the
+//     first member that holds them.
+//   - debian_operations_test.go: the rebuild that writes no properties, for
+//     an absent repository, an unreadable package and a queue that refuses
+//     it.
+//   - debian_snapshot_fault_test.go: snapshot requests and reads without a
+//     store or a caller, and requests whose caller's permissions cannot be
+//     read; queued snapshots over the work key bound or refused by the
+//     queue or their run; the work handler registered once and refusing
+//     jobs it cannot run; and claims and snapshots failing closed on store,
+//     blob and permission faults, Release declarations that do not parse,
+//     excluded packages, an unreadable InRelease and a package a remote
+//     source refuses.
+//
+// debian_index_test.go and debian_virtual_test.go serve their item GETs
+// through the kit with TryDebianItem as the only overlay
+// (overlay_fixture_test.go).
 //
 // The route suite test/server/artifacts/debian checks the snapshot reads'
 // guards through the router, and the @debian acceptance partition
