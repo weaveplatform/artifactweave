@@ -42,17 +42,18 @@ lane executes `^TestAcc`; native feature partitions execute the exact
 `TestAccFeatures` entry point and use godog tags to select format scenarios.
 The full core native job runs the other acceptance-harness `TestAcc` entry
 points once. The package selector uses reviewed ownership and the reverse
-import graph. In a shared directory of the [ownership inventory](server-test-ownership.md)
-(a `shared_files` key; today the mixed `migration/app` package among them),
-a narrow PR selects only entry points in the files that
-`format_dependencies` lists for the changed format. The impact job retains the exact
+import graph. In a shared directory of the [ownership inventory](server-test-ownership.md),
+one that is a `shared_files` key, a narrow PR selects only the entry points in
+the files that `format_dependencies` lists for the changed format. Today those
+files lie in `migration/app`, beside the router, and in the module suites
+`test/server/access` and `test/server/artifacts`. The impact job retains the exact
 selected test names as a `test-selection` artifact and reports selected and
 skipped lane reasons in its summary.
 
 The CI test selector reports the selected profile, changed paths and reasons in
 the job summary. The format profile combines reviewed test ownership with the
-current Go reverse import graph. It includes independent server test packages,
-root server and application tests that depend on the format, production importers, matching
+current Go reverse import graph. It includes the format's server test packages,
+the shared tests that `format_dependencies` lists for it, production importers, matching
 native acceptance tags and only their client inputs. Edits to registrations,
 package templates, test data, API generation, workflows, stores, auth or
 multiple owners run full. Deployment templates select the deployment checks.
@@ -264,7 +265,7 @@ assigns the missing behaviors to phases through P41.
 
 | Planned job | Phase | Intended checks |
 |---|---|---|
-| `acceptance-peers` | P13–P15 | Two or three `-cover` instances on separate ports and data directories for federated repository convergence, partitions and full sync (P13), Access Federation and topology (P14), and release bundle distribution to an edge (P15). Separate from `acceptance` to preserve the per-PR budget; its `cover-accept-peers` artifact and coverage/gate dependencies are added with the job |
+| `acceptance-peers` | P13 to P15 | Two or three `-cover` instances on separate ports and data directories for federated repository convergence, partitions and full sync (P13), Access Federation and topology (P14), and release bundle distribution to an edge (P15). Separate from `acceptance` to preserve the per-PR budget; its `cover-accept-peers` artifact and coverage/gate dependencies are added with the job |
 
 ## Public upstream conformance (P9)
 
@@ -1142,7 +1143,7 @@ signature committed in `deploy/ci/testdata/jfrog-providers`.
      checks. Sensitive repository values are redacted and persistent bytes contain no
      plaintext fixture credentials. A remote `terraformbackend` request must fail validation.
      Upstream URLs use the fixture server; this proves management only, with native content
-     evidence owned by #624–#633. Provider `artifactory_proxy` CRUD still requires P12/#303
+     evidence owned by #624 to #633. Provider `artifactory_proxy` CRUD still requires P12/#303
      XML descriptor reads; the fixture removes its proxy through PATCH after destroy.
 4. Require `terraform plan -detailed-exitcode` to exit 0.
 5. Destroy.
